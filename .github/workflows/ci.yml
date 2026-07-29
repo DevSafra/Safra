@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  # A newer push supersedes an in-flight run on the same ref.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Integration tests run against a real PostgreSQL. The behaviour they cover —
+    # exclusion constraints, upsert semantics, immutability triggers — cannot be
+    # exercised against a mock, so CI provisions the real thing.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: safra
+          POSTGRES_PASSWORD: safra
+          POSTGRES_DB: safra_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U safra"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://safra:safra@localhost:5432/safra_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm run format:check
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Migrate test database
+        run: pnpm run db:migrate
+
+      - name: Seed reference data
+        run: pnpm run db:seed
+
+      # Runs twice deliberately: migrations and seed must be idempotent, because
+      # every deploy re-applies them.
+      - name: Verify migrate + seed are idempotent
+        run: pnpm run db:migrate && pnpm run db:seed
+
+      - name: Test (including database integration tests)
+        run: pnpm exec vitest run
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.13.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Rule 1: dependencies are audited in CI. A known-vulnerable package must
+      # fail the build rather than appear in a report nobody reads.
+      - run: pnpm audit --audit-level=moderate
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: a secret committed and later removed is still a leak.
+          fetch-depth: 0
+      - name: Scan for committed secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
