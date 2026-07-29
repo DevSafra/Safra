@@ -29,3 +29,40 @@ END;
 $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION reset_booking_sequence_yearly() IS
   'Call from a scheduled job at 00:00 on 1 January for per-year booking numbering (SRS §6.5).';
+
+-- ----------------------------------------------------------------------------
+-- UUIDv7 generator, used as the DATABASE-level default for every primary key.
+--
+-- The application also generates v7 ids client-side (see _shared.ts primaryId),
+-- which avoids a round trip on inserts. This function is the safety net for every
+-- other writer: data migrations, admin SQL, bulk imports and test fixtures. Without
+-- it those all fail with "null value in column id", which is a footgun rather than
+-- a guard rail.
+--
+-- v7 rather than gen_random_uuid()'s v4 so SQL-side inserts keep the same
+-- index locality the application relies on. PostgreSQL 18 ships uuidv7()
+-- natively; this is the equivalent for 17.
+--
+-- Ordering is at MILLISECOND granularity, not strictly monotonic: the low 80 bits
+-- are random, so two ids minted in the same millisecond may sort either way.
+-- Verified: ordering holds across distinct milliseconds, which is all that index
+-- locality needs. Do not rely on this for sequencing — use created_at.
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION uuidv7() RETURNS uuid AS $$
+DECLARE
+  v_time_ms bigint;
+  v_bytes   bytea;
+BEGIN
+  v_time_ms := floor(extract(epoch FROM clock_timestamp()) * 1000)::bigint;
+
+  -- 48-bit big-endian millisecond timestamp, then 80 random bits.
+  v_bytes := substring(int8send(v_time_ms) FROM 3 FOR 6) || gen_random_bytes(10);
+
+  -- Version 7 in the high nibble of byte 6 (0x70).
+  v_bytes := set_byte(v_bytes, 6, (get_byte(v_bytes, 6) & 15) | 112);
+  -- RFC 4122 variant 0b10 in the top two bits of byte 8 (0x80).
+  v_bytes := set_byte(v_bytes, 8, (get_byte(v_bytes, 8) & 63) | 128);
+
+  RETURN encode(v_bytes, 'hex')::uuid;
+END;
+$$ LANGUAGE plpgsql VOLATILE;

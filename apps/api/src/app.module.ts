@@ -5,6 +5,8 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module.js';
 import { BookingsModule } from './bookings/bookings.module.js';
 import { DatabaseModule } from './database/database.module.js';
+import { SearchModule } from './search/search.module.js';
+import { SettingsModule } from './settings/settings.module.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
 import { PermissionsGuard } from './rbac/permissions.guard.js';
 
@@ -17,8 +19,10 @@ import { PermissionsGuard } from './rbac/permissions.guard.js';
      * is protected before anyone remembers to think about it.
      */
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
+    SettingsModule,
     AuthModule,
     BookingsModule,
+    SearchModule,
   ],
   providers: [
     // Order matters: throttling runs first (cheapest rejection), then

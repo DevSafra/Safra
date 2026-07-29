@@ -10,7 +10,12 @@ import { v7 as uuidv7 } from 'uuid';
 export const primaryId = () =>
   uuid('id')
     .primaryKey()
-    .$defaultFn(() => uuidv7());
+    // App-side generation avoids a round trip on every insert...
+    .$defaultFn(() => uuidv7())
+    // ...and the database default is the safety net for every OTHER writer: data
+    // migrations, admin SQL, bulk imports, test fixtures. Without it those fail
+    // with `null value in column "id"`. See migrations/pre/ for the function.
+    .default(sql`uuidv7()`);
 
 export const foreignId = (name: string) => uuid(name);
 

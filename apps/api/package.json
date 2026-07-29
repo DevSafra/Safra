@@ -9,7 +9,8 @@
     "start": "node dist/main.js",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "clean": "rm -rf dist *.tsbuildinfo"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.0",

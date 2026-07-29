@@ -15,7 +15,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "clean": "rm -rf dist",
+    "clean": "rm -rf dist *.tsbuildinfo",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/migrate.ts",
     "db:studio": "drizzle-kit studio",

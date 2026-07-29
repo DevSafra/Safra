@@ -3,7 +3,8 @@
   "compilerOptions": {
     "noEmit": false,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts"]
 }
