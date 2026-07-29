@@ -82,7 +82,20 @@ export const bookings = pgTable(
     // commission at any time; historical bookings and finished revenue reports
     // must not silently change when they do.
     baseAmount: money('base_amount').notNull(),
-    customerFeeRate: numeric('customer_fee_rate', { precision: 6, scale: 4 }).notNull(),
+    /**
+     * How the customer fee was calculated, snapshotted.
+     *
+     * The approved settings page charges the customer a FLAT $1.99 while the
+     * partner pays a 7% commission — the two sides use different units, so a
+     * single "rate" column could not represent both. `mode` + `value` records
+     * whichever was configured at booking time, so an admin switching from flat to
+     * percentage never rewrites the arithmetic of existing bookings.
+     */
+    customerFeeMode: text('customer_fee_mode').notNull().default('flat'),
+    customerFeeValue: numeric('customer_fee_value', {
+      precision: 12,
+      scale: 4,
+    }).notNull(),
     customerFeeAmount: money('customer_fee_amount').notNull(),
     partnerCommissionRate: numeric('partner_commission_rate', {
       precision: 6,

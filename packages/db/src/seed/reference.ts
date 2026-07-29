@@ -575,40 +575,75 @@ export const SETTINGS: {
   descriptionAr: string;
   descriptionEn: string;
 }[] = [
+  /**
+   * §3 P-005 and §2.1: every operational value the admin edits from the Rules
+   * Engine settings page, with the units that page shows.
+   *
+   * NOTE on the customer fee: it is a FLAT amount ($1.99), not a percentage. The
+   * approved settings screen labels it "رسوم ثابتة تضاف على كل حجز" (a fixed fee
+   * added to every booking), while only the PARTNER side is a 7% commission. An
+   * earlier reading of SRS §2.1 had both sides at 7%; the settings page is the
+   * authority and this is the corrected model.
+   *
+   * `customer_fee_mode` exists so the admin can switch to a percentage later
+   * without a deploy — bookings snapshot the mode and value they used, so history
+   * stays correct across a change.
+   */
   {
-    key: 'commission.customer_rate',
-    value: 0.07,
-    valueSchema: 'rate',
-    descriptionAr: 'نسبة رسوم الخدمة على العميل',
-    descriptionEn: 'Service fee rate charged to the customer (§2.1)',
+    key: 'commission.customer_fee_mode',
+    value: 'flat',
+    valueSchema: 'feeMode',
+    descriptionAr: 'طريقة حساب رسوم خدمة العميل',
+    descriptionEn: 'Customer fee mode: flat or percent',
+  },
+  {
+    key: 'commission.customer_fee_value',
+    value: 1.99,
+    valueSchema: 'money',
+    descriptionAr: 'رسوم خدمة العميل — رسوم ثابتة تضاف على كل حجز',
+    descriptionEn: 'Customer service fee, flat amount added to every booking',
   },
   {
     key: 'commission.partner_rate',
     value: 0.07,
     valueSchema: 'rate',
-    descriptionAr: 'نسبة العمولة على الشريك',
-    descriptionEn: 'Commission rate deducted from the partner (§2.1)',
+    descriptionAr: 'عمولة الشريك — تخصم من مستحقاته قبل التحويل',
+    descriptionEn: 'Partner commission, deducted before payout (§2.1)',
   },
   {
     key: 'booking.confirmation_window_minutes',
     value: 120,
     valueSchema: 'positiveInt',
-    descriptionAr: 'مهلة تأكيد الشريك بالدقائق',
+    descriptionAr: 'مهلة تأكيد الشريك (ساعتان)',
     descriptionEn: 'Partner confirmation SLA in minutes (§6.4)',
   },
   {
     key: 'booking.same_day_cutoff_hour',
     value: 17,
     valueSchema: 'hourOfDay',
-    descriptionAr: 'ساعة إغلاق حجوزات نفس اليوم',
+    descriptionAr: 'إغلاق حجز اليوم نفسه — بتوقيت المدينة',
     descriptionEn: 'Same-day booking cutoff, city-local (§5.3)',
   },
   {
-    key: 'partner.first_violation_fine_usd',
-    value: 10,
+    key: 'booking.pending_payment_timeout_minutes',
+    value: 30,
     valueSchema: 'positiveInt',
-    descriptionAr: 'غرامة أول مخالفة بالدولار',
-    descriptionEn: 'First no-response fine, credited to customer wallet (§6.4)',
+    descriptionAr: 'مهلة Pending Payment — يلغى الحجز تلقائياً إن لم يكتمل الدفع',
+    descriptionEn: 'Pending payment expiry; booking auto-cancels (EC-001)',
+  },
+  {
+    key: 'partner.first_violation_fine',
+    value: 10,
+    valueSchema: 'money',
+    descriptionAr: 'غرامة عدم الرد (أول مخالفة)',
+    descriptionEn: 'No-response fine, first violation (§6.4)',
+  },
+  {
+    key: 'wallet.sla_compensation',
+    value: 10,
+    valueSchema: 'money',
+    descriptionAr: 'تعويض محفظة العميل عند خيبة الأمل (P-007)',
+    descriptionEn: 'Customer wallet compensation on partner failure (P-007)',
   },
   {
     key: 'refund.minimum_percent',
