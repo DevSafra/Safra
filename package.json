@@ -8,7 +8,7 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "turbo run lint",
+    "lint": "eslint .",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:e2e": "turbo run test:e2e",
@@ -19,14 +19,17 @@
     "db:seed": "pnpm --filter @safra/db db:seed",
     "db:studio": "pnpm --filter @safra/db db:studio",
     "audit:deps": "pnpm audit --audit-level=moderate",
-    "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run audit:deps"
+    "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run audit:deps",
+    "lint:fix": "eslint . --fix"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.15.0",
     "eslint": "^9.30.0",
     "prettier": "^3.6.0",
     "turbo": "^2.5.0",
     "typescript": "^5.9.0",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^3.2.0"
   },
   "pnpm": {

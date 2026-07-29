@@ -44,7 +44,7 @@ describeIfDb('CalendarService.updateRange — field-level upsert semantics', () 
     db = createDatabase(DATABASE_URL as string, 2);
 
     // Audit writes are not what this test covers; a no-op keeps the fixture small.
-    const audit = { record: async () => undefined } as unknown as AuditService;
+    const audit = { record: () => Promise.resolve() } as unknown as AuditService;
     service = new CalendarService(db, audit);
 
     await seed(db);

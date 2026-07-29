@@ -178,7 +178,21 @@ function contextOf(request: Request): RequestContext {
   };
 }
 
+/**
+ * Reads the refresh cookie defensively.
+ *
+ * cookie-parser attaches `cookies` at runtime, so it is untyped as far as the
+ * Express types are concerned. Narrowing through `unknown` rather than asserting a
+ * shape means a malformed or absent jar yields undefined instead of leaking an
+ * `any` into the auth path.
+ */
 function readRefreshCookie(request: Request): string | undefined {
-  const cookies = (request as Request & { cookies?: Record<string, string> }).cookies;
-  return cookies?.[REFRESH_COOKIE_NAME];
+  const jar: unknown = (request as { cookies?: unknown }).cookies;
+
+  if (typeof jar !== 'object' || jar === null) {
+    return undefined;
+  }
+
+  const value = (jar as Record<string, unknown>)[REFRESH_COOKIE_NAME];
+  return typeof value === 'string' ? value : undefined;
 }

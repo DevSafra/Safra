@@ -1,0 +1,105 @@
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+
+/**
+ * Flat config, shared by every workspace package.
+ *
+ * The rules here are deliberately the ones that catch REAL defects rather than
+ * style preferences — Prettier already owns formatting, so anything a formatter
+ * can fix is off. Each block below states which project rule it serves.
+ */
+export default tseslint.config(
+  {
+    ignores: [
+      '**/dist/**',
+      '**/.next/**',
+      '**/.turbo/**',
+      '**/node_modules/**',
+      '**/migrations/**',
+      // The linter config cannot be type-checked against a tsconfig that does not
+      // include it, and linting the linter earns nothing.
+      'eslint.config.mjs',
+    ],
+  },
+
+  js.configs.recommended,
+
+  // Type-aware linting. Slower than the syntactic rules, and worth it: the checks
+  // that matter most here (floating promises, unsafe any) need type information.
+  ...tseslint.configs.recommendedTypeChecked,
+
+  {
+    languageOptions: {
+      parserOptions: {
+        // allowDefaultProject keeps root config files linted even though no
+        // tsconfig includes them.
+        projectService: {
+          allowDefaultProject: ['*.config.ts'],
+        },
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      // ── Correctness (rule 4) ────────────────────────────────────────────────
+      // An un-awaited promise in a booking or payment path silently loses work.
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/await-thenable': 'error',
+      // `return await` inside try/catch is required for the catch to fire.
+      '@typescript-eslint/return-await': ['error', 'in-try-catch'],
+
+      // ── No silent escape hatches (rule 4: "no `any`, no silenced errors") ───
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unsafe-assignment': 'error',
+      '@typescript-eslint/no-unsafe-member-access': 'error',
+      '@typescript-eslint/no-unsafe-call': 'error',
+      '@typescript-eslint/no-unsafe-return': 'error',
+      // A blanket ts-ignore hides exactly the errors strict mode exists to surface.
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        { 'ts-expect-error': 'allow-with-description', 'ts-ignore': true },
+      ],
+
+      // ── Dead code (rule 4) ──────────────────────────────────────────────────
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' },
+      ],
+
+      // ── Money safety ────────────────────────────────────────────────────────
+      // Amounts are numeric strings from the database; implicit coercion in a
+      // template is how "55.00" + 1 becomes "55.001".
+      '@typescript-eslint/restrict-plus-operands': 'error',
+      '@typescript-eslint/no-base-to-string': 'error',
+
+      // Type-only imports must be explicit, so decorator metadata is not stripped.
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports', fixStyle: 'separate-type-imports' },
+      ],
+
+      // console is fine in scripts and bootstrap; Nest's Logger is used in services.
+      'no-console': 'off',
+    },
+  },
+
+  // Tests assert on loosely-typed fixtures and stub services; the unsafe-* rules
+  // produce noise there without catching anything a failing test would not.
+  {
+    files: ['**/*.test.ts', '**/*.spec.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+
+  // Seed and migration scripts are one-shot CLI entry points.
+  {
+    files: ['packages/db/src/seed/**', 'packages/db/src/migrate.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+    },
+  },
+);
