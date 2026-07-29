@@ -1,0 +1,49 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Turborepo
+.turbo/
+
+# Test / coverage
+coverage/
+playwright-report/
+test-results/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Local database volumes
+docker/volumes/
+
+# Claude Code workspace — local only, never committed or pushed (Bashar, 2026-07-29).
+# Holds the project rules (.claude/CLAUDE.md) and decision records (.claude/memory/).
+# Consequence: these are NOT shared via the repo. Distribute them out of band.
+.claude/
+
+# Root CLAUDE.md only imports .claude/CLAUDE.md, which is ignored above — committing
+# it would leave a dangling reference in a fresh clone.
+CLAUDE.md

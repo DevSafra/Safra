@@ -1,0 +1,32 @@
+{
+  "name": "safra",
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,md,json,yaml,yml}\"",
+    "db:generate": "pnpm --filter @safra/db db:generate",
+    "db:migrate": "pnpm --filter @safra/db db:migrate",
+    "db:seed": "pnpm --filter @safra/db db:seed",
+    "db:studio": "pnpm --filter @safra/db db:studio",
+    "audit:deps": "pnpm audit --audit-level=moderate",
+    "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run audit:deps"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "eslint": "^9.30.0",
+    "prettier": "^3.6.0",
+    "turbo": "^2.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
