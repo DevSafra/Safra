@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // NestJS dependency injection reads parameter types at runtime, which needs
+    // both decorator flags. verbatimModuleSyntax is off here because it can elide
+    // imports that emitDecoratorMetadata still needs at runtime.
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "verbatimModuleSyntax": false,
+    "noEmit": true,
+    "types": ["node"],
+    "lib": ["ES2023"]
+  },
+  "include": ["src/**/*.ts"]
+}
