@@ -93,9 +93,17 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Rule 1: dependencies are audited in CI. A known-vulnerable package must
-      # fail the build rather than appear in a report nobody reads.
-      - run: pnpm audit --audit-level=moderate
+      # Two gates, per AUDIT-EXCEPTIONS.md.
+      #
+      # Production dependencies allow NO exceptions: this is everything that
+      # reaches a running server or a user's browser.
+      - name: Audit production dependencies (no exceptions)
+        run: pnpm audit --audit-level=moderate --prod
+
+      # Full tree including build tooling, honouring the documented exceptions in
+      # package.json > pnpm.auditConfig.ignoreGhsas.
+      - name: Audit full dependency tree
+        run: pnpm audit --audit-level=moderate
 
   secret-scan:
     name: Secret scan

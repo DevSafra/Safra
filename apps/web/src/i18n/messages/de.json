@@ -1,0 +1,114 @@
+{
+  "brand": {
+    "name": "SAFRA",
+    "latin": "سفرة",
+    "tagline": "Unterkünfte in der Levante · ab einer Nacht"
+  },
+  "nav": {
+    "home": "Startseite",
+    "stays": "Unterkünfte",
+    "partner": "Partner-Dashboard",
+    "admin": "Verwaltung",
+    "account": "Mein Konto",
+    "theme": "Design wechseln",
+    "language": "Sprache",
+    "currency": "Währung"
+  },
+  "home": {
+    "heroCountries": "Syrien · Jordanien · Libanon",
+    "heroTitle": "Ihre Nacht in der Levante beginnt mit SAFRA",
+    "heroSubtitle": "Hotels, möblierte Wohnungen, Villen, Bauernhöfe, Chalets und Camps",
+    "heroPromise": "Sie zahlen an SAFRA, und SAFRA begleitet Ihre Buchung bis zur Abreise. Support und Entschädigung sind unsere Verantwortung, nicht die der Unterkunft.",
+    "trustVerified": "Partner vor der Veröffentlichung geprüft",
+    "trustPayment": "Sie zahlen an SAFRA, nie an die Unterkunft",
+    "trustCompensation": "Automatische Entschädigung bei Enttäuschungen",
+    "destinationsTitle": "Reiseziele",
+    "destinationsSubtitle": "Städte, die mit Ihnen wach bleiben",
+    "typesTitle": "Arten von Unterkünften",
+    "typesSubtitle": "Vom Damaszener Hotel bis zum Camp unter den Sternen",
+    "howTitle": "So funktioniert die Buchung",
+    "howSubtitle": "Buchen bei SAFRA ist nicht sofort — und das ist Absicht",
+    "howBody": "Sie zahlen den vollen Betrag an SAFRA, und wir kontaktieren den Partner, um die Verfügbarkeit innerhalb von zwei Stunden zu bestätigen. Ohne Bestätigung: vollständige Rückerstattung plus Entschädigung in Ihrer Wallet.",
+    "pledgesTitle": "SAFRAs Versprechen",
+    "pledgesSubtitle": "Drei Zusagen, bei denen wir keine Kompromisse machen",
+    "pledge1Title": "Ihre Beziehung besteht zu SAFRA, nicht zur Unterkunft",
+    "pledge1Body": "Support, Zahlung, Beschwerden, Änderungen und Stornierungen laufen über SAFRA. Keine Telefonnummern vor der Buchungsbestätigung.",
+    "pledge2Title": "Vertrauen vor Menge",
+    "pledge2Body": "Keine Unterkunft wird veröffentlicht, bevor SAFRA Dokumente, Fotos und Adresse geprüft hat. Achten Sie auf das Abzeichen „Von SAFRA geprüft“.",
+    "pledge3Title": "Entschädigung, wenn wir Sie enttäuschen",
+    "pledge3Body": "Antwortet der Partner nicht rechtzeitig: Storno, vollständige Rückerstattung und automatische Entschädigung in Ihrer Wallet.",
+    "partnersTitle": "Für Partner",
+    "partnersSubtitle": "Listen Sie Ihr Hotel oder Ihr Haus auf SAFRA",
+    "partnersBody": "Ein kostenloses Verwaltungs-Dashboard, Kalender und Preise in Ihrer Hand, regelmäßige Überweisungen und nur {rate} Provision von Ihren Auszahlungen.",
+    "partnersCta": "Als Partner registrieren"
+  },
+  "search": {
+    "destination": "Reiseziel",
+    "destinationOptional": "Reiseziel (optional)",
+    "allCities": "Alle Städte",
+    "checkIn": "Anreise",
+    "checkOut": "Abreise",
+    "guests": "Gäste",
+    "guestsCount": "{count, plural, =1 {1 Erwachsener} other {# Gäste}}",
+    "attributes": "Reiseeigenschaften",
+    "submit": "Unterkünfte suchen",
+    "cutoffNotice": "Buchungen für heute sind geschlossen (nach {hour} Ortszeit der Stadt). Das erste verfügbare Datum ist {date}.",
+    "resultsTitle": "{count, plural, =0 {Keine Ergebnisse} =1 {1 Ergebnis} other {# Ergebnisse}}",
+    "noResults": "Keine passenden Unterkünfte",
+    "noResultsHint": "Erweitern Sie die Filter oder wählen Sie eine andere Stadt",
+    "sortLabel": "Sortierung",
+    "sortRecommended": "Von SAFRA empfohlen",
+    "sortPriceAsc": "Preis: aufsteigend",
+    "sortPriceDesc": "Preis: absteigend",
+    "sortRatingDesc": "Beste Bewertung"
+  },
+  "attributes": {
+    "sea": "Meer",
+    "mountain": "Berge",
+    "history": "Geschichte",
+    "nature": "Natur",
+    "families": "Familien",
+    "honeymoon": "Honeymoon",
+    "pool": "Pool",
+    "parking": "Parkplatz",
+    "internet": "Internet",
+    "business": "Business"
+  },
+  "cityCategories": {
+    "coastal": "Küste",
+    "mountain": "Berge",
+    "desert": "Wüste",
+    "historic": "Historisch"
+  },
+  "propertyTypes": {
+    "hotel": "Hotel",
+    "apartment": "Möblierte Wohnung",
+    "villa": "Villa",
+    "farm": "Bauernhof",
+    "chalet": "Chalet",
+    "rural_house": "Landhaus",
+    "camp": "Camp"
+  },
+  "property": {
+    "perNight": "/ Nacht",
+    "totalFor": "{nights, plural, =1 {für 1 Nacht} other {für # Nächte}}",
+    "serviceFee": "+ SAFRA-Servicegebühr",
+    "rating": "Bewertung",
+    "reviews": "{count, plural, =1 {1 Bewertung} other {# Bewertungen}}",
+    "viewDetails": "Details ansehen",
+    "guestsUpTo": "bis zu {count} Gäste",
+    "badgeVerified": "Von SAFRA geprüft",
+    "badgeRecommends": "SAFRA empfiehlt"
+  },
+  "city": {
+    "availableStays": "Verfügbare Unterkünfte in {city}",
+    "backHome": "Startseite",
+    "highlights": "Highlights"
+  },
+  "common": {
+    "loading": "Wird geladen…",
+    "error": "Etwas ist schiefgelaufen",
+    "retry": "Erneut versuchen",
+    "skipToContent": "Zum Inhalt springen"
+  }
+}

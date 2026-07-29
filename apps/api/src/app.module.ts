@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { BookingsModule } from './bookings/bookings.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { AdminModule } from './admin/admin.module.js';
+import { CatalogModule } from './catalog/catalog.module.js';
 import { PartnerModule } from './partner/partner.module.js';
 import { RankingModule } from './ranking/ranking.module.js';
 import { SearchModule } from './search/search.module.js';
@@ -33,6 +34,7 @@ import { PermissionsGuard } from './rbac/permissions.guard.js';
     PartnerModule,
     RankingModule,
     AdminModule,
+    CatalogModule,
   ],
   providers: [
     // Order matters: throttling runs first (cheapest rejection), then

@@ -1,0 +1,127 @@
+@import 'tailwindcss';
+
+/**
+ * Design tokens taken verbatim from the approved SAFRA prototype.
+ *
+ * §1.1 specifies the identity: an oriental character, gold on a night background
+ * of blacks and dark/light sky blue. Dark is therefore the PRIMARY theme, not an
+ * afterthought — the light palette exists because the prototype shipped a toggle
+ * and the admin screens use it.
+ */
+@theme {
+  --font-display: var(--font-amiri), 'Amiri', serif;
+  --font-sans: var(--font-cairo), system-ui, sans-serif;
+
+  --color-bg: #0c0a1c;
+  --color-card: #17142f;
+  --color-field: #0f0d24;
+  --color-line: #2a2450;
+  --color-text: #f4eedf;
+  --color-muted: #a9a3c4;
+  --color-faint: #736f92;
+  --color-gold: #e8bc66;
+  --color-sky: #78aee0;
+  --color-ok: #6fc792;
+  --color-warn: #e8a54b;
+  --color-bad: #e06868;
+  --color-pend: #9f8ce8;
+
+  --radius-card: 0.875rem;
+}
+
+/**
+ * Light theme. Applied by an explicit `data-theme`, and also honoured when the
+ * visitor's OS prefers light AND no explicit choice has been made — so the toggle
+ * always wins over the system preference in both directions.
+ */
+:root[data-theme='light'] {
+  --color-bg: #f5f6fa;
+  --color-card: #ffffff;
+  --color-field: #f1f3f8;
+  --color-line: #dfe3ed;
+  --color-text: #1d2333;
+  --color-muted: #5c6377;
+  --color-faint: #7c8296;
+  --color-gold: #a87a1f;
+  --color-sky: #2e66a8;
+  --color-ok: #1f7d53;
+  --color-warn: #9e6e15;
+  --color-bad: #c23f3f;
+  --color-pend: #6c51c9;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']):not([data-theme='light']) {
+    --color-bg: #f5f6fa;
+    --color-card: #ffffff;
+    --color-field: #f1f3f8;
+    --color-line: #dfe3ed;
+    --color-text: #1d2333;
+    --color-muted: #5c6377;
+    --color-faint: #7c8296;
+    --color-gold: #a87a1f;
+    --color-sky: #2e66a8;
+    --color-ok: #1f7d53;
+    --color-warn: #9e6e15;
+    --color-bad: #c23f3f;
+    --color-pend: #6c51c9;
+  }
+}
+
+html {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  color-scheme: dark light;
+}
+
+body {
+  font-family: var(--font-sans);
+  /* Arabic needs a little more line height than Latin at the same size. */
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+/**
+ * Arabic numerals. Prices and dates read as Western digits across all three
+ * locales — the prototype uses them, and mixing Eastern Arabic digits into a
+ * price beside a Latin currency code is harder to scan, not more authentic.
+ */
+[lang='ar'] {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+/* Focus must be visible for keyboard users; the gold ring works on both themes. */
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/**
+ * A decorative rule that reads correctly in both directions. Using a logical
+ * gradient rather than left/right keeps it correct under RTL without a mirrored
+ * stylesheet.
+ */
+.gold-rule {
+  block-size: 1px;
+  background: linear-gradient(
+    to var(--rule-direction, right),
+    transparent,
+    var(--color-gold),
+    transparent
+  );
+  opacity: 0.5;
+}
+
+[dir='rtl'] .gold-rule {
+  --rule-direction: left;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

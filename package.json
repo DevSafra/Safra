@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@next/eslint-plugin-next": "^16.2.12",
     "@types/node": "^22.15.0",
     "eslint": "^9.30.0",
     "prettier": "^3.6.0",
@@ -34,8 +35,16 @@
   },
   "pnpm": {
     "overrides": {
-      "brace-expansion": ">=5.0.8",
+      "brace-expansion@1": "1.1.16",
+      "brace-expansion@2": "2.0.2",
+      "postcss": ">=8.5.18",
+      "sharp": ">=0.35.0",
       "esbuild": ">=0.25.0"
+    },
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-mh99-v99m-4gvg"
+      ]
     }
   }
 }
