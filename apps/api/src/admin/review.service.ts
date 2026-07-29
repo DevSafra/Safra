@@ -1,0 +1,324 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { and, eq, isNull, sql } from 'drizzle-orm';
+
+import type { Database } from '@safra/db';
+import { schema } from '@safra/db';
+import type { PartnerVerifyInput, PropertyReviewInput } from '@safra/contracts';
+
+import { AuditService } from '../common/audit/audit.service.js';
+import { DATABASE } from '../database/database.module.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
+
+/**
+ * Staff verification of partners and listings (SRS §8.1, §9.2).
+ *
+ * This is where principle P-002 — "trust before volume" — stops being a slogan.
+ * Nothing reaches search without passing through here, and every decision is
+ * recorded with who made it, when, and why.
+ */
+@Injectable()
+export class ReviewService {
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly audit: AuditService,
+  ) {}
+
+  /** §9.2's "properties awaiting approval" queue, oldest first so nothing rots. */
+  async pendingProperties(limit = 50) {
+    return this.db.query.properties.findMany({
+      where: and(
+        eq(schema.properties.status, 'pending_review'),
+        isNull(schema.properties.deletedAt),
+      ),
+      columns: {
+        reference: true,
+        slug: true,
+        nameAr: true,
+        nameEn: true,
+        address: true,
+        latitude: true,
+        longitude: true,
+        descriptionAr: true,
+        createdAt: true,
+        reviewNotes: true,
+      },
+      with: {
+        partner: { columns: { reference: true, displayName: true, verification: true } },
+        city: { columns: { slug: true, nameAr: true } },
+      },
+      orderBy: (p, { asc }) => [asc(p.createdAt)],
+      limit,
+    });
+  }
+
+  /** §9.2's "partners awaiting approval". */
+  async pendingPartners(limit = 50) {
+    return this.db.query.partners.findMany({
+      where: and(
+        eq(schema.partners.verification, 'pending'),
+        isNull(schema.partners.deletedAt),
+      ),
+      columns: {
+        reference: true,
+        displayName: true,
+        legalName: true,
+        email: true,
+        phone: true,
+        verification: true,
+        sanctionsScreenedAt: true,
+        createdAt: true,
+      },
+      with: {
+        documents: { columns: { kind: true, status: true, fileName: true } },
+        city: { columns: { slug: true, nameAr: true } },
+      },
+      orderBy: (p, { asc }) => [asc(p.createdAt)],
+      limit,
+    });
+  }
+
+  /**
+   * Approve or reject a submitted listing.
+   *
+   * Approval publishes directly rather than stopping at an intermediate `approved`
+   * state: the SRS treats verification and going live as one decision, and a
+   * listing sitting verified-but-invisible would just be a second queue for staff
+   * to forget about.
+   */
+  async reviewProperty(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+    input: PropertyReviewInput,
+  ) {
+    const property = await this.db.query.properties.findFirst({
+      where: and(
+        eq(schema.properties.reference, reference),
+        isNull(schema.properties.deletedAt),
+      ),
+      columns: { id: true, status: true, partnerId: true },
+    });
+
+    if (!property) throw new NotFoundException('Property not found.');
+
+    if (property.status !== 'pending_review') {
+      throw new ConflictException(
+        `Only a listing awaiting review can be reviewed (this one is ${property.status}).`,
+      );
+    }
+
+    if (input.decision === 'approve') {
+      /**
+       * The partner must be verified before ANY of their listings can publish.
+       *
+       * §8.1 requires document verification at the partner level, and approving a
+       * property would otherwise quietly bypass it — putting an unvetted operator
+       * in front of paying customers, which is precisely what P-002 forbids.
+       */
+      const partner = await this.db.query.partners.findFirst({
+        where: eq(schema.partners.id, property.partnerId),
+        columns: { verification: true, reference: true, sanctionsScreenedAt: true },
+      });
+
+      if (partner?.verification !== 'approved') {
+        throw new ConflictException(
+          `Partner ${partner?.reference ?? ''} is not verified yet. Verify the partner before publishing their listings.`,
+        );
+      }
+    }
+
+    const nextStatus = input.decision === 'approve' ? 'published' : 'rejected';
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(schema.properties)
+        .set({
+          status: nextStatus,
+          reviewNotes: input.notes ?? null,
+          reviewedAt: new Date(),
+          // verifiedAt is set ONLY on approval, and never cleared on rejection —
+          // it records that a human checked this listing, which stays true.
+          ...(input.decision === 'approve'
+            ? { verifiedAt: new Date(), verifiedByUserId: claims?.sub ?? null }
+            : {}),
+        })
+        .where(eq(schema.properties.id, property.id));
+
+      await this.audit.record(
+        {
+          actorUserId: claims?.sub,
+          actorRole: claims?.role,
+          action: `property.${input.decision === 'approve' ? 'approved' : 'rejected'}`,
+          subjectType: 'property',
+          subjectId: property.id,
+          before: { status: property.status },
+          after: { status: nextStatus },
+          reason: input.notes ?? null,
+        },
+        tx as unknown as Database,
+      );
+
+      await tx.insert(schema.timelineEvents).values({
+        subjectType: 'property',
+        subjectId: property.id,
+        eventType: `property.${input.decision === 'approve' ? 'approved' : 'rejected'}`,
+        actorType: 'staff',
+        actorUserId: claims?.sub ?? null,
+        payload: { notes: input.notes ?? null },
+      });
+    });
+
+    return { reference, status: nextStatus, notes: input.notes ?? null };
+  }
+
+  /**
+   * Verify or reject a partner (§8.1).
+   *
+   * Approval requires that sanctions screening has been recorded. That is not
+   * bureaucracy: the general Syria sanctions programme was repealed in 2025 but
+   * residual SDN designations and export controls survive it, so onboarding an
+   * unscreened counterparty is a live legal risk (see ADR 0002).
+   */
+  async verifyPartner(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+    input: PartnerVerifyInput,
+  ) {
+    const partner = await this.db.query.partners.findFirst({
+      where: and(
+        eq(schema.partners.reference, reference),
+        isNull(schema.partners.deletedAt),
+      ),
+      columns: { id: true, verification: true, sanctionsScreenedAt: true },
+    });
+
+    if (!partner) throw new NotFoundException('Partner not found.');
+
+    if (partner.verification === 'approved' && input.decision === 'approve') {
+      throw new ConflictException('Partner is already verified.');
+    }
+
+    if (input.decision === 'approve' && partner.sanctionsScreenedAt === null) {
+      throw new BadRequestException(
+        'Sanctions screening must be recorded before a partner can be verified.',
+      );
+    }
+
+    const nextStatus = input.decision === 'approve' ? 'approved' : 'rejected';
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(schema.partners)
+        .set({
+          verification: nextStatus,
+          ...(input.decision === 'approve'
+            ? { verifiedAt: new Date(), verifiedByUserId: claims?.sub ?? null }
+            : {}),
+        })
+        .where(eq(schema.partners.id, partner.id));
+
+      await this.audit.record(
+        {
+          actorUserId: claims?.sub,
+          actorRole: claims?.role,
+          action: `partner.${nextStatus}`,
+          subjectType: 'partner',
+          subjectId: partner.id,
+          before: { verification: partner.verification },
+          after: { verification: nextStatus },
+          reason: input.notes ?? null,
+        },
+        tx as unknown as Database,
+      );
+
+      await tx.insert(schema.timelineEvents).values({
+        subjectType: 'partner',
+        subjectId: partner.id,
+        eventType: `partner.${nextStatus}`,
+        actorType: 'staff',
+        actorUserId: claims?.sub ?? null,
+        payload: { notes: input.notes ?? null },
+      });
+
+      /**
+       * Rejecting or suspending a partner must take their live listings down with
+       * them — otherwise an unverified operator keeps selling. Suspension, never
+       * deletion (P-003).
+       */
+      if (input.decision === 'reject') {
+        await tx
+          .update(schema.properties)
+          .set({ status: 'suspended' })
+          .where(
+            and(
+              eq(schema.properties.partnerId, partner.id),
+              eq(schema.properties.status, 'published'),
+            ),
+          );
+      }
+    });
+
+    return { reference, verification: nextStatus };
+  }
+
+  /** Records that screening was performed, with the provider's raw result. */
+  async recordSanctionsScreening(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+    result: unknown,
+  ) {
+    const updated = await this.db
+      .update(schema.partners)
+      .set({ sanctionsScreenedAt: new Date(), sanctionsScreeningResult: result })
+      .where(
+        and(eq(schema.partners.reference, reference), isNull(schema.partners.deletedAt)),
+      )
+      .returning({ id: schema.partners.id });
+
+    const partner = updated[0];
+    if (!partner) throw new NotFoundException('Partner not found.');
+
+    await this.audit.record({
+      actorUserId: claims?.sub,
+      actorRole: claims?.role,
+      action: 'partner.sanctions_screened',
+      subjectType: 'partner',
+      subjectId: partner.id,
+      after: { screenedAt: new Date().toISOString() },
+    });
+
+    return { reference, screened: true };
+  }
+
+  /** Counts for the §9.2 "needs your attention now" panel. */
+  async attentionCounts() {
+    const rows = await this.db.execute<{ metric: string; count: string }>(sql`
+      SELECT 'properties_pending_review' AS metric, COUNT(*)::text AS count
+        FROM properties WHERE status = 'pending_review' AND deleted_at IS NULL
+      UNION ALL
+      SELECT 'partners_pending_verification', COUNT(*)::text
+        FROM partners WHERE verification = 'pending' AND deleted_at IS NULL
+      UNION ALL
+      SELECT 'partners_unscreened', COUNT(*)::text
+        FROM partners WHERE sanctions_screened_at IS NULL AND deleted_at IS NULL
+      UNION ALL
+      SELECT 'bookings_awaiting_confirmation', COUNT(*)::text
+        FROM bookings WHERE status = 'pending_confirmation' AND deleted_at IS NULL
+      UNION ALL
+      -- SLA about to lapse: the single most time-critical queue (§6.4).
+      SELECT 'bookings_sla_expiring_within_30m', COUNT(*)::text
+        FROM bookings
+        WHERE status = 'pending_confirmation'
+          AND confirmation_deadline_at IS NOT NULL
+          AND confirmation_deadline_at <= now() + INTERVAL '30 minutes'
+          AND deleted_at IS NULL
+    `);
+
+    return Object.fromEntries(rows.rows.map((r) => [r.metric, Number(r.count)]));
+  }
+}

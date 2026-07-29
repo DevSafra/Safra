@@ -104,6 +104,13 @@ export const properties = pgTable(
     status: propertyStatus('status').notNull().default('draft'),
     verifiedAt: timestamp('verified_at', { withTimezone: true }),
     verifiedByUserId: foreignId('verified_by_user_id').references(() => users.id),
+    /**
+     * Why a submission was rejected (§8.1). The partner must be able to read this —
+     * a rejection with no explanation just produces a support ticket and a
+     * resubmission of the same listing.
+     */
+    reviewNotes: text('review_notes'),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
 
     cancellationPolicyId: foreignId('cancellation_policy_id')
       .notNull()

@@ -4,14 +4,14 @@ import { PERMISSIONS as P } from '@safra/contracts';
 
 import { RequirePermissions } from '../rbac/decorators.js';
 import { RecommendationService } from './recommendation.service.js';
+import { RankingScheduler } from './ranking.scheduler.js';
 
 /**
- * Admin-triggered recompute.
+ * Manual recompute, on top of the nightly RankingScheduler run.
  *
- * Nightly scheduling belongs on the BullMQ queue that arrives with Phase 5 (§14
- * requires a background queue for heavy work). Until then this endpoint exists so
- * the score is operable rather than stale — and it is gated behind SETTINGS_UPDATE
- * because rewriting every listing's rank is a platform-level action.
+ * Exists so staff can force a refresh after bulk-importing listings or retuning
+ * weights, rather than waiting for 03:00. Gated behind SETTINGS_UPDATE because
+ * rewriting every listing's rank is a platform-level action.
  */
 @Controller('admin/ranking')
 class RankingController {
@@ -28,7 +28,7 @@ class RankingController {
 
 @Module({
   controllers: [RankingController],
-  providers: [RecommendationService],
+  providers: [RecommendationService, RankingScheduler],
   exports: [RecommendationService],
 })
 export class RankingModule {}

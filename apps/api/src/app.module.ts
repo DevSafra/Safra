@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AuthModule } from './auth/auth.module.js';
 import { BookingsModule } from './bookings/bookings.module.js';
 import { DatabaseModule } from './database/database.module.js';
+import { AdminModule } from './admin/admin.module.js';
 import { PartnerModule } from './partner/partner.module.js';
 import { RankingModule } from './ranking/ranking.module.js';
 import { SearchModule } from './search/search.module.js';
@@ -15,6 +17,9 @@ import { PermissionsGuard } from './rbac/permissions.guard.js';
 @Module({
   imports: [
     DatabaseModule,
+    // Cron support for the nightly ranking recompute. The job itself takes a
+    // Postgres advisory lock so only one replica runs it — see RankingScheduler.
+    ScheduleModule.forRoot(),
     /**
      * Global default rate limit. Individual routes tighten this with @Throttle —
      * auth endpoints are far stricter. A global floor means a newly added endpoint
@@ -27,6 +32,7 @@ import { PermissionsGuard } from './rbac/permissions.guard.js';
     SearchModule,
     PartnerModule,
     RankingModule,
+    AdminModule,
   ],
   providers: [
     // Order matters: throttling runs first (cheapest rejection), then

@@ -124,3 +124,29 @@ export const propertyReviewSchema = z
   });
 
 export type PropertyReviewInput = z.infer<typeof propertyReviewSchema>;
+
+/** Staff decision on a partner's onboarding (§8.1). */
+export const partnerVerifySchema = z
+  .object({
+    decision: z.enum(['approve', 'reject']),
+    notes: z.string().trim().max(2000).optional(),
+  })
+  .strict()
+  .refine((v) => v.decision !== 'reject' || (v.notes?.length ?? 0) > 0, {
+    message: 'Rejection requires notes explaining what must change.',
+    path: ['notes'],
+  });
+
+export type PartnerVerifyInput = z.infer<typeof partnerVerifySchema>;
+
+/** Raw screening result from the sanctions provider, stored verbatim for audit. */
+export const sanctionsScreeningSchema = z
+  .object({
+    provider: z.string().trim().min(1).max(80),
+    matched: z.boolean(),
+    /** Provider payload; shape varies, so it is not modelled further. */
+    details: z.unknown().optional(),
+  })
+  .strict();
+
+export type SanctionsScreeningInput = z.infer<typeof sanctionsScreeningSchema>;
