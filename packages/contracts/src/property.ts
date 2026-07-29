@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { tripAttributeSchema } from './search.js';
+
 /**
  * Partner-facing property and unit management (SRS §8.3).
  *
@@ -43,6 +45,12 @@ export const propertyCreateSchema = z
     address: z.string().trim().min(3).max(300),
     latitude: latitudeSchema.optional(),
     longitude: longitudeSchema.optional(),
+    /**
+     * §5.2 trip attributes ("صفات الرحلة"). Partner-declared and searchable.
+     * Validated against the same enum the search filter uses, so a listing can
+     * never be tagged with something no customer can search for.
+     */
+    attributes: z.array(tripAttributeSchema).max(10).default([]),
   })
   .strict();
 

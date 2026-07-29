@@ -121,6 +121,16 @@ export const properties = pgTable(
     reviewsCount: integer('reviews_count').notNull().default(0),
     /** Earned badges: "safra_verified", "safra_recommends" (§5.6). */
     badges: text('badges').array().notNull().default([]),
+    /**
+     * Trip attributes from §5.2's "صفات الرحلة" filter — sea, mountain, history,
+     * nature, families, honeymoon, pool, parking, internet, business.
+     *
+     * Stored on the PROPERTY rather than inferred from city categories or
+     * amenities. Inference would be wrong in both directions: a coastal city
+     * contains inland properties, and "honeymoon" or "business" correspond to no
+     * amenity at all. Tagging is explicit, and the GIN index makes filtering cheap.
+     */
+    attributes: text('attributes').array().notNull().default([]),
     /** Cached ranking input for "SAFRA recommends" (§5.5); recomputed nightly. */
     recommendationScore: numeric('recommendation_score', { precision: 6, scale: 3 })
       .notNull()
@@ -133,6 +143,7 @@ export const properties = pgTable(
     index('properties_search_idx').on(t.cityId, t.status, t.recommendationScore),
     index('properties_partner_idx').on(t.partnerId),
     index('properties_type_idx').on(t.propertyTypeId),
+    index('properties_attributes_idx').using('gin', t.attributes),
   ],
 );
 

@@ -114,6 +114,7 @@ export class PropertiesService {
           address: input.address,
           latitude: input.latitude ?? null,
           longitude: input.longitude ?? null,
+          attributes: input.attributes,
           // Forced. Never taken from input — the schema has no status field, and
           // this is the second barrier (§8.1 / P-002).
           status: 'draft',
@@ -171,6 +172,7 @@ export class PropertiesService {
       if (input.description.de) patch['descriptionDe'] = input.description.de;
     }
     if (input.address !== undefined) patch['address'] = input.address;
+    if (input.attributes !== undefined) patch['attributes'] = input.attributes;
     if (input.latitude !== undefined) patch['latitude'] = input.latitude;
     if (input.longitude !== undefined) patch['longitude'] = input.longitude;
 

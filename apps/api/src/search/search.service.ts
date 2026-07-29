@@ -164,6 +164,25 @@ export class SearchService {
           )
 
           ${
+            // §5.2 trip attributes. `@>` requires the property to carry ALL
+            // selected attributes, matching how the amenity filter behaves — a
+            // multi-select that silently ORed would surprise anyone narrowing a
+            // search on purpose.
+            query.attributes.length > 0
+              ? // Bound as a parameter, never interpolated. The Zod enum already
+                // restricts these to 10 known values, but rule 1 is unconditional:
+                // no string-built SQL, so a future change to the schema cannot turn
+                // this into an injection point.
+                // Each element is bound individually. Passing the JS array directly
+                // makes drizzle emit a row constructor `($1,$2)`, which Postgres
+                // cannot cast to text[] — "cannot cast type record to text[]".
+                sql`AND p.attributes @> ARRAY[${sql.join(
+                  query.attributes.map((a) => sql`${a}`),
+                  sql`, `,
+                )}]::text[]`
+              : sql``
+          }
+          ${
             query.amenityCodes.length > 0
               ? sql`AND (
                   SELECT COUNT(DISTINCT a.code)

@@ -44,6 +44,23 @@ export const TRIP_ATTRIBUTES = [
 export const tripAttributeSchema = z.enum(TRIP_ATTRIBUTES);
 export type TripAttribute = z.infer<typeof tripAttributeSchema>;
 
+/**
+ * A repeatable query parameter arrives as a STRING when supplied once and an
+ * ARRAY when supplied twice (`?a=x` vs `?a=x&a=y`). Express does not normalise
+ * this, so the schema has to: without it, filtering by a single amenity or
+ * attribute fails validation while two of them succeed.
+ */
+const queryArray = <T extends z.ZodTypeAny>(element: T) =>
+  z.preprocess((value: unknown): unknown[] => {
+    if (value === undefined) {
+      return [];
+    }
+
+    // Array.isArray narrows to any[], so the cast is explicit rather than implied.
+    // The element schema validates each entry immediately afterwards.
+    return Array.isArray(value) ? (value as unknown[]) : [value];
+  }, z.array(element));
+
 export const searchQuerySchema = z
   .object({
     checkIn: calendarDateSchema,
@@ -55,8 +72,8 @@ export const searchQuerySchema = z
     /** Optional: §5.2 allows searching with no city selected. */
     citySlug: z.string().trim().min(1).max(80).optional(),
     propertyTypeCode: z.string().trim().min(1).max(40).optional(),
-    attributes: z.array(tripAttributeSchema).max(TRIP_ATTRIBUTES.length).default([]),
-    amenityCodes: z.array(z.string().trim().min(1).max(40)).max(30).default([]),
+    attributes: queryArray(tripAttributeSchema).default([]),
+    amenityCodes: queryArray(z.string().trim().min(1).max(40)).default([]),
 
     minPrice: z.coerce.number().min(0).max(1_000_000).optional(),
     maxPrice: z.coerce.number().min(0).max(1_000_000).optional(),
