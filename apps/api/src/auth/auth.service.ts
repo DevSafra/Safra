@@ -14,7 +14,6 @@ import {
   type LoginInput,
   type RegisterInput,
   isStaffRole,
-  resolvePermissions,
 } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
@@ -213,17 +212,8 @@ export class AuthService {
     user: typeof schema.users.$inferSelect,
     context: RequestContext,
   ): Promise<AuthResult> {
-    const permissions = resolvePermissions(user.role, user.permissionOverrides ?? []);
-
-    const tokens = await this.tokens.issue(
-      {
-        sub: user.id,
-        role: user.role,
-        permissions,
-        locale: user.preferredLocale,
-      },
-      context,
-    );
+    const claims = await this.tokens.buildClaims(user);
+    const tokens = await this.tokens.issue(claims, context);
 
     return {
       tokens,
@@ -232,7 +222,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         preferredLocale: user.preferredLocale as AuthUser['preferredLocale'],
-        permissions,
+        permissions: claims.permissions,
       },
     };
   }

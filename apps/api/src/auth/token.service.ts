@@ -18,6 +18,16 @@ export interface AccessTokenClaims {
   role: Role;
   permissions: Permission[];
   locale: string;
+  /**
+   * Owning ids for resource-level authorization (see rbac/ownership.ts).
+   *
+   * Embedded in the token so ownership filtering costs no extra query on the hot
+   * path. Exactly one is set in practice: a customer carries customerProfileId, a
+   * partner carries partnerId, and staff carry neither because they are scoped by
+   * a `*_all` permission instead.
+   */
+  customerProfileId?: string | undefined;
+  partnerId?: string | undefined;
 }
 
 export interface IssuedTokens {
@@ -77,6 +87,8 @@ export class TokenService {
       role: claims.role,
       permissions: claims.permissions,
       locale: claims.locale,
+      customerProfileId: claims.customerProfileId,
+      partnerId: claims.partnerId,
     })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setSubject(claims.sub)
@@ -124,10 +136,52 @@ export class TokenService {
         role: payload['role'] as Role,
         permissions: (payload['permissions'] as Permission[]) ?? [],
         locale: (payload['locale'] as string) ?? 'ar',
+        customerProfileId: payload['customerProfileId'] as string | undefined,
+        partnerId: payload['partnerId'] as string | undefined,
       };
     } catch {
       throw new UnauthorizedException('Invalid or expired token.');
     }
+  }
+
+  /**
+   * The ONE place access claims are constructed.
+   *
+   * Both login and refresh route through here, so a rotated token can never carry
+   * more authority than the original login granted — a class of bug that appears
+   * whenever the two paths build claims independently and then drift.
+   */
+  async buildClaims(user: typeof schema.users.$inferSelect): Promise<AccessTokenClaims> {
+    const claims: AccessTokenClaims = {
+      sub: user.id,
+      role: user.role,
+      permissions: resolvePermissions(user.role, user.permissionOverrides ?? []),
+      locale: user.preferredLocale,
+    };
+
+    if (user.role === 'customer') {
+      const profile = await this.db.query.customerProfiles.findFirst({
+        where: and(
+          eq(schema.customerProfiles.userId, user.id),
+          isNull(schema.customerProfiles.deletedAt),
+        ),
+        columns: { id: true },
+      });
+      claims.customerProfileId = profile?.id;
+    }
+
+    if (user.role === 'partner') {
+      const partner = await this.db.query.partners.findFirst({
+        where: and(
+          eq(schema.partners.userId, user.id),
+          isNull(schema.partners.deletedAt),
+        ),
+        columns: { id: true },
+      });
+      claims.partnerId = partner?.id;
+    }
+
+    return claims;
   }
 
   /**
@@ -172,12 +226,7 @@ export class TokenService {
       return null;
     }
 
-    const claims: AccessTokenClaims = {
-      sub: user.id,
-      role: user.role,
-      permissions: resolvePermissions(user.role, user.permissionOverrides ?? []),
-      locale: user.preferredLocale,
-    };
+    const claims = await this.buildClaims(user);
 
     const tokens = await this.issue(claims, {
       ...context,
