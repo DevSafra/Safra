@@ -47,9 +47,18 @@ export const partnerTier = pgEnum('partner_tier', [
   'gold',
 ]);
 
+/**
+ * §8.1: nothing publishes before SAFRA verifies it.
+ *
+ * `rejected` is a distinct state from `draft`: a rejected listing carries review
+ * notes telling the partner what to fix, and it must be re-submitted rather than
+ * silently reverting to an untouched draft. Without it there is nowhere to record
+ * that a review happened and failed.
+ */
 export const propertyStatus = pgEnum('property_status', [
   'draft',
   'pending_review',
+  'rejected',
   'approved',
   'published',
   'suspended',

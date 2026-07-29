@@ -72,6 +72,36 @@ export function resolveBookingScope(claims: AccessTokenClaims | undefined): Acce
 }
 
 /**
+ * The caller's own partner id, for write paths that only ever act on the partner's
+ * own inventory.
+ *
+ * Separate from resolveScope because a WRITE has no meaningful "all" variant here:
+ * staff do not edit partner listings on their behalf (§8.3 gives the partner the
+ * dashboard; §4 gives staff approval rights, not authoring rights). So this either
+ * returns the partner's id or refuses — there is no branch that widens.
+ */
+export function requirePartnerId(
+  claims: AccessTokenClaims | undefined,
+  permission: Permission,
+): string {
+  if (!claims) {
+    throw new ForbiddenException('Authentication required.');
+  }
+
+  if (!(claims.permissions ?? []).includes(permission)) {
+    throw new ForbiddenException(`Missing required permission: ${permission}.`);
+  }
+
+  if (!claims.partnerId) {
+    // A partner-role token without a partner record is a data problem, not an
+    // authorization one — but it still must not fall through to an unscoped write.
+    throw new ForbiddenException('This account is not linked to a partner profile.');
+  }
+
+  return claims.partnerId;
+}
+
+/**
  * Converts a `none` scope into a 403 at the single point where scope is consumed,
  * so no caller can forget the check and fall through to an unfiltered query.
  */
