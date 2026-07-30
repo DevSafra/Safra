@@ -140,6 +140,23 @@ export const bookings = pgTable(
     /** Internal staff notes, never visible to customer or partner (§9.4). */
     internalNotes: text('internal_notes'),
 
+    /**
+     * Authorizes a GUEST to act on this booking — currently to pay for it.
+     *
+     * §4 permits booking with no account, so at the moment payment starts there is
+     * no session to check. The reference cannot serve as the credential: §13.2
+     * makes it a year-scoped sequence (`BKG-2026-000042`), so anyone can guess a
+     * live one and, without this, pay for or read a stranger's booking.
+     *
+     * SHA-256 rather than Argon2id deliberately: this is a 256-bit random secret,
+     * not a human password, so there is no dictionary to slow down and a fast hash
+     * keeps the payment path cheap. Stored hashed so a database read cannot be
+     * turned into the ability to act on bookings.
+     */
+    accessTokenHash: text('access_token_hash'),
+    /** Tracks the payment window; a token outliving its purpose is a liability. */
+    accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }),
+
     /** §15 requires IP and device on sensitive operations. */
     createdIp: text('created_ip'),
     createdUserAgent: text('created_user_agent'),

@@ -14,6 +14,7 @@ import { evaluateArrival } from '@safra/contracts';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { BookingAccessService } from './booking-access.service.js';
 import { PricingService } from './pricing.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -38,6 +39,7 @@ export class BookingCreationService {
     private readonly pricing: PricingService,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly access: BookingAccessService,
   ) {}
 
   /**
@@ -289,6 +291,21 @@ export class BookingCreationService {
 
         if (!booking) throw new Error('Booking insert returned no row.');
 
+        /**
+         * Minted inside the same transaction as the booking. §4 allows booking
+         * without an account, so this token is the ONLY thing that will authorize
+         * the guest to pay — a committed booking without one is unreachable and
+         * unpayable, so the two must succeed or fail together.
+         *
+         * Scoped to the payment window: once EC-001 has released the dates there is
+         * nothing left for it to authorize.
+         */
+        const accessToken = await this.access.mint(
+          tx as unknown as Database,
+          booking.id,
+          new Date(now.getTime() + paymentWindowMinutes * 60_000),
+        );
+
         await tx.insert(schema.timelineEvents).values({
           subjectType: 'booking',
           subjectId: booking.id,
@@ -320,6 +337,11 @@ export class BookingCreationService {
         return {
           reference: booking.reference,
           status: booking.status,
+          /**
+           * Returned exactly once, in this response, and never retrievable again —
+           * only its digest is stored. The client must hold it to start payment.
+           */
+          accessToken,
           expiresAt: new Date(
             now.getTime() + paymentWindowMinutes * 60_000,
           ).toISOString(),

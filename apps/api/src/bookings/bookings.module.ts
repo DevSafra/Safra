@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { IdempotencyService } from '../common/idempotency/idempotency.service.js';
+import { BookingAccessService } from './booking-access.service.js';
 import { BookingActionsService } from './booking-actions.service.js';
 import { BookingCreationService } from './booking-creation.service.js';
 import { BookingsController } from './bookings.controller.js';
@@ -13,6 +14,7 @@ import { SlaService } from './sla.service.js';
   controllers: [BookingsController],
   providers: [
     BookingsService,
+    BookingAccessService,
     BookingCreationService,
     BookingActionsService,
     PricingService,
@@ -22,6 +24,7 @@ import { SlaService } from './sla.service.js';
   ],
   exports: [
     BookingsService,
+    BookingAccessService,
     BookingCreationService,
     BookingActionsService,
     PricingService,
