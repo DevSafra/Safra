@@ -57,6 +57,27 @@
       "when": 1785415731030,
       "tag": "0007_chilly_bastion",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785436328258,
+      "tag": "0008_tiresome_firebird",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785436341014,
+      "tag": "0009_nebulous_king_bedlam",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785438917684,
+      "tag": "0010_overrated_logan",
+      "breakpoints": true
     }
   ]
 }

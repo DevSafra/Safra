@@ -653,6 +653,33 @@ export const SETTINGS: {
     descriptionEn: 'Refund floor across all policies (§7.4)',
   },
   {
+    /**
+     * Which gateway serves which country, in preference order (ADR 0002).
+     *
+     * Only `manual_transfer` is listed because it is the only rail
+     * `Safra Technologies GmbH` can operate with no third-party agreement. The four
+     * approved customer-facing methods (Visa, Mastercard, Klarna, Sham Cash) each
+     * need one first: the card schemes need an acquirer, Klarna a merchant
+     * agreement, Sham Cash a Syrian collection relationship. Until then
+     * `GET /payments/methods` correctly returns an empty list rather than
+     * advertising a rail that cannot be served.
+     *
+     * A provider is added HERE, not in code — that is the point of the abstraction.
+     */
+    key: 'payment.provider_routing',
+    value: { SY: ['manual_transfer'], '*': ['manual_transfer'] },
+    valueSchema: 'json',
+    descriptionAr: 'توجيه مزودي الدفع حسب البلد — بترتيب الأولوية',
+    descriptionEn: 'Payment provider routing per country, in preference order (§7.1)',
+  },
+  {
+    key: 'payment.merchant_of_record',
+    value: 'Safra Technologies GmbH',
+    valueSchema: 'string',
+    descriptionAr: 'الجهة التعاقدية التي تحصّل المدفوعات',
+    descriptionEn: 'Contracting entity that collects payment (ADR 0002)',
+  },
+  {
     key: 'search.max_nights',
     value: 90,
     valueSchema: 'positiveInt',
