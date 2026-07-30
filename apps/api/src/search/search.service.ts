@@ -149,7 +149,7 @@ export class SearchService {
           AND NOT EXISTS (
             SELECT 1 FROM bookings b
             WHERE b.unit_id = u.id
-              AND b.status IN ('pending_confirmation', 'confirmed', 'checked_in')
+              AND b.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
               AND daterange(b.check_in, b.check_out, '[)')
                   && daterange(${query.checkIn}::date, ${query.checkOut}::date, '[)')
           )

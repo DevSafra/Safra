@@ -1,10 +1,37 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 
-import { type CursorQuery, cursorQuerySchema } from '@safra/contracts';
+import {
+  PERMISSIONS as P,
+  type BookingCancelInput,
+  type BookingCreateInput,
+  type CursorQuery,
+  type PartnerBookingDecisionInput,
+  bookingCancelSchema,
+  bookingCreateSchema,
+  cursorQuerySchema,
+  partnerBookingDecisionSchema,
+} from '@safra/contracts';
 
+import { AuditExempt } from '../common/audit/audit.interceptor.js';
+import { IdempotencyService } from '../common/idempotency/idempotency.service.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
-import { CurrentUser } from '../rbac/decorators.js';
+import { CurrentUser, Public, RequirePermissions } from '../rbac/decorators.js';
+import { requirePartnerId } from '../rbac/ownership.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { BookingActionsService } from './booking-actions.service.js';
+import { BookingCreationService } from './booking-creation.service.js';
 import { BookingsService } from './bookings.service.js';
 
 /**
@@ -25,7 +52,70 @@ import { BookingsService } from './bookings.service.js';
  */
 @Controller('bookings')
 export class BookingsController {
-  constructor(private readonly bookings: BookingsService) {}
+  constructor(
+    private readonly bookings: BookingsService,
+    private readonly creation: BookingCreationService,
+    private readonly actions: BookingActionsService,
+    private readonly idempotency: IdempotencyService,
+  ) {}
+
+  /**
+   * Creates a booking (§6.3 steps 1–4).
+   *
+   * @Public() because §4 allows a Guest Customer to book with no account. A signed-in
+   * customer is still recognised — JwtAuthGuard decodes a token when one is present —
+   * so their booking attaches to their existing profile.
+   */
+  @Public()
+  @Post()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @AuditExempt('Audited transactionally inside BookingCreationService.')
+  async create(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(bookingCreateSchema)) body: BookingCreateInput,
+    @Req() request: Request,
+  ) {
+    const context = { ipAddress: request.ip, userAgent: request.get('user-agent') };
+
+    // EC-003: a replayed request returns the FIRST response instead of booking twice.
+    return this.idempotency.run(
+      { key: body.idempotencyKey, scope: 'booking.create', request: body },
+      () => this.creation.createDraft(body, user, context),
+    );
+  }
+
+  /** The partner answering within the two-hour window (§6.4). */
+  @Post(':reference/partner-decision')
+  @RequirePermissions(P.BOOKING_RESPOND_AS_PARTNER)
+  @AuditExempt('Audited transactionally inside BookingActionsService.')
+  async partnerDecision(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(partnerBookingDecisionSchema))
+    body: PartnerBookingDecisionInput,
+  ) {
+    const partnerId = requirePartnerId(user, P.BOOKING_RESPOND_AS_PARTNER);
+    return this.actions.partnerDecision(
+      reference,
+      partnerId,
+      body.decision,
+      body.reason,
+      user,
+    );
+  }
+
+  /** Staff cancellation (§9.4). Customers cancel through their own bookings view. */
+  @Post(':reference/cancel')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.BOOKING_CANCEL)
+  @AuditExempt('Audited transactionally inside BookingActionsService.')
+  async cancel(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(bookingCancelSchema)) body: BookingCancelInput,
+  ) {
+    return this.actions.cancel(reference, body.reason, 'staff', user);
+  }
 
   @Get()
   async list(

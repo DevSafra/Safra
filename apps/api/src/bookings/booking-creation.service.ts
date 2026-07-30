@@ -1,0 +1,386 @@
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { sql } from 'drizzle-orm';
+
+import type { Database } from '@safra/db';
+import { schema } from '@safra/db';
+import { evaluateArrival } from '@safra/contracts';
+
+import { AuditService } from '../common/audit/audit.service.js';
+import { DATABASE } from '../database/database.module.js';
+import { SettingsService } from '../settings/settings.service.js';
+import { PricingService } from './pricing.service.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
+
+/** PostgreSQL raises 23P01 when an EXCLUDE constraint rejects a row. */
+const EXCLUSION_VIOLATION = '23P01';
+
+export interface BookingDraftInput {
+  unitId: string;
+  checkIn: string;
+  checkOut: string;
+  adults: number;
+  children?: number | undefined;
+  infants?: number | undefined;
+  guest: { fullName: string; email: string; phone: string };
+  attributes?: string[] | undefined;
+}
+
+@Injectable()
+export class BookingCreationService {
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly pricing: PricingService,
+    private readonly settings: SettingsService,
+    private readonly audit: AuditService,
+  ) {}
+
+  /**
+   * Creates a booking in `pending_payment` (SRS §6.3 steps 1–4).
+   *
+   * The booking is inserted BEFORE any payment is attempted, and it is the insert
+   * that reserves the inventory — the `bookings_no_overlapping_stays` exclusion
+   * constraint is what makes the reservation real. Checking availability and then
+   * inserting would leave a race between the two; here the database decides, and a
+   * loser gets 23P01 rather than a double booking.
+   *
+   * §6.2 has no "reserved" state, so `pending_payment` holds the slot for the
+   * configured window and EC-001's sweep releases it if payment never completes.
+   */
+  async createDraft(
+    input: BookingDraftInput,
+    claims: AccessTokenClaims | undefined,
+    context: { ipAddress?: string | undefined; userAgent?: string | undefined },
+    now: Date = new Date(),
+  ) {
+    // ── Resolve the unit and its property, and confirm it is bookable ────────
+    const unitRows = await this.db.execute<{
+      unit_id: string;
+      property_id: string;
+      partner_id: string;
+      city_id: string;
+      city_timezone: string;
+      city_cutoff_hour: number | null;
+      max_guests: number;
+      min_nights: number;
+      max_nights: number | null;
+      property_status: string;
+      policy_id: string;
+      policy_code: string;
+      policy_tiers: unknown;
+      policy_min_refund: number;
+    }>(sql`
+      SELECT
+        u.id AS unit_id, u.property_id, u.max_guests, u.min_nights, u.max_nights,
+        p.partner_id, p.city_id, p.status AS property_status,
+        ci.timezone AS city_timezone, ci.same_day_cutoff_hour AS city_cutoff_hour,
+        cp.id AS policy_id, cp.code AS policy_code, cp.tiers AS policy_tiers,
+        cp.min_refund_percent AS policy_min_refund
+      FROM units u
+      JOIN properties p ON p.id = u.property_id
+      JOIN cities ci ON ci.id = p.city_id
+      JOIN cancellation_policies cp ON cp.id = p.cancellation_policy_id
+      WHERE u.id = ${input.unitId}
+        AND u.is_active
+        AND u.deleted_at IS NULL
+        AND p.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const unit = unitRows.rows[0];
+    if (!unit) throw new NotFoundException('Unit not found.');
+
+    // Only published inventory is bookable (P-002). A draft or suspended listing is
+    // reported as not found, exactly as search hides it.
+    if (unit.property_status !== 'published') {
+      throw new NotFoundException('Unit not found.');
+    }
+
+    // ── §5.3 same-day cutoff, in the CITY's local time ──────────────────────
+    const cutoffHour =
+      unit.city_cutoff_hour ??
+      (await this.settings.getNumber('booking.same_day_cutoff_hour', 17));
+
+    const verdict = evaluateArrival(input.checkIn, now, unit.city_timezone, cutoffHour);
+
+    if (!verdict.allowed) {
+      throw new BadRequestException({
+        message:
+          verdict.reason === 'same_day_closed'
+            ? "Today's bookings have closed for this city."
+            : 'The arrival date is in the past.',
+        reason: verdict.reason,
+        firstBookableDate: verdict.firstBookableDate,
+      });
+    }
+
+    // ── Party size and stay length ──────────────────────────────────────────
+    const guests = input.adults + (input.children ?? 0); // infants do not occupy a bed
+    if (guests > unit.max_guests) {
+      throw new BadRequestException(
+        `This unit accommodates ${unit.max_guests} guests; ${guests} were requested.`,
+      );
+    }
+
+    const nights = Math.round(
+      (Date.parse(`${input.checkOut}T00:00:00Z`) -
+        Date.parse(`${input.checkIn}T00:00:00Z`)) /
+        86_400_000,
+    );
+
+    if (nights < 1) {
+      throw new BadRequestException(
+        'Departure must be at least one night after arrival.',
+      );
+    }
+    if (nights < unit.min_nights) {
+      throw new BadRequestException(
+        `This unit requires at least ${unit.min_nights} nights.`,
+      );
+    }
+    if (unit.max_nights !== null && nights > unit.max_nights) {
+      throw new BadRequestException(
+        `This unit allows at most ${unit.max_nights} nights.`,
+      );
+    }
+
+    const maxNights = await this.settings.getNumber('search.max_nights', 90);
+    if (nights > maxNights) {
+      throw new BadRequestException(`A stay may not exceed ${maxNights} nights.`);
+    }
+
+    // ── Partner-declared availability ───────────────────────────────────────
+    // The exclusion constraint stops overlapping BOOKINGS; it knows nothing about a
+    // partner closing dates, so that is checked here.
+    const blocked = await this.db.execute<{ date: string; status: string }>(sql`
+      SELECT date::text AS date, status::text AS status
+      FROM availability_days
+      WHERE unit_id = ${input.unitId}
+        AND date >= ${input.checkIn}::date
+        AND date <  ${input.checkOut}::date
+        AND status <> 'available'
+      ORDER BY date
+      LIMIT 1
+    `);
+
+    const blockedDay = blocked.rows[0];
+    if (blockedDay) {
+      throw new ConflictException(
+        `The unit is not available on ${blockedDay.date} (${blockedDay.status}).`,
+      );
+    }
+
+    const perDayMinimum = await this.db.execute<{ min_nights: number }>(sql`
+      SELECT min_nights FROM availability_days
+      WHERE unit_id = ${input.unitId}
+        AND date = ${input.checkIn}::date
+        AND min_nights IS NOT NULL
+      LIMIT 1
+    `);
+
+    const arrivalMinimum = perDayMinimum.rows[0]?.min_nights;
+    if (arrivalMinimum !== undefined && nights < arrivalMinimum) {
+      throw new BadRequestException(
+        `Arrivals on ${input.checkIn} require at least ${arrivalMinimum} nights.`,
+      );
+    }
+
+    // ── Price, with every rate snapshotted ──────────────────────────────────
+    const price = await this.pricing.quote({
+      unitId: input.unitId,
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+    });
+
+    const paymentWindowMinutes = await this.settings.getNumber(
+      'booking.pending_payment_timeout_minutes',
+      30,
+    );
+
+    // ── Insert ──────────────────────────────────────────────────────────────
+    try {
+      return await this.db.transaction(async (tx) => {
+        const customerProfileId = await this.resolveCustomerProfile(
+          tx,
+          input.guest,
+          claims,
+        );
+
+        const [booking] = await tx
+          .insert(schema.bookings)
+          .values({
+            customerProfileId,
+            unitId: input.unitId,
+            propertyId: unit.property_id,
+            partnerId: unit.partner_id,
+            cityId: unit.city_id,
+            checkIn: input.checkIn,
+            checkOut: input.checkOut,
+            guestsAdults: input.adults,
+            guestsChildren: input.children ?? 0,
+            guestsInfants: input.infants ?? 0,
+            status: 'pending_payment',
+
+            baseAmount: price.baseAmount,
+            customerFeeMode: price.customerFeeMode,
+            customerFeeValue: price.customerFeeValue,
+            customerFeeAmount: price.customerFeeAmount,
+            partnerCommissionRate: price.partnerCommissionRate,
+            partnerCommissionAmount: price.partnerCommissionAmount,
+            totalAmount: price.totalAmount,
+            partnerPayableAmount: price.partnerPayableAmount,
+            currencyId: price.currencyId,
+            fxRateToSyp: price.fxRateToSyp,
+            totalSyp: price.totalSyp,
+
+            /**
+             * The policy AS IT STANDS NOW. The row may be edited later; the terms
+             * this customer agreed to may not.
+             */
+            cancellationPolicySnapshot: {
+              code: unit.policy_code,
+              tiers: unit.policy_tiers,
+              minRefundPercent: unit.policy_min_refund,
+              snapshotAt: now.toISOString(),
+            },
+
+            /**
+             * EC-001. The slot is held only until payment is expected to complete;
+             * the sweep cancels it afterwards and releases the dates.
+             */
+            confirmationDeadlineAt: new Date(
+              now.getTime() + paymentWindowMinutes * 60_000,
+            ),
+
+            searchAttributes: input.attributes ?? [],
+            createdIp: context.ipAddress ?? null,
+            createdUserAgent: context.userAgent ?? null,
+          })
+          .returning({
+            id: schema.bookings.id,
+            reference: schema.bookings.reference,
+            status: schema.bookings.status,
+          });
+
+        if (!booking) throw new Error('Booking insert returned no row.');
+
+        await tx.insert(schema.timelineEvents).values({
+          subjectType: 'booking',
+          subjectId: booking.id,
+          eventType: 'booking.payment_started',
+          actorType: claims ? 'customer' : 'system',
+          actorUserId: claims?.sub ?? null,
+          payload: { total: price.totalAmount, currency: price.currencyCode },
+        });
+
+        await this.audit.record(
+          {
+            actorUserId: claims?.sub,
+            actorRole: claims?.role,
+            action: 'booking.created',
+            subjectType: 'booking',
+            subjectId: booking.id,
+            after: {
+              reference: booking.reference,
+              total: price.totalAmount,
+              currency: price.currencyCode,
+              nights: price.nights,
+            },
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+          },
+          tx as unknown as Database,
+        );
+
+        return {
+          reference: booking.reference,
+          status: booking.status,
+          expiresAt: new Date(
+            now.getTime() + paymentWindowMinutes * 60_000,
+          ).toISOString(),
+          price: {
+            nightly: price.nightly,
+            baseAmount: price.baseAmount,
+            serviceFee: price.customerFeeAmount,
+            totalAmount: price.totalAmount,
+            currencyCode: price.currencyCode,
+            nights: price.nights,
+          },
+        };
+      });
+    } catch (error) {
+      /**
+       * EC-005 reaching the surface. Two customers paid for the last room at the
+       * same instant and the database rejected the second — which is the system
+       * working, not failing. It becomes a 409 and the UI offers alternatives.
+       */
+      if (isExclusionViolation(error)) {
+        throw new ConflictException({
+          message: 'Those dates were just taken. Please choose different dates.',
+          reason: 'dates_unavailable',
+        });
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Finds or creates the customer profile.
+   *
+   * §4 allows a Guest Customer to complete a booking with no account, so an
+   * unauthenticated caller still gets a profile — it is the identity a booking,
+   * wallet and support thread attach to, not a login.
+   */
+  private async resolveCustomerProfile(
+    tx: Parameters<Parameters<Database['transaction']>[0]>[0],
+    guest: BookingDraftInput['guest'],
+    claims: AccessTokenClaims | undefined,
+  ): Promise<string> {
+    if (claims?.customerProfileId) {
+      return claims.customerProfileId;
+    }
+
+    // A returning guest is matched on email so their bookings stay together, rather
+    // than accumulating a new profile per booking.
+    const existing = await tx.execute<{ id: string }>(sql`
+      SELECT id FROM customer_profiles
+      WHERE email = ${guest.email} AND deleted_at IS NULL
+      ORDER BY created_at
+      LIMIT 1
+    `);
+
+    const found = existing.rows[0]?.id;
+    if (found) return found;
+
+    const created = await tx.execute<{ id: string }>(sql`
+      INSERT INTO customer_profiles (full_name, email, phone, is_guest)
+      VALUES (${guest.fullName}, ${guest.email}, ${guest.phone}, true)
+      RETURNING id
+    `);
+
+    const id = created.rows[0]?.id;
+    if (!id) throw new Error('Customer profile insert returned no row.');
+
+    return id;
+  }
+}
+
+function isExclusionViolation(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+
+  // Drizzle wraps the driver error, so the code can be one level down.
+  const candidates = [error, (error as { cause?: unknown }).cause];
+
+  return candidates.some(
+    (candidate) =>
+      typeof candidate === 'object' &&
+      candidate !== null &&
+      (candidate as { code?: unknown }).code === EXCLUSION_VIOLATION,
+  );
+}

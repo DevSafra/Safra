@@ -213,7 +213,7 @@ export class PropertyDetailService {
         LEFT JOIN availability_days ad ON ad.unit_id = u.id AND ad.date = days.date
         LEFT JOIN bookings b
           ON b.unit_id = u.id
-         AND b.status IN ('pending_confirmation', 'confirmed', 'checked_in')
+         AND b.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
          AND days.date >= b.check_in AND days.date < b.check_out
         WHERE p.slug = ${slug} AND u.is_active AND u.deleted_at IS NULL
       )

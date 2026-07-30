@@ -67,7 +67,7 @@ export class CalendarService {
         ON ad.unit_id = u.id AND ad.date = d.day::date
       LEFT JOIN bookings b
         ON b.unit_id = u.id
-       AND b.status IN ('pending_confirmation', 'confirmed', 'checked_in')
+       AND b.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
        AND d.day::date >= b.check_in
        AND d.day::date <  b.check_out
       WHERE u.id = ${unitId}
