@@ -127,5 +127,42 @@
     "booked": "Booked",
     "closed": "Closed",
     "maintenance": "Under maintenance"
+  },
+  "checkout": {
+    "title": "Complete your booking",
+    "subtitle": "You pay SAFRA in full now · the booking becomes “pending confirmation” until the partner approves",
+    "guestDetails": "Guest details",
+    "noAccountNeeded": "You can book without creating an account.",
+    "fullName": "Full name",
+    "email": "Email address",
+    "phone": "Phone number (WhatsApp)",
+    "phoneHint": "International format, e.g. +963912345678",
+    "submit": "Continue to payment",
+    "submitting": "Processing…",
+    "terms": "By continuing you accept the cancellation policy and SAFRA's terms.",
+    "summary": "Payment summary",
+    "subtotal": "Nights subtotal",
+    "dueNow": "Due now",
+    "notInstant": "Booking is not instant: after payment SAFRA contacts the partner to confirm availability within two hours. If they do not confirm, you are refunded in full and compensated in your wallet.",
+    "missingDetails": "Booking details are incomplete.",
+    "backToSearch": "Search stays",
+    "backToProperty": "Back to the property",
+    "unavailable": "This unit is not available for those dates.",
+    "unavailableHint": "It may have just been booked. Try different dates.",
+    "datesTaken": "Those dates were taken a moment ago. Please choose different dates.",
+    "cutoffClosed": "Today's bookings have closed. The first available date is {date}.",
+    "fixFields": "Please correct the highlighted fields.",
+    "networkError": "Could not connect. Try again — this will not create a duplicate booking.",
+    "genericError": "Something unexpected happened. Please try again."
+  },
+  "bookingPending": {
+    "title": "Paid — your booking is pending confirmation",
+    "body": "SAFRA received your payment. We are contacting the partner to confirm availability.",
+    "referenceLabel": "Booking reference",
+    "step1": "SAFRA contacts the partner to confirm availability within two hours.",
+    "step2": "On approval you receive WhatsApp and email with your voucher and QR code.",
+    "step3": "On arrival you use your booking reference or QR code with the partner.",
+    "guarantee": "If the partner does not respond in time: the booking is cancelled, you are refunded in full, and compensation is added to your wallet automatically.",
+    "backHome": "Back to home"
   }
 }

@@ -127,3 +127,47 @@ export function imageUrl(
 
   return `${base}/${image.fileKey}-${chosen}.${format}`;
 }
+
+const quoteSchema = z.object({
+  nights: z.number(),
+  baseAmount: z.string(),
+  customerFeeAmount: z.string(),
+  totalAmount: z.string(),
+  currencyCode: z.string(),
+  nightly: z.array(z.object({ date: z.string(), amount: z.string() })),
+});
+
+export type Quote = z.infer<typeof quoteSchema>;
+
+/**
+ * A live price quote for a specific unit and date range.
+ *
+ * Never cached. The checkout total is what the customer is about to be charged, and a
+ * stale figure there is a dispute waiting to happen. Returns null when the unit is no
+ * longer bookable, so the page can say so rather than showing a price for something
+ * unavailable.
+ */
+export async function quote(input: {
+  unitId: string;
+  checkIn: string;
+  checkOut: string;
+}): Promise<Quote | null> {
+  const url = new URL(`${API_URL}/api/v1/bookings/quote`);
+  url.searchParams.set('unitId', input.unitId);
+  url.searchParams.set('checkIn', input.checkIn);
+  url.searchParams.set('checkOut', input.checkOut);
+
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) return null;
+
+    const parsed = quoteSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}

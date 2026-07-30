@@ -77,6 +77,7 @@ export default async function PropertyPage({
   const description = pick(property.description, locale);
   const cityName = cityLabel(property.city, locale);
   const cheapest = property.units[0];
+  const defaultStay = firstAvailableWindow(property.calendar, cheapest?.minNights ?? 1);
 
   return (
     <article className="mx-auto max-w-6xl px-4 py-8">
@@ -253,8 +254,13 @@ export default async function PropertyPage({
                   </div>
                 </dl>
 
+                {/*
+                  Carries the unit and a concrete date range, because checkout needs
+                  both to quote a price. The first bookable window from the calendar is
+                  used as the default so the link always lands on something valid.
+                */}
                 <Link
-                  href={`/${locale}/search?citySlug=${property.city.slug}`}
+                  href={`/${locale}/checkout?property=${property.slug}&unitId=${cheapest.id}&checkIn=${defaultStay.checkIn}&checkOut=${defaultStay.checkOut}&adults=${Math.min(2, cheapest.maxGuests)}`}
                   className="mt-5 block rounded-lg bg-gold px-5 py-3 text-center font-semibold text-bg transition-opacity hover:opacity-90"
                 >
                   {t('bookNow')}
@@ -411,4 +417,46 @@ function dayGlyph(status: string): string {
   if (status === 'booked') return '●';
   if (status === 'maintenance') return '⚒';
   return '×';
+}
+
+/**
+ * The first run of consecutive available days long enough to satisfy minNights.
+ *
+ * Linking "Book now" at today's date would often land on a closed or booked night and
+ * greet the customer with an error on the checkout page. Finding a genuinely bookable
+ * window from the calendar this page already loaded costs nothing and means the button
+ * always works.
+ */
+function firstAvailableWindow(
+  calendar: PropertyDetail['calendar'],
+  minNights: number,
+): { checkIn: string; checkOut: string } {
+  const required = Math.max(minNights, 1);
+  let runStart: string | null = null;
+  let runLength = 0;
+
+  for (const day of calendar) {
+    if (day.status === 'available') {
+      runStart ??= day.date;
+      runLength += 1;
+
+      if (runLength >= required && runStart) {
+        return { checkIn: runStart, checkOut: shiftDate(runStart, required) };
+      }
+    } else {
+      runStart = null;
+      runLength = 0;
+    }
+  }
+
+  // Nothing bookable within the calendar window. Checkout will quote these dates and
+  // report the real reason, rather than this page guessing at one.
+  const fallback = calendar[0]?.date ?? new Date().toISOString().slice(0, 10);
+  return { checkIn: fallback, checkOut: shiftDate(fallback, required) };
+}
+
+/** Calendar arithmetic on a date-only value; UTC avoids any DST component. */
+function shiftDate(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }

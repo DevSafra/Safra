@@ -127,5 +127,42 @@
     "booked": "Gebucht",
     "closed": "Geschlossen",
     "maintenance": "In Wartung"
+  },
+  "checkout": {
+    "title": "Buchung abschließen",
+    "subtitle": "Sie zahlen jetzt den vollen Betrag an SAFRA · die Buchung ist „ausstehend“ bis der Partner bestätigt",
+    "guestDetails": "Gästedaten",
+    "noAccountNeeded": "Sie können ohne Konto buchen.",
+    "fullName": "Vollständiger Name",
+    "email": "E-Mail-Adresse",
+    "phone": "Telefonnummer (WhatsApp)",
+    "phoneHint": "Internationales Format, z. B. +963912345678",
+    "submit": "Weiter zur Zahlung",
+    "submitting": "Wird verarbeitet…",
+    "terms": "Mit dem Fortfahren akzeptieren Sie die Stornierungsbedingungen und die AGB von SAFRA.",
+    "summary": "Zahlungsübersicht",
+    "subtotal": "Zwischensumme Nächte",
+    "dueNow": "Jetzt fällig",
+    "notInstant": "Die Buchung erfolgt nicht sofort: Nach der Zahlung kontaktiert SAFRA den Partner, um die Verfügbarkeit innerhalb von zwei Stunden zu bestätigen. Ohne Bestätigung erhalten Sie den vollen Betrag zurück plus Entschädigung in Ihrer Wallet.",
+    "missingDetails": "Die Buchungsdaten sind unvollständig.",
+    "backToSearch": "Unterkünfte suchen",
+    "backToProperty": "Zurück zur Unterkunft",
+    "unavailable": "Diese Einheit ist für diese Daten nicht verfügbar.",
+    "unavailableHint": "Sie wurde möglicherweise gerade gebucht. Versuchen Sie andere Daten.",
+    "datesTaken": "Diese Daten wurden gerade vergeben. Bitte wählen Sie andere Daten.",
+    "cutoffClosed": "Buchungen für heute sind geschlossen. Das erste verfügbare Datum ist {date}.",
+    "fixFields": "Bitte korrigieren Sie die markierten Felder.",
+    "networkError": "Verbindung fehlgeschlagen. Versuchen Sie es erneut — es entsteht keine Doppelbuchung.",
+    "genericError": "Ein unerwarteter Fehler ist aufgetreten. Bitte erneut versuchen."
+  },
+  "bookingPending": {
+    "title": "Bezahlt — Ihre Buchung wird bestätigt",
+    "body": "SAFRA hat Ihre Zahlung erhalten. Wir kontaktieren den Partner zur Bestätigung der Verfügbarkeit.",
+    "referenceLabel": "Buchungsnummer",
+    "step1": "SAFRA kontaktiert den Partner zur Bestätigung innerhalb von zwei Stunden.",
+    "step2": "Nach Zustimmung erhalten Sie WhatsApp und E-Mail mit Voucher und QR-Code.",
+    "step3": "Bei der Ankunft nutzen Sie Ihre Buchungsnummer oder den QR-Code.",
+    "guarantee": "Antwortet der Partner nicht rechtzeitig: Die Buchung wird storniert, Sie erhalten den vollen Betrag zurück und eine Entschädigung in Ihrer Wallet.",
+    "backHome": "Zurück zur Startseite"
   }
 }
