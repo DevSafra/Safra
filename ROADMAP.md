@@ -25,8 +25,11 @@ and search are done; booking, money, both dashboards and all communications are 
 7. ✅ Build info parked inside `dist` so `rm -rf dist` truly resets an incremental build
 8. ✅ ESLint flat config, type-aware — floating promises, unsafe `any`, `restrict-plus-operands`
    for money strings, no `ts-ignore`. Found 3 real defects on first run.
-9. ✅ CI pipeline — format, lint, typecheck, build, migrate, seed, **idempotency re-run**,
-   tests against a real PostgreSQL service, plus dependency audit and gitleaks secret scan
+9. ✅ CI pipeline — build → lint → typecheck → migrate → seed → idempotency re-run → tests
+   against a real PostgreSQL service, plus a production-only audit gate, a full-tree audit,
+   and gitleaks. **Build must precede lint**: type-aware ESLint resolves workspace types
+   through `dist`, and every run before 2026-07-30 failed at Lint for exactly that reason,
+   masking every later step
 10. ❌ Pre-commit hook (lint + format + typecheck before commit)
 
 ### 0.2 Database schema (28 tables)
@@ -211,6 +214,11 @@ and search are done; booking, money, both dashboards and all communications are 
      settings, badges, "Book now" / "Ask SAFRA" and **no partner contact before
      confirmation** (P-001, verified)
 129. ❌ Accessibility pass and Core Web Vitals budget (§14.1: home < 2 s)
+129b. ✅ Checkout page and confirmation page — live server-quoted price with every night
+     itemised, guest details without an account (§4), stable idempotency key per form so a
+     double-click cannot duplicate a booking, and inline field errors from the shared Zod
+     schema. Posts through a Next route handler so the API origin stays server-side and the
+     real client IP reaches the audit trail
 
 ---
 
@@ -232,7 +240,10 @@ and search are done; booking, money, both dashboards and all communications are 
      runs the handler twice; same key + different body returns 422 (EC-003)
 137. ❌ Webhook handling and reconciliation (EC-002)
 138. ❌ Split payment — gift card + wallet + card in one transaction (§7.3)
-139. ❌ Double-entry ledger writes on every money movement
+139. ✅ Double-entry ledger — 4 legs per captured payment, posted in the SAME transaction as
+     the status change; partner fines posted too. Trial balance endpoint verified balanced
+     across multiple bookings, and the append-only + balance triggers verified to reject
+     both an unbalanced group and an UPDATE
 140. ✅ FX rate snapshotted onto each booking, exact bigint arithmetic at SYP magnitudes
 141. ❌ Wallet credit/debit operations
 142. ❌ Gift card purchase, redemption, partial balance (§11.2)

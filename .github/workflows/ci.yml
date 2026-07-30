@@ -56,14 +56,19 @@ jobs:
       - name: Format check
         run: pnpm run format:check
 
+      # Build FIRST. Type-aware ESLint and tsc both resolve @safra/db and
+      # @safra/contracts through their `exports`, which point at dist/*.d.ts. Without
+      # those files every cross-package symbol is `error`-typed and the no-unsafe-*
+      # rules fire in the thousands — which is exactly how this job failed on every
+      # run until 2026-07-30, masking typecheck, migrations and tests entirely.
+      - name: Build
+        run: pnpm run build
+
       - name: Lint
         run: pnpm run lint
 
       - name: Typecheck
         run: pnpm run typecheck
-
-      - name: Build
-        run: pnpm run build
 
       - name: Migrate test database
         run: pnpm run db:migrate
