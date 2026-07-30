@@ -297,14 +297,17 @@ and search are done; booking, money, both dashboards and all communications are 
        year-scoped sequence: without it anyone could pay for, and read the total of, a guessed
        booking. Constant-time comparison, a dummy compare when the booking is absent so timing
        cannot confirm which references exist, 404-not-403 throughout, and revoked on capture
-     - ❌ **150b** **DEFECT (pre-existing, found 2026-07-30): `fx_rates` is empty after a fresh seed and
-       `PricingService.currentFxToSyp` silently falls back to `'1'` for a non-SYP currency.**
-       Every `amount_syp` in the ledger is then understated by ~13,000x, so §1.4's SYP display
-       and all SYP reporting are wrong on a fresh install. Two candidate fixes, and the choice is
-       a business call: refuse to price a booking with no configured rate (a fresh deploy then
-       cannot take bookings until an admin sets one), or seed a starting USD→SYP rate that an
-       admin must maintain. Not changed here — it sits outside the payment scope and alters
-       whether a new deployment can accept bookings at all
+     - ✅ **150b** **FX defect fixed (found and fixed 2026-07-30).** Pricing previously fell
+       back to a rate of `'1'` when `fx_rates` had no row — the state of every fresh
+       install — so a $220 booking recorded `total_syp = 220` instead of ~2,860,000.
+       Nothing failed and nothing warned. Pricing now **refuses**: a missing rate raises
+       503 with a generic client message and an actionable server log, because a platform
+       that cannot convert to its own accounting currency cannot honestly price a stay.
+       Consequences, all deliberate: a fresh deployment cannot take bookings until an
+       admin sets a rate; no rate is seeded, since a hardcoded one goes stale and a wrong
+       rate is worse than a missing one because it looks plausible; and `pnpm db:seed`
+       prints an ACTION REQUIRED block when none is configured, so the requirement is
+       visible where an operator will see it
      - ❌ **150c** PSP fee ledger leg — the fee is recorded on `payments.provider_fee_amount` and the
        `payment_provider_fee` account exists, but no leg is posted. Deferred deliberately:
        most PSPs only report the fee at settlement, not capture, so whether it belongs in the
@@ -313,6 +316,18 @@ and search are done; booking, money, both dashboards and all communications are 
        and next steps, but not the GmbH's IBAN/beneficiary. Those are business data belonging in
        settings alongside the payout configuration (items 84, 193), so the page has nowhere to
        read them from yet
+     - ✅ **150e** FX rate administration — `GET`/`POST /admin/fx-rates` gated on
+       `FX_RATE_MANAGE`, shipped in the SAME change as the refusal because refusing with
+       no remedy would have bricked pricing. Rates are decimal STRINGS (a JSON number is
+       an IEEE-754 double, which is the class of bug being fixed); setting one is an
+       INSERT so history is never rewritten and a booking's snapshot stays reproducible;
+       the cache is invalidated on write so an admin sees pricing recover immediately; and
+       the audit row records the old and new rate, written inside the insert transaction
+       because the route interceptor resolves its subject from a route param and captured
+       neither
+     - ❌ **150f** Grant `FX_RATE_MANAGE` to `finance_officer` — a policy call, not an
+       engineering one. Today only `super_admin` holds it, so finance cannot see or set
+       the rate their books depend on
 
 ---
 
