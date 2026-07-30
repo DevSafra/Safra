@@ -82,7 +82,28 @@ export class CatalogService {
 
     if (!city) throw new NotFoundException('City not found.');
 
-    return city;
+    // §5.4's hero band. Hero first, then by sort order.
+    const images = await this.db.execute<Record<string, unknown>>(sql`
+      SELECT i.file_key, i.variant_widths, i.width, i.height,
+             i.alt_ar, i.alt_en, i.alt_de, i.credit, i.is_hero
+      FROM city_images i
+      JOIN cities c ON c.id = i.city_id
+      WHERE c.slug = ${slug} AND i.deleted_at IS NULL
+      ORDER BY i.is_hero DESC, i.sort_order
+    `);
+
+    return {
+      ...city,
+      images: images.rows.map((r) => ({
+        fileKey: r['file_key'],
+        variantWidths: (r['variant_widths'] as number[] | null) ?? [],
+        width: r['width'] === null ? null : Number(r['width']),
+        height: r['height'] === null ? null : Number(r['height']),
+        alt: { ar: r['alt_ar'], en: r['alt_en'], de: r['alt_de'] },
+        credit: r['credit'],
+        isHero: r['is_hero'] === true,
+      })),
+    };
   }
 
   /** Property types with a live count, for the "types of stay" grid. */

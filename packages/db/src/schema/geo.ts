@@ -98,6 +98,39 @@ export const cities = pgTable(
 );
 
 /**
+ * City photography for the hero band (§5.4: "the first third of the page is
+ * high-quality images of the city").
+ *
+ * A separate table rather than a column on `cities` because the spec asks for
+ * imagery in the plural, and a hero band rotates through several. Shares the same
+ * upload pipeline as property images, so the same validation and EXIF stripping
+ * apply — city photos are usually licensed stock, and stripping metadata avoids
+ * republishing a photographer's embedded details by accident.
+ */
+export const cityImages = pgTable(
+  'city_images',
+  {
+    id: primaryId(),
+    cityId: foreignId('city_id')
+      .notNull()
+      .references(() => cities.id),
+    fileKey: text('file_key').notNull(),
+    variantWidths: integer('variant_widths').array().notNull().default([]),
+    width: integer('width'),
+    height: integer('height'),
+    altAr: text('alt_ar'),
+    altEn: text('alt_en'),
+    altDe: text('alt_de'),
+    /** Attribution, where the licence requires it. */
+    credit: text('credit'),
+    isHero: boolean('is_hero').notNull().default(false),
+    sortOrder: integer('sort_order').notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [index('city_images_city_idx').on(t.cityId, t.sortOrder)],
+);
+
+/**
  * SRS §1.4 makes SYP the internal accounting currency, and SYP is volatile. Rates
  * are therefore an immutable time series, and every financial record snapshots the
  * rate it used (see bookings.fxRateToSyp). Without that, last month's revenue

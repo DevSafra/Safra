@@ -26,25 +26,27 @@ export class MediaController {
   private readonly root = resolve(process.cwd(), '.storage');
 
   /**
-   * Only the exact key shape this system generates:
-   * `properties/<REFERENCE>/<uuid>-<width>.<avif|webp>`
+   * Only the exact key shapes this system generates:
+   * `properties/<REFERENCE>/<uuid>-<width>.<avif|webp>` and
+   * `cities/<slug>/<uuid>-<width>.<avif|webp>`
    *
    * An allow-list pattern rather than a traversal blocklist — there is no `..` to
    * filter because nothing outside this shape is accepted in the first place.
    */
   private static readonly KEY_PATTERN =
-    /^properties\/[A-Za-z0-9-]{1,40}\/[0-9a-f-]{36}-\d{2,5}\.(avif|webp)$/;
+    /^(properties|cities)\/[A-Za-z0-9-]{1,60}\/[0-9a-f-]{36}-\d{2,5}\.(avif|webp)$/;
 
   @Public()
-  @Get('properties/:reference/:filename')
+  @Get(':kind/:owner/:filename')
   @Header('Cache-Control', 'public, max-age=31536000, immutable')
   @Header('X-Content-Type-Options', 'nosniff')
   async serve(
-    @Param('reference') reference: string,
+    @Param('kind') kind: string,
+    @Param('owner') owner: string,
     @Param('filename') filename: string,
     @Res() response: Response,
   ): Promise<void> {
-    const key = `properties/${reference}/${filename}`;
+    const key = `${kind}/${owner}/${filename}`;
 
     if (!MediaController.KEY_PATTERN.test(key)) {
       throw new NotFoundException();

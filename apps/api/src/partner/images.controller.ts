@@ -17,6 +17,7 @@ import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
+import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { ImageService } from '../storage/image.service.js';
@@ -48,6 +49,7 @@ export class PartnerImagesController {
 
   @Post()
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @AuditExempt('Audited transactionally alongside the property_images insert.')
   // Image processing is CPU-heavy, so the budget is tighter than the global one.
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @UseInterceptors(
@@ -97,7 +99,8 @@ export class PartnerImagesController {
      * anything by the client; only the decoded file header is evidence.
      */
     const processed = await this.images.process(file.buffer, {
-      propertyReference: property.reference,
+      kind: 'properties',
+      owner: property.reference,
     });
 
     const inserted = await this.db.transaction(async (tx) => {
@@ -157,6 +160,7 @@ export class PartnerImagesController {
   /** Soft delete only (P-003). The stored objects are intentionally left in place. */
   @Delete(':imageId')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @AuditExempt('Audited transactionally alongside the soft delete.')
   async remove(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('reference') reference: string,

@@ -54,7 +54,12 @@ export class ImageService {
 
   async process(
     buffer: Buffer,
-    context: { propertyReference: string },
+    /**
+     * `kind` and `owner` build the storage prefix, e.g. `properties/PRO-000101` or
+     * `cities/damascus`. Kept generic so a city image is not filed under
+     * `properties/` — storage layout should describe what it holds.
+     */
+    context: { kind: 'properties' | 'cities'; owner: string },
   ): Promise<ProcessedImage> {
     if (buffer.byteLength === 0) {
       throw new BadRequestException('The uploaded file is empty.');
@@ -106,7 +111,7 @@ export class ImageService {
     // caller-influenced key is a path-traversal write, and a caller-influenced
     // filename is a stored-XSS vector when it is later rendered.
     const id = randomUUID();
-    const prefix = `properties/${context.propertyReference}/${id}`;
+    const prefix = `${context.kind}/${context.owner}/${id}`;
 
     const variants: ProcessedImage['variants'] = [];
 
@@ -141,7 +146,7 @@ export class ImageService {
     }
 
     this.logger.log(
-      `Processed image for ${context.propertyReference}: ${width}×${height} ${format} → ${variants.length} variants`,
+      `Processed image for ${context.kind}/${context.owner}: ${width}×${height} ${format} → ${variants.length} variants`,
     );
 
     return {
