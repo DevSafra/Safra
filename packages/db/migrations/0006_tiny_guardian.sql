@@ -1,0 +1,1 @@
+ALTER TABLE "property_images" ADD COLUMN "variant_widths" integer[] DEFAULT '{}' NOT NULL;

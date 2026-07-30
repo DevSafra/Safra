@@ -160,6 +160,15 @@ export const propertyImages = pgTable(
     altDe: text('alt_de'),
     width: integer('width'),
     height: integer('height'),
+    /**
+     * The widths actually rendered for this image.
+     *
+     * The pipeline never upscales, so a 1200 px source yields 400/800/1200 — not
+     * the nominal 400/800/1600. Storing the real set is the only way the frontend
+     * can request a variant that exists; recomputing the rule client-side means two
+     * copies of it that silently drift apart.
+     */
+    variantWidths: integer('variant_widths').array().notNull().default([]),
     isCover: boolean('is_cover').notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
     ...timestamps,

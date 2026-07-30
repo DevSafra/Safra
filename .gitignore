@@ -47,3 +47,6 @@ docker/volumes/
 # Root CLAUDE.md only imports .claude/CLAUDE.md, which is ignored above — committing
 # it would leave a dangling reference in a fresh clone.
 CLAUDE.md
+
+# Local object storage (development only)
+.storage/

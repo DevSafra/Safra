@@ -43,6 +43,13 @@
       "when": 1785358699767,
       "tag": "0005_unique_valeria_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785413809516,
+      "tag": "0006_tiny_guardian",
+      "breakpoints": true
     }
   ]
 }

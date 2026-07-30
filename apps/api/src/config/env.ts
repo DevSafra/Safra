@@ -46,6 +46,21 @@ export const envSchema = z.object({
       'Must be 64 hex characters. Generate with: openssl rand -hex 32',
     ),
 
+  /** This service's own public base URL, used to build media links. */
+  API_URL_SELF: z.string().url().default('http://localhost:4000'),
+
+  /**
+   * Object storage. All optional: when unset the API falls back to local disk,
+   * which keeps a fresh checkout runnable without cloud credentials.
+   */
+  S3_ENDPOINT: z.string().url().optional(),
+  S3_REGION: z.string().optional(),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  /** CDN or bucket URL images are served from, if different from the endpoint. */
+  S3_PUBLIC_URL: z.string().url().optional(),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 
