@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
+import { AuditInterceptor } from './common/audit/audit.interceptor.js';
+import { AuditService } from './common/audit/audit.service.js';
 import { AuthModule } from './auth/auth.module.js';
 import { BookingsModule } from './bookings/bookings.module.js';
 import { DatabaseModule } from './database/database.module.js';
@@ -45,6 +47,10 @@ import { PermissionsGuard } from './rbac/permissions.guard.js';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    // Runs after the guards, so an unauthorised request is never audited as an
+    // action. Also warns about mutating routes with no audit declaration (§15).
+    AuditService,
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
 export class AppModule {}
