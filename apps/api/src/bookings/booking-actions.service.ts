@@ -1,5 +1,4 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { v7 as uuidv7 } from 'uuid';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -90,20 +89,31 @@ export class BookingActionsService {
       `);
 
       /**
-       * A payment row is created even without a gateway, so the ledger's payment_id
-       * foreign key points at something real and the eventual webhook has a record to
-       * attach its provider reference to.
+       * Two callers, two shapes.
+       *
+       * A webhook already has a payment row — the one the customer paid against —
+       * so it passes the id and this only marks it captured. Inserting a second row
+       * there would leave the real attempt permanently "requires_action" and make
+       * refunds route through a payment that never took money.
+       *
+       * The staff simulate-capture path has no row, so one is created to satisfy
+       * the ledger's payment_id foreign key.
        */
-      const created = await tx.execute<{ id: string }>(sql`
-        INSERT INTO payments
-          (booking_id, method, provider, amount, currency_id, status, captured_at)
-        VALUES (${booking.id}, 'wallet'::payment_method, 'internal',
-                ${amounts.total_amount}, ${amounts.currency_id},
-                'captured'::payment_status, now())
-        RETURNING id
-      `);
+      const payment =
+        paymentId ??
+        (await this.createInternalPayment(
+          tx as unknown as Database,
+          booking.id,
+          amounts,
+        ));
 
-      const payment = created.rows[0]?.id ?? paymentId ?? uuidv7();
+      if (paymentId) {
+        await tx.execute(sql`
+          UPDATE payments
+          SET status = 'captured'::payment_status, captured_at = now(), updated_at = now()
+          WHERE id = ${paymentId}
+        `);
+      }
 
       /**
        * §13.3: the money is recorded the moment it is captured, in the SAME
@@ -317,6 +327,32 @@ export class BookingActionsService {
       // module — there is no captured payment to refund until a gateway exists.
       return { reference, status: 'cancelled' as const, refundPending: true };
     });
+  }
+
+  /**
+   * A payment row for a capture that had no gateway behind it.
+   *
+   * `provider = 'internal'` is what marks it as such, so a later reconciliation can
+   * tell staff-simulated money from money an acquirer actually settled.
+   */
+  private async createInternalPayment(
+    tx: Database,
+    bookingId: string,
+    amounts: { total_amount: string; currency_id: string },
+  ): Promise<string> {
+    const created = await tx.execute<{ id: string }>(sql`
+      INSERT INTO payments
+        (booking_id, method, provider, amount, currency_id, status, captured_at)
+      VALUES (${bookingId}, 'wallet'::payment_method, 'internal',
+              ${amounts.total_amount}, ${amounts.currency_id},
+              'captured'::payment_status, now())
+      RETURNING id
+    `);
+
+    const id = created.rows[0]?.id;
+    if (!id) throw new Error('Payment insert returned no row.');
+
+    return id;
   }
 
   private async load(reference: string) {

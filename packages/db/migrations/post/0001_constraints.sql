@@ -179,6 +179,42 @@ BEGIN
   END LOOP;
 END $$;
 
+-- Webhook evidence is partially immutable: the received payload and its signature
+-- verdict may never change, but processing state must be writable.
+--
+-- A blanket append-only trigger cannot express that, and leaving the table fully
+-- mutable would let a bug — or an attacker with a SQL foothold — rewrite a forged
+-- payload as a verified one after the fact, destroying the only record of the
+-- forgery. So the trigger allows exactly the two processing columns to move and
+-- rejects everything else, including any DELETE.
+CREATE OR REPLACE FUNCTION deny_payment_event_rewrite() RETURNS trigger AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION
+      'payment_provider_events is append-only; DELETE is not permitted.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  IF NEW.provider           IS DISTINCT FROM OLD.provider
+  OR NEW.provider_event_id  IS DISTINCT FROM OLD.provider_event_id
+  OR NEW.event_type         IS DISTINCT FROM OLD.event_type
+  OR NEW.payload            IS DISTINCT FROM OLD.payload
+  OR NEW.signature_verified IS DISTINCT FROM OLD.signature_verified
+  OR NEW.created_at         IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION
+      'payment_provider_events: only processed_at, processing_error and payment_id may be updated.'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS payment_provider_events_immutable ON payment_provider_events;
+CREATE TRIGGER payment_provider_events_immutable
+  BEFORE UPDATE OR DELETE ON payment_provider_events
+  FOR EACH ROW EXECUTE FUNCTION deny_payment_event_rewrite();
+
 -- ----------------------------------------------------------------------------
 -- 4. updated_at maintenance — one trigger, not scattered application code.
 -- ----------------------------------------------------------------------------

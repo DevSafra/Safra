@@ -73,22 +73,54 @@ export const dayStatus = pgEnum('day_status', [
   'maintenance',
 ]);
 
-/** SRS §7.1. Rails are enum values; which are ENABLED is per-country config. */
+/**
+ * Payment rails (SRS §7.1, narrowed by Bashar on 2026-07-30).
+ *
+ * The four the site offers a customer are **visa, mastercard, sham_cash, klarna**.
+ * `paypal` and `apple_pay` were removed on instruction — §7.1 names PayPal, but it
+ * refused Syria-originating business in March 2026, so the spec could not have been
+ * satisfied anyway (ADR 0002).
+ *
+ * The remaining three are NOT customer-facing and exist for different reasons:
+ *
+ *  - `gift_card` and `wallet` are internal SAFRA balances, not gateways. §7.3's
+ *    split payment and §11.2's gift cards are settled against them, so removing
+ *    them would delete those features rather than a payment option.
+ *  - `bank_transfer` is the finance-side SEPA fallback. It is deliberately absent
+ *    from the offered set (see CUSTOMER_FACING_METHODS in @safra/contracts), so a
+ *    customer never sees it, but it is retained because it is the only rail that
+ *    needs no third-party agreement — which matters while all three external rails
+ *    are pending underwriting.
+ *
+ * Which of the four are actually OFFERED is derived from provider routing, never
+ * hardcoded: a method with no registered provider behind it is not shown.
+ */
 export const paymentMethod = pgEnum('payment_method', [
   'visa',
   'mastercard',
   'sham_cash',
-  'paypal',
-  'apple_pay',
+  'klarna',
   'gift_card',
   'wallet',
+  'bank_transfer',
 ]);
 
+/**
+ * `requires_action` is not cosmetic — it is PSD2/SCA.
+ *
+ * An EEA card payment routinely suspends mid-flow for a 3-D Secure challenge, so
+ * "initiated" and "authorized" cannot describe the interval where the customer
+ * has left for their bank's page. Without a state for it, a resumed payment looks
+ * indistinguishable from a stalled one and the SLA sweep would cancel bookings
+ * whose customers are mid-challenge.
+ */
 export const paymentStatus = pgEnum('payment_status', [
   'initiated',
+  'requires_action',
   'authorized',
   'captured',
   'failed',
+  'expired',
   'refunded',
   'partially_refunded',
 ]);
@@ -115,6 +147,12 @@ export const ledgerAccount = pgEnum('ledger_account', [
   'wallet_debit',
   'gift_card_redemption',
   'partner_fine',
+  /**
+   * What the PSP keeps. A cost to SAFRA, not to the partner and not to the
+   * customer, so it needs its own account: netting it against commission would
+   * overstate the fee SAFRA actually earned and make the margin unreadable.
+   */
+  'payment_provider_fee',
 ]);
 
 export const ledgerDirection = pgEnum('ledger_direction', ['debit', 'credit']);

@@ -1,5 +1,6 @@
 import { relations, sql } from 'drizzle-orm';
 import {
+  boolean,
   index,
   jsonb,
   numeric,
@@ -35,9 +36,10 @@ export const payments = pgTable(
       .references(() => bookings.id),
     method: paymentMethod('method').notNull(),
     /**
-     * Provider slug ("sham_cash", "stripe", …). Stored per payment because the
-     * merchant entity is undecided and rails differ per country — a refund must
-     * route back through the provider that took the money. See ADR 0002.
+     * Provider slug ("manual_transfer", "klarna", …) — the GATEWAY, distinct from
+     * `method`, which is the rail the customer chose. Stored per payment because a
+     * refund must route back through whichever provider took the money, and rails
+     * differ per country. See ADR 0002.
      */
     provider: text('provider').notNull(),
     providerRef: text('provider_ref'),
@@ -52,10 +54,16 @@ export const payments = pgTable(
     /** Provider message for staff. Never surfaced raw to the customer (§1). */
     failureReason: text('failure_reason'),
     /**
-     * Raw webhook payloads, append-only. EC-002 (payment succeeded but the
-     * customer's connection dropped) is resolved from these, not from the client.
+     * When this attempt stops being payable. Mirrors the booking's payment window
+     * so an abandoned intent cannot be completed after EC-001 released the dates —
+     * otherwise a customer pays for a stay someone else now holds.
      */
-    providerEvents: jsonb('provider_events').$type<unknown[]>().notNull().default([]),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    /**
+     * What the PSP kept. Nullable because most rails only reveal it on settlement,
+     * and a guessed fee in the books is worse than a missing one.
+     */
+    providerFeeAmount: money('provider_fee_amount'),
     ...timestamps,
   },
   (t) => [
@@ -64,6 +72,60 @@ export const payments = pgTable(
       .on(t.provider, t.providerRef)
       .where(sql`provider_ref IS NOT NULL`),
     index('payments_status_idx').on(t.status, t.createdAt),
+    /** The sweep that expires abandoned intents; partial so it stays small. */
+    index('payments_expiry_idx')
+      .on(t.expiresAt)
+      .where(sql`status IN ('initiated','requires_action') AND expires_at IS NOT NULL`),
+  ],
+);
+
+/**
+ * Every webhook a provider ever sent us, append-only.
+ *
+ * A table rather than a jsonb array on `payments`, for three reasons that all bite
+ * in production:
+ *
+ *  1. **Dedupe needs a unique index.** PSPs retry aggressively and guarantee only
+ *     at-least-once delivery, so the same event arrives repeatedly. `(provider,
+ *     provider_event_id)` unique turns a replayed capture into a no-op instead of a
+ *     double ledger posting.
+ *  2. **It must be writable before the payment is known.** A webhook for an unknown
+ *     or mismatched reference still has to be recorded — that is precisely the
+ *     evidence needed to investigate. `payment_id` is therefore nullable.
+ *  3. An array column grows without bound on a row read in the payment hot path.
+ *
+ * EC-002 (payment succeeded, customer's connection dropped) is resolved from here,
+ * never from the client's claim about what happened.
+ */
+export const paymentProviderEvents = pgTable(
+  'payment_provider_events',
+  {
+    id: primaryId(),
+    provider: text('provider').notNull(),
+    /** The PSP's own event id — the dedupe key. */
+    providerEventId: text('provider_event_id').notNull(),
+    eventType: text('event_type').notNull(),
+    paymentId: foreignId('payment_id').references(() => payments.id),
+    /** Unparsed body as received, so a signature can be re-verified later. */
+    payload: jsonb('payload').notNull(),
+    /**
+     * False means the signature did not verify. Such an event is stored and NEVER
+     * acted upon: discarding it would erase the only trace of someone probing the
+     * webhook endpoint.
+     */
+    signatureVerified: boolean('signature_verified').notNull(),
+    /** Null until handled, so a crash mid-processing is visibly unfinished. */
+    processedAt: timestamp('processed_at', { withTimezone: true }),
+    processingError: text('processing_error'),
+    ...createdAt,
+  },
+  (t) => [
+    uniqueIndex('payment_provider_events_dedupe').on(t.provider, t.providerEventId),
+    index('payment_provider_events_payment_idx').on(t.paymentId, t.createdAt),
+    /** Finds events that were received but never completed processing. */
+    index('payment_provider_events_unprocessed_idx')
+      .on(t.createdAt)
+      .where(sql`processed_at IS NULL`),
   ],
 );
 
@@ -176,4 +238,15 @@ export const paymentsRelations = relations(payments, ({ one, many }) => ({
     references: [currencies.id],
   }),
   refunds: many(refunds),
+  providerEvents: many(paymentProviderEvents),
 }));
+
+export const paymentProviderEventsRelations = relations(
+  paymentProviderEvents,
+  ({ one }) => ({
+    payment: one(payments, {
+      fields: [paymentProviderEvents.paymentId],
+      references: [payments.id],
+    }),
+  }),
+);
