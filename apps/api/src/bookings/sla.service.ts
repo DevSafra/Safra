@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { LedgerService } from '../ledger/ledger.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
@@ -32,6 +33,7 @@ export class SlaService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly settings: SettingsService,
+    private readonly ledger: LedgerService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE, { name: 'booking-sla-sweep' })
@@ -117,8 +119,10 @@ export class SlaService {
       partner_id: string;
       customer_profile_id: string;
       currency_id: string;
+      fx_rate_to_syp: string;
     }>(sql`
-      SELECT id, reference, partner_id, customer_profile_id, currency_id
+      SELECT id, reference, partner_id, customer_profile_id, currency_id,
+             fx_rate_to_syp::text AS fx_rate_to_syp
       FROM bookings
       WHERE status = 'pending_confirmation'
         AND confirmation_deadline_at IS NOT NULL
@@ -211,6 +215,22 @@ export class SlaService {
                 cancellation_count = cancellation_count + 1
             WHERE id = ${booking.partner_id}
           `);
+
+          /**
+           * The fine and the compensation are two legs of one movement (§13.3): the
+           * partner owes it, the customer's wallet receives it. Posting it keeps the
+           * books balanced — a wallet credit with no matching debit would mean money
+           * appearing from nowhere.
+           */
+          await this.ledger.postPartnerFine(tx as unknown as Database, {
+            bookingId: booking.id,
+            partnerId: booking.partner_id,
+            customerProfileId: booking.customer_profile_id,
+            currencyId: booking.currency_id,
+            fxRateToSyp: booking.fx_rate_to_syp,
+            amount: compensation.toFixed(2),
+            reference: booking.reference,
+          });
 
           await tx.execute(sql`
             INSERT INTO timeline_events (subject_type, subject_id, event_type, actor_type, payload)

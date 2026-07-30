@@ -1,9 +1,11 @@
 import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { v7 as uuidv7 } from 'uuid';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { LedgerService } from '../ledger/ledger.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { canTransition, type Actor, type BookingStatus } from './booking-state.js';
@@ -23,6 +25,7 @@ export class BookingActionsService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
+    private readonly ledger: LedgerService,
   ) {}
 
   /**
@@ -31,10 +34,39 @@ export class BookingActionsService {
    * Called by the payment webhook once a gateway is integrated. Exposed as a service
    * method now so the booking lifecycle is complete and testable without one.
    */
-  async markPaid(reference: string, claims: AccessTokenClaims | undefined) {
+  async markPaid(
+    reference: string,
+    claims: AccessTokenClaims | undefined,
+    paymentId?: string,
+  ) {
     const booking = await this.load(reference);
 
     this.assertTransition(booking.status, 'pending_confirmation', 'system');
+
+    // Every figure needed for the ledger legs, read from the booking's own snapshots
+    // rather than recomputed — the rates may have changed since it was created.
+    const money = await this.db.execute<{
+      id: string;
+      partner_id: string;
+      customer_profile_id: string;
+      currency_id: string;
+      fx_rate_to_syp: string;
+      total_amount: string;
+      customer_fee_amount: string;
+      partner_commission_amount: string;
+      partner_payable_amount: string;
+    }>(sql`
+      SELECT id, partner_id, customer_profile_id, currency_id,
+             fx_rate_to_syp::text AS fx_rate_to_syp,
+             total_amount::text AS total_amount,
+             customer_fee_amount::text AS customer_fee_amount,
+             partner_commission_amount::text AS partner_commission_amount,
+             partner_payable_amount::text AS partner_payable_amount
+      FROM bookings WHERE id = ${booking.id}
+    `);
+
+    const amounts = money.rows[0];
+    if (!amounts) throw new NotFoundException('Booking not found.');
 
     const windowMinutes = await this.settings.getNumber(
       'booking.confirmation_window_minutes',
@@ -57,6 +89,45 @@ export class BookingActionsService {
         VALUES ('booking', ${booking.id}, 'booking.payment_captured', 'system')
       `);
 
+      /**
+       * A payment row is created even without a gateway, so the ledger's payment_id
+       * foreign key points at something real and the eventual webhook has a record to
+       * attach its provider reference to.
+       */
+      const created = await tx.execute<{ id: string }>(sql`
+        INSERT INTO payments
+          (booking_id, method, provider, amount, currency_id, status, captured_at)
+        VALUES (${booking.id}, 'wallet'::payment_method, 'internal',
+                ${amounts.total_amount}, ${amounts.currency_id},
+                'captured'::payment_status, now())
+        RETURNING id
+      `);
+
+      const payment = created.rows[0]?.id ?? paymentId ?? uuidv7();
+
+      /**
+       * §13.3: the money is recorded the moment it is captured, in the SAME
+       * transaction as the status change. A ledger entry that outlived a rolled-back
+       * capture would show revenue that never arrived.
+       */
+      const { entryGroupId } = await this.ledger.postBookingPayment(
+        tx as unknown as Database,
+        {
+          id: amounts.id,
+          partnerId: amounts.partner_id,
+          customerProfileId: amounts.customer_profile_id,
+          currencyId: amounts.currency_id,
+          fxRateToSyp: amounts.fx_rate_to_syp,
+          totalAmount: amounts.total_amount,
+          customerFeeAmount: amounts.customer_fee_amount,
+          partnerCommissionAmount: amounts.partner_commission_amount,
+          partnerPayableAmount: amounts.partner_payable_amount,
+          reference,
+        },
+        payment,
+        claims?.sub,
+      );
+
       await this.audit.record(
         {
           actorUserId: claims?.sub,
@@ -68,13 +139,29 @@ export class BookingActionsService {
           after: {
             status: 'pending_confirmation',
             confirmationWindowMinutes: windowMinutes,
+            ledgerEntryGroup: entryGroupId,
           },
         },
         tx as unknown as Database,
       );
 
-      return { reference, status: 'pending_confirmation' as const };
+      return {
+        reference,
+        status: 'pending_confirmation' as const,
+        ledgerEntryGroup: entryGroupId,
+      };
     });
+  }
+
+  /**
+   * Simulates capture, for exercising the lifecycle before a gateway exists.
+   *
+   * Deliberately staff-gated and separate from markPaid so that when a real webhook
+   * arrives it calls markPaid directly and this stays a testing affordance rather
+   * than becoming a way to mark bookings paid without money.
+   */
+  async simulateCapture(reference: string, claims: AccessTokenClaims | undefined) {
+    return this.markPaid(reference, claims);
   }
 
   /**
