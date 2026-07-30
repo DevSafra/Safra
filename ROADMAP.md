@@ -199,7 +199,11 @@ and search are done; booking, money, both dashboards and all communications are 
 118. ✅ Rejecting a partner suspends their published listings — verified search drops to 0
 119. ✅ Attention counters for the §9.2 dashboard
 120. ❌ Actual sanctions-screening provider integration (the endpoint records a result;
-     nothing calls a screening service)
+     nothing calls a screening service). **Now a legal obligation, not a precaution:** a German
+     merchant entity is bound by EU sanctions law, and while Regulation (EU) 2025/1098 lifted
+     the economic measures from 2025-05-29, asset freezes on persons and entities tied to the
+     former al-Assad regime were renewed on 2026-05-18 until 2027-06-01. Screening partners
+     against the EU consolidated list is therefore required before verification
 121. ❌ Document review workflow per document
 
 ### 1.7 Public web app (`apps/web`) — **not started**
@@ -214,11 +218,11 @@ and search are done; booking, money, both dashboards and all communications are 
      settings, badges, "Book now" / "Ask SAFRA" and **no partner contact before
      confirmation** (P-001, verified)
 129. ❌ Accessibility pass and Core Web Vitals budget (§14.1: home < 2 s)
-     129b. ✅ Checkout page and confirmation page — live server-quoted price with every night
-     itemised, guest details without an account (§4), stable idempotency key per form so a
-     double-click cannot duplicate a booking, and inline field errors from the shared Zod
-     schema. Posts through a Next route handler so the API origin stays server-side and the
-     real client IP reaches the audit trail
+     - ✅ **129b** Checkout page and confirmation page — live server-quoted price with every night
+       itemised, guest details without an account (§4), stable idempotency key per form so a
+       double-click cannot duplicate a booking, and inline field errors from the shared Zod
+       schema. Posts through a Next route handler so the API origin stays server-side and the
+       real client IP reaches the audit trail
 
 ---
 
@@ -234,11 +238,38 @@ and search are done; booking, money, both dashboards and all communications are 
 133. ✅ Fee model resolved from the approved settings page: customer pays a **flat $1.99**,
      partner pays **7%**. Stored as `customer_fee_mode` + `customer_fee_value` snapshots, so an
      admin switching to a percentage never rewrites existing bookings.
-134. ❌ Payment provider abstraction with per-country routing (ADR 0002)
-135. ❌ First real gateway integration (Sham Cash, and cards via the chosen entity)
+134. ✅ Payment provider abstraction — a `PaymentProvider` port plus a registry that routes
+     per country from the `payment.provider_routing` setting (P-005, so a new acquirer is a
+     settings row, not a deploy). Shaped around the hardest rail (PSD2/SCA card, async
+     webhook capture) so simpler rails fit inside it. Two adapters ship: `manual_transfer`
+     (SEPA, finance-confirmed) and a `simulator` for development/CI
+135. ❌ First real gateway integration — **blocked commercially, not technically.** The
+     approved customer-facing methods are **Visa, Mastercard, Klarna, Sham Cash**
+     (Bashar, 2026-07-30). PayPal and Apple Pay were removed; Stripe is excluded as a
+     gateway. Each remaining method needs a different agreement first: the card schemes
+     an acquirer, Klarna a direct merchant agreement, Sham Cash a Syrian collecting
+     party. **Klarna is the most tractable** — a licensed EU bank, contracted directly
+     with no acquirer needed, native to the German market the GmbH sits in, and it
+     carries the customer's credit risk. Until one is signed `GET /payments/methods`
+     returns an empty list and checkout says so, rather than showing four unusable
+     logos. See ADR 0002
+     - ✅ **135a** Approved method set enforced end to end — `payment_method` narrowed by
+       migration, with a guard that refuses to run while legacy `paypal`/`apple_pay` rows
+       exist (a historic payment needs a deliberate target, which a migration must not
+       pick for itself); a `CUSTOMER_FACING_METHODS` whitelist that the request schema and
+       the offered-methods endpoint both derive from; and a checkout selector rendering
+       only methods a routed provider can actually serve
 136. ✅ Idempotency — claim-first insert on the primary key, so a concurrent replay never
      runs the handler twice; same key + different body returns 422 (EC-003)
-137. ❌ Webhook handling and reconciliation (EC-002)
+137. ✅ Webhook handling (EC-002) — HMAC-SHA256 over the RAW body with a 5-minute replay
+     window (rejecting future-dated timestamps too), multi-secret acceptance for zero-downtime
+     rotation, and exactly-once delivery via a `(provider, provider_event_id)` unique index
+     rather than check-then-act, which two concurrent retries would race. Every delivery is
+     persisted including forged ones — a rejected webhook is the only evidence of probing —
+     and the payload is immutable by trigger while processing state stays writable. An unknown
+     provider reference is DEFERRED for retry, not rejected, because a webhook can outrun the
+     response that created the payment row
+     - ❌ **137a** Reconciliation report against a provider settlement file (needs a real PSP)
 138. ❌ Split payment — gift card + wallet + card in one transaction (§7.3)
 139. ✅ Double-entry ledger — 4 legs per captured payment, posted in the SAME transaction as
      the status change; partner fines posted too. Trial balance endpoint verified balanced
@@ -248,7 +279,12 @@ and search are done; booking, money, both dashboards and all communications are 
 141. ❌ Wallet credit/debit operations
 142. ❌ Gift card purchase, redemption, partial balance (§11.2)
 143. ❌ Coupon validation and redemption (§11.3)
-144. ❌ Refunds — full and partial, routed back through the original provider (§7.4)
+144. ✅ Refunds (§7.4) — tiers read from the booking's policy SNAPSHOT, never the live
+     policy, so a partner tightening terms cannot shrink a refund already owed; the §7.4 floor
+     applies even when no tier matches. Refundable base excludes SAFRA's service fee, already
+     refunded amounts are subtracted so a second call cannot pay out twice, and the refund
+     routes back through the originating provider. Two balanced ledger legs posted in the same
+     transaction as the refund row
 145. ✅ Confirmation SLA — advisory-locked sweep every minute, self-healing (a lost job
      would never fire; the next sweep still finds it). Also expires unpaid holds (EC-001)
 146. ✅ Partner fines and wallet compensation — violation recorded with occurrence number,
@@ -256,6 +292,27 @@ and search are done; booking, money, both dashboards and all communications are 
 147. ❌ Booking voucher + QR code PDF, Arabic-safe (§6.5)
 148. ❌ Transactional outbox so `BookingConfirmed` side effects cannot be lost (§14)
 149. ❌ PCI review — card data must never touch SAFRA servers
+     - ✅ **150a** Guest payment authorization — a 256-bit per-booking access token, returned once at
+       creation and stored only as a SHA-256 digest. Required because §13.2 makes references a
+       year-scoped sequence: without it anyone could pay for, and read the total of, a guessed
+       booking. Constant-time comparison, a dummy compare when the booking is absent so timing
+       cannot confirm which references exist, 404-not-403 throughout, and revoked on capture
+     - ❌ **150b** **DEFECT (pre-existing, found 2026-07-30): `fx_rates` is empty after a fresh seed and
+       `PricingService.currentFxToSyp` silently falls back to `'1'` for a non-SYP currency.**
+       Every `amount_syp` in the ledger is then understated by ~13,000x, so §1.4's SYP display
+       and all SYP reporting are wrong on a fresh install. Two candidate fixes, and the choice is
+       a business call: refuse to price a booking with no configured rate (a fresh deploy then
+       cannot take bookings until an admin sets one), or seed a starting USD→SYP rate that an
+       admin must maintain. Not changed here — it sits outside the payment scope and alters
+       whether a new deployment can accept bookings at all
+     - ❌ **150c** PSP fee ledger leg — the fee is recorded on `payments.provider_fee_amount` and the
+       `payment_provider_fee` account exists, but no leg is posted. Deferred deliberately:
+       most PSPs only report the fee at settlement, not capture, so whether it belongs in the
+       capture group or a later settlement group depends on the provider chosen in item 135
+     - ❌ **150d** Bank-transfer instructions display — the return page renders the remittance reference
+       and next steps, but not the GmbH's IBAN/beneficiary. Those are business data belonging in
+       settings alongside the payout configuration (items 84, 193), so the page has nowhere to
+       read them from yet
 
 ---
 
@@ -327,8 +384,15 @@ and search are done; booking, money, both dashboards and all communications are 
 
 These block engineering work and are not ours to make.
 
-189. ❌ **Merchant entity jurisdiction** — Jordan/UAE vs Syria. Blocks Phase 2.
-     Recommendation and reasoning in `.claude/memory/0002-payments-entity-and-sanctions.md`.
+189. ✅ **Merchant entity** — `Safra Technologies GmbH` (Germany), decided by Bashar
+     2026-07-30. This superseded the earlier Jordan/UAE recommendation and, in doing so,
+     exposed that the recommendation's premise was wrong: entity jurisdiction was never what
+     gated Stripe/PayPal. Both bar services _originating from_ Syria regardless of where the
+     merchant sits. The GmbH's real advantage is that it moves the Syria exposure off the
+     card-network leg and onto the partner payout leg, which is batchable and auditable and
+     does not sit in a customer's checkout. Reasoning in
+     `.claude/memory/0002-payments-entity-and-sanctions.md`. **A PSP willing to underwrite
+     the exposure is now the critical path (item 135).**
 190. ✅ Customer fee model — **flat $1.99**, confirmed by the approved settings screen
      ("رسوم ثابتة تضاف على كل حجز"). Partner side is 7%.
 191. ❌ WhatsApp BSP selection
