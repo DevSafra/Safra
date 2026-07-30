@@ -214,7 +214,7 @@ and search are done; booking, money, both dashboards and all communications are 
      settings, badges, "Book now" / "Ask SAFRA" and **no partner contact before
      confirmation** (P-001, verified)
 129. ❌ Accessibility pass and Core Web Vitals budget (§14.1: home < 2 s)
-129b. ✅ Checkout page and confirmation page — live server-quoted price with every night
+     129b. ✅ Checkout page and confirmation page — live server-quoted price with every night
      itemised, guest details without an account (§4), stable idempotency key per form so a
      double-click cannot duplicate a booking, and inline field errors from the shared Zod
      schema. Posts through a Next route handler so the API origin stays server-side and the

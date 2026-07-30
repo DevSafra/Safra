@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Blocks a commit whose staged files Prettier would reformat.
+#
+# This exists because of a real failure: files edited AFTER a verification run
+# reached CI unformatted, and the pipeline stopped at "Format check" with every
+# later step skipped — so a formatting slip masqueraded as a broken build. The
+# check belongs at commit time, where it costs a second, not in CI.
+#
+# Only STAGED files are checked, so an unrelated work-in-progress file cannot
+# block an otherwise clean commit.
+
+set -e
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(ts|tsx|md|json|ya?ml)$' || true)
+[ -z "$staged" ] && exit 0
+
+# xargs keeps this working when many files are staged at once.
+if ! printf '%s\n' "$staged" | xargs corepack pnpm exec prettier --check >/dev/null 2>&1; then
+  echo "Prettier would reformat these staged files:" >&2
+  printf '%s\n' "$staged" | xargs corepack pnpm exec prettier --list-different >&2
+  echo "" >&2
+  echo "Run: pnpm run format" >&2
+  exit 1
+fi
