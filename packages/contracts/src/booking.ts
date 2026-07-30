@@ -61,3 +61,18 @@ export const bookingCancelSchema = z
   .strict();
 
 export type BookingCancelInput = z.infer<typeof bookingCancelSchema>;
+
+/** A price quote for a unit and date range, with nothing created. */
+export const bookingQuoteSchema = z
+  .object({
+    unitId: z.string().uuid(),
+    checkIn: calendarDateSchema,
+    checkOut: calendarDateSchema,
+  })
+  .strict()
+  .refine((q) => q.checkOut > q.checkIn, {
+    message: 'Departure must be after arrival.',
+    path: ['checkOut'],
+  });
+
+export type BookingQuoteInput = z.infer<typeof bookingQuoteSchema>;

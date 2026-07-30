@@ -16,10 +16,12 @@ import {
   PERMISSIONS as P,
   type BookingCancelInput,
   type BookingCreateInput,
+  type BookingQuoteInput,
   type CursorQuery,
   type PartnerBookingDecisionInput,
   bookingCancelSchema,
   bookingCreateSchema,
+  bookingQuoteSchema,
   cursorQuerySchema,
   partnerBookingDecisionSchema,
 } from '@safra/contracts';
@@ -84,6 +86,22 @@ export class BookingsController {
     );
   }
 
+  /**
+   * A price quote without creating anything (§6.3 step 3).
+   *
+   * @Public() because a guest reaches checkout before authenticating. Read-only and
+   * side-effect free: it reserves nothing, so quoting cannot be used to hold
+   * inventory.
+   */
+  @Public()
+  @Get('quote')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  async quote(
+    @Query(new ZodValidationPipe(bookingQuoteSchema)) query: BookingQuoteInput,
+  ) {
+    return this.creation.quote(query);
+  }
+
   /** The partner answering within the two-hour window (§6.4). */
   @Post(':reference/partner-decision')
   @RequirePermissions(P.BOOKING_RESPOND_AS_PARTNER)
@@ -102,6 +120,24 @@ export class BookingsController {
       body.reason,
       user,
     );
+  }
+
+  /**
+   * Marks a booking paid (§6.3 step 5) and posts the ledger entries.
+   *
+   * Staff-gated stand-in for the payment webhook, which does not exist until a
+   * gateway is chosen (ADR 0002). It exists so the lifecycle and the books are
+   * exercisable end to end rather than untested until the entity decision lands.
+   */
+  @Post(':reference/capture-payment')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.BOOKING_UPDATE_STATUS)
+  @AuditExempt('Audited transactionally inside BookingActionsService.markPaid.')
+  async capturePayment(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.actions.simulateCapture(reference, user);
   }
 
   /** Staff cancellation (§9.4). Customers cancel through their own bookings view. */

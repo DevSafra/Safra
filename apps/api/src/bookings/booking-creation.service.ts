@@ -41,6 +41,26 @@ export class BookingCreationService {
   ) {}
 
   /**
+   * A price quote with no side effects (§6.3 step 3).
+   *
+   * Returns only what the customer needs to see. The partner's commission and payable
+   * amounts are deliberately withheld: §7.2 forbids exposing partner financials, and
+   * a guest quoting a price has no business learning either.
+   */
+  async quote(input: { unitId: string; checkIn: string; checkOut: string }) {
+    const price = await this.pricing.quote(input);
+
+    return {
+      nights: price.nights,
+      baseAmount: price.baseAmount,
+      customerFeeAmount: price.customerFeeAmount,
+      totalAmount: price.totalAmount,
+      currencyCode: price.currencyCode,
+      nightly: price.nightly,
+    };
+  }
+
+  /**
    * Creates a booking in `pending_payment` (SRS §6.3 steps 1–4).
    *
    * The booking is inserted BEFORE any payment is attempted, and it is the insert
