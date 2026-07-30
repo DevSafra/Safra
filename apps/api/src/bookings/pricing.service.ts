@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { FxRateService } from '../fx/fx-rate.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
 /**
@@ -37,6 +38,7 @@ export class PricingService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly settings: SettingsService,
+    private readonly fx: FxRateService,
   ) {}
 
   /**
@@ -121,8 +123,15 @@ export class PricingService {
     const totalMinor = baseMinor + customerFeeMinor;
     const payableMinor = baseMinor - partnerCommissionMinor;
 
-    // ── FX snapshot (§1.4) ──────────────────────────────────────────────────
-    const fxRate = await this.currentFxToSyp(first.currency_code);
+    /**
+     * FX snapshot (§1.4).
+     *
+     * Delegated, and it can REFUSE. If no rate to SYP is configured this throws
+     * rather than quietly using 1 — the old behaviour understated every SYP figure
+     * by roughly four orders of magnitude on a fresh install. Better to decline to
+     * quote than to record a total nobody can reconcile.
+     */
+    const fxRate = await this.fx.rateToSyp(first.currency_code);
     const totalSyp = multiplyDecimalStrings(fromMinor(totalMinor, scale), fxRate, 2);
 
     return {
@@ -141,32 +150,6 @@ export class PricingService {
       totalSyp,
       nightly,
     };
-  }
-
-  /**
-   * The live rate from the booking currency to SYP.
-   *
-   * Snapshotted onto the booking, because SYP is volatile and a report run next month
-   * must reproduce the same figure it showed today. Falls back to 1 when the currency
-   * IS SYP or no rate is configured — better a recorded 1 than a null that breaks
-   * reporting arithmetic.
-   */
-  private async currentFxToSyp(currencyCode: string): Promise<string> {
-    if (currencyCode === 'SYP') return '1';
-
-    const rows = await this.db.execute<{ rate: string }>(sql`
-      SELECT f.rate::text AS rate
-      FROM fx_rates f
-      JOIN currencies base ON base.id = f.base_currency_id
-      JOIN currencies quote ON quote.id = f.quote_currency_id
-      WHERE base.code = ${currencyCode}
-        AND quote.code = 'SYP'
-        AND f.effective_from <= now()
-      ORDER BY f.effective_from DESC
-      LIMIT 1
-    `);
-
-    return rows.rows[0]?.rate ?? '1';
   }
 }
 

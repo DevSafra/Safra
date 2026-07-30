@@ -228,6 +228,42 @@ async function seed(db: Database): Promise<void> {
   });
 }
 
+/**
+ * Tells the operator the one thing the seed deliberately cannot do for them.
+ *
+ * Pricing REFUSES to quote without a `currency → SYP` rate, so a freshly seeded
+ * deployment returns 503 on every quote until someone sets one. That is intentional
+ * — the previous behaviour silently used a rate of 1 and understated every SYP
+ * figure by four orders of magnitude — but it is invisible from the UI, which shows
+ * only "temporarily unavailable".
+ *
+ * A rate is NOT seeded on purpose: a hardcoded number would be wrong the day after
+ * it was written, and a wrong rate is worse than an absent one because it produces
+ * plausible figures nobody questions. So the seed says so instead, at the moment the
+ * operator is looking.
+ */
+async function warnIfNoFxRate(db: Database): Promise<void> {
+  const rows = await db.execute<{ count: string }>(sql`
+    SELECT COUNT(*)::text AS count
+    FROM fx_rates f
+    JOIN currencies quote ON quote.id = f.quote_currency_id
+    WHERE quote.code = 'SYP' AND f.effective_from <= now()
+  `);
+
+  if (Number(rows.rows[0]?.count ?? 0) > 0) return;
+
+  console.log('');
+  console.log('  ⚠  ACTION REQUIRED: no FX rate to SYP is configured.');
+  console.log('     Bookings cannot be priced until one is set — every quote will');
+  console.log('     return 503. Set one as a super admin:');
+  console.log('');
+  console.log('       POST /api/v1/admin/fx-rates');
+  console.log('       {"currency":"USD","rate":"13000.00","source":"central_bank"}');
+  console.log('');
+  console.log('     No rate is seeded on purpose: a hardcoded one goes stale, and a');
+  console.log('     wrong rate is worse than a missing one because it looks plausible.');
+}
+
 async function main(): Promise<void> {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
@@ -239,6 +275,7 @@ async function main(): Promise<void> {
 
   try {
     await seed(db);
+    await warnIfNoFxRate(db);
     console.log('Seed complete.');
   } finally {
     // The pg Pool keeps the process alive otherwise.
