@@ -2,6 +2,7 @@ import { Controller, Get, Module, Param } from '@nestjs/common';
 
 import { Public } from '../rbac/decorators.js';
 import { CatalogService } from './catalog.service.js';
+import { PropertyDetailService } from './property-detail.service.js';
 
 /**
  * Public catalogue. @Public() because §5.1 requires a visitor to browse and search
@@ -9,7 +10,10 @@ import { CatalogService } from './catalog.service.js';
  */
 @Controller()
 class CatalogController {
-  constructor(private readonly catalog: CatalogService) {}
+  constructor(
+    private readonly catalog: CatalogService,
+    private readonly properties: PropertyDetailService,
+  ) {}
 
   @Public()
   @Get('cities')
@@ -21,6 +25,13 @@ class CatalogController {
   @Get('cities/:slug')
   async city(@Param('slug') slug: string) {
     return this.catalog.city(slug);
+  }
+
+  /** §5.6 — the full property page payload. */
+  @Public()
+  @Get('properties/:slug')
+  async property(@Param('slug') slug: string) {
+    return this.properties.bySlug(slug);
   }
 
   @Public()
@@ -44,7 +55,7 @@ class CatalogController {
 
 @Module({
   controllers: [CatalogController],
-  providers: [CatalogService],
-  exports: [CatalogService],
+  providers: [CatalogService, PropertyDetailService],
+  exports: [CatalogService, PropertyDetailService],
 })
 export class CatalogModule {}

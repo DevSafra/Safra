@@ -12,6 +12,7 @@ import { PartnerModule } from './partner/partner.module.js';
 import { RankingModule } from './ranking/ranking.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SettingsModule } from './settings/settings.module.js';
+import { StorageModule } from './storage/storage.module.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
 import { PermissionsGuard } from './rbac/permissions.guard.js';
 
@@ -28,6 +29,7 @@ import { PermissionsGuard } from './rbac/permissions.guard.js';
      */
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
     SettingsModule,
+    StorageModule,
     AuthModule,
     BookingsModule,
     SearchModule,
