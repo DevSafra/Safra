@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
+import type { CustomerFacingMethod } from '@safra/contracts';
+
 import type { Locale } from '@/i18n/routing';
 
 interface FieldErrors {
@@ -26,6 +28,7 @@ export function CheckoutForm({
   checkOut,
   adults,
   propertySlug,
+  methods,
 }: {
   locale: Locale;
   unitId: string;
@@ -33,13 +36,23 @@ export function CheckoutForm({
   checkOut: string;
   adults: number;
   propertySlug: string;
+  /**
+   * Resolved server-side from provider routing (§7.1). May legitimately be empty
+   * while no external rail is contracted, which is why the form still submits
+   * without one — the booking is worth taking even if payment follows out of band.
+   */
+  methods: readonly CustomerFacingMethod[];
 }) {
   const t = useTranslations('checkout');
+  const tm = useTranslations('paymentMethods');
   const router = useRouter();
 
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  /** Defaults to the first offered method, matching the approved display order. */
+  const [method, setMethod] = useState<CustomerFacingMethod | undefined>(methods[0]);
 
   /**
    * Generated ONCE per mounted form, not per submit (EC-003).
@@ -88,18 +101,20 @@ export function CheckoutForm({
         return;
       }
 
-      // `'reference' in body` narrows, so no cast is needed to read it.
-      const reference =
-        typeof body === 'object' && body !== null && 'reference' in body
-          ? String(body.reference)
-          : null;
+      const created = readCreated(body);
 
-      if (!reference) {
+      if (!created) {
         setFormError(t('genericError'));
         return;
       }
 
-      router.push(`/${locale}/booking/${reference}`);
+      /**
+       * The booking exists but holds the dates only until the payment window
+       * lapses (EC-001), so payment starts immediately rather than on another
+       * click. From here the booking is recoverable: the access token authorizes
+       * a retry, and a failure below is not a lost booking.
+       */
+      await startPayment(created, { locale, router, method });
     } catch {
       // A network failure is safe to retry: the idempotency key is unchanged, so a
       // booking that did reach the server will be returned rather than duplicated.
@@ -154,6 +169,50 @@ export function CheckoutForm({
         />
       </div>
 
+      {/* ── Payment method (§7.1) ────────────────────────────────────────── */}
+      <fieldset className="mt-6">
+        <legend className="text-sm text-muted">{tm('heading')}</legend>
+
+        {methods.length === 0 ? (
+          /*
+           * Said plainly rather than hidden. No external rail is contracted yet, and
+           * a customer who reaches checkout deserves to know payment will be arranged
+           * separately — not to meet a dead button or an empty box.
+           */
+          <p className="mt-2 rounded-lg border border-sky/30 bg-sky/10 p-3 text-xs text-sky">
+            {tm('none')}
+          </p>
+        ) : (
+          <div className="mt-2 grid gap-2">
+            {methods.map((option) => (
+              <label
+                key={option}
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${
+                  method === option
+                    ? 'border-gold bg-gold/5'
+                    : 'border-line hover:border-gold/50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="method"
+                  value={option}
+                  checked={method === option}
+                  onChange={() => setMethod(option)}
+                  className="mt-0.5 accent-gold"
+                />
+                <span>
+                  <span className="block text-sm text-text">{tm(option)}</span>
+                  <span className="block text-xs text-faint">
+                    {methodHint(option, tm)}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+      </fieldset>
+
       <button
         type="submit"
         disabled={submitting}
@@ -167,6 +226,102 @@ export function CheckoutForm({
       <input type="hidden" name="propertySlug" value={propertySlug} />
     </form>
   );
+}
+
+/**
+ * One line of reassurance per rail.
+ *
+ * Each says the thing a customer is most likely to be uncertain about: that a card
+ * will bounce them to their bank (§SCA, so the redirect is expected rather than
+ * alarming), that Klarna defers the charge, and that Sham Cash only works inside
+ * Syria. Grouped in one function so the mapping is readable in one place.
+ */
+function methodHint(method: CustomerFacingMethod, tm: (key: string) => string): string {
+  switch (method) {
+    case 'klarna':
+      return tm('klarnaHint');
+    case 'sham_cash':
+      return tm('shamCashHint');
+    case 'visa':
+    case 'mastercard':
+      return tm('cardHint');
+  }
+}
+
+interface CreatedBooking {
+  reference: string;
+  accessToken: string;
+}
+
+/**
+ * Pulls the reference and access token out of the creation response.
+ *
+ * The token is returned exactly once and is the ONLY thing that will authorize this
+ * guest to pay — references are sequential (§13.2), so the API cannot accept one
+ * alone. If it is missing, the booking is unpayable and saying so beats redirecting
+ * to a page that silently cannot proceed.
+ */
+function readCreated(body: unknown): CreatedBooking | null {
+  if (typeof body !== 'object' || body === null) return null;
+
+  const record = body as Record<string, unknown>;
+
+  return typeof record['reference'] === 'string' &&
+    typeof record['accessToken'] === 'string'
+    ? { reference: record['reference'], accessToken: record['accessToken'] }
+    : null;
+}
+
+/**
+ * Starts payment and sends the customer wherever the provider needs them.
+ *
+ * `redirectUrl` is followed with a full navigation rather than the Next router: it
+ * points at a payment provider (or, for bank transfer, at an instructions page),
+ * and a client-side route transition cannot leave the origin.
+ *
+ * If this step fails the customer is still sent to the booking page. The booking is
+ * real and held, so stranding them on the form with an error would hide it from
+ * them entirely.
+ */
+async function startPayment(
+  created: CreatedBooking,
+  handlers: {
+    locale: Locale;
+    router: { push: (href: string) => void };
+    method: CustomerFacingMethod | undefined;
+  },
+): Promise<void> {
+  const { locale, router, method } = handlers;
+
+  try {
+    const response = await fetch(`/${locale}/api/payments/start`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        reference: created.reference,
+        accessToken: created.accessToken,
+        // Omitted rather than sent as null when nothing is offered: the request
+        // schema is .strict() and rejects unknown or ill-typed fields.
+        ...(method ? { method } : {}),
+      }),
+    });
+
+    const body: unknown = await response.json().catch(() => null);
+
+    if (response.ok && typeof body === 'object' && body !== null) {
+      const redirectUrl = (body as Record<string, unknown>)['redirectUrl'];
+
+      if (typeof redirectUrl === 'string') {
+        window.location.assign(redirectUrl);
+        return;
+      }
+    }
+  } catch {
+    // Fall through: the booking is held either way, and the pending page explains
+    // what happens next. A network blip must not look like a failed booking.
+  }
+
+  router.push(`/${locale}/booking/${created.reference}`);
 }
 
 /**

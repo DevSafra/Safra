@@ -6,7 +6,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { CheckoutForm } from '@/components/checkout-form';
 import { isLocale } from '@/i18n/routing';
 import { formatMoney } from '@/lib/localise';
-import { getProperty, quote } from '@/lib/property';
+import { availablePaymentMethods, getProperty, quote } from '@/lib/property';
 
 /**
  * Checkout (SRS §6.3 step 3 — the payment summary).
@@ -73,8 +73,14 @@ export default async function CheckoutPage({
    * Recomputing it in the browser or on this page would create a second source of
    * truth for money, and the two would eventually disagree — at which point the
    * customer sees one total and is charged another.
+   *
+   * The offered payment methods come from the same round of requests: neither depends
+   * on the other, so awaiting them in sequence would add latency for nothing (§3).
    */
-  const priced = await quote({ unitId, checkIn, checkOut });
+  const [priced, methods] = await Promise.all([
+    quote({ unitId, checkIn, checkOut }),
+    availablePaymentMethods(property.city.countryCode),
+  ]);
 
   if (!priced) {
     return (
@@ -108,6 +114,7 @@ export default async function CheckoutPage({
           checkOut={checkOut}
           adults={adults}
           propertySlug={slug}
+          methods={methods}
         />
 
         {/* ── Payment summary (§6.3 step 3) ──────────────────────────────── */}

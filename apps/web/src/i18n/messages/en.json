@@ -164,5 +164,30 @@
     "step3": "On arrival you use your booking reference or QR code with the partner.",
     "guarantee": "If the partner does not respond in time: the booking is cancelled, you are refunded in full, and compensation is added to your wallet automatically.",
     "backHome": "Back to home"
+  },
+  "paymentReturn": {
+    "title": "Complete your payment by bank transfer",
+    "intro": "Your booking is held. To confirm it, transfer the amount below and quote the reference in the payment description.",
+    "remittanceLabel": "Transfer reference",
+    "remittanceHint": "Quote this on the transfer — without it the payment cannot be matched to your booking.",
+    "nextSteps": "Once the transfer arrives your booking is confirmed within one business day, and we email you.",
+    "referenceLabel": "Booking reference",
+    "viewBooking": "View booking",
+    "genericTitle": "Checking your payment",
+    "genericBody": "This may take a moment. Please do not close this page.",
+    "failedTitle": "The payment did not complete",
+    "failedBody": "Nothing was charged. Your dates are held for a short while — you can try again.",
+    "retry": "Try again"
+  },
+  "paymentMethods": {
+    "heading": "Payment method",
+    "none": "No online payment method is available yet. Our team will contact you to complete payment after booking.",
+    "visa": "Visa",
+    "mastercard": "Mastercard",
+    "klarna": "Klarna",
+    "sham_cash": "Sham Cash",
+    "klarnaHint": "Pay later or in instalments with Klarna",
+    "cardHint": "Your bank will verify the card (3-D Secure)",
+    "shamCashHint": "Mobile wallet inside Syria"
   }
 }

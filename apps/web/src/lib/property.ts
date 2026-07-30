@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { CUSTOMER_FACING_METHODS, type CustomerFacingMethod } from '@safra/contracts';
+
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
 const translated = z.object({
@@ -169,5 +171,45 @@ export async function quote(input: {
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
+  }
+}
+
+const methodsSchema = z.object({
+  methods: z.array(z.enum(CUSTOMER_FACING_METHODS)),
+});
+
+/**
+ * Which payment methods checkout may offer for this property's country (§7.1).
+ *
+ * Asked of the API rather than hardcoded in the UI, because "is this rail actually
+ * available?" depends on provider routing that a super admin controls (P-005).
+ * Hardcoding the four approved logos would show a customer a Klarna button months
+ * before Klarna is contracted.
+ *
+ * An empty array is a real answer, not a failure: no external rail is live until an
+ * acquirer or Klarna agreement exists. On a network error it also returns empty —
+ * offering nothing is the safe failure, since offering a method that cannot be
+ * served strands the customer mid-checkout.
+ */
+export async function availablePaymentMethods(
+  countryCode: string,
+): Promise<CustomerFacingMethod[]> {
+  const url = new URL(`${API_URL}/api/v1/payments/methods`);
+  url.searchParams.set('country', countryCode);
+
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      // Short cache: this changes only when an admin edits routing, and checkout
+      // must not pay a round trip for it on every render (§3).
+      next: { revalidate: 60 },
+    });
+
+    if (!response.ok) return [];
+
+    const parsed = methodsSchema.safeParse(await response.json());
+    return parsed.success ? [...parsed.data.methods] : [];
+  } catch {
+    return [];
   }
 }

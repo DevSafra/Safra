@@ -164,5 +164,30 @@
     "step3": "Bei der Ankunft nutzen Sie Ihre Buchungsnummer oder den QR-Code.",
     "guarantee": "Antwortet der Partner nicht rechtzeitig: Die Buchung wird storniert, Sie erhalten den vollen Betrag zurück und eine Entschädigung in Ihrer Wallet.",
     "backHome": "Zurück zur Startseite"
+  },
+  "paymentReturn": {
+    "title": "Zahlung per Banküberweisung abschließen",
+    "intro": "Ihre Buchung ist reserviert. Überweisen Sie zur Bestätigung den unten genannten Betrag und geben Sie die Referenz im Verwendungszweck an.",
+    "remittanceLabel": "Überweisungsreferenz",
+    "remittanceHint": "Bitte im Verwendungszweck angeben — ohne sie kann die Zahlung Ihrer Buchung nicht zugeordnet werden.",
+    "nextSteps": "Nach Eingang der Überweisung wird Ihre Buchung innerhalb eines Werktags bestätigt; Sie erhalten eine E-Mail.",
+    "referenceLabel": "Buchungsnummer",
+    "viewBooking": "Buchung ansehen",
+    "genericTitle": "Wir prüfen Ihre Zahlung",
+    "genericBody": "Das kann einen Moment dauern. Bitte schließen Sie diese Seite nicht.",
+    "failedTitle": "Die Zahlung wurde nicht abgeschlossen",
+    "failedBody": "Es wurde nichts abgebucht. Ihre Daten sind kurzzeitig reserviert — Sie können es erneut versuchen.",
+    "retry": "Erneut versuchen"
+  },
+  "paymentMethods": {
+    "heading": "Zahlungsart",
+    "none": "Derzeit ist keine Online-Zahlungsart verfügbar. Unser Team kontaktiert Sie nach der Buchung zur Zahlungsabwicklung.",
+    "visa": "Visa",
+    "mastercard": "Mastercard",
+    "klarna": "Klarna",
+    "sham_cash": "Sham Cash",
+    "klarnaHint": "Später zahlen oder in Raten mit Klarna",
+    "cardHint": "Ihre Bank prüft die Karte (3-D Secure)",
+    "shamCashHint": "Mobile Wallet innerhalb Syriens"
   }
 }
