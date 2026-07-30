@@ -42,12 +42,39 @@ $$ LANGUAGE plpgsql;
 -- impossible. The losing transaction fails with SQLSTATE 23P01, which the booking
 -- service translates into a 409 and a "just taken" message.
 -- ----------------------------------------------------------------------------
-SELECT add_constraint_if_missing('bookings', 'bookings_no_overlapping_stays', $def$
+-- v1 held only from pending_confirmation onward, which let two customers both
+-- reach payment for the same dates. Superseded by v2, which holds from
+-- pending_payment. Dropped explicitly because add_constraint_if_missing() only ever
+-- adds.
+ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_no_overlapping_stays;
+
+-- Any data created while v1 was in force may violate v2, and PostgreSQL refuses to
+-- create an exclusion constraint that existing rows break. Overlapping
+-- `pending_payment` rows are exactly what the v1 gap allowed, and they were never
+-- valid reservations — none had been paid. Expiring them is the correct repair, and
+-- it keeps this migration applicable to a database that ran the buggy version.
+UPDATE bookings b
+SET status = 'cancelled',
+    cancelled_at = now(),
+    cancellation_reason = 'Released: overlapping unpaid hold created before the reservation window was enforced.'
+WHERE b.status = 'pending_payment'
+  AND EXISTS (
+    SELECT 1 FROM bookings other
+    WHERE other.id <> b.id
+      AND other.unit_id = b.unit_id
+      AND other.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
+      AND daterange(other.check_in, other.check_out, '[)')
+          && daterange(b.check_in, b.check_out, '[)')
+      -- Keep the earliest hold; release the ones that should never have been taken.
+      AND other.created_at < b.created_at
+  );
+
+SELECT add_constraint_if_missing('bookings', 'bookings_no_overlapping_stays_v2', $def$
   EXCLUDE USING gist (
     unit_id WITH =,
     daterange(check_in, check_out, '[)') WITH &&
   )
-  WHERE (status IN ('pending_confirmation', 'confirmed', 'checked_in'))
+  WHERE (status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in'))
 $def$);
 
 SELECT add_constraint_if_missing('bookings', 'bookings_checkout_after_checkin',

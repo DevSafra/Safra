@@ -5,7 +5,7 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-07-30**. Lint clean, 69 tests passing, production dependencies clean.
+Status as of **2026-07-30**. Lint clean, 99 tests passing, production dependencies clean.
 
 **Scale of what remains:** roughly 25% of the MVP is built. The API foundation, catalogue
 and search are done; booking, money, both dashboards and all communications are not.
@@ -77,8 +77,9 @@ and search are done; booking, money, both dashboards and all communications are 
 43. ✅ Per-route rate limiting (5/min on login and register)
 44. ✅ Guest checkout supported — `customer_profiles.user_id` nullable (§4)
 45. ✅ Field encryption service (AES-256-GCM) for TOTP seeds and payout details
-46. ❌ **Staff 2FA enrollment** — login _verifies_ TOTP, but there is no endpoint to enrol,
-    show a QR, or store recovery codes. Effectively unusable today.
+46. ✅ Staff 2FA enrolment — two-step setup (secret then confirm, so a mis-scanned QR
+    cannot lock anyone out), 8 recovery codes stored as Argon2id hashes, disable requires
+    password + live code, all other sessions revoked on enable
 47. ❌ Email verification flow
 48. ❌ Password reset flow
 49. ❌ Phone / WhatsApp OTP verification
@@ -104,8 +105,9 @@ and search are done; booking, money, both dashboards and all communications are 
 61. ✅ IP, user agent, actor, action, before/after captured (§15)
 62. ✅ Redaction helper for passwords, tokens, secrets, account numbers
 63. ✅ Timeline events for booking/partner/property/customer histories
-64. ❌ Audit interceptor applied automatically — currently every call site writes explicitly,
-    so a new endpoint can silently ship with no audit trail
+64. ✅ Audit interceptor — `@Audited` writes rows automatically, and any mutating route
+    marked neither `@Audited` nor `@AuditExempt` logs a startup warning. It immediately
+    caught one undeclared route (§15)
 65. ❌ Audit log viewer endpoint (§9.3)
 
 ---
@@ -124,7 +126,8 @@ and search are done; booking, money, both dashboards and all communications are 
     (EC-001)**, first-violation fine, **wallet compensation as a separate value**, refund floor,
     max nights
 72. ✅ Seed is idempotent and never truncates; existing setting values are never overwritten
-73. ❌ City hero images (§5.4 requires the top third of a city page to be photography)
+73. ✅ City hero images — staff upload via the same sharp pipeline, `geo.manage` gated,
+    served from `cities/<slug>/…`, exposed on the public city endpoint
 74. ❌ Tourist categories and city landmark content beyond the seeded tags
 
 ### 1.2 Partner inventory management
@@ -213,25 +216,32 @@ and search are done; booking, money, both dashboards and all communications are 
 
 ## Phase 2 — Booking and Money — **not started**
 
-130. ❌ Booking creation — draft → pending_payment → pending_confirmation (§6.3)
-131. ❌ Booking state machine with guarded transitions (§6.2)
-132. ❌ Commission calculation snapshotting rates onto the booking (§2.1)
+130. ✅ Booking creation — `pending_payment` **holds the inventory** via the exclusion
+     constraint, so a conflict is rejected BEFORE money moves (§6.3)
+131. ✅ Booking state machine — transitions declared as data with permitted actors; an
+     invariant test parses the migration to prove `BLOCKING_STATUSES` matches the
+     exclusion constraint
+132. ✅ Commission calculation — integer minor units throughout (21 tests), flat fee once
+     per booking, mode/value/rate all snapshotted onto the booking
 133. ✅ Fee model resolved from the approved settings page: customer pays a **flat $1.99**,
      partner pays **7%**. Stored as `customer_fee_mode` + `customer_fee_value` snapshots, so an
      admin switching to a percentage never rewrites existing bookings.
 134. ❌ Payment provider abstraction with per-country routing (ADR 0002)
 135. ❌ First real gateway integration (Sham Cash, and cards via the chosen entity)
-136. ❌ Idempotency middleware using the `idempotency_keys` table (EC-003)
+136. ✅ Idempotency — claim-first insert on the primary key, so a concurrent replay never
+     runs the handler twice; same key + different body returns 422 (EC-003)
 137. ❌ Webhook handling and reconciliation (EC-002)
 138. ❌ Split payment — gift card + wallet + card in one transaction (§7.3)
 139. ❌ Double-entry ledger writes on every money movement
-140. ❌ FX rate snapshotting per transaction
+140. ✅ FX rate snapshotted onto each booking, exact bigint arithmetic at SYP magnitudes
 141. ❌ Wallet credit/debit operations
 142. ❌ Gift card purchase, redemption, partial balance (§11.2)
 143. ❌ Coupon validation and redemption (§11.3)
 144. ❌ Refunds — full and partial, routed back through the original provider (§7.4)
-145. ❌ **2-hour partner confirmation SLA** as a delayed job (§6.4)
-146. ❌ Partner fines and automatic customer wallet compensation (§6.4)
+145. ✅ Confirmation SLA — advisory-locked sweep every minute, self-healing (a lost job
+     would never fire; the next sweep still finds it). Also expires unpaid holds (EC-001)
+146. ✅ Partner fines and wallet compensation — violation recorded with occurrence number,
+     wallet created if absent and credited, partner score docked (§6.4, P-007)
 147. ❌ Booking voucher + QR code PDF, Arabic-safe (§6.5)
 148. ❌ Transactional outbox so `BookingConfirmed` side effects cannot be lost (§14)
 149. ❌ PCI review — card data must never touch SAFRA servers

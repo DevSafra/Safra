@@ -50,6 +50,13 @@
       "when": 1785413809516,
       "tag": "0006_tiny_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785415731030,
+      "tag": "0007_chilly_bastion",
+      "breakpoints": true
     }
   ]
 }
