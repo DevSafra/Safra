@@ -37,6 +37,17 @@ export const users = pgTable(
      */
     totpSecretEncrypted: text('totp_secret_encrypted'),
     totpEnabledAt: timestamp('totp_enabled_at', { withTimezone: true }),
+    /**
+     * Single-use recovery codes, stored as Argon2id hashes.
+     *
+     * A recovery code bypasses 2FA entirely, so it is a credential of equal weight
+     * to the password and is never stored in clear. Codes are removed from the array
+     * as they are consumed, which is what makes them single-use.
+     */
+    totpRecoveryCodeHashes: text('totp_recovery_code_hashes')
+      .array()
+      .notNull()
+      .default([]),
     /** Per-user grants layered on top of the role, for CASL. */
     permissionOverrides: jsonb('permission_overrides').$type<string[]>(),
     /** Lockout state after repeated failed sign-ins (§1 rate limiting). */

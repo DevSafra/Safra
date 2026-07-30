@@ -67,6 +67,16 @@ export const loginSchema = z
       .string()
       .regex(/^\d{6}$/, 'Authenticator code must be 6 digits.')
       .optional(),
+    /**
+     * Accepted in place of totpCode when the authenticator is lost. Single-use:
+     * consumed on a successful sign-in.
+     */
+    recoveryCode: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/)
+      .optional(),
   })
   .strict();
 export type LoginInput = z.infer<typeof loginSchema>;

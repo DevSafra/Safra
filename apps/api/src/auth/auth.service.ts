@@ -20,6 +20,7 @@ import { DATABASE } from '../database/database.module.js';
 import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import { PasswordService } from '../common/crypto/password.service.js';
 import { TokenService, type IssuedTokens } from './token.service.js';
+import { TwoFactorService } from './two-factor.service.js';
 
 /** Rule 1: lock out after repeated failures rather than allowing endless guesses. */
 const MAX_FAILED_ATTEMPTS = 5;
@@ -42,6 +43,7 @@ export class AuthService {
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
     private readonly encryption: FieldEncryptionService,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   /**
@@ -154,15 +156,29 @@ export class AuthService {
     // Staff 2FA (rule 1). Checked AFTER the password so a valid TOTP alone is
     // never sufficient, and so TOTP state does not leak for a wrong password.
     if (isStaffRole(user.role) && user.totpEnabledAt && user.totpSecretEncrypted) {
-      if (!input.totpCode) {
+      if (!input.totpCode && !input.recoveryCode) {
         throw new UnauthorizedException('Authenticator code required.');
       }
 
-      const secret = this.encryption.decrypt(user.totpSecretEncrypted);
+      if (input.recoveryCode) {
+        // A recovery code is single-use and consumed here, whether or not the rest
+        // of the login succeeds — a code that has been transmitted is spent.
+        const accepted = await this.twoFactor.consumeRecoveryCode(
+          user.id,
+          input.recoveryCode,
+        );
 
-      if (!authenticator.verify({ token: input.totpCode, secret })) {
-        await this.registerFailedAttempt(user.id);
-        throw new UnauthorizedException('Invalid authenticator code.');
+        if (!accepted) {
+          await this.registerFailedAttempt(user.id);
+          throw new UnauthorizedException('Invalid recovery code.');
+        }
+      } else {
+        const secret = this.encryption.decrypt(user.totpSecretEncrypted);
+
+        if (!authenticator.verify({ token: input.totpCode as string, secret })) {
+          await this.registerFailedAttempt(user.id);
+          throw new UnauthorizedException('Invalid authenticator code.');
+        }
       }
     }
 

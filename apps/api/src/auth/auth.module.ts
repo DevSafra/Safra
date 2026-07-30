@@ -6,12 +6,15 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { TokenService } from './token.service.js';
+import { TwoFactorController } from './two-factor.controller.js';
+import { TwoFactorService } from './two-factor.service.js';
 
 @Module({
-  controllers: [AuthController],
+  controllers: [AuthController, TwoFactorController],
   providers: [
     AuthService,
     TokenService,
+    TwoFactorService,
     PasswordService,
     FieldEncryptionService,
     AuditService,
