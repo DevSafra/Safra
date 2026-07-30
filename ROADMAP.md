@@ -5,7 +5,7 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-07-29**. 11 commits, 69 tests passing, lint clean, 0 known vulnerabilities.
+Status as of **2026-07-30**. Lint clean, 69 tests passing, production dependencies clean.
 
 **Scale of what remains:** roughly 25% of the MVP is built. The API foundation, catalogue
 and search are done; booking, money, both dashboards and all communications are not.
@@ -135,8 +135,9 @@ and search are done; booking, money, both dashboards and all communications are 
 78. ✅ Add and update units, with amenity sets replaced wholesale
 79. ✅ Slug derivation with uniqueness fallback
 80. ✅ Cross-partner isolation verified — partner B gets 404 on partner A's property and calendar
-81. ❌ **Property image upload** — `property_images` table exists and feeds the ranking score,
-    but there is no upload endpoint, no S3 wiring, no `sharp` processing
+81. ✅ Property image upload — multipart, `sharp` re-encodes everything to AVIF+WebP at
+    3 widths, **EXIF stripped** (verified: source GPS gone), storage abstracted over
+    S3/local disk, polyglot + SVG + undersized uploads rejected, traversal blocked
 82. ❌ Partner document upload (§8.1 requires ID, commercial register, ownership proof)
 83. ❌ Partner self-registration flow (partners are currently created by SQL only)
 84. ❌ Partner payout account management endpoints
@@ -203,7 +204,9 @@ and search are done; booking, money, both dashboards and all communications are 
 125. ❌ Home page with search engine (§5.1)
 126. ❌ City pages, server-rendered for SEO (§5.4)
 127. ❌ Results page with filters and labelled ad slots (§5.5)
-128. ❌ Property page — gallery, map, calendar, policy, fees (§5.6)
+128. ✅ Property page — gallery, approximate location, 4-state calendar, policy, fees from
+     settings, badges, "Book now" / "Ask SAFRA" and **no partner contact before
+     confirmation** (P-001, verified)
 129. ❌ Accessibility pass and Core Web Vitals budget (§14.1: home < 2 s)
 
 ---

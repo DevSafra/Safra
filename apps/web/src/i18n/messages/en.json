@@ -98,7 +98,17 @@
     "viewDetails": "View details",
     "guestsUpTo": "up to {count} guests",
     "badgeVerified": "Verified by SAFRA",
-    "badgeRecommends": "SAFRA recommends"
+    "badgeRecommends": "SAFRA recommends",
+    "amenities": "Amenities",
+    "cancellationPolicy": "Cancellation policy",
+    "refundFloor": "The minimum refund across SAFRA policies is {percent}%, except in special cases approved by administration.",
+    "location": "Location",
+    "exactLocationAfterBooking": "The exact location is shown once your booking is confirmed.",
+    "serviceFeeLabel": "SAFRA service fee",
+    "bookNow": "Book now",
+    "askSafra": "Ask SAFRA about this property",
+    "notInstantNotice": "You will not contact the partner directly — SAFRA confirms your booking within two hours of payment.",
+    "noUnits": "No units are currently available."
   },
   "city": {
     "availableStays": "Available stays in {city}",
@@ -110,5 +120,12 @@
     "error": "Something went wrong",
     "retry": "Try again",
     "skipToContent": "Skip to content"
+  },
+  "calendar": {
+    "title": "Availability — coming days",
+    "available": "Available",
+    "booked": "Booked",
+    "closed": "Closed",
+    "maintenance": "Under maintenance"
   }
 }
