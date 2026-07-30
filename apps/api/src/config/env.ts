@@ -61,6 +61,33 @@ export const envSchema = z.object({
   /** CDN or bucket URL images are served from, if different from the endpoint. */
   S3_PUBLIC_URL: z.string().url().optional(),
 
+  /**
+   * The fake gateway used in development and CI (ADR 0002). `loadEnv` refuses to
+   * let this be true in production — a simulator that can mark bookings paid
+   * without money is the single most dangerous thing in this codebase if it ever
+   * reaches a live deployment, so the guard is an explicit throw rather than a
+   * default.
+   */
+  PAYMENT_SIMULATOR_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  /**
+   * Comma-separated so more than one is valid at a time. That is what makes
+   * rotating a webhook secret safe: publish the new one, keep the old one accepted
+   * until the provider has switched over, then remove it. With a single secret
+   * there is always a window where live webhooks are rejected.
+   */
+  PAYMENT_SIMULATOR_WEBHOOK_SECRETS: z
+    .string()
+    .optional()
+    .transform((v) =>
+      (v ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    ),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 
@@ -82,6 +109,35 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   // validate as an access token — a privilege escalation, not a style issue.
   if (env.JWT_ACCESS_SECRET === env.JWT_REFRESH_SECRET) {
     throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different values.');
+  }
+
+  /**
+   * A gateway that can mark a booking paid with no money behind it must be
+   * impossible in production, not merely discouraged. Refusing to boot is the only
+   * enforcement that cannot be skipped by a misconfigured deploy.
+   */
+  if (env.NODE_ENV === 'production' && env.PAYMENT_SIMULATOR_ENABLED) {
+    throw new Error(
+      'PAYMENT_SIMULATOR_ENABLED must be false in production. The payment simulator ' +
+        'captures payments without money and would let anyone confirm a booking.',
+    );
+  }
+
+  if (
+    env.PAYMENT_SIMULATOR_ENABLED &&
+    env.PAYMENT_SIMULATOR_WEBHOOK_SECRETS.length === 0
+  ) {
+    throw new Error(
+      'PAYMENT_SIMULATOR_ENABLED is true but PAYMENT_SIMULATOR_WEBHOOK_SECRETS is empty. ' +
+        'Unsigned webhooks would be accepted. Generate with: openssl rand -base64 48',
+    );
+  }
+
+  const tooShort = env.PAYMENT_SIMULATOR_WEBHOOK_SECRETS.filter((s) => s.length < 32);
+  if (tooShort.length > 0) {
+    throw new Error(
+      'Every PAYMENT_SIMULATOR_WEBHOOK_SECRETS entry must be at least 32 characters.',
+    );
   }
 
   return env;

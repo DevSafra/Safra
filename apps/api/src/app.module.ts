@@ -12,6 +12,7 @@ import { AdminModule } from './admin/admin.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { LedgerModule } from './ledger/ledger.module.js';
 import { PartnerModule } from './partner/partner.module.js';
+import { PaymentsModule } from './payments/payments.module.js';
 import { RankingModule } from './ranking/ranking.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SettingsModule } from './settings/settings.module.js';
@@ -38,6 +39,7 @@ import { PermissionsGuard } from './rbac/permissions.guard.js';
     BookingsModule,
     SearchModule,
     PartnerModule,
+    PaymentsModule,
     RankingModule,
     AdminModule,
     CatalogModule,

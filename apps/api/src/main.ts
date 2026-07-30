@@ -20,6 +20,15 @@ async function bootstrap(): Promise<void> {
       env.NODE_ENV === 'production'
         ? ['error', 'warn', 'log']
         : ['error', 'warn', 'log', 'debug', 'verbose'],
+    /**
+     * Keeps the unparsed request body available as `req.rawBody`.
+     *
+     * Mandatory for payment webhooks: the signature is computed over the exact bytes
+     * the provider sent, and `JSON.parse` followed by `JSON.stringify` reorders keys
+     * and normalises whitespace, so a digest taken from the parsed object never
+     * matches. Without this the usual "fix" is to stop verifying signatures.
+     */
+    rawBody: true,
   });
 
   /**
