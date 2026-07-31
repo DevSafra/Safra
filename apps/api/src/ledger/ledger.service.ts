@@ -6,7 +6,12 @@ import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
-import { multiplyDecimalStrings } from '../common/money.js';
+import {
+  MONEY_SCALE,
+  fromMinor,
+  multiplyDecimalStrings,
+  toMinor,
+} from '../common/money.js';
 
 /**
  * The accounts, derived from the database enum rather than restated.
@@ -107,16 +112,22 @@ export class LedgerService {
   /**
    * The entries for a captured booking payment.
    *
-   * One movement, four legs, because the customer's money splits three ways:
+   * One movement, because the customer's money splits three ways:
    *
-   *   DEBIT  customer_payment           total the customer paid
+   *   DEBIT  customer_payment           what came in through the gateway
+   *   DEBIT  wallet_debit               what came out of stored value (§7.3)
    *   CREDIT safra_commission_customer  the flat service fee SAFRA keeps
    *   CREDIT safra_commission_partner   the % SAFRA deducts from the partner
    *   CREDIT partner_payable            what the partner is owed
    *
-   * Debits equal credits by construction: total = fee + commission + payable, which
-   * is the same identity the pricing tests assert. If the arithmetic ever drifts, the
-   * trigger rejects the transaction rather than letting the books go out.
+   * Debits equal credits by construction: total = fee + commission + payable, and
+   * the debit side splits that same total across however many sources funded it. If
+   * the arithmetic ever drifts, the trigger rejects the transaction rather than
+   * letting the books go out.
+   *
+   * The split lives HERE rather than in the booking's own amounts: netting a wallet
+   * payment out of `total_amount` would break the identity above, because the fee
+   * and commission are still owed on the full price regardless of how it was paid.
    */
   async postBookingPayment(
     tx: Database,
@@ -127,6 +138,8 @@ export class LedgerService {
       currencyId: string;
       fxRateToSyp: string;
       totalAmount: string;
+      /** Portion funded from the wallet; the rest came through the gateway. */
+      walletAmount?: string | undefined;
       customerFeeAmount: string;
       partnerCommissionAmount: string;
       partnerPayableAmount: string;
@@ -135,15 +148,51 @@ export class LedgerService {
     paymentId: string,
     actorUserId?: string,
   ): Promise<{ entryGroupId: string }> {
+    const total = toMinor(booking.totalAmount, MONEY_SCALE);
+    const fromWallet = toMinor(booking.walletAmount ?? '0', MONEY_SCALE);
+    const fromGateway = total - fromWallet;
+
+    if (fromWallet < 0n || fromGateway < 0n) {
+      // The wallet cannot have funded more than the booking cost. Reaching here
+      // means a hold was placed against the wrong total, and posting it would
+      // record a negative receipt.
+      throw new Error(
+        `Wallet portion ${booking.walletAmount} exceeds the total ${booking.totalAmount}.`,
+      );
+    }
+
+    /**
+     * A zero-value leg is omitted rather than written.
+     *
+     * A wallet-only booking has no gateway receipt, and posting `customer_payment
+     * 0.00` would put a row in the books asserting money arrived through a rail
+     * nobody used — which is exactly the kind of entry that makes a rail-mix report
+     * lie.
+     */
+    const funding: LedgerLeg[] = [];
+
+    if (fromGateway > 0n) {
+      funding.push({
+        account: 'customer_payment',
+        direction: 'debit',
+        amount: fromMinor(fromGateway, MONEY_SCALE),
+        description: `Payment received for ${booking.reference}`,
+      });
+    }
+
+    if (fromWallet > 0n) {
+      funding.push({
+        account: 'wallet_debit',
+        direction: 'debit',
+        amount: fromMinor(fromWallet, MONEY_SCALE),
+        description: `Wallet balance applied to ${booking.reference}`,
+      });
+    }
+
     return this.post(
       tx,
       [
-        {
-          account: 'customer_payment',
-          direction: 'debit',
-          amount: booking.totalAmount,
-          description: `Payment received for ${booking.reference}`,
-        },
+        ...funding,
         {
           account: 'safra_commission_customer',
           direction: 'credit',

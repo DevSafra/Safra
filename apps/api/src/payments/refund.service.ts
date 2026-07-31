@@ -12,8 +12,9 @@ import type { Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
-import { LedgerService } from '../ledger/ledger.service.js';
+import { LedgerService, type LedgerLeg } from '../ledger/ledger.service.js';
 import { MONEY_SCALE, applyRate, fromMinor, toMinor } from '../common/money.js';
+import { WalletService } from '../wallet/wallet.service.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -28,6 +29,10 @@ export interface RefundQuote {
   readonly refundPercent: number;
   readonly refundAmount: string;
   readonly currencyCode: string;
+  /** Of `refundAmount`, how much goes back to the wallet (§7.3). */
+  readonly walletAmount: string;
+  /** Of `refundAmount`, how much goes back out through the gateway. */
+  readonly providerAmount: string;
   readonly hoursBeforeCheckIn: number;
   readonly tierApplied: string;
   readonly alreadyRefunded: string;
@@ -56,6 +61,7 @@ export class RefundService {
     private readonly registry: PaymentProviderRegistry,
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
+    private readonly wallet: WalletService,
   ) {}
 
   /**
@@ -98,9 +104,19 @@ export class RefundService {
       );
     }
 
-    const provider = this.registry.bySlug(payment.provider);
+    const needsProvider = toMinor(quote.providerAmount, MONEY_SCALE) > 0n;
 
-    if (!provider) {
+    /**
+     * A refund settled entirely from stored value needs no gateway.
+     *
+     * Resolving one anyway would fail for exactly the bookings this path exists to
+     * serve: a wallet-only payment carries `provider = 'internal'`, which is not in
+     * the registry and never will be, so requiring a provider here would make those
+     * refunds permanently impossible.
+     */
+    const provider = needsProvider ? this.registry.bySlug(payment.provider) : undefined;
+
+    if (needsProvider && !provider) {
       /**
        * A refund owed through a provider that is no longer registered needs a human,
        * not a guess. Failing loudly beats silently routing it elsewhere.
@@ -116,10 +132,11 @@ export class RefundService {
     const refundId = await this.db.transaction(async (tx) => {
       const inserted = await tx.execute<{ id: string }>(sql`
         INSERT INTO refunds
-          (payment_id, booking_id, amount, currency_id, applied_refund_percent,
-           reason, status, initiated_by_user_id)
+          (payment_id, booking_id, amount, wallet_amount, currency_id,
+           applied_refund_percent, reason, status, initiated_by_user_id)
         VALUES (${payment.id}, ${booking.id}, ${quote.refundAmount},
-                ${booking.currency_id}, ${quote.refundPercent}, ${reason},
+                ${quote.walletAmount}, ${booking.currency_id},
+                ${quote.refundPercent}, ${reason},
                 'pending'::refund_status, ${claims?.sub ?? null})
         RETURNING id
       `);
@@ -128,10 +145,52 @@ export class RefundService {
       if (!id) throw new Error('Refund insert returned no row.');
 
       /**
-       * Two legs: SAFRA's refund account is debited, the customer's payment account
-       * credited back. Posted in this transaction so a refund can never exist
-       * without its ledger movement (§13.3).
+       * The stored-value portion actually moves here, in the same transaction as
+       * the refund row. Unlike the gateway leg — which is a request to a third
+       * party that may still fail — a wallet credit is SAFRA's own ledger, so there
+       * is no pending state for it to sit in and no reason to defer it.
        */
+      if (toMinor(quote.walletAmount, MONEY_SCALE) > 0n) {
+        await this.wallet.credit(tx as unknown as Database, {
+          customerProfileId: booking.customer_profile_id,
+          amount: quote.walletAmount,
+          currencyId: booking.currency_id,
+          reason: 'refund',
+          bookingId: booking.id,
+          note: `Refund on ${reference} (${quote.tierApplied})`,
+        });
+      }
+
+      /**
+       * SAFRA's refund account is debited for the whole amount; the credit side
+       * splits across wherever the money is going back to. Posted in this
+       * transaction so a refund can never exist without its ledger movement (§13.3).
+       *
+       * `wallet_credit` rather than `customer_payment` for the stored-value part:
+       * that money is not leaving SAFRA, it is moving back into a liability owed to
+       * the customer, and booking it as an outbound payment would overstate what
+       * the gateway actually returned.
+       */
+      const destinations: LedgerLeg[] = [];
+
+      if (toMinor(quote.providerAmount, MONEY_SCALE) > 0n) {
+        destinations.push({
+          account: 'customer_payment',
+          direction: 'credit',
+          amount: quote.providerAmount,
+          description: `Refund returned to customer for ${reference}`,
+        });
+      }
+
+      if (toMinor(quote.walletAmount, MONEY_SCALE) > 0n) {
+        destinations.push({
+          account: 'wallet_credit',
+          direction: 'credit',
+          amount: quote.walletAmount,
+          description: `Refund returned to wallet for ${reference}`,
+        });
+      }
+
       await this.ledger.post(
         tx as unknown as Database,
         [
@@ -141,12 +200,7 @@ export class RefundService {
             amount: quote.refundAmount,
             description: `Refund on ${reference} (${quote.tierApplied})`,
           },
-          {
-            account: 'customer_payment',
-            direction: 'credit',
-            amount: quote.refundAmount,
-            description: `Refund returned to customer for ${reference}`,
-          },
+          ...destinations,
         ],
         {
           currencyId: booking.currency_id,
@@ -167,6 +221,8 @@ export class RefundService {
                 ${claims?.sub ?? null},
                 ${JSON.stringify({
                   amount: quote.refundAmount,
+                  toWallet: quote.walletAmount,
+                  toProvider: quote.providerAmount,
                   percent: quote.refundPercent,
                   tier: quote.tierApplied,
                 })}::jsonb)
@@ -182,6 +238,8 @@ export class RefundService {
           after: {
             refundId: id,
             amount: quote.refundAmount,
+            walletAmount: quote.walletAmount,
+            providerAmount: quote.providerAmount,
             percent: quote.refundPercent,
             provider: payment.provider,
           },
@@ -193,9 +251,33 @@ export class RefundService {
       return id;
     });
 
+    /**
+     * Nothing left to send. The stored-value portion was credited inside the
+     * transaction above, so the refund is already complete — there is no third
+     * party whose acknowledgement it is waiting on.
+     */
+    if (!provider) {
+      await this.db.execute(sql`
+        UPDATE refunds
+        SET status = 'completed'::refund_status, completed_at = now(), updated_at = now()
+        WHERE id = ${refundId}
+      `);
+
+      await this.markPaymentRefundState(payment.id);
+
+      return {
+        refundId,
+        amount: quote.refundAmount,
+        status: 'completed',
+        percent: quote.refundPercent,
+      };
+    }
+
     const outcome = await provider.refund({
       paymentProviderRef: payment.provider_ref ?? '',
-      amount: { value: quote.refundAmount, currencyCode: quote.currencyCode },
+      // Only the gateway's share. Sending the full amount would return the stored
+      // value a second time, through a rail it never came in on.
+      amount: { value: quote.providerAmount, currencyCode: quote.currencyCode },
       refundId,
       reason,
     });
@@ -272,11 +354,35 @@ export class RefundService {
 
     const remaining = toMinor(gross, MONEY_SCALE) - toMinor(alreadyRefunded, MONEY_SCALE);
 
-    const refundAmount = fromMinor(remaining > 0n ? remaining : 0n, MONEY_SCALE);
+    const refundAmountMinor = remaining > 0n ? remaining : 0n;
+    const refundAmount = fromMinor(refundAmountMinor, MONEY_SCALE);
+
+    /**
+     * Stored value is returned before card money (§7.3).
+     *
+     * The customer gets spendable balance back immediately instead of waiting on a
+     * card settlement, and SAFRA is not out of pocket for an acquirer's refund fee
+     * on money that never went through an acquirer. Capped at what the wallet
+     * actually funded, less whatever earlier refunds already returned — otherwise a
+     * second partial refund would hand back the same balance twice.
+     */
+    const walletFunded = toMinor(booking.wallet_amount, MONEY_SCALE);
+    const walletAlreadyBack = toMinor(
+      await this.sumRefundedToWallet(booking.id),
+      MONEY_SCALE,
+    );
+
+    const walletHeadroom = walletFunded - walletAlreadyBack;
+    const cappedHeadroom = walletHeadroom > 0n ? walletHeadroom : 0n;
+
+    const toWalletMinor =
+      refundAmountMinor < cappedHeadroom ? refundAmountMinor : cappedHeadroom;
 
     return {
       refundPercent: percent,
       refundAmount,
+      walletAmount: fromMinor(toWalletMinor, MONEY_SCALE),
+      providerAmount: fromMinor(refundAmountMinor - toWalletMinor, MONEY_SCALE),
       currencyCode: booking.currency_code,
       hoursBeforeCheckIn,
       tierApplied: matched
@@ -285,6 +391,17 @@ export class RefundService {
       alreadyRefunded,
       refundable: gross,
     };
+  }
+
+  /** How much of this booking's refunds has already gone back to stored value. */
+  private async sumRefundedToWallet(bookingId: string): Promise<string> {
+    const rows = await this.db.execute<{ total: string }>(sql`
+      SELECT COALESCE(SUM(wallet_amount), 0)::text AS total
+      FROM refunds
+      WHERE booking_id = ${bookingId} AND status IN ('pending','processing','completed')
+    `);
+
+    return rows.rows[0]?.total ?? '0';
   }
 
   private async sumRefunded(bookingId: string): Promise<string> {
@@ -337,6 +454,7 @@ export class RefundService {
     const rows = await this.db.execute<BookingRow>(sql`
       SELECT b.id, b.status::text AS status, b.check_in::text AS check_in,
              b.base_amount::text AS base_amount, b.total_amount::text AS total_amount,
+             b.wallet_amount::text AS wallet_amount,
              b.currency_id, b.fx_rate_to_syp::text AS fx_rate_to_syp,
              b.partner_id, b.customer_profile_id,
              b.cancellation_policy_snapshot, cur.code AS currency_code
@@ -364,6 +482,7 @@ type BookingRow = {
   check_in: string;
   base_amount: string;
   total_amount: string;
+  wallet_amount: string;
   currency_id: string;
   currency_code: string;
   fx_rate_to_syp: string;

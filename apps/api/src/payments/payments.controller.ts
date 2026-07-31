@@ -81,6 +81,7 @@ export class PaymentsController {
   async start(
     @Body(new ZodValidationPipe(startPaymentSchema)) body: StartPaymentRequest,
     @Req() request: Request,
+    @CurrentUser() user: AccessTokenClaims | undefined,
   ) {
     /**
      * Locale is narrowed to the three SAFRA supports (§1.4) rather than passed
@@ -90,10 +91,18 @@ export class PaymentsController {
     const requested = request.get('accept-language')?.slice(0, 2).toLowerCase();
     const locale = requested === 'en' || requested === 'de' ? requested : 'ar';
 
+    /**
+     * `user` is undefined for a guest, which is the normal case on this @Public()
+     * route — JwtAuthGuard still decodes a token when one is present. Applying a
+     * wallet balance is the one thing here that needs it, and the service refuses
+     * rather than silently ignoring the request when it is missing.
+     */
     return this.intents.start({
       reference: body.reference,
       accessToken: body.accessToken,
       method: body.method,
+      applyWallet: body.applyWallet,
+      claims: user,
       locale,
     });
   }

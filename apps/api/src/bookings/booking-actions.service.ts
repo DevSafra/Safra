@@ -5,8 +5,10 @@ import type { Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { MONEY_SCALE, toMinor } from '../common/money.js';
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { WalletService } from '../wallet/wallet.service.js';
 import { canTransition, type Actor, type BookingStatus } from './booking-state.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -25,6 +27,7 @@ export class BookingActionsService {
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
     private readonly ledger: LedgerService,
+    private readonly wallet: WalletService,
   ) {}
 
   /**
@@ -51,6 +54,7 @@ export class BookingActionsService {
       currency_id: string;
       fx_rate_to_syp: string;
       total_amount: string;
+      wallet_amount: string;
       customer_fee_amount: string;
       partner_commission_amount: string;
       partner_payable_amount: string;
@@ -58,6 +62,7 @@ export class BookingActionsService {
       SELECT id, partner_id, customer_profile_id, currency_id,
              fx_rate_to_syp::text AS fx_rate_to_syp,
              total_amount::text AS total_amount,
+             wallet_amount::text AS wallet_amount,
              customer_fee_amount::text AS customer_fee_amount,
              partner_commission_amount::text AS partner_commission_amount,
              partner_payable_amount::text AS partner_payable_amount
@@ -129,6 +134,10 @@ export class BookingActionsService {
           currencyId: amounts.currency_id,
           fxRateToSyp: amounts.fx_rate_to_syp,
           totalAmount: amounts.total_amount,
+          // Splits the debit side; the wallet was already debited when the hold was
+          // taken at payment start, so this records where the money came from
+          // rather than moving it.
+          walletAmount: amounts.wallet_amount,
           customerFeeAmount: amounts.customer_fee_amount,
           partnerCommissionAmount: amounts.partner_commission_amount,
           partnerPayableAmount: amounts.partner_payable_amount,
@@ -303,6 +312,18 @@ export class BookingActionsService {
         WHERE id = ${booking.id}
       `);
 
+      /**
+       * Stored value held against an UNPAID booking goes straight back (§7.3).
+       *
+       * Only from `pending_payment`: after capture the hold has become part of a
+       * settled payment, and returning it here would refund outside the
+       * cancellation policy and without a `refunds` row — RefundService owns that
+       * path and applies §7.4's tiers to it.
+       */
+      if (booking.status === 'pending_payment') {
+        await this.releaseWalletHold(tx as unknown as Database, booking.id, reference);
+      }
+
       await tx.execute(sql`
         INSERT INTO timeline_events (subject_type, subject_id, event_type, actor_type, actor_user_id, payload)
         VALUES ('booking', ${booking.id}, 'booking.cancelled', ${actor},
@@ -327,6 +348,43 @@ export class BookingActionsService {
       // module — there is no captured payment to refund until a gateway exists.
       return { reference, status: 'cancelled' as const, refundPending: true };
     });
+  }
+
+  /**
+   * Returns any stored value held against a booking being cancelled before payment.
+   *
+   * Reads the amount inside the caller's transaction rather than taking it as an
+   * argument, so it cannot be handed a figure that has already gone stale.
+   */
+  private async releaseWalletHold(
+    tx: Database,
+    bookingId: string,
+    reference: string,
+  ): Promise<void> {
+    const rows = await tx.execute<{
+      wallet_amount: string;
+      customer_profile_id: string;
+      currency_id: string;
+    }>(sql`
+      SELECT wallet_amount::text AS wallet_amount, customer_profile_id, currency_id
+      FROM bookings WHERE id = ${bookingId}
+    `);
+
+    const held = rows.rows[0];
+    if (!held || toMinor(held.wallet_amount, MONEY_SCALE) <= 0n) return;
+
+    await this.wallet.credit(tx, {
+      customerProfileId: held.customer_profile_id,
+      amount: held.wallet_amount,
+      currencyId: held.currency_id,
+      reason: 'refund',
+      bookingId,
+      note: `Balance returned — ${reference} was cancelled before payment.`,
+    });
+
+    await tx.execute(sql`
+      UPDATE bookings SET wallet_amount = 0, updated_at = now() WHERE id = ${bookingId}
+    `);
   }
 
   /**

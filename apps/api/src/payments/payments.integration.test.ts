@@ -7,8 +7,10 @@ import { createDatabase, type Database } from '@safra/db';
 
 import { BookingAccessService } from '../bookings/booking-access.service.js';
 import { BookingActionsService } from '../bookings/booking-actions.service.js';
+import { SlaService } from '../bookings/sla.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { PaymentIntentService } from './payment-intent.service.js';
+import { PaymentProviderUnavailableError } from './payment-provider.port.js';
 import { PaymentWebhookService } from './payment-webhook.service.js';
 import { RefundService } from './refund.service.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
@@ -16,7 +18,10 @@ import { ManualTransferProvider } from './providers/manual-transfer.provider.js'
 // Only the signer is imported: the registry constructs the simulator itself when
 // PAYMENT_SIMULATOR_ENABLED is set, which is exactly the behaviour under test.
 import { signSimulatorPayload } from './providers/simulator.provider.js';
+import { WalletService } from '../wallet/wallet.service.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { AuditService } from '../common/audit/audit.service.js';
+import type { FxRateService } from '../fx/fx-rate.service.js';
 import type { SettingsService } from '../settings/settings.service.js';
 
 /**
@@ -60,6 +65,11 @@ describeIfDb('payment collection, webhooks and refunds', () => {
   let refunds: RefundService;
   let registry: PaymentProviderRegistry;
   let intents: PaymentIntentService;
+  let wallet: WalletService;
+  /** Held at suite scope so a test can build a variant service around them. */
+  let actions: BookingActionsService;
+  let audit: AuditService;
+  let sla: SlaService;
 
   /** The booking under test, replaced before each case. */
   let booking: Booking;
@@ -67,7 +77,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
   beforeAll(async () => {
     db = createDatabase(DATABASE_URL as string, 2);
 
-    const audit = { record: () => Promise.resolve() } as unknown as AuditService;
+    audit = { record: () => Promise.resolve() } as unknown as AuditService;
     const ledger = new LedgerService(db);
 
     /** Routes everything to the simulator; the real routing table is tested separately. */
@@ -90,15 +100,35 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
     access = new BookingAccessService(db);
 
-    const actions = new BookingActionsService(db, settings, audit, ledger);
+    /**
+     * FX throws rather than returning a rate.
+     *
+     * Every booking here is priced in USD and every wallet is created in USD, so a
+     * conversion would mean the single-currency fast path had been skipped. Making
+     * that a loud failure is more useful than a stub returning a plausible number,
+     * and it keeps this suite off the shared `fx_rates` table that FxRateService's
+     * own tests clear wholesale.
+     */
+    const fx = {
+      rateToSyp: () => {
+        throw new Error('FX must not be consulted for a same-currency wallet movement.');
+      },
+    } as unknown as FxRateService;
+
+    wallet = new WalletService(db, fx);
+
+    actions = new BookingActionsService(db, settings, audit, ledger, wallet);
+    sla = new SlaService(db, settings, ledger, wallet);
     webhooks = new PaymentWebhookService(db, registry, actions, access);
-    refunds = new RefundService(db, registry, ledger, audit);
+    refunds = new RefundService(db, registry, ledger, audit, wallet);
     intents = new PaymentIntentService(
       db,
       { APP_URL: 'https://safra.test' } as never,
       access,
       registry,
       audit,
+      wallet,
+      actions,
     );
 
     await seedFixtures(db);
@@ -111,6 +141,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
   beforeEach(async () => {
     booking = await createBooking(db);
+    await resetWallet(db, wallet);
   });
 
   // ── Guest authorization ──────────────────────────────────────────────────────
@@ -419,6 +450,391 @@ describeIfDb('payment collection, webhooks and refunds', () => {
     });
   });
 
+  // ── Split payment (§7.3) ─────────────────────────────────────────────────────
+
+  describe('paying partly from the wallet', () => {
+    /** A signed-in customer owning this booking's profile. */
+    const owner = {
+      sub: USER_ID,
+      customerProfileId: PROFILE_ID,
+      permissions: [],
+    } as unknown as AccessTokenClaims;
+
+    it('reduces the gateway amount by the balance applied', async () => {
+      await credit(db, wallet, '50.00');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+
+      const result = await intents.start({
+        reference: booking.reference,
+        accessToken: token,
+        applyWallet: true,
+        claims: owner,
+        locale: 'en',
+      });
+
+      // Booking total is 201.99; 50.00 comes from the balance.
+      expect(result.walletApplied).toBe('50.00');
+      expect(result.amount.value).toBe('151.99');
+
+      // And the gateway is asked for exactly that, not the full total.
+      const rows = await db.execute<{ amount: string }>(sql`
+        SELECT amount::text AS amount FROM payments
+        WHERE booking_id = ${booking.id}::uuid ORDER BY created_at DESC LIMIT 1`);
+
+      expect(rows.rows[0]?.amount).toBe('151.99');
+      expect(await balanceOf(wallet)).toBe('0.00');
+    });
+
+    /**
+     * The hold must be taken only AFTER the gateway has accepted the intent.
+     *
+     * Ordered the other way round, every provider blip would strand a customer's
+     * balance: debited, no payment to show for it, and nothing to release it until
+     * the booking eventually expires. The simulator always succeeds, so this needs
+     * a provider that genuinely throws — the property is about ordering, and only a
+     * real failure at the right moment can demonstrate it.
+     */
+    it('does not touch the balance when the provider refuses the intent', async () => {
+      await credit(db, wallet, '50.00');
+
+      const unavailable = {
+        resolveForCountry: () =>
+          Promise.resolve({
+            slug: 'simulator',
+            supportedMethods: ['visa'],
+            isOffline: false,
+            createIntent: () => {
+              throw new PaymentProviderUnavailableError('simulator', 'Gateway down.');
+            },
+          }),
+        bySlug: () => undefined,
+      } as unknown as PaymentProviderRegistry;
+
+      const flaky = new PaymentIntentService(
+        db,
+        { APP_URL: 'https://safra.test' } as never,
+        access,
+        unavailable,
+        audit,
+        wallet,
+        actions,
+      );
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+
+      await expect(
+        flaky.start({
+          reference: booking.reference,
+          accessToken: token,
+          applyWallet: true,
+          claims: owner,
+          locale: 'en',
+        }),
+      ).rejects.toThrow(/temporarily unavailable/i);
+
+      expect(await balanceOf(wallet)).toBe('50.00');
+
+      // And the booking records no hold either.
+      const held = await db.execute<{ wallet_amount: string }>(sql`
+        SELECT wallet_amount::text AS wallet_amount FROM bookings
+        WHERE id = ${booking.id}::uuid`);
+
+      expect(held.rows[0]?.wallet_amount).toBe('0.00');
+    });
+
+    it('captures with no provider at all when the balance covers the total', async () => {
+      await credit(db, wallet, '250.00');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+
+      const result = await intents.start({
+        reference: booking.reference,
+        accessToken: token,
+        applyWallet: true,
+        claims: owner,
+        locale: 'en',
+      });
+
+      expect(result.status).toBe('captured');
+      expect(result.amount.value).toBe('0.00');
+      expect(result.walletApplied).toBe('201.99');
+
+      // 250.00 - 201.99. The surplus stays spendable.
+      expect(await balanceOf(wallet)).toBe('48.01');
+
+      const status = await db.execute<{ status: string }>(sql`
+        SELECT status::text AS status FROM bookings WHERE id = ${booking.id}::uuid`);
+
+      expect(status.rows[0]?.status).toBe('pending_confirmation');
+    });
+
+    /**
+     * The capture group splits its DEBIT side across the two funding sources while
+     * the credit side is untouched, so `total = fee + commission + payable` still
+     * holds. The deferred trigger would reject it otherwise.
+     */
+    it('posts both funding legs and still balances', async () => {
+      await credit(db, wallet, '50.00');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+      const ref = `sim_${booking.id}`;
+
+      await intents.start({
+        reference: booking.reference,
+        accessToken: token,
+        applyWallet: true,
+        claims: owner,
+        locale: 'en',
+      });
+
+      await db.execute(sql`
+        UPDATE payments SET provider_ref = ${ref}
+        WHERE booking_id = ${booking.id}::uuid`);
+
+      await deliver(webhooks, eventId(), ref, '151.99');
+
+      const legs = await db.execute<{ account: string; amount: string }>(sql`
+        SELECT account::text AS account, amount::text AS amount
+        FROM ledger_entries
+        WHERE booking_id = ${booking.id}::uuid AND direction = 'debit'
+        ORDER BY account`);
+
+      expect(legs.rows).toStrictEqual([
+        { account: 'customer_payment', amount: '151.99' },
+        { account: 'wallet_debit', amount: '50.00' },
+      ]);
+    });
+
+    /**
+     * A booking access token proves possession of ONE booking. The wallet spans
+     * every booking on the profile, so spending it needs a session.
+     */
+    it('refuses to spend a balance for a guest holding only the access token', async () => {
+      await credit(db, wallet, '50.00');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+
+      await expect(
+        intents.start({
+          reference: booking.reference,
+          accessToken: token,
+          applyWallet: true,
+          locale: 'en',
+        }),
+      ).rejects.toThrow(/sign in/i);
+
+      expect(await balanceOf(wallet)).toBe('50.00');
+    });
+
+    it('refuses a signed-in customer who does not own the booking', async () => {
+      await credit(db, wallet, '50.00');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+
+      await expect(
+        intents.start({
+          reference: booking.reference,
+          accessToken: token,
+          applyWallet: true,
+          claims: { ...owner, customerProfileId: randomUUID() },
+          locale: 'en',
+        }),
+      ).rejects.toThrow(/sign in/i);
+
+      expect(await balanceOf(wallet)).toBe('50.00');
+    });
+
+    /**
+     * EC-001: the customer applies a balance, then closes the tab.
+     *
+     * Without a release the wallet is simply poorer — debited for a booking that
+     * was cancelled and never captured. This is the most likely way a real customer
+     * loses money to split payment, so it is swept rather than left to support.
+     */
+    it('returns the balance when the booking expires unpaid', async () => {
+      await credit(db, wallet, '50.00');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+
+      await intents.start({
+        reference: booking.reference,
+        accessToken: token,
+        applyWallet: true,
+        claims: owner,
+        locale: 'en',
+      });
+
+      expect(await balanceOf(wallet)).toBe('0.00');
+
+      // Push the payment window into the past so the sweep picks it up.
+      await db.execute(sql`
+        UPDATE bookings SET confirmation_deadline_at = now() - interval '1 minute'
+        WHERE id = ${booking.id}::uuid`);
+
+      await sla.sweep();
+
+      expect(await bookingStatus(db, booking.id)).toBe('cancelled');
+      expect(await balanceOf(wallet)).toBe('50.00');
+
+      // And the hold is cleared, so a later sweep cannot return it twice.
+      const held = await db.execute<{ wallet_amount: string }>(sql`
+        SELECT wallet_amount::text AS wallet_amount FROM bookings
+        WHERE id = ${booking.id}::uuid`);
+
+      expect(held.rows[0]?.wallet_amount).toBe('0.00');
+    });
+
+    /**
+     * The customer backing out before paying must release it the same way.
+     *
+     * `customer`, not `staff`: §6.2 gives the pending_payment → cancelled edge to
+     * the customer and the system only, so a staff-actor cancel is refused by the
+     * state machine before it ever reaches the wallet.
+     */
+    it('returns the balance when the booking is cancelled before payment', async () => {
+      await credit(db, wallet, '50.00');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+
+      await intents.start({
+        reference: booking.reference,
+        accessToken: token,
+        applyWallet: true,
+        claims: owner,
+        locale: 'en',
+      });
+
+      await actions.cancel(booking.reference, 'Changed plans', 'customer', undefined);
+
+      expect(await balanceOf(wallet)).toBe('50.00');
+    });
+
+    it('charges the full total when the balance is not asked for', async () => {
+      await credit(db, wallet, '50.00');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+
+      const result = await intents.start({
+        reference: booking.reference,
+        accessToken: token,
+        claims: owner,
+        locale: 'en',
+      });
+
+      expect(result.amount.value).toBe('201.99');
+      expect(result.walletApplied).toBe('0.00');
+      expect(await balanceOf(wallet)).toBe('50.00');
+    });
+
+    /** An empty wallet is not an error — checkout proceeds at the full price. */
+    it('proceeds normally when there is no balance to apply', async () => {
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+
+      const result = await intents.start({
+        reference: booking.reference,
+        accessToken: token,
+        applyWallet: true,
+        claims: owner,
+        locale: 'en',
+      });
+
+      expect(result.amount.value).toBe('201.99');
+      expect(result.walletApplied).toBe('0.00');
+    });
+  });
+
+  describe('refunding a booking part-paid from the wallet', () => {
+    const owner = {
+      sub: USER_ID,
+      customerProfileId: PROFILE_ID,
+      permissions: [],
+    } as unknown as AccessTokenClaims;
+
+    it('returns stored value first, and the rest through the gateway', async () => {
+      await credit(db, wallet, '50.00');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+      const ref = `sim_${booking.id}`;
+
+      await intents.start({
+        reference: booking.reference,
+        accessToken: token,
+        applyWallet: true,
+        claims: owner,
+        locale: 'en',
+      });
+
+      await db.execute(sql`
+        UPDATE payments SET provider_ref = ${ref}
+        WHERE booking_id = ${booking.id}::uuid`);
+
+      await deliver(webhooks, eventId(), ref, '151.99');
+
+      const quote = await refunds.quote(booking.reference);
+
+      // 200.00 refundable base: 50.00 back to the wallet, 150.00 to the card.
+      expect(quote.refundAmount).toBe('200.00');
+      expect(quote.walletAmount).toBe('50.00');
+      expect(quote.providerAmount).toBe('150.00');
+
+      await refunds.execute(booking.reference, 'Customer request', undefined);
+
+      // The wallet was emptied paying for this booking; 50.00 comes straight back.
+      expect(await balanceOf(wallet)).toBe('50.00');
+    });
+
+    /**
+     * A wallet-only booking carries `provider = 'internal'`, which is not in the
+     * registry and never will be. Requiring a provider would make exactly these
+     * refunds impossible.
+     */
+    it('refunds a wallet-only booking without consulting any provider', async () => {
+      await credit(db, wallet, '250.00');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+
+      await intents.start({
+        reference: booking.reference,
+        accessToken: token,
+        applyWallet: true,
+        claims: owner,
+        locale: 'en',
+      });
+
+      const result = await refunds.execute(booking.reference, 'Changed plans', undefined);
+
+      expect(result.status).toBe('completed');
+      expect(result.amount).toBe('200.00');
+
+      // 48.01 left over from the payment, plus the 200.00 base returned.
+      expect(await balanceOf(wallet)).toBe('248.01');
+    });
+
+    it('does not return the same stored value twice across two partial refunds', async () => {
+      await credit(db, wallet, '250.00');
+
+      const token = await access.mint(db, booking.id, minutesFromNow(60));
+
+      await intents.start({
+        reference: booking.reference,
+        accessToken: token,
+        applyWallet: true,
+        claims: owner,
+        locale: 'en',
+      });
+
+      await refunds.execute(booking.reference, 'First', undefined);
+
+      // The base is now fully refunded, so a second call has nothing left to give.
+      await expect(
+        refunds.execute(booking.reference, 'Second', undefined),
+      ).rejects.toThrow(/no refundable amount/i);
+
+      expect(await balanceOf(wallet)).toBe('248.01');
+    });
+  });
+
   // ── Routing ──────────────────────────────────────────────────────────────────
 
   describe('offered payment methods (§7.1)', () => {
@@ -601,16 +1017,73 @@ function eventBody(
   });
 }
 
+/**
+ * `amount` overrides the default full-total payload. A split payment captures the
+ * REDUCED figure, and the webhook service compares what the provider reports
+ * against `payments.amount` — so a test that left it at 201.99 would be rejected
+ * for a mismatch rather than proving anything about the split.
+ */
 async function deliver(
   webhooks: PaymentWebhookService,
   id: string,
   paymentRef: string,
+  amount?: string,
 ): Promise<string> {
-  const raw = eventBody(id, paymentRef);
+  const raw = eventBody(id, paymentRef, amount ? { amount } : {});
 
   return webhooks.handle('simulator', raw, {
     'x-safra-signature': signSimulatorPayload(raw, SECRET, nowSec()),
   });
+}
+
+/** Puts money in the booking customer's wallet. */
+async function credit(
+  db: Database,
+  wallet: WalletService,
+  amount: string,
+): Promise<void> {
+  await wallet.credit(db, {
+    customerProfileId: PROFILE_ID,
+    amount,
+    currencyId: await usdId(db),
+    reason: 'sla_compensation',
+  });
+}
+
+async function balanceOf(wallet: WalletService): Promise<string> {
+  return (await wallet.findByCustomer(PROFILE_ID))?.balance ?? '0.00';
+}
+
+/**
+ * Empties the shared wallet between tests, by DEBITING it rather than deleting.
+ *
+ * `wallet_transactions` is append-only by trigger and `wallets` is referenced by
+ * it, so neither can be truncated — the fixtures deliberately share one customer
+ * profile, and without this reset each test would inherit the previous one's
+ * balance and every assertion would depend on execution order.
+ */
+async function resetWallet(db: Database, wallet: WalletService): Promise<void> {
+  const current = await wallet.findByCustomer(PROFILE_ID);
+  if (!current || current.balance === '0.00') return;
+
+  await wallet.debit(db, {
+    customerProfileId: PROFILE_ID,
+    amount: current.balance,
+    currencyId: current.currencyId,
+    reason: 'booking_payment',
+    note: 'Test fixture reset.',
+  });
+}
+
+async function usdId(db: Database): Promise<string> {
+  const rows = await db.execute<{ id: string }>(
+    sql`SELECT id FROM currencies WHERE code = 'USD'`,
+  );
+
+  const id = rows.rows[0]?.id;
+  if (!id) throw new Error('USD is not seeded.');
+
+  return id;
 }
 
 async function openPayment(

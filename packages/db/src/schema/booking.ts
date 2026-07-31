@@ -104,8 +104,21 @@ export const bookings = pgTable(
     partnerCommissionAmount: money('partner_commission_amount').notNull(),
     discountAmount: money('discount_amount').notNull().default('0'),
     giftCardAmount: money('gift_card_amount').notNull().default('0'),
+    /**
+     * Stored value applied to this booking (§7.3), held from the moment a payment
+     * attempt succeeds in reaching the gateway until the booking is captured — or
+     * credited back if it expires unpaid.
+     */
     walletAmount: money('wallet_amount').notNull().default('0'),
-    /** What the customer actually pays through a gateway right now. */
+    /**
+     * The GROSS total: base + customer fee. What the gateway is asked for is
+     * `totalAmount - walletAmount - giftCardAmount`.
+     *
+     * Not reduced when stored value is applied, deliberately. The capture ledger
+     * balances on the identity `total = fee + commission + payable`, and netting a
+     * wallet payment out of the total would break it — the split belongs on the
+     * DEBIT side of that group, not in the booking's own arithmetic.
+     */
     totalAmount: money('total_amount').notNull(),
     /** What the partner is owed once entitlement conditions are met (§7.2). */
     partnerPayableAmount: money('partner_payable_amount').notNull(),

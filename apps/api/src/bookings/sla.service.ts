@@ -6,6 +6,7 @@ import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { MONEY_SCALE, toMinor } from '../common/money.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 
@@ -77,7 +78,13 @@ export class SlaService {
    * fault when a customer simply closes the tab.
    */
   private async expireUnpaidBookings(): Promise<number> {
-    const result = await this.db.execute<{ id: string; reference: string }>(sql`
+    const result = await this.db.execute<{
+      id: string;
+      reference: string;
+      customer_profile_id: string;
+      currency_id: string;
+      wallet_amount: string;
+    }>(sql`
       WITH expired AS (
         UPDATE bookings
         SET status = 'cancelled',
@@ -87,9 +94,10 @@ export class SlaService {
           AND confirmation_deadline_at IS NOT NULL
           AND confirmation_deadline_at < now()
           AND deleted_at IS NULL
-        RETURNING id, reference
+        RETURNING id, reference, customer_profile_id, currency_id,
+                  wallet_amount::text AS wallet_amount
       )
-      SELECT id, reference FROM expired
+      SELECT id, reference, customer_profile_id, currency_id, wallet_amount FROM expired
     `);
 
     for (const booking of result.rows) {
@@ -98,9 +106,62 @@ export class SlaService {
         VALUES ('booking', ${booking.id}, 'booking.payment_expired', 'system',
                 ${JSON.stringify({ reason: 'EC-001' })}::jsonb)
       `);
+
+      await this.releaseWalletHold(booking);
     }
 
     return result.rows.length;
+  }
+
+  /**
+   * Returns stored value held against a booking that expired unpaid (§7.3).
+   *
+   * Without this, abandoning checkout after applying a balance would destroy it:
+   * the wallet was debited when the payment attempt reached the gateway, and the
+   * booking is now cancelled with nothing captured. The customer would simply be
+   * poorer, with a `booking_payment` debit and no booking to show for it.
+   *
+   * Its own transaction per booking, and failures are logged rather than thrown —
+   * the cancellation has already committed, and one wallet that cannot be credited
+   * must not stop the sweep from expiring the rest. A missed release shows up as a
+   * booking with a non-zero `wallet_amount` in a terminal state, which is
+   * queryable.
+   */
+  private async releaseWalletHold(booking: {
+    id: string;
+    reference: string;
+    customer_profile_id: string;
+    currency_id: string;
+    wallet_amount: string;
+  }): Promise<void> {
+    if (toMinor(booking.wallet_amount, MONEY_SCALE) <= 0n) return;
+
+    try {
+      await this.db.transaction(async (tx) => {
+        await this.wallet.credit(tx as unknown as Database, {
+          customerProfileId: booking.customer_profile_id,
+          amount: booking.wallet_amount,
+          currencyId: booking.currency_id,
+          reason: 'refund',
+          bookingId: booking.id,
+          note: `Balance returned — ${booking.reference} expired before payment.`,
+        });
+
+        await tx.execute(sql`
+          UPDATE bookings SET wallet_amount = 0, updated_at = now()
+          WHERE id = ${booking.id}
+        `);
+      });
+
+      this.logger.log(
+        `Returned ${booking.wallet_amount} to the wallet for expired ${booking.reference}.`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Could not return the wallet hold on ${booking.reference}: ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   /**

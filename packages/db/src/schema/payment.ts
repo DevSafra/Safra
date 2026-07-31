@@ -140,6 +140,16 @@ export const refunds = pgTable(
       .notNull()
       .references(() => bookings.id),
     amount: money('amount').notNull(),
+    /**
+     * How much of `amount` went back to the customer's wallet rather than out
+     * through the gateway (§7.3).
+     *
+     * Recorded per refund rather than derived, because "how much stored value has
+     * already been returned on this booking?" is what bounds the next partial
+     * refund, and deriving it from the ledger would mean reconstructing intent from
+     * accounts that also carry unrelated movements.
+     */
+    walletAmount: money('wallet_amount').notNull().default('0'),
     currencyId: foreignId('currency_id')
       .notNull()
       .references(() => currencies.id),

@@ -1,4 +1,10 @@
-import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -6,7 +12,11 @@ import type { Database } from '@safra/db';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
+import { MONEY_SCALE, fromMinor, toMinor } from '../common/money.js';
 import { BookingAccessService } from '../bookings/booking-access.service.js';
+import { BookingActionsService } from '../bookings/booking-actions.service.js';
+import { WalletService } from '../wallet/wallet.service.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { IntentOutcome } from './payment-provider.port.js';
 import { PaymentProviderUnavailableError } from './payment-provider.port.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
@@ -23,6 +33,16 @@ export interface StartPaymentInput {
   /** Preferred rail. Advisory — routing decides what is actually possible. */
   readonly method?: string | undefined;
   readonly locale: string;
+  /**
+   * Apply the customer's stored balance to this booking (§7.3).
+   *
+   * A boolean, NOT an amount. How much to apply is derived server-side from the
+   * balance and the total; accepting a figure would be accepting a client-supplied
+   * price by another name.
+   */
+  readonly applyWallet?: boolean | undefined;
+  /** The signed-in customer, when there is one. Required to apply a balance. */
+  readonly claims?: AccessTokenClaims | undefined;
 }
 
 export interface StartPaymentResult {
@@ -31,7 +51,10 @@ export interface StartPaymentResult {
   readonly status: 'requires_action' | 'authorized' | 'captured' | 'failed';
   readonly redirectUrl?: string;
   readonly offline: boolean;
+  /** What the gateway is being asked for — the total less any stored value. */
   readonly amount: { value: string; currencyCode: string };
+  /** Stored value funding this booking, for the customer's breakdown. */
+  readonly walletApplied: string;
 }
 
 /**
@@ -59,6 +82,8 @@ export class PaymentIntentService {
     private readonly access: BookingAccessService,
     private readonly registry: PaymentProviderRegistry,
     private readonly audit: AuditService,
+    private readonly wallet: WalletService,
+    private readonly actions: BookingActionsService,
   ) {}
 
   /**
@@ -99,6 +124,20 @@ export class PaymentIntentService {
 
     if (existing) return existing;
 
+    /**
+     * How much stored value to add, on top of anything already held.
+     *
+     * Resolved before the provider is chosen because it decides whether a provider
+     * is needed at all — a balance covering the whole total means no gateway, no
+     * redirect, and nothing for the customer to do.
+     */
+    const toApply = await this.resolveWalletApplication(input, context, booking);
+    const dueMinor = context.dueMinor - toApply;
+
+    if (dueMinor === 0n) {
+      return this.captureFromWalletAlone(input, context, booking, toApply);
+    }
+
     const provider = await this.registry.resolveForCountry(
       context.countryCode,
       input.method,
@@ -114,11 +153,14 @@ export class PaymentIntentService {
      */
     const method = resolveMethod(provider.supportedMethods, input.method);
 
+    const due = fromMinor(dueMinor, MONEY_SCALE);
+
     const paymentId = await this.createPaymentRow(
       booking.id,
       provider.slug,
       method,
       context,
+      due,
     );
 
     let outcome;
@@ -126,7 +168,9 @@ export class PaymentIntentService {
       outcome = await provider.createIntent({
         paymentId,
         bookingReference: booking.reference,
-        amount: { value: context.totalAmount, currencyCode: context.currencyCode },
+        // The reduced amount, not the booking total. Asking the gateway for the
+        // full price and separately debiting the wallet would charge twice.
+        amount: { value: due, currencyCode: context.currencyCode },
         returnUrl: this.returnUrl(input.locale),
         customerEmail: context.email,
         locale: input.locale,
@@ -146,10 +190,180 @@ export class PaymentIntentService {
       throw error;
     }
 
+    /**
+     * The hold is taken AFTER the gateway has accepted the intent, never before.
+     *
+     * Ordering it the other way round would strand a customer's balance every time
+     * a provider was briefly unreachable: money gone from the wallet, no payment to
+     * show for it, and a release path that only runs when the booking eventually
+     * expires. Nothing has been debited on any path that reaches the `catch` above.
+     */
+    if (toApply > 0n) {
+      await this.holdWallet(booking, context, toApply, paymentId);
+    }
+
     return this.persistOutcome(paymentId, provider.slug, provider.isOffline, outcome, {
       booking,
       context,
+      due,
+      walletApplied: fromMinor(context.walletMinor + toApply, MONEY_SCALE),
     });
+  }
+
+  /**
+   * How much stored value to add to this booking, in minor units.
+   *
+   * Returns zero unless every condition holds, and never throws for a customer who
+   * simply has no balance — an empty wallet is not an error, and failing checkout
+   * over it would be worse than ignoring the request.
+   */
+  private async resolveWalletApplication(
+    input: StartPaymentInput,
+    context: PaymentContext,
+    booking: { customerProfileId: string },
+  ): Promise<bigint> {
+    if (input.applyWallet !== true) return 0n;
+
+    /**
+     * Applied at most once per booking. A second attempt reuses the existing hold
+     * rather than adding to it, so a customer reloading the payment page cannot
+     * drain their balance across repeated attempts.
+     */
+    if (context.walletMinor > 0n) return 0n;
+
+    /**
+     * **A booking access token is not proof of wallet ownership.**
+     *
+     * The token proves possession of ONE booking; the wallet spans every booking on
+     * the customer profile and may hold compensation earned elsewhere. Someone who
+     * came by a single token — a forwarded confirmation email, a shared device —
+     * could otherwise spend a balance that booking never contributed to. So this
+     * path requires a real session whose profile matches, and a guest is simply
+     * offered no balance rather than being told one exists.
+     */
+    const signedInProfile = input.claims?.customerProfileId;
+
+    if (!signedInProfile || signedInProfile !== booking.customerProfileId) {
+      throw new ForbiddenException(
+        'Sign in to the account that holds this booking to use your balance.',
+      );
+    }
+
+    const wallet = await this.wallet.findByCustomer(booking.customerProfileId);
+    if (!wallet) return 0n;
+
+    /**
+     * Only a balance in the booking's own currency is offered.
+     *
+     * `WalletService` can convert, but doing it silently here would quote the
+     * customer a figure that moves with the FX rate between page load and payment.
+     * Cross-currency application needs a quoted, held rate, which is its own piece
+     * of work.
+     */
+    if (wallet.currencyId !== context.currencyId) {
+      this.logger.log(
+        `Wallet for ${booking.customerProfileId} is held in ${wallet.currencyCode} ` +
+          `but ${booking.customerProfileId ? context.currencyCode : ''} is due; ` +
+          `not offering it.`,
+      );
+      return 0n;
+    }
+
+    const available = toMinor(wallet.balance, MONEY_SCALE);
+
+    // Never more than the booking costs — the surplus stays spendable elsewhere.
+    return available < context.dueMinor ? available : context.dueMinor;
+  }
+
+  /**
+   * Debits the wallet and records the hold on the booking, atomically.
+   *
+   * If the balance moved between the quote and here, the debit refuses and this
+   * marks the attempt failed rather than letting the customer proceed to a gateway
+   * expecting a reduced amount that nothing is covering.
+   */
+  private async holdWallet(
+    booking: { id: string; reference: string; customerProfileId: string },
+    context: PaymentContext,
+    amountMinor: bigint,
+    paymentId: string,
+  ): Promise<void> {
+    const amount = fromMinor(amountMinor, MONEY_SCALE);
+
+    try {
+      await this.db.transaction(async (tx) => {
+        await this.wallet.debit(tx as unknown as Database, {
+          customerProfileId: booking.customerProfileId,
+          amount,
+          currencyId: context.currencyId,
+          reason: 'booking_payment',
+          bookingId: booking.id,
+          note: `Applied to ${booking.reference}`,
+        });
+
+        await tx.execute(sql`
+          UPDATE bookings
+          SET wallet_amount = wallet_amount + ${amount}::numeric, updated_at = now()
+          WHERE id = ${booking.id}
+        `);
+      });
+    } catch (error) {
+      await this.markFailed(paymentId, 'Wallet balance was no longer available.');
+
+      this.logger.warn(
+        `Wallet hold of ${amount} for ${booking.reference} failed: ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
+
+      throw new ConflictException(
+        'Your balance changed while this payment was being prepared. Please try again.',
+      );
+    }
+  }
+
+  /**
+   * A booking paid entirely from stored value.
+   *
+   * No provider is involved at all, which is why this is a separate path rather
+   * than a zero-amount intent: there is no gateway to redirect to, no webhook
+   * coming, and asking an acquirer to authorise 0.00 is not a thing. Capture still
+   * routes through `markPaid`, so the ledger posting keeps exactly one entry point.
+   */
+  private async captureFromWalletAlone(
+    input: StartPaymentInput,
+    context: PaymentContext,
+    booking: { id: string; reference: string; customerProfileId: string },
+    amountMinor: bigint,
+  ): Promise<StartPaymentResult> {
+    const amount = fromMinor(amountMinor, MONEY_SCALE);
+
+    const paymentId = await this.createWalletPaymentRow(booking.id, context, amount);
+
+    await this.holdWallet(booking, context, amountMinor, paymentId);
+
+    await this.actions.markPaid(booking.reference, input.claims, paymentId);
+
+    await this.audit.record({
+      actorUserId: input.claims?.sub,
+      action: 'payment.started',
+      subjectType: 'booking',
+      subjectId: booking.id,
+      after: {
+        provider: 'internal',
+        status: 'captured',
+        walletApplied: amount,
+        currency: context.currencyCode,
+      },
+    });
+
+    return {
+      reference: booking.reference,
+      paymentReference: await this.paymentReference(paymentId),
+      status: 'captured',
+      offline: false,
+      amount: { value: '0.00', currencyCode: context.currencyCode },
+      walletApplied: fromMinor(context.walletMinor + amountMinor, MONEY_SCALE),
+    };
   }
 
   /**
@@ -161,6 +375,7 @@ export class PaymentIntentService {
   private async loadPaymentContext(bookingId: string): Promise<PaymentContext> {
     const rows = await this.db.execute<{
       total_amount: string;
+      wallet_amount: string;
       currency_id: string;
       currency_code: string;
       country_code: string;
@@ -170,6 +385,7 @@ export class PaymentIntentService {
       open_payment_provider: string | null;
     }>(sql`
       SELECT b.total_amount::text     AS total_amount,
+             b.wallet_amount::text    AS wallet_amount,
              b.currency_id,
              cur.code                 AS currency_code,
              co.code                  AS country_code,
@@ -194,8 +410,13 @@ export class PaymentIntentService {
     const row = rows.rows[0];
     if (!row) throw new ConflictException('This booking can no longer be paid.');
 
+    const walletMinor = toMinor(row.wallet_amount, MONEY_SCALE);
+
     return {
       totalAmount: row.total_amount,
+      walletMinor,
+      // What still needs paying: the gross total less stored value already held.
+      dueMinor: toMinor(row.total_amount, MONEY_SCALE) - walletMinor,
       currencyId: row.currency_id,
       currencyCode: row.currency_code,
       countryCode: row.country_code,
@@ -228,8 +449,9 @@ export class PaymentIntentService {
       reference: string;
       provider_ref: string | null;
       status: string;
+      amount: string;
     }>(sql`
-      SELECT reference, provider_ref, status::text AS status
+      SELECT reference, provider_ref, status::text AS status, amount::text AS amount
       FROM payments WHERE id = ${paymentId}
     `);
 
@@ -241,10 +463,20 @@ export class PaymentIntentService {
      * provider token, so replaying a persisted one is how customers land on an
      * expired gateway page; asking the provider again always yields a fresh one.
      */
+    /**
+     * The amount already recorded on the attempt, not a freshly computed one.
+     *
+     * A reused attempt carries whatever it was opened for, including any wallet
+     * reduction applied at the time. Recomputing here would let a balance change
+     * silently move the figure the gateway was asked for, so the two would disagree
+     * about the same payment reference.
+     */
+    const due = payment.amount;
+
     const outcome = await provider.createIntent({
       paymentId,
       bookingReference: input.reference,
-      amount: { value: context.totalAmount, currencyCode: context.currencyCode },
+      amount: { value: due, currencyCode: context.currencyCode },
       returnUrl: this.returnUrl(input.locale),
       customerEmail: context.email,
       locale: input.locale,
@@ -258,7 +490,8 @@ export class PaymentIntentService {
       status: outcome.kind,
       ...(outcome.kind === 'requires_action' ? { redirectUrl: outcome.redirectUrl } : {}),
       offline: provider.isOffline,
-      amount: { value: context.totalAmount, currencyCode: context.currencyCode },
+      amount: { value: due, currencyCode: context.currencyCode },
+      walletApplied: fromMinor(context.walletMinor, MONEY_SCALE),
     };
   }
 
@@ -267,12 +500,43 @@ export class PaymentIntentService {
     providerSlug: string,
     method: string,
     context: PaymentContext,
+    amount: string,
   ): Promise<string> {
     const rows = await this.db.execute<{ id: string }>(sql`
       INSERT INTO payments
         (booking_id, method, provider, amount, currency_id, status, expires_at)
       VALUES (${bookingId}, ${method}::payment_method, ${providerSlug},
-              ${context.totalAmount}, ${context.currencyId},
+              ${amount}, ${context.currencyId},
+              'initiated'::payment_status, ${context.expiresAt})
+      RETURNING id
+    `);
+
+    const id = rows.rows[0]?.id;
+    if (!id) throw new Error('Payment insert returned no row.');
+
+    return id;
+  }
+
+  /**
+   * The payment row for a booking settled entirely from stored value.
+   *
+   * `provider = 'internal'` marks it as having no acquirer behind it, the same
+   * convention `BookingActionsService` uses for a simulated capture — so
+   * reconciliation against a settlement file can tell internal movements from money
+   * a PSP actually remitted. Inserted as `initiated` and captured by `markPaid`,
+   * rather than written straight to `captured`, so the state change and its ledger
+   * posting stay in one place.
+   */
+  private async createWalletPaymentRow(
+    bookingId: string,
+    context: PaymentContext,
+    amount: string,
+  ): Promise<string> {
+    const rows = await this.db.execute<{ id: string }>(sql`
+      INSERT INTO payments
+        (booking_id, method, provider, amount, currency_id, status, expires_at)
+      VALUES (${bookingId}, 'wallet'::payment_method, 'internal',
+              ${amount}, ${context.currencyId},
               'initiated'::payment_status, ${context.expiresAt})
       RETURNING id
     `);
@@ -288,9 +552,14 @@ export class PaymentIntentService {
     providerSlug: string,
     offline: boolean,
     outcome: IntentOutcome,
-    subject: { booking: { id: string; reference: string }; context: PaymentContext },
+    subject: {
+      booking: { id: string; reference: string };
+      context: PaymentContext;
+      due: string;
+      walletApplied: string;
+    },
   ): Promise<StartPaymentResult> {
-    const { booking, context } = subject;
+    const { booking, context, due, walletApplied } = subject;
 
     if (outcome.kind === 'failed') {
       await this.markFailed(paymentId, outcome.reason);
@@ -307,7 +576,8 @@ export class PaymentIntentService {
         paymentReference: await this.paymentReference(paymentId),
         status: 'failed',
         offline,
-        amount: { value: context.totalAmount, currencyCode: context.currencyCode },
+        amount: { value: due, currencyCode: context.currencyCode },
+        walletApplied,
       };
     }
 
@@ -335,7 +605,8 @@ export class PaymentIntentService {
       after: {
         provider: providerSlug,
         status,
-        amount: context.totalAmount,
+        amount: due,
+        walletApplied,
         currency: context.currencyCode,
       },
     });
@@ -346,7 +617,8 @@ export class PaymentIntentService {
       status,
       ...(outcome.kind === 'requires_action' ? { redirectUrl: outcome.redirectUrl } : {}),
       offline,
-      amount: { value: context.totalAmount, currencyCode: context.currencyCode },
+      amount: { value: due, currencyCode: context.currencyCode },
+      walletApplied,
     };
   }
 
@@ -371,7 +643,12 @@ export class PaymentIntentService {
 }
 
 interface PaymentContext {
+  /** The gross booking total, before any stored value is applied. */
   readonly totalAmount: string;
+  /** Stored value already held against this booking, in minor units. */
+  readonly walletMinor: bigint;
+  /** What still needs paying: `totalAmount - walletMinor`, in minor units. */
+  readonly dueMinor: bigint;
   readonly currencyId: string;
   readonly currencyCode: string;
   readonly countryCode: string;

@@ -79,6 +79,19 @@ export const startPaymentSchema = z
      * Still advisory within that set: routing decides what is actually available.
      */
     method: z.enum(CUSTOMER_FACING_METHODS).optional(),
+
+    /**
+     * Apply the customer's stored balance to this booking (§7.3).
+     *
+     * A BOOLEAN, not an amount — how much is derived server-side from the balance
+     * and the total. A client-supplied figure would be a client-supplied price
+     * wearing a different name, and the same rule applies to it.
+     *
+     * Requires a signed-in customer who owns the booking. The access token above
+     * proves possession of one booking; a wallet spans every booking on the
+     * profile and can hold compensation earned elsewhere, so it is not sufficient.
+     */
+    applyWallet: z.boolean().optional(),
   })
   .strict();
 

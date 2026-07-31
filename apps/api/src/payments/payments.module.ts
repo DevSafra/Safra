@@ -9,6 +9,7 @@ import { PaymentsController } from './payments.controller.js';
 import { RefundService } from './refund.service.js';
 import { ManualTransferProvider } from './providers/manual-transfer.provider.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
+import { WalletModule } from '../wallet/wallet.module.js';
 
 /**
  * Payment collection and refunds (SRS §7).
@@ -21,7 +22,9 @@ import { PaymentProviderRegistry } from './providers/provider.registry.js';
  */
 @Module({
   // DatabaseModule (which provides ENV) and SettingsModule are @Global.
-  imports: [BookingsModule, LedgerModule],
+  // WalletModule supplies the §7.3 split: stored value is debited when a payment
+  // starts and credited back on refund.
+  imports: [BookingsModule, LedgerModule, WalletModule],
   controllers: [PaymentsController],
   providers: [
     ManualTransferProvider,

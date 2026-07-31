@@ -5,7 +5,7 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **223 tests
+Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **236 tests
 passing** against a real PostgreSQL, production dependencies clean.
 
 **Scale of what remains:** the API foundation, catalogue, search, the public booking
@@ -254,6 +254,14 @@ had in fact shipped. Verified against the files, not against memory._
      settings, badges, "Book now" / "Ask SAFRA" and **no partner contact before
      confirmation** (P-001, verified)
 129. ❌ Accessibility pass and Core Web Vitals budget (§14.1: home < 2 s)
+     - ❌ **129c** **Customer authentication — entirely absent from `apps/web`.** Found on
+       2026-08-01 while building split payment. The API has login, refresh and rotation
+       (items 39–41), but the web app has no login page, no session cookie and no
+       `Authorization` header in any request: every page is anonymous and every booking
+       is a guest booking. That was invisible while checkout was guest-only by design
+       (§4), and it becomes blocking the moment a feature needs to know WHO is asking —
+       spending a wallet balance is the first (138b), and viewing "my bookings" or a
+       wallet statement is the next
      - ✅ **129b** Checkout page and confirmation page — live server-quoted price with every night
        itemised, guest details without an account (§4), stable idempotency key per form so a
        double-click cannot duplicate a booking, and inline field errors from the shared Zod
@@ -309,12 +317,39 @@ shipped._
      provider reference is DEFERRED for retry, not rejected, because a webhook can outrun the
      response that created the payment row
      - ❌ **137a** Reconciliation report against a provider settlement file (needs a real PSP)
-138. ❌ Split payment — gift card + wallet + card in one transaction (§7.3). The wallet
-     half of this is now buildable rather than theoretical: item 141 gives an exact,
-     lock-safe `debit` that participates in the caller's transaction. What is missing
-     is the composition — reducing the amount sent to the provider, posting the wallet
-     leg in the same group as the capture, and the case where a balance covers the
-     whole total so no provider is involved at all
+138. ⚠️ Split payment (§7.3) — **wallet + card is done end to end in the API; gift cards
+     and coupons are not** (items 142–143), and the checkout UI is blocked (138b).
+     `applyWallet` is a BOOLEAN on the start-payment contract, never an amount: how much
+     is derived server-side, because a client-supplied figure is a client-supplied price
+     under another name. What the gateway is asked for drops to `total − wallet`; the
+     capture group splits its DEBIT side into `customer_payment` + `wallet_debit` while
+     the credit side is untouched, so `total = fee + commission + payable` still holds.
+     Four decisions worth keeping:
+     - **The hold is taken AFTER the gateway accepts the intent, never before.** Reversed,
+       every provider blip strands a customer's balance — debited, no payment to show for
+       it, nothing to release it until the booking expires. Pinned by a test that fails
+       when the two are swapped (verified: 50.00 vanishes).
+     - **A balance covering the whole total skips the provider entirely.** No redirect, no
+       webhook, no acquirer asked to authorise 0.00 — but capture still routes through
+       `markPaid`, so the ledger keeps one entry point.
+     - **Abandoning checkout returns the balance.** The EC-001 sweep and a customer-side
+       cancellation both credit the hold back. Without it, closing the tab after applying
+       a balance simply makes the customer poorer.
+     - **Refunds return stored value first**, then the remainder through the originating
+       provider. A wallet-only booking refunds with no provider call at all — it carries
+       `provider = 'internal'`, which is not in the registry and never will be, so
+       requiring one would have made exactly those refunds impossible.
+     - ❌ **138a** Gift card and coupon composition at the same seam (items 142–143)
+     - ❌ **138b** **Checkout UI — blocked on customer authentication, which `apps/web`
+       does not have.** Applying a balance requires a session: a booking access token
+       proves possession of ONE booking, while a wallet spans every booking on the
+       profile and can hold compensation earned elsewhere, so a forwarded confirmation
+       email would otherwise be enough to drain it. The web app has no login page, no
+       session cookie and no `Authorization` header anywhere — see item 129c
+     - ❌ **138c** Cross-currency application. A balance is offered only when it is held in
+       the booking's own currency. `WalletService` can convert, but doing it at checkout
+       would quote a figure that moves with the FX rate between page load and payment;
+       that needs a quoted, held rate
 139. ✅ Double-entry ledger — 4 legs per captured payment, posted in the SAME transaction as
      the status change; partner fines posted too. Trial balance endpoint verified balanced
      across multiple bookings, and the append-only + balance triggers verified to reject
@@ -340,9 +375,7 @@ shipped._
        that do not own a transaction. Five concurrent credits of 3.33 produced 6.66
        instead of 16.65 — three silently discarded. The movement now opens its own
        transaction (a SAVEPOINT when nested), so the lock holds regardless of caller.
-     - ❌ **141a** Spending the balance at checkout is item 138, not this. The wallet can
-       now be debited correctly; nothing calls that yet, so a customer can see their
-       compensation but not yet use it.
+     - ✅ **141a** Spending the balance — done in the same session as item 138 below.
      - ❌ **141b** Reconciliation job comparing `wallets.balance` against
        `SUM(wallet_transactions)` on a schedule. The comparison exists
        (`sumTransactions`, surfaced on the admin balance endpoint) but nothing runs it
@@ -499,15 +532,15 @@ These block engineering work and are not ours to make.
 
 ## Immediate next steps
 
-1. **Split payment — item 138.** The natural continuation of the wallet: a customer can
-   now see a compensation balance they still cannot spend. Wallet first (the primitive
-   exists and is tested), then gift cards (142) and coupons (143), which need the same
-   composition at checkout.
-2. **Partner self-registration and documents — items 82–84.** Partners are still created
+1. **Customer authentication in `apps/web` — item 129c.** Now the highest-value gap, and
+   newly so: the split-payment API is finished and tested, but no customer can reach it
+   because the web app cannot tell who they are. It also unblocks "my bookings" and the
+   wallet statement, both of which are built server-side and unreachable.
+2. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
+   just established, so the second and third stored-value instruments are far cheaper
+   now than they would have been before it.
+3. **Partner self-registration and documents — items 82–84.** Partners are still created
    by hand in SQL, so §8.1's verification queue and the sanctions screening gate (120)
    are reviewing inventory nobody can actually submit.
-3. **`apps/web` accessibility and performance pass — item 129.** The funnel is complete
-   end to end (home → search → property → checkout → confirmation); what has never been
-   measured is §14.1's "home under 2 s" or a single accessibility check.
 4. **Grant `FX_RATE_MANAGE` to `finance_officer` — item 150f.** One line, blocked only on
    a policy nod: finance currently cannot see or set the rate their books depend on.
