@@ -5,7 +5,7 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **295 tests
+Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **304 tests
 passing** against a real PostgreSQL, production dependencies clean.
 
 **Scale of what remains:** the API foundation, catalogue, search, the public booking
@@ -194,7 +194,17 @@ building something else and none is urgent enough to have widened that change.
     3 widths, **EXIF stripped** (verified: source GPS gone), storage abstracted over
     S3/local disk, polyglot + SVG + undersized uploads rejected, traversal blocked
 82. ❌ Partner document upload (§8.1 requires ID, commercial register, ownership proof)
-83. ❌ Partner self-registration flow (partners are currently created by SQL only)
+83. ✅ Partner self-registration — `POST /partner/register` creates the account and the
+    partner row in ONE transaction, so a half-made application cannot leave a user with
+    partner permissions and no partner to scope them to (`requirePartnerId` refuses
+    that, locking the applicant out of what they were just told was created).
+    An OPEN endpoint minting `partner`-role accounts is only acceptable because of what
+    it does not grant: the applicant lands in `pending`, item 116 blocks publication
+    while unverified, and ADR 0002 makes sanctions screening a hard precondition for
+    verifying them. Anyone may apply; nothing they create reaches a customer until a
+    human and a screening check have both passed — pinned by tests rather than assumed.
+    No session is issued: partner sessions stay on the one login path that carries the
+    lockout counter and the 2FA check
 84. ❌ Partner payout account management endpoints
 
 ### 1.3 Availability calendar (§8.4)
@@ -576,10 +586,12 @@ These block engineering work and are not ours to make.
 
 ## Immediate next steps
 
-1. **Partner self-registration and documents — items 82–84.** Partners are still created
-   by hand in SQL, so §8.1's verification queue and the sanctions screening gate (120)
-   are reviewing inventory nobody can actually submit. This is the largest remaining
-   hole in the operational loop.
+1. **Partner document upload and payout accounts — items 82, 84.** Partners can now apply
+   (item 83), but §8.1 requires ID, commercial register and ownership proof before anyone
+   can be verified — so the queue still cannot be worked to completion. Documents need a
+   PDF-aware upload path (the existing pipeline re-encodes images through `sharp`, which
+   a PDF must not go through), and payout accounts need the field-encryption service that
+   already exists.
 2. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
    established, so the second and third stored-value instruments are far cheaper now
    than they would have been before it.

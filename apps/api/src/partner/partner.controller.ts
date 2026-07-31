@@ -1,25 +1,41 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+} from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 
 import {
   PERMISSIONS as P,
   type CalendarQuery,
   type CalendarRangeUpdate,
+  type PartnerRegisterInput,
   type PropertyCreateInput,
   type PropertyUpdateInput,
   type UnitCreateInput,
   type UnitUpdateInput,
   calendarQuerySchema,
   calendarRangeUpdateSchema,
+  partnerRegisterSchema,
   propertyCreateSchema,
   propertyUpdateSchema,
   unitCreateSchema,
   unitUpdateSchema,
 } from '@safra/contracts';
 
+import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
-import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
+import { CurrentUser, Public, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { CalendarService } from './calendar.service.js';
+import { PartnerRegistrationService } from './partner-registration.service.js';
 import { PropertiesService } from './properties.service.js';
 
 /**
@@ -35,7 +51,36 @@ export class PartnerController {
   constructor(
     private readonly properties: PropertiesService,
     private readonly calendar: CalendarService,
+    private readonly registration: PartnerRegistrationService,
   ) {}
+
+  /**
+   * Applying to become a partner (§8.1).
+   *
+   * `@Public()` — the applicant has no account yet, which is the point. That is safe
+   * only because of what registration does NOT grant: the partner lands in `pending`,
+   * item 116 blocks publication while unverified, and ADR 0002 makes sanctions
+   * screening a hard precondition for verifying them. Anyone may apply; nothing they
+   * create reaches a customer until a human and a screening check have both passed.
+   *
+   * Throttled like customer registration: five a minute per address. It writes two
+   * rows and runs an Argon2id hash, so it is both expensive and worth abusing.
+   */
+  @Public()
+  @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @AuditExempt(
+    'PartnerRegistrationService records partner.registered in the same transaction.',
+  )
+  async register(
+    @Body(new ZodValidationPipe(partnerRegisterSchema)) body: PartnerRegisterInput,
+    @Req() request: Request,
+  ) {
+    return this.registration.register(body, {
+      ipAddress: request.ip,
+      userAgent: request.get('user-agent'),
+    });
+  }
 
   @Get('properties')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)

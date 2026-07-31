@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { emailSchema, localeSchema, passwordSchema, phoneSchema } from './auth.js';
 import { tripAttributeSchema } from './search.js';
 
 /**
@@ -132,6 +133,42 @@ export const propertyReviewSchema = z
   });
 
 export type PropertyReviewInput = z.infer<typeof propertyReviewSchema>;
+
+/**
+ * A partner applying to join (SRS §8.1).
+ *
+ * Note what this CANNOT set, and why each absence is deliberate:
+ *
+ *  - `verification` — an applicant declaring themselves verified defeats §8.1
+ *    entirely. It is forced to `pending` server-side.
+ *  - `score`, `tier` — §8.5 ranking inputs. A partner setting their own score would
+ *    be buying placement.
+ *  - `role` — the account is created as `partner` in code, never from the payload.
+ *
+ * Three barriers rather than one: the field is absent from the schema, `.strict()`
+ * rejects it if sent anyway, and the service never reads the payload for these
+ * values. Mass assignment is the most common way a registration endpoint is broken.
+ */
+export const partnerRegisterSchema = z
+  .object({
+    /** The sign-in account created alongside the partner record. */
+    email: emailSchema,
+    password: passwordSchema,
+    phone: phoneSchema,
+
+    /** The legal entity, as it appears on the commercial register (§8.1). */
+    legalName: z.string().trim().min(2).max(200),
+    /** What customers see. May differ from the legal name. */
+    displayName: z.string().trim().min(2).max(120),
+    /** `accommodation`, `mobility`, … — validated against `partner_types`. */
+    partnerTypeCode: z.string().trim().min(2).max(40),
+    citySlug: z.string().trim().min(2).max(80),
+    address: z.string().trim().min(4).max(300),
+    preferredLocale: localeSchema.default('ar'),
+  })
+  .strict();
+
+export type PartnerRegisterInput = z.infer<typeof partnerRegisterSchema>;
 
 /** Staff decision on a partner's onboarding (§8.1). */
 export const partnerVerifySchema = z
