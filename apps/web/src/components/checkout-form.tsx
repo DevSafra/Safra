@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import type { CustomerFacingMethod } from '@safra/contracts';
 
 import type { Locale } from '@/i18n/routing';
+import { formatMoney } from '@/lib/localise';
 
 interface FieldErrors {
   [field: string]: string | undefined;
@@ -29,6 +30,8 @@ export function CheckoutForm({
   adults,
   propertySlug,
   methods,
+  wallet,
+  signedIn,
 }: {
   locale: Locale;
   unitId: string;
@@ -42,6 +45,13 @@ export function CheckoutForm({
    * without one — the booking is worth taking even if payment follows out of band.
    */
   methods: readonly CustomerFacingMethod[];
+  /**
+   * The customer's spendable balance in THIS booking's currency (§7.3), or null
+   * when there is none to offer. Resolved server-side; the amount shown here is
+   * advisory, and the API recomputes what it actually applies.
+   */
+  wallet: { balance: string; currencyCode: string; total: string } | null;
+  signedIn: boolean;
 }) {
   const t = useTranslations('checkout');
   const tm = useTranslations('paymentMethods');
@@ -53,6 +63,16 @@ export function CheckoutForm({
 
   /** Defaults to the first offered method, matching the approved display order. */
   const [method, setMethod] = useState<CustomerFacingMethod | undefined>(methods[0]);
+
+  /**
+   * Opt-IN, not opt-out.
+   *
+   * Spending stored value is irreversible from the customer's point of view — it is
+   * their money, and a balance quietly consumed by a booking they were only halfway
+   * committed to is a support ticket at best. Defaulting to off means using it is
+   * always a deliberate act.
+   */
+  const [applyWallet, setApplyWallet] = useState(false);
 
   /**
    * Generated ONCE per mounted form, not per submit (EC-003).
@@ -114,7 +134,7 @@ export function CheckoutForm({
        * click. From here the booking is recoverable: the access token authorizes
        * a retry, and a failure below is not a lost booking.
        */
-      await startPayment(created, { locale, router, method });
+      await startPayment(created, { locale, router, method, applyWallet });
     } catch {
       // A network failure is safe to retry: the idempotency key is unchanged, so a
       // booking that did reach the server will be returned rather than duplicated.
@@ -168,6 +188,47 @@ export function CheckoutForm({
           required
         />
       </div>
+
+      {/* ── SAFRA balance (§7.3) ─────────────────────────────────────────── */}
+      {wallet ? (
+        <div className="mt-6 rounded-lg border border-gold/30 bg-gold/5 p-4">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={applyWallet}
+              onChange={(event) => setApplyWallet(event.target.checked)}
+              className="mt-0.5 accent-gold"
+            />
+            <span>
+              <span className="block text-sm text-text">
+                {t('walletApply', {
+                  amount: formatMoney(wallet.balance, wallet.currencyCode, locale),
+                })}
+              </span>
+              <span className="block text-xs text-faint">
+                {coversEverything(wallet)
+                  ? t('walletCoversAll')
+                  : t('walletRemaining') +
+                    ': ' +
+                    formatMoney(
+                      remainder(wallet, applyWallet),
+                      wallet.currencyCode,
+                      locale,
+                    )}
+              </span>
+            </span>
+          </label>
+        </div>
+      ) : signedIn ? null : (
+        /*
+         * Shown to guests as an invitation, not an obstacle. §4 keeps guest checkout
+         * open, so this must never read as "you must sign in" — it says only that
+         * there is a balance feature and an account is how to reach it.
+         */
+        <p className="mt-6 rounded-lg border border-line bg-card p-3 text-xs text-faint">
+          {t('walletSignedOut')}
+        </p>
+      )}
 
       {/* ── Payment method (§7.1) ────────────────────────────────────────── */}
       <fieldset className="mt-6">
@@ -289,9 +350,10 @@ async function startPayment(
     locale: Locale;
     router: { push: (href: string) => void };
     method: CustomerFacingMethod | undefined;
+    applyWallet: boolean;
   },
 ): Promise<void> {
-  const { locale, router, method } = handlers;
+  const { locale, router, method, applyWallet } = handlers;
 
   try {
     const response = await fetch(`/${locale}/api/payments/start`, {
@@ -303,6 +365,12 @@ async function startPayment(
         // Omitted rather than sent as null when nothing is offered: the request
         // schema is .strict() and rejects unknown or ill-typed fields.
         ...(method ? { method } : {}),
+        /**
+         * A flag, never an amount. The API derives how much to apply from the
+         * balance and the total — a figure sent from here would be a
+         * client-supplied price, which is the one thing checkout must never send.
+         */
+        ...(applyWallet ? { applyWallet: true } : {}),
       }),
     });
 
@@ -322,6 +390,33 @@ async function startPayment(
   }
 
   router.push(`/${locale}/booking/${created.reference}`);
+}
+
+/** Whether the balance settles the booking outright, so nothing goes to a gateway. */
+function coversEverything(wallet: { balance: string; total: string }): boolean {
+  return minor(wallet.balance) >= minor(wallet.total);
+}
+
+/** What is still owed once the balance is applied. Display only — the API decides. */
+function remainder(wallet: { balance: string; total: string }, applied: boolean): string {
+  if (!applied) return wallet.total;
+
+  const due = minor(wallet.total) - minor(wallet.balance);
+  const value = due > 0n ? due : 0n;
+
+  return `${value / 100n}.${(value % 100n).toString().padStart(2, '0')}`;
+}
+
+/**
+ * Parses a two-decimal amount into integer minor units.
+ *
+ * Even here, in display code, the amount never becomes a float: `201.99 - 50.00`
+ * evaluates to 151.99000000000004 as a double, and a checkout page showing that is
+ * a checkout page nobody trusts.
+ */
+function minor(amount: string): bigint {
+  const [whole = '0', fraction = ''] = amount.split('.');
+  return BigInt(whole) * 100n + BigInt(fraction.padEnd(2, '0').slice(0, 2) || '0');
 }
 
 /**

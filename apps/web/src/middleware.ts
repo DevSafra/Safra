@@ -1,8 +1,164 @@
 import createMiddleware from 'next-intl/middleware';
+import { NextResponse, type NextRequest } from 'next/server';
 
 import { routing } from './i18n/routing';
+import { callAuth } from './lib/auth-api';
+import {
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_SECONDS,
+  decodeSession,
+  encodeSession,
+  needsRefresh,
+  sessionCookieOptions,
+} from './lib/session';
 
-export default createMiddleware(routing);
+const intlMiddleware = createMiddleware(routing);
+
+/**
+ * Locale routing, plus session rotation.
+ *
+ * Rotation lives here because it has nowhere else to go: access tokens last fifteen
+ * minutes, and a server component CANNOT set a cookie. Without this, a customer
+ * reading a page sixteen minutes after signing in would find every authenticated
+ * fetch returning 401 with no way to recover short of signing in again.
+ *
+ * Both jars are written, and that is the subtle part. Setting the cookie only on the
+ * RESPONSE fixes the next request but leaves the current render reading the expired
+ * token — so the page that triggered the refresh is the one page that still fails.
+ * Writing the request jar first means this render sees the new token immediately.
+ */
+export default async function middleware(request: NextRequest) {
+  const rotated = await rotateIfStale(request);
+
+  /**
+   * Bounce anonymous visitors off the account pages before rendering them.
+   *
+   * A convenience, not the security boundary — the page checks again, and the API
+   * refuses unauthenticated reads regardless. What it buys is that a signed-out
+   * customer lands on a sign-in form that returns them where they were, instead of
+   * on an account page that renders empty.
+   */
+  const response = redirectOrContinue(request, rotated);
+
+  /**
+   * Applied to WHICHEVER response is going back, including the redirect above.
+   *
+   * Doing this only on the normal path was a real bug: a customer whose refresh
+   * token had been revoked got bounced to sign-in with the dead cookie still in
+   * place, so every later request retried the same doomed refresh and the header
+   * kept claiming they were signed in.
+   */
+  if (rotated) {
+    response.cookies.set(
+      SESSION_COOKIE,
+      rotated,
+      sessionCookieOptions(SESSION_MAX_AGE_SECONDS),
+    );
+  } else if (rotated === null) {
+    /**
+     * The refresh was REJECTED — the token was expired, revoked, or replayed (the
+     * API burns a whole token family on replay). Clearing the cookie turns that into
+     * a clean signed-out state instead of a session that fails every request while
+     * still looking active.
+     */
+    response.cookies.set(SESSION_COOKIE, '', sessionCookieOptions(0));
+  }
+
+  return response;
+}
+
+/**
+ * Bounce anonymous visitors off the account pages before rendering them.
+ *
+ * A convenience, not the security boundary — the page checks again, and the API
+ * refuses unauthenticated reads regardless. What it buys is that a signed-out
+ * customer lands on a sign-in form that returns them where they were, instead of on
+ * an account page that renders empty.
+ */
+function redirectOrContinue(
+  request: NextRequest,
+  rotated: string | null | undefined,
+): NextResponse {
+  if (!isProtected(request.nextUrl.pathname) || hasSession(request, rotated)) {
+    return intlMiddleware(request);
+  }
+
+  const locale = localeOf(request.nextUrl.pathname);
+  const target = new URL(`/${locale}/login`, request.url);
+
+  target.searchParams.set('next', request.nextUrl.pathname + request.nextUrl.search);
+
+  return NextResponse.redirect(target);
+}
+
+/**
+ * Refreshes the session when the access token is spent.
+ *
+ * Returns the new cookie value, `null` when the session must be dropped, or
+ * `undefined` when nothing needed doing — which is the overwhelmingly common case
+ * and costs one cookie parse.
+ */
+async function rotateIfStale(request: NextRequest): Promise<string | null | undefined> {
+  const raw = request.cookies.get(SESSION_COOKIE)?.value;
+  if (!raw) return undefined;
+
+  const session = decodeSession(raw);
+
+  // Unparseable: a cookie from an older shape. Drop it rather than carry it.
+  if (!session) return null;
+
+  if (!needsRefresh(session)) return undefined;
+
+  const outcome = await callAuth('/auth/refresh', { refreshToken: session.refreshToken });
+
+  /**
+   * A transient failure must NOT sign the customer out.
+   *
+   * 502 is this app failing to reach the API; 401 is the API refusing the token.
+   * Only the second means the session is genuinely dead. Treating an outage as a
+   * logout would empty every browser on the internet the moment the API restarted.
+   */
+  if (!outcome.ok || !outcome.session) {
+    return outcome.status === 401 || outcome.status === 403 ? null : undefined;
+  }
+
+  const encoded = encodeSession(outcome.session);
+
+  // The current render reads this, not the stale value it arrived with.
+  request.cookies.set(SESSION_COOKIE, encoded);
+
+  return encoded;
+}
+
+/** Paths that need a session, matched after the locale segment. */
+const PROTECTED = ['/account'];
+
+function isProtected(pathname: string): boolean {
+  // Strip a leading locale segment so `/ar/account` and `/account` both match.
+  const withoutLocale = pathname.replace(/^\/(ar|en|de)(?=\/|$)/, '');
+
+  return PROTECTED.some(
+    (path) => withoutLocale === path || withoutLocale.startsWith(`${path}/`),
+  );
+}
+
+function localeOf(pathname: string): string {
+  return /^\/(ar|en|de)(?=\/|$)/.exec(pathname)?.[1] ?? routing.defaultLocale;
+}
+
+/**
+ * Whether the request carries a usable session.
+ *
+ * `rotated === null` means the refresh was rejected and the cookie is being cleared,
+ * so the incoming cookie must NOT count — otherwise the one request that discovers a
+ * dead session is the one request allowed through with it.
+ */
+function hasSession(request: NextRequest, rotated: string | null | undefined): boolean {
+  if (rotated === null) return false;
+  if (typeof rotated === 'string') return true;
+
+  return decodeSession(request.cookies.get(SESSION_COOKIE)?.value) !== null;
+}
 
 export const config = {
   // Everything except API routes, Next internals and files with an extension.

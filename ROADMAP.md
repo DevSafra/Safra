@@ -5,7 +5,7 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **236 tests
+Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **271 tests
 passing** against a real PostgreSQL, production dependencies clean.
 
 **Scale of what remains:** the API foundation, catalogue, search, the public booking
@@ -254,14 +254,35 @@ had in fact shipped. Verified against the files, not against memory._
      settings, badges, "Book now" / "Ask SAFRA" and **no partner contact before
      confirmation** (P-001, verified)
 129. ❌ Accessibility pass and Core Web Vitals budget (§14.1: home < 2 s)
-     - ❌ **129c** **Customer authentication — entirely absent from `apps/web`.** Found on
-       2026-08-01 while building split payment. The API has login, refresh and rotation
-       (items 39–41), but the web app has no login page, no session cookie and no
-       `Authorization` header in any request: every page is anonymous and every booking
-       is a guest booking. That was invisible while checkout was guest-only by design
-       (§4), and it becomes blocking the moment a feature needs to know WHO is asking —
-       spending a wallet balance is the first (138b), and viewing "my bookings" or a
-       wallet statement is the next
+     - ✅ **129c** **Customer authentication in `apps/web`.** Sign in, register, sign out,
+       a protected `/account` page showing bookings and the wallet with its statement,
+       and signed-in state in the header — all three locales. The API already had login,
+       rotation and revocation (items 39–41); what was missing was every part of the web
+       app that could reach them.
+       - **One HttpOnly cookie on the WEB origin**, not the API's. The browser never
+         talks to the API directly (that is what the route-handler proxies are for), so
+         a cookie scoped to the API's path is one the browser can neither see nor send.
+         The handlers capture the API's `Set-Cookie` and re-issue it here.
+       - **`SameSite=Strict`**, matching the API and rule 1. Known cost, accepted: a link
+         from an email lands anonymous on the first navigation.
+       - **Rotation happens in MIDDLEWARE**, because a server component cannot set a
+         cookie and the access token lasts 15 minutes. It writes the REQUEST jar as well
+         as the response — without that, the very render which triggered the refresh is
+         the one that still sees the expired token.
+       - **A failed refresh is not always a logout.** 401/403 clears the session; a 502
+         does not, because treating an API restart as a logout would empty every browser
+         at once.
+       - Verified against a running stack, not just a green build: register → protected
+         page → expired token silently rotating mid-request → replayed refresh token
+         revoking the session → sign-out. A **real bug** surfaced there and was fixed —
+         the protected-route redirect returned early, so a revoked session kept its dead
+         cookie and retried the doomed refresh on every request.
+     - ❌ **129d** Password reset and email verification have no UI, because the API has no
+       endpoints for them (items 47–48). A customer who forgets their password currently
+       has no route back into their account
+     - ❌ **129e** Guest bookings do not attach to an account created later. §4 allows
+       booking without one, so a customer who books as a guest and registers afterwards
+       sees an empty `/account`. Needs a claim-by-email step at registration
      - ✅ **129b** Checkout page and confirmation page — live server-quoted price with every night
        itemised, guest details without an account (§4), stable idempotency key per form so a
        double-click cannot duplicate a booking, and inline field errors from the shared Zod
@@ -340,12 +361,12 @@ shipped._
        `provider = 'internal'`, which is not in the registry and never will be, so
        requiring one would have made exactly those refunds impossible.
      - ❌ **138a** Gift card and coupon composition at the same seam (items 142–143)
-     - ❌ **138b** **Checkout UI — blocked on customer authentication, which `apps/web`
-       does not have.** Applying a balance requires a session: a booking access token
-       proves possession of ONE booking, while a wallet spans every booking on the
-       profile and can hold compensation earned elsewhere, so a forwarded confirmation
-       email would otherwise be enough to drain it. The web app has no login page, no
-       session cookie and no `Authorization` header anywhere — see item 129c
+     - ✅ **138b** Checkout UI — unblocked by 129c and shipped with it. A signed-in
+       customer sees their applicable balance and the reduced amount due, behind an
+       opt-IN checkbox: stored value is the customer's own money, and a balance quietly
+       consumed by a booking they were half-committed to is a support ticket. Guests are
+       shown an invitation to sign in rather than a blocked control, because §4 keeps
+       guest checkout open and it must not read as a requirement
      - ❌ **138c** Cross-currency application. A balance is offered only when it is held in
        the booking's own currency. `WalletService` can convert, but doing it at checkout
        would quote a figure that moves with the FX rate between page load and payment;
@@ -532,15 +553,15 @@ These block engineering work and are not ours to make.
 
 ## Immediate next steps
 
-1. **Customer authentication in `apps/web` — item 129c.** Now the highest-value gap, and
-   newly so: the split-payment API is finished and tested, but no customer can reach it
-   because the web app cannot tell who they are. It also unblocks "my bookings" and the
-   wallet statement, both of which are built server-side and unreachable.
-2. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
-   just established, so the second and third stored-value instruments are far cheaper
-   now than they would have been before it.
-3. **Partner self-registration and documents — items 82–84.** Partners are still created
+1. **Password reset — items 48 and 129d.** Now the sharpest edge in the product: customers
+   can create accounts and sign in, and a forgotten password is a dead end with no route
+   back. It needs the API endpoint first, then the two screens.
+2. **Partner self-registration and documents — items 82–84.** Partners are still created
    by hand in SQL, so §8.1's verification queue and the sanctions screening gate (120)
-   are reviewing inventory nobody can actually submit.
+   are reviewing inventory nobody can actually submit. This is the largest remaining
+   hole in the operational loop.
+3. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
+   established, so the second and third stored-value instruments are far cheaper now
+   than they would have been before it.
 4. **Grant `FX_RATE_MANAGE` to `finance_officer` — item 150f.** One line, blocked only on
    a policy nod: finance currently cannot see or set the rate their books depend on.

@@ -153,7 +153,12 @@
     "cutoffClosed": "Buchungen für heute sind geschlossen. Das erste verfügbare Datum ist {date}.",
     "fixFields": "Bitte korrigieren Sie die markierten Felder.",
     "networkError": "Verbindung fehlgeschlagen. Versuchen Sie es erneut — es entsteht keine Doppelbuchung.",
-    "genericError": "Ein unerwarteter Fehler ist aufgetreten. Bitte erneut versuchen."
+    "genericError": "Ein unerwarteter Fehler ist aufgetreten. Bitte erneut versuchen.",
+    "walletHeading": "Ihr SAFRA-Guthaben",
+    "walletApply": "{amount} vom Guthaben verwenden",
+    "walletRemaining": "Restbetrag",
+    "walletCoversAll": "Ihr Guthaben deckt diese Buchung vollständig ab.",
+    "walletSignedOut": "Melden Sie sich an, um Ihr SAFRA-Guthaben zu verwenden."
   },
   "bookingPending": {
     "title": "Bezahlt — Ihre Buchung wird bestätigt",
@@ -189,5 +194,64 @@
     "klarnaHint": "Später zahlen oder in Raten mit Klarna",
     "cardHint": "Ihre Bank prüft die Karte (3-D Secure)",
     "shamCashHint": "Mobile Wallet innerhalb Syriens"
+  },
+  "auth": {
+    "signIn": "Anmelden",
+    "signOut": "Abmelden",
+    "signingOut": "Wird abgemeldet…",
+    "account": "Mein Konto",
+    "createAccount": "Konto erstellen",
+    "signInTitle": "Anmelden",
+    "signInSubtitle": "Zugriff auf Ihre Buchungen und Ihr Guthaben.",
+    "registerTitle": "Konto erstellen",
+    "registerSubtitle": "Schneller buchen und Ihr Guthaben an einem Ort behalten.",
+    "email": "E-Mail-Adresse",
+    "password": "Passwort",
+    "fullName": "Vollständiger Name",
+    "phone": "Telefonnummer",
+    "phoneHint": "Internationales Format, damit wir Sie zu Ihrem Aufenthalt erreichen können.",
+    "passwordHint": "Mindestens 12 Zeichen. Länge zählt mehr als Sonderzeichen.",
+    "submitting": "Bitte warten…",
+    "noAccount": "Noch kein Konto?",
+    "haveAccount": "Sie haben bereits ein Konto?",
+    "guestNote": "Sie können auch ohne Konto buchen.",
+    "badCredentials": "E-Mail und Passwort passen zu keinem Konto.",
+    "emailTaken": "Für diese E-Mail-Adresse besteht bereits ein Konto.",
+    "locked": "Dieses Konto ist nach zu vielen Fehlversuchen vorübergehend gesperrt. Bitte später erneut versuchen.",
+    "tooManyAttempts": "Zu viele Versuche. Bitte warten Sie eine Minute.",
+    "fixFields": "Bitte korrigieren Sie die markierten Felder.",
+    "networkError": "Der Server war nicht erreichbar. Bitte erneut versuchen.",
+    "genericError": "Etwas ist schiefgelaufen. Bitte erneut versuchen."
+  },
+  "account": {
+    "title": "Mein Konto",
+    "walletTitle": "Guthaben",
+    "walletBalance": "Verfügbares Guthaben",
+    "walletHint": "Wird bei Ihrer nächsten Buchung an der Kasse angerechnet.",
+    "walletEmpty": "Sie haben noch kein Guthaben. Entschädigungen und Erstattungen erscheinen hier.",
+    "walletStatement": "Letzte Bewegungen",
+    "bookingsTitle": "Meine Buchungen",
+    "noBookings": "Sie haben noch keinen Aufenthalt gebucht.",
+    "findStay": "Unterkunft finden",
+    "nights": "{count} Nächte",
+    "loadFailed": "Konnte gerade nicht geladen werden. Bitte aktualisieren.",
+    "sessionExpired": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
+    "reason": {
+      "sla_compensation": "Entschädigung für eine versäumte Bestätigung",
+      "refund": "Erstattung",
+      "booking_payment": "Auf eine Buchung angerechnet",
+      "admin_adjustment": "Anpassung durch SAFRA",
+      "gift_card_transfer": "Geschenkkarte"
+    },
+    "status": {
+      "draft": "Entwurf",
+      "pending_payment": "Zahlung ausstehend",
+      "pending_confirmation": "Bestätigung ausstehend",
+      "confirmed": "Bestätigt",
+      "cancelled": "Storniert",
+      "checked_in": "Eingecheckt",
+      "completed": "Abgeschlossen",
+      "disputed": "Strittig"
+    }
   }
 }

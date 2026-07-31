@@ -153,7 +153,12 @@
     "cutoffClosed": "Today's bookings have closed. The first available date is {date}.",
     "fixFields": "Please correct the highlighted fields.",
     "networkError": "Could not connect. Try again — this will not create a duplicate booking.",
-    "genericError": "Something unexpected happened. Please try again."
+    "genericError": "Something unexpected happened. Please try again.",
+    "walletHeading": "Your SAFRA balance",
+    "walletApply": "Use {amount} from my balance",
+    "walletRemaining": "Remaining to pay",
+    "walletCoversAll": "Your balance covers this booking in full.",
+    "walletSignedOut": "Sign in to use your SAFRA balance."
   },
   "bookingPending": {
     "title": "Paid — your booking is pending confirmation",
@@ -189,5 +194,64 @@
     "klarnaHint": "Pay later or in instalments with Klarna",
     "cardHint": "Your bank will verify the card (3-D Secure)",
     "shamCashHint": "Mobile wallet inside Syria"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…",
+    "account": "My account",
+    "createAccount": "Create an account",
+    "signInTitle": "Sign in",
+    "signInSubtitle": "Access your bookings and wallet balance.",
+    "registerTitle": "Create an account",
+    "registerSubtitle": "Book faster, and keep your wallet balance in one place.",
+    "email": "Email address",
+    "password": "Password",
+    "fullName": "Full name",
+    "phone": "Phone number",
+    "phoneHint": "International format, so we can reach you about your stay.",
+    "passwordHint": "At least 12 characters. Length matters more than symbols.",
+    "submitting": "Please wait…",
+    "noAccount": "No account yet?",
+    "haveAccount": "Already have an account?",
+    "guestNote": "You can also book without an account.",
+    "badCredentials": "That email and password do not match an account.",
+    "emailTaken": "An account already exists for this email address.",
+    "locked": "This account is temporarily locked after too many failed attempts. Try again shortly.",
+    "tooManyAttempts": "Too many attempts. Please wait a minute and try again.",
+    "fixFields": "Please correct the highlighted fields.",
+    "networkError": "We could not reach the server. Please try again.",
+    "genericError": "Something went wrong. Please try again."
+  },
+  "account": {
+    "title": "My account",
+    "walletTitle": "Wallet",
+    "walletBalance": "Available balance",
+    "walletHint": "Applied at checkout on your next booking.",
+    "walletEmpty": "You have no wallet balance yet. Compensation and refunds appear here.",
+    "walletStatement": "Recent activity",
+    "bookingsTitle": "My bookings",
+    "noBookings": "You have not booked a stay yet.",
+    "findStay": "Find a stay",
+    "nights": "{count} nights",
+    "loadFailed": "We could not load this right now. Please refresh.",
+    "sessionExpired": "Your session expired. Please sign in again.",
+    "reason": {
+      "sla_compensation": "Compensation for a missed confirmation",
+      "refund": "Refund",
+      "booking_payment": "Applied to a booking",
+      "admin_adjustment": "Adjustment by SAFRA",
+      "gift_card_transfer": "Gift card"
+    },
+    "status": {
+      "draft": "Draft",
+      "pending_payment": "Awaiting payment",
+      "pending_confirmation": "Awaiting confirmation",
+      "confirmed": "Confirmed",
+      "cancelled": "Cancelled",
+      "checked_in": "Checked in",
+      "completed": "Completed",
+      "disputed": "Disputed"
+    }
   }
 }

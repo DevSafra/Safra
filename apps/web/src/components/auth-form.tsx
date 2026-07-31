@@ -1,0 +1,291 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+
+import type { Locale } from '@/i18n/routing';
+
+interface FieldErrors {
+  [field: string]: string | undefined;
+}
+
+/**
+ * Sign in and register, in one component (SRS §4).
+ *
+ * One component rather than two because the two forms differ only in which inputs
+ * they show and which endpoint they post to — everything that is actually tricky
+ * (inline field errors keyed by the shared Zod schema's paths, a disabled button
+ * during submission, redirecting back to where the customer came from) is identical,
+ * and duplicating it is how the two drift apart.
+ *
+ * Posts to a Next route handler, never to the API: the tokens go straight into an
+ * HttpOnly cookie server-side, so no access token ever exists in client JavaScript.
+ */
+export function AuthForm({
+  locale,
+  mode,
+  redirectTo,
+}: {
+  locale: Locale;
+  mode: 'login' | 'register';
+  /**
+   * Where to go after signing in. Already validated server-side to be a path on
+   * this site — see `safeRedirect` in the page. An unchecked value here would be an
+   * open redirect on the one form most worth phishing.
+   */
+  redirectTo: string;
+}) {
+  const t = useTranslations('auth');
+  const router = useRouter();
+
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitting) return;
+
+    setSubmitting(true);
+    setFormError(null);
+    setFieldErrors({});
+
+    const form = new FormData(event.currentTarget);
+
+    const body =
+      mode === 'login'
+        ? { email: text(form, 'email'), password: text(form, 'password') }
+        : {
+            email: text(form, 'email'),
+            password: text(form, 'password'),
+            fullName: text(form, 'fullName'),
+            phone: text(form, 'phone'),
+            preferredLocale: locale,
+          };
+
+    try {
+      const response = await fetch(`/${locale}/api/auth/${mode}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        applyError(await response.json().catch(() => null), response.status, {
+          setFormError,
+          setFieldErrors,
+          t,
+        });
+        setSubmitting(false);
+        return;
+      }
+
+      /**
+       * `refresh()` before `push()`, and both are needed.
+       *
+       * The session lives in an HttpOnly cookie the client cannot see, so nothing in
+       * the React tree knows it changed. Without the refresh, the server components
+       * that render the header and the account page are served from the router cache
+       * and still believe the customer is signed out.
+       */
+      router.refresh();
+      router.push(redirectTo);
+    } catch {
+      setFormError(t('networkError'));
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={(event) => void handleSubmit(event)}
+      noValidate
+      className="flex flex-col gap-4"
+    >
+      {formError ? (
+        <p
+          role="alert"
+          className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-sm text-bad"
+        >
+          {formError}
+        </p>
+      ) : null}
+
+      {mode === 'register' ? (
+        <Field
+          name="fullName"
+          label={t('fullName')}
+          autoComplete="name"
+          error={fieldErrors['fullName']}
+          required
+        />
+      ) : null}
+
+      <Field
+        name="email"
+        type="email"
+        label={t('email')}
+        autoComplete="email"
+        inputMode="email"
+        error={fieldErrors['email']}
+        required
+      />
+
+      {mode === 'register' ? (
+        <Field
+          name="phone"
+          type="tel"
+          label={t('phone')}
+          placeholder="+963912345678"
+          autoComplete="tel"
+          hint={t('phoneHint')}
+          error={fieldErrors['phone']}
+          required
+        />
+      ) : null}
+
+      <Field
+        name="password"
+        type="password"
+        label={t('password')}
+        // "new-password" tells a password manager to OFFER one on registration and
+        // not to autofill the existing one; "current-password" does the opposite.
+        autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+        hint={mode === 'register' ? t('passwordHint') : undefined}
+        error={fieldErrors['password']}
+        required
+      />
+
+      <button
+        type="submit"
+        disabled={submitting}
+        className="mt-2 w-full rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {submitting ? t('submitting') : t(mode === 'login' ? 'signIn' : 'createAccount')}
+      </button>
+    </form>
+  );
+}
+
+/**
+ * `FormData.get` returns `string | File`, so coercing with String() would post a file
+ * input as the literal "[object File]". Anything that is not a string is treated as
+ * absent and the schema rejects it.
+ */
+function text(form: FormData, name: string): string {
+  const value = form.get(name);
+  return typeof value === 'string' ? value : '';
+}
+
+function Field({
+  name,
+  label,
+  error,
+  hint,
+  ...rest
+}: {
+  name: string;
+  label: string;
+  error?: string | undefined;
+  hint?: string | undefined;
+} & React.InputHTMLAttributes<HTMLInputElement>) {
+  const id = `field-${name}`;
+  const describedBy = [error ? `${id}-error` : null, hint ? `${id}-hint` : null]
+    .filter(Boolean)
+    .join(' ');
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="text-sm text-muted">
+        {label} <span className="text-gold">*</span>
+      </label>
+      <input
+        id={id}
+        name={name}
+        aria-invalid={error ? 'true' : undefined}
+        aria-describedby={describedBy || undefined}
+        className={`rounded-lg border bg-field px-3 py-2.5 text-text ${
+          error ? 'border-bad' : 'border-line'
+        }`}
+        {...rest}
+      />
+      {hint ? (
+        <span id={`${id}-hint`} className="text-xs text-faint">
+          {hint}
+        </span>
+      ) : null}
+      {error ? (
+        <span id={`${id}-error`} className="text-xs text-bad">
+          {error}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Turns an API failure into something the customer can act on.
+ *
+ * The 401 case is deliberately vague, and that is the API's design showing through:
+ * login answers identically for an unknown email and a wrong password so the form
+ * cannot be used to enumerate accounts. Registration is the opposite — a 409 says
+ * plainly that the address is taken, because a signup form reveals that anyway by
+ * refusing to proceed (ADR 0003).
+ */
+function applyError(
+  body: unknown,
+  status: number,
+  handlers: {
+    setFormError: (message: string) => void;
+    setFieldErrors: (errors: FieldErrors) => void;
+    t: (key: string) => string;
+  },
+): void {
+  const { setFormError, setFieldErrors, t } = handlers;
+
+  if (typeof body === 'object' && body !== null) {
+    const record = body as Record<string, unknown>;
+
+    if (Array.isArray(record['errors'])) {
+      const mapped: FieldErrors = {};
+
+      for (const entry of record['errors']) {
+        if (typeof entry === 'object' && entry !== null && 'field' in entry) {
+          const item = entry as { field?: unknown; message?: unknown };
+          if (typeof item.field === 'string' && typeof item.message === 'string') {
+            mapped[item.field] = item.message;
+          }
+        }
+      }
+
+      if (Object.keys(mapped).length > 0) {
+        setFieldErrors(mapped);
+        setFormError(t('fixFields'));
+        return;
+      }
+    }
+  }
+
+  if (status === 401) {
+    setFormError(t('badCredentials'));
+    return;
+  }
+
+  if (status === 409) {
+    setFormError(t('emailTaken'));
+    return;
+  }
+
+  if (status === 423) {
+    setFormError(t('locked'));
+    return;
+  }
+
+  if (status === 429) {
+    setFormError(t('tooManyAttempts'));
+    return;
+  }
+
+  setFormError(t('genericError'));
+}

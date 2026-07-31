@@ -5,8 +5,10 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { CheckoutForm } from '@/components/checkout-form';
 import { isLocale } from '@/i18n/routing';
+import { getMyWallet } from '@/lib/account';
 import { formatMoney } from '@/lib/localise';
 import { availablePaymentMethods, getProperty, quote } from '@/lib/property';
+import { getSession } from '@/lib/session-server';
 
 /**
  * Checkout (SRS §6.3 step 3 — the payment summary).
@@ -77,9 +79,10 @@ export default async function CheckoutPage({
    * The offered payment methods come from the same round of requests: neither depends
    * on the other, so awaiting them in sequence would add latency for nothing (§3).
    */
-  const [priced, methods] = await Promise.all([
+  const [priced, methods, session] = await Promise.all([
     quote({ unitId, checkIn, checkOut }),
     availablePaymentMethods(property.city.countryCode),
+    getSession(),
   ]);
 
   if (!priced) {
@@ -96,6 +99,29 @@ export default async function CheckoutPage({
       </div>
     );
   }
+
+  /**
+   * The spendable balance, for signed-in customers only (§7.3).
+   *
+   * A guest is offered nothing, and that is a security decision rather than a
+   * limitation: the booking access token proves possession of ONE booking, while a
+   * wallet spans every booking on the profile and can hold compensation earned
+   * elsewhere. The API refuses a guest's `applyWallet` for the same reason, so
+   * offering it here would only produce a rejected payment.
+   *
+   * Only a balance in the booking's own currency counts. The API declines to convert
+   * at checkout — the rate would move between page load and payment — so showing a
+   * JOD balance against a USD stay would promise a discount that never arrives.
+   */
+  const walletResult = session ? await getMyWallet() : null;
+
+  const balance =
+    walletResult && walletResult !== 'failed' && walletResult !== 'unauthenticated'
+      ? walletResult.wallet
+      : null;
+
+  const applicable =
+    balance && balance.currencyCode === priced.currencyCode ? balance.balance : null;
 
   const name = locale === 'ar' ? property.name.ar : property.name.en || property.name.ar;
   const cityName =
@@ -115,6 +141,16 @@ export default async function CheckoutPage({
           adults={adults}
           propertySlug={slug}
           methods={methods}
+          wallet={
+            applicable
+              ? {
+                  balance: applicable,
+                  currencyCode: priced.currencyCode,
+                  total: priced.totalAmount,
+                }
+              : null
+          }
+          signedIn={session !== null}
         />
 
         {/* ── Payment summary (§6.3 step 3) ──────────────────────────────── */}

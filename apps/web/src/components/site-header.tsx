@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
 import { LOCALE_LABELS, type Locale, routing } from '@/i18n/routing';
+import { getSession } from '@/lib/session-server';
 import { ThemeToggle } from './theme-toggle';
 
 /**
@@ -14,6 +15,15 @@ import { ThemeToggle } from './theme-toggle';
 export async function SiteHeader({ locale }: { locale: Locale }) {
   const t = await getTranslations('nav');
   const brand = await getTranslations('brand');
+  const auth = await getTranslations('auth');
+
+  /**
+   * Reading the session makes every page dynamic, which is the cost of a header
+   * that knows who you are. It is paid only where it must be: the city and property
+   * pages that §5.4 needs indexed render their own content statically, and this
+   * header is the sole dynamic part of them.
+   */
+  const session = await getSession();
 
   const links = [
     { href: `/${locale}`, label: t('home') },
@@ -71,6 +81,28 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
             </Link>
           ))}
         </nav>
+
+        {/*
+          Account or sign in. The email is shown rather than a name because that is
+          what the API's auth payload carries — inventing a display name from it
+          would just be guessing at what comes before the @.
+        */}
+        {session ? (
+          <Link
+            href={`/${locale}/account`}
+            className="max-w-[10rem] truncate rounded-lg border border-gold/40 bg-card px-3 py-1.5 text-xs text-gold transition-colors hover:border-gold"
+            title={session.user.email}
+          >
+            {auth('account')}
+          </Link>
+        ) : (
+          <Link
+            href={`/${locale}/login`}
+            className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted transition-colors hover:border-gold/50 hover:text-gold"
+          >
+            {auth('signIn')}
+          </Link>
+        )}
 
         <ThemeToggle />
       </div>
