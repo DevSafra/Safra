@@ -41,14 +41,33 @@ export default async function LoginPage({
   // would only sign them in as themselves again.
   if (await getSession()) redirect(next);
 
+  // Set by the reset flow, which lands here because a completed reset revokes every
+  // session — including any this browser was holding.
+  const justReset = query['reset'] === '1';
+
   return (
     <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="font-display text-3xl font-bold text-gold">{t('signInTitle')}</h1>
       <p className="mt-2 text-sm text-muted">{t('signInSubtitle')}</p>
 
+      {justReset ? (
+        <p className="mt-6 rounded-lg border border-good/40 bg-good/10 p-3 text-sm text-good">
+          {t('resetDone')}
+        </p>
+      ) : null}
+
       <div className="mt-8 rounded-card border border-line bg-card p-6">
         <AuthForm locale={locale} mode="login" redirectTo={next} />
       </div>
+
+      <p className="mt-4 text-center text-sm">
+        <Link
+          href={`/${locale}/forgot-password`}
+          className="text-muted hover:text-gold hover:underline"
+        >
+          {t('forgotPassword')}
+        </Link>
+      </p>
 
       <p className="mt-6 text-center text-sm text-muted">
         {t('noAccount')}{' '}

@@ -175,6 +175,27 @@ export const walletTxnReason = pgEnum('wallet_txn_reason', [
   'booking_payment',
   'admin_adjustment',
   'gift_card_transfer',
+  /**
+   * Balance moved from a guest profile onto the account that claimed it, once the
+   * email address was verified (§4).
+   *
+   * Its own reason rather than reusing `admin_adjustment`: nobody adjusted anything,
+   * and the customer's statement has to explain why a balance appeared without an
+   * accompanying booking or compensation event.
+   */
+  'profile_claim',
+]);
+
+/**
+ * What a one-time auth token is for.
+ *
+ * Purpose is part of the row rather than implied by which table it lives in, so a
+ * password-reset token can never be redeemed as an email verification or the other
+ * way round — the redeeming code states what it expects and the lookup filters on it.
+ */
+export const authTokenPurpose = pgEnum('auth_token_purpose', [
+  'password_reset',
+  'email_verification',
 ]);
 
 export const giftCardStatus = pgEnum('gift_card_status', [

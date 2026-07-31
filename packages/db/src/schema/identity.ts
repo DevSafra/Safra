@@ -11,7 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { createdAt, foreignId, notDeleted, primaryId, timestamps } from './_shared.js';
-import { userRole, userStatus } from './enums.js';
+import { authTokenPurpose, userRole, userStatus } from './enums.js';
 import { currencies } from './geo.js';
 
 /**
@@ -87,6 +87,42 @@ export const refreshTokens = pgTable(
   (t) => [
     index('refresh_tokens_user_idx').on(t.userId),
     index('refresh_tokens_family_idx').on(t.familyId),
+  ],
+);
+
+/**
+ * Single-use tokens for password reset and email verification (SRS §4).
+ *
+ * Stored as a digest, never in clear — same reasoning as `refreshTokens`. A password
+ * reset token IS a credential: whoever holds it can take over the account without
+ * knowing the password, so a leaked database must not hand out live ones.
+ *
+ * `consumedAt` rather than a delete, so a redeemed token leaves evidence. "This reset
+ * link was used at 14:02 from this address" is exactly what an account-takeover
+ * investigation needs, and a deleted row says nothing at all.
+ */
+export const authTokens = pgTable(
+  'auth_tokens',
+  {
+    id: primaryId(),
+    userId: foreignId('user_id')
+      .notNull()
+      .references(() => users.id),
+    purpose: authTokenPurpose('purpose').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    ...createdAt,
+  },
+  (t) => [
+    /**
+     * Supports both hot paths: "how many has this user requested lately?" for
+     * throttling, and "invalidate their outstanding ones" when a reset succeeds.
+     */
+    index('auth_tokens_user_purpose_idx').on(t.userId, t.purpose, t.createdAt),
+    index('auth_tokens_expiry_idx').on(t.expiresAt),
   ],
 );
 

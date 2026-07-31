@@ -8,6 +8,7 @@ import {
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
+import { schema } from '@safra/db';
 import {
   type CursorPage,
   type CursorQuery,
@@ -25,13 +26,15 @@ import {
   toMinor,
 } from '../common/money.js';
 
-/** SRS §2.3 — the reasons a balance is allowed to move. */
-export type WalletTxnReason =
-  | 'sla_compensation'
-  | 'refund'
-  | 'booking_payment'
-  | 'admin_adjustment'
-  | 'gift_card_transfer';
+/**
+ * SRS §2.3 — the reasons a balance is allowed to move.
+ *
+ * Derived from the database enum rather than restated, for the same reason
+ * `LedgerAccount` is: the hand-written copy had already fallen behind once. Adding a
+ * reason is now one edit to `schema/enums.ts`, and a movement naming one the database
+ * does not have fails to compile instead of at INSERT time.
+ */
+export type WalletTxnReason = (typeof schema.walletTxnReason.enumValues)[number];
 
 export interface WalletMovement {
   readonly customerProfileId: string;

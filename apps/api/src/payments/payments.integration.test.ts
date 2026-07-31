@@ -675,7 +675,22 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       await sla.sweep();
 
       expect(await bookingStatus(db, booking.id)).toBe('cancelled');
-      expect(await balanceOf(wallet)).toBe('50.00');
+
+      /**
+       * Asserted against THIS booking's movements, not the wallet total.
+       *
+       * `sweep()` is deliberately global — it expires every overdue booking on the
+       * platform — so any residue left by an earlier run releases its hold in the
+       * same call and the balance is whatever those add up to. An absolute figure
+       * here passes on a clean database and fails on a used one, which is the least
+       * useful kind of test.
+       */
+      const released = await db.execute<{ amount: string; direction: string }>(sql`
+        SELECT wt.amount::text AS amount, wt.direction::text AS direction
+        FROM wallet_transactions wt
+        WHERE wt.booking_id = ${booking.id}::uuid AND wt.reason = 'refund'`);
+
+      expect(released.rows).toStrictEqual([{ amount: '50.00', direction: 'credit' }]);
 
       // And the hold is cleared, so a later sweep cannot return it twice.
       const held = await db.execute<{ wallet_amount: string }>(sql`

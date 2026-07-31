@@ -14,17 +14,25 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
 import {
+  type EmailVerificationConfirmInput,
   type LoginInput,
   type LoginResponse,
+  type PasswordResetConfirmInput,
+  type PasswordResetRequestInput,
   type RegisterInput,
+  emailVerificationConfirmSchema,
   loginSchema,
+  passwordResetConfirmSchema,
+  passwordResetRequestSchema,
   registerSchema,
 } from '@safra/contracts';
 
+import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH } from '../config/constants.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, Public } from '../rbac/decorators.js';
+import { AccountRecoveryService } from './account-recovery.service.js';
 import { AuthService, type AuthResult, type RequestContext } from './auth.service.js';
 import { TokenService, type AccessTokenClaims } from './token.service.js';
 
@@ -34,6 +42,7 @@ export class AuthController {
     private readonly auth: AuthService,
     private readonly tokens: TokenService,
     private readonly audit: AuditService,
+    private readonly recovery: AccountRecoveryService,
   ) {}
 
   /**
@@ -60,6 +69,18 @@ export class AuthController {
       subjectId: result.user.id,
       ...contextOf(request),
     });
+
+    /**
+     * The verification email goes out here rather than inside `register`, so a mail
+     * failure can never roll back an account the customer has already been told was
+     * created. Awaited, not detached: `MailService.send` swallows delivery errors, so
+     * the only thing being waited on is a token insert.
+     *
+     * Verification is NOT a precondition for signing in — §4 keeps the barrier to
+     * booking low — but it IS the precondition for claiming guest bookings, which is
+     * a transfer of access to somebody else's data.
+     */
+    await this.recovery.requestEmailVerification(result.user.id, contextOf(request));
 
     return this.respond(result, response);
   }
@@ -131,6 +152,93 @@ export class AuthController {
   ): Promise<void> {
     await this.auth.logout(readRefreshCookie(request));
     response.clearCookie(REFRESH_COOKIE_NAME, this.cookieOptions());
+  }
+
+  /**
+   * Asks for a password reset link (§4).
+   *
+   * Always 204, whatever happened — unknown address, suspended account, throttled,
+   * or sent. See AccountRecoveryService: any distinguishable response turns this into
+   * an account-existence oracle that needs no password guess.
+   *
+   * Three per minute per IP, tighter than login. A reset request costs an email and
+   * an Argon2id-free database round trip, so the limit is about protecting inboxes
+   * rather than CPU — and the per-account throttle sits behind it for the case where
+   * one victim is targeted from many addresses.
+   */
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @Post('password-reset')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @AuditExempt(
+    'AccountRecoveryService records auth.password_reset_requested only when an ' +
+      'account actually matched; auditing the route would log every probe as an action.',
+  )
+  async requestPasswordReset(
+    @Body(new ZodValidationPipe(passwordResetRequestSchema))
+    body: PasswordResetRequestInput,
+    @Req() request: Request,
+  ): Promise<void> {
+    await this.recovery.requestPasswordReset(body.email, contextOf(request));
+  }
+
+  /**
+   * Sets the new password and ends every existing session.
+   *
+   * Not throttled as tightly as the request route: the token is 256 bits, so guessing
+   * is not the threat, and a customer retyping a mistyped password should not be
+   * locked out of their own reset.
+   */
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Post('password-reset/confirm')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @AuditExempt('AccountRecoveryService records auth.password_reset_completed.')
+  async confirmPasswordReset(
+    @Body(new ZodValidationPipe(passwordResetConfirmSchema))
+    body: PasswordResetConfirmInput,
+    @Req() request: Request,
+  ): Promise<void> {
+    await this.recovery.confirmPasswordReset(
+      body.token,
+      body.password,
+      contextOf(request),
+    );
+  }
+
+  /** Re-sends the verification email to the signed-in account. */
+  @Post('email/verify')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @AuditExempt(
+    'Requesting a verification email is not itself a state change worth auditing.',
+  )
+  async requestEmailVerification(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Req() request: Request,
+  ): Promise<void> {
+    if (!user) throw new UnauthorizedException('Authentication required.');
+
+    await this.recovery.requestEmailVerification(user.sub, contextOf(request));
+  }
+
+  /**
+   * Confirms the address, and claims any guest bookings made with it (§4).
+   *
+   * @Public() because the customer may open the link in a browser where they are not
+   * signed in — a different device, or a private window. The token is the
+   * authorization, and it identifies the account on its own.
+   */
+  @Public()
+  @Post('email/verify/confirm')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @AuditExempt('AccountRecoveryService records auth.email_verified with the claim count.')
+  async confirmEmailVerification(
+    @Body(new ZodValidationPipe(emailVerificationConfirmSchema))
+    body: EmailVerificationConfirmInput,
+  ): Promise<{ claimedBookings: number }> {
+    return this.recovery.confirmEmailVerification(body.token);
   }
 
   /** Returns the caller's identity and effective permissions. */

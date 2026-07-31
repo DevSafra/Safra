@@ -88,6 +88,18 @@ export const envSchema = z.object({
         .filter((s) => s.length > 0),
     ),
 
+  /**
+   * Outbound email (§10.3).
+   *
+   * Optional, and absent means "log it instead of sending". That keeps a fresh
+   * checkout runnable with no mail server — the same choice `S3_*` makes — and it is
+   * why `loadEnv` refuses to let it stay absent in production: a password reset that
+   * silently writes the link to a log file is an outage nobody notices until a
+   * customer says they never received it.
+   */
+  SMTP_URL: z.string().url().optional(),
+  MAIL_FROM: z.string().min(3).default('SAFRA <no-reply@safra.example>'),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 
@@ -137,6 +149,18 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   if (tooShort.length > 0) {
     throw new Error(
       'Every PAYMENT_SIMULATOR_WEBHOOK_SECRETS entry must be at least 32 characters.',
+    );
+  }
+
+  /**
+   * Without SMTP the mailer logs instead of sending, which is right for development
+   * and wrong for production in a way that hides itself: password resets and booking
+   * confirmations would appear to succeed while no customer ever receives one.
+   */
+  if (env.NODE_ENV === 'production' && !env.SMTP_URL) {
+    throw new Error(
+      'SMTP_URL is required in production. Without it the mailer only logs, so ' +
+        'password resets and verification emails would never be delivered.',
     );
   }
 

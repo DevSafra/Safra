@@ -87,6 +87,41 @@ export type LoginInput = z.infer<typeof loginSchema>;
  */
 export const refreshSchema = z.object({}).strict();
 
+/**
+ * Asking for a password reset link (SRS §4).
+ *
+ * Only the address, and the response says nothing about whether it matched. A
+ * "no such account" reply here would be an easier customer-list oracle than the
+ * login form, because it needs no password guess at all.
+ */
+export const passwordResetRequestSchema = z.object({ email: emailSchema }).strict();
+export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchema>;
+
+/** 32 random bytes as base64url — see AuthTokenService. */
+const authTokenSchema = z
+  .string()
+  .length(43)
+  .regex(/^[A-Za-z0-9_-]+$/, 'Malformed link token.');
+
+/**
+ * Choosing the new password.
+ *
+ * Reuses `passwordSchema`, so the 12-character floor applies identically here and at
+ * registration. A reset form with a looser rule is the standard way a password policy
+ * quietly stops being one.
+ */
+export const passwordResetConfirmSchema = z
+  .object({ token: authTokenSchema, password: passwordSchema })
+  .strict();
+export type PasswordResetConfirmInput = z.infer<typeof passwordResetConfirmSchema>;
+
+export const emailVerificationConfirmSchema = z
+  .object({ token: authTokenSchema })
+  .strict();
+export type EmailVerificationConfirmInput = z.infer<
+  typeof emailVerificationConfirmSchema
+>;
+
 export const authUserSchema = z.object({
   id: z.string().uuid(),
   email: emailSchema,

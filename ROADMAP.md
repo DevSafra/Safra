@@ -5,7 +5,7 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **271 tests
+Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **295 tests
 passing** against a real PostgreSQL, production dependencies clean.
 
 **Scale of what remains:** the API foundation, catalogue, search, the public booking
@@ -98,8 +98,26 @@ real card yet — that is a commercial blocker, not an engineering one (item 135
 46. ✅ Staff 2FA enrolment — two-step setup (secret then confirm, so a mis-scanned QR
     cannot lock anyone out), 8 recovery codes stored as Argon2id hashes, disable requires
     password + live code, all other sessions revoked on enable
-47. ❌ Email verification flow
-48. ❌ Password reset flow
+47. ✅ Email verification — sent on registration and re-sendable, 24-hour single-use
+    token stored as a digest. Not a precondition for signing in (§4 keeps the barrier to
+    booking low) but it IS the precondition for claiming guest bookings, because that is
+    a transfer of access to someone else's data
+48. ✅ Password reset flow — request and confirm, with the properties that make it safe
+    rather than merely present:
+    - **Requesting reveals nothing.** Unknown address, suspended account, throttled and
+      sent are all indistinguishable. A "no such account" reply would be an easier
+      customer-list oracle than the login form, needing no password guess at all
+    - **Tokens are credentials and are treated as such** — 256 bits, stored as a SHA-256
+      digest, single-use via a conditional UPDATE so two concurrent clicks cannot both
+      win, one hour to live, and issuing a new one supersedes any outstanding link
+    - **Completing a reset revokes every session.** People reset because they think
+      someone else has the password; leaving that person's refresh tokens alive hands
+      the account straight back
+    - **A per-ACCOUNT throttle sits behind the per-IP limit**, so an attacker cycling
+      addresses cannot bury one victim's inbox and drown out a real security notice
+    - **Links are built from `APP_URL`, never a request header** — a reset link
+      assembled from a Host header is the classic host-header injection, where the
+      victim's own click hands their token to the attacker's domain
 49. ❌ Phone / WhatsApp OTP verification
 
 ### 0.5 Authorization
@@ -277,12 +295,17 @@ had in fact shipped. Verified against the files, not against memory._
          revoking the session → sign-out. A **real bug** surfaced there and was fixed —
          the protected-route redirect returned early, so a revoked session kept its dead
          cookie and retried the doomed refresh on every request.
-     - ❌ **129d** Password reset and email verification have no UI, because the API has no
-       endpoints for them (items 47–48). A customer who forgets their password currently
-       has no route back into their account
-     - ❌ **129e** Guest bookings do not attach to an account created later. §4 allows
-       booking without one, so a customer who books as a guest and registers afterwards
-       sees an empty `/account`. Needs a claim-by-email step at registration
+     - ✅ **129d** Password reset and email-confirmation screens, in all three locales.
+       Verified live end to end against a real SMTP server: register → reset email
+       delivered → old password rejected → new one accepted → link refuses reuse
+     - ✅ **129e** Guest bookings attach to an account **once the address is verified** —
+       not at registration. Registration alone would let anyone type a stranger's email
+       and take their guest bookings, which carry travel dates, phone numbers and
+       amounts paid. Proving control of the inbox is the minimum bar for a transfer of
+       access. The claim also carries any **wallet balance** across: §6.4 credits SLA
+       compensation to whichever profile made the booking, including a guest one, so
+       moving the bookings without the money would strand real compensation on a profile
+       the customer can no longer reach
      - ✅ **129b** Checkout page and confirmation page — live server-quoted price with every night
        itemised, guest details without an account (§4), stable idempotency key per form so a
        double-click cannot duplicate a booking, and inline field errors from the shared Zod
@@ -553,15 +576,12 @@ These block engineering work and are not ours to make.
 
 ## Immediate next steps
 
-1. **Password reset — items 48 and 129d.** Now the sharpest edge in the product: customers
-   can create accounts and sign in, and a forgotten password is a dead end with no route
-   back. It needs the API endpoint first, then the two screens.
-2. **Partner self-registration and documents — items 82–84.** Partners are still created
+1. **Partner self-registration and documents — items 82–84.** Partners are still created
    by hand in SQL, so §8.1's verification queue and the sanctions screening gate (120)
    are reviewing inventory nobody can actually submit. This is the largest remaining
    hole in the operational loop.
-3. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
+2. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
    established, so the second and third stored-value instruments are far cheaper now
    than they would have been before it.
-4. **Grant `FX_RATE_MANAGE` to `finance_officer` — item 150f.** One line, blocked only on
+3. **Grant `FX_RATE_MANAGE` to `finance_officer` — item 150f.** One line, blocked only on
    a policy nod: finance currently cannot see or set the rate their books depend on.
