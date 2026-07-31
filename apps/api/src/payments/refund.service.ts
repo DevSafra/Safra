@@ -13,12 +13,9 @@ import type { Database } from '@safra/db';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { LedgerService } from '../ledger/ledger.service.js';
-import { applyRate, fromMinor, toMinor } from '../bookings/pricing.service.js';
+import { MONEY_SCALE, applyRate, fromMinor, toMinor } from '../common/money.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-
-/** Minor units for every currency SAFRA handles; §1.4 lists no zero-decimal ones. */
-const MONEY_SCALE = 2;
 
 /** The shape snapshotted onto the booking at creation. */
 interface PolicySnapshot {

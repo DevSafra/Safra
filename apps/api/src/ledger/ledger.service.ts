@@ -3,9 +3,21 @@ import { sql } from 'drizzle-orm';
 import { v7 as uuidv7 } from 'uuid';
 
 import type { Database } from '@safra/db';
+import { schema } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
-import { multiplyDecimalStrings } from '../bookings/pricing.service.js';
+import { multiplyDecimalStrings } from '../common/money.js';
+
+/**
+ * The accounts, derived from the database enum rather than restated.
+ *
+ * This union used to be written out by hand and had already fallen behind twice —
+ * `payment_provider_fee` and `wallet_adjustment` both existed in PostgreSQL while
+ * TypeScript refused to accept them. Deriving it means adding a value is one edit
+ * to `schema/enums.ts`, and a leg naming an account the database does not have
+ * fails to compile instead of at INSERT time.
+ */
+export type LedgerAccount = (typeof schema.ledgerAccount.enumValues)[number];
 
 /**
  * A single leg of a double-entry movement.
@@ -15,17 +27,7 @@ import { multiplyDecimalStrings } from '../bookings/pricing.service.js';
  * would undo that in the one place it matters most.
  */
 export interface LedgerLeg {
-  account:
-    | 'customer_payment'
-    | 'safra_commission_customer'
-    | 'safra_commission_partner'
-    | 'partner_payable'
-    | 'partner_payout'
-    | 'refund'
-    | 'wallet_credit'
-    | 'wallet_debit'
-    | 'gift_card_redemption'
-    | 'partner_fine';
+  account: LedgerAccount;
   direction: 'debit' | 'credit';
   amount: string;
   description: string;

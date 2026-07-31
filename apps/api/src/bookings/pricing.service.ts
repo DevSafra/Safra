@@ -6,14 +6,16 @@ import type { Database } from '@safra/db';
 import { DATABASE } from '../database/database.module.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import {
+  applyRate,
+  fromMinor,
+  multiplyDecimalStrings,
+  toMinor,
+} from '../common/money.js';
 
 /**
- * Every amount is a decimal STRING, never a number.
- *
- * JavaScript numbers are IEEE-754 doubles: `0.1 + 0.2 !== 0.3`, and
- * `55.05 * 3 === 165.14999999999998`. A booking total is a legal obligation, so all
- * arithmetic here is done in integer minor units and only formatted back to a
- * decimal string at the boundary.
+ * Every amount is a decimal STRING, never a number — see `common/money.ts` for why
+ * and for the integer minor-unit arithmetic this service is built on.
  */
 export interface PriceBreakdown {
   baseAmount: string;
@@ -151,64 +153,4 @@ export class PricingService {
       nightly,
     };
   }
-}
-
-/** Parses a decimal string into integer minor units. Never uses parseFloat. */
-export function toMinor(value: string, scale: number): bigint {
-  const trimmed = value.trim();
-  const negative = trimmed.startsWith('-');
-  const unsigned = negative ? trimmed.slice(1) : trimmed;
-
-  const [whole = '0', fraction = ''] = unsigned.split('.');
-  // Pad or truncate the fraction to the currency's scale, so "55.5" and "55.50"
-  // both become 5550 for a 2-decimal currency.
-  const padded = (fraction + '0'.repeat(scale)).slice(0, scale);
-
-  const minor = BigInt(whole || '0') * 10n ** BigInt(scale) + BigInt(padded || '0');
-  return negative ? -minor : minor;
-}
-
-/** Formats integer minor units back into a decimal string. */
-export function fromMinor(minor: bigint, scale: number): string {
-  const negative = minor < 0n;
-  const abs = negative ? -minor : minor;
-  const divisor = 10n ** BigInt(scale);
-
-  const whole = abs / divisor;
-  const fraction = abs % divisor;
-
-  const body =
-    scale === 0
-      ? whole.toString()
-      : `${whole.toString()}.${fraction.toString().padStart(scale, '0')}`;
-
-  return negative ? `-${body}` : body;
-}
-
-/**
- * Applies a fractional rate (0.07) to minor units, rounding half-up.
- *
- * The rate is scaled to an integer first so the multiplication stays in bigint —
- * `baseMinor * 0.07` would reintroduce float error on the very value we are
- * protecting.
- */
-export function applyRate(minor: bigint, rate: number): bigint {
-  const RATE_SCALE = 1_000_000n; // six decimal places of rate precision
-  const scaledRate = BigInt(Math.round(rate * Number(RATE_SCALE)));
-
-  const product = minor * scaledRate;
-  // Round half-up rather than truncating, so a fee is never systematically short.
-  return (product + RATE_SCALE / 2n) / RATE_SCALE;
-}
-
-/** Multiplies two decimal strings exactly, at a fixed output scale. */
-export function multiplyDecimalStrings(a: string, b: string, outScale: number): string {
-  const SCALE = 8;
-  const aMinor = toMinor(a, SCALE);
-  const bMinor = toMinor(b, SCALE);
-
-  const productMinor = aMinor * bMinor; // now at 2 * SCALE
-  const divisor = 10n ** BigInt(2 * SCALE - outScale);
-
-  return fromMinor((productMinor + divisor / 2n) / divisor, outScale);
 }
