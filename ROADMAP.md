@@ -5,10 +5,14 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-07-30**. Lint clean, 99 tests passing, production dependencies clean.
+Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **223 tests
+passing** against a real PostgreSQL, production dependencies clean.
 
-**Scale of what remains:** roughly 25% of the MVP is built. The API foundation, catalogue
-and search are done; booking, money, both dashboards and all communications are not.
+**Scale of what remains:** the API foundation, catalogue, search, the public booking
+funnel and most of the money layer are done. What is not: spending stored value
+(split payment, gift cards, coupons), partner self-service, both staff dashboards, and
+every outbound communication. No payment gateway is contracted, so nothing can take a
+real card yet — that is a commercial blocker, not an engineering one (item 135).
 
 ---
 
@@ -30,7 +34,11 @@ and search are done; booking, money, both dashboards and all communications are 
    and gitleaks. **Build must precede lint**: type-aware ESLint resolves workspace types
    through `dist`, and every run before 2026-07-30 failed at Lint for exactly that reason,
    masking every later step
-10. ❌ Pre-commit hook (lint + format + typecheck before commit)
+10. ⚠️ Pre-commit hook — **format only.** `.githooks/pre-commit` blocks a commit whose
+    staged files Prettier would reformat, which is the failure that actually happened
+    (a formatting slip stopped CI at step one and masked every later step). Lint and
+    typecheck are still not run at commit time; they need the workspace `dist` built
+    first, so a naive hook would be slow enough that people disable it
 
 ### 0.2 Database schema (28 tables)
 
@@ -59,6 +67,13 @@ and search are done; booking, money, both dashboards and all communications are 
     `gift_card_transactions`, `timeline_events` — UPDATE and DELETE raise
 26. ✅ Double-entry ledger balance enforced by a deferred constraint trigger
 27. ✅ Money CHECK constraints — no negative wallet, no gift-card overspend, coupon percent bounded
+    - ❌ **27a** Money columns are `numeric(14,2)` while `currencies.decimals` records 3 for
+      JOD. A JOD amount is therefore rounded to two decimals wherever it is stored, and
+      `currencies.decimals` is documentation rather than something the schema honours.
+      Not fixed here deliberately: it is a change to ~20 columns and every money path,
+      which does not belong behind a wallet feature. `MONEY_SCALE` in
+      `apps/api/src/common/money.ts` now names the real constraint in one place so the
+      rounding happens predictably rather than at whichever write lands first
 28. ✅ 50% refund floor constraint on cancellation policies (§7.4)
 29. ✅ Reference sequences — `CUS-`, `PAR-`, `PRO-`, `BKG-YYYY-`, `PAY-`, `GIF-` (§13.2)
 30. ✅ `uuidv7()` SQL function as the database-level PK default
@@ -112,6 +127,22 @@ and search are done; booking, money, both dashboards and all communications are 
     marked neither `@Audited` nor `@AuditExempt` logs a startup warning. It immediately
     caught one undeclared route (§15)
 65. ❌ Audit log viewer endpoint (§9.3)
+
+### 0.7 Known defects, found and not yet fixed
+
+Recorded here rather than left in a commit message, because each was found while
+building something else and none is urgent enough to have widened that change.
+
+- ❌ **65a — Booking list pagination truncates its cursor to milliseconds.**
+  `BookingsService.list` builds the keyset bound from a driver-supplied `Date`, which
+  holds milliseconds, while PostgreSQL `timestamptz` holds microseconds. Any two
+  bookings sharing a millisecond at a page boundary make the next page come back
+  empty and the client believe it has reached the end. Found while building the
+  wallet statement, where rows written in one transaction share a timestamp _by
+  construction_ and the bug fires every time. `encodeCursor`/`decodeCursor` now
+  accept and return a full-precision sort key, so the fix for bookings is to select
+  the raw timestamp instead of the `Date`; it is not applied there yet because two
+  bookings in the same millisecond needs concurrency this system does not yet see
 
 ---
 
@@ -206,14 +237,19 @@ and search are done; booking, money, both dashboards and all communications are 
      against the EU consolidated list is therefore required before verification
 121. ❌ Document review workflow per document
 
-### 1.7 Public web app (`apps/web`) — **not started**
+### 1.7 Public web app (`apps/web`)
 
-122. ❌ Next.js 15 App Router scaffold
-123. ❌ i18n — `ar` / `en` / `de` with RTL (§1.4)
-124. ❌ Design system from the approved prototype (`--bg:#0C0A1C`, `--gold:#E8BC66`, Amiri)
-125. ❌ Home page with search engine (§5.1)
-126. ❌ City pages, server-rendered for SEO (§5.4)
-127. ❌ Results page with filters and labelled ad slots (§5.5)
+_Statuses corrected 2026-08-01: 122–127 were still marked "not started" while the pages
+had in fact shipped. Verified against the files, not against memory._
+
+122. ✅ Next.js 15 App Router scaffold
+123. ✅ i18n — `ar` / `en` / `de`, with `dir` resolved per locale on `<html>` (§1.4)
+124. ✅ Design system from the approved prototype (`--bg:#0C0A1C`, `--gold:#E8BC66`, Amiri
+     for display, Cairo for text)
+125. ✅ Home page with search engine (§5.1)
+126. ✅ City pages, server-rendered for SEO (§5.4)
+127. ⚠️ Results page — filters and the four sort modes are live, **ad slots are not**.
+     Advertising is Phase 6 (items 174–175), so there is nothing to label yet
 128. ✅ Property page — gallery, approximate location, 4-state calendar, policy, fees from
      settings, badges, "Book now" / "Ask SAFRA" and **no partner contact before
      confirmation** (P-001, verified)
@@ -226,7 +262,10 @@ and search are done; booking, money, both dashboards and all communications are 
 
 ---
 
-## Phase 2 — Booking and Money — **not started**
+## Phase 2 — Booking and Money
+
+_Header corrected 2026-08-01: this said "not started" while most of the phase had
+shipped._
 
 130. ✅ Booking creation — `pending_payment` **holds the inventory** via the exclusion
      constraint, so a conflict is rejected BEFORE money moves (§6.3)
@@ -270,13 +309,44 @@ and search are done; booking, money, both dashboards and all communications are 
      provider reference is DEFERRED for retry, not rejected, because a webhook can outrun the
      response that created the payment row
      - ❌ **137a** Reconciliation report against a provider settlement file (needs a real PSP)
-138. ❌ Split payment — gift card + wallet + card in one transaction (§7.3)
+138. ❌ Split payment — gift card + wallet + card in one transaction (§7.3). The wallet
+     half of this is now buildable rather than theoretical: item 141 gives an exact,
+     lock-safe `debit` that participates in the caller's transaction. What is missing
+     is the composition — reducing the amount sent to the provider, posting the wallet
+     leg in the same group as the capture, and the case where a balance covers the
+     whole total so no provider is involved at all
 139. ✅ Double-entry ledger — 4 legs per captured payment, posted in the SAME transaction as
      the status change; partner fines posted too. Trial balance endpoint verified balanced
      across multiple bookings, and the append-only + balance triggers verified to reject
      both an unbalanced group and an UPDATE
 140. ✅ FX rate snapshotted onto each booking, exact bigint arithmetic at SYP magnitudes
-141. ❌ Wallet credit/debit operations
+141. ✅ Wallet credit/debit operations — closes a hole that had been open since the SLA
+     sweep shipped: §6.4 compensation was being credited into wallets that no customer
+     could see and no code could spend. `WalletService` is the single primitive —
+     exact bigint arithmetic, one currency per wallet, `FOR UPDATE` row lock, balance
+     cache and append-only transaction written together. `GET /wallet` and
+     `GET /wallet/transactions` for the customer; `GET`/`POST /admin/wallets/:id/…`
+     for staff, with adjustments gated on `WALLET_ADJUST`, audited transactionally and
+     balanced against a new `wallet_adjustment` ledger account. Three defects fixed on
+     the way in, each verified by a test that fails without the fix:
+     - **Float arithmetic on money.** The SLA sweep advanced the balance with
+       `Number(balance) + compensation` and a hardcoded `toFixed(2)` — the same class
+       of defect as the FX fallback (150b), in the one codebase that computes every
+       booking total in integer minor units precisely to avoid it.
+     - **Mixed currencies in one balance.** A customer compensated on a USD booking and
+       then a JOD one had both numbers added into a single scalar. Amounts now convert
+       through SYP, and a wallet's currency never changes after creation.
+     - **Lost updates.** There was no row lock, and the service is called from paths
+       that do not own a transaction. Five concurrent credits of 3.33 produced 6.66
+       instead of 16.65 — three silently discarded. The movement now opens its own
+       transaction (a SAVEPOINT when nested), so the lock holds regardless of caller.
+     - ❌ **141a** Spending the balance at checkout is item 138, not this. The wallet can
+       now be debited correctly; nothing calls that yet, so a customer can see their
+       compensation but not yet use it.
+     - ❌ **141b** Reconciliation job comparing `wallets.balance` against
+       `SUM(wallet_transactions)` on a schedule. The comparison exists
+       (`sumTransactions`, surfaced on the admin balance endpoint) but nothing runs it
+       periodically or alerts on drift — that belongs with the queue in §14.
 142. ❌ Gift card purchase, redemption, partial balance (§11.2)
 143. ❌ Coupon validation and redemption (§11.3)
 144. ✅ Refunds (§7.4) — tiers read from the booking's policy SNAPSHOT, never the live
@@ -410,19 +480,34 @@ These block engineering work and are not ours to make.
      the exposure is now the critical path (item 135).**
 190. ✅ Customer fee model — **flat $1.99**, confirmed by the approved settings screen
      ("رسوم ثابتة تضاف على كل حجز"). Partner side is 7%.
-191. ❌ WhatsApp BSP selection
-192. ❌ Hosting provider and region
-193. ❌ Partner payout mechanism per country
-194. ❌ Maps provider billing account (MapLibre + MapTiler recommended)
-195. ❌ Legal review of terms, privacy policy and the partner contract
+191. ❌ **Which currency the Rules Engine money settings are denominated in.** Surfaced by
+     item 141 and not answerable from the code. `wallet.sla_compensation` and
+     `partner.first_violation_fine` are bare numbers (10), and the approved screen shows
+     them with a `$`. Today the sweep treats them as the BOOKING's currency, so a partner
+     who misses the window on a 10 JOD booking is fined "10" JOD (~$14) while one who
+     misses a USD booking is fined $10 — the same offence, different penalties. Treating
+     them as USD instead is a one-line change to the sweep, but it changes what partners
+     owe and what customers receive, so it is Bashar's call and not an engineering
+     default. The wallet's own conversion is already correct either way
+192. ❌ WhatsApp BSP selection
+193. ❌ Hosting provider and region
+194. ❌ Partner payout mechanism per country
+195. ❌ Maps provider billing account (MapLibre + MapTiler recommended)
+196. ❌ Legal review of terms, privacy policy and the partner contract
 
 ---
 
 ## Immediate next steps
 
-1. `apps/web` — items 122–129 _(next up)_
-2. Property image upload — item 81. The ranking score already rewards photo count, so
-   completeness scoring measures something partners cannot yet supply.
-3. Staff 2FA enrolment — item 46. Login verifies a TOTP code but nobody can turn it on.
-4. Audit interceptor — item 64. Every call site currently writes explicitly, so a new
-   endpoint can ship with no audit trail.
+1. **Split payment — item 138.** The natural continuation of the wallet: a customer can
+   now see a compensation balance they still cannot spend. Wallet first (the primitive
+   exists and is tested), then gift cards (142) and coupons (143), which need the same
+   composition at checkout.
+2. **Partner self-registration and documents — items 82–84.** Partners are still created
+   by hand in SQL, so §8.1's verification queue and the sanctions screening gate (120)
+   are reviewing inventory nobody can actually submit.
+3. **`apps/web` accessibility and performance pass — item 129.** The funnel is complete
+   end to end (home → search → property → checkout → confirmation); what has never been
+   measured is §14.1's "home under 2 s" or a single accessibility check.
+4. **Grant `FX_RATE_MANAGE` to `finance_officer` — item 150f.** One line, blocked only on
+   a policy nod: finance currently cannot see or set the rate their books depend on.

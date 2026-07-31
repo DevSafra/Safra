@@ -8,3 +8,4 @@ export * from './permissions.js';
 export * from './property.js';
 export * from './search.js';
 export * from './two-factor.js';
+export * from './wallet.js';

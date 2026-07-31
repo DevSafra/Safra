@@ -18,6 +18,7 @@ import { RankingModule } from './ranking/ranking.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { StorageModule } from './storage/storage.module.js';
+import { WalletModule } from './wallet/wallet.module.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
 import { PermissionsGuard } from './rbac/permissions.guard.js';
 
@@ -37,6 +38,7 @@ import { PermissionsGuard } from './rbac/permissions.guard.js';
     StorageModule,
     LedgerModule,
     FxModule,
+    WalletModule,
     AuthModule,
     BookingsModule,
     SearchModule,

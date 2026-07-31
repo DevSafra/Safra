@@ -1,0 +1,13 @@
+-- SAFRA's side of a manual wallet movement made by finance (§13.3).
+--
+-- A wallet credit needs a balancing debit or money appears from nowhere, and the
+-- SLA path already has one (`partner_fine`). A discretionary adjustment has no such
+-- counterparty: it is SAFRA's own money, so it gets its own account rather than
+-- being netted against commission revenue.
+--
+-- Additive only. PostgreSQL cannot remove an enum value, so this stays a one-way
+-- change — which is the right trade here, because the alternative is the type swap
+-- migration 0010 had to perform. Safe inside drizzle's per-migration transaction
+-- because nothing in this file USES the new value; PostgreSQL only forbids reading
+-- back a value added in the same transaction.
+ALTER TYPE "public"."ledger_account" ADD VALUE 'wallet_adjustment';

@@ -37,16 +37,40 @@ export interface CursorPage<T> {
  * request regardless of what the cursor says, so a forged cursor can shift the
  * page window but never widen access.
  */
-export function encodeCursor(createdAt: Date, id: string): string {
-  return Buffer.from(`${createdAt.toISOString()}|${id}`, 'utf8').toString('base64url');
+export function encodeCursor(createdAt: Date | string, id: string): string {
+  /**
+   * A string sort key is passed through verbatim, and that is the point.
+   *
+   * A JavaScript Date holds MILLISECONDS; PostgreSQL `timestamptz` holds
+   * microseconds. Round-tripping the key through a Date therefore truncates it, and
+   * the keyset comparison `(created_at, id) < (cursor_ts, cursor_id)` then matches
+   * nothing for any row whose real timestamp has a sub-millisecond component —
+   * the page after the boundary comes back empty and the client believes it has
+   * reached the end.
+   *
+   * That is not hypothetical: several rows written in one transaction share a
+   * timestamp to the microsecond, which is exactly when the id tiebreaker is
+   * supposed to save the page boundary and instead cannot be reached. Callers with
+   * sub-millisecond keys pass the raw value; callers already holding a Date (whose
+   * driver truncated it long before this function) keep the old behaviour.
+   */
+  const key = typeof createdAt === 'string' ? createdAt : createdAt.toISOString();
+
+  return Buffer.from(`${key}|${id}`, 'utf8').toString('base64url');
 }
 
 /**
  * Returns null for anything unparseable. Callers MUST treat null as a client
  * error (400) rather than falling back to the first page — see the note in
  * BookingsService.list about infinite pagination loops.
+ *
+ * `sortKey` is the timestamp exactly as it was encoded, for callers comparing in
+ * SQL at full precision. `createdAt` is the same instant as a Date, for callers
+ * comparing against a driver-supplied Date.
  */
-export function decodeCursor(cursor: string): { createdAt: Date; id: string } | null {
+export function decodeCursor(
+  cursor: string,
+): { createdAt: Date; sortKey: string; id: string } | null {
   try {
     const raw = Buffer.from(cursor, 'base64url').toString('utf8');
     const separator = raw.indexOf('|');
@@ -55,14 +79,15 @@ export function decodeCursor(cursor: string): { createdAt: Date; id: string } | 
       return null;
     }
 
-    const createdAt = new Date(raw.slice(0, separator));
+    const sortKey = raw.slice(0, separator);
+    const createdAt = new Date(sortKey);
     const id = raw.slice(separator + 1);
 
     if (Number.isNaN(createdAt.getTime()) || id.length === 0) {
       return null;
     }
 
-    return { createdAt, id };
+    return { createdAt, sortKey, id };
   } catch {
     // A malformed cursor is treated as "start from the beginning" by the caller,
     // never as a 500.

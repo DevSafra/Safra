@@ -153,6 +153,18 @@ export const ledgerAccount = pgEnum('ledger_account', [
    * overstate the fee SAFRA actually earned and make the margin unreadable.
    */
   'payment_provider_fee',
+  /**
+   * SAFRA's side of a manual wallet movement made by finance — goodwill credited
+   * to a customer, or an erroneous credit clawed back.
+   *
+   * Its own account rather than a debit against commission, for two reasons. A
+   * goodwill gesture is an expense, not negative revenue, so netting it against
+   * `safra_commission_customer` would understate what SAFRA actually earned. And
+   * discretionary payments are exactly what an auditor asks to see in isolation
+   * (§13.3) — a separate account makes "what did we hand out by hand this month?"
+   * one query instead of a forensic exercise.
+   */
+  'wallet_adjustment',
 ]);
 
 export const ledgerDirection = pgEnum('ledger_direction', ['debit', 'credit']);

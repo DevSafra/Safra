@@ -7,6 +7,7 @@ import type { Database } from '@safra/db';
 import { DATABASE } from '../database/database.module.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { WalletService } from '../wallet/wallet.service.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
 const SLA_LOCK_KEY = 8_421_002;
@@ -34,6 +35,7 @@ export class SlaService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly settings: SettingsService,
     private readonly ledger: LedgerService,
+    private readonly wallet: WalletService,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE, { name: 'booking-sla-sweep' })
@@ -169,43 +171,26 @@ export class SlaService {
                     ${compensation.toFixed(2)}, 5)
           `);
 
-          // P-007: the customer is compensated for the disappointment.
-          const walletRows = await tx.execute<{ id: string; balance: string }>(sql`
-            SELECT id, balance::text AS balance FROM wallets
-            WHERE customer_profile_id = ${booking.customer_profile_id}
-              AND deleted_at IS NULL
-            LIMIT 1
-          `);
-
-          let walletId = walletRows.rows[0]?.id;
-          let balance = walletRows.rows[0]?.balance ?? '0';
-
-          if (!walletId) {
-            // A guest booking has no wallet yet; compensation still has to land.
-            const created = await tx.execute<{ id: string }>(sql`
-              INSERT INTO wallets (customer_profile_id, balance, currency_id)
-              VALUES (${booking.customer_profile_id}, 0, ${booking.currency_id})
-              RETURNING id
-            `);
-            walletId = created.rows[0]?.id;
-            balance = '0';
-          }
-
-          if (walletId) {
-            const newBalance = (Number(balance) + compensation).toFixed(2);
-
-            await tx.execute(sql`
-              UPDATE wallets SET balance = ${newBalance} WHERE id = ${walletId}
-            `);
-
-            await tx.execute(sql`
-              INSERT INTO wallet_transactions
-                (wallet_id, direction, reason, amount, currency_id, balance_after, booking_id, note)
-              VALUES (${walletId}, 'credit', 'sla_compensation', ${compensation.toFixed(2)},
-                      ${booking.currency_id}, ${newBalance}, ${booking.id},
-                      'Partner did not respond within the confirmation window.')
-            `);
-          }
+          /**
+           * P-007: the customer is compensated for the disappointment.
+           *
+           * Delegated to WalletService rather than done inline, and that is a fix
+           * rather than a tidy-up. This block used to advance the balance with
+           * `Number(balance) + compensation` — float arithmetic on money, in the
+           * one codebase that computes every booking total in integer minor units
+           * precisely to avoid it. It also credited the BOOKING's currency into a
+           * wallet that may be denominated in another, adding JOD to a USD balance
+           * as though they were the same number. The service converts through SYP
+           * and locks the row, so neither is possible from any caller.
+           */
+          const movement = await this.wallet.credit(tx as unknown as Database, {
+            customerProfileId: booking.customer_profile_id,
+            amount: compensation.toFixed(2),
+            currencyId: booking.currency_id,
+            reason: 'sla_compensation',
+            bookingId: booking.id,
+            note: 'Partner did not respond within the confirmation window.',
+          });
 
           // §8.5: the internal score drives "SAFRA recommends", so a missed SLA
           // must actually cost the partner visibility.
@@ -221,6 +206,12 @@ export class SlaService {
            * partner owes it, the customer's wallet receives it. Posting it keeps the
            * books balanced — a wallet credit with no matching debit would mean money
            * appearing from nowhere.
+           *
+           * Denominated in the BOOKING's currency, which is what the partner is
+           * fined in, even when the customer's wallet holds another. That is not a
+           * mismatch: `ledger_entries` balances in SYP (see the constraint trigger),
+           * so the pair reconciles in the accounting currency, which is the only one
+           * both sides of a cross-currency movement share.
            */
           await this.ledger.postPartnerFine(tx as unknown as Database, {
             bookingId: booking.id,
@@ -232,25 +223,31 @@ export class SlaService {
             reference: booking.reference,
           });
 
+          /**
+           * What actually landed, not what was configured. When the wallet is
+           * denominated differently from the booking these differ, and a customer
+           * asking why they were credited $14.46 for a 10.000 JOD booking needs the
+           * answer to be on the record rather than inferred from two FX rates.
+           */
+          const outcome = {
+            occurrence,
+            fine: fineAmount,
+            compensation,
+            creditedAmount: movement.appliedAmount,
+            creditedCurrency: movement.currencyCode,
+            walletBalance: movement.balance,
+          };
+
           await tx.execute(sql`
             INSERT INTO timeline_events (subject_type, subject_id, event_type, actor_type, payload)
             VALUES ('booking', ${booking.id}, 'booking.sla_expired', 'system',
-                    ${JSON.stringify({
-                      occurrence,
-                      fine: fineAmount,
-                      compensation,
-                    })}::jsonb)
+                    ${JSON.stringify(outcome)}::jsonb)
           `);
 
           await tx.execute(sql`
             INSERT INTO audit_log (action, subject_type, subject_id, after)
             VALUES ('booking.sla_expired', 'booking', ${booking.id},
-                    ${JSON.stringify({
-                      reference: booking.reference,
-                      occurrence,
-                      fine: fineAmount,
-                      compensation,
-                    })}::jsonb)
+                    ${JSON.stringify({ reference: booking.reference, ...outcome })}::jsonb)
           `);
         });
 
