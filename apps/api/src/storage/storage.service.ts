@@ -1,4 +1,4 @@
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join, normalize, resolve, sep } from 'node:path';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -26,6 +26,19 @@ export abstract class StorageService {
   abstract put(key: string, body: Buffer, contentType: string): Promise<StoredObject>;
   abstract remove(key: string): Promise<void>;
   abstract publicUrl(key: string): string;
+
+  /**
+   * Reads an object back through the API rather than handing out a URL.
+   *
+   * Exists for PRIVATE objects — partner identity documents (§8.1). `publicUrl` is
+   * wrong for those twice over: it produces a link that works for anyone who has it,
+   * and it leaves no record of who looked. A document is fetched by an authorised
+   * caller, through a handler that checks the permission and writes an audit row.
+   *
+   * Returns null when the object is missing, so a deleted file renders a 404 rather
+   * than a 500.
+   */
+  abstract get(key: string): Promise<Buffer | null>;
 }
 
 @Injectable()
@@ -57,6 +70,15 @@ export class LocalDiskStorage extends StorageService {
       await unlink(this.resolveWithin(key));
     } catch {
       // Already gone is a success for our purposes.
+    }
+  }
+
+  async get(key: string): Promise<Buffer | null> {
+    try {
+      return await readFile(this.resolveWithin(key));
+    } catch {
+      // Missing is a 404 for the caller, not a server fault.
+      return null;
     }
   }
 

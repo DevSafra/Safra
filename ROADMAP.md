@@ -5,7 +5,7 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **314 tests
+Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **336 tests
 passing** against a real PostgreSQL, production dependencies clean.
 
 **Scale of what remains:** the API foundation, catalogue, search, the public booking
@@ -193,7 +193,28 @@ building something else and none is urgent enough to have widened that change.
 81. ✅ Property image upload — multipart, `sharp` re-encodes everything to AVIF+WebP at
     3 widths, **EXIF stripped** (verified: source GPS gone), storage abstracted over
     S3/local disk, polyglot + SVG + undersized uploads rejected, traversal blocked
-82. ❌ Partner document upload (§8.1 requires ID, commercial register, ownership proof)
+82. ✅ Partner document upload (§8.1) — identity, commercial register, ownership proof,
+    management contract, bank confirmation, as a closed list of kinds. Held to a higher
+    bar than property images, because these are identity documents under a German
+    entity:
+    - **Never public.** Images get a CDN URL; a document is read back through an
+      authorised handler that records who looked. `publicUrl` throws for these in the
+      test double, so a future caller reaching for it fails loudly.
+    - **Type is proved by CONTENT.** `Content-Type` is chosen by the client; an
+      executable announced as a PDF passes a header check and fails the magic-byte one.
+      A signature anywhere but the first byte is also rejected — leading junk is how a
+      polyglot slips past a "contains %PDF" test.
+    - **Images are re-encoded, PDFs are not.** `sharp` strips EXIF (a phone photo of an
+      ID carries where it was taken) and kills anything hidden in the container; a PDF
+      cannot survive that, so it is defended at the READ side instead — served as an
+      attachment, `nosniff`, `no-store`, never inline.
+    - **Every view writes an audit row.** "Who opened this passport scan?" has to be
+      answerable from the trail, not from web-server logs.
+    - ❌ **82a** Retention. Nothing deletes these on a schedule; under a German entity
+      that is a legal question, deferred to item 195 rather than invented here
+    - ❌ **82b** Malware scanning. No provider is configured, so a PDF is stored on the
+      strength of its header alone. The read path is hardened against it being rendered,
+      but a hostile file downloaded by a reviewer is not addressed
 83. ✅ Partner self-registration — `POST /partner/register` creates the account and the
     partner row in ONE transaction, so a half-made application cannot leave a user with
     partner permissions and no partner to scope them to (`requirePartnerId` refuses
@@ -263,7 +284,13 @@ building something else and none is urgent enough to have widened that change.
      the economic measures from 2025-05-29, asset freezes on persons and entities tied to the
      former al-Assad regime were renewed on 2026-05-18 until 2027-06-01. Screening partners
      against the EU consolidated list is therefore required before verification
-121. ❌ Document review workflow per document
+121. ✅ Document review workflow per document — approve or reject each one separately,
+     with mandatory notes on rejection. Per document rather than per partner because
+     "your paperwork was rejected" is useless feedback: a partner needs to know the
+     ownership proof was illegible while the ID was fine, or one review cycle becomes
+     several. Gated on `PARTNER_DOCUMENT_REVIEW`, which support agents do not hold —
+     §4.1's "staff see only the data their role requires", applied to the most sensitive
+     document the platform holds
 
 ### 1.7 Public web app (`apps/web`)
 
@@ -594,12 +621,10 @@ These block engineering work and are not ours to make.
 
 ## Immediate next steps
 
-1. **Partner document upload and payout accounts — items 82, 84.** Partners can now apply
-   (item 83), but §8.1 requires ID, commercial register and ownership proof before anyone
-   can be verified — so the queue still cannot be worked to completion. Documents need a
-   PDF-aware upload path (the existing pipeline re-encodes images through `sharp`, which
-   a PDF must not go through), and payout accounts need the field-encryption service that
-   already exists.
+1. **Partner payout accounts — item 84. DEFERRED to the end of the project** with the
+   rest of the payment work (Bashar, 2026-08-01): it needs the payout mechanism per
+   country, which is item 193 and still open. The onboarding loop is otherwise complete —
+   a partner can apply, upload documents, and be reviewed and verified.
 2. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
    established, so the second and third stored-value instruments are far cheaper now
    than they would have been before it.

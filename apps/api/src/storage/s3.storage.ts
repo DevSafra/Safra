@@ -1,4 +1,9 @@
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { Inject, Injectable } from '@nestjs/common';
 
 import { ENV, type Env } from '../config/env.js';
@@ -56,6 +61,22 @@ export class S3Storage extends StorageService {
 
   async remove(key: string): Promise<void> {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
+  }
+
+  async get(key: string): Promise<Buffer | null> {
+    try {
+      const result = await this.client.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+
+      const bytes = await result.Body?.transformToByteArray();
+
+      return bytes ? Buffer.from(bytes) : null;
+    } catch {
+      // NoSuchKey and a transient fault are both "cannot serve this now"; the
+      // caller renders 404 either way rather than leaking bucket detail (rule 1).
+      return null;
+    }
   }
 
   publicUrl(key: string): string {

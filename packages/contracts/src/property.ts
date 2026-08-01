@@ -170,6 +170,53 @@ export const partnerRegisterSchema = z
 
 export type PartnerRegisterInput = z.infer<typeof partnerRegisterSchema>;
 
+/**
+ * The documents §8.1 requires before a partner can be verified.
+ *
+ * A closed list, not free text. The verification queue exists to answer "has this
+ * partner proved who they are and that they may let this property?", and a kind
+ * nobody recognises cannot contribute to that answer — it just sits in the queue
+ * looking like progress.
+ */
+export const PARTNER_DOCUMENT_KINDS = [
+  /** Passport or national ID of the signing person. */
+  'identity',
+  /** Commercial register extract for the legal entity. */
+  'commercial_register',
+  /** Title deed, or whatever shows the right to let the property. */
+  'ownership_proof',
+  /** Where the partner manages rather than owns. */
+  'management_contract',
+  /** Bank letter or similar, when finance asks for confirmation. */
+  'bank_confirmation',
+] as const;
+
+export type PartnerDocumentKind = (typeof PARTNER_DOCUMENT_KINDS)[number];
+
+export const partnerDocumentUploadSchema = z
+  .object({ kind: z.enum(PARTNER_DOCUMENT_KINDS) })
+  .strict();
+
+export type PartnerDocumentUploadInput = z.infer<typeof partnerDocumentUploadSchema>;
+
+/** A reviewer's decision on ONE document (§8.1, item 121). */
+export const partnerDocumentReviewSchema = z
+  .object({
+    decision: z.enum(['approve', 'reject']),
+    notes: z.string().trim().max(2000).optional(),
+  })
+  .strict()
+  .refine((v) => v.decision !== 'reject' || (v.notes?.length ?? 0) > 0, {
+    /**
+     * "Rejected" with no reason forces the partner to guess and re-upload blind,
+     * which turns one review cycle into several.
+     */
+    message: 'Rejection requires notes explaining what is wrong with the document.',
+    path: ['notes'],
+  });
+
+export type PartnerDocumentReviewInput = z.infer<typeof partnerDocumentReviewSchema>;
+
 /** Staff decision on a partner's onboarding (§8.1). */
 export const partnerVerifySchema = z
   .object({
