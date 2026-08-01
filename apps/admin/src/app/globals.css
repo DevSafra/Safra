@@ -1,0 +1,33 @@
+@import 'tailwindcss';
+
+/**
+ * The staff console shares SAFRA's palette but not its personality.
+ *
+ * Deliberately plainer than the public site: no Amiri display face, no gold
+ * flourishes beyond the accent. Someone reading a passport scan at 6pm needs
+ * contrast and density, not atmosphere — and a console that looks obviously
+ * different from the customer site is one nobody confuses for it.
+ */
+@theme {
+  --color-bg: #0c0a1c;
+  --color-card: #15132a;
+  --color-field: #1c1936;
+  --color-line: #2a2745;
+  --color-text: #e8e6f0;
+  --color-muted: #a9a5c0;
+  --color-faint: #726e8f;
+  --color-gold: #e8bc66;
+  --color-good: #4ade80;
+  --color-bad: #f87171;
+  --color-sky: #7dd3fc;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+}

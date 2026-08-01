@@ -156,6 +156,18 @@ export class PartnerDocumentsService {
     };
   }
 
+  /** As `list`, resolving the partner by their §13.2 reference. */
+  async listByReference(reference: string): Promise<DocumentRecord[]> {
+    const rows = await this.db.execute<{ id: string }>(sql`
+      SELECT id FROM partners WHERE reference = ${reference} AND deleted_at IS NULL
+    `);
+
+    const partnerId = rows.rows[0]?.id;
+    if (!partnerId) throw new NotFoundException('Partner not found.');
+
+    return this.list(partnerId);
+  }
+
   /** Metadata only — the bytes are never included in a list. */
   async list(partnerId: string): Promise<DocumentRecord[]> {
     const rows = await this.db.execute<{

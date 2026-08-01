@@ -5,7 +5,7 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **336 tests
+Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **345 tests
 passing** against a real PostgreSQL, production dependencies clean.
 
 **Scale of what remains:** the API foundation, catalogue, search, the public booking
@@ -272,7 +272,14 @@ building something else and none is urgent enough to have widened that change.
 
 ### 1.6 Staff verification (§8.1, §9.2)
 
-114. ✅ Pending-properties and pending-partners queues, oldest first
+114. ⚠️ Pending-properties and pending-partners queues, oldest first. **The partners
+     queue returned a 500 on every call from the day it shipped** and nobody noticed,
+     because nothing called it until the admin console was built — a queue nobody
+     opens cannot be seen to be broken. Drizzle needs both halves of a relation
+     declared and only `partners.documents`'s `many()` side existed, so the query threw
+     before reaching the database. Fixed, with a regression test that asserts the
+     queries EXECUTE and their nested relations resolve — the part a type-check cannot
+     prove
 115. ✅ Approve / reject a listing, with notes mandatory on rejection
 116. ✅ **A listing cannot publish while its partner is unverified**
 117. ✅ **Sanctions screening is a hard precondition** for verifying a partner (ADR 0002)
@@ -536,8 +543,27 @@ shipped._
 
 ## Phase 4 — Admin Command Center — **not started**
 
-157. ❌ `apps/admin` scaffold (separate app, off the public attack surface)
-158. ❌ Dashboard home with the §9.2 panels
+157. ✅ `apps/admin` scaffold — separate Next app on port 3001, off the public attack
+     surface per ADR 0001. Staff sign-in, session (shared `@safra/session` package, on
+     a DIFFERENT cookie name because cookies ignore the port and would otherwise be
+     shared with the public app on localhost), strict CSP, `noindex` in both headers
+     and metadata, and no referrer at all — an admin URL carries partner and booking
+     ids.
+     - **A non-staff account is refused at the door**, after a successful
+       authentication and with no cookie set. Not authorization — the API declines
+       every staff endpoint anyway — but a customer who tries their credentials here
+       gets a flat no instead of an empty console.
+     - **2FA is forced.** `AuthService.login` only demands a TOTP code from accounts
+       that have ALREADY enabled it, so a staff account that never enrolled signs in
+       on a password alone. Tolerable for an API with per-endpoint permissions; not
+       for the console that approves partners and moves wallet balances. An unenrolled
+       session can reach the enrolment page and nothing else. Verified live: sign in →
+       forced to enrolment → enrol → dashboard opens.
+     - Access tokens now carry a `totpEnabled` claim so middleware can enforce that
+       without a round trip per request
+158. ⚠️ Dashboard home — the §9.2 attention counters and both verification queues, with
+     screening state surfaced in the partner queue rather than only on a detail page.
+     The remaining §9.3 panels are deliberately not built yet (item 159)
 159. ❌ The 18 sections listed in §9.3
 160. ❌ Booking detail with full timeline, messages and internal notes (§9.4)
 161. ❌ Settings editor for commissions, SLA, fines, cutoff (P-005)

@@ -191,3 +191,38 @@ export const partnersRelations = relations(partners, ({ one, many }) => ({
   payoutAccounts: many(partnerPayoutAccounts),
   violations: many(partnerViolations),
 }));
+
+/**
+ * The INVERSE side of each `many()` above.
+ *
+ * Drizzle needs both halves declared: `many()` alone says a partner has documents
+ * but not which column joins them, so a relational query fails at runtime with
+ * "not enough information to infer relation". These were missing, which meant
+ * `GET /admin/partners/pending` — the §8.1 verification queue — returned a 500 on
+ * every call from the day it shipped. Nothing caught it because nothing called it:
+ * the endpoint had no consumer until the admin console was built, and a queue that
+ * is never opened cannot be seen to be broken.
+ */
+export const partnerDocumentsRelations = relations(partnerDocuments, ({ one }) => ({
+  partner: one(partners, {
+    fields: [partnerDocuments.partnerId],
+    references: [partners.id],
+  }),
+}));
+
+export const partnerPayoutAccountsRelations = relations(
+  partnerPayoutAccounts,
+  ({ one }) => ({
+    partner: one(partners, {
+      fields: [partnerPayoutAccounts.partnerId],
+      references: [partners.id],
+    }),
+  }),
+);
+
+export const partnerViolationsRelations = relations(partnerViolations, ({ one }) => ({
+  partner: one(partners, {
+    fields: [partnerViolations.partnerId],
+    references: [partners.id],
+  }),
+}));

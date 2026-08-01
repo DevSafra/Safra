@@ -104,10 +104,18 @@ export class PartnerDocumentsController {
 export class AdminPartnerDocumentsController {
   constructor(private readonly documents: PartnerDocumentsService) {}
 
-  @Get(':partnerId/documents')
+  /**
+   * Keyed on the partner REFERENCE, not their uuid.
+   *
+   * `POST /admin/partners/:reference/verify` already works this way, and an admin
+   * API that mixes the two invites exactly the bug this replaced: a console linking
+   * with one key against an endpoint expecting the other. References are also the
+   * §13.2 handle staff quote to each other, and they keep internal ids off the wire.
+   */
+  @Get(':reference/documents')
   @RequirePermissions(P.PARTNER_DOCUMENT_REVIEW)
-  async list(@Param('partnerId', ParseUUIDPipe) partnerId: string) {
-    return { documents: await this.documents.list(partnerId) };
+  async list(@Param('reference') reference: string) {
+    return { documents: await this.documents.listByReference(reference) };
   }
 
   @Get('documents/:documentId/file')
