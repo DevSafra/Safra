@@ -6,7 +6,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { AuthForm } from '@/components/auth-form';
 import { isLocale } from '@/i18n/routing';
 import { getSession } from '@/lib/session-server';
-import { safeRedirect } from '@/lib/redirect';
+import { safeRedirect } from '@safra/session';
 
 /**
  * Sign in (SRS §4).

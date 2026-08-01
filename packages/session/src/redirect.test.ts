@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { safeRedirect } from './redirect';
+import { safeRedirect } from './redirect.js';
 
 /**
  * Open-redirect guard for the sign-in form's `?next=`.

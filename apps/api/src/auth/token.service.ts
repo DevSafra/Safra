@@ -29,6 +29,15 @@ export interface AccessTokenClaims {
    */
   customerProfileId?: string | undefined;
   partnerId?: string | undefined;
+  /**
+   * Whether this account has completed 2FA enrolment.
+   *
+   * Carried in the token so the admin app can route an unenrolled staff member to
+   * enrolment without a round trip on every request. It is a UX signal only — the
+   * API refuses staff actions on its own authority, never on the strength of what a
+   * client did with this flag.
+   */
+  totpEnabled?: boolean | undefined;
 }
 
 export interface IssuedTokens {
@@ -91,6 +100,7 @@ export class TokenService {
       locale: claims.locale,
       customerProfileId: claims.customerProfileId,
       partnerId: claims.partnerId,
+      totpEnabled: claims.totpEnabled,
     })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setSubject(claims.sub)
@@ -140,6 +150,10 @@ export class TokenService {
         locale: (payload['locale'] as string) ?? 'ar',
         customerProfileId: payload['customerProfileId'] as string | undefined,
         partnerId: payload['partnerId'] as string | undefined,
+        // Read back explicitly. A claim that is signed into the token but dropped
+        // here is worse than one that never existed: the guard sees `undefined` and
+        // every consumer quietly treats an enrolled account as unenrolled.
+        totpEnabled: payload['totpEnabled'] === true,
       };
     } catch {
       throw new UnauthorizedException('Invalid or expired token.');
@@ -163,6 +177,7 @@ export class TokenService {
         await this.enabledGrants(),
       ),
       locale: user.preferredLocale,
+      totpEnabled: user.totpEnabledAt !== null,
     };
 
     return this.attachOwningIds(claims, user);

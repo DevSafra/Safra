@@ -2,15 +2,15 @@ import createMiddleware from 'next-intl/middleware';
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { routing } from './i18n/routing';
-import { callAuth } from './lib/auth-api';
 import {
-  SESSION_COOKIE,
+  CUSTOMER_SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
+  callAuth,
   decodeSession,
   encodeSession,
   needsRefresh,
   sessionCookieOptions,
-} from './lib/session';
+} from '@safra/session';
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -50,7 +50,7 @@ export default async function middleware(request: NextRequest) {
    */
   if (rotated) {
     response.cookies.set(
-      SESSION_COOKIE,
+      CUSTOMER_SESSION_COOKIE,
       rotated,
       sessionCookieOptions(SESSION_MAX_AGE_SECONDS),
     );
@@ -61,7 +61,7 @@ export default async function middleware(request: NextRequest) {
      * a clean signed-out state instead of a session that fails every request while
      * still looking active.
      */
-    response.cookies.set(SESSION_COOKIE, '', sessionCookieOptions(0));
+    response.cookies.set(CUSTOMER_SESSION_COOKIE, '', sessionCookieOptions(0));
   }
 
   return response;
@@ -99,7 +99,7 @@ function redirectOrContinue(
  * and costs one cookie parse.
  */
 async function rotateIfStale(request: NextRequest): Promise<string | null | undefined> {
-  const raw = request.cookies.get(SESSION_COOKIE)?.value;
+  const raw = request.cookies.get(CUSTOMER_SESSION_COOKIE)?.value;
   if (!raw) return undefined;
 
   const session = decodeSession(raw);
@@ -125,7 +125,7 @@ async function rotateIfStale(request: NextRequest): Promise<string | null | unde
   const encoded = encodeSession(outcome.session);
 
   // The current render reads this, not the stale value it arrived with.
-  request.cookies.set(SESSION_COOKIE, encoded);
+  request.cookies.set(CUSTOMER_SESSION_COOKIE, encoded);
 
   return encoded;
 }
@@ -157,7 +157,7 @@ function hasSession(request: NextRequest, rotated: string | null | undefined): b
   if (rotated === null) return false;
   if (typeof rotated === 'string') return true;
 
-  return decodeSession(request.cookies.get(SESSION_COOKIE)?.value) !== null;
+  return decodeSession(request.cookies.get(CUSTOMER_SESSION_COOKIE)?.value) !== null;
 }
 
 export const config = {

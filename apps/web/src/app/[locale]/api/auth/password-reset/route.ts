@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { passwordResetConfirmSchema, passwordResetRequestSchema } from '@safra/contracts';
 
-import { forwardedHeaders } from '@/lib/auth-api';
+import { forwardedHeaders } from '@safra/session';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 

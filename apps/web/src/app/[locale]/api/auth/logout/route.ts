@@ -1,8 +1,12 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
-import { callLogout } from '@/lib/auth-api';
-import { SESSION_COOKIE, decodeSession, sessionCookieOptions } from '@/lib/session';
+import {
+  CUSTOMER_SESSION_COOKIE,
+  callLogout,
+  decodeSession,
+  sessionCookieOptions,
+} from '@safra/session';
 
 /**
  * Ends the session (SRS §4).
@@ -18,7 +22,7 @@ import { SESSION_COOKIE, decodeSession, sessionCookieOptions } from '@/lib/sessi
  */
 export async function POST(): Promise<NextResponse> {
   const jar = await cookies();
-  const session = decodeSession(jar.get(SESSION_COOKIE)?.value);
+  const session = decodeSession(jar.get(CUSTOMER_SESSION_COOKIE)?.value);
 
   await callLogout(session?.refreshToken);
 
@@ -29,7 +33,7 @@ export async function POST(): Promise<NextResponse> {
    * The attributes must match the ones it was set with — path in particular — or the
    * browser keeps the original cookie and the customer stays signed in.
    */
-  response.cookies.set(SESSION_COOKIE, '', sessionCookieOptions(0));
+  response.cookies.set(CUSTOMER_SESSION_COOKIE, '', sessionCookieOptions(0));
 
   return response;
 }

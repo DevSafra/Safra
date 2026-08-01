@@ -2,7 +2,12 @@ import 'server-only';
 
 import { cookies } from 'next/headers';
 
-import { SESSION_COOKIE, decodeSession, readClaim, type Session } from './session';
+import {
+  CUSTOMER_SESSION_COOKIE,
+  decodeSession,
+  readClaim,
+  type Session,
+} from '@safra/session';
 
 /**
  * Reading the ambient session, for server components.
@@ -17,7 +22,7 @@ import { SESSION_COOKIE, decodeSession, readClaim, type Session } from './sessio
  */
 export async function getSession(): Promise<Session | null> {
   const jar = await cookies();
-  return decodeSession(jar.get(SESSION_COOKIE)?.value);
+  return decodeSession(jar.get(CUSTOMER_SESSION_COOKIE)?.value);
 }
 
 /**

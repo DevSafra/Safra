@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CUSTOMER_SESSION_COOKIE,
   REFRESH_MARGIN_MS,
+  STAFF_SESSION_COOKIE,
   decodeSession,
   encodeSession,
+  hasTwoFactor,
   needsRefresh,
   readClaim,
   sessionCookieOptions,
   sessionFrom,
   type Session,
-} from './session';
+} from './session.js';
 
 /**
  * The session cookie's encode/decode path.
@@ -144,6 +147,57 @@ describe('cookie attributes', () => {
    */
   it('follows NODE_ENV for Secure', () => {
     expect(sessionCookieOptions(1).secure).toBe(process.env.NODE_ENV === 'production');
+  });
+});
+
+describe('cookie names', () => {
+  /**
+   * Not tidiness — correctness. Cookies are scoped by domain and IGNORE the port, so
+   * a customer session on `localhost:3000` and a staff session on `localhost:3001`
+   * would be the same cookie if these matched. In development that means signing
+   * into the admin app silently replaces the customer session, or the public app
+   * starts rendering with staff claims.
+   */
+  it('differ between the customer and staff apps', () => {
+    expect(CUSTOMER_SESSION_COOKIE).not.toBe(STAFF_SESSION_COOKIE);
+  });
+});
+
+describe('hasTwoFactor', () => {
+  function tokenWith(payload: Record<string, unknown>): string {
+    const encoded = Buffer.from(JSON.stringify(payload), 'utf8')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    return `header.${encoded}.signature`;
+  }
+
+  it('is true when the claim says so', () => {
+    expect(hasTwoFactor(session({ accessToken: tokenWith({ totpEnabled: true }) }))).toBe(
+      true,
+    );
+  });
+
+  /**
+   * Absent must mean NOT enrolled. A token minted before the claim existed would
+   * otherwise wave its holder straight past the enrolment gate.
+   */
+  it('is false when the claim is absent', () => {
+    expect(hasTwoFactor(session({ accessToken: tokenWith({ sub: 'u1' }) }))).toBe(false);
+  });
+
+  it('is false for anything that is not literally true', () => {
+    for (const value of ['true', 1, 'yes', {}, null]) {
+      expect(
+        hasTwoFactor(session({ accessToken: tokenWith({ totpEnabled: value }) })),
+      ).toBe(false);
+    }
+  });
+
+  it('is false for a malformed token rather than throwing', () => {
+    expect(hasTwoFactor(session({ accessToken: 'not-a-jwt' }))).toBe(false);
   });
 });
 

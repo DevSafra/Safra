@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { readSetCookie } from './auth-api';
+import { readSetCookie } from './auth-api.js';
 
 /**
  * Reading the API's rotated refresh token out of `Set-Cookie`.

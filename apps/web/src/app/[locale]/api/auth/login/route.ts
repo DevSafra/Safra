@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server';
 
 import { loginSchema } from '@safra/contracts';
 
-import { callAuth, forwardedHeaders } from '@/lib/auth-api';
 import {
-  SESSION_COOKIE,
+  CUSTOMER_SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
+  callAuth,
   encodeSession,
+  forwardedHeaders,
   sessionCookieOptions,
-} from '@/lib/session';
+} from '@safra/session';
 
 /**
  * Signs a customer in (SRS §4).
@@ -71,7 +72,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const response = NextResponse.json({ user: outcome.session.user });
 
   response.cookies.set(
-    SESSION_COOKIE,
+    CUSTOMER_SESSION_COOKIE,
     encodeSession(outcome.session),
     sessionCookieOptions(SESSION_MAX_AGE_SECONDS),
   );
