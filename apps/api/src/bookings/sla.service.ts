@@ -7,7 +7,7 @@ import type { Database } from '@safra/db';
 import { DATABASE } from '../database/database.module.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { MONEY_SCALE, toMinor } from '../common/money.js';
-import { SettingsService } from '../settings/settings.service.js';
+import { MoneySettingsService } from '../settings/money-settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
@@ -34,7 +34,7 @@ export class SlaService {
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
-    private readonly settings: SettingsService,
+    private readonly money: MoneySettingsService,
     private readonly ledger: LedgerService,
     private readonly wallet: WalletService,
   ) {}
@@ -182,26 +182,46 @@ export class SlaService {
       partner_id: string;
       customer_profile_id: string;
       currency_id: string;
+      currency_code: string;
       fx_rate_to_syp: string;
     }>(sql`
-      SELECT id, reference, partner_id, customer_profile_id, currency_id,
-             fx_rate_to_syp::text AS fx_rate_to_syp
-      FROM bookings
-      WHERE status = 'pending_confirmation'
-        AND confirmation_deadline_at IS NOT NULL
-        AND confirmation_deadline_at < now()
-        AND deleted_at IS NULL
+      SELECT b.id, b.reference, b.partner_id, b.customer_profile_id, b.currency_id,
+             cur.code AS currency_code,
+             b.fx_rate_to_syp::text AS fx_rate_to_syp
+      FROM bookings b
+      JOIN currencies cur ON cur.id = b.currency_id
+      WHERE b.status = 'pending_confirmation'
+        AND b.confirmation_deadline_at IS NOT NULL
+        AND b.confirmation_deadline_at < now()
+        AND b.deleted_at IS NULL
       LIMIT 100
     `);
 
     if (due.rows.length === 0) return 0;
 
-    const fineAmount = await this.settings.getNumber('partner.first_violation_fine', 10);
-    const compensation = await this.settings.getNumber('wallet.sla_compensation', 10);
-
     let handled = 0;
 
     for (const booking of due.rows) {
+      /**
+       * Resolved PER BOOKING, in the booking's own currency (§2.1).
+       *
+       * Not hoisted out of the loop, and that is the fix rather than an oversight:
+       * the fine is a configured amount in a configured currency, so two bookings in
+       * different currencies need two different converted figures. Hoisting a single
+       * number was what made the same offence cost a partner $10 or $14 depending on
+       * where the property happened to be.
+       */
+      const fineAmount = await this.money.resolveOrFallback(
+        'partner.first_violation_fine',
+        '10.00',
+        booking.currency_code,
+      );
+      const compensation = await this.money.resolveOrFallback(
+        'wallet.sla_compensation',
+        '10.00',
+        booking.currency_code,
+      );
+
       try {
         await this.db.transaction(async (tx) => {
           await tx.execute(sql`
@@ -228,8 +248,8 @@ export class SlaService {
               (partner_id, booking_id, kind, occurrence_number, fine_amount,
                fine_currency_id, customer_compensation_amount, score_penalty)
             VALUES (${booking.partner_id}, ${booking.id}, 'no_response', ${occurrence},
-                    ${fineAmount.toFixed(2)}, ${booking.currency_id},
-                    ${compensation.toFixed(2)}, 5)
+                    ${fineAmount}, ${booking.currency_id},
+                    ${compensation}, 5)
           `);
 
           /**
@@ -246,7 +266,7 @@ export class SlaService {
            */
           const movement = await this.wallet.credit(tx as unknown as Database, {
             customerProfileId: booking.customer_profile_id,
-            amount: compensation.toFixed(2),
+            amount: compensation,
             currencyId: booking.currency_id,
             reason: 'sla_compensation',
             bookingId: booking.id,
@@ -280,7 +300,7 @@ export class SlaService {
             customerProfileId: booking.customer_profile_id,
             currencyId: booking.currency_id,
             fxRateToSyp: booking.fx_rate_to_syp,
-            amount: compensation.toFixed(2),
+            amount: compensation,
             reference: booking.reference,
           });
 

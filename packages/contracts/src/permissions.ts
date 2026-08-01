@@ -222,11 +222,48 @@ export function isStaffRole(role: Role): boolean {
 }
 
 /**
+ * Grants a role can be given at RUNTIME, without a deploy.
+ *
+ * Deliberately a tiny, closed list rather than a general "edit any role" facility.
+ * The value of `permissions.ts` is that "what can this role do?" is answered by
+ * reading one file; a settings table that could grant anything to anyone would
+ * destroy exactly that, and quietly.
+ *
+ * Everything here is therefore off by default, flippable only by `super_admin`
+ * (SETTINGS_UPDATE belongs to no other role), and audited like any other setting.
+ */
+export const TOGGLEABLE_GRANTS = {
+  /**
+   * Lets finance officers see and set the FX rate their books are denominated in
+   * (roadmap 150f). Off by default: rate changes move every SYP figure on the
+   * platform, so widening who can make them is a decision, not a default.
+   */
+  'rbac.finance_can_manage_fx': {
+    role: 'finance_officer',
+    permission: PERMISSIONS.FX_RATE_MANAGE,
+  },
+} as const satisfies Record<string, { role: string; permission: Permission }>;
+
+export type ToggleableGrantKey = keyof typeof TOGGLEABLE_GRANTS;
+
+export const TOGGLEABLE_GRANT_KEYS = Object.keys(
+  TOGGLEABLE_GRANTS,
+) as ToggleableGrantKey[];
+
+/**
  * Resolves a role plus any per-user overrides into a flat permission set.
  * Overrides only ADD; a role's absence of a permission can never be widened by
  * accident, and there is no mechanism to subtract, so a role's list is a floor.
+ *
+ * `enabledGrants` carries the runtime toggles above. They also only ADD, and only
+ * the pairs declared in `TOGGLEABLE_GRANTS` — an unrecognised key grants nothing, so
+ * a stale settings row cannot widen a role by accident.
  */
-export function resolvePermissions(role: Role, overrides: string[] = []): Permission[] {
+export function resolvePermissions(
+  role: Role,
+  overrides: string[] = [],
+  enabledGrants: string[] = [],
+): Permission[] {
   const granted = new Set<Permission>(ROLE_PERMISSIONS[role]);
   const valid = new Set<string>(Object.values(P));
 
@@ -235,6 +272,14 @@ export function resolvePermissions(role: Role, overrides: string[] = []): Permis
     // override must never become an implicit grant.
     if (valid.has(override)) {
       granted.add(override as Permission);
+    }
+  }
+
+  for (const key of enabledGrants) {
+    const grant = TOGGLEABLE_GRANTS[key as ToggleableGrantKey];
+
+    if (grant && grant.role === role) {
+      granted.add(grant.permission);
     }
   }
 

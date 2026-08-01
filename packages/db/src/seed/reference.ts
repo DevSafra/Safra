@@ -645,6 +645,32 @@ export const SETTINGS: {
     descriptionAr: 'تعويض محفظة العميل عند خيبة الأمل (P-007)',
     descriptionEn: 'Customer wallet compensation on partner failure (P-007)',
   },
+  /**
+   * Whether every money setting is dollars regardless of its own currency.
+   *
+   * On by default, which is what makes §6.4 fair: with it off, a fine of "10"
+   * applied in the booking's currency costs a partner ~$14 on a JOD booking and $10
+   * on a USD one for identical conduct. Turning it off is the escape hatch for a
+   * market that genuinely needs local amounts, not the default.
+   */
+  {
+    key: 'money.always_usd',
+    value: true,
+    valueSchema: 'boolean',
+    descriptionAr: 'اعتبار كل القيم المالية بالدولار الأمريكي',
+    descriptionEn: 'Treat every money setting as USD, whatever currency it names',
+  },
+  /**
+   * Off by default. Rate changes move every SYP figure on the platform, so widening
+   * who may make them is a decision rather than a default (roadmap 150f).
+   */
+  {
+    key: 'rbac.finance_can_manage_fx',
+    value: false,
+    valueSchema: 'boolean',
+    descriptionAr: 'السماح لمسؤول المالية بإدارة أسعار الصرف',
+    descriptionEn: 'Grant fx_rate.manage to finance_officer while enabled',
+  },
   {
     key: 'refund.minimum_percent',
     value: 50,

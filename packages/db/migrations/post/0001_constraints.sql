@@ -264,3 +264,42 @@ CREATE INDEX IF NOT EXISTS properties_published_idx
 -- Expired idempotency keys and refresh tokens are swept by a scheduled job.
 CREATE INDEX IF NOT EXISTS refresh_tokens_expiry_idx ON refresh_tokens (expires_at)
   WHERE revoked_at IS NULL;
+
+-- ----------------------------------------------------------------------------
+-- 6. One settings row per key and scope (P-005)
+-- ----------------------------------------------------------------------------
+--
+-- Resolution reads a single row per key, so two rows for the same key and scope
+-- make every read of that setting a coin toss — and the settings in question are
+-- commissions, fines and the confirmation window. That is a silent wrong answer,
+-- which is the worst shape a configuration bug can take.
+--
+-- NULLS NOT DISTINCT is what makes this work at all: `scope_id` is NULL for every
+-- global setting, and PostgreSQL's default treats each NULL as unique, so a plain
+-- unique index would permit exactly the duplicates being prevented here.
+DO $$
+DECLARE
+  duplicates text;
+BEGIN
+  SELECT string_agg(DISTINCT key, ', ')
+    INTO duplicates
+  FROM (
+    SELECT key FROM settings
+    WHERE deleted_at IS NULL
+    GROUP BY key, scope, scope_id
+    HAVING COUNT(*) > 1
+  ) d;
+
+  IF duplicates IS NOT NULL THEN
+    RAISE EXCEPTION
+      'Cannot enforce one settings row per key and scope: duplicates exist for %. '
+      'Remove the extra rows before migrating; which value is authoritative is not '
+      'something a migration may decide.',
+      duplicates
+      USING ERRCODE = 'unique_violation';
+  END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS settings_key_scope_unique
+  ON settings (key, scope, scope_id) NULLS NOT DISTINCT
+  WHERE deleted_at IS NULL;

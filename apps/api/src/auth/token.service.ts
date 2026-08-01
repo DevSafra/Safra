@@ -7,11 +7,12 @@ import { v7 as uuidv7 } from 'uuid';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
-import { resolvePermissions } from '@safra/contracts';
+import { TOGGLEABLE_GRANT_KEYS, resolvePermissions } from '@safra/contracts';
 import type { Permission, Role } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 export interface AccessTokenClaims {
   sub: string;
@@ -64,6 +65,7 @@ export class TokenService {
   constructor(
     @Inject(ENV) private readonly env: Env,
     @Inject(DATABASE) private readonly db: Database,
+    private readonly settings: SettingsService,
   ) {
     this.accessSecret = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
     this.refreshPepper = env.JWT_REFRESH_SECRET;
@@ -155,10 +157,44 @@ export class TokenService {
     const claims: AccessTokenClaims = {
       sub: user.id,
       role: user.role,
-      permissions: resolvePermissions(user.role, user.permissionOverrides ?? []),
+      permissions: resolvePermissions(
+        user.role,
+        user.permissionOverrides ?? [],
+        await this.enabledGrants(),
+      ),
       locale: user.preferredLocale,
     };
 
+    return this.attachOwningIds(claims, user);
+  }
+
+  /**
+   * Which runtime permission toggles are currently on.
+   *
+   * Read here, at token-mint time, rather than in the guard on every request: ADR
+   * 0003 already accepts up to fifteen minutes of permission staleness in exchange
+   * for keeping authorization off the hot path, and a settings read per request
+   * would trade that away for a toggle almost nobody flips.
+   *
+   * The staleness is only tolerable in the granting direction. `SettingsService`
+   * exposes the flip so the caller can revoke the affected role's sessions when a
+   * grant is turned OFF — see `AdminGrantsService`; taking authority away must be
+   * immediate even though giving it need not be.
+   */
+  private async enabledGrants(): Promise<string[]> {
+    const enabled: string[] = [];
+
+    for (const key of TOGGLEABLE_GRANT_KEYS) {
+      if (await this.settings.get<boolean>(key, false)) enabled.push(key);
+    }
+
+    return enabled;
+  }
+
+  private async attachOwningIds(
+    claims: AccessTokenClaims,
+    user: typeof schema.users.$inferSelect,
+  ): Promise<AccessTokenClaims> {
     if (user.role === 'customer') {
       const profile = await this.db.query.customerProfiles.findFirst({
         where: and(

@@ -18,6 +18,7 @@ import { ManualTransferProvider } from './providers/manual-transfer.provider.js'
 // Only the signer is imported: the registry constructs the simulator itself when
 // PAYMENT_SIMULATOR_ENABLED is set, which is exactly the behaviour under test.
 import { signSimulatorPayload } from './providers/simulator.provider.js';
+import { MoneySettingsService } from '../settings/money-settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { AuditService } from '../common/audit/audit.service.js';
@@ -118,7 +119,16 @@ describeIfDb('payment collection, webhooks and refunds', () => {
     wallet = new WalletService(db, fx);
 
     actions = new BookingActionsService(db, settings, audit, ledger, wallet);
-    sla = new SlaService(db, settings, ledger, wallet);
+
+    /**
+     * A REAL MoneySettingsService over the stubbed settings and the throwing FX.
+     *
+     * Every booking here is USD, and `money.always_usd` defaults to true, so the
+     * fine and the compensation resolve to USD with no conversion — which is exactly
+     * the path worth exercising. If a conversion ever crept in, the FX stub above
+     * would throw and `resolveOrFallback` would log it rather than hide it.
+     */
+    sla = new SlaService(db, new MoneySettingsService(settings, fx), ledger, wallet);
     webhooks = new PaymentWebhookService(db, registry, actions, access);
     refunds = new RefundService(db, registry, ledger, audit, wallet);
     intents = new PaymentIntentService(

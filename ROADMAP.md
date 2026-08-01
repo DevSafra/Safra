@@ -5,7 +5,7 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **304 tests
+Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **314 tests
 passing** against a real PostgreSQL, production dependencies clean.
 
 **Scale of what remains:** the API foundation, catalogue, search, the public booking
@@ -482,9 +482,16 @@ shipped._
        the audit row records the old and new rate, written inside the insert transaction
        because the route interceptor resolves its subject from a route param and captured
        neither
-     - ❌ **150f** Grant `FX_RATE_MANAGE` to `finance_officer` — a policy call, not an
-       engineering one. Today only `super_admin` holds it, so finance cannot see or set
-       the rate their books depend on
+     - ✅ **150f** `FX_RATE_MANAGE` stays `super_admin` by default, with a **runtime toggle**
+       that grants it to `finance_officer` (Bashar, 2026-08-01). `PUT /admin/grants`,
+       gated on `SETTINGS_UPDATE` — which only `super_admin` holds, so widening a role
+       is not something a role can do to itself. The toggleable pairs are a closed list
+       in `@safra/contracts`, never free-form: a settings table that could grant anything
+       to anyone would destroy the property that makes the model reviewable — that "what
+       can this role do?" is one file — and destroy it quietly. Granting is lazy (up to
+       15 minutes, per ADR 0003's token staleness); **revoking is immediate**, because an
+       admin withdrawing an ability does not mean "in a quarter of an hour", so every
+       session for the role is revoked on the way down
 
 ---
 
@@ -567,15 +574,16 @@ These block engineering work and are not ours to make.
      the exposure is now the critical path (item 135).**
 190. ✅ Customer fee model — **flat $1.99**, confirmed by the approved settings screen
      ("رسوم ثابتة تضاف على كل حجز"). Partner side is 7%.
-191. ❌ **Which currency the Rules Engine money settings are denominated in.** Surfaced by
-     item 141 and not answerable from the code. `wallet.sla_compensation` and
-     `partner.first_violation_fine` are bare numbers (10), and the approved screen shows
-     them with a `$`. Today the sweep treats them as the BOOKING's currency, so a partner
-     who misses the window on a 10 JOD booking is fined "10" JOD (~$14) while one who
-     misses a USD booking is fined $10 — the same offence, different penalties. Treating
-     them as USD instead is a one-line change to the sweep, but it changes what partners
-     owe and what customers receive, so it is Bashar's call and not an engineering
-     default. The wallet's own conversion is already correct either way
+191. ✅ **Currency of the Rules Engine money settings** — decided by Bashar 2026-08-01:
+     each money setting carries its own currency, PLUS a global `money.always_usd`
+     toggle that overrides them all. The toggle is ON by default, which is what makes
+     §6.4 fair — with it off, "10" applied in the booking's currency costs a partner
+     ~$14 on a JOD booking and $10 on a USD one for identical conduct. A setting's value
+     may be a bare number (read as USD) or `{"amount","currency"}`; both shapes are
+     understood, because `settings` is seeded and never truncated and a parser that only
+     knew the new shape would silently fall back to defaults on exactly the installations
+     that have configured values. Conversion goes through SYP with exact decimal
+     arithmetic, and the SLA sweep resolves PER BOOKING rather than once per sweep
 192. ❌ WhatsApp BSP selection
 193. ❌ Hosting provider and region
 194. ❌ Partner payout mechanism per country
@@ -595,5 +603,7 @@ These block engineering work and are not ours to make.
 2. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
    established, so the second and third stored-value instruments are far cheaper now
    than they would have been before it.
-3. **Grant `FX_RATE_MANAGE` to `finance_officer` — item 150f.** One line, blocked only on
-   a policy nod: finance currently cannot see or set the rate their books depend on.
+3. **A settings editor in the admin app — item 161.** `money.always_usd`, the per-setting
+   currencies and `rbac.finance_can_manage_fx` are all live in the API and all only
+   reachable by hand. P-005 promised configuration, not configuration a developer has to
+   apply.
