@@ -20,6 +20,8 @@ import { SearchModule } from './search/search.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { WalletModule } from './wallet/wallet.module.js';
+import { RedisModule } from './redis/redis.module.js';
+import { RedisThrottlerStorage } from './redis/redis-throttler.storage.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
 import { PermissionsGuard } from './rbac/permissions.guard.js';
 import { StaffTwoFactorGuard } from './rbac/staff-two-factor.guard.js';
@@ -27,6 +29,7 @@ import { StaffTwoFactorGuard } from './rbac/staff-two-factor.guard.js';
 @Module({
   imports: [
     DatabaseModule,
+    RedisModule,
     // Cron support for the nightly ranking recompute. The job itself takes a
     // Postgres advisory lock so only one replica runs it — see RankingScheduler.
     ScheduleModule.forRoot(),
@@ -34,8 +37,19 @@ import { StaffTwoFactorGuard } from './rbac/staff-two-factor.guard.js';
      * Global default rate limit. Individual routes tighten this with @Throttle —
      * auth endpoints are far stricter. A global floor means a newly added endpoint
      * is protected before anyone remembers to think about it.
+     *
+     * Counters live in Redis, not in the process — see RedisThrottlerStorage. With the
+     * default in-memory store the effective limit was N × 120 across N replicas and
+     * every counter reset on deploy.
      */
-    ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 120 }]),
+    ThrottlerModule.forRootAsync({
+      imports: [RedisModule],
+      inject: [RedisThrottlerStorage],
+      useFactory: (storage: RedisThrottlerStorage) => ({
+        throttlers: [{ name: 'default', ttl: 60_000, limit: 120 }],
+        storage,
+      }),
+    }),
     SettingsModule,
     StorageModule,
     LedgerModule,
