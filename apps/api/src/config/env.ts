@@ -175,6 +175,22 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
     );
   }
 
+  /**
+   * StorageModule falls back to local disk when S3 is unconfigured, which is correct
+   * for a developer and silently destructive in production: partner identity
+   * documents would be written to one replica's ephemeral filesystem, 404 from every
+   * other replica behind the load balancer, and vanish on the next deploy. Losing
+   * uploaded ID documents is both a compliance failure and unrecoverable, so this
+   * refuses to boot rather than warn.
+   */
+  if (env.NODE_ENV === 'production' && !(env.S3_ACCESS_KEY_ID && env.S3_BUCKET)) {
+    throw new Error(
+      'S3_ACCESS_KEY_ID and S3_BUCKET are required in production. Without them ' +
+        'uploads fall back to local disk, where partner identity documents are ' +
+        'invisible to other replicas and lost on redeploy.',
+    );
+  }
+
   return env;
 }
 
