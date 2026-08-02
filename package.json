@@ -21,7 +21,8 @@
     "audit:deps": "pnpm audit --audit-level=moderate",
     "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run audit:deps",
     "lint:fix": "turbo run build --filter='./packages/*' && eslint . --fix",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "bootstrap:admin": "pnpm --filter @safra/api bootstrap:admin"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

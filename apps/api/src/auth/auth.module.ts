@@ -30,7 +30,18 @@ import { TwoFactorService } from './two-factor.service.js';
     AuditService,
   ],
   // TokenService is exported because JwtAuthGuard is registered globally and
-  // resolves it from the root injector.
-  exports: [TokenService, AuditService, PasswordService, FieldEncryptionService],
+  // resolves it from the root injector. AuthTokenService and MailService are
+  // exported for StaffService (M-5), which issues invitation tokens and emails
+  // them — importing them rather than re-providing keeps ONE nodemailer transport
+  // and one token-issuing path, so a change to either cannot apply in one place
+  // and not the other.
+  exports: [
+    TokenService,
+    AuditService,
+    PasswordService,
+    FieldEncryptionService,
+    AuthTokenService,
+    MailService,
+  ],
 })
 export class AuthModule {}

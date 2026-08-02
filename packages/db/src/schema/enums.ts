@@ -196,6 +196,13 @@ export const walletTxnReason = pgEnum('wallet_txn_reason', [
 export const authTokenPurpose = pgEnum('auth_token_purpose', [
   'password_reset',
   'email_verification',
+  /**
+   * A staff invitation. Separate from `password_reset` on purpose: an invitation is
+   * the only token that turns an account with no password into a usable one, so it
+   * must not be redeemable through the reset endpoint — and a reset token must not be
+   * usable to activate an invitation that was never accepted.
+   */
+  'staff_invitation',
 ]);
 
 export const giftCardStatus = pgEnum('gift_card_status', [

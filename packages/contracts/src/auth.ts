@@ -144,3 +144,47 @@ export const loginResponseSchema = z.object({
   user: authUserSchema,
 });
 export type LoginResponse = z.infer<typeof loginResponseSchema>;
+
+/**
+ * Staff management (M-5).
+ *
+ * `role` is validated against the closed set of staff roles rather than accepted as a
+ * string: an unvalidated role would be written straight into a `user_role` column and
+ * a typo would produce an account whose permissions resolve to nothing — visible in
+ * the console, unable to do anything, and confusing to diagnose.
+ */
+export const STAFF_ROLE_VALUES = [
+  'support_agent',
+  'finance_officer',
+  'operations_manager',
+  'super_admin',
+] as const;
+
+export const staffInviteSchema = z
+  .object({
+    email: z.string().email().max(320),
+    role: z.enum(STAFF_ROLE_VALUES),
+    locale: z.enum(['ar', 'en', 'de']).optional(),
+  })
+  .strict();
+export type StaffInviteInput = z.infer<typeof staffInviteSchema>;
+
+export const staffRoleChangeSchema = z
+  .object({ role: z.enum(STAFF_ROLE_VALUES) })
+  .strict();
+export type StaffRoleChangeInput = z.infer<typeof staffRoleChangeSchema>;
+
+export const staffStatusSchema = z
+  .object({ status: z.enum(['active', 'suspended']) })
+  .strict();
+export type StaffStatusInput = z.infer<typeof staffStatusSchema>;
+
+/**
+ * Accepting an invitation. Reuses `passwordSchema`, so the floor that applies at
+ * registration applies to the accounts with the most access too — the one place a
+ * looser rule would be least defensible.
+ */
+export const staffInvitationAcceptSchema = z
+  .object({ token: authTokenSchema, password: passwordSchema })
+  .strict();
+export type StaffInvitationAcceptInput = z.infer<typeof staffInvitationAcceptSchema>;

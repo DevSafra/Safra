@@ -109,3 +109,60 @@ export function emailVerificationMail(input: {
 
   return { to: input.to, subject: copy.subject, text: copy.body };
 }
+
+/**
+ * A staff invitation.
+ *
+ * Deliberately says what the account is FOR and who to contact if it is unexpected.
+ * An unexplained "set your password" email to a work address is indistinguishable
+ * from a phishing attempt, and the people receiving this one have privileged access —
+ * they are exactly the population worth training not to click unexplained links.
+ */
+export function staffInvitationMail(input: {
+  to: string;
+  url: string;
+  roleLabel: string;
+  locale: string;
+  expiresInHours: number;
+}): OutgoingMail {
+  const { url, roleLabel, expiresInHours } = input;
+
+  const copy = {
+    ar: {
+      subject: 'دعوة للانضمام إلى فريق سفرة',
+      body:
+        `تمت دعوتك للانضمام إلى لوحة تحكم سفرة بصفة: ${roleLabel}.\n\n` +
+        `افتح الرابط التالي لتعيين كلمة المرور الخاصة بك:\n${url}\n\n` +
+        `تنتهي صلاحية الرابط خلال ${expiresInHours} ساعة ويمكن استخدامه مرة واحدة فقط.\n\n` +
+        `بعد تعيين كلمة المرور سيُطلب منك تفعيل المصادقة الثنائية قبل استخدام الحساب.\n\n` +
+        `إذا لم تكن تتوقع هذه الدعوة، لا تفتح الرابط وأبلغ فريق سفرة.\n\n` +
+        `فريق سفرة`,
+    },
+    en: {
+      subject: 'You have been invited to the SAFRA admin console',
+      body:
+        `You have been invited to the SAFRA admin console as: ${roleLabel}.\n\n` +
+        `Open this link to set your password:\n${url}\n\n` +
+        `The link expires in ${expiresInHours} hours and can be used once.\n\n` +
+        `After setting a password you will be required to enable two-factor ` +
+        `authentication before the account can be used.\n\n` +
+        `If you were not expecting this invitation, do not open the link and tell ` +
+        `the SAFRA team.\n\n` +
+        `The SAFRA team`,
+    },
+    de: {
+      subject: 'Einladung zur SAFRA-Administrationskonsole',
+      body:
+        `Sie wurden zur SAFRA-Administrationskonsole eingeladen als: ${roleLabel}.\n\n` +
+        `Öffnen Sie diesen Link, um Ihr Passwort festzulegen:\n${url}\n\n` +
+        `Der Link läuft in ${expiresInHours} Stunden ab und ist einmal verwendbar.\n\n` +
+        `Nach dem Festlegen des Passworts müssen Sie die Zwei-Faktor-Authentifizierung ` +
+        `aktivieren, bevor das Konto genutzt werden kann.\n\n` +
+        `Falls Sie diese Einladung nicht erwartet haben, öffnen Sie den Link nicht und ` +
+        `informieren Sie das SAFRA-Team.\n\n` +
+        `Ihr SAFRA-Team`,
+    },
+  }[pick(input.locale)];
+
+  return { to: input.to, subject: copy.subject, text: copy.body };
+}

@@ -9,7 +9,8 @@
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "clean": "rm -rf dist *.tsbuildinfo"
+    "clean": "rm -rf dist *.tsbuildinfo",
+    "bootstrap:admin": "tsx src/scripts/bootstrap-super-admin.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1098.0",
@@ -41,6 +42,7 @@
     "@types/cookie-parser": "^1.4.8",
     "@types/express": "^5.0.0",
     "@types/multer": "^2.2.0",
-    "@types/nodemailer": "^8.0.1"
+    "@types/nodemailer": "^8.0.1",
+    "tsx": "^4.23.1"
   }
 }

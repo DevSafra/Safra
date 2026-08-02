@@ -7,7 +7,15 @@ import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
 
-export type AuthTokenPurpose = 'password_reset' | 'email_verification';
+export type AuthTokenPurpose =
+  | 'password_reset'
+  | 'email_verification'
+  /**
+   * A staff invitation (M-5). Distinct from `password_reset` because it is the only
+   * token that turns an account with no password into a usable one — the two must not
+   * be interchangeable, and `redeem` filters on purpose so they cannot be.
+   */
+  | 'staff_invitation';
 
 export interface IssuedAuthToken {
   /** The clear token. Returned ONCE, goes into an email, never stored. */
