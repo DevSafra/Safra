@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { text } from '@/lib/form';
+
 /**
  * Staff sign-in (SRS §4, §9).
  *
@@ -102,11 +104,6 @@ export function StaffLoginForm({ next }: { next: string }) {
       </button>
     </form>
   );
-}
-
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === 'string' ? value : '';
 }
 
 function requiresEnrolment(body: unknown): boolean {

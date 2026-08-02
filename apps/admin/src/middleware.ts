@@ -13,8 +13,15 @@ import {
 } from '@safra/session';
 import { isStaffRole } from '@safra/contracts';
 
-/** The only paths reachable without a complete, enrolled staff session. */
-const PUBLIC_PATHS = ['/login'];
+/**
+ * The only paths reachable without a complete, enrolled staff session.
+ *
+ * `/invitation` is here because an invited staff member has no session yet and cannot
+ * get one — their account has no password until they use this page. The invitation
+ * token is the authentication, and the API validates it; this app only renders the
+ * form. Without this entry the emailed link redirects to a sign-in they cannot pass.
+ */
+const PUBLIC_PATHS = ['/login', '/invitation'];
 
 /** Reachable with a session that has not yet enrolled in 2FA — and nothing else. */
 const ENROLMENT_PATHS = ['/enrol-2fa'];
