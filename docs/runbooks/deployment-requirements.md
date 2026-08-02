@@ -66,6 +66,11 @@ because the fallback is local disk — invisible to other replicas and lost on r
 
 - **Secret manager.** ~10 secrets (see `.env.example`). One of them,
   `SANCTIONS_FEED_URL`, carries a credential in its query string.
+- **Do NOT rotate `FIELD_ENCRYPTION_KEY`.** Staff TOTP secrets are encrypted with it and
+  nothing re-encrypts them, so rotating it locks every staff account out of the console
+  at once. Recovery means single-use recovery codes, which is circular if the super
+  admin is also locked out. Two-key support is future-work item **S-6**; until it ships,
+  attach this warning to the secret itself.
 - **TLS termination** with HSTS, and `X-Forwarded-For` set correctly. The app sets
   `trust proxy = 1` — exactly one proxy. **More than one hop requires changing that
   number**, or a client can forge its IP and walk through the rate limiter.
