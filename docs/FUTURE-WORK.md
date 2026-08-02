@@ -505,6 +505,18 @@ justified in `AUDIT-EXCEPTIONS.md`, and gated separately in CI.
 | S-5 | No legal review                           | Medium           | **Legal**                       |
 | S-3 | Never load-tested                         | Medium           | Hosting                         |
 
+### Honest statement of position
+
+- **No known vulnerability class is currently shipped**, on the basis of this
+  engineering self-review.
+- **Every fixable issue found within the current scope has been fixed** and verified
+  against a running system.
+- **The remaining high-impact risks are external or operational**, not code: backups
+  and restore, sanctions registration, legal and compliance review, malware scanning,
+  production alerting, load testing, and independent penetration testing.
+- **This is not a claim that the platform cannot be compromised.** That is not a
+  provable property of any system, and nothing here should be quoted as if it were.
+
 ### Accepted risks
 
 - **Rate limiting fails open when Redis is down.** Failing closed turns a cache outage
