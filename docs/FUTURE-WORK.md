@@ -6,7 +6,7 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for the next
 > action, then §4–§9 for the item you are picking up.
 
-**Last updated:** 2026-08-02 (all three apps containerised; web CSP added; encryption-key failure mode fixed)
+**Last updated:** 2026-08-02 (S-6 key rotation delivered; all three apps containerised; web CSP added)
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
 **Last pushed:** `422dc33` — later commits are local until pushed
 
@@ -38,7 +38,7 @@ approve or reject a listing, look up any booking with its full money breakdown a
 append-only timeline, read the audit log, and change every operational setting with the
 change attributed and recorded.
 
-**509 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
+**517 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
 clean, and the suite passes against a freshly migrated and seeded database.
 
 **What remains is not product.** It is infrastructure, operations and compliance. That
@@ -266,29 +266,10 @@ request arrives rather than under a one-month statutory deadline.
 **To unblock:** a stated retention period, a decision on what erasure means given the
 above, and then a deletion/pseudonymisation mechanism.
 
-### S-6 — `FIELD_ENCRYPTION_KEY` cannot be rotated without locking out all staff
+### S-6 — `FIELD_ENCRYPTION_KEY` rotation
 
-**Status:** open · **Owner:** Backend + Platform engineering · **Impact:** high if
-triggered, low likelihood · **Dependency:** none — this is buildable now
-
-**Rationale.** Staff TOTP secrets are encrypted at rest with `FIELD_ENCRYPTION_KEY`.
-Nothing re-encrypts them, so rotating that key — the ordinary response to a suspected
-key compromise, and a routine annual control in many organisations — makes every
-stored secret undecryptable and **locks every staff account out of the console
-simultaneously**. Recovery would mean each person using a single-use recovery code, if
-they still have one, or a super admin resetting them, which is circular if the super
-admin is also locked out.
-
-**Discovered 2026-08-02** by running the API in a container with a mismatched key. The
-symptom was a bare `500 Internal server error`, identical for every account, naming
-nothing. That part is fixed — it is now a `503` with a server log that names
-`FIELD_ENCRYPTION_KEY` explicitly — but the underlying inability to rotate remains.
-
-**Recommended next action:** support two keys at once. Read with the current key,
-fall back to a previous one, and re-encrypt on successful decryption. Rotation then
-becomes: add the new key, let logins migrate secrets, remove the old key. Roughly a
-day. Until it exists, **do not rotate `FIELD_ENCRYPTION_KEY`** — write that on the
-secret itself.
+**Status:** ✅ **Delivered 2026-08-02.** See §10 and
+[`runbooks/encryption-key-rotation.md`](runbooks/encryption-key-rotation.md).
 
 ### S-7 — Migrations are forward-only, with no tested rollback
 
