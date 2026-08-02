@@ -6,9 +6,9 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for the next
 > action, then §4–§9 for the item you are picking up.
 
-**Last updated:** 2026-08-02
+**Last updated:** 2026-08-02 (M-4 and M-6 delivered)
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
-**Last pushed:** `422dc33`
+**Last pushed:** `422dc33` — later commits are local until pushed
 
 ---
 
@@ -38,7 +38,7 @@ approve or reject a listing, look up any booking with its full money breakdown a
 append-only timeline, read the audit log, and change every operational setting with the
 change attributed and recorded.
 
-**460 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
+**477 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
 clean, and the suite passes against a freshly migrated and seeded database.
 
 **What remains is not product.** It is infrastructure, operations and compliance. That
@@ -70,19 +70,19 @@ Bashar, not an implementation detail.
 Agreed with Bashar on 2026-08-02. **Do not expand product scope until all six
 must-haves have a plan.**
 
-1. **M-1** Deployment target / infrastructure
-2. **M-2** Sanctions feed activation
-3. **M-3** Backups and restore validation
-4. **M-4** Redis-backed rate limiting
-5. **M-5** Staff provisioning workflow
-6. **M-6** Health endpoint
+1. **M-1** Deployment target / infrastructure — blocked on the hosting decision
+2. **M-2** Sanctions feed activation — blocked on an external party
+3. **M-3** Backups and restore validation — blocked on M-1
+4. ~~**M-4** Redis-backed rate limiting~~ — **done 2026-08-02**, see §10
+5. **M-5** Staff provisioning workflow — **ready to build, next up**
+6. ~~**M-6** Health endpoint~~ — **done 2026-08-02**, see §10
 
 **Start M-2 immediately regardless of its position.** It is the only item whose timeline
 SAFRA does not control, and it fails a week after anyone stops paying attention.
 
-**M-4, M-5 and M-6 are not blocked by anything.** They can be built today, in parallel
-with the external dependencies in M-1, M-2 and M-3. Sequence position reflects
-importance, not readiness.
+**M-4 and M-6 are delivered.** M-5 is the only remaining must-have that is not blocked
+by an external party or a decision, so it is the next thing to build. M-1, M-2 and M-3
+cannot start until someone outside engineering acts.
 
 ### Highest-risk item
 
@@ -166,19 +166,7 @@ nobody has restored is not a backup.
 
 ### M-4 — Rate limiting is per-process
 
-**Status:** **ready to build, nothing blocking** · **Owner:** Backend
-
-`ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }])` uses the default in-memory
-store. With N replicas the effective limit is N × 120, and every counter resets on
-deploy. This weakens precisely the limits that matter — login, password reset, OTP.
-
-It also contradicts the project's own rule that application servers are stateless and
-shared state lives in Redis (`.claude/CLAUDE.md` §2).
-
-**To unblock:** nothing. `REDIS_URL` is already a required environment variable and
-already provisioned. The throttler is simply not wired to it.
-
-**Estimate:** about a day including tests.
+**Status:** ✅ **Delivered 2026-08-02.** See §10.
 
 ### M-5 — Staff accounts can only be created with direct SQL
 
@@ -200,14 +188,7 @@ enrolment before it can do anything. `StaffTwoFactorGuard` already enforces this
 
 ### M-6 — No health endpoint
 
-**Status:** **ready to build, nothing blocking** · **Owner:** Backend
-
-`GET /health` returns 404, so no load balancer can distinguish a wedged replica from a
-healthy one.
-
-**To unblock:** nothing. Needs liveness and readiness endpoints — readiness should check
-the database and Redis, liveness should not (a liveness probe that fails on a database
-blip restarts healthy replicas during an incident and makes it worse).
+**Status:** ✅ **Delivered 2026-08-02.** See §10.
 
 ---
 
@@ -227,6 +208,10 @@ currently unmeasurable.
 2. The SLA sweep silently not running — partners escape fines and customers lose
    compensation, with nothing to indicate it.
 3. Refresh-token replay detection firing — currently a log line; it is a security event.
+4. **Redis unreachable.** Rate limiting fails open by design, so a Redis outage silently
+   removes rate limiting from every endpoint. `RedisThrottlerStorage` logs at `error`
+   with "Rate limiting is DEGRADED"; nothing alerts on it yet. Readiness reports
+   `redis: "degraded"` and is the cheapest thing to poll.
 
 **Also alert on `sanctions ageDays > 3`,** not 7. By 7 onboarding has already stopped;
 3 leaves two missed nightly runs of margin.
@@ -316,6 +301,15 @@ Things that are not blockers but will cost someone a day if forgotten.
 - **The settings uniqueness migration raises on pre-existing duplicates** rather than
   choosing a winner. Correct, but it means the migration refuses rather than proceeds if
   any environment has duplicate settings rows.
+- **The `REDIS` injection token lives in `redis/redis.tokens.ts`, not the module.**
+  `RedisModule` provides `RedisThrottlerStorage`, which injects `REDIS`; with the token
+  in the module those two files import each other and under ESM the decorator runs
+  before the cycle resolves — the process dies at boot with "Cannot access 'REDIS'
+  before initialization". A unit test that constructs the storage directly never touches
+  the module, which is exactly how it was missed. Do not move the token back.
+- **Rate limiting fails OPEN when Redis is unreachable.** Deliberate — failing closed
+  would turn a cache outage into a total outage. The exposure is bounded but real, and
+  it is why S-1 lists alerting on Redis errors as required before production.
 - **Sanctions screening is advisory, not deciding.** The platform scores name similarity
   (0.35 to surface, 0.75 flagged strong) and records the reviewer's conclusion. The human
   remains accountable for the determination.
