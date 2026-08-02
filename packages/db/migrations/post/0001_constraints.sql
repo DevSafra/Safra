@@ -191,12 +191,37 @@ END $$;
 -- mutable would let a bug — or an attacker with a SQL foothold — rewrite a forged
 -- payload as a verified one after the fact, destroying the only record of the
 -- forgery. So the trigger allows exactly the two processing columns to move and
--- rejects everything else, including any DELETE.
+-- rejects everything else.
+--
+-- DELETE is refused for EVIDENCE, and permitted for expired noise.
+--
+-- The original rule refused every DELETE, which read as the safer choice and was not.
+-- The webhook endpoint is necessarily public and answers 200 even for an invalid
+-- signature, so anyone can write rows to this table; refusing all deletion made that
+-- growth permanent and unbounded — measured at 1,208 rows from routine probing on
+-- 2026-08-02, with nothing able to reclaim them. An immutability guarantee that also
+-- protects an attacker's junk is protecting the wrong thing.
+--
+-- So the exemption is drawn as narrowly as the risk allows. A row may be deleted ONLY
+-- when all three hold:
+--   * its signature never verified — it is not evidence of anything a provider said;
+--   * it was never processed — nothing in the system acted on it, so no ledger entry,
+--     payment or booking depends on it;
+--   * it is older than 30 days — long enough to investigate an incident found late.
+-- Anything verified, anything processed, and anything recent stays undeletable, which
+-- is the property that actually mattered.
 CREATE OR REPLACE FUNCTION deny_payment_event_rewrite() RETURNS trigger AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
+    IF OLD.signature_verified = false
+       AND OLD.processed_at IS NULL
+       AND OLD.created_at < now() - interval '30 days' THEN
+      RETURN OLD;
+    END IF;
+
     RAISE EXCEPTION
-      'payment_provider_events is append-only; DELETE is not permitted.'
+      'payment_provider_events: only unverified, unprocessed payloads older than 30 '
+      'days may be deleted. This row is evidence.'
       USING ERRCODE = 'insufficient_privilege';
   END IF;
 

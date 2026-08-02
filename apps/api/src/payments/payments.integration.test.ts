@@ -358,6 +358,15 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       expect(failure).toMatch(/only processed_at/i);
     });
 
+    /**
+     * A delivered, verified event is evidence and may never be deleted — at any age.
+     *
+     * The rule was narrowed on 2026-08-02 so that UNVERIFIED, unprocessed payloads
+     * older than 30 days can be reclaimed: the webhook endpoint is public and answers
+     * 200 to an invalid signature, so refusing every delete let anyone grow the table
+     * without limit. This asserts the side of the line that must not move — see
+     * `webhook-retention.integration.test.ts` for the side that may.
+     */
     it('refuses to delete a stored event', async () => {
       const ref = `sim_${booking.id}`;
       await openPayment(db, booking.id, ref);
@@ -370,7 +379,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         ),
       );
 
-      expect(failure).toMatch(/append-only/i);
+      expect(failure).toMatch(/this row is evidence/i);
     });
 
     /** Processing state must still be writable, or a retry could never be marked done. */
