@@ -710,8 +710,9 @@ These block engineering work and are not ours to make.
 
 ## Immediate next steps
 
-**A full production-readiness assessment now lives in `docs/production-readiness.md`.**
-This list is the engineering slice of it.
+**`docs/FUTURE-WORK.md` is the authoritative register of open work** — every blocker and
+open decision, with why it is blocked and what unblocks it. `docs/production-readiness.md`
+holds the narrative assessment behind it. This list is the engineering slice.
 
 1. **Register for the sanctions feed — item 120a.** Everything around it is built, tested
    and now documented (`docs/runbooks/sanctions-feed.md`). What is missing is an EU Login

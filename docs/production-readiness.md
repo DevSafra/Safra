@@ -1,5 +1,10 @@
 # Production readiness — remaining blockers
 
+> **This is a dated assessment, not the live status.** The authoritative register of
+> open work — with current status, dependencies and next actions — is
+> [`FUTURE-WORK.md`](FUTURE-WORK.md). Read that first; this document is the reasoning
+> behind it.
+
 **As of 2026-08-02.** Scope: what stands between the current state and a
 **staff-operated platform running in production**. Customer-facing launch is a
 superset of this and is not assessed here.
