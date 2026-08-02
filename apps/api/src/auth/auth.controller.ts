@@ -31,7 +31,7 @@ import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH } from '../config/constants.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
-import { CurrentUser, Public } from '../rbac/decorators.js';
+import { AllowsUnenrolledStaff, CurrentUser, Public } from '../rbac/decorators.js';
 import { AccountRecoveryService } from './account-recovery.service.js';
 import { AuthService, type AuthResult, type RequestContext } from './auth.service.js';
 import { TokenService, type AccessTokenClaims } from './token.service.js';
@@ -241,7 +241,14 @@ export class AuthController {
     return this.recovery.confirmEmailVerification(body.token);
   }
 
-  /** Returns the caller's identity and effective permissions. */
+  /**
+   * Returns the caller's identity and effective permissions.
+   *
+   * Reachable before enrolment: it discloses nothing the caller's own token does not
+   * already carry, and a client that cannot read its own state cannot tell that
+   * enrolment is what it is missing.
+   */
+  @AllowsUnenrolledStaff()
   @Get('me')
   me(@CurrentUser() user: AccessTokenClaims | undefined): AccessTokenClaims {
     if (!user) {

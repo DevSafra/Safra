@@ -10,7 +10,7 @@ import {
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
-import { CurrentUser } from '../rbac/decorators.js';
+import { AllowsUnenrolledStaff, CurrentUser } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from './token.service.js';
 import { TwoFactorService } from './two-factor.service.js';
 
@@ -21,6 +21,17 @@ import { TwoFactorService } from './two-factor.service.js';
  * staff member does for their OWN account, and the service enforces that only staff
  * roles may do it.
  */
+/*
+ * `@AllowsUnenrolledStaff` on the controller, not per route.
+ *
+ * StaffTwoFactorGuard refuses every staff request until TOTP is enabled, so without
+ * this the enrolment endpoints would be unreachable by exactly the accounts that need
+ * them — a new staff member could never make their account usable. `disable` is
+ * included deliberately: it demands the current password and a valid code of its own,
+ * so it is not weakened by being reachable here, and excluding it would strand an
+ * account mid-rotation.
+ */
+@AllowsUnenrolledStaff()
 @Controller('auth/2fa')
 export class TwoFactorController {
   constructor(private readonly twoFactor: TwoFactorService) {}

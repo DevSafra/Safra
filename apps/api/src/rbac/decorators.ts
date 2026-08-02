@@ -6,6 +6,7 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 
 export const PUBLIC_KEY = 'safra:public';
 export const PERMISSIONS_KEY = 'safra:permissions';
+export const ALLOWS_UNENROLLED_STAFF_KEY = 'safra:allows-unenrolled-staff';
 
 /**
  * Marks a route as reachable without a session.
@@ -23,6 +24,16 @@ export const Public = () => SetMetadata(PUBLIC_KEY, true);
  */
 export const RequirePermissions = (...permissions: Permission[]) =>
   SetMetadata(PERMISSIONS_KEY, permissions);
+
+/**
+ * Lets a staff member who has not yet enrolled a second factor reach this route.
+ *
+ * `StaffTwoFactorGuard` otherwise refuses every staff request until TOTP is enabled,
+ * which would make enrolment itself unreachable — the account could never become
+ * usable. Only the enrolment routes and sign-out carry this; each one is a deliberate
+ * hole in the gate and should be justified where it is applied.
+ */
+export const AllowsUnenrolledStaff = () => SetMetadata(ALLOWS_UNENROLLED_STAFF_KEY, true);
 
 export const CurrentUser = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext): AccessTokenClaims | undefined => {

@@ -22,6 +22,7 @@ import { StorageModule } from './storage/storage.module.js';
 import { WalletModule } from './wallet/wallet.module.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
 import { PermissionsGuard } from './rbac/permissions.guard.js';
+import { StaffTwoFactorGuard } from './rbac/staff-two-factor.guard.js';
 
 @Module({
   imports: [
@@ -56,6 +57,10 @@ import { PermissionsGuard } from './rbac/permissions.guard.js';
     // request that a rate limiter was going to reject anyway.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    // After JwtAuthGuard (it needs request.user) and before PermissionsGuard: an
+    // unenrolled staff account is refused on enrolment grounds, not on a permission
+    // it may well hold.
+    { provide: APP_GUARD, useClass: StaffTwoFactorGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     // Runs after the guards, so an unauthorised request is never audited as an
     // action. Also warns about mutating routes with no audit declaration (§15).
