@@ -89,6 +89,16 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  /**
+   * Declared exempt because this handler audits BOTH outcomes itself, below — the
+   * interceptor cannot, since a failed login must still be recorded and the
+   * interceptor only sees successes.
+   *
+   * Without the declaration the interceptor warned on every single sign-in. That is
+   * worse than untidy: a warning that fires constantly and is always benign is how
+   * people learn to ignore the warning that is supposed to catch a real gap.
+   */
+  @AuditExempt('Both outcomes are recorded in the handler; a failure must audit too.')
   @UsePipes(new ZodValidationPipe(loginSchema))
   async login(
     @Body() body: LoginInput,
