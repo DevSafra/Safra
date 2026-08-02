@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createDatabase, type Database } from '@safra/db';
 
@@ -42,15 +42,32 @@ describeIfDb('SettingsAdminService', () => {
   });
 
   afterAll(async () => {
+    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+  });
+
+  beforeEach(() => {
+    settings.invalidate();
+  });
+
+  /**
+   * Restored after EVERY test, not just at the end of the file.
+   *
+   * `booking.confirmation_window_minutes` is a real seeded setting that
+   * `BookingActionsService` and `CatalogService` both read, and vitest runs files in
+   * parallel. Holding a changed value for the length of this whole suite leaves a
+   * window in which another suite can read 91 minutes where it expects 120 — an
+   * intermittent failure in a file that never mentions settings, which is close to
+   * undiagnosable. Restoring per test shrinks that window to a few milliseconds.
+   *
+   * The right long-term fix is a setting that nothing else consumes, but every seeded
+   * key is consumed by something; that is recorded in the future-work register.
+   */
+  afterEach(async () => {
     await db.execute(sql`
       UPDATE settings SET value = ${JSON.stringify(original)}::jsonb
       WHERE key = ${KEY} AND scope = 'global'
     `);
 
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
-  });
-
-  beforeEach(() => {
     settings.invalidate();
   });
 
