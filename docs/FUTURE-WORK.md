@@ -38,7 +38,7 @@ approve or reject a listing, look up any booking with its full money breakdown a
 append-only timeline, read the audit log, and change every operational setting with the
 change attributed and recorded.
 
-**528 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
+**537 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
 clean, and the suite passes against a freshly migrated and seeded database.
 
 **What remains is not product.** It is infrastructure, operations and compliance. That
@@ -196,7 +196,9 @@ nobody has restored is not a backup.
 **Status:** blocked on M-1 · **Owner:** Platform engineering
 
 **Prerequisite done (2026-08-02):** logs are now structured JSON on stdout, one object
-per line, carrying `level`, `time`, `context`, `requestId` and `userId`. Sensitive keys
+per line, carrying `level`, `time`, `context`, `requestId` and `userId`, **plus one
+access-log line per request** (method, path, status, duration) covering rejections and
+404s as well as successes. Sensitive keys
 are redacted **in the logger**, not by convention at each call site. Every request gets
 an `x-request-id` — reused from upstream when present so a trace started at the load
 balancer stays one trace — and it is echoed in the response, so a support conversation
