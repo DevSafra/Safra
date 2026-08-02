@@ -43,6 +43,15 @@ const config: NextConfig = {
            * reflected payload has nowhere to execute. This app renders identity
            * documents, so the containment matters more than the convenience.
            */
+          /**
+           * Set here as well as at the edge. A header that exists only at the edge is
+           * absent the moment traffic reaches the app another way — a staging host, a
+           * direct origin pull, a misrouted record — and this app authenticates staff.
+           */
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=31536000; includeSubDomains; preload',
+          },
           {
             key: 'Content-Security-Policy',
             value: [
