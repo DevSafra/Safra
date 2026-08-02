@@ -20,6 +20,7 @@ import { SearchModule } from './search/search.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { WalletModule } from './wallet/wallet.module.js';
+import { HealthModule } from './health/health.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { RedisThrottlerStorage } from './redis/redis-throttler.storage.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
@@ -64,6 +65,7 @@ import { StaffTwoFactorGuard } from './rbac/staff-two-factor.guard.js';
     SanctionsModule,
     AdminModule,
     CatalogModule,
+    HealthModule,
   ],
   providers: [
     // Order matters: throttling runs first (cheapest rejection), then
