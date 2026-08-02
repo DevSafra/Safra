@@ -84,6 +84,64 @@ export class ReviewService {
   }
 
   /**
+   * One listing, everything a reviewer needs to decide (§8.1, P-002).
+   *
+   * Includes the PARTNER's verification state, which is the thing most likely to make
+   * the decision moot: item 116 refuses to publish a listing whose partner is not yet
+   * verified, so a reviewer who cannot see that would approve and get a conflict they
+   * have no way to explain.
+   */
+  async propertyDetail(reference: string) {
+    const property = await this.db.query.properties.findFirst({
+      where: and(
+        eq(schema.properties.reference, reference),
+        isNull(schema.properties.deletedAt),
+      ),
+      columns: {
+        reference: true,
+        slug: true,
+        nameAr: true,
+        nameEn: true,
+        descriptionAr: true,
+        descriptionEn: true,
+        address: true,
+        latitude: true,
+        longitude: true,
+        status: true,
+        reviewNotes: true,
+        attributes: true,
+        createdAt: true,
+      },
+      with: {
+        partner: {
+          columns: {
+            reference: true,
+            displayName: true,
+            legalName: true,
+            verification: true,
+          },
+        },
+        city: { columns: { slug: true, nameAr: true, nameEn: true } },
+        propertyType: { columns: { code: true } },
+        /**
+         * The photos are the review. §5.6's gallery is what a customer sees, and a
+         * listing approved without looking at them is the whole of P-002 skipped.
+         */
+        images: {
+          columns: { fileKey: true, width: true, height: true, isCover: true },
+        },
+        units: {
+          columns: { nameEn: true, maxGuests: true, basePrice: true, minNights: true },
+        },
+      },
+    });
+
+    if (!property) throw new NotFoundException('Property not found.');
+
+    return property;
+  }
+
+  /**
    * Approve or reject a submitted listing.
    *
    * Approval publishes directly rather than stopping at an intermediate `approved`
@@ -174,6 +232,90 @@ export class ReviewService {
     });
 
     return { reference, status: nextStatus, notes: input.notes ?? null };
+  }
+
+  /**
+   * One partner, everything a reviewer needs to decide (§8.1).
+   *
+   * Separate from the queue rather than reusing it: the queue is a list of what is
+   * waiting and is capped, while this is the evidence for a single decision — the
+   * documents with their individual review state, the screening result, and the
+   * listings that will go live the moment this partner is approved.
+   *
+   * That last one matters and is easy to omit. Approving a partner is not an
+   * isolated act; item 116 means their submitted listings become publishable, so a
+   * reviewer who cannot see what they are about to unlock is deciding half-blind.
+   */
+  async partnerDetail(reference: string) {
+    const partner = await this.db.query.partners.findFirst({
+      where: and(
+        eq(schema.partners.reference, reference),
+        isNull(schema.partners.deletedAt),
+      ),
+      columns: {
+        reference: true,
+        legalName: true,
+        displayName: true,
+        email: true,
+        phone: true,
+        address: true,
+        verification: true,
+        verifiedAt: true,
+        sanctionsScreenedAt: true,
+        sanctionsScreeningResult: true,
+        suspendedAt: true,
+        suspendedReason: true,
+        createdAt: true,
+      },
+      with: {
+        city: { columns: { slug: true, nameAr: true, nameEn: true } },
+        partnerType: { columns: { code: true } },
+        documents: {
+          columns: {
+            id: true,
+            kind: true,
+            fileName: true,
+            status: true,
+            reviewNotes: true,
+            reviewedAt: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    if (!partner) throw new NotFoundException('Partner not found.');
+
+    /**
+     * Their listings, so the reviewer sees the consequence of approving.
+     *
+     * A separate query rather than another relation: `properties` is not declared as
+     * a relation on `partners`, and adding one to serve a single screen would widen
+     * the relational graph for every other query that touches a partner.
+     */
+    const properties = await this.db.execute<{
+      reference: string;
+      name_ar: string;
+      name_en: string | null;
+      status: string;
+    }>(sql`
+      SELECT reference, name_ar, name_en, status::text AS status
+      FROM properties
+      WHERE partner_id = (SELECT id FROM partners WHERE reference = ${reference})
+        AND deleted_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 50
+    `);
+
+    return {
+      ...partner,
+      properties: properties.rows.map((row) => ({
+        reference: row.reference,
+        nameAr: row.name_ar,
+        nameEn: row.name_en,
+        status: row.status,
+      })),
+    };
   }
 
   /**

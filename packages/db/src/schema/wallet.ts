@@ -209,3 +209,27 @@ export const walletsRelations = relations(wallets, ({ one, many }) => ({
 export const giftCardsRelations = relations(giftCards, ({ many }) => ({
   transactions: many(giftCardTransactions),
 }));
+
+/**
+ * Inverse sides, required by Drizzle.
+ *
+ * A `many()` without its matching `one()` throws at QUERY time, not compile time —
+ * see `schema/relations.test.ts`, which now runs every relation to keep this class
+ * of bug from shipping again.
+ */
+export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({
+  wallet: one(wallets, {
+    fields: [walletTransactions.walletId],
+    references: [wallets.id],
+  }),
+}));
+
+export const giftCardTransactionsRelations = relations(
+  giftCardTransactions,
+  ({ one }) => ({
+    giftCard: one(giftCards, {
+      fields: [giftCardTransactions.giftCardId],
+      references: [giftCards.id],
+    }),
+  }),
+);

@@ -166,6 +166,21 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   refreshTokens: many(refreshTokens),
 }));
 
+/**
+ * Inverse sides, required by Drizzle.
+ *
+ * A `many()` without its matching `one()` throws at QUERY time, not compile time —
+ * see `schema/relations.test.ts`, which now runs every relation to keep this class
+ * of bug from shipping again.
+ */
+export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
+  user: one(users, { fields: [refreshTokens.userId], references: [users.id] }),
+}));
+
+export const authTokensRelations = relations(authTokens, ({ one }) => ({
+  user: one(users, { fields: [authTokens.userId], references: [users.id] }),
+}));
+
 export const customerProfilesRelations = relations(customerProfiles, ({ one }) => ({
   user: one(users, { fields: [customerProfiles.userId], references: [users.id] }),
   preferredCurrency: one(currencies, {

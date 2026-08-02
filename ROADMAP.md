@@ -5,7 +5,7 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **345 tests
+Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **394 tests
 passing** against a real PostgreSQL, production dependencies clean.
 
 **Scale of what remains:** the API foundation, catalogue, search, the public booking
@@ -561,15 +561,35 @@ shipped._
        forced to enrolment → enrol → dashboard opens.
      - Access tokens now carry a `totpEnabled` claim so middleware can enforce that
        without a round trip per request
-158. ⚠️ Dashboard home — the §9.2 attention counters and both verification queues, with
-     screening state surfaced in the partner queue rather than only on a detail page.
-     The remaining §9.3 panels are deliberately not built yet (item 159)
-159. ❌ The 18 sections listed in §9.3
-160. ❌ Booking detail with full timeline, messages and internal notes (§9.4)
-161. ❌ Settings editor for commissions, SLA, fines, cutoff (P-005)
-162. ❌ **Emergency Mode** activation per city/country (EC-009)
-163. ❌ Audit log viewer
-164. ❌ Staff user and permission management
+158. ✅ Dashboard home — the §9.2 attention counters and both verification queues, with
+     screening state surfaced in the partner queue rather than only on a detail page
+159. ⚠️ The §9.3 sections — **the operational spine is built, the other panels are not.**
+     Partner verification and property review are complete end to end; bookings,
+     customers, finance, reports, ads, emergency mode and the audit viewer are
+     deliberately deferred rather than built badly in bulk.
+     - ✅ **159b** Partner verification screen — the applicant, their documents with
+       per-document approve/reject and an authenticated download, the screening panel,
+       and the decision. Their listings are shown alongside it because approving a
+       partner is not isolated: item 116 means their submitted listings become
+       publishable, so a reviewer who cannot see what they are unlocking is deciding
+       half-blind. Approval is disabled until screening is recorded, mirroring the
+       API's refusal so the requirement is learned before the notes are written.
+     - ✅ **159c** Property review screen — the listing, its units, and the PARTNER's
+       verification state first and prominent, because item 116 makes an unverified
+       partner the most likely reason the decision is moot. Approving publishes
+       immediately, and the button says so.
+     - ❌ **159a** Photo previews on the property review screen. The count is shown and
+       the absence is stated; serving the images would need either a public CDN URL for
+       an unpublished listing or a second authenticated image proxy, and neither is
+       worth building before the storage layer has a signed-URL story.
+     - ❌ **159d** Bookings, customers, finance, reports, ads, emergency mode, audit
+       viewer — the remaining §9.3 sections
+160. ❌ The 18 sections listed in §9.3
+161. ❌ Booking detail with full timeline, messages and internal notes (§9.4)
+162. ❌ Settings editor for commissions, SLA, fines, cutoff (P-005)
+163. ❌ **Emergency Mode** activation per city/country (EC-009)
+164. ❌ Audit log viewer
+165. ❌ Staff user and permission management
 
 ---
 
@@ -647,14 +667,19 @@ These block engineering work and are not ours to make.
 
 ## Immediate next steps
 
-1. **Partner payout accounts — item 84. DEFERRED to the end of the project** with the
+1. **Sanctions screening against the EU consolidated list — item 120.** The gate is
+   real and enforced, but a human performs the check and records what they found. The
+   screen says so plainly rather than implying automation. Ingesting the EU's own free
+   feed with conservative trigram matching is the next step; ongoing monitoring — the
+   thing a one-off check cannot give — is what would justify a paid vendor later.
+2. **Partner payout accounts — item 84. DEFERRED to the end of the project** with the
    rest of the payment work (Bashar, 2026-08-01): it needs the payout mechanism per
    country, which is item 193 and still open. The onboarding loop is otherwise complete —
    a partner can apply, upload documents, and be reviewed and verified.
-2. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
+3. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
    established, so the second and third stored-value instruments are far cheaper now
    than they would have been before it.
-3. **A settings editor in the admin app — item 161.** `money.always_usd`, the per-setting
+4. **A settings editor in the admin app — item 161.** `money.always_usd`, the per-setting
    currencies and `rbac.finance_can_manage_fx` are all live in the API and all only
    reachable by hand. P-005 promised configuration, not configuration a developer has to
    apply.

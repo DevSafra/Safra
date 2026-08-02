@@ -260,3 +260,15 @@ export const paymentProviderEventsRelations = relations(
     }),
   }),
 );
+
+/**
+ * Inverse sides, required by Drizzle.
+ *
+ * A `many()` without its matching `one()` throws at QUERY time, not compile time —
+ * see `schema/relations.test.ts`, which now runs every relation to keep this class
+ * of bug from shipping again.
+ */
+export const refundsRelations = relations(refunds, ({ one }) => ({
+  payment: one(payments, { fields: [refunds.paymentId], references: [payments.id] }),
+  booking: one(bookings, { fields: [refunds.bookingId], references: [bookings.id] }),
+}));

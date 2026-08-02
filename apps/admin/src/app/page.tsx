@@ -106,16 +106,18 @@ export default async function DashboardPage() {
       <Queue title="Listings awaiting review" state={properties}>
         {(rows) =>
           rows.map((property) => (
-            <li
-              key={property.reference}
-              className="rounded-lg border border-line bg-card p-4"
-            >
-              <span className="block text-sm text-text">
-                {property.nameEn ?? property.nameAr}
-              </span>
-              <span className="block text-xs text-faint">
-                {property.reference} · submitted {property.createdAt.slice(0, 10)}
-              </span>
+            <li key={property.reference}>
+              <Link
+                href={`/properties/${property.reference}`}
+                className="block rounded-lg border border-line bg-card p-4 transition-colors hover:border-gold/50"
+              >
+                <span className="block text-sm text-text">
+                  {property.nameEn ?? property.nameAr}
+                </span>
+                <span className="block text-xs text-faint">
+                  {property.reference} · submitted {property.createdAt.slice(0, 10)}
+                </span>
+              </Link>
             </li>
           ))
         }

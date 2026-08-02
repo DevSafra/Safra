@@ -107,6 +107,67 @@ export async function getPendingPartners() {
   return staffFetch('/admin/partners/pending', z.array(pendingPartnerSchema));
 }
 
+// ─── Partner detail (§8.1) ────────────────────────────────────────────────────
+
+/** Postgres timestamps arrive as strings or Dates depending on the driver path. */
+const timestamp = z
+  .union([z.string(), z.date()])
+  .nullable()
+  .transform((v) => (v === null ? null : new Date(v).toISOString()));
+
+const partnerDocumentSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  fileName: z.string(),
+  status: z.string(),
+  reviewNotes: z.string().nullable(),
+  reviewedAt: timestamp,
+  createdAt: timestamp,
+});
+
+export type PartnerDocument = z.infer<typeof partnerDocumentSchema>;
+
+const partnerDetailSchema = z.object({
+  reference: z.string(),
+  legalName: z.string(),
+  displayName: z.string(),
+  email: z.string(),
+  phone: z.string(),
+  address: z.string(),
+  verification: z.string(),
+  verifiedAt: timestamp,
+  sanctionsScreenedAt: timestamp,
+  /** Provider payload, shape varies by provider — rendered as-is for the record. */
+  sanctionsScreeningResult: z.unknown().nullable(),
+  suspendedAt: timestamp,
+  suspendedReason: z.string().nullable(),
+  createdAt: timestamp,
+  city: z.object({
+    slug: z.string(),
+    nameAr: z.string(),
+    nameEn: z.string().nullable(),
+  }),
+  partnerType: z.object({ code: z.string() }),
+  documents: z.array(partnerDocumentSchema),
+  properties: z.array(
+    z.object({
+      reference: z.string(),
+      nameAr: z.string(),
+      nameEn: z.string().nullable(),
+      status: z.string(),
+    }),
+  ),
+});
+
+export type PartnerDetail = z.infer<typeof partnerDetailSchema>;
+
+export async function getPartner(reference: string) {
+  return staffFetch(
+    `/admin/partners/${encodeURIComponent(reference)}`,
+    partnerDetailSchema,
+  );
+}
+
 const pendingPropertySchema = z.object({
   reference: z.string(),
   slug: z.string(),
@@ -118,4 +179,55 @@ const pendingPropertySchema = z.object({
 
 export async function getPendingProperties() {
   return staffFetch('/admin/properties/pending', z.array(pendingPropertySchema));
+}
+
+// ─── Property detail (§8.1, P-002) ────────────────────────────────────────────
+
+const propertyDetailSchema = z.object({
+  reference: z.string(),
+  slug: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string().nullable(),
+  descriptionAr: z.string().nullable(),
+  descriptionEn: z.string().nullable(),
+  address: z.string(),
+  latitude: z.string().nullable(),
+  longitude: z.string().nullable(),
+  status: z.string(),
+  reviewNotes: z.string().nullable(),
+  attributes: z.array(z.string()).nullable(),
+  createdAt: timestamp,
+  partner: z.object({
+    reference: z.string(),
+    displayName: z.string(),
+    legalName: z.string(),
+    verification: z.string(),
+  }),
+  city: z.object({ slug: z.string(), nameAr: z.string(), nameEn: z.string().nullable() }),
+  propertyType: z.object({ code: z.string() }),
+  images: z.array(
+    z.object({
+      fileKey: z.string(),
+      width: z.number().nullable(),
+      height: z.number().nullable(),
+      isCover: z.boolean(),
+    }),
+  ),
+  units: z.array(
+    z.object({
+      nameEn: z.string(),
+      maxGuests: z.number(),
+      basePrice: z.string(),
+      minNights: z.number(),
+    }),
+  ),
+});
+
+export type PropertyDetail = z.infer<typeof propertyDetailSchema>;
+
+export async function getProperty(reference: string) {
+  return staffFetch(
+    `/admin/properties/${encodeURIComponent(reference)}`,
+    propertyDetailSchema,
+  );
 }

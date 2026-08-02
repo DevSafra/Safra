@@ -40,6 +40,13 @@ export class AdminController {
     return this.review.pendingProperties();
   }
 
+  /** One listing's full submission (§8.1). `PROPERTY_READ`, held by support too. */
+  @Get('properties/:reference')
+  @RequirePermissions(P.PROPERTY_READ)
+  async propertyDetail(@Param('reference') reference: string) {
+    return this.review.propertyDetail(reference);
+  }
+
   @Post('properties/:reference/review')
   @RequirePermissions(P.PROPERTY_APPROVE)
   async reviewProperty(
@@ -54,6 +61,20 @@ export class AdminController {
   @RequirePermissions(P.PARTNER_APPROVE)
   async pendingPartners() {
     return this.review.pendingPartners();
+  }
+
+  /**
+   * One partner's full application (§8.1).
+   *
+   * `PARTNER_READ` rather than `PARTNER_APPROVE`: support agents legitimately need to
+   * look up a partner while answering a ticket. The DOCUMENTS themselves are behind
+   * `PARTNER_DOCUMENT_REVIEW` on their own route — this returns their metadata and
+   * review state, never their bytes.
+   */
+  @Get('partners/:reference')
+  @RequirePermissions(P.PARTNER_READ)
+  async partnerDetail(@Param('reference') reference: string) {
+    return this.review.partnerDetail(reference);
   }
 
   @Post('partners/:reference/verify')
