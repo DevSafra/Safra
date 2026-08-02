@@ -18,13 +18,44 @@ reject a partner, approve or reject a listing, look up any booking with its full
 breakdown and append-only timeline, read the audit log, and change every operational
 setting with the change recorded and attributed.
 
-453 tests pass. `pnpm verify` (format, lint, types, tests, dependency audit) is clean.
+460 tests pass. `pnpm verify` (format, lint, types, tests, dependency audit) is clean.
 
 What follows is what is missing, ordered by what stops you first.
 
 ---
 
-## Blocking — cannot operate in production without these
+## Classification
+
+Every remaining item falls into one of three tiers. **Must-have** means the platform
+cannot be operated safely in production without it. **Should-have** means it can be
+operated, but with a known and accepted risk that has an owner. **Deferred** means it
+costs capability, not safety.
+
+| #   | Item                                                              | Tier                 | Owner                |
+| --- | ----------------------------------------------------------------- | -------------------- | -------------------- |
+| 1   | Deployment target / infrastructure                                | Must-have            | Platform engineering |
+| 2   | Sanctions feed activation                                         | Must-have            | **Compliance**       |
+| 3   | Backups and restore validation                                    | Must-have            | Platform engineering |
+| 4   | Redis-backed rate limiting                                        | Must-have            | Backend              |
+| 5   | Staff provisioning workflow                                       | Must-have            | Backend              |
+| 6   | Health endpoint                                                   | Must-have            | Backend              |
+| 7   | Error tracking and alerts                                         | Should-have          | Platform engineering |
+| 8   | Partner notification of a waiting booking                         | Should-have          | Product / Backend    |
+| 9   | Load-test booking and search                                      | Should-have          | Backend              |
+| 10  | ID document retention policy                                      | Should-have          | **Compliance**       |
+| 11  | Legal review of terms and partner contract                        | Should-have          | **Legal**            |
+| 12  | Messaging and disputes                                            | Deferred             | Product              |
+| 13  | Remaining §9.3 sections, non-EU lists, Emergency Mode, gift cards | Deferred             | Product              |
+| 14  | Payment rails and payouts                                         | Deferred by decision | Bashar, 2026-08-01   |
+
+**Agreed order of work (Bashar, 2026-08-02): items 1 → 6, in that sequence, with no
+further product scope until there is a plan for all six.** Item 2 is sequenced second
+but should be _started_ immediately — it depends on an external party and is the only
+item whose timeline SAFRA does not control.
+
+---
+
+## Must-have — cannot operate in production without these
 
 ### 1. No deployment target exists
 
@@ -52,7 +83,16 @@ stops**. This is the single item most likely to be discovered too late.
 
 **Owner:** Compliance. Not an engineering task.
 
-### 3. Rate limiting is per-process, so it does not survive horizontal scaling
+### 3. No backups, and no restore anyone has tried
+
+There is no backup configuration, no retention policy, and no tested restore. The
+database holds the ledger, the audit log and the append-only tables that the whole
+compliance story rests on — all of which are, by design, impossible to reconstruct.
+
+**Fix:** point-in-time recovery on the managed instance, plus a restore rehearsal.
+A backup nobody has restored is not a backup.
+
+### 4. Rate limiting is per-process, so it does not survive horizontal scaling
 
 `ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }])` uses the default in-memory
 store. With N replicas the effective limit is N × 120, and every counter resets on
@@ -65,28 +105,7 @@ already provisioned; it is simply not wired to the throttler.
 
 **Fix:** a Redis-backed `ThrottlerStorage`. Contained, roughly a day with tests.
 
-### 4. No backups, and no restore anyone has tried
-
-There is no backup configuration, no retention policy, and no tested restore. The
-database holds the ledger, the audit log and the append-only tables that the whole
-compliance story rests on — all of which are, by design, impossible to reconstruct.
-
-**Fix:** point-in-time recovery on the managed instance, plus a restore rehearsal.
-A backup nobody has restored is not a backup.
-
-### 5. No health endpoint, no error tracking, no metrics
-
-`GET /health` returns 404, so no load balancer can tell a wedged replica from a healthy
-one. There is no Sentry or equivalent, and no metrics — the p95 < 200 ms budget in the
-project rules is currently unmeasurable, and the rules themselves say to state the
-measurement rather than guess.
-
-Specifically un-alerted today: a failing sanctions refresh (logs at `error`, tells
-nobody), the SLA sweep silently not running, and refresh-token replay detection firing.
-
-**Fix:** health/readiness endpoints, error tracking, and alerts on the three above.
-
-### 6. Staff accounts can only be created with direct SQL
+### 5. Staff accounts can only be created with direct SQL
 
 There is no staff provisioning flow — no invite, no admin-creates-admin screen, no seed
 for the first `super_admin`. Every staff account so far was inserted by hand.
@@ -99,6 +118,18 @@ exists to make unnecessary.
 invite flow for the rest.
 
 ---
+
+### 6. No health endpoint (and, separately, no error tracking or metrics)
+
+`GET /health` returns 404, so no load balancer can tell a wedged replica from a healthy
+one. There is no Sentry or equivalent, and no metrics — the p95 < 200 ms budget in the
+project rules is currently unmeasurable, and the rules themselves say to state the
+measurement rather than guess.
+
+Specifically un-alerted today: a failing sanctions refresh (logs at `error`, tells
+nobody), the SLA sweep silently not running, and refresh-token replay detection firing.
+
+**Fix:** health/readiness endpoints, error tracking, and alerts on the three above.
 
 ## Fixed today, noted because they were found rather than known
 
@@ -146,7 +177,7 @@ contractual question. Now explicit `AT TIME ZONE 'UTC'`.
 
 ---
 
-## Significant gaps that are not blockers for staff operation
+## Should-have, and deferred
 
 ### Support agents cannot do two thirds of their job
 
@@ -190,14 +221,15 @@ paginated for it; that is a design property, not a measurement.
 
 ---
 
-## Suggested order
+## Where this list came from
 
-1. Hosting decision and a deployment that runs (unblocks everything else)
-2. Sanctions feed registration — **start now, it depends on an external party**
-3. Redis-backed rate limiting; backups with a rehearsed restore
-4. Health endpoint, error tracking, alerts on the three silent failures
-5. Staff bootstrap and invite flow
-6. Load-test the booking and search paths, then state the real numbers
-7. Messaging and disputes — the largest remaining product gap
+Every "must-have" here is something that was verified against a running system rather
+than inferred: the rate limiter's storage was read from its configuration, the health
+endpoint was requested and returned 404, the staff-provisioning gap is why every account
+in the test database was inserted by hand, and the sanctions endpoint was called.
 
-Items 2 and 3 are independent of item 1 and can run in parallel.
+The three "fixed today" entries were all found the same way — by trying to break a claim
+rather than by reading the code that makes it. That is the argument for treating the
+must-have list as incomplete rather than exhaustive: nothing in it was found by
+inspection alone, so the parts of the system that have never been run in a
+production-shaped environment are the parts most likely to be hiding the next one.
