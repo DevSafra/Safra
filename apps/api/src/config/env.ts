@@ -100,6 +100,17 @@ export const envSchema = z.object({
   SMTP_URL: z.string().url().optional(),
   MAIL_FROM: z.string().min(3).default('SAFRA <no-reply@safra.example>'),
 
+  /**
+   * Where the EU consolidated sanctions list is downloaded from (ADR 0002).
+   *
+   * No default, deliberately. The publisher's export sits behind a token it issues
+   * and occasionally rotates, so a hardcoded URL would produce a system that stops
+   * refreshing silently and only reveals it days later when verification starts
+   * refusing on a stale list. Unset means no automatic refresh, said loudly at
+   * startup, with manual import as the fallback.
+   */
+  SANCTIONS_FEED_URL: z.string().url().optional(),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 

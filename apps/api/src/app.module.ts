@@ -15,6 +15,7 @@ import { LedgerModule } from './ledger/ledger.module.js';
 import { PartnerModule } from './partner/partner.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { RankingModule } from './ranking/ranking.module.js';
+import { SanctionsModule } from './sanctions/sanctions.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { StorageModule } from './storage/storage.module.js';
@@ -45,6 +46,7 @@ import { PermissionsGuard } from './rbac/permissions.guard.js';
     PartnerModule,
     PaymentsModule,
     RankingModule,
+    SanctionsModule,
     AdminModule,
     CatalogModule,
   ],

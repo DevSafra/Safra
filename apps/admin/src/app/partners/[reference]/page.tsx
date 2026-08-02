@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { getPartner } from '@/lib/api';
+import { getPartner, getSanctionsStatus } from '@/lib/api';
 import { DocumentReview } from '@/components/document-review';
 import { ScreeningPanel } from '@/components/screening-panel';
 import { VerifyPartner } from '@/components/verify-partner';
@@ -26,7 +26,15 @@ export default async function PartnerPage({
   params: Promise<{ reference: string }>;
 }) {
   const { reference } = await params;
-  const partner = await getPartner(reference);
+
+  /**
+   * The list's health is fetched alongside the partner, so the screening panel can
+   * explain a refusal before the reviewer triggers it rather than after.
+   */
+  const [partner, listStatus] = await Promise.all([
+    getPartner(reference),
+    getSanctionsStatus(),
+  ]);
 
   if (partner === 'unauthenticated') {
     return (
@@ -89,6 +97,11 @@ export default async function PartnerPage({
           reference={partner.reference}
           screenedAt={partner.sanctionsScreenedAt}
           result={partner.sanctionsScreeningResult}
+          listStatus={
+            listStatus === 'failed' || listStatus === 'unauthenticated'
+              ? null
+              : listStatus
+          }
         />
       </Section>
 

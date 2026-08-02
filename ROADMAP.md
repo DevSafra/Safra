@@ -5,7 +5,7 @@ Every implementation step from zero, derived from `SAFRA_SRS_Company_File_Detail
 - ✅ = done and verified
 - ❌ = not done (or only partially done — the note says what exists)
 
-Status as of **2026-08-01**. `pnpm verify` green: format, lint, typecheck, **394 tests
+Status as of **2026-08-02**. `pnpm verify` green: format, lint, typecheck, **436 tests
 passing** against a real PostgreSQL, production dependencies clean.
 
 **Scale of what remains:** the API foundation, catalogue, search, the public booking
@@ -285,12 +285,45 @@ building something else and none is urgent enough to have widened that change.
 117. ✅ **Sanctions screening is a hard precondition** for verifying a partner (ADR 0002)
 118. ✅ Rejecting a partner suspends their published listings — verified search drops to 0
 119. ✅ Attention counters for the §9.2 dashboard
-120. ❌ Actual sanctions-screening provider integration (the endpoint records a result;
-     nothing calls a screening service). **Now a legal obligation, not a precaution:** a German
-     merchant entity is bound by EU sanctions law, and while Regulation (EU) 2025/1098 lifted
-     the economic measures from 2025-05-29, asset freezes on persons and entities tied to the
-     former al-Assad regime were renewed on 2026-05-18 until 2027-06-01. Screening partners
-     against the EU consolidated list is therefore required before verification
+120. ⚠️ Sanctions screening — **SAFRA now performs the check itself** against an
+     imported EU consolidated list, rather than recording what a staff member said
+     they had found. The obligation is real: a German merchant entity is bound by EU
+     sanctions law, and while Regulation (EU) 2025/1098 lifted the economic measures
+     from 2025-05-29, asset freezes on persons and entities tied to the former
+     al-Assad regime were renewed on 2026-05-18 until 2027-06-01.
+     - **Snapshots, not a mutable list.** A screening decision must stay explicable
+       years later, and "we found nothing on 12 August" only means something alongside
+       what the list said that day. Each refresh inserts a new snapshot; screening
+       reads the newest COMPLETE one.
+     - **Refuses on missing AND on stale** (7 days), for the same reason the FX
+       refusal exists: a run against a list nobody can prove is current produces a
+       record that _looks_ like compliance and is not. A 503 with an actionable
+       message, because unlike the customer-facing FX refusal the reader can fix it.
+     - **`completed_at` is written last**, so a crash mid-import leaves a visibly
+       incomplete snapshot that screening ignores — a partial list would confidently
+       clear everyone missing from it.
+     - **Matching is deliberately noisy.** Trigram similarity from 0.35, because a
+       false positive costs a reviewer half a minute and a missed designation is a
+       legal exposure. Every candidate carries its similarity AND its token overlap so
+       a reviewer can see why it surfaced rather than trusting or ignoring the machine.
+     - **Arabic transliteration is the hard part**, and it is where the tests
+       concentrate: Muhammad/Mohammed/Mohamed/Mohammad/Muhammed/Mohamad converge, the
+       definite article is dropped however written, and genuinely distinct names
+       (Hasan vs Husayn) stay apart.
+     - **The decision stays human.** The service never approves or rejects; it returns
+       candidates, and a reviewer may override in either direction — with the override
+       and the automated reading both recorded.
+     - ❌ **120a** The feed URL is configuration (`SANCTIONS_FEED_URL`), not a constant,
+       and **has not been verified against the live endpoint** — the EU's export sits
+       behind a publisher-issued token and the well-known URL returned 500 from this
+       environment. An operator must supply a working URL; until then the documented
+       fallback is `POST /admin/sanctions/import`, which is built and tested. A
+       hardcoded URL would have produced a system that stops refreshing silently.
+     - ❌ **120b** Ongoing monitoring. This is a point-in-time check: a partner
+       designated AFTER onboarding stays verified. That is the main thing a paid
+       screening vendor would add, and the main argument for one later.
+     - ❌ **120c** Only the EU list. UN, OFAC and UK consolidated lists are not
+       ingested; the schema is source-agnostic so adding one is an ingestion job.
 121. ✅ Document review workflow per document — approve or reject each one separately,
      with mandatory notes on rejection. Per document rather than per partner because
      "your paperwork was rejected" is useless feedback: a partner needs to know the
@@ -667,11 +700,11 @@ These block engineering work and are not ours to make.
 
 ## Immediate next steps
 
-1. **Sanctions screening against the EU consolidated list — item 120.** The gate is
-   real and enforced, but a human performs the check and records what they found. The
-   screen says so plainly rather than implying automation. Ingesting the EU's own free
-   feed with conservative trigram matching is the next step; ongoing monitoring — the
-   thing a one-off check cannot give — is what would justify a paid vendor later.
+1. **Confirm the sanctions feed URL — item 120a.** Everything around it is built and
+   tested; what is missing is a working `SANCTIONS_FEED_URL`, which needs a
+   publisher-issued token this environment could not obtain. Until it is set, the list
+   must be imported by hand and will go stale in seven days — at which point partner
+   verification refuses outright. **This is the one thing blocking real onboarding.**
 2. **Partner payout accounts — item 84. DEFERRED to the end of the project** with the
    rest of the payment work (Bashar, 2026-08-01): it needs the payout mechanism per
    country, which is item 193 and still open. The onboarding loop is otherwise complete —

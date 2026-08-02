@@ -3,36 +3,48 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+interface Candidate {
+  name: string;
+  designationId: string;
+  subjectType: string;
+  programme: string | null;
+  details: string | null;
+  similarity: number;
+  tokenOverlap: number;
+  confidence: 'strong' | 'possible' | 'weak';
+}
+
 /**
- * Recording a sanctions screening result (ADR 0002, §8.1).
+ * Running a sanctions screening (ADR 0002, §8.1).
  *
- * **This screen does not perform a check.** Item 120 has no provider integration, so
- * what happens today is that a human searches the EU consolidated list themselves and
- * records what they found. The wording says exactly that, because a panel that looked
- * automated would let a reviewer believe a check had run when none had — and the
- * whole point of the gate is that somebody actually looked.
+ * The platform performs the search itself against the imported EU consolidated list.
+ * Until item 120 landed this panel only RECORDED what a staff member said they had
+ * found, which meant a legal obligation could be satisfied by an assertion; now the
+ * button runs the check and the reviewer judges what it returns.
  *
- * A German entity is bound by EU sanctions law. Regulation (EU) 2025/1098 lifted the
- * economic measures in 2025, but asset freezes on persons tied to the former al-Assad
- * regime were renewed to 2027-06-01, so screening is a legal obligation rather than a
- * precaution.
+ * The judgement stays human on purpose. The matcher deliberately over-flags — a
+ * false positive costs half a minute, a missed designation is a legal exposure for
+ * the German entity — so it produces candidates with a confidence and a reason, and
+ * a person decides whether the hit is the same party.
  */
 export function ScreeningPanel({
   reference,
   screenedAt,
   result,
+  listStatus,
 }: {
   reference: string;
   screenedAt: string | null;
   result: unknown;
+  listStatus: { imported: boolean; stale: boolean; ageDays: number | null } | null;
 }) {
   const router = useRouter();
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [recording, setRecording] = useState(false);
+  const [override, setOverride] = useState<boolean | null>(null);
 
-  async function record(matched: boolean, notes: string) {
+  async function run(matched?: boolean) {
     if (busy) return;
 
     setBusy(true);
@@ -42,26 +54,17 @@ export function ScreeningPanel({
       const response = await fetch(`/api/partners/${reference}/screening`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          /**
-           * Named for what actually happened. When item 120 lands and a provider is
-           * called, its own name goes here instead — and the two are then
-           * distinguishable in the record, which is the point of storing it.
-           */
-          provider: 'manual_eu_consolidated_list',
-          matched,
-          details: { checkedBy: 'staff', notes, list: 'EU consolidated list' },
-        }),
+        body: JSON.stringify(matched === undefined ? {} : { matched }),
       });
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? 'Could not record the screening.');
+        setError(messageOf(body) ?? 'Could not run the screening.');
         setBusy(false);
         return;
       }
 
-      setRecording(false);
+      setOverride(null);
       router.refresh();
       setBusy(false);
     } catch {
@@ -70,40 +73,80 @@ export function ScreeningPanel({
     }
   }
 
-  const matched = isMatched(result);
+  const previous = readResult(result);
+
+  /**
+   * The list's own state comes first. A reviewer who clicks and gets an unexplained
+   * refusal will assume the feature is broken; telling them the list is nine days
+   * old points at the actual problem, which somebody can fix.
+   */
+  if (listStatus && (!listStatus.imported || listStatus.stale)) {
+    return (
+      <div className="rounded-lg border border-bad/40 bg-bad/10 p-4">
+        <p className="text-sm text-bad">
+          {listStatus.imported
+            ? `The sanctions list is ${listStatus.ageDays} days old and cannot be screened against.`
+            : 'No sanctions list has been imported.'}
+        </p>
+        <p className="mt-2 text-xs text-muted">
+          Partner verification is blocked until this is resolved. Screening against a list
+          that cannot be shown to be current would look like compliance without being it.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-lg border border-line bg-card p-4">
       {screenedAt ? (
         <div>
-          <p className={`text-sm ${matched ? 'text-bad' : 'text-good'}`}>
-            {matched
+          <p className={`text-sm ${previous.matched ? 'text-bad' : 'text-good'}`}>
+            {previous.matched
               ? 'A possible match was recorded — do not approve without escalating.'
-              : 'Screened, no match recorded.'}
+              : 'Screened against the EU consolidated list, no match.'}
           </p>
-          <p className="mt-1 text-xs text-faint">Recorded {screenedAt.slice(0, 10)}</p>
+          <p className="mt-1 text-xs text-faint">
+            Recorded {screenedAt.slice(0, 10)}
+            {previous.searched.length > 0
+              ? ` · searched ${previous.searched.join(', ')}`
+              : ''}
+          </p>
 
-          {/*
-            The raw provider payload, verbatim. If a match is ever disputed, what the
-            screener actually saw is the only useful evidence — a summary would be our
-            interpretation of it.
-          */}
-          {result ? (
-            <pre className="mt-3 max-h-40 overflow-auto rounded border border-line bg-field p-3 text-xs text-muted">
-              {JSON.stringify(result, null, 2)}
-            </pre>
+          {previous.candidates.length > 0 ? (
+            <ul className="mt-3 grid gap-2">
+              {previous.candidates.map((candidate) => (
+                <li
+                  key={`${candidate.designationId}-${candidate.name}`}
+                  className="rounded border border-line bg-field px-3 py-2"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-sm text-text">{candidate.name}</span>
+                    <ConfidencePill confidence={candidate.confidence} />
+                  </div>
+                  {/*
+                    The numbers are shown, not hidden behind the label. A reviewer
+                    dismissing a hit needs to see it scored 0.4 on letters and shares
+                    no name part — otherwise the only options are blind trust or
+                    blanket dismissal.
+                  */}
+                  <p className="mt-1 text-xs text-faint">
+                    {candidate.subjectType} · similarity {candidate.similarity} · shared
+                    name parts {candidate.tokenOverlap}
+                    {candidate.programme ? ` · ${candidate.programme}` : ''}
+                  </p>
+                  {candidate.details ? (
+                    <p className="mt-1 text-xs text-muted">{candidate.details}</p>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
           ) : null}
         </div>
       ) : (
         <p className="text-sm text-gold">
-          Not screened. A partner cannot be verified until a screening result is recorded.
+          Not screened. A partner cannot be verified until a screening has been run.
         </p>
       )}
-
-      <p className="mt-3 text-xs text-faint">
-        SAFRA does not yet call a screening provider. Search the EU consolidated list for
-        the legal name and the signing person, then record what you found.
-      </p>
 
       {error ? (
         <p role="alert" className="mt-3 text-xs text-bad">
@@ -111,84 +154,100 @@ export function ScreeningPanel({
         </p>
       ) : null}
 
-      {recording ? (
-        <form
-          className="mt-3 grid gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const form = new FormData(event.currentTarget);
-            const notes = form.get('notes');
-            void record(
-              form.get('matched') === 'yes',
-              typeof notes === 'string' ? notes : '',
-            );
-          }}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => void run()}
+          disabled={busy}
+          className="rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-60"
         >
-          <label htmlFor="notes" className="text-xs text-muted">
-            What did you search, and what came back?
-          </label>
-          <textarea
-            id="notes"
-            name="notes"
-            required
-            rows={2}
-            className="rounded-lg border border-line bg-field px-3 py-2 text-sm text-text"
-          />
+          {busy ? 'Searching…' : screenedAt ? 'Screen again' : 'Run screening'}
+        </button>
 
-          <fieldset className="grid gap-1.5">
-            <legend className="text-xs text-muted">Result</legend>
-            <label className="flex items-center gap-2 text-sm text-text">
-              <input
-                type="radio"
-                name="matched"
-                value="no"
-                defaultChecked
-                className="accent-gold"
-              />
-              No match
-            </label>
-            <label className="flex items-center gap-2 text-sm text-text">
-              <input type="radio" name="matched" value="yes" className="accent-gold" />
-              Possible match — needs escalation
-            </label>
-          </fieldset>
-
-          <div className="flex gap-2">
+        {/*
+          The override, available only after a check has run. Overriding a result
+          that does not exist would be the assertion-based screening this replaced.
+        */}
+        {screenedAt ? (
+          <>
             <button
-              type="submit"
+              type="button"
+              onClick={() => setOverride(previous.matched ? false : true)}
+              disabled={busy}
+              className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold disabled:opacity-60"
+            >
+              {previous.matched ? 'Record as not a match' : 'Flag as a match anyway'}
+            </button>
+          </>
+        ) : null}
+      </div>
+
+      {override !== null ? (
+        <div className="mt-3 rounded border border-gold/30 bg-gold/5 p-3">
+          <p className="text-xs text-gold">
+            {override
+              ? 'This will record a match against the automated result, blocking approval.'
+              : 'This will clear the match against the automated result. Only do this if you have confirmed a different party.'}
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => void run(override)}
               disabled={busy}
               className="rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-60"
             >
-              {busy ? 'Saving…' : 'Record result'}
+              Confirm override
             </button>
             <button
               type="button"
-              onClick={() => setRecording(false)}
+              onClick={() => setOverride(null)}
               className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted"
             >
               Cancel
             </button>
           </div>
-        </form>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setRecording(true)}
-          className="mt-3 rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold"
-        >
-          {screenedAt ? 'Record a new screening' : 'Record screening result'}
-        </button>
-      )}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function isMatched(result: unknown): boolean {
+function ConfidencePill({ confidence }: { confidence: Candidate['confidence'] }) {
+  const tone =
+    confidence === 'strong'
+      ? 'border-bad/40 bg-bad/10 text-bad'
+      : confidence === 'possible'
+        ? 'border-gold/40 bg-gold/10 text-gold'
+        : 'border-line bg-field text-faint';
+
   return (
-    typeof result === 'object' &&
-    result !== null &&
-    (result as Record<string, unknown>)['matched'] === true
+    <span className={`rounded-full border px-2 py-0.5 text-xs ${tone}`}>
+      {confidence}
+    </span>
   );
+}
+
+/** Reads the stored payload defensively — its shape has changed once already. */
+function readResult(result: unknown): {
+  matched: boolean;
+  searched: string[];
+  candidates: Candidate[];
+} {
+  if (typeof result !== 'object' || result === null) {
+    return { matched: false, searched: [], candidates: [] };
+  }
+
+  const record = result as Record<string, unknown>;
+
+  return {
+    matched: record['matched'] === true,
+    searched: Array.isArray(record['searched'])
+      ? record['searched'].filter((s): s is string => typeof s === 'string')
+      : [],
+    candidates: Array.isArray(record['candidates'])
+      ? (record['candidates'] as Candidate[])
+      : [],
+  };
 }
 
 function messageOf(body: unknown): string | null {

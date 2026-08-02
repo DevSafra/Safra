@@ -19,5 +19,6 @@ export * from './property.js';
 export * from './booking.js';
 export * from './payment.js';
 export * from './wallet.js';
+export * from './sanctions.js';
 export * from './audit.js';
 export * from './settings.js';

@@ -231,3 +231,20 @@ export async function getProperty(reference: string) {
     propertyDetailSchema,
   );
 }
+
+// ─── Sanctions list health (ADR 0002) ─────────────────────────────────────────
+
+const sanctionsStatusSchema = z.object({
+  imported: z.boolean(),
+  stale: z.boolean(),
+  entryCount: z.number(),
+  fetchedAt: z.string().nullable(),
+  publishedAt: z.string().nullable(),
+  ageDays: z.number().nullable(),
+});
+
+export type SanctionsStatus = z.infer<typeof sanctionsStatusSchema>;
+
+export async function getSanctionsStatus() {
+  return staffFetch('/admin/sanctions/status', sanctionsStatusSchema);
+}

@@ -231,13 +231,22 @@ export const partnerVerifySchema = z
 
 export type PartnerVerifyInput = z.infer<typeof partnerVerifySchema>;
 
-/** Raw screening result from the sanctions provider, stored verbatim for audit. */
+/**
+ * Recording a sanctions screening (ADR 0002, §8.1).
+ *
+ * Note what is NOT here: the result. The platform runs the search itself against the
+ * imported EU consolidated list, so a caller cannot assert an outcome it did not
+ * obtain — which is what the previous shape allowed, making the legal obligation
+ * satisfiable by a staff member simply saying they had checked.
+ *
+ * `matched` remains, as an OVERRIDE. Only a human can judge whether a fuzzy hit is
+ * the same person, and the override is recorded alongside what the matcher said.
+ */
 export const sanctionsScreeningSchema = z
   .object({
-    provider: z.string().trim().min(1).max(80),
-    matched: z.boolean(),
-    /** Provider payload; shape varies, so it is not modelled further. */
-    details: z.unknown().optional(),
+    /** Overrides the automated reading, in either direction. Audited when it differs. */
+    matched: z.boolean().optional(),
+    notes: z.string().trim().max(2000).optional(),
   })
   .strict();
 

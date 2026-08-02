@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 
 import {
   PERMISSIONS as P,
@@ -10,10 +11,13 @@ import {
   sanctionsScreeningSchema,
 } from '@safra/contracts';
 
+import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ReviewService } from './review.service.js';
+import { EU_SOURCE, SanctionsService } from '../sanctions/sanctions.service.js';
+import { parseEuSanctionsXml } from '../sanctions/eu-list.parser.js';
 
 /**
  * Staff verification endpoints (SRS §8.1, §9.2).
@@ -25,7 +29,10 @@ import { ReviewService } from './review.service.js';
  */
 @Controller('admin')
 export class AdminController {
-  constructor(private readonly review: ReviewService) {}
+  constructor(
+    private readonly review: ReviewService,
+    private readonly sanctions: SanctionsService,
+  ) {}
 
   /** The §9.2 dashboard counters. */
   @Get('attention')
@@ -88,9 +95,59 @@ export class AdminController {
   }
 
   /**
-   * Records a sanctions screening result. Gated on document review rather than
-   * approval, because this is part of collecting evidence, not deciding on it.
+   * RUNS a sanctions screening and records what it found (ADR 0002).
+   *
+   * Gated on document review rather than approval, because this is collecting
+   * evidence rather than deciding on it — and the two are held by different roles on
+   * purpose, so the person who gathers the evidence need not be the one who acts on
+   * it.
    */
+  /**
+   * Whether the sanctions list is current enough to screen against.
+   *
+   * Surfaced so the console can say "the list is 9 days old" instead of a reviewer
+   * discovering it as an unexplained refusal on the decision they were about to make.
+   */
+  @Get('sanctions/status')
+  @RequirePermissions(P.PARTNER_DOCUMENT_REVIEW)
+  async sanctionsStatus() {
+    return this.sanctions.status();
+  }
+
+  /**
+   * Imports a sanctions list body directly (ADR 0002).
+   *
+   * The documented fallback when `SANCTIONS_FEED_URL` is unset or the publisher's
+   * token has lapsed — an operator downloads the export and posts it. Without this,
+   * a rotated token would silently block every partner verification with no way to
+   * recover short of a deploy.
+   *
+   * `SETTINGS_UPDATE`, so only `super_admin` can replace the list a legal obligation
+   * is checked against. Throttled hard: it parses megabytes and writes thousands of
+   * rows.
+   */
+  @Post('sanctions/import')
+  @RequirePermissions(P.SETTINGS_UPDATE)
+  @Throttle({ default: { limit: 3, ttl: 300_000 } })
+  @AuditExempt('The snapshot row itself is the record, with its content hash.')
+  async importSanctionsList(@Body() body: { xml?: unknown }) {
+    if (typeof body?.xml !== 'string' || body.xml.length < 1000) {
+      throw new BadRequestException(
+        'Post the sanctions list XML as { "xml": "..." }. A body this small cannot ' +
+          'be a consolidated list.',
+      );
+    }
+
+    const parsed = parseEuSanctionsXml(body.xml);
+
+    return this.sanctions.importSnapshot({
+      source: EU_SOURCE,
+      rawBody: body.xml,
+      publishedAt: parsed.publishedAt,
+      entries: parsed.entries,
+    });
+  }
+
   @Post('partners/:reference/sanctions-screening')
   @RequirePermissions(P.PARTNER_DOCUMENT_REVIEW)
   async recordScreening(

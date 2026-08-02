@@ -7,6 +7,7 @@ import { createDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { ReviewService } from './review.service.js';
+import { SanctionsService } from '../sanctions/sanctions.service.js';
 
 /**
  * The §8.1 verification queues, against a REAL PostgreSQL.
@@ -33,7 +34,12 @@ describeIfDb('verification queues', () => {
   beforeAll(async () => {
     db = createDatabase(DATABASE_URL as string, 3);
 
-    review = new ReviewService(db, new AuditService(db));
+    /**
+     * A real SanctionsService. These tests only exercise the QUEUES, which never
+     * screen — but constructing the real thing means a change to its shape breaks
+     * here rather than silently at runtime.
+     */
+    review = new ReviewService(db, new AuditService(db), new SanctionsService(db));
 
     reference = await createPendingPartnerWithDocument(db);
   });

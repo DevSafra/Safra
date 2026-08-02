@@ -303,3 +303,19 @@ END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS settings_key_scope_unique
   ON settings (key, scope, scope_id) NULLS NOT DISTINCT
   WHERE deleted_at IS NULL;
+
+-- ----------------------------------------------------------------------------
+-- 7. Sanctions screening (ADR 0002)
+-- ----------------------------------------------------------------------------
+--
+-- Fuzzy name matching needs a trigram index; a btree cannot serve `similarity()`
+-- at all. Without it every partner verification would sequentially scan the whole
+-- list — slow enough that someone would eventually be tempted to skip the check,
+-- which is the one outcome this feature cannot have.
+CREATE INDEX IF NOT EXISTS sanctions_entries_name_trgm_idx
+  ON sanctions_entries USING gin (normalised_name gin_trgm_ops);
+
+-- Screening reads the newest COMPLETE snapshot per source on every verification.
+CREATE INDEX IF NOT EXISTS sanctions_snapshots_current_idx
+  ON sanctions_snapshots (source, completed_at DESC)
+  WHERE completed_at IS NOT NULL;

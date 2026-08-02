@@ -12,6 +12,7 @@ import { schema } from '@safra/db';
 import type { PartnerVerifyInput, PropertyReviewInput } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { SanctionsService } from '../sanctions/sanctions.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -27,6 +28,7 @@ export class ReviewService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly sanctions: SanctionsService,
   ) {}
 
   /** §9.2's "properties awaiting approval" queue, oldest first so nothing rots. */
@@ -409,21 +411,63 @@ export class ReviewService {
   }
 
   /** Records that screening was performed, with the provider's raw result. */
+  /**
+   * RUNS a screening against the imported list and records the result (ADR 0002).
+   *
+   * This used to accept whatever result the caller supplied, which meant the legal
+   * obligation was satisfied by a staff member asserting they had checked. Now the
+   * platform performs the search itself against the newest EU consolidated-list
+   * snapshot, and the recorded result is what the search actually returned.
+   *
+   * A reviewer can still override the outcome — `matched` is theirs to set, because
+   * only a human can judge whether a fuzzy hit is the same person — but they are
+   * overriding evidence rather than producing it from nothing.
+   */
   async recordSanctionsScreening(
     claims: AccessTokenClaims | undefined,
     reference: string,
-    result: unknown,
+    input: { matched?: boolean | undefined; notes?: string | undefined },
   ) {
-    const updated = await this.db
+    const partner = await this.db.query.partners.findFirst({
+      where: and(
+        eq(schema.partners.reference, reference),
+        isNull(schema.partners.deletedAt),
+      ),
+      columns: { id: true, legalName: true, displayName: true },
+    });
+
+    if (!partner) throw new NotFoundException('Partner not found.');
+
+    /**
+     * Both names are searched. A designation may name the company or the person
+     * signing for it, and a partner registers with both.
+     */
+    const outcome = await this.sanctions.screen([partner.legalName, partner.displayName]);
+
+    /**
+     * The reviewer's judgement wins over the machine's, in EITHER direction.
+     *
+     * Up, because a reviewer who recognises a name the matcher scored as weak must
+     * be able to flag it. Down, because the matcher deliberately over-flags and a
+     * human confirming "different person, different country, different birth year"
+     * is exactly the decision this design reserves for people.
+     */
+    const matched = input.matched ?? outcome.matched;
+
+    const result = {
+      ...outcome,
+      matched,
+      /** Recorded when the reviewer disagreed with the automated reading. */
+      ...(input.matched !== undefined && input.matched !== outcome.matched
+        ? { overriddenBy: claims?.sub ?? null, automatedMatch: outcome.matched }
+        : {}),
+      ...(input.notes ? { reviewerNotes: input.notes } : {}),
+    };
+
+    await this.db
       .update(schema.partners)
       .set({ sanctionsScreenedAt: new Date(), sanctionsScreeningResult: result })
-      .where(
-        and(eq(schema.partners.reference, reference), isNull(schema.partners.deletedAt)),
-      )
-      .returning({ id: schema.partners.id });
-
-    const partner = updated[0];
-    if (!partner) throw new NotFoundException('Partner not found.');
+      .where(eq(schema.partners.id, partner.id));
 
     await this.audit.record({
       actorUserId: claims?.sub,
@@ -431,10 +475,17 @@ export class ReviewService {
       action: 'partner.sanctions_screened',
       subjectType: 'partner',
       subjectId: partner.id,
-      after: { screenedAt: new Date().toISOString() },
+      after: {
+        screenedAt: new Date().toISOString(),
+        source: outcome.source,
+        snapshotId: outcome.snapshotId,
+        candidateCount: outcome.candidates.length,
+        matched,
+        automatedMatch: outcome.matched,
+      },
     });
 
-    return { reference, screened: true };
+    return { reference, screened: true, matched, candidates: outcome.candidates };
   }
 
   /** Counts for the §9.2 "needs your attention now" panel. */
