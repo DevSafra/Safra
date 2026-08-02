@@ -145,7 +145,47 @@ describeIfDb('SettingsAdminService', () => {
       expect(await settings.get(KEY, 0)).toBe(92);
     });
   });
+
+  describe('the history is evidence', () => {
+    /**
+     * Regression guard. `settings_history` was created without the append-only
+     * trigger its siblings (`audit_log`, `timeline_events`, `ledger_entries`) all
+     * carry, so the record of who changed a commission rate could be rewritten or
+     * deleted outright — by anything holding a database connection.
+     */
+    it('cannot be updated', async () => {
+      await admin.update(KEY, 93, 'to be tampered with', {});
+
+      await expect(
+        db.execute(sql`
+          UPDATE settings_history SET reason = 'covered up'
+          WHERE key = ${KEY} AND reason = 'to be tampered with'
+        `),
+      ).rejects.toSatisfy(isAppendOnlyRefusal);
+    });
+
+    it('cannot be deleted', async () => {
+      await expect(
+        db.execute(sql`DELETE FROM settings_history WHERE key = ${KEY}`),
+      ).rejects.toSatisfy(isAppendOnlyRefusal);
+    });
+  });
 });
+
+/**
+ * Asserts the rejection came from the append-only trigger, not from anything else.
+ *
+ * Drizzle wraps a driver error as "Failed query: …" and hangs the real one off
+ * `cause`, so matching the top-level message would pass for ANY failed statement —
+ * including a typo in the test's own SQL. The trigger's own text is what proves the
+ * guard fired.
+ */
+function isAppendOnlyRefusal(error: unknown): boolean {
+  const cause = (error as { cause?: unknown }).cause;
+  const message = cause instanceof Error ? cause.message : String(error);
+
+  return /append-only/i.test(message);
+}
 
 async function currentValue(db: Database, key: string): Promise<unknown> {
   const row = await db.execute<{ value: unknown }>(

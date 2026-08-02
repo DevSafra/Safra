@@ -167,7 +167,12 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'ledger_entries', 'audit_log', 'wallet_transactions',
-    'gift_card_transactions', 'timeline_events'
+    'gift_card_transactions', 'timeline_events',
+    -- settings_history is the record of who changed a commission rate or an SLA
+    -- window and what it was before. It is evidence in exactly the same sense as
+    -- audit_log, so it gets the same protection rather than relying on the parallel
+    -- audit_log row surviving.
+    'settings_history'
   ]
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', t || '_immutable', t);
