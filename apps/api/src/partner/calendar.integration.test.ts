@@ -213,13 +213,35 @@ async function seed(db: Database): Promise<void> {
     ON CONFLICT DO NOTHING`);
 }
 
+/**
+ * Removes the fixture, by PARENT rather than by fixed child id.
+ *
+ * The previous version deleted `units WHERE id = UNIT_ID` and then the property. Any
+ * other unit under that property — left behind by a run that errored before its own
+ * teardown — blocked the property delete with a foreign key violation, and the suite
+ * then failed on every subsequent run against that database. One bad run poisoned the
+ * database permanently, and the resulting failure pointed at the calendar tests rather
+ * than at whatever had actually crashed.
+ *
+ * Deleting everything under the parent makes cleanup self-healing: it removes its own
+ * rows and any debris from an earlier failure.
+ *
+ * Hard deletes are acceptable ONLY here: these are synthetic rows, never production
+ * data. P-003 governs application code paths, not test cleanup.
+ */
 async function teardown(db: Database): Promise<void> {
   const { sql } = await import('drizzle-orm');
 
-  // Hard deletes are acceptable ONLY here: these are synthetic test rows, never
-  // production data. P-003 governs application code paths, not test cleanup.
-  await db.execute(sql`DELETE FROM availability_days WHERE unit_id = ${UNIT_ID}::uuid`);
-  await db.execute(sql`DELETE FROM units WHERE id = ${UNIT_ID}::uuid`);
+  const units = sql`SELECT id FROM units WHERE property_id = ${PROPERTY_ID}::uuid`;
+
+  await db.execute(sql`DELETE FROM availability_days WHERE unit_id IN (${units})`);
+  /**
+   * Bookings are cleared before units because a booking holds a foreign key to one.
+   * Scoped to this fixture's property, so a booking belonging to any other suite is
+   * untouched.
+   */
+  await db.execute(sql`DELETE FROM bookings WHERE property_id = ${PROPERTY_ID}::uuid`);
+  await db.execute(sql`DELETE FROM units WHERE property_id = ${PROPERTY_ID}::uuid`);
   await db.execute(sql`DELETE FROM properties WHERE id = ${PROPERTY_ID}::uuid`);
   await db.execute(sql`DELETE FROM partners WHERE id = ${PARTNER_ID}::uuid`);
   await db.execute(sql`DELETE FROM users WHERE id = ${claims.sub}::uuid`);
