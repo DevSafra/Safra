@@ -8,6 +8,8 @@ import helmet from 'helmet';
 
 import { AppModule } from './app.module.js';
 import { API_PREFIX } from './config/constants.js';
+import { JsonLogger } from './common/logging/json.logger.js';
+import { requestIdMiddleware } from './common/logging/request-id.middleware.js';
 import { loadEnv } from './config/env.js';
 
 async function bootstrap(): Promise<void> {
@@ -15,11 +17,15 @@ async function bootstrap(): Promise<void> {
   // immediately and visibly rather than serving broken requests.
   const env = loadEnv();
 
+  /**
+   * Structured JSON in every environment but development, at the level LOG_LEVEL
+   * asks for. That variable was declared in the schema and read by nothing, so the
+   * setting appeared to work and did not.
+   */
+  const logger = new JsonLogger(env.LOG_LEVEL, env.NODE_ENV === 'development');
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger:
-      env.NODE_ENV === 'production'
-        ? ['error', 'warn', 'log']
-        : ['error', 'warn', 'log', 'debug', 'verbose'],
+    logger,
     /**
      * Keeps the unparsed request body available as `req.rawBody`.
      *
@@ -38,6 +44,13 @@ async function bootstrap(): Promise<void> {
    * and walk straight through the rate limiter.
    */
   app.set('trust proxy', 1);
+
+  /**
+   * FIRST, before anything that might log. Everything downstream runs inside the
+   * request context this establishes, so a line written by a later middleware —
+   * including a helmet or CORS rejection — still carries the correlation ID.
+   */
+  app.use(requestIdMiddleware);
 
   app.use(helmet({ contentSecurityPolicy: env.NODE_ENV === 'production' }));
   app.use(cookieParser());
@@ -60,12 +73,29 @@ async function bootstrap(): Promise<void> {
    * Unknown-field rejection is not lost: every request schema is .strict().
    */
   app.setGlobalPrefix(API_PREFIX);
+  /**
+   * SIGTERM closes the app rather than killing it, so in-flight requests finish and
+   * the Redis and database pools drain. A rolling deploy otherwise severs whatever
+   * was mid-request at the moment the old replica was replaced.
+   */
   app.enableShutdownHooks();
+
+  /**
+   * Logged so shutdown is OBSERVABLE. A container that exits fast looks identical
+   * whether it drained cleanly or was killed outright, and the difference only shows
+   * up later as unexplained truncated requests during deploys.
+   */
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.once(signal, () => {
+      new Logger('Bootstrap').log(`${signal} received; draining and shutting down.`);
+    });
+  }
 
   await app.listen(env.PORT);
 
   new Logger('Bootstrap').log(
-    `SAFRA API listening on http://localhost:${env.PORT}/${API_PREFIX} [${env.NODE_ENV}]`,
+    `SAFRA API listening on http://localhost:${env.PORT}/${API_PREFIX} ` +
+      `[${env.NODE_ENV}, log level ${env.LOG_LEVEL}]`,
   );
 }
 

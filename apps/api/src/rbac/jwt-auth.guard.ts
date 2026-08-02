@@ -8,6 +8,7 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 
 import { TokenService, type AccessTokenClaims } from '../auth/token.service.js';
+import { setRequestUser } from '../common/logging/request-context.js';
 import { PUBLIC_KEY } from './decorators.js';
 
 /**
@@ -38,6 +39,7 @@ export class JwtAuthGuard implements CanActivate {
       if (token) {
         try {
           request.user = await this.tokens.verifyAccessToken(token);
+          setRequestUser(request.user.sub);
         } catch {
           // An invalid token on a public route is simply treated as anonymous.
         }
@@ -50,6 +52,13 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     request.user = await this.tokens.verifyAccessToken(token);
+
+    /**
+     * Every subsequent log line carries who made the request. The ID, never the
+     * email — logs leave the machine, and rule 1 keeps full PII out of them.
+     */
+    setRequestUser(request.user.sub);
+
     return true;
   }
 }
