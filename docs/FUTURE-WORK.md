@@ -6,7 +6,7 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for the next
 > action, then §4–§9 for the item you are picking up.
 
-**Last updated:** 2026-08-02 (M-4, M-5, M-6 delivered; container image, structured logging and deployment requirements added)
+**Last updated:** 2026-08-02 (M-4, M-5, M-6 delivered; container image, structured logging, deployment requirements, test-teardown hardening)
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
 **Last pushed:** `422dc33` — later commits are local until pushed
 
@@ -319,22 +319,12 @@ Things that are not blockers but will cost someone a day if forgotten.
   Each now carries a `NOT YET WIRED` comment, because the alternative is a deployer
   setting `SENTRY_DSN`, believing error tracking is on, and never discovering S-1 is
   outstanding. Keep the labels until the code actually reads them.
-- **Integration tests need a FRESH database; a long-lived one accumulates debris and
-  produces phantom failures.** On 2026-08-02 two unrelated intermittent failures
-  appeared in a dev database that had been reused all session: an FX assertion
-  (`ServiceUnavailableException` for a rate that had just been inserted) and a calendar
-  teardown (`DELETE FROM properties` blocked by a foreign key from `units`). The
-  database had **36 leftover units** under one shared fixture property, accumulated
-  from earlier runs that errored before their teardown completed.
-  **Resolution: not a code or test defect.** Three consecutive full runs against a
-  freshly migrated and seeded database passed 505/505 and leaked zero rows. CI is
-  unaffected because it provisions a new database per run.
-  **What this means in practice:** before believing a local integration failure, re-run
-  against a fresh database — `createdb`, `db:migrate`, `db:seed`. A red run on a reused
-  database is not evidence of a regression.
-  **Residual improvement, low priority:** teardowns that delete by fixed fixture ID
-  (`DELETE FROM units WHERE id = $UNIT_ID`) leave behind rows created with random IDs
-  under the same parent. Deleting by parent instead would make them self-healing.
+- **A local integration failure on a REUSED database is not evidence of a regression.**
+  Two unrelated intermittent failures on 2026-08-02 (an FX assertion, a calendar
+  teardown) both traced to debris accumulated in a dev database used all session, not
+  to any defect. Re-run against a freshly migrated and seeded database before
+  believing one. The root cause is fixed — see §10 — but the habit is still the right
+  one, because any suite whose teardown is interrupted can leave rows behind.
 - **A test mutates a shared seeded setting.** `settings-admin.integration.test.ts`
   changes `booking.confirmation_window_minutes` while vitest runs files in parallel.
   Nothing reads the derived value in a test today — the payments tests set
