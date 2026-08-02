@@ -4,9 +4,9 @@
 > recover full context and continue, without reading the rest of the repository first.
 >
 > **How to use it in a new session:** read §1 for where things stand, §3 for the next
-> action, then §4–§9 for the item you are picking up.
+> action, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-02 (S-6 key rotation delivered; all three apps containerised; web CSP added)
+**Last updated:** 2026-08-02 (full security review completed — see §11)
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
 **Last pushed:** `422dc33` — later commits are local until pushed
 
@@ -38,7 +38,7 @@ approve or reject a listing, look up any booking with its full money breakdown a
 append-only timeline, read the audit log, and change every operational setting with the
 change attributed and recorded.
 
-**517 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
+**528 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
 clean, and the suite passes against a freshly migrated and seeded database.
 
 **What remains is not product.** It is infrastructure, operations and compliance. That
@@ -129,7 +129,7 @@ termination, and a deploy pipeline.
 **Still blocked:** the pipeline, and everything that needs a running environment.
 
 **Note:** the API refuses to boot in production without `SMTP_URL` and without
-`S3_ACCESS_KEY_ID` + `S3_BUCKET`. Both are deliberate; see §10.
+`S3_ACCESS_KEY_ID` + `S3_BUCKET`. Both are deliberate; see §11.
 
 ### M-2 — The sanctions feed is not activated
 
@@ -177,15 +177,15 @@ nobody has restored is not a backup.
 
 ### M-4 — Rate limiting is per-process
 
-**Status:** ✅ **Delivered 2026-08-02.** See §10.
+**Status:** ✅ **Delivered 2026-08-02.** See §11.
 
 ### M-5 — Staff accounts can only be created with direct SQL
 
-**Status:** ✅ **Delivered 2026-08-02.** See §10.
+**Status:** ✅ **Delivered 2026-08-02.** See §11.
 
 ### M-6 — No health endpoint
 
-**Status:** ✅ **Delivered 2026-08-02.** See §10.
+**Status:** ✅ **Delivered 2026-08-02.** See §11.
 
 ---
 
@@ -268,8 +268,47 @@ above, and then a deletion/pseudonymisation mechanism.
 
 ### S-6 — `FIELD_ENCRYPTION_KEY` rotation
 
-**Status:** ✅ **Delivered 2026-08-02.** See §10 and
+**Status:** ✅ **Delivered 2026-08-02.** See §11 and
 [`runbooks/encryption-key-rotation.md`](runbooks/encryption-key-rotation.md).
+
+### S-8 — Uploaded documents are not scanned for malware
+
+**Status:** open · **Severity:** Medium · **Owner:** Platform engineering +
+Compliance · **Dependency:** a scanning service (vendor/infrastructure decision)
+
+**Rationale.** Partners upload identity documents, ownership proof and commercial
+register extracts. The pipeline validates magic bytes, re-encodes images through sharp
+(which strips EXIF and would fail on a malformed file), and passes PDFs through
+verbatim. Nothing scans for malware.
+
+**Impact.** The realistic victim is a **staff reviewer**, not the server: a malicious
+PDF opened in the admin console attacks their machine. Downloads are served with
+`Content-Disposition: attachment`, `X-Content-Type-Options: nosniff` and `no-store`,
+so the browser will not render it inline — that reduces the risk but does not remove
+it, because the reviewer's job is to open the file.
+
+**Mitigation now in place:** magic-byte type detection, image re-encoding, attachment
+disposition, per-request authorisation, and an audit row for every document read.
+
+**Recommended next action:** a ClamAV sidecar or an object-storage scanning hook,
+quarantining anything flagged and surfacing it in the review queue. Needs the hosting
+decision (M-1) before it can be wired.
+
+### S-9 — No independent penetration test
+
+**Status:** open · **Severity:** High (assurance gap, not a known defect) ·
+**Owner:** **Bashar** — needs a vendor · **Dependency:** M-1, a deployed environment
+
+**Rationale.** Everything in §11 was reviewed and probed by the same party that wrote
+it. That finds implementation errors; it does not reliably find design blind spots,
+and it cannot be evidence of independence for a compliance conversation.
+
+**Impact.** Unknown by definition. No finding here should be read as "the platform is
+secure" — only as "these specific attacks were tried and did not work".
+
+**Recommended next action:** commission an external test once a staging environment
+exists, scoped to the customer app, the staff console and the API, with authenticated
+testing at every role. Book it early; good testers have lead times.
 
 ### S-7 — Migrations are forward-only, with no tested rollback
 
@@ -345,7 +384,7 @@ Things that are not blockers but will cost someone a day if forgotten.
   Two unrelated intermittent failures on 2026-08-02 (an FX assertion, a calendar
   teardown) both traced to debris accumulated in a dev database used all session, not
   to any defect. Re-run against a freshly migrated and seeded database before
-  believing one. The root cause is fixed — see §10 — but the habit is still the right
+  believing one. The root cause is fixed — see §11 — but the habit is still the right
   one, because any suite whose teardown is interrupted can leave rows behind.
 - **A test mutates a shared seeded setting.** `settings-admin.integration.test.ts`
   changes `booking.confirmation_window_minutes` while vitest runs files in parallel.
@@ -395,7 +434,89 @@ Things that are not blockers but will cost someone a day if forgotten.
 
 ---
 
-## 10. Resolved
+## 10. Security review — 2026-08-02
+
+A full pass over authentication, authorisation, injection, browser security, file
+handling, secrets, logging, API surface, data integrity, containers, recovery and
+tests. **Probed against a running system**, not read.
+
+**This is a self-review.** It finds implementation errors; it is not independent
+assurance and must not be quoted as such. See **S-9**.
+
+### Verified sound — attacks attempted and defeated
+
+Each row is a thing that was actually tried against a running instance.
+
+| Attack                                              | Result                                                                |
+| --------------------------------------------------- | --------------------------------------------------------------------- |
+| Read another customer's booking                     | `404` — not `403`, which would confirm it exists                      |
+| Cancel / partner-confirm another's booking          | `403`                                                                 |
+| Reach any `/admin/*` route as a customer            | `403` on all five tried                                               |
+| Reach `/partner/*` as a customer                    | `403`                                                                 |
+| Set `role: super_admin` at registration             | `400`, unknown key rejected by `.strict()`                            |
+| Set `permissionOverrides` at registration           | `400`                                                                 |
+| Enumerate accounts via login                        | Identical message for known and unknown                               |
+| Enumerate via password reset                        | `204` for both                                                        |
+| CORS from `https://evil.example`                    | No `Access-Control-Allow-Origin` returned                             |
+| Brute-force one account                             | `401`×5 then `429`; account locked even after clearing the IP counter |
+| Replay a used refresh token                         | `401`, and the whole token family revoked                             |
+| SQL injection via reference/query                   | Only 2 `sql.raw` calls exist, both on compile-time constants          |
+| Path traversal on media                             | Allow-list pattern **and** a root-containment check                   |
+| 5 MB / 200 KB request body                          | `413`                                                                 |
+| Forge a log line via a newline in an email          | 0 forged lines — JSON serialisation escapes it                        |
+| Delete verified webhook evidence                    | Refused by trigger: "This row is evidence"                            |
+| Delete audit / ledger / timeline / settings history | Refused by trigger                                                    |
+| Backdate a webhook's `created_at`                   | Refused by trigger                                                    |
+
+Also confirmed: refresh cookie is `HttpOnly; SameSite=Strict; Path=/api/v1/auth` with
+`Secure` gated on production; EXIF is stripped by re-encoding through sharp; document
+reads are authorised per request and audited; unverified webhooks are recorded but
+never processed (**0 of 1,208**); production dependencies report **no known
+vulnerabilities** (`pnpm audit --prod`), and the single ignored advisory is dev-only,
+justified in `AUDIT-EXCEPTIONS.md`, and gated separately in CI.
+
+### Fixed during the review
+
+| Finding                                           | Severity     | Fix                                                                             |
+| ------------------------------------------------- | ------------ | ------------------------------------------------------------------------------- |
+| Staff 2FA enforced in the console, not the API    | **Critical** | `StaffTwoFactorGuard` — declining to enrol was a way to opt out entirely        |
+| Customer app had no Content-Security-Policy       | **High**     | Strict CSP, inline script admitted by hash not `unsafe-inline`                  |
+| `FIELD_ENCRYPTION_KEY` could not be rotated       | **High**     | Two-key support + re-encryption; rotation performed end to end                  |
+| Production could store ID documents on local disk | **High**     | Boot-time refusal                                                               |
+| Unauthenticated unbounded table growth            | **Medium**   | Immutability narrowed to evidence; daily pruning                                |
+| HSTS missing from both web apps                   | **Medium**   | Set in each app, not only at the edge                                           |
+| `settings_history` was mutable                    | **Medium**   | Same append-only trigger as its siblings                                        |
+| Booking timestamps rendered in server timezone    | **Medium**   | Explicit `AT TIME ZONE 'UTC'`                                                   |
+| Wrong encryption key produced an opaque `500`     | **Medium**   | `503` + a log naming the variable                                               |
+| Rate limits were per-process                      | **Medium**   | Redis-backed; measured 6-through-instead-of-3 before, 3 after                   |
+| Every login logged a false audit warning          | **Low**      | Declared exempt — constant benign warnings train people to ignore the mechanism |
+
+### Open, with severity
+
+| #   | Finding                                   | Severity         | Blocked by                      |
+| --- | ----------------------------------------- | ---------------- | ------------------------------- |
+| S-9 | No independent penetration test           | High (assurance) | Vendor + a deployed environment |
+| M-3 | No backups or tested restore              | High             | Hosting                         |
+| S-1 | No alerting on security events            | High             | Hosting                         |
+| S-8 | No malware scanning on uploads            | Medium           | Vendor + hosting                |
+| S-4 | GDPR erasure conflicts with the audit log | Medium           | **Compliance decision**         |
+| M-2 | Sanctions screening not activated         | Medium           | **Compliance registration**     |
+| S-7 | No stated migration rollback strategy     | Medium           | M-1                             |
+| S-5 | No legal review                           | Medium           | **Legal**                       |
+| S-3 | Never load-tested                         | Medium           | Hosting                         |
+
+### Accepted risks
+
+- **Rate limiting fails open when Redis is down.** Failing closed turns a cache outage
+  into a total outage. Bounded, deliberate, and the reason S-1 lists Redis alerting.
+- **Webhooks answer `200` to an invalid signature.** A `4xx` makes providers retry
+  forever or disable the endpoint. Payloads are recorded and never acted on.
+- **One dev-only dependency advisory**, documented in `AUDIT-EXCEPTIONS.md`, with
+  production audited separately and clean.
+
+---
+
+## 11. Resolved
 
 Kept because the reason something was blocked is often the reason it returns.
 
