@@ -2,6 +2,8 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { and, eq, isNull, sql } from 'drizzle-orm';
@@ -38,6 +40,8 @@ export interface RequestContext {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly passwords: PasswordService,
@@ -173,7 +177,38 @@ export class AuthService {
           throw new UnauthorizedException('Invalid recovery code.');
         }
       } else {
-        const secret = this.encryption.decrypt(user.totpSecretEncrypted);
+        let secret: string;
+
+        try {
+          secret = this.encryption.decrypt(user.totpSecretEncrypted);
+        } catch (error) {
+          /**
+           * The stored secret cannot be decrypted — which means the key is wrong, not
+           * that the person is.
+           *
+           * Almost always `FIELD_ENCRYPTION_KEY` differing from the one that encrypted
+           * the row: a mistyped secret, an environment promoted with the wrong value,
+           * or a rotation performed without re-encrypting. Left unhandled it surfaced
+           * as a bare 500 with "Internal server error", identical for every staff
+           * account, and nothing anywhere named the key. An operator would reasonably
+           * conclude the database or the API was broken.
+           *
+           * Logged loudly and named precisely; the client gets 503 rather than 401,
+           * because "try again with the right code" is wrong advice — no code will
+           * ever work until the configuration is fixed.
+           */
+          this.logger.error(
+            `Cannot decrypt the stored TOTP secret for user ${user.id}. This is a ` +
+              `configuration fault, not a bad code: FIELD_ENCRYPTION_KEY does not ` +
+              `match the key the secret was encrypted with. Every staff sign-in will ` +
+              `fail until it does. ` +
+              `(${error instanceof Error ? error.message : String(error)})`,
+          );
+
+          throw new ServiceUnavailableException(
+            'Sign-in is temporarily unavailable. Please contact support.',
+          );
+        }
 
         if (!authenticator.verify({ token: input.totpCode as string, secret })) {
           await this.registerFailedAttempt(user.id);
