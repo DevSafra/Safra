@@ -6,7 +6,7 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for the next
 > action, then §4–§9 for the item you are picking up.
 
-**Last updated:** 2026-08-02 (M-4, M-5, M-6 delivered; staff console screens added)
+**Last updated:** 2026-08-02 (M-4, M-5, M-6 delivered; container image, structured logging and deployment requirements added)
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
 **Last pushed:** `422dc33` — later commits are local until pushed
 
@@ -38,7 +38,7 @@ approve or reject a listing, look up any booking with its full money breakdown a
 append-only timeline, read the audit log, and change every operational setting with the
 change attributed and recorded.
 
-**492 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
+**505 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
 clean, and the suite passes against a freshly migrated and seeded database.
 
 **What remains is not product.** It is infrastructure, operations and compliance. That
@@ -115,8 +115,18 @@ Everything else in this section is downstream of it.
 with `pg_trgm`, managed Redis, object storage (S3-compatible), a secret manager, TLS
 termination, and a deploy pipeline.
 
-**Partially actionable now:** a multi-stage Dockerfile is provider-agnostic and can be
-written before the decision. The pipeline cannot.
+**Partially done (2026-08-02).** The provider-agnostic half is complete and verified:
+
+- `apps/api/Dockerfile` — multi-stage, non-root, no source or dev dependencies in the
+  final layer, `tini` for signal handling, a liveness-only `HEALTHCHECK`. Verified by
+  building it and running it against real Postgres and Redis: serves both health
+  endpoints, reports `healthy`, and logs `SIGTERM received; draining` on stop.
+- `docs/runbooks/deployment-requirements.md` — what any provider must supply, written
+  so the hosting decision can be made against a concrete list. **Read it before
+  choosing**; it flags `pg_trgm` availability as a hard requirement that a few managed
+  Postgres offerings do not meet, which would be an expensive surprise post-migration.
+
+**Still blocked:** the pipeline, and everything that needs a running environment.
 
 **Note:** the API refuses to boot in production without `SMTP_URL` and without
 `S3_ACCESS_KEY_ID` + `S3_BUCKET`. Both are deliberate; see §10.
@@ -184,6 +194,14 @@ nobody has restored is not a backup.
 ### S-1 — No error tracking, no metrics, no alerts
 
 **Status:** blocked on M-1 · **Owner:** Platform engineering
+
+**Prerequisite done (2026-08-02):** logs are now structured JSON on stdout, one object
+per line, carrying `level`, `time`, `context`, `requestId` and `userId`. Sensitive keys
+are redacted **in the logger**, not by convention at each call site. Every request gets
+an `x-request-id` — reused from upstream when present so a trace started at the load
+balancer stays one trace — and it is echoed in the response, so a support conversation
+can start with an ID instead of "it broke around two o'clock". Wiring an aggregator is
+now configuration rather than a refactor.
 
 No Sentry or equivalent; no metrics, so the p95 < 200 ms budget in the project rules is
 currently unmeasurable.
@@ -287,11 +305,36 @@ been reviewed. Required for a German merchant entity handling EU personal data.
 
 Things that are not blockers but will cost someone a day if forgotten.
 
+- **The logger is hand-rolled, not pino.** ~60 lines, chosen for no new dependency in a
+  payments process and for redaction that cannot be bypassed by a call site. If log
+  volume ever makes serialisation measurable, swapping the `write` method for pino is a
+  contained change — measure before doing it.
+- **`trust proxy` is set to `1` — exactly one hop.** More than one proxy in front of the
+  API requires changing that number, or a client can forge `X-Forwarded-For` and walk
+  through the rate limiter. Called out in the deployment requirements too.
+- **Cron jobs run in-process with Postgres advisory locks.** Do NOT configure an
+  external scheduler as well; it would double-run them.
 - **`.env.example` lists variables nothing reads, and they are labelled.** `SENTRY_DSN`,
   `OTEL_EXPORTER_OTLP_ENDPOINT`, the WhatsApp trio and `MAPTILER_API_KEY` are aspirational.
   Each now carries a `NOT YET WIRED` comment, because the alternative is a deployer
   setting `SENTRY_DSN`, believing error tracking is on, and never discovering S-1 is
   outstanding. Keep the labels until the code actually reads them.
+- **Integration tests need a FRESH database; a long-lived one accumulates debris and
+  produces phantom failures.** On 2026-08-02 two unrelated intermittent failures
+  appeared in a dev database that had been reused all session: an FX assertion
+  (`ServiceUnavailableException` for a rate that had just been inserted) and a calendar
+  teardown (`DELETE FROM properties` blocked by a foreign key from `units`). The
+  database had **36 leftover units** under one shared fixture property, accumulated
+  from earlier runs that errored before their teardown completed.
+  **Resolution: not a code or test defect.** Three consecutive full runs against a
+  freshly migrated and seeded database passed 505/505 and leaked zero rows. CI is
+  unaffected because it provisions a new database per run.
+  **What this means in practice:** before believing a local integration failure, re-run
+  against a fresh database — `createdb`, `db:migrate`, `db:seed`. A red run on a reused
+  database is not evidence of a regression.
+  **Residual improvement, low priority:** teardowns that delete by fixed fixture ID
+  (`DELETE FROM units WHERE id = $UNIT_ID`) leave behind rows created with random IDs
+  under the same parent. Deleting by parent instead would make them self-healing.
 - **A test mutates a shared seeded setting.** `settings-admin.integration.test.ts`
   changes `booking.confirmation_window_minutes` while vitest runs files in parallel.
   Nothing reads the derived value in a test today — the payments tests set
