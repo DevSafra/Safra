@@ -52,13 +52,22 @@ describe('AuthService.login when the TOTP secret cannot be decrypted', () => {
       verifyDummy: () => Promise.resolve(undefined),
     } as unknown as PasswordService;
 
+    /**
+     * `decryptForRotation` is what the login path calls, not `decrypt` — that changed
+     * when key rotation landed (S-6), and this stub failing to keep up is exactly how
+     * this test caught the change.
+     */
+    const decrypt =
+      overrides.decrypt ??
+      (() => {
+        // Exactly what node's crypto throws for a key/ciphertext mismatch.
+        throw new Error('Unsupported state or unable to authenticate data');
+      });
+
     const encryption = {
-      decrypt:
-        overrides.decrypt ??
-        (() => {
-          // Exactly what node's crypto throws for a key/ciphertext mismatch.
-          throw new Error('Unsupported state or unable to authenticate data');
-        }),
+      decrypt,
+      decryptForRotation: () => ({ plaintext: decrypt(), needsReEncryption: false }),
+      encrypt: (value: string) => value,
     } as unknown as FieldEncryptionService;
 
     return new AuthService(

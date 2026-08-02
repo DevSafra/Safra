@@ -180,7 +180,21 @@ export class AuthService {
         let secret: string;
 
         try {
-          secret = this.encryption.decrypt(user.totpSecretEncrypted);
+          const decrypted = this.encryption.decryptForRotation(user.totpSecretEncrypted);
+          secret = decrypted.plaintext;
+
+          /**
+           * Migrated opportunistically (S-6). The secret still lives under the retired
+           * key, so it is rewritten under the current one now that we hold the
+           * plaintext. Rotation therefore completes by itself for anyone who signs in,
+           * and `pnpm rotate:encryption-key` only has to sweep up the dormant accounts.
+           *
+           * Not awaited into the login path's critical section — a failed re-encrypt
+           * must never turn a valid sign-in into an error. The next login retries it.
+           */
+          if (decrypted.needsReEncryption) {
+            void this.reEncryptTotpSecret(user.id, secret);
+          }
         } catch (error) {
           /**
            * The stored secret cannot be decrypted — which means the key is wrong, not
@@ -282,6 +296,31 @@ export class AuthService {
    * Counter increments in SQL rather than read-modify-write, so concurrent
    * guesses cannot race each other into an undercount.
    */
+  /**
+   * Rewrites a TOTP secret under the current key.
+   *
+   * Failure is logged and swallowed: this runs alongside a successful sign-in, and
+   * the person signing in has nothing to do with it. The value stays readable via the
+   * retired key until it succeeds, so the only cost of a failure is that rotation is
+   * not yet finished for this account.
+   */
+  private async reEncryptTotpSecret(userId: string, secret: string): Promise<void> {
+    try {
+      await this.db
+        .update(schema.users)
+        .set({ totpSecretEncrypted: this.encryption.encrypt(secret) })
+        .where(eq(schema.users.id, userId));
+
+      this.logger.log(`Re-encrypted the TOTP secret for user ${userId} (key rotation).`);
+    } catch (error) {
+      this.logger.error(
+        `Could not re-encrypt the TOTP secret for user ${userId}; it remains under ` +
+          `the previous key and will be retried on the next sign-in. ` +
+          `(${error instanceof Error ? error.message : String(error)})`,
+      );
+    }
+  }
+
   private async registerFailedAttempt(userId: string): Promise<void> {
     await this.db
       .update(schema.users)

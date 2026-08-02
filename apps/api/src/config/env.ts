@@ -46,6 +46,20 @@ export const envSchema = z.object({
       'Must be 64 hex characters. Generate with: openssl rand -hex 32',
     ),
 
+  /**
+   * The key being rotated OUT, used for decryption only (future-work S-6).
+   *
+   * Without it, rotating `FIELD_ENCRYPTION_KEY` makes every stored TOTP secret
+   * undecryptable and locks every staff account out of the console at once — and
+   * recovery is circular if the super admin is locked out too. With it, both keys
+   * decrypt while only the new one encrypts, so secrets migrate as people sign in and
+   * `pnpm rotate:encryption-key` finishes the rest. Remove it once nothing needs it.
+   */
+  FIELD_ENCRYPTION_KEY_PREVIOUS: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/i, 'Must be 64 hex characters, like FIELD_ENCRYPTION_KEY.')
+    .optional(),
+
   /** This service's own public base URL, used to build media links. */
   API_URL_SELF: z.string().url().default('http://localhost:4000'),
 
@@ -188,6 +202,22 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
       'S3_ACCESS_KEY_ID and S3_BUCKET are required in production. Without them ' +
         'uploads fall back to local disk, where partner identity documents are ' +
         'invisible to other replicas and lost on redeploy.',
+    );
+  }
+
+  /**
+   * A previous key identical to the current one is a rotation that did not happen —
+   * almost certainly a copy-paste while setting it up. Allowing it would leave the
+   * operator believing they had rotated when they had not.
+   */
+  if (
+    env.FIELD_ENCRYPTION_KEY_PREVIOUS &&
+    env.FIELD_ENCRYPTION_KEY_PREVIOUS.toLowerCase() ===
+      env.FIELD_ENCRYPTION_KEY.toLowerCase()
+  ) {
+    throw new Error(
+      'FIELD_ENCRYPTION_KEY_PREVIOUS is identical to FIELD_ENCRYPTION_KEY. That is ' +
+        'not a rotation — unset it, or set the key actually being retired.',
     );
   }
 
