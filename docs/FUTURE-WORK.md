@@ -6,7 +6,7 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for the next
 > action, then §4–§9 for the item you are picking up.
 
-**Last updated:** 2026-08-02 (M-4, M-5 and M-6 delivered — every unblocked must-have is done)
+**Last updated:** 2026-08-02 (M-4, M-5, M-6 delivered; staff console screens added)
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
 **Last pushed:** `422dc33` — later commits are local until pushed
 
@@ -287,6 +287,11 @@ been reviewed. Required for a German merchant entity handling EU personal data.
 
 Things that are not blockers but will cost someone a day if forgotten.
 
+- **`.env.example` lists variables nothing reads, and they are labelled.** `SENTRY_DSN`,
+  `OTEL_EXPORTER_OTLP_ENDPOINT`, the WhatsApp trio and `MAPTILER_API_KEY` are aspirational.
+  Each now carries a `NOT YET WIRED` comment, because the alternative is a deployer
+  setting `SENTRY_DSN`, believing error tracking is on, and never discovering S-1 is
+  outstanding. Keep the labels until the code actually reads them.
 - **A test mutates a shared seeded setting.** `settings-admin.integration.test.ts`
   changes `booking.confirmation_window_minutes` while vitest runs files in parallel.
   Nothing reads the derived value in a test today — the payments tests set
