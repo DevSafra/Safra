@@ -138,6 +138,13 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post('refresh')
+  /**
+   * Not audited, deliberately. A refresh happens every fifteen minutes for every
+   * active session; auditing it would bury the events §15 exists to preserve under
+   * routine token churn. The security-relevant case — a REPLAYED refresh token — is
+   * recorded by TokenService when it revokes the family.
+   */
+  @AuditExempt('Routine token rotation; replay detection is what gets recorded.')
   @HttpCode(HttpStatus.OK)
   async refresh(
     @Req() request: Request,

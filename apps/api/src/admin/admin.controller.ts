@@ -85,6 +85,9 @@ export class AdminController {
   }
 
   @Post('partners/:reference/verify')
+  @AuditExempt(
+    'ReviewService records partner.approved / partner.rejected transactionally.',
+  )
   @RequirePermissions(P.PARTNER_APPROVE)
   async verifyPartner(
     @CurrentUser() user: AccessTokenClaims | undefined,
@@ -150,6 +153,9 @@ export class AdminController {
    */
   @Post('partners/:reference/sanctions-screening')
   @RequirePermissions(P.PARTNER_DOCUMENT_REVIEW)
+  @AuditExempt(
+    'ReviewService records partner.sanctions_screened inside the screening transaction.',
+  )
   async recordScreening(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('reference') reference: string,
