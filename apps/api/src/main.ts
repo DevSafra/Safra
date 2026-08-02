@@ -10,6 +10,7 @@ import { AppModule } from './app.module.js';
 import { API_PREFIX } from './config/constants.js';
 import { JsonLogger } from './common/logging/json.logger.js';
 import { requestIdMiddleware } from './common/logging/request-id.middleware.js';
+import { requestLogMiddleware } from './common/logging/request-log.middleware.js';
 import { loadEnv } from './config/env.js';
 
 async function bootstrap(): Promise<void> {
@@ -51,6 +52,12 @@ async function bootstrap(): Promise<void> {
    * including a helmet or CORS rejection — still carries the correlation ID.
    */
   app.use(requestIdMiddleware);
+
+  /**
+   * Immediately after the id, and before everything else. Middleware runs ahead of
+   * the guards, so this records rejections a Nest interceptor would never see.
+   */
+  app.use(requestLogMiddleware);
 
   app.use(helmet({ contentSecurityPolicy: env.NODE_ENV === 'production' }));
   app.use(cookieParser());
