@@ -144,7 +144,9 @@ real card yet — that is a commercial blocker, not an engineering one (item 135
 64. ✅ Audit interceptor — `@Audited` writes rows automatically, and any mutating route
     marked neither `@Audited` nor `@AuditExempt` logs a startup warning. It immediately
     caught one undeclared route (§15)
-65. ❌ Audit log viewer endpoint (§9.3)
+65. ✅ Audit log viewer — `GET /admin/audit-log` with prefix action filter, actor filter and
+    full-precision keyset pagination, plus the `/audit` console screen. Read-only by
+    construction: the table is append-only by trigger, and there is no write path
 
 ### 0.7 Known defects, found and not yet fixed
 
@@ -313,10 +315,13 @@ building something else and none is urgent enough to have widened that change.
      - **The decision stays human.** The service never approves or rejects; it returns
        candidates, and a reviewer may override in either direction — with the override
        and the automated reading both recorded.
-     - ❌ **120a** The feed URL is configuration (`SANCTIONS_FEED_URL`), not a constant,
-       and **has not been verified against the live endpoint** — the EU's export sits
-       behind a publisher-issued token and the well-known URL returned 500 from this
-       environment. An operator must supply a working URL; until then the documented
+     - 🔶 **120a** The feed URL is configuration (`SANCTIONS_FEED_URL`), not a constant.
+       **Activation is now fully documented** in `docs/runbooks/sanctions-feed.md`, including
+       a finding verified against the live service on 2026-08-02: the widely-circulated
+       public token returns 500 (identical to a bogus token, while the FSF service itself is
+       healthy), so registration is mandatory — and the parser needs the **1.1** export, not
+       the 1.0 one most third-party guidance points at. What remains is an EU Login account
+       and a token, which is a compliance task, not an engineering one. Until then the
        fallback is `POST /admin/sanctions/import`, which is built and tested. A
        hardcoded URL would have produced a system that stops refreshing silently.
      - ❌ **120b** Ongoing monitoring. This is a point-in-time check: a partner
@@ -618,8 +623,13 @@ shipped._
      - ❌ **159d** Bookings, customers, finance, reports, ads, emergency mode, audit
        viewer — the remaining §9.3 sections
 160. ❌ The 18 sections listed in §9.3
-161. ❌ Booking detail with full timeline, messages and internal notes (§9.4)
-162. ❌ Settings editor for commissions, SLA, fines, cutoff (P-005)
+161. 🔶 Booking detail with full timeline (§9.4) — **built**: parties, dates, money with the
+     snapshotted SYP rate, append-only timeline, and a payments section present only for
+     `PAYMENT_READ` holders (absent, not redacted). **Messages and internal notes are not**,
+     because neither feature exists yet — see items 164–165
+162. ✅ Settings editor (P-005) — per-`valueSchema` validation, one save per setting rather
+     than a bulk post, `settings_history` + audit row written in the same transaction, and
+     an unvalidatable schema (`payment.provider_routing`) refused rather than waved through
 163. ❌ **Emergency Mode** activation per city/country (EC-009)
 164. ❌ Audit log viewer
 165. ❌ Staff user and permission management
@@ -700,19 +710,33 @@ These block engineering work and are not ours to make.
 
 ## Immediate next steps
 
-1. **Confirm the sanctions feed URL — item 120a.** Everything around it is built and
-   tested; what is missing is a working `SANCTIONS_FEED_URL`, which needs a
-   publisher-issued token this environment could not obtain. Until it is set, the list
-   must be imported by hand and will go stale in seven days — at which point partner
-   verification refuses outright. **This is the one thing blocking real onboarding.**
-2. **Partner payout accounts — item 84. DEFERRED to the end of the project** with the
-   rest of the payment work (Bashar, 2026-08-01): it needs the payout mechanism per
-   country, which is item 193 and still open. The onboarding loop is otherwise complete —
-   a partner can apply, upload documents, and be reviewed and verified.
-3. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
-   established, so the second and third stored-value instruments are far cheaper now
-   than they would have been before it.
-4. **A settings editor in the admin app — item 161.** `money.always_usd`, the per-setting
-   currencies and `rbac.finance_can_manage_fx` are all live in the API and all only
-   reachable by hand. P-005 promised configuration, not configuration a developer has to
-   apply.
+**A full production-readiness assessment now lives in `docs/production-readiness.md`.**
+This list is the engineering slice of it.
+
+1. **Register for the sanctions feed — item 120a.** Everything around it is built, tested
+   and now documented (`docs/runbooks/sanctions-feed.md`). What is missing is an EU Login
+   account and a publisher-issued token, which this environment cannot obtain and which is
+   a **compliance** task. Until `SANCTIONS_FEED_URL` is set, the list must be imported by
+   hand and goes stale in seven days — at which point partner verification refuses
+   outright. **Start this first; it depends on an external party.**
+2. **Redis-backed rate limiting.** `ThrottlerModule` uses the default in-memory store, so
+   with N replicas the effective limit is N × the configured one and every counter resets
+   on deploy. It weakens exactly the limits that matter — login, password reset, OTP — and
+   it contradicts the stateless-app-server rule. Redis is already required and provisioned;
+   it is simply not wired up.
+3. **Hosting, backups and a health endpoint — items 193 and beyond.** There is no
+   deployment target, no tested restore, and `GET /health` 404s so no load balancer can
+   tell a wedged replica from a healthy one. Nothing else can be verified until something
+   is actually running.
+4. **Staff provisioning.** Every staff account so far was inserted with SQL. Bootstrapping
+   production currently means running an INSERT against the production database — the
+   exact access pattern the audit log exists to make unnecessary.
+5. **Messages and disputes — the largest product gap.** SRS §4 defines a support agent as
+   someone who sees bookings, messages and disputes. Only bookings exist; the other two
+   have permissions defined and assigned but no tables, no modules and no UI, which makes
+   the platform look more capable than it is.
+6. **Partner payout accounts — item 84. DEFERRED to the end of the project** with the rest
+   of the payment work (Bashar, 2026-08-01): it needs the payout mechanism per country,
+   which is item 193 and still open. The onboarding loop is otherwise complete.
+7. **Gift cards and coupons — items 142–143.** They compose at the seam split payment
+   established, so they are far cheaper now than they would have been before it.
