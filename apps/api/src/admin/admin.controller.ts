@@ -95,14 +95,6 @@ export class AdminController {
   }
 
   /**
-   * RUNS a sanctions screening and records what it found (ADR 0002).
-   *
-   * Gated on document review rather than approval, because this is collecting
-   * evidence rather than deciding on it — and the two are held by different roles on
-   * purpose, so the person who gathers the evidence need not be the one who acts on
-   * it.
-   */
-  /**
    * Whether the sanctions list is current enough to screen against.
    *
    * Surfaced so the console can say "the list is 9 days old" instead of a reviewer
@@ -148,6 +140,14 @@ export class AdminController {
     });
   }
 
+  /**
+   * RUNS a sanctions screening and records what it found (ADR 0002).
+   *
+   * Gated on document review rather than approval, because this is collecting
+   * evidence rather than deciding on it — and the two are held by different roles on
+   * purpose, so the person who gathers the evidence need not be the one who acts on
+   * it.
+   */
   @Post('partners/:reference/sanctions-screening')
   @RequirePermissions(P.PARTNER_DOCUMENT_REVIEW)
   async recordScreening(

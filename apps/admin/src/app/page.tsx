@@ -32,8 +32,46 @@ export default async function DashboardPage() {
             {session?.user.email} · {session?.user.role.replace(/_/g, ' ')}
           </p>
         </div>
-        <SignOutButton />
+        <div className="flex flex-wrap items-center gap-2">
+          {/*
+            Section links rather than a sidebar. Four destinations does not justify
+            persistent chrome, and a queue-first console should open on the queues.
+          */}
+          <Link
+            href="/settings"
+            className="rounded-lg border border-line px-3 py-2 text-sm text-muted hover:border-gold/50 hover:text-gold"
+          >
+            Rules Engine
+          </Link>
+          <Link
+            href="/audit"
+            className="rounded-lg border border-line px-3 py-2 text-sm text-muted hover:border-gold/50 hover:text-gold"
+          >
+            Audit log
+          </Link>
+          <SignOutButton />
+        </div>
       </header>
+
+      {/*
+        Booking lookup by reference. §9.4's screen is reached by reference because
+        that is what a customer reads out on the phone — there is no browsable list of
+        every booking, and there should not be one.
+      */}
+      <form action="/bookings" method="get" className="mt-6 flex flex-wrap gap-2">
+        <input
+          name="reference"
+          placeholder="BKG-2026-000123"
+          aria-label="Find a booking by reference"
+          className="min-w-56 flex-1 rounded-lg border border-line bg-field px-3 py-2 text-sm text-text"
+        />
+        <button
+          type="submit"
+          className="rounded-lg border border-line px-4 py-2 text-sm text-muted hover:border-gold/50 hover:text-gold"
+        >
+          Find booking
+        </button>
+      </form>
 
       {/* ── Attention counters (§9.2) ─────────────────────────────────────── */}
       <section className="mt-8 grid gap-3 sm:grid-cols-3">

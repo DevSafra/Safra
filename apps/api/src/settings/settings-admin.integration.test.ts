@@ -1,0 +1,156 @@
+import { sql } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+import { createDatabase, type Database } from '@safra/db';
+
+import { AuditService } from '../common/audit/audit.service.js';
+import { SettingsAdminService } from './settings-admin.service.js';
+import { SettingsService } from './settings.service.js';
+
+/**
+ * The Rules Engine against a REAL PostgreSQL (SRS §9.3, P-005).
+ *
+ * Settings govern money — the commission rate, the service fee, the SLA window — so
+ * the properties worth pinning are not "the form works" but: a bad value cannot get
+ * in, a change cannot happen without its record, and that record cannot later be
+ * altered.
+ *
+ * Skipped when DATABASE_URL is unset; CI provisions a database and runs it.
+ */
+const DATABASE_URL = process.env['DATABASE_URL'];
+const describeIfDb = DATABASE_URL ? describe : describe.skip;
+
+describeIfDb('SettingsAdminService', () => {
+  let db: Database;
+  let admin: SettingsAdminService;
+  let settings: SettingsService;
+
+  /** Restored after each test so a failure cannot leave the platform misconfigured. */
+  const KEY = 'booking.confirmation_window_minutes';
+  let original: unknown;
+
+  beforeAll(async () => {
+    db = createDatabase(DATABASE_URL as string, 2);
+    settings = new SettingsService(db);
+    admin = new SettingsAdminService(db, settings, new AuditService(db));
+
+    const row = await db.execute<{ value: unknown }>(
+      sql`SELECT value FROM settings WHERE key = ${KEY} AND scope = 'global'`,
+    );
+
+    original = row.rows[0]?.value;
+  });
+
+  afterAll(async () => {
+    await db.execute(sql`
+      UPDATE settings SET value = ${JSON.stringify(original)}::jsonb
+      WHERE key = ${KEY} AND scope = 'global'
+    `);
+
+    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+  });
+
+  beforeEach(() => {
+    settings.invalidate();
+  });
+
+  describe('rejecting values that would silently misconfigure the platform', () => {
+    /**
+     * The failure mode this guards. `SettingsService.getNumber` falls back to the
+     * caller's default when the stored value is not a number — so a rate saved as a
+     * string leaves every commission using the hardcoded fallback while the admin
+     * screen displays the new figure. Nothing throws and nothing warns.
+     */
+    it('refuses a numeric setting supplied as a string', async () => {
+      await expect(admin.update(KEY, '90', undefined, {})).rejects.toThrow(
+        /whole number/i,
+      );
+    });
+
+    it('refuses a rate outside 0..1, which is how 7% becomes 700%', async () => {
+      await expect(
+        admin.update('commission.partner_rate', 7, undefined, {}),
+      ).rejects.toThrow(/between 0 and 1/i);
+    });
+
+    it('refuses a negative fine, which would invert who owes whom', async () => {
+      await expect(
+        admin.update('partner.first_violation_fine', -10, undefined, {}),
+      ).rejects.toThrow(/positive amount/i);
+    });
+
+    /**
+     * A typo must not create a second, plausible-looking key. `commision.partner_rate`
+     * would never be consulted, and the real setting would stay silently in force.
+     */
+    it('refuses to create a key that was never seeded', async () => {
+      await expect(
+        admin.update('commision.partner_rate', 0.07, undefined, {}),
+      ).rejects.toThrow(/settings are seeded/i);
+    });
+
+    /**
+     * `payment.provider_routing` is a nested object this editor cannot check. Waving
+     * an unknown schema through is how a typo breaks payment routing.
+     */
+    it('refuses a schema it cannot validate rather than accepting it', async () => {
+      await expect(
+        admin.update('payment.provider_routing', { '*': [] }, undefined, {}),
+      ).rejects.toThrow(/cannot validate/i);
+    });
+
+    it('leaves the stored value untouched after a rejection', async () => {
+      await admin.update(KEY, '90', undefined, {}).catch(() => undefined);
+
+      const row = await db.execute<{ value: unknown }>(
+        sql`SELECT value FROM settings WHERE key = ${KEY} AND scope = 'global'`,
+      );
+
+      expect(row.rows[0]?.value).toEqual(original);
+    });
+  });
+
+  describe('recording the change', () => {
+    it('writes history and audit together with the value', async () => {
+      const before = await currentValue(db, KEY);
+
+      await admin.update(KEY, 91, 'Ramadan pilot', {});
+
+      const history = await admin.history(KEY, 1);
+
+      expect(history[0]).toMatchObject({
+        previousValue: before,
+        newValue: 91,
+        reason: 'Ramadan pilot',
+      });
+
+      const audit = await db.execute<{ after: { value: number } }>(sql`
+        SELECT after FROM audit_log
+        WHERE action = 'setting.updated' AND after->>'key' = ${KEY}
+        ORDER BY created_at DESC LIMIT 1
+      `);
+
+      expect(audit.rows[0]?.after.value).toBe(91);
+    });
+
+    /**
+     * The point of invalidating rather than waiting out the 30-second TTL: an
+     * operator who closes the same-day cutoff must see it take effect, not wonder
+     * whether the save worked.
+     */
+    it('makes the new value readable immediately, not after the cache TTL', async () => {
+      await settings.get(KEY, 0); // Warm the cache with the old value.
+      await admin.update(KEY, 92, undefined, {});
+
+      expect(await settings.get(KEY, 0)).toBe(92);
+    });
+  });
+});
+
+async function currentValue(db: Database, key: string): Promise<unknown> {
+  const row = await db.execute<{ value: unknown }>(
+    sql`SELECT value FROM settings WHERE key = ${key} AND scope = 'global'`,
+  );
+
+  return row.rows[0]?.value;
+}

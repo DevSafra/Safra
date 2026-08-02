@@ -248,3 +248,156 @@ export type SanctionsStatus = z.infer<typeof sanctionsStatusSchema>;
 export async function getSanctionsStatus() {
   return staffFetch('/admin/sanctions/status', sanctionsStatusSchema);
 }
+
+// ─── Audit log (§15, item 65) ─────────────────────────────────────────────────
+
+const auditEntrySchema = z.object({
+  id: z.string(),
+  action: z.string(),
+  subjectType: z.string(),
+  subjectId: z.string().nullable(),
+  actorEmail: z.string().nullable(),
+  actorRole: z.string().nullable(),
+  before: z.unknown(),
+  after: z.unknown(),
+  reason: z.string().nullable(),
+  ipAddress: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type AuditEntry = z.infer<typeof auditEntrySchema>;
+
+const auditPageSchema = z.object({
+  items: z.array(auditEntrySchema),
+  nextCursor: z.string().nullable(),
+});
+
+export async function getAuditLog(params: Record<string, string | undefined>) {
+  const query = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value) query.set(key, value);
+  }
+
+  return staffFetch(`/admin/audit-log?${query.toString()}`, auditPageSchema);
+}
+
+export async function getAuditActions() {
+  return staffFetch(
+    '/admin/audit-log/actions',
+    z.object({ actions: z.array(z.string()) }),
+  );
+}
+
+// ─── Settings (§9.3, P-005) ───────────────────────────────────────────────────
+
+const settingSchema = z.object({
+  key: z.string(),
+  value: z.unknown(),
+  valueSchema: z.string(),
+  descriptionEn: z.string().nullable(),
+  descriptionAr: z.string().nullable(),
+  updatedAt: z.string().nullable(),
+  updatedByEmail: z.string().nullable(),
+});
+
+export type EditableSetting = z.infer<typeof settingSchema>;
+
+export async function getSettings() {
+  return staffFetch('/admin/settings', z.object({ settings: z.array(settingSchema) }));
+}
+
+// ─── Booking detail (§9.4) ────────────────────────────────────────────────────
+
+const bookingDetailSchema = z.object({
+  reference: z.string(),
+  status: z.string(),
+  stay: z.object({
+    checkIn: z.string(),
+    checkOut: z.string(),
+    nights: z.number(),
+    adults: z.number(),
+    children: z.number(),
+    infants: z.number(),
+  }),
+  customer: z.object({
+    reference: z.string(),
+    name: z.string(),
+    email: z.string(),
+    phone: z.string(),
+    isGuest: z.boolean(),
+  }),
+  partner: z.object({
+    reference: z.string(),
+    name: z.string(),
+    phone: z.string(),
+  }),
+  property: z.object({
+    reference: z.string(),
+    name: z.string(),
+    unit: z.string(),
+    citySlug: z.string(),
+  }),
+  money: z.object({
+    currencyCode: z.string(),
+    baseAmount: z.string(),
+    customerFeeAmount: z.string(),
+    walletAmount: z.string(),
+    totalAmount: z.string(),
+    partnerCommissionAmount: z.string(),
+    partnerPayableAmount: z.string(),
+    totalSyp: z.string(),
+    fxRateToSyp: z.string(),
+  }),
+  dates: z.object({
+    createdAt: z.string(),
+    paidAt: z.string().nullable(),
+    confirmationDeadlineAt: z.string().nullable(),
+    confirmedAt: z.string().nullable(),
+    cancelledAt: z.string().nullable(),
+  }),
+  cancellationReason: z.string().nullable(),
+  timeline: z.array(
+    z.object({
+      eventType: z.string(),
+      actorType: z.string(),
+      actorEmail: z.string().nullable(),
+      payload: z.unknown(),
+      createdAt: z.string(),
+    }),
+  ),
+  /** Present only for callers holding PAYMENT_READ — absent, not redacted (§4). */
+  payments: z
+    .object({
+      attempts: z.array(
+        z.object({
+          reference: z.string(),
+          method: z.string(),
+          provider: z.string(),
+          amount: z.string(),
+          status: z.string(),
+          capturedAt: z.string().nullable(),
+          createdAt: z.string(),
+        }),
+      ),
+      refunds: z.array(
+        z.object({
+          amount: z.string(),
+          walletAmount: z.string(),
+          status: z.string(),
+          reason: z.string(),
+          createdAt: z.string(),
+        }),
+      ),
+    })
+    .optional(),
+});
+
+export type BookingDetail = z.infer<typeof bookingDetailSchema>;
+
+export async function getBooking(reference: string) {
+  return staffFetch(
+    `/admin/bookings/${encodeURIComponent(reference)}`,
+    bookingDetailSchema,
+  );
+}
