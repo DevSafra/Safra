@@ -401,3 +401,27 @@ export async function getBooking(reference: string) {
     bookingDetailSchema,
   );
 }
+
+/**
+ * A staff account as the console lists it (M-5).
+ *
+ * `invitationPending` is surfaced because an unopened invitation looks identical to
+ * an active account in a plain list, and "why can't they log in" is the support
+ * ticket that follows.
+ */
+const staffMemberSchema = z.object({
+  id: z.string(),
+  email: z.string(),
+  role: z.string(),
+  status: z.string(),
+  twoFactorEnabled: z.boolean(),
+  invitationPending: z.boolean(),
+  lastLoginAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type StaffMember = z.infer<typeof staffMemberSchema>;
+
+export async function getStaff() {
+  return staffFetch('/admin/staff', z.object({ staff: z.array(staffMemberSchema) }));
+}

@@ -38,6 +38,12 @@ export default async function DashboardPage() {
             persistent chrome, and a queue-first console should open on the queues.
           */}
           <Link
+            href="/staff"
+            className="rounded-lg border border-line px-3 py-2 text-sm text-muted hover:border-gold/50 hover:text-gold"
+          >
+            Staff
+          </Link>
+          <Link
             href="/settings"
             className="rounded-lg border border-line px-3 py-2 text-sm text-muted hover:border-gold/50 hover:text-gold"
           >
