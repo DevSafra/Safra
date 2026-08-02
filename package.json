@@ -22,7 +22,8 @@
     "verify": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run audit:deps",
     "lint:fix": "turbo run build --filter='./packages/*' && eslint . --fix",
     "prepare": "git config core.hooksPath .githooks || true",
-    "bootstrap:admin": "pnpm --filter @safra/api bootstrap:admin"
+    "bootstrap:admin": "pnpm --filter @safra/api bootstrap:admin",
+    "rotate:encryption-key": "pnpm --filter @safra/api rotate:encryption-key"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
