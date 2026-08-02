@@ -6,7 +6,7 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for the next
 > action, then §4–§9 for the item you are picking up.
 
-**Last updated:** 2026-08-02 (M-4 and M-6 delivered)
+**Last updated:** 2026-08-02 (M-4, M-5 and M-6 delivered — every unblocked must-have is done)
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
 **Last pushed:** `422dc33` — later commits are local until pushed
 
@@ -38,7 +38,7 @@ approve or reject a listing, look up any booking with its full money breakdown a
 append-only timeline, read the audit log, and change every operational setting with the
 change attributed and recorded.
 
-**477 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
+**492 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
 clean, and the suite passes against a freshly migrated and seeded database.
 
 **What remains is not product.** It is infrastructure, operations and compliance. That
@@ -74,15 +74,16 @@ must-haves have a plan.**
 2. **M-2** Sanctions feed activation — blocked on an external party
 3. **M-3** Backups and restore validation — blocked on M-1
 4. ~~**M-4** Redis-backed rate limiting~~ — **done 2026-08-02**, see §10
-5. **M-5** Staff provisioning workflow — **ready to build, next up**
+5. ~~**M-5** Staff provisioning workflow~~ — **done 2026-08-02**, see §10
 6. ~~**M-6** Health endpoint~~ — **done 2026-08-02**, see §10
 
 **Start M-2 immediately regardless of its position.** It is the only item whose timeline
 SAFRA does not control, and it fails a week after anyone stops paying attention.
 
-**M-4 and M-6 are delivered.** M-5 is the only remaining must-have that is not blocked
-by an external party or a decision, so it is the next thing to build. M-1, M-2 and M-3
-cannot start until someone outside engineering acts.
+**M-4, M-5 and M-6 are delivered. Every must-have that engineering can act on alone is
+now done.** M-1, M-2 and M-3 are blocked on a decision (hosting) or an external party
+(the EU registration); M-3 additionally depends on M-1. Nothing further on the
+must-have list can start until someone outside engineering acts.
 
 ### Highest-risk item
 
@@ -170,21 +171,7 @@ nobody has restored is not a backup.
 
 ### M-5 — Staff accounts can only be created with direct SQL
 
-**Status:** **ready to build, nothing blocking** · **Owner:** Backend
-
-No invite flow, no admin-creates-admin screen, no seed for the first `super_admin`.
-Every staff account so far was inserted by hand.
-
-This is not merely inconvenient. Bootstrapping production means running an INSERT against
-the production database — the exact access pattern the audit log exists to make
-unnecessary.
-
-**To unblock:** nothing. Needs a documented bootstrap command for the first
-`super_admin`, then an in-console invite flow for the rest.
-
-**Design constraint:** a newly created staff account must be forced through 2FA
-enrolment before it can do anything. `StaffTwoFactorGuard` already enforces this — see
-§10 — so the invite flow must not attempt to work around it.
+**Status:** ✅ **Delivered 2026-08-02.** See §10.
 
 ### M-6 — No health endpoint
 
@@ -239,15 +226,27 @@ design property, not a measurement.
 
 **Targets:** search, booking creation, the partner queue.
 
-### S-4 — No retention policy for identity documents
+### S-4 — No retention policy, and erasure conflicts with the audit log
 
-**Status:** deferred by decision, now due · **Owner:** **Compliance**
+**Status:** deferred by decision, now due · **Owner:** **Compliance**, with an
+engineering question attached
 
 Bashar decided on 2026-08-01 to store and restrict access to partner ID documents and
 defer the retention policy. Storing them in production without a retention rule starts a
 GDPR clock.
 
-**To unblock:** a stated retention period and a deletion mechanism.
+**A conflict found on 2026-08-02 while building M-5, which the retention decision has to
+resolve:** `audit_log.actor_user_id` is a foreign key to `users`, and `audit_log` is
+append-only by trigger. So **a user who has ever done anything cannot be hard-deleted** —
+the database refuses. That is deliberate and correct (deleting an account must not erase
+what it did), but it means a GDPR erasure request cannot be satisfied by deleting the
+row. The available answer is soft-delete plus pseudonymisation of the personal fields,
+leaving the audit trail's foreign keys intact — but "what exactly gets erased" is a
+compliance decision, not an engineering one, and it should be made before the first real
+request arrives rather than under a one-month statutory deadline.
+
+**To unblock:** a stated retention period, a decision on what erasure means given the
+above, and then a deletion/pseudonymisation mechanism.
 
 ### S-5 — No legal review
 
@@ -310,6 +309,13 @@ Things that are not blockers but will cost someone a day if forgotten.
 - **Rate limiting fails OPEN when Redis is unreachable.** Deliberate — failing closed
   would turn a cache outage into a total outage. The exposure is bounded but real, and
   it is why S-1 lists alerting on Redis errors as required before production.
+- **A user who has ever acted cannot be hard-deleted.** `audit_log.actor_user_id` is a
+  foreign key and `audit_log` is append-only, so `DELETE FROM users` fails with a foreign
+  key violation. Use soft-delete (`deleted_at`), which is what the application does and
+  what test cleanup must do. This has a GDPR consequence — see S-4.
+- **`MailService` and `AuthTokenService` are exported by `AuthModule`, not re-provided.**
+  Re-providing them elsewhere would create a second nodemailer transport and a second
+  token-issuing path, so a change to either would apply in one place and not the other.
 - **Sanctions screening is advisory, not deciding.** The platform scores name similarity
   (0.35 to surface, 0.75 flagged strong) and records the reviewer's conclusion. The human
   remains accountable for the determination.
