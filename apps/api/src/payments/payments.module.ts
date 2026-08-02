@@ -5,6 +5,7 @@ import { BookingsModule } from '../bookings/bookings.module.js';
 import { LedgerModule } from '../ledger/ledger.module.js';
 import { PaymentIntentService } from './payment-intent.service.js';
 import { PaymentWebhookService } from './payment-webhook.service.js';
+import { WebhookRetentionService } from './webhook-retention.service.js';
 import { PaymentsController } from './payments.controller.js';
 import { RefundService } from './refund.service.js';
 import { ManualTransferProvider } from './providers/manual-transfer.provider.js';
@@ -27,6 +28,7 @@ import { WalletModule } from '../wallet/wallet.module.js';
   imports: [BookingsModule, LedgerModule, WalletModule],
   controllers: [PaymentsController],
   providers: [
+    WebhookRetentionService,
     ManualTransferProvider,
     PaymentProviderRegistry,
     PaymentIntentService,
