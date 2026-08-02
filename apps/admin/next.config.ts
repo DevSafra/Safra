@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+
 import type { NextConfig } from 'next';
 
 /**
@@ -12,6 +14,24 @@ import type { NextConfig } from 'next';
 const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+
+  /**
+   * Emits a self-contained server with only the files actually imported, which is
+   * what the container image ships. Without it the image needs the whole
+   * `node_modules` tree — hundreds of megabytes of build-time dependencies that have
+   * no business being in a running container.
+   */
+  output: 'standalone',
+
+  /**
+   * The workspace root, not this directory.
+   *
+   * In a pnpm monorepo Next infers the tracing root from the nearest lockfile and gets
+   * it wrong, silently omitting the hoisted `.pnpm` store that the `@safra/*` packages
+   * resolve through. The build succeeds and the container then fails at startup with a
+   * missing module — a failure that only appears once it is running.
+   */
+  outputFileTracingRoot: join(import.meta.dirname, '../..'),
 
   typescript: { ignoreBuildErrors: false },
   eslint: { ignoreDuringBuilds: false },

@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+
 import { createHash } from 'node:crypto';
 
 import createNextIntlPlugin from 'next-intl/plugin';
@@ -20,6 +22,24 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+
+  /**
+   * Emits a self-contained server with only the files actually imported, which is
+   * what the container image ships. Without it the image needs the whole
+   * `node_modules` tree — hundreds of megabytes of build-time dependencies that have
+   * no business being in a running container.
+   */
+  output: 'standalone',
+
+  /**
+   * The workspace root, not this directory.
+   *
+   * In a pnpm monorepo Next infers the tracing root from the nearest lockfile and gets
+   * it wrong, silently omitting the hoisted `.pnpm` store that the `@safra/*` packages
+   * resolve through. The build succeeds and the container then fails at startup with a
+   * missing module — a failure that only appears once it is running.
+   */
+  outputFileTracingRoot: join(import.meta.dirname, '../..'),
 
   // Type and lint errors must fail the build. Next's defaults already do this;
   // stating it prevents a future "just ship it" flag from being added quietly.

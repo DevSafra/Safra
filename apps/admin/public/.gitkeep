@@ -1,0 +1,6 @@
+Kept so the directory exists.
+
+`Dockerfile.next` copies `public/` into the image. Without this file the directory is
+absent from a fresh clone, the COPY fails, and the build breaks for a reason that has
+nothing to do with whatever change is being made. Deleting it also means the first
+static asset anyone adds here is silently missing in production.

@@ -1,0 +1,96 @@
+# syntax=docker/dockerfile:1.7
+#
+# SAFRA — production image for either Next.js app (M-1, provider-agnostic).
+#
+# ONE file for both apps rather than two near-identical copies. They differ only in
+# name and port, and two files would drift: a hardening change made to one and
+# forgotten in the other is exactly the kind of gap nobody notices until it matters.
+#
+#   docker build -f Dockerfile.next --build-arg APP=web   --build-arg PORT=3000 -t safra-web .
+#   docker build -f Dockerfile.next --build-arg APP=admin --build-arg PORT=3001 -t safra-admin .
+#
+# Build from the REPOSITORY ROOT — both apps depend on workspace packages.
+#
+# Note on build-time configuration: `NEXT_PUBLIC_*` values are inlined at build time,
+# so an image is specific to the environment it was built for. Neither app uses any
+# today, which is deliberate — everything reaches the browser through this app's own
+# route handlers, never directly from the client. Keep it that way and one image can
+# be promoted from staging to production unchanged.
+
+FROM node:22.12-alpine AS base
+
+ENV PNPM_HOME=/pnpm
+ENV PATH="$PNPM_HOME:$PATH"
+
+# Corepack is updated first: the copy bundled with node:22.12 ships expired npm
+# signing keys and fails with "Cannot find matching keyid". See apps/api/Dockerfile.
+RUN npm install -g corepack@latest && corepack enable
+
+WORKDIR /repo
+
+# ── Dependencies ─────────────────────────────────────────────────────────────
+FROM base AS deps
+
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/web/package.json           apps/web/
+COPY apps/admin/package.json         apps/admin/
+COPY apps/api/package.json           apps/api/
+COPY packages/contracts/package.json packages/contracts/
+COPY packages/db/package.json        packages/db/
+COPY packages/session/package.json   packages/session/
+
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --ignore-scripts
+
+# ── Build ────────────────────────────────────────────────────────────────────
+FROM deps AS build
+
+ARG APP
+RUN test -n "$APP" || (echo "APP build-arg is required (web|admin)" && exit 1)
+
+COPY . .
+
+RUN pnpm rebuild sharp
+
+# `next build` with `output: 'standalone'` emits a self-contained server tree,
+# including only the files actually imported.
+RUN pnpm --filter @safra/${APP}... build
+
+# ── Runtime ──────────────────────────────────────────────────────────────────
+FROM node:22.12-alpine AS runtime
+
+ARG APP
+ARG PORT=3000
+
+RUN apk add --no-cache tini
+
+ENV NODE_ENV=production
+ENV PORT=${PORT}
+# Baked from the build argument, because ARG values do NOT survive into the running
+# container. Referencing ${APP} in CMD would expand to empty at run time and — with a
+# default — silently start the wrong application.
+ENV SERVER_ENTRY=apps/${APP}/server.js
+# Bind all interfaces: the default binds loopback, which is unreachable from outside
+# the container and presents as a container that starts and never serves anything.
+ENV HOSTNAME=0.0.0.0
+
+WORKDIR /app
+
+# The standalone tree mirrors the workspace layout, so the server lives at the app's
+# path within it. Static assets are not traced into it and must be copied separately.
+COPY --from=build --chown=node:node /repo/apps/${APP}/.next/standalone ./
+COPY --from=build --chown=node:node /repo/apps/${APP}/.next/static ./apps/${APP}/.next/static
+COPY --from=build --chown=node:node /repo/apps/${APP}/public ./apps/${APP}/public
+
+USER node
+
+EXPOSE ${PORT}
+
+# Next has no health route of its own; a 200 from the root is the available signal
+# that the server is up. Liveness only — it must not probe the API, or an API blip
+# would restart every healthy front-end replica.
+HEALTHCHECK --interval=30s --timeout=3s --start-period=25s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT).then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["sh", "-c", "exec node \"$SERVER_ENTRY\""]
