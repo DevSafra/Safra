@@ -24,6 +24,20 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import { TokenService, type IssuedTokens } from './token.service.js';
 import { TwoFactorService } from './two-factor.service.js';
 
+/**
+ * Thrown when credentials were ACCEPTED and only the second factor is outstanding.
+ *
+ * A distinct type rather than a message the caller matches on, because two callers now
+ * need to tell this apart from a real failure: the sign-in form, which advances to its
+ * second step, and the controller, which must NOT audit it as a failed login. It is an
+ * incomplete attempt, not a rejected one — the password was right.
+ */
+export class SecondFactorRequiredException extends UnauthorizedException {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
 /** Rule 1: lock out after repeated failures rather than allowing endless guesses. */
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
@@ -161,7 +175,7 @@ export class AuthService {
     // never sufficient, and so TOTP state does not leak for a wrong password.
     if (isStaffRole(user.role) && user.totpEnabledAt && user.totpSecretEncrypted) {
       if (!input.totpCode && !input.recoveryCode) {
-        throw new UnauthorizedException('Authenticator code required.');
+        throw new SecondFactorRequiredException('Authenticator code required.');
       }
 
       if (input.recoveryCode) {

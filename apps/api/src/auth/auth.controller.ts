@@ -33,7 +33,12 @@ import { REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH } from '../config/constants.js
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { AllowsUnenrolledStaff, CurrentUser, Public } from '../rbac/decorators.js';
 import { AccountRecoveryService } from './account-recovery.service.js';
-import { AuthService, type AuthResult, type RequestContext } from './auth.service.js';
+import {
+  AuthService,
+  SecondFactorRequiredException,
+  type AuthResult,
+  type RequestContext,
+} from './auth.service.js';
 import { TokenService, type AccessTokenClaims } from './token.service.js';
 
 @Controller('auth')
@@ -86,7 +91,17 @@ export class AuthController {
   }
 
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  /**
+   * Ten per minute, not five, because a staff sign-in now costs TWO requests:
+   * credentials, then the second factor. At five, a staff member who mistyped a code
+   * once was locked out mid-sign-in — measured on 2026-08-03.
+   *
+   * This restores the previous number of user-visible ATTEMPTS rather than loosening
+   * the control. The primary defence against targeted brute force is unchanged: five
+   * failed attempts locks the account for fifteen minutes, and a missing second factor
+   * does not count toward that.
+   */
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   /**
@@ -119,6 +134,18 @@ export class AuthController {
 
       return this.respond(result, response);
     } catch (error) {
+      /**
+       * A missing second factor is NOT a failed sign-in and must not be audited as
+       * one. The password was accepted; the attempt is simply incomplete, and the
+       * two-step form is about to supply the code.
+       *
+       * Recording it would put one `auth.login_failed` row against every successful
+       * staff sign-in — making it look as though everyone fails once, and burying the
+       * real failed-login pattern §15 exists to expose. Measured on 2026-08-03: one
+       * spurious row per successful two-step sign-in.
+       */
+      if (error instanceof SecondFactorRequiredException) throw error;
+
       // Failed sign-ins are recorded WITHOUT the attempted password, and keyed by
       // email rather than user id — the account may not exist at all.
       this.audit.recordDetached({
