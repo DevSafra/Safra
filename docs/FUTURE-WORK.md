@@ -3,10 +3,11 @@
 > **This document is the authoritative resume point.** Opening it should be enough to
 > recover full context and continue, without reading the rest of the repository first.
 >
-> **How to use it in a new session:** read §1 for where things stand, §3 for the next
-> action, then §4–§9 for the item you are picking up, and §10 for the security position.
+> **How to use it in a new session:** read §1 for where things stand, §3 for who must act
+> on what, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-03 (S-7 documented; settings-test isolation fixed at the root)
+**Last updated:** 2026-08-03 — **unblocked engineering work is complete.** From here the
+project waits on external decisions; see §3 for who must act on what.
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
 **Last pushed:** `422dc33`. Everything after it is committed locally and **not pushed** —
 34 commits as of 2026-08-03.
@@ -45,6 +46,10 @@ clean, and the suite passes against a freshly migrated and seeded database.
 **What remains is not product.** It is infrastructure, operations and compliance. That
 is the central finding of the 2026-08-02 assessment and it still holds.
 
+**Engineering work that needs no external decision is complete as of 2026-08-03.** The
+next move belongs to Bashar (hosting), Compliance (sanctions registration, retention) and
+Legal — not to engineering. §3 sorts every remaining item by who must act.
+
 ---
 
 ## 2. Standing decisions that constrain all future work
@@ -66,36 +71,85 @@ Bashar, not an implementation detail.
 
 ---
 
-## 3. Recommended execution order
+## 3. Status at a glance — everything sorted by who must act
 
-Agreed with Bashar on 2026-08-02. **Do not expand product scope until all six
-must-haves have a plan.**
+**As of 2026-08-03, engineering work that can be completed without an external decision
+is COMPLETE.** From here the project is blocked only by decisions outside engineering,
+unless a new defect is found. That is a statement about scope, not a claim of
+perfection — §10 records the residual security risk honestly.
 
-1. **M-1** Deployment target / infrastructure — blocked on the hosting decision
-2. **M-2** Sanctions feed activation — blocked on an external party
-3. **M-3** Backups and restore validation — blocked on M-1
-4. ~~**M-4** Redis-backed rate limiting~~ — **done 2026-08-02**, see §10
-5. ~~**M-5** Staff provisioning workflow~~ — **done 2026-08-02**, see §10
-6. ~~**M-6** Health endpoint~~ — **done 2026-08-02**, see §10
+### ✅ Completed engineering (no further action)
 
-**Start M-2 immediately regardless of its position.** It is the only item whose timeline
-SAFRA does not control, and it fails a week after anyone stops paying attention.
+| Item                                                                                                                 | Delivered     |
+| -------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **M-4** Redis-backed rate limiting                                                                                   | 2026-08-02    |
+| **M-5** Staff provisioning — bootstrap command + console invite flow                                                 | 2026-08-02    |
+| **M-6** Liveness and readiness endpoints                                                                             | 2026-08-02    |
+| **S-6** Encryption key rotation with re-encryption                                                                   | 2026-08-02    |
+| **M-1 (partial)** Container images for all three apps, deployment requirements                                       | 2026-08-02    |
+| **S-1 (prerequisite)** Structured JSON logs, correlation ids, access log                                             | 2026-08-02–03 |
+| **S-7 (documented half)** Forward-only migration strategy and rollback answer                                        | 2026-08-03    |
+| Staff console: dashboard, partner verification, listing review, booking detail, audit log, Rules Engine, staff admin | 2026-08-02    |
+| Security hardening — see §10 for the full list and evidence                                                          | 2026-08-02–03 |
 
-**M-4, M-5 and M-6 are delivered. Every must-have that engineering can act on alone is
-now done.** M-1, M-2 and M-3 are blocked on a decision (hosting) or an external party
-(the EU registration); M-3 additionally depends on M-1. Nothing further on the
-must-have list can start until someone outside engineering acts.
+### 🏗 Hosting-dependent — waiting on roadmap item 193
+
+Nothing here can start until a provider and region are chosen. **This one decision
+unblocks four items and is the highest-leverage action available.**
+
+| Item                                                 | Note                                                             |
+| ---------------------------------------------------- | ---------------------------------------------------------------- |
+| **M-1** Deploy pipeline                              | The image is built and verified; the pipeline needs the provider |
+| **M-3** Backups + rehearsed restore                  | **Highest severity on the whole list** — see below               |
+| **S-1** Error tracking, metrics, alerting            | Logs are ready to ingest; the sink is missing                    |
+| **S-3** Load testing                                 | No capacity number should be quoted until this runs              |
+| **S-7** Rehearsing the destructive-migration restore | Fold into the M-3 rehearsal                                      |
+
+### ⚖️ Compliance and legal dependencies
+
+| Item                                               | Owner          | Note                                                                                                              |
+| -------------------------------------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **M-2** Sanctions feed registration                | **Compliance** | **Start first.** External timeline, and partner onboarding is blocked without it                                  |
+| **S-4** Retention policy + what GDPR erasure means | **Compliance** | Append-only tables make a `DELETE` impossible; the answer is pseudonymisation, but the scope is a compliance call |
+| **S-5** Terms, privacy policy, partner contract    | **Legal**      | Roadmap item 196                                                                                                  |
+
+### 🤝 Vendor dependencies
+
+| Item                                            | Note                                                             |
+| ----------------------------------------------- | ---------------------------------------------------------------- |
+| **S-9** Independent penetration test            | Book early; testers have lead times. Needs a staging environment |
+| **S-8** Malware scanning for uploaded documents | ClamAV sidecar or storage hook; needs hosting                    |
+| **S-2** Partner notifications                   | Blocked on the WhatsApp BSP decision (item 192)                  |
+| Maps billing account                            | Item 195; MapLibre + MapTiler recommended                        |
+
+### 📦 Deferred product scope — deliberately not started
+
+Bashar's instruction (2026-08-02): no product expansion until the must-haves have a plan.
+
+| Item                                       | Note                                                                                                                                                                                                                       |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Messaging and disputes**                 | The largest gap. SRS §4 defines a support agent as handling bookings, messages and disputes; only bookings exist. Permissions are assigned but there are no tables — which makes the platform look more capable than it is |
+| Remaining 11 of the 18 §9.3 admin sections | The 7 built are those that block onboarding or administration                                                                                                                                                              |
+| Payment rails and payouts (items 84, 135)  | Deferred by decision 2026-08-01                                                                                                                                                                                            |
+| Gift cards and coupons (items 142–143)     | Compose onto the split-payment seam                                                                                                                                                                                        |
+| UK, US and UN sanctions lists              | EU-only is deliberate; revisit before US/UK payments                                                                                                                                                                       |
+| Emergency Mode (EC-009)                    | No operational need yet                                                                                                                                                                                                    |
 
 ### Highest-risk item
 
 **M-3, backups.** Not the most likely to bite — that is M-2 — but the only failure on
-the list that is _unrecoverable_. Every other must-have fails loudly and reversibly: the
+the list that is _unrecoverable_. Every other blocker fails loudly and reversibly: the
 sanctions feed refuses, a wedged replica serves errors, a weak rate limit is an attack
-you can detect. Data loss is silent until the moment you need the data, and this
-platform is unusually exposed to it because the entire compliance story rests on records
-designed to be impossible to reconstruct — the double-entry ledger, `audit_log`,
-`timeline_events`, `settings_history`, all append-only by trigger precisely so they can
-serve as evidence. That property is worth nothing if the database is gone.
+you can detect. Data loss is silent until the moment you need the data, and this platform
+is unusually exposed because the entire compliance story rests on records designed to be
+impossible to reconstruct — the double-entry ledger, `audit_log`, `timeline_events`,
+`settings_history`, all append-only by trigger precisely so they can serve as evidence.
+That property is worth nothing if the database is gone.
+
+### If you only do one thing
+
+Choose the hosting provider, and start the sanctions registration the same day. The first
+unblocks four items; the second is the only one whose clock you do not control.
 
 ---
 
