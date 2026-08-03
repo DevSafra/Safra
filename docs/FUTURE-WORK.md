@@ -442,6 +442,10 @@ Things that are not blockers but will cost someone a day if forgotten.
   to any defect. Re-run against a freshly migrated and seeded database before
   believing one. The root cause is fixed — see §11 — but the habit is still the right
   one, because any suite whose teardown is interrupted can leave rows behind.
+- **Bound a version-scoped pnpm override to its major.** `"brace-expansion@1":
+">=1.1.18"` also matches 5.x, so pnpm resolved ESLint's dependency to brace-expansion 5
+  and reintroduced the CJS-export incompatibility that had previously forced an audit
+  exception. Use `">=1.1.18 <2"`. Observed 2026-08-03; see `AUDIT-EXCEPTIONS.md`.
 - **`next build` must NOT inherit `NODE_ENV=development`.** Sourcing the local `.env`
   (which sets it, correctly, for running the apps) made `next build` fail while
   prerendering `/404` with "`<Html>` should not be imported outside of
@@ -534,9 +538,9 @@ Each row is a thing that was actually tried against a running instance.
 Also confirmed: refresh cookie is `HttpOnly; SameSite=Strict; Path=/api/v1/auth` with
 `Secure` gated on production; EXIF is stripped by re-encoding through sharp; document
 reads are authorised per request and audited; unverified webhooks are recorded but
-never processed (**0 of 1,208**); production dependencies report **no known
-vulnerabilities** (`pnpm audit --prod`), and the single ignored advisory is dev-only,
-justified in `AUDIT-EXCEPTIONS.md`, and gated separately in CI.
+never processed (**0 of 1,208**); and `pnpm audit` reports **no known vulnerabilities at
+any severity with no advisories suppressed**, on both the production and full dependency
+trees (re-verified 2026-08-03 after retiring the last exception).
 
 ### Fixed during the review
 
@@ -586,8 +590,10 @@ justified in `AUDIT-EXCEPTIONS.md`, and gated separately in CI.
   into a total outage. Bounded, deliberate, and the reason S-1 lists Redis alerting.
 - **Webhooks answer `200` to an invalid signature.** A `4xx` makes providers retry
   forever or disable the endpoint. Payloads are recorded and never acted on.
-- **One dev-only dependency advisory**, documented in `AUDIT-EXCEPTIONS.md`, with
-  production audited separately and clean.
+- ~~One dev-only dependency advisory~~ — **eliminated 2026-08-03.** A `brace-expansion`
+  1.1.x patch was published, meeting the removal condition recorded when the risk was
+  accepted. `pnpm audit` now reports zero vulnerabilities at any severity with **no
+  suppressions at all**, on both the production and full trees.
 
 ---
 

@@ -1,42 +1,48 @@
 # Dependency audit exceptions
 
-Rule 1 requires dependencies to be audited in CI and known-vulnerable packages to
-fail the build. Every exception to that is listed here with its reasoning, and each
-must be re-checked whenever the dependency tree changes.
+**There are currently none.** `pnpm audit` reports no known vulnerabilities at any
+severity, with no advisories suppressed, across both the production tree and the full
+tree including build tooling. Verified 2026-08-03.
+
+Rule 1 requires dependencies to be audited in CI and known-vulnerable packages to fail
+the build. Any future exception must be listed here with its reasoning, and re-checked
+whenever the dependency tree changes.
 
 CI enforces two gates:
 
 1. **`pnpm audit --prod`** — production dependencies, **no exceptions allowed**.
    This covers everything that reaches a running server or a user's browser.
-2. **`pnpm audit`** — the full tree including build tooling, honouring the
-   exceptions below.
+2. **`pnpm audit`** — the full tree including build tooling.
 
 ---
 
-## GHSA-mh99-v99m-4gvg — brace-expansion, DoS via unbounded expansion
+## Resolved
 
-**Status:** accepted, 2026-07-29
-**Severity:** high
-**Path:** `eslint → minimatch@3 → brace-expansion@1`
+### GHSA-mh99-v99m-4gvg — brace-expansion, DoS via unbounded expansion
 
-**Why it is not fixable.** The advisory lists `>=5.0.8` as the only patched
-release. ESLint 9 depends on `minimatch@3`, which requires `brace-expansion@^1.1.7`
-and calls it as a CommonJS default export. brace-expansion 5 changed that export
-shape, so forcing the patched version breaks ESLint outright with
-`TypeError: expand is not a function` — verified, not hypothesised. No patched
-release exists on the 1.x line for this specific advisory.
+**Accepted 2026-07-29. Removed 2026-08-03 — no longer applicable.**
 
-**Why the risk is acceptable.**
+It was accepted because the advisory listed `>=5.0.8` as the only patched release, and
+ESLint depends on `minimatch@3`, which requires `brace-expansion@^1.1.7` and calls it as
+a CommonJS default export. brace-expansion 5 changed that export shape, so forcing the
+patched version broke ESLint outright with `TypeError: expand is not a function`. The
+recorded removal condition was "a `1.1.x` release carrying the fix is published".
 
-- **Not reachable from production.** `pnpm audit --prod` reports zero
-  vulnerabilities. ESLint is a devDependency and ships in no bundle.
-- **Exploitation requires control of our own repository.** The DoS is triggered by
-  feeding a malicious glob pattern to ESLint. Anyone able to do that can already
-  edit our lint config and CI workflow, so this is not the weakest link.
-- **Blast radius is a hung CI job**, not data exposure or code execution.
+That condition was met. `brace-expansion@1.1.18` fixes it on the 1.x line, so the
+exception is gone rather than merely still justified.
 
-**Removal condition.** Drop this exception as soon as ESLint stops depending on
-`minimatch@3` (tracked upstream in the `@eslint/eslintrc` legacy-config path), or a
-`1.1.x` release carrying the fix is published. Re-run
-`pnpm audit --audit-level=moderate` after any ESLint major upgrade and delete this
-entry if it no longer appears.
+---
+
+## A trap worth knowing before adding an override
+
+The overrides for this package are bounded to their major on purpose:
+
+```json
+"brace-expansion@1": ">=1.1.18 <2",
+"brace-expansion@5": ">=5.0.9 <6"
+```
+
+Writing `">=1.1.18"` without the upper bound looks equivalent and is not: the range also
+matches 5.x, so pnpm resolved the ESLint dependency to brace-expansion 5 and reintroduced
+the exact incompatibility described above. Observed on 2026-08-03. Always bound a
+version-scoped override to its major.
