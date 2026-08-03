@@ -83,7 +83,48 @@ because the fallback is local disk — invisible to other replicas and lost on r
   locks so exactly one replica executes each. Do not also configure an external
   scheduler — it would double-run them.
 
-## 6. Two mistakes that are easy to make here
+## 6. Migrations and rollback
+
+**Migrations are forward-only, deliberately.** There are no down migrations and none
+should be written. A down migration is code that runs once, under pressure, on a path
+nobody exercised — it is usually wrong when it matters, and writing one creates a false
+sense that rollback is a solved problem.
+
+**Run them as a one-shot job before the new replicas start**, never from the application
+on boot: several replicas booting at once would race the same migration.
+
+### How to roll back a bad deploy
+
+The answer depends on one question, which is why it must be asked at review time rather
+than during an incident:
+
+**Was the migration destructive?** — did it drop a column or table, or rewrite data in a
+way the old code cannot read?
+
+|                                                                                         | Action                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Not destructive** (the common case: added a table, a column, an index, an enum value) | **Revert the application image.** The old code ignores what it does not know about. Leave the schema in place; the next fix rolls forward. Do NOT touch the database           |
+| **Destructive**                                                                         | Restore the database to a point in time before the migration (M-3), and revert the image. This loses everything written since that point, so it is an incident, not a rollback |
+
+Because the second row is genuinely expensive, treat "is this migration destructive?" as a
+review question on every schema change. A migration that only adds is always safe to leave
+behind — which is most of them, and is the reason forward-only works in practice.
+
+**This is untested.** No environment exists to rehearse it in. Rehearsing the destructive
+path is part of M-3, not separate from it: a restore you have never performed is not a
+recovery plan.
+
+### A property worth knowing before you plan any cleanup
+
+Rows referenced by an append-only table **cannot be deleted**, ever. `audit_log`,
+`settings_history`, `timeline_events`, `ledger_entries` and `wallet_transactions` are all
+append-only by trigger, and they hold foreign keys to `users`, `settings`, `bookings` and
+others. So a user who has ever acted, or a setting that has ever been edited, is permanent
+— by design, because deleting the row would erase the evidence of what it did. Use
+`deleted_at`. This is also why GDPR erasure needs a decision rather than a `DELETE`
+(future-work S-4).
+
+## 7. Two mistakes that are easy to make here
 
 **Pointing liveness at readiness.** Readiness checks the database. A failed _liveness_
 probe kills the container, so during a database blip every healthy replica restarts at

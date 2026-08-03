@@ -6,9 +6,10 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for the next
 > action, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-02 (full security review completed — see §11)
+**Last updated:** 2026-08-03 (S-7 documented; settings-test isolation fixed at the root)
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
-**Last pushed:** `422dc33` — later commits are local until pushed
+**Last pushed:** `422dc33`. Everything after it is committed locally and **not pushed** —
+34 commits as of 2026-08-03.
 
 ---
 
@@ -38,7 +39,7 @@ approve or reject a listing, look up any booking with its full money breakdown a
 append-only timeline, read the audit log, and change every operational setting with the
 change attributed and recorded.
 
-**537 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is
+**537 tests pass** (10 of them re-pointed at an isolated fixture on 2026-08-03). `pnpm verify` (format, lint, types, tests, dependency audit) is
 clean, and the suite passes against a freshly migrated and seeded database.
 
 **What remains is not product.** It is infrastructure, operations and compliance. That
@@ -312,24 +313,23 @@ secure" — only as "these specific attacks were tried and did not work".
 exists, scoped to the customer app, the staff console and the API, with authenticated
 testing at every role. Book it early; good testers have lead times.
 
-### S-7 — Migrations are forward-only, with no tested rollback
+### S-7 — Migration rollback strategy
 
-**Status:** open · **Owner:** Platform engineering · **Impact:** medium ·
-**Dependency:** M-1 (nothing to roll back until something is deployed)
+**Status:** **documented 2026-08-03; still untested** · **Severity:** Medium ·
+**Owner:** Platform engineering · **Dependency:** M-1 for the untested half
 
-**Rationale.** All 17 migrations are forward-only; there are no down migrations.
-Forward-only is a legitimate and common strategy — down migrations are frequently
-wrong and rarely tested — but it is currently an accident rather than a decision, and
-it leaves no documented answer to "the deploy is bad, how do we get back?"
+**Done.** Forward-only is now a stated decision rather than an accident, and the
+rollback answer is explicit in `runbooks/deployment-requirements.md` §6: revert the
+image for a non-destructive migration and leave the schema alone; restore to a point in
+time only when the migration was destructive. That turns "is this destructive?" into a
+review-time question, which is where it belongs.
 
-**Impact.** With PITR (M-3) the answer is restore-to-timestamp, which is usually
-better than a down migration. Without M-3 there is no answer at all.
+**Not done, and not markable as solved:** none of it has been rehearsed, because there
+is nowhere to rehearse it. Rehearsing the destructive path is part of M-3 — a restore
+nobody has performed is not a recovery plan.
 
-**Recommended next action:** state forward-only as the deliberate strategy in the
-deployment runbook, and make the rollback answer explicit: revert the application
-image, and only restore the database if the migration was destructive. That makes
-"is this migration destructive?" a question asked at review time, which is where it
-belongs.
+**Recommended next action:** fold the destructive-migration restore into the M-3 restore
+rehearsal rather than treating it as separate work.
 
 **Status:** blocked on an external party · **Owner:** **Legal**
 
@@ -388,12 +388,12 @@ Things that are not blockers but will cost someone a day if forgotten.
   to any defect. Re-run against a freshly migrated and seeded database before
   believing one. The root cause is fixed — see §11 — but the habit is still the right
   one, because any suite whose teardown is interrupted can leave rows behind.
-- **A test mutates a shared seeded setting.** `settings-admin.integration.test.ts`
-  changes `booking.confirmation_window_minutes` while vitest runs files in parallel.
-  Nothing reads the derived value in a test today — the payments tests set
-  `confirmation_deadline_at` directly — so it does not flake. The day someone asserts a
-  two-hour deadline, it will flake intermittently and the cause will not be obvious.
-  Cheap fix: point that test at a key nothing else consumes.
+- **A row referenced by an append-only table can never be deleted.** `audit_log`,
+  `settings_history`, `timeline_events`, `ledger_entries` and `wallet_transactions` are
+  append-only by trigger and hold foreign keys to `users`, `settings` and `bookings`, so
+  a user who has ever acted or a setting that has ever been edited is permanent. Use
+  `deleted_at`. Test teardowns must not attempt a hard delete — three suites learned this
+  the hard way. It is also why GDPR erasure needs a decision, not a `DELETE` (S-4).
 - **`pnpm verify` must pass before committing.** There is no review branch; every commit
   lands on `main` directly.
 - **The API must run under SWC**, not plain `tsc`, or NestJS decorator metadata is lost
