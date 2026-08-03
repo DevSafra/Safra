@@ -442,6 +442,13 @@ Things that are not blockers but will cost someone a day if forgotten.
   to any defect. Re-run against a freshly migrated and seeded database before
   believing one. The root cause is fixed — see §11 — but the habit is still the right
   one, because any suite whose teardown is interrupted can leave rows behind.
+- **`next build` must NOT inherit `NODE_ENV=development`.** Sourcing the local `.env`
+  (which sets it, correctly, for running the apps) made `next build` fail while
+  prerendering `/404` with "`<Html>` should not be imported outside of
+  `pages/_document`" — an error that names nothing relevant. Both Next `build` scripts now
+  force `NODE_ENV=production`, so the ambient value cannot break a production build.
+  **`pnpm verify` does not catch this** — it only builds `packages/*`, so run a full
+  `pnpm build` before trusting that the apps compile.
 - **A row referenced by an append-only table can never be deleted.** `audit_log`,
   `settings_history`, `timeline_events`, `ledger_entries` and `wallet_transactions` are
   append-only by trigger and hold foreign keys to `users`, `settings` and `bookings`, so
