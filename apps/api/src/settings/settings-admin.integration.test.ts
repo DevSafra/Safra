@@ -25,8 +25,26 @@ describeIfDb('SettingsAdminService', () => {
   let admin: SettingsAdminService;
   let settings: SettingsService;
 
-  /** Restored after each test so a failure cannot leave the platform misconfigured. */
-  const KEY = 'booking.confirmation_window_minutes';
+  /**
+   * This suite owns its own setting rather than editing a real one.
+   *
+   * It used to edit `booking.confirmation_window_minutes`, which `BookingActionsService`
+   * and `CatalogService` both read, while vitest runs files in parallel — so another
+   * suite could observe a changed value and fail for a reason with no visible
+   * connection to settings. Restoring in `afterEach` shrank that window but could not
+   * close it.
+   *
+   * A row created here consumes nothing, so no window exists at all.
+   *
+   * ONE stable key, not one per run. It cannot be deleted afterwards —
+   * `settings_history` holds a foreign key to `settings.id` and is append-only by
+   * trigger, so any setting that has ever been edited is permanent. A per-run key would
+   * therefore leave a new undeletable row behind every time. This leaves exactly one,
+   * ever, and its description explains itself to anyone who meets it in the Rules
+   * Engine screen.
+   */
+  const KEY = 'test.settings_admin_fixture';
+  const ORIGINAL_VALUE = 120;
   let original: unknown;
 
   beforeAll(async () => {
@@ -34,13 +52,33 @@ describeIfDb('SettingsAdminService', () => {
     settings = new SettingsService(db);
     admin = new SettingsAdminService(db, settings, new AuditService(db));
 
-    const row = await db.execute<{ value: unknown }>(
-      sql`SELECT value FROM settings WHERE key = ${KEY} AND scope = 'global'`,
-    );
+    /**
+     * Insert-if-absent then reset, rather than `ON CONFLICT`. The unique index on
+     * settings is PARTIAL (`WHERE deleted_at IS NULL`), so an `ON CONFLICT` clause has
+     * to repeat that predicate exactly or Postgres rejects it — a detail of the index
+     * that a test has no business depending on.
+     */
+    await db.execute(sql`
+      INSERT INTO settings (key, scope, value, value_schema, description_en)
+      SELECT ${KEY}, 'global', ${JSON.stringify(ORIGINAL_VALUE)}::jsonb, 'positiveInt',
+             'Integration-test fixture for the settings editor. Read by no code; safe to ignore.'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM settings WHERE key = ${KEY} AND deleted_at IS NULL
+      )
+    `);
 
-    original = row.rows[0]?.value;
+    await db.execute(sql`
+      UPDATE settings SET value = ${JSON.stringify(ORIGINAL_VALUE)}::jsonb
+      WHERE key = ${KEY} AND deleted_at IS NULL
+    `);
+
+    original = ORIGINAL_VALUE;
   });
 
+  /**
+   * Nothing to remove. The fixture row is permanent by design — see the note on `KEY` —
+   * and `afterEach` has already restored its value, so the next run starts clean.
+   */
   afterAll(async () => {
     await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
   });
@@ -50,17 +88,8 @@ describeIfDb('SettingsAdminService', () => {
   });
 
   /**
-   * Restored after EVERY test, not just at the end of the file.
-   *
-   * `booking.confirmation_window_minutes` is a real seeded setting that
-   * `BookingActionsService` and `CatalogService` both read, and vitest runs files in
-   * parallel. Holding a changed value for the length of this whole suite leaves a
-   * window in which another suite can read 91 minutes where it expects 120 — an
-   * intermittent failure in a file that never mentions settings, which is close to
-   * undiagnosable. Restoring per test shrinks that window to a few milliseconds.
-   *
-   * The right long-term fix is a setting that nothing else consumes, but every seeded
-   * key is consumed by something; that is recorded in the future-work register.
+   * Still restored per test, so each one starts from a known value regardless of
+   * ordering. Cheap, and it keeps the assertions independent.
    */
   afterEach(async () => {
     await db.execute(sql`
