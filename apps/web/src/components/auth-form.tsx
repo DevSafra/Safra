@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+
+import { PasswordField } from '@safra/ui';
 import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
@@ -145,10 +147,10 @@ export function AuthForm({
         />
       ) : null}
 
-      <Field
+      <PasswordField
         name="password"
-        type="password"
         label={t('password')}
+        showRequiredMark
         // "new-password" tells a password manager to OFFER one on registration and
         // not to autofill the existing one; "current-password" does the opposite.
         autoComplete={mode === 'register' ? 'new-password' : 'current-password'}

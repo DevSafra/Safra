@@ -1,6 +1,20 @@
 @import 'tailwindcss';
 
 /**
+ * Tailwind must be told to scan the shared UI package.
+ *
+ * v4 auto-detects sources under the app, and `@safra/ui` resolves through a
+ * node_modules symlink — which Tailwind skips. Without this line every class used ONLY
+ * in that package is absent from the stylesheet, so the component renders completely
+ * unstyled: the password field's eye button appeared as a plain button BELOW the input
+ * rather than positioned inside it. Nothing errors; the classes simply do not exist.
+ *
+ * Points at `src` rather than `dist` so a change is picked up without rebuilding the
+ * package first.
+ */
+@source '../../../../packages/ui/src';
+
+/**
  * The staff console shares SAFRA's palette but not its personality.
  *
  * Deliberately plainer than the public site: no Amiri display face, no gold

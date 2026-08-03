@@ -6,6 +6,8 @@ import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
 
+import { PasswordField } from '@safra/ui';
+
 /**
  * Both halves of a password reset (SRS §4).
  *
@@ -114,9 +116,8 @@ export function PasswordResetForm({
           required
         />
       ) : (
-        <Field
+        <PasswordField
           name="password"
-          type="password"
           label={t('newPassword')}
           autoComplete="new-password"
           hint={t('passwordHint')}

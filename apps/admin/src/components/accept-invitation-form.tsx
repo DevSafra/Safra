@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { PasswordField } from '@safra/ui';
+
 import { text } from '@/lib/form';
 
 /**
@@ -94,30 +96,22 @@ export function AcceptInvitationForm({ token }: { token: string }) {
         </p>
       ) : null}
 
-      <label className="grid gap-1">
-        <span className="text-xs text-muted">New password</span>
-        <input
-          name="password"
-          type="password"
-          required
-          minLength={12}
-          autoComplete="new-password"
-          className="rounded-lg border border-line bg-field px-3 py-2 text-sm text-text"
-        />
-        <span className="text-xs text-faint">At least 12 characters.</span>
-      </label>
+      <PasswordField
+        name="password"
+        label="New password"
+        required
+        minLength={12}
+        autoComplete="new-password"
+        hint="At least 12 characters."
+      />
 
-      <label className="grid gap-1">
-        <span className="text-xs text-muted">Confirm password</span>
-        <input
-          name="confirm"
-          type="password"
-          required
-          minLength={12}
-          autoComplete="new-password"
-          className="rounded-lg border border-line bg-field px-3 py-2 text-sm text-text"
-        />
-      </label>
+      <PasswordField
+        name="confirm"
+        label="Confirm password"
+        required
+        minLength={12}
+        autoComplete="new-password"
+      />
 
       <button
         type="submit"
