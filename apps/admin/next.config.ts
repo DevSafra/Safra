@@ -51,41 +51,21 @@ const config: NextConfig = {
           // No referrer at all: an admin URL carries partner and booking ids, and
           // there is no legitimate destination that needs to know where staff were.
           { key: 'Referrer-Policy', value: 'no-referrer' },
-          {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), payment=()',
-          },
-          /**
-           * No inline script, no external origin, nothing framed.
-           *
-           * `unsafe-inline` is present for STYLES only, which Next requires for its
-           * injected critical CSS; scripts get `strict-dynamic`-free self-only, so a
-           * reflected payload has nowhere to execute. This app renders identity
-           * documents, so the containment matters more than the convenience.
-           */
           /**
            * Set here as well as at the edge. A header that exists only at the edge is
            * absent the moment traffic reaches the app another way — a staging host, a
            * direct origin pull, a misrouted record — and this app authenticates staff.
+           *
+           * Removed by accident on 2026-08-03 while stripping the static CSP out of
+           * this file, and caught by asserting the header rather than the diff.
            */
           {
             key: 'Strict-Transport-Security',
             value: 'max-age=31536000; includeSubDomains; preload',
           },
           {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self'",
-              "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
-              "font-src 'self'",
-              "connect-src 'self'",
-              "frame-ancestors 'none'",
-              "form-action 'self'",
-              "base-uri 'none'",
-              "object-src 'none'",
-            ].join('; '),
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), payment=()',
           },
         ],
       },

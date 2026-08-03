@@ -6,7 +6,8 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for who must act
 > on what, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-03 — **unblocked engineering work is complete.** From here the
+**Last updated:** 2026-08-03 — see §11 for a CSP regression found by opening the app in a
+browser. **Unblocked engineering work is otherwise complete.** From here the
 project waits on external decisions; see §3 for who must act on what.
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
 **Last pushed:** `422dc33`. Everything after it is committed locally and **not pushed** —
@@ -40,7 +41,7 @@ approve or reject a listing, look up any booking with its full money breakdown a
 append-only timeline, read the audit log, and change every operational setting with the
 change attributed and recorded.
 
-**537 tests pass** (10 of them re-pointed at an isolated fixture on 2026-08-03). `pnpm verify` (format, lint, types, tests, dependency audit) is
+**549 tests pass** (10 of them re-pointed at an isolated fixture on 2026-08-03). `pnpm verify` (format, lint, types, tests, dependency audit) is
 clean, and the suite passes against a freshly migrated and seeded database.
 
 **What remains is not product.** It is infrastructure, operations and compliance. That
@@ -442,6 +443,12 @@ Things that are not blockers but will cost someone a day if forgotten.
   to any defect. Re-run against a freshly migrated and seeded database before
   believing one. The root cause is fixed — see §11 — but the habit is still the right
   one, because any suite whose teardown is interrupted can leave rows behind.
+- **A `200` from a Next page proves almost nothing about the browser.** The HTML is
+  server-rendered, so a page whose client-side JavaScript is entirely blocked still
+  returns `200` with correct-looking markup. Two CSP regressions hid behind exactly that
+  for a day. When changing anything that affects scripts, styles or headers, **count the
+  script tags and check they carry the nonce** — see the resolved CSP entry in §11 for the
+  method.
 - **Bound a version-scoped pnpm override to its major.** `"brace-expansion@1":
 ">=1.1.18"` also matches 5.x, so pnpm resolved ESLint's dependency to brace-expansion 5
   and reintroduced the CJS-export incompatibility that had previously forced an audit

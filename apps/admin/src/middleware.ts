@@ -3,7 +3,9 @@ import { NextResponse, type NextRequest } from 'next/server';
 import {
   SESSION_MAX_AGE_SECONDS,
   STAFF_SESSION_COOKIE,
+  buildCsp,
   callAuth,
+  createNonce,
   decodeSession,
   encodeSession,
   hasTwoFactor,
@@ -48,6 +50,28 @@ const ENROLMENT_PATHS = ['/enrol-2fa'];
  * what makes the 2FA requirement real rather than advisory.
  */
 export default async function middleware(request: NextRequest) {
+  /**
+   * Built per request because it carries a nonce, and set on the forwarded REQUEST
+   * headers as well as the response — that is how Next learns the nonce and stamps it
+   * onto its own inline scripts.
+   *
+   * The static policy this replaces declared `script-src 'self'` and blocked EVERY
+   * inline script Next emits for hydration. Measured on 2026-08-03: 4 blocked, none
+   * allowed, on the sign-in page alone. Pages still returned 200 because the HTML is
+   * server-rendered, so nothing that only checked a status code could see it — but in a
+   * browser no form in this console worked.
+   *
+   * `img-src` is narrower than the customer app's: this console renders identity
+   * documents through the API and needs no remote images at all.
+   */
+  const csp = buildCsp({
+    nonce: createNonce(),
+    imgSrc: "'self' data: blob:",
+    upgradeInsecure: process.env.NODE_ENV === 'production',
+  });
+
+  request.headers.set('content-security-policy', csp);
+
   const rotated = await rotateIfStale(request);
   const session = currentSession(request, rotated);
 
@@ -64,6 +88,8 @@ export default async function middleware(request: NextRequest) {
   } else if (rotated === null) {
     response.cookies.set(STAFF_SESSION_COOKIE, '', sessionCookieOptions(0));
   }
+
+  response.headers.set('content-security-policy', csp);
 
   return response;
 }

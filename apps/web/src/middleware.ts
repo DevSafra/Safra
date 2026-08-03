@@ -5,7 +5,9 @@ import { routing } from './i18n/routing';
 import {
   CUSTOMER_SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
+  buildCsp,
   callAuth,
+  createNonce,
   decodeSession,
   encodeSession,
   needsRefresh,
@@ -28,6 +30,26 @@ const intlMiddleware = createMiddleware(routing);
  * Writing the request jar first means this render sees the new token immediately.
  */
 export default async function middleware(request: NextRequest) {
+  /**
+   * The CSP is built HERE, per request, rather than in `next.config.ts`, because it
+   * carries a nonce. A static policy cannot: Next's hydration scripts are inline and
+   * their contents are the page's own data, so no hash is stable. See `buildCsp` for
+   * what the static version broke.
+   *
+   * Set on the forwarded REQUEST headers as well as the response — that is how Next
+   * learns the nonce and stamps it onto the scripts it generates. Omitting it serves a
+   * policy the browser enforces against scripts that carry no nonce.
+   */
+  const csp = buildCsp({
+    nonce: createNonce(),
+    // https: because property photography comes from object storage or a CDN whose
+    // hostname is deployment configuration, not known at build time.
+    imgSrc: "'self' data: blob: https:",
+    upgradeInsecure: process.env.NODE_ENV === 'production',
+  });
+
+  request.headers.set('content-security-policy', csp);
+
   const rotated = await rotateIfStale(request);
 
   /**
@@ -39,6 +61,8 @@ export default async function middleware(request: NextRequest) {
    * on an account page that renders empty.
    */
   const response = redirectOrContinue(request, rotated);
+
+  response.headers.set('content-security-policy', csp);
 
   /**
    * Applied to WHICHEVER response is going back, including the redirect above.
@@ -80,6 +104,10 @@ function redirectOrContinue(
   rotated: string | null | undefined,
 ): NextResponse {
   if (!isProtected(request.nextUrl.pathname) || hasSession(request, rotated)) {
+    /**
+     * `request` already carries the CSP header set by the caller, so next-intl
+     * forwards it to the render and Next reads the nonce out of it.
+     */
     return intlMiddleware(request);
   }
 
