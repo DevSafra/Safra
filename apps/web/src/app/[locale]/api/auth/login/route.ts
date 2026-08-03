@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { loginSchema } from '@safra/contracts';
+import { isStaffRole, loginSchema } from '@safra/contracts';
 
 import {
   CUSTOMER_SESSION_COOKIE,
@@ -22,6 +22,14 @@ import {
  *
  * Neither token is ever returned in the body. They go straight into an HttpOnly
  * cookie, so client JavaScript cannot read them even on this origin.
+ *
+ * A STAFF account is refused here, after a successful authentication — the mirror image
+ * of what the staff console does to a customer account. It is not authorization; the API
+ * authorises every call on its own authority either way. It is about blast radius: this
+ * is the internet-facing origin that renders partner-supplied content, and letting a
+ * super admin hold a session here would mean any future flaw on this surface yields a
+ * super-admin token instead of a customer one. Staff who want to book use a personal
+ * account, which is the separation that should exist anyway.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   let body: unknown;
@@ -66,6 +74,20 @@ export async function POST(request: Request): Promise<NextResponse> {
         ...(outcome.fieldErrors ? { errors: outcome.fieldErrors } : {}),
       },
       { status: outcome.status },
+    );
+  }
+
+  if (isStaffRole(outcome.session.user.role)) {
+    /**
+     * No cookie is set. The message is explicit rather than vague: the person has just
+     * proved they hold these credentials, so telling them where the account belongs
+     * reveals nothing, and a generic refusal here would look like a broken password.
+     */
+    return NextResponse.json(
+      {
+        message: 'This is a staff account. Sign in to the SAFRA command center instead.',
+      },
+      { status: 403 },
     );
   }
 

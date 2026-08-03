@@ -121,17 +121,39 @@ function requiresEnrolment(body: unknown): boolean {
  * are theirs and the only useful thing to say is that this account is not staff.
  */
 function describe(body: unknown, status: number): string {
-  if (status === 401) return 'That email, password or code was not accepted.';
+  if (status === 401) {
+    /**
+     * A 401 covers two very different situations and they must not read alike.
+     *
+     * "Authenticator code required" arrives only AFTER the password was accepted, so
+     * the person already holds it — telling them a code is needed reveals nothing they
+     * could not establish, and the API makes exactly that trade by returning a distinct
+     * message. Flattening it into the credential wording sent people to re-check a
+     * password that was already correct, which is what happened on 2026-08-03.
+     *
+     * Everything else stays deliberately vague: a message that distinguishes "no such
+     * account" from "wrong password" is an account-existence oracle.
+     */
+    const message = messageOf(body);
+
+    return message && /authenticator|code/i.test(message)
+      ? message
+      : 'That email, password or code was not accepted.';
+  }
+
   if (status === 403) return 'This account does not have access to the command center.';
   if (status === 423) return 'This account is temporarily locked. Try again shortly.';
   if (status === 429) return 'Too many attempts. Wait a minute and try again.';
 
-  if (typeof body === 'object' && body !== null && 'message' in body) {
-    const { message } = body;
-    if (typeof message === 'string') return message;
-  }
+  return messageOf(body) ?? 'Something went wrong. Please try again.';
+}
 
-  return 'Something went wrong. Please try again.';
+function messageOf(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
+
+  const { message } = body;
+
+  return typeof message === 'string' ? message : null;
 }
 
 function Field({
