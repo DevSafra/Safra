@@ -11,7 +11,8 @@
     "test": "vitest run",
     "clean": "rm -rf dist *.tsbuildinfo",
     "bootstrap:admin": "tsx src/scripts/bootstrap-super-admin.ts",
-    "rotate:encryption-key": "tsx src/scripts/rotate-encryption-key.ts"
+    "rotate:encryption-key": "tsx src/scripts/rotate-encryption-key.ts",
+    "dev:totp": "tsx src/scripts/dev-totp.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1098.0",

@@ -23,7 +23,8 @@
     "lint:fix": "turbo run build --filter='./packages/*' && eslint . --fix",
     "prepare": "git config core.hooksPath .githooks || true",
     "bootstrap:admin": "pnpm --filter @safra/api bootstrap:admin",
-    "rotate:encryption-key": "pnpm --filter @safra/api rotate:encryption-key"
+    "rotate:encryption-key": "pnpm --filter @safra/api rotate:encryption-key",
+    "code": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api dev:totp'"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
