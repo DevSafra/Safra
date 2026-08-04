@@ -6,9 +6,10 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for who must act
 > on what, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-04 — the Super Admin console was built out against the design handoff:
-**15 of its 19 sections are now implemented**, 4 need a schema change first. Full gap analysis and
-every documented deviation: **`docs/design-gap-report.md`**.
+**Last updated:** 2026-08-04 — **all 19 Super Admin console sections are implemented and verified**
+against the design handoff. Two passes: 15 sections, then the schema for the remaining 4 plus
+partner contracts. Full gap analysis, the four answers and every documented deviation:
+**`docs/design-gap-report.md`**.
 **Unblocked infrastructure work is otherwise complete.** From here the project waits on
 external decisions; see §3 for who must act on what.
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
@@ -43,22 +44,29 @@ approve or reject a listing, look up any booking with its full money breakdown a
 append-only timeline, read the audit log, and change every operational setting with the
 change attributed and recorded.
 
-**566 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is clean, and the
-suite passes against a freshly migrated and seeded database. A further **51 browser tests**
+**604 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is clean, and the
+suite passes against a freshly migrated and seeded database. A further **56 browser tests**
 (`pnpm e2e`) cover the staff sign-in, all nineteen console sections, table search, pagination,
-filtering and the honesty rules; they are NOT part of `pnpm verify` and must be run separately
-against running servers.
+filtering, the dispute close workflow, contact-detail redaction and the honesty rules; they are NOT
+part of `pnpm verify` and must be run separately against running servers.
 
 **The staff console renders in Arabic, right-to-left** (Bashar, 2026-08-03). Every section screen
 is translated. What remains English is the four DETAIL screens — partner detail, property detail,
 enrol-2fa, accept-invitation — plus stored data such as audit reasons and wallet notes, which are
 shown as written.
 
-**The console follows the approved design** (built out 2026-08-04). Fifteen of the nineteen
-sections are implemented against real data — dashboard, bookings, partners, properties, customers,
-staff, payments, wallet, gift cards, coupons, geography, reports, settings, audit log and Emergency
-Mode. The remaining four — disputes, messages, WhatsApp/email, ads — have routes that name what is
-missing rather than empty tables, because an empty disputes table reads as "there are none".
+**The console follows the approved design** (built out 2026-08-04, two passes). All nineteen
+sections render real data: dashboard, bookings, partners, properties, customers, staff, payments,
+wallet, gift cards, coupons, geography, reports, settings, audit log, Emergency Mode, disputes,
+messages, WhatsApp/email and ads — plus partner contracts inside الشركاء. Nothing renders a
+placeholder.
+
+**Five new domains landed with pass 2**: `disputes` + `dispute_evidence`, `conversations` +
+`messages`, `notifications`, `advertisers` + `ad_campaigns`, `partner_contracts`. One forward-only
+additive migration (`0017`), 6 enums, 13 constraints each probed against the live database, and 3
+new permissions. Workflows verified end to end: closing a dispute credits the wallet and releases
+the payout freeze; contact details are stripped from staff replies; a contract supersedes rather
+than overwrites; CSV export streams with the filter applied.
 
 **`docs/design-gap-report.md` is the authority on visual fidelity.** It holds the full gap
 analysis, the schema work each remaining section needs (B-1…B-11), and **twelve explicitly
@@ -559,6 +567,28 @@ Things that are not blockers but will cost someone a day if forgotten.
 - **`pnpm build` regenerates `.next` under a running `next start`.** The running server
   then serves chunk names that no longer exist and the browser fails in ways that look like
   a regression in whatever was just changed. Stop the Next servers, build, then restart.
+- **A `bigint` column reaches the driver as a STRING.** Postgres returns it that way to avoid
+  silent precision loss, so `SELECT impressions` gives `"2860"` where a `z.number()` response schema
+  expects `2860` — the parse fails and the whole screen renders "could not load this list". Cast to
+  text in SQL and coerce with `Number()` (exact to 2^53, nine orders of magnitude beyond any counter
+  this platform holds). Found 2026-08-04 on the ads screen.
+- **A redaction test that asserts "a mask appeared" proves almost nothing.** The contact-detail
+  blocker stored `ahmad@x.com` as `ahmad@⟨محجوب⟩` for a while: the URL pattern ate the domain before
+  the email pattern saw it, so a mask WAS present and the count DID rise, and the test passed while
+  the local part leaked. Assert the original substring is **wholly absent**. Found by probing the
+  live endpoint, not by the suite (2026-08-04).
+- **Pattern order matters in redaction: email before URL.** The URL pattern matches bare domains, so
+  running it first splits every email. See `apps/api/src/messaging/redaction.ts`.
+- **A rolled-back transaction does NOT roll back a sequence.** Probing the new CHECK constraints
+  consumed `ADS-000001` and `DSP-000001` inside transactions that were rolled back, so the seeded
+  data starts at `ADS-000002`. Never hardcode a reference in a test or a script; read one back.
+- **Backticks in a comment inside a `sql\`\``template terminate the string.** Recorded before, hit
+twice more on 2026-08-04 in two different files. Use`--` SQL comments with no backticks inside a
+  template literal. The error names a line far from the cause.
+- **Local object storage must be running to test an upload.** `S3_ENDPOINT` points at
+  `localhost:9000`; without a MinIO container the upload path fails with `ECONNREFUSED` behind a
+  generic 500. `docker run -d --name safra-minio -p 9000:9000 -e MINIO_ROOT_USER=… minio/minio
+server /data`, then create the `safra-media` bucket.
 - **A `server-only` build failure is the guard working, not an obstacle.** A CLIENT component
   imported a formatting helper from `lib/console.ts`, which imports the API client — so session
   reading and access-token handling were on their way into the browser bundle. Next refused the
@@ -740,6 +770,11 @@ Kept because the reason something was blocked is often the reason it returns.
 | 2026-08-04 | The console used the wrong UI font                         | Cairo, chosen as a guess before the handoff. §4.1 specifies IBM Plex Sans Arabic, which every spacing value in the handoff was measured against. Swapped for the console; the customer app has NOT been — see §8a.                                                                                                                                                                                                                                                                                                                       |
 | 2026-08-04 | `text-good` / `bg-good` matched no token anywhere          | The colour token is `ok` in both the handoff and the customer app, but twelve console files and two customer files used `good`. Tailwind generates nothing for an undefined token, so those elements silently kept their inherited colour — including two success banners in the customer app. Renamed throughout.                                                                                                                                                                                                                       |
 | 2026-08-04 | `pending_confirmation` was rendered in gold                | The handoff makes it an explicit rule: pending confirmation is purple (`--pend`), never gold. Gold is SAFRA's affirmative accent, and a paid booking still waiting on a partner is not good news.                                                                                                                                                                                                                                                                                                                                        |
+| 2026-08-04 | The last 4 console sections had no tables                  | `disputes` + `dispute_evidence`, `conversations` + `messages`, `notifications`, `advertisers` + `ad_campaigns` and `partner_contracts` created in one forward-only additive migration, with 6 enums, 2 sequences, 13 constraints and 3 permissions. Every constraint was probed against the live database to confirm it rejects the bad row. All 19 sections now render real data.                                                                                                                                                       |
+| 2026-08-04 | Contact-detail redaction leaked the local part of an email | `ahmad@x.com` stored as `ahmad@⟨محجوب⟩`: the URL pattern matched the bare domain before the email pattern saw it. The test passed because it asserted only that a mask appeared and the count rose. Reordered email-before-URL; the test now asserts the original substring is wholly absent. Found by probing the live endpoint.                                                                                                                                                                                                        |
+| 2026-08-04 | The ads screen could never load                            | `impressions` is `bigint`, which the driver returns as a string, against a `z.number()` schema. Same silent-parse-failure shape as the listing queue in the morning. Cast to text and coerced with `Number()`.                                                                                                                                                                                                                                                                                                                           |
+| 2026-08-04 | A partner contract could never become active               | Every upload starts `awaiting_partner_signature` and nothing could move it, so `active` was unreachable and a whole branch of the status vocabulary was dead. Added the mark-signed action; replacing now supersedes an unsigned contract too, which it previously did not.                                                                                                                                                                                                                                                              |
+| 2026-08-04 | The dashboard and the disputes section disagreed           | The dashboard KPI still said "the disputes feature does not exist" while `/disputes` showed six. Wired to the real count; a browser test now asserts the two screens agree, because two screens disagreeing is worse than either being wrong alone.                                                                                                                                                                                                                                                                                      |
 | 2026-08-04 | 12 of the 19 console sections did not exist                | Built against the design handoff: bookings, customers, payments, wallet, gift cards, coupons, geography, reports and Emergency Mode from scratch; partner/property registries, staff and audit rebuilt. Backed by 12 new keyset-paginated endpoints, each behind its narrowest permission and verified live against the running database.                                                                                                                                                                                                |
 | 2026-08-04 | A client component was importing a server-only module      | `setting-row.tsx` reached the API client — session reading, access tokens — through a formatting helper in `lib/console.ts`. `next build` refused, correctly. Pure formatters moved to `lib/format.ts`, which imports nothing but strings and the locale constant. See the trap in §8.                                                                                                                                                                                                                                                   |
 | 2026-08-04 | The permission matrix filtered on a false belief           | It dropped "permissions no staff role holds", which can never happen: `SUPER_ADMIN` is `Object.values(PERMISSIONS)`. Dead code, found by a unit test written to confirm the filter and failing instead. Removed; the matrix now lists the full catalogue, which is also the more useful answer.                                                                                                                                                                                                                                          |

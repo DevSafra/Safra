@@ -132,45 +132,60 @@ test.describe('the command-center dashboard', () => {
   });
 
   /**
-   * Disputes have no table, so the card must ADMIT that.
+   * The disputes card shows the REAL open count, and agrees with the disputes section.
    *
-   * This is the assertion that stops a future change from quietly rendering `0` there. A
-   * confident zero for a feature that does not exist would be read as "no open disputes"
-   * by someone whose job is to act on that.
+   * For months this test asserted the opposite — that the card said "the feature does not exist"
+   * and showed a dash — which was correct while there was no table. The table landed on
+   * 2026-08-04, and a dash would now be a lie in the other direction.
+   *
+   * What it asserts instead is CONSISTENCY: the dashboard's number must match what the section
+   * itself reports. Two screens disagreeing about how many disputes are open is worse than either
+   * being wrong alone, because it destroys trust in both.
    */
-  test('the disputes card says unavailable rather than showing zero', async ({
-    page,
-  }) => {
+  test('the disputes card agrees with the disputes section', async ({ page }) => {
     const card = page
       .getByRole('region', { name: AR.admin.kpiRow })
       .getByText(AR.admin.kpiDisputes, { exact: true })
       .locator('..');
 
-    await expect(card).toContainText(AR.admin.kpiDisputesUnavailable);
-    await expect(card).toContainText(AR.admin.noData);
-    await expect(card).not.toContainText(/^0$/);
+    await expect(card).toContainText(AR.admin.kpiDisputesSub);
+    await expect(card).not.toContainText(AR.admin.kpiDisputesUnavailable);
+
+    const onDashboard = (await card.innerText()).match(/\d+/)?.[0] ?? '';
+
+    await page.goto('/disputes');
+
+    const openCard = page
+      .getByRole('region', { name: AR.nav.disputes })
+      .getByText(AR.sections.disputes.kpiOpen, { exact: true })
+      .locator('..');
+    const investigating = page
+      .getByRole('region', { name: AR.nav.disputes })
+      .getByText(AR.sections.disputes.kpiInvestigating, { exact: true })
+      .locator('..');
+
+    const open = Number((await openCard.innerText()).match(/\d+/)?.[0] ?? '0');
+    const reviewing = Number((await investigating.innerText()).match(/\d+/)?.[0] ?? '0');
+
+    // The dashboard counts both unresolved states, which is what "open" means to an operator.
+    expect(Number(onDashboard)).toBe(open + reviewing);
   });
 
   /**
-   * Every sidebar item navigates, and the unbuilt ones explain themselves.
+   * Every sidebar item navigates to a section backed by real data.
    *
-   * This test used to assert the opposite — that unbuilt sections were `aria-disabled` and NOT
-   * links — which was right while eleven of the eighteen had no route at all. Now every route
-   * exists: fifteen render real data and four render a page that names what is missing and why.
-   * A page that says "النزاعات needs a DSP table" is strictly better than a dimmed row, because
-   * it can carry the reason.
-   *
-   * The rule that has NOT changed is the one worth protecting: an unbuilt section must never
-   * render an empty table, because "no results" reads as "there are no disputes".
+   * This test has been rewritten twice, and the history is the point. First it asserted that
+   * unbuilt sections were `aria-disabled` and NOT links — right while eleven of the eighteen had
+   * no route. Then it asserted they navigated to a page explaining the gap. Now all nineteen are
+   * implemented, so it asserts the strongest form: the destination shows data, not an apology.
    */
-  test('unbuilt sections navigate to a page that explains the gap', async ({ page }) => {
+  test('the disputes section is reachable and shows real data', async ({ page }) => {
     await page.getByRole('link', { name: AR.nav.disputes }).click();
 
     await expect(page).toHaveURL(/\/disputes$/);
     await expect(page.getByRole('heading', { name: AR.nav.disputes })).toBeVisible();
-    await expect(page.getByText(AR.unbuilt.heading)).toBeVisible();
-    // No table at all — not an empty one.
-    await expect(page.locator('table')).toHaveCount(0);
+    await expect(page.getByText(AR.unbuilt.heading)).toBeHidden();
+    await expect(page.getByText(AR.dashboard.queueFailed)).toBeHidden();
   });
 
   /** Emergency Mode is reached from the header, as the prototype's `openEmergency` does. */

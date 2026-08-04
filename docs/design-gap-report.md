@@ -28,34 +28,73 @@ endpoint exists yet.
 
 ---
 
-## 0. Outcome of this pass
+## 0. Outcome — all 19 sections implemented
 
-Written as a gap report, then executed. **15 of the 19 sections are now implemented and verified
-against the running application**; the remaining 4 need a schema change first and are listed in §4.
+**Second pass, 2026-08-04.** The first pass built 15 of 19 and listed 4 as blocked on schema. This
+pass created that schema and implemented them, so **all 19 admin sections are now implemented and
+verified against the running application**. Nothing renders a placeholder.
 
-|                                   | Sections                                                                                                                                                                                                 |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Built and backed by real data** | لوحة الإدارة · الحجوزات · الشركاء · العقارات · العملاء · الموظفون · الدفع والفواتير · المحفظة · بطاقات الهدايا · الكوبونات · المدن والدول والعملات · التقارير · الإعدادات · سجل التدقيق · Emergency Mode |
-| **Route exists, states the gap**  | الإعلانات · النزاعات · الرسائل · واتساب والبريد                                                                                                                                                          |
+| Section                                                                                                                                                                                                  | State             |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| لوحة الإدارة · الحجوزات · الشركاء · العقارات · العملاء · الموظفون · الدفع والفواتير · المحفظة · بطاقات الهدايا · الكوبونات · المدن والدول والعملات · التقارير · الإعدادات · سجل التدقيق · Emergency Mode | Built, pass 1     |
+| **النزاعات · الرسائل · واتساب والبريد · الإعلانات**                                                                                                                                                      | **Built, pass 2** |
+| **عقود الشراكة** (inside الشركاء §8.1)                                                                                                                                                                   | **Built, pass 2** |
 
-New API surface: 12 endpoints on `RegistriesController`, every one keyset-paginated, `.strict()`
-validated, and guarded by the narrowest permission that fits. Verified live: all 12 return 200 with
-real rows, pagination advances without repeating, unknown query parameters 400, a malformed cursor
-400s rather than silently restarting at page 1, and an unauthenticated call 401s.
+### What pass 2 added
 
-Verification at the end of the pass: `pnpm verify` green (566 tests), `pnpm build` green,
-`pnpm e2e` green at **51 browser tests** (up from 22), and all 19 routes loaded in a real browser
-with no console errors, no horizontal page overflow and no untranslated UI copy.
+**Schema** — one forward-only additive migration (`0017`), no `DROP`, no type change:
 
-### Defects this pass found in existing code
+| Table                           | Purpose                                                                                      |
+| ------------------------------- | -------------------------------------------------------------------------------------------- |
+| `disputes` + `dispute_evidence` | `DSP-NNNNNN`, EC-coded kinds, terminal states requiring a resolution, EC-007 customer photos |
+| `conversations` + `messages`    | Three-party threads; messages append-only by trigger                                         |
+| `notifications`                 | WhatsApp/email delivery log with attempts and failure reasons                                |
+| `advertisers` + `ad_campaigns`  | `ADS-NNNNNN`, city-targeted, impression/click counters                                       |
+| `partner_contracts`             | PDF ≤ 10MB, supersede-not-overwrite, one active per kind                                     |
 
-| Found                                                                                                                                                                                                                                                                                                             | Where                           |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| A **client component importing a `server-only` module** — `setting-row.tsx` pulled the API client (session reading, access tokens) toward the browser bundle via a formatting helper. Next refused the build, which is exactly what `server-only` is for. Pure formatters now live in `lib/format.ts`.            | `apps/admin/src/lib/console.ts` |
-| **Dead code asserting a false belief**: the permission matrix filtered out "permissions no staff role holds". `SUPER_ADMIN` is `Object.values(PERMISSIONS)`, so the filter could never fire. A unit test written to confirm the filter failed instead, which is how it was found.                                 | `staff-overview.service.ts`     |
-| **Two redundant `as unknown as string` casts** on already-typed columns.                                                                                                                                                                                                                                          | `finance.service.ts`            |
-| **`ISO code` after an amount reorders under RTL** — `3,000.00 USD` rendered as `USD 3,000.00`, reading as a label rather than a figure. Amounts now carry a symbol in the position the handoff uses.                                                                                                              | payments KPI cards              |
-| **No FX rate is configured for any currency** — surfaced in red by the new geo screen. Not a bug: the seed refuses to invent one and prints ACTION REQUIRED, because a wrong rate is worse than an absent one. The screen now makes that visible to an operator rather than only to whoever read the seed output. | `fx_rates`                      |
+Plus 6 enums, 2 reference sequences, and **13 constraints** in `migrations/post` — each one probed
+against the live database to confirm it rejects the bad row rather than assumed to work.
+
+**Permissions** — 3 new (`notification.read`, `partner_contract.read`, `partner_contract.manage`),
+assigned per role. The staff permission matrix picks them up automatically because it is derived
+from `ROLE_PERMISSIONS` rather than transcribed.
+
+**API** — 13 endpoints on `CommsController`, all keyset-paginated and `.strict()` validated.
+
+**Workflows, end to end and verified live:**
+
+- **Close a dispute** → validates, writes the resolution, credits the customer's wallet in the same
+  transaction (600.00 → 615.00 observed), writes the audit row, and **releases the payout freeze**
+  (4 frozen bookings → 3). Closing twice returns 409.
+- **Staff reply** → contact details stripped on the way in, staff not exempt.
+- **Pause/resume a campaign** → audited; an expired campaign refuses rather than appearing to work.
+- **Contract lifecycle** → upload (magic-byte PDF check) → supersede the previous → mark signed →
+  `active`, with exactly one active per kind enforced by a partial unique index.
+- **CSV export** → streams 2,823 rows with the on-screen filter applied, UTF-8 BOM, and CSV-formula
+  injection neutralised.
+
+### The payout freeze is derived, never stored
+
+The handoff's rule — "فتح النزاع يجمّد استحقاق تحويل الشريك" — is a predicate over `disputes`, not a
+`payout_frozen` flag on the booking. A flag has one failure mode and it is unacceptable here: the
+flag and the disputes disagree, and money moves on the strength of the stale one.
+
+### Defects this pass found
+
+| Found                                                                                                                                                                                                                                     | How                                                                                         |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| **Contact-detail redaction leaked the local part of an email** — `ahmad@x.com` stored as `ahmad@⟨محجوب⟩`, because the URL pattern ate the domain before the email pattern saw it. The test passed: it asserted only that a mask appeared. | Probing the live endpoint. The test now asserts the original substring is **wholly absent** |
+| **`bigint` reaches the driver as a string** — `impressions: "2860"` against a schema expecting a number, which failed the parse and blanked the whole ads screen                                                                          | Loading the page in a browser                                                               |
+| **Replacing a contract did not supersede an unsigned one** — two pending base agreements for one partner, with nothing to say which was current                                                                                           | Testing the upload twice                                                                    |
+| **`active` was unreachable** — every contract started `awaiting_partner_signature` and nothing could move it, so a whole branch of the status vocabulary was dead. Added the sign action                                                  | Testing the upload path                                                                     |
+| **The dashboard said disputes were unavailable while `/disputes` showed six**                                                                                                                                                             | Cross-reading two screens; a test now asserts the two agree                                 |
+| **A backtick inside a `sql\`\`` comment terminated the template** — twice, in two different files                                                                                                                                         | `tsc`                                                                                       |
+
+### Verification
+
+`pnpm verify` exit 0 — **604 tests**, format, lint, types, no vulnerabilities. `pnpm build` green.
+`pnpm e2e` **56/56**. All 19 routes loaded in a real browser: no console errors, no horizontal
+overflow, no untranslated UI copy, no `LOAD-FAILED`, no "not built" panel.
 
 ---
 
@@ -76,7 +115,11 @@ with no console errors, no horizontal page overflow and no untranslated UI copy.
 
 ---
 
-## 2. Implemented but visually or functionally different
+## 2. Implemented but visually or functionally different — RESOLVED
+
+> **Historical.** Every row below was closed during the two implementation passes. Kept because the
+> reasoning is the record of why each screen looks the way it does. Current deviations are §6; what
+> remains is §4.
 
 Each row states the deviation and what closing it requires.
 
@@ -93,7 +136,10 @@ Each row states the deviation and what closing it requires.
 
 ---
 
-## 3. Completely missing
+## 3. Completely missing — RESOLVED
+
+> **Historical.** All fourteen items below were built: nine in pass 1, five in pass 2 (النزاعات ·
+> الرسائل · واتساب والبريد · الإعلانات · عقود الشراكة).
 
 | Section                                    | Handoff content                                                                                                                                                                                                                     | Backed?                                                                                                       |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
@@ -113,30 +159,45 @@ Each row states the deviation and what closing it requires.
 
 ---
 
-## 4. Blocked by backend / API functionality
+## 4. Backend work still required — the four answers
 
-These need a schema change before any screen can be honest. They are **not externally
-blocked** — they are mine to build — but each is a domain, not a page, and shipping a screen
-against no data would be a fabricated UI, which is the one thing this console must not do.
+The four questions asked of this pass, answered.
 
-| #   | What is missing       | Shape needed                                                                                                                                                                                                                     | Sections it unblocks                                                                    |
-| --- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| B-1 | **Disputes**          | `disputes` (reference `DSP-NNNNNN`, booking_id, kind/EC code, title, status open/reviewing/closed, opened_by, closed_by, resolution, compensation_amount) + `dispute_evidence` (EC-007 customer photos) + the payout-freeze rule | النزاعات; the dashboard's open-disputes KPI, which currently and correctly shows a dash |
-| B-2 | **Conversations**     | `conversations` (booking_id or partner_id, three-party) + `messages` (sender_kind, body, redaction flags) + the contact-detail blocking rule                                                                                     | الرسائل                                                                                 |
-| B-3 | **Notification log**  | `notifications` (channel whatsapp/email, template key, locale, subject ref, status sent/failed/pending, provider_ref, attempts) — the send path itself is externally blocked (WhatsApp BSP, item 192), but the LOG is not        | واتساب والبريد                                                                          |
-| B-4 | **Advertisers**       | `advertisers` + `ad_campaigns` (city_id, period, impressions, clicks, status)                                                                                                                                                    | الإعلانات                                                                               |
-| B-5 | **Partner contracts** | `partner_contracts` (partner_id, kind, file ref via the existing storage abstraction, uploaded_by, uploaded_at, expires_at, status)                                                                                              | عقود الشراكة inside الشركاء                                                             |
-| B-6 | **Staff scope**       | `users.scope` or a `staff_scopes` join to cities/countries — the design's النطاق column and the invite form's نطاق العمل select                                                                                                  | الموظفون                                                                                |
+### 1. Which sections are fully implemented and verified
 
-Five further items are data-shape gaps rather than missing tables:
+**All 19.** Each renders real data from its own table, was loaded in a browser, and is covered by a
+browser test asserting it neither fails to load nor shows a placeholder. See §0.
 
-| #    | Gap                                                                                                 | Effect                                                                                                                                                                                                                                                                                                         |
-| ---- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B-7  | `gift_cards` and `coupons` have **zero rows**                                                       | The screens will render correctly and show an empty state. That is honest, but it means the layout has not been seen against real data. Worth seeding a handful in dev.                                                                                                                                        |
-| B-8  | `properties` has **one row**, `cities` nine                                                         | The properties table and the geo city counts are thin in dev; not a code gap.                                                                                                                                                                                                                                  |
-| B-9  | **No payouts table** — `partner_payout_accounts` records where to send money, not that any was sent | الدفع والفواتير cannot show the design's تحويل شريك (`TRF-…`) row type. Deriving one from `bookings.partner_payable_amount` would present an obligation as a transfer that occurred, so the screen shows what is OWED and states that transfers are absent. Also gated by the deferred payment-rails decision. |
-| B-10 | **`refunds` has no human reference** — the design shows `RFD-000342`                                | Refund rows are keyed by the payment they reverse. Adding a `reference` column needs a sequence plus a backfill for 591 existing rows: small and additive, but out of scope for a pass that changed no schema.                                                                                                 |
-| B-11 | **No `users.scope`**                                                                                | The design's النطاق column and the invite form's نطاق العمل select are absent from الموظفون rather than filled with a placeholder. Same underlying item as B-6.                                                                                                                                                |
+### 2. Which sections differ from the handoff, and why
+
+Twelve documented deviations in §6, plus three added by this pass (13–15). Every one is a
+deliberate decision with a stated reason. There are no undocumented differences.
+
+### 3. What is still blocked, and by what
+
+| Item                           | Blocked by                                                     | Effect                                                                                                                                                           |
+| ------------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sending** on واتساب والبريد  | **External** — WhatsApp BSP undecided (item 192). Email works. | The log, the template inventory and the per-channel state are built. The ad template is inert until the one-message-maximum can be enforced. The screen says so. |
+| **Executing** a partner payout | **External** — payment rails deferred by decision 2026-08-01   | الدفع والفواتير shows what is owed and states that transfers are not shown. `disputes/frozen-payouts` is built and ready for the payout path to consult.         |
+| **النطاق (staff scope)**       | **A product decision** — see below                             | The column and the invite-form select are absent rather than faked.                                                                                              |
+
+### 4. Backend work still required for complete parity
+
+Two items, and only two.
+
+| #        | Item                                               | Why it is not done                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Proposed schema / plan                                                                                                                                                                                                                                                                                                         |
+| -------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **B-12** | **Staff scope** (النطاق column, نطاق العمل select) | Needs a decision, not code. A scope that is DISPLAYED but not ENFORCED is the exact failure this console avoids everywhere else — an operator would read "كرم عبّود · اللاذقية · طرطوس" and believe Karam cannot see a Damascus booking. Enforcing it is a security-relevant change to who sees what, and the semantics are a product call. **The question for Bashar:** does a Latakia-scoped operations manager see a Damascus booking at all, or see it read-only? And is the audit log scoped (it should not be — a scoped audit trail is not an audit trail)? | `users.scope_kind` enum (`all_cities` \| `cities` \| `outside_syria`) plus a `staff_scope_cities` join to `cities`. Enforcement is one extra predicate on the three city-bearing registries (bookings, partners, properties); finance, settings and audit stay global by nature. Roughly a day once the semantics are decided. |
+| **B-13** | **Audit entry for a CSV export**                   | The export streams from the BFF, which cannot write an audit row inside the API's transaction. An export removes data from the console's access controls and should be recorded.                                                                                                                                                                                                                                                                                                                                                                                   | Move the export behind `GET /admin/bookings/export` in the API, streaming from there and writing one `booking.exported` audit row with the filter and the row count. Half a day.                                                                                                                                               |
+
+Everything else previously listed here (B-1…B-6) was built in this pass. The data-shape gaps that
+remain are cosmetic or dev-only:
+
+| #    | Gap                                                              | Effect                                                                                                                                                          |
+| ---- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B-7  | `gift_cards` and `coupons` have zero rows                        | The screens render correctly and show an empty state. Worth seeding a handful in dev to see the layout against data.                                            |
+| B-8  | `properties` has one row, `cities` nine                          | Thin dev data; not a code gap.                                                                                                                                  |
+| B-10 | `refunds` has no human reference (the design shows `RFD-000342`) | Refund rows are keyed by the payment they reverse. A `reference` column needs a sequence plus a backfill for 591 rows — additive and small, cosmetic in effect. |
 
 ---
 
@@ -198,11 +259,24 @@ Every deviation in the finished console should be one of these. Anything else is
 11. **The Emergency Mode banner is on its own section, not above all nineteen.** A console-wide
     banner costs a query for active declarations on every page load, and the state is already
     visible where it is acted on.
-12. **`تصدير CSV` is not implemented.** The design puts an export button on الحجوزات and on each
-    report card. Deferred rather than faked: an export must carry the current filters (or it exports
-    the wrong set and somebody reconciles against it), must stream rather than buffer 3,000 rows, and
-    should be audit-logged because it removes data from the console's access controls. That is its own
-    piece of work, and a button that downloaded the first page only would be worse than none.
+12. **`تصدير CSV` is implemented on الحجوزات only.** It streams with the on-screen filter applied,
+    a UTF-8 BOM so Excel does not mangle Arabic, and CSV-formula injection neutralised (a property
+    name beginning with `=` would otherwise execute on open). Truncation past 5,000 rows appends a
+    visible marker rather than ending silently. The report cards do NOT have one: each would export a
+    different shape, and the four sparklines are eight numbers each — a screenshot serves better than
+    a file. Recorded as B-13 that the export should write an audit row.
+13. **The permission matrix drops the design's ○ tier**, and the operations-manager contract
+    permission is granted outright. The handoff marks "رفع وتعديل عقود الشراكة" as ○ — allowed with
+    manager approval. There is no approval workflow in the model, so the binary decision was made
+    deliberately: an operations manager who has just verified a partner is the person who files the
+    signed contract, and routing that through a super admin makes the queue depend on one person.
+    Every upload is audit-logged with who did it, which is the accountability ○ was reaching for.
+14. **عرض on a contract row is disabled.** Serving the file needs a per-request authorization check
+    and a short-lived signed URL. A button that downloaded nothing would be worse than a disabled
+    one; a button that downloaded _without_ the check would be much worse than either.
+15. **The Emergency Mode broadcast records the choice and sends nothing.** The WhatsApp channel is
+    blocked on the provider decision, and the form says so when the box is ticked — rather than
+    accepting the instruction and silently dropping it.
 
 ---
 
@@ -216,17 +290,18 @@ the §9.1 tokens; both are recorded in the future-work register §8a.
 
 ---
 
-## 8. Execution order
+## 8. Execution order — complete
 
-Sequenced so each step is verifiable on its own, and so the shared primitives land before the
-sections that depend on them.
+| Step | Work                                                                                      | State                                  |
+| ---- | ----------------------------------------------------------------------------------------- | -------------------------------------- |
+| 1    | Shared primitives: `AdminTable`, `TableToolbar`, `Kpi`, `StatusPill`, `Pager`, `FootNote` | ✅ pass 1                              |
+| 2    | 11 sections backed by existing tables                                                     | ✅ pass 1                              |
+| 3    | Rebuild staff · audit · settings to the design                                            | ✅ pass 1                              |
+| 4    | New domains: contracts → disputes → notification log → ads → conversations                | ✅ pass 2                              |
+| 5    | CSV export                                                                                | ✅ pass 2                              |
+| 6    | Staff scope (B-12)                                                                        | ⏸ awaiting a product decision — see §4 |
+| 7    | Export audit entry (B-13)                                                                 | 📋 half a day, no blocker              |
 
-| Step | Work                                                                                                                                                                            | Depends on |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| 1    | Shared primitives: `AdminTable`, `SearchField`, `Kpi`, `StatusPill`, `Panel`, `FootNote`, CSV export                                                                            | —          |
-| 2    | Sections backed by existing tables: bookings · partners table + score/tier · properties table · customers · payments · wallet · giftcards · coupons · geo · reports · emergency | Step 1     |
-| 3    | Rebuild to the design: staff (KPIs, permission matrix, activity) · audit (IP, badge) · settings (Rules Engine)                                                                  | Step 1     |
-| 4    | New domains, schema first: B-5 contracts → B-1 disputes → B-3 notification log → B-4 ads → B-2 conversations → B-6 staff scope                                                  | Step 2–3   |
-
-Steps 1–3 are 15 of the 19 sections and need no schema change. Step 4 is the remaining 4
-sections plus partner contracts and the staff scope column.
+**No remaining implementation work can be completed within the current project scope** except B-13,
+which is a small relocation of the export into the API, and B-12, which needs Bashar to answer two
+questions about what scope means before any code is the right code.

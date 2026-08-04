@@ -40,11 +40,15 @@ const SECTIONS = [
   { path: '/settings', title: AR.nav.settings, built: true },
   { path: '/audit', title: AR.nav.audit, built: true },
   { path: '/emergency', title: AR.admin.emergencyMode, built: true },
-  // Present in the design, no table behind them yet — see docs/design-gap-report.md §4.
-  { path: '/ads', title: AR.nav.ads, built: false },
-  { path: '/disputes', title: AR.nav.disputes, built: false },
-  { path: '/messages', title: AR.nav.messages, built: false },
-  { path: '/comms', title: AR.nav.whatsapp, built: false },
+  /*
+    These four were `built: false` until 2026-08-04, when the schema they needed landed —
+    `disputes`, `conversations`/`messages`, `notifications`, `advertisers`/`ad_campaigns`. All
+    nineteen sections are now backed by real tables, so nothing on this list is a placeholder.
+  */
+  { path: '/ads', title: AR.nav.ads, built: true },
+  { path: '/disputes', title: AR.nav.disputes, built: true },
+  { path: '/messages', title: AR.nav.messages, built: true },
+  { path: '/comms', title: AR.nav.whatsapp, built: true },
 ] as const;
 
 /** The failure message every section renders when its fetch does not parse. */
@@ -70,10 +74,13 @@ test.describe('every admin section the design specifies', () => {
       await expect(page.getByText(LOAD_FAILED)).toBeHidden();
       await expect(page.getByText(AR.dashboard.countersFailed)).toBeHidden();
 
-      if (!section.built) {
-        // An unbuilt section must SAY so. An empty table would read as "there are none".
-        await expect(page.getByText(AR.unbuilt.heading)).toBeVisible();
-      }
+      /*
+        Nothing may render the "not built" panel any more. This assertion is the one that would
+        catch a regression to a placeholder, and it is stated for EVERY section rather than only
+        the ones that used to be unbuilt.
+      */
+      await expect(page.getByText(AR.unbuilt.heading)).toBeHidden();
+      expect(section.built).toBe(true);
     });
   }
 
@@ -225,6 +232,101 @@ test.describe('honesty rules the design and the register require', () => {
     await page.goto('/giftcards');
 
     await expect(page.getByText(AR.sections.giftcards.codeNote)).toBeVisible();
+  });
+
+  /**
+   * A dispute cannot be closed without a written decision.
+   *
+   * The API requires ten characters, a database CHECK requires a resolution for any terminal
+   * status, and the form keeps its button disabled. Three layers, because this closure releases a
+   * partner's payout and may credit a customer's wallet — and a dispute closed with no stated
+   * outcome is unauditable.
+   */
+  test('a dispute cannot be closed without a resolution', async ({ page }) => {
+    await page.goto('/disputes');
+
+    const open = page.getByRole('button', { name: AR.sections.disputes.open }).first();
+
+    test.skip((await open.count()) === 0, 'No open dispute in the seeded data');
+
+    await open.click();
+
+    const confirm = page.getByRole('button', { name: AR.sections.disputes.confirmClose });
+
+    await expect(confirm).toBeDisabled();
+
+    // Too short still leaves it disabled; the threshold matches the API and the CHECK.
+    await page.getByRole('textbox').first().fill('short');
+    await expect(confirm).toBeDisabled();
+
+    await page
+      .getByRole('textbox')
+      .first()
+      .fill('تحققنا من الشكوى وأغلقناها بعد مراجعة الأدلة.');
+    await expect(confirm).toBeEnabled();
+  });
+
+  /**
+   * An unresolved dispute must SAY that it is holding the partner's money.
+   *
+   * "فتح النزاع يجمّد استحقاق تحويل الشريك" is the rule with money attached and the one an operator
+   * forgets, so it is a badge on each affected card rather than only a footnote.
+   */
+  test('unresolved disputes state the payout freeze', async ({ page }) => {
+    await page.goto('/disputes');
+
+    await expect(page.getByText(AR.sections.disputes.frozen).first()).toBeVisible();
+    await expect(page.getByText(AR.sections.disputes.note)).toBeVisible();
+  });
+
+  /**
+   * The WhatsApp channel is not wired, and the screen says so.
+   *
+   * The provider is undecided (item 192). A comms log that showed queued WhatsApp messages without
+   * that caveat would read as "sending works", and somebody would wait for a delivery that is
+   * never coming.
+   */
+  test('the comms log admits WhatsApp is not wired', async ({ page }) => {
+    await page.goto('/comms');
+
+    await expect(page.getByText(AR.sections.comms.whatsappBlocked)).toBeVisible();
+    // And the inert template is labelled rather than hidden.
+    await expect(page.getByText(AR.sections.comms.notWired).first()).toBeVisible();
+  });
+
+  /**
+   * Advertising must never expose a ranking control.
+   *
+   * "لا تُخلط بترتيب البحث الطبيعي" is a promise to customers. There is no priority column in the
+   * table, in the service or in the schema, and the screen states it — because the moment such a
+   * control exists somebody will use it.
+   */
+  test('the ads screen states that ads never affect ranking', async ({ page }) => {
+    await page.goto('/ads');
+
+    await expect(page.getByText(AR.sections.ads.noRanking)).toBeVisible();
+  });
+
+  /**
+   * Contact details are stripped from staff replies too.
+   *
+   * Exempting staff would be the obvious shortcut and the wrong one: an agent pasting a partner's
+   * number to a customer defeats the rule just as thoroughly.
+   */
+  test('a staff reply has its contact details redacted', async ({ page }) => {
+    await page.goto('/messages');
+
+    const thread = page.locator('a[href^="/messages/"]').first();
+
+    test.skip((await thread.count()) === 0, 'No seeded conversation');
+
+    await thread.click();
+    await page.getByRole('textbox').first().fill('اتصل بي على 0944123456 بخصوص الحجز');
+    await page.getByRole('button', { name: AR.sections.messages.reply }).click();
+
+    // The number is gone; the mask is visible; the booking word survived.
+    await expect(page.getByText('0944123456')).toHaveCount(0);
+    await expect(page.getByText('⟨محجوب⟩').first()).toBeVisible();
   });
 
   /**
