@@ -4,7 +4,9 @@ import {
   index,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -12,12 +14,40 @@ import {
 
 import { createdAt, foreignId, notDeleted, primaryId, timestamps } from './_shared.js';
 import { authTokenPurpose, userRole, userStatus } from './enums.js';
-import { currencies } from './geo.js';
+import { cities, currencies } from './geo.js';
 
 /**
  * Authenticatable accounts only. A "Visitor" (§4) has no row here, and a Guest
  * Customer books without one — see customerProfiles.userId being nullable.
  */
+/**
+ * How widely a staff member's authority reaches (design handoff §8.2, نطاق العمل).
+ *
+ * `all_cities` is the default and covers every staff member who has no geographic limit —
+ * finance, super admins, and any operations manager who works nationally. `cities` narrows them
+ * to an explicit list in `staff_scope_cities`.
+ *
+ * "خارج سوريا" from the design is NOT a third kind: it is a city list containing the non-Syrian
+ * cities. Modelling it as a special case would mean a second code path that has to be kept in
+ * step with the first, for a distinction the data already expresses.
+ */
+export const staffScopeKind = pgEnum('staff_scope_kind', ['all_cities', 'cities']);
+
+/**
+ * What a scoped staff member may do OUTSIDE their cities (Bashar, 2026-08-04).
+ *
+ * `none` — the resource does not exist for them. Lists omit it and a detail read returns 404,
+ * never 403: a 403 confirms the row exists, which is itself information they are not scoped to
+ * have.
+ *
+ * `read_only` — they can see it and cannot change it.
+ *
+ * Writes are refused outside scope in BOTH modes. `read_only` is a widening of READ only; there is
+ * no mode in which a Latakia-scoped agent edits a Damascus booking. Default is `none`, because
+ * deny-by-default is rule 1 and the safer value must be the one you get by forgetting to choose.
+ */
+export const outsideScopeAccess = pgEnum('outside_scope_access', ['none', 'read_only']);
+
 export const users = pgTable(
   'users',
   {
@@ -50,6 +80,18 @@ export const users = pgTable(
       .default([]),
     /** Per-user grants layered on top of the role, for CASL. */
     permissionOverrides: jsonb('permission_overrides').$type<string[]>(),
+    /**
+     * Geographic scope (design handoff §8.2). Enforced server-side, never only rendered.
+     *
+     * `all_cities` for everybody by default, so adding the column changed nobody's authority. A
+     * super_admin is never scoped — the API refuses it, because scoping the only account that can
+     * un-scope an account is a lockout waiting to happen.
+     */
+    scopeKind: staffScopeKind('scope_kind').notNull().default('all_cities'),
+    /** Only meaningful when `scopeKind = 'cities'`. See the enum for why writes ignore it. */
+    outsideScopeAccess: outsideScopeAccess('outside_scope_access')
+      .notNull()
+      .default('none'),
     /** Lockout state after repeated failed sign-ins (§1 rate limiting). */
     failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
     lockedUntil: timestamp('locked_until', { withTimezone: true }),
@@ -187,4 +229,37 @@ export const customerProfilesRelations = relations(customerProfiles, ({ one }) =
     fields: [customerProfiles.preferredCurrencyId],
     references: [currencies.id],
   }),
+}));
+
+/**
+ * Which cities a scoped staff member covers (design handoff §8.2).
+ *
+ * A join table rather than a `city_ids uuid[]` column on `users`, for one reason that matters: a
+ * foreign key. An array cannot reference `cities`, so a city that was renamed or archived would
+ * leave a dangling uuid in somebody's scope — and a scope with a uuid nobody recognises fails
+ * open or closed unpredictably. Here the database refuses to delete a city that is still somebody's
+ * scope.
+ *
+ * Composite primary key: a member covers a city once or not at all.
+ */
+export const staffScopeCities = pgTable(
+  'staff_scope_cities',
+  {
+    userId: foreignId('user_id')
+      .notNull()
+      .references(() => users.id),
+    cityId: foreignId('city_id')
+      .notNull()
+      .references(() => cities.id),
+    ...createdAt,
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.cityId] }),
+    index('staff_scope_cities_user_idx').on(t.userId),
+  ],
+);
+
+export const staffScopeCitiesRelations = relations(staffScopeCities, ({ one }) => ({
+  user: one(users, { fields: [staffScopeCities.userId], references: [users.id] }),
+  city: one(cities, { fields: [staffScopeCities.cityId], references: [cities.id] }),
 }));

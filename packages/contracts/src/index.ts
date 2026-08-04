@@ -6,6 +6,7 @@ export * from './pagination.js';
 export * from './payment.js';
 export * from './permissions.js';
 export * from './property.js';
+export * from './scope.js';
 export * from './search.js';
 export * from './two-factor.js';
 export * from './wallet.js';
