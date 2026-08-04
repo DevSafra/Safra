@@ -23,11 +23,14 @@ import { AR, auditAction, bookingStatus, roleName } from '@/lib/strings';
  *
  * ## Nothing here is invented
  *
- * Every figure comes from a column. Where the design asks for something the platform does
- * not record — open disputes, Emergency Mode — the UI says so rather than showing a
- * plausible value. A confident zero for a feature that does not exist is the one failure
- * mode a staff dashboard must not have: somebody would read "no open disputes" and believe
- * it.
+ * Every figure comes from a column. Where the design asks for something the platform does not
+ * record, the UI says so rather than showing a plausible value — a confident zero for a feature
+ * that does not exist is the one failure mode a staff dashboard must not have, because somebody
+ * would read "no open disputes" and believe it.
+ *
+ * That rule cost nothing when disputes had no table: the card showed a dash and named the gap. The
+ * table landed on 2026-08-04 and the card now shows the real count, which is the same rule pointing
+ * the other way. `null` is still rendered as a dash and still means "cannot be determined".
  */
 export const dynamic = 'force-dynamic';
 
@@ -141,7 +144,12 @@ function Overview({
           value={count(counters.cancelled_today)}
           sub={`${AR.admin.ofWhich} ${count(counters.cancelled_today_with_fine)} ${AR.admin.kpiCancelledSub}`}
         />
-        {/* Dash, not a zero — see the module note. */}
+        {/*
+          Real since 2026-08-04, when the disputes table landed. It showed a dash and "the
+          feature does not exist" for months, which was the right answer then and would be a lie
+          now. `null` still renders a dash — it means "cannot be determined", which is a
+          different statement from zero and must never be conflated with it.
+        */}
         <Kpi
           label={AR.admin.kpiDisputes}
           value={
@@ -149,8 +157,18 @@ function Overview({
               ? AR.admin.noData
               : count(overview.openDisputes)
           }
-          valueClass="text-faint"
-          sub={AR.admin.kpiDisputesUnavailable}
+          valueClass={
+            overview.openDisputes === null
+              ? 'text-faint'
+              : overview.openDisputes > 0
+                ? 'text-bad'
+                : 'text-text'
+          }
+          sub={
+            overview.openDisputes === null
+              ? AR.admin.kpiDisputesUnavailable
+              : AR.admin.kpiDisputesSub
+          }
         />
       </section>
 

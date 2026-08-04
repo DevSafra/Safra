@@ -532,6 +532,14 @@ function listQuery(params: {
 export interface ListParams {
   readonly q?: string | undefined;
   readonly cursor?: string | undefined;
+  /**
+   * Page size, defaulting to 25.
+   *
+   * Only the CSV export passes it, and only to walk the cursor in larger strides. Screens leave it
+   * alone: a page size chosen per screen is a page size that drifts, and the API caps it at 100
+   * regardless.
+   */
+  readonly limit?: number | undefined;
 }
 
 // ── الحجوزات ─────────────────────────────────────────────────────────────────
@@ -859,4 +867,176 @@ export type EmergencyMode = z.infer<typeof emergencyModeSchema>;
 
 export async function getEmergency() {
   return staffFetch('/admin/emergency', emergencySchema);
+}
+
+// ─── §8 disputes, conversations, comms and advertising ────────────────────────
+
+const disputeItemSchema = z.object({
+  reference: z.string(),
+  kind: z.string(),
+  status: z.string(),
+  title: z.string(),
+  bookingReference: z.string().nullable(),
+  partner: z.string().nullable(),
+  customer: z.string().nullable(),
+  evidenceCount: z.number(),
+  compensationAmount: z.string().nullable(),
+  compensationCurrency: z.string().nullable(),
+  resolution: z.string().nullable(),
+  ageHours: z.number(),
+  openedAt: z.string(),
+  closedAt: z.string().nullable(),
+  freezesPayout: z.boolean(),
+});
+
+const disputesSchema = cursorPage(disputeItemSchema).extend({
+  counters: z.object({
+    open: z.number(),
+    investigating: z.number(),
+    resolvedThisMonth: z.number(),
+    oldestOpenHours: z.number().nullable(),
+    frozenPayouts: z.number(),
+  }),
+});
+
+export type DisputeItem = z.infer<typeof disputeItemSchema>;
+export type Disputes = z.infer<typeof disputesSchema>;
+
+export async function getDisputes(params: ListParams & { status?: string | undefined }) {
+  return staffFetch(`/admin/disputes${listQuery(params)}`, disputesSchema);
+}
+
+const conversationItemSchema = z.object({
+  reference: z.string(),
+  subjectKind: z.string(),
+  subjectReference: z.string().nullable(),
+  customer: z.string().nullable(),
+  partner: z.string().nullable(),
+  lastMessage: z.string().nullable(),
+  lastMessageAt: z.string().nullable(),
+  unreadForStaff: z.number(),
+  messageCount: z.number(),
+  closed: z.boolean(),
+});
+
+export type ConversationItem = z.infer<typeof conversationItemSchema>;
+
+export async function getConversations(params: ListParams) {
+  return staffFetch(
+    `/admin/conversations${listQuery(params)}`,
+    cursorPage(conversationItemSchema),
+  );
+}
+
+const messageSchema = z.object({
+  senderKind: z.string(),
+  senderEmail: z.string().nullable(),
+  body: z.string(),
+  redactedCount: z.number(),
+  internal: z.boolean(),
+  at: z.string(),
+});
+
+export type ThreadMessage = z.infer<typeof messageSchema>;
+
+export async function getThread(reference: string) {
+  return staffFetch(
+    `/admin/conversations/${encodeURIComponent(reference)}`,
+    z.object({ messages: z.array(messageSchema) }),
+  );
+}
+
+const notificationItemSchema = z.object({
+  channel: z.string(),
+  templateKey: z.string(),
+  locale: z.string(),
+  status: z.string(),
+  attempts: z.number(),
+  failureReason: z.string().nullable(),
+  subjectReference: z.string().nullable(),
+  at: z.string(),
+});
+
+const notificationsSchema = cursorPage(notificationItemSchema).extend({
+  counters: z.object({
+    windowDays: z.number(),
+    byChannel: z.record(z.string(), z.record(z.string(), z.number())),
+  }),
+  templates: z.array(
+    z.object({
+      key: z.string(),
+      nameAr: z.string(),
+      channels: z.array(z.string()),
+      locales: z.array(z.string()),
+      implemented: z.boolean(),
+    }),
+  ),
+});
+
+export type NotificationItem = z.infer<typeof notificationItemSchema>;
+export type Notifications = z.infer<typeof notificationsSchema>;
+
+export async function getNotifications(
+  params: ListParams & { status?: string | undefined },
+) {
+  return staffFetch(`/admin/notifications${listQuery(params)}`, notificationsSchema);
+}
+
+const campaignItemSchema = z.object({
+  reference: z.string(),
+  advertiser: z.string(),
+  advertiserKind: z.string(),
+  city: z.string(),
+  status: z.string(),
+  billingPeriod: z.string(),
+  priceAmount: z.string().nullable(),
+  priceCurrency: z.string().nullable(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+  impressions: z.number(),
+  clicks: z.number(),
+  daysRemaining: z.number(),
+});
+
+const campaignsSchema = cursorPage(campaignItemSchema).extend({
+  counters: z.object({
+    active: z.number(),
+    paused: z.number(),
+    endingWithinWeek: z.number(),
+    impressions30d: z.number(),
+    clicks30d: z.number(),
+  }),
+});
+
+export type CampaignItem = z.infer<typeof campaignItemSchema>;
+export type Campaigns = z.infer<typeof campaignsSchema>;
+
+export async function getCampaigns(params: ListParams) {
+  return staffFetch(`/admin/ad-campaigns${listQuery(params)}`, campaignsSchema);
+}
+
+const contractSchema = z.object({
+  id: z.string(),
+  partnerReference: z.string(),
+  partnerName: z.string(),
+  kind: z.string(),
+  status: z.string(),
+  fileName: z.string(),
+  sizeBytes: z.number(),
+  uploadedBy: z.string().nullable(),
+  uploadedAt: z.string(),
+  signedAt: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+  daysToExpiry: z.number().nullable(),
+});
+
+export type ContractItem = z.infer<typeof contractSchema>;
+
+export async function getContracts(partner?: string) {
+  const search = partner ? `?partner=${encodeURIComponent(partner)}` : '';
+
+  return staffFetch(
+    `/admin/partner-contracts${search}`,
+    z.object({ contracts: z.array(contractSchema) }),
+  );
 }

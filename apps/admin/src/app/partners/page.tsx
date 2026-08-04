@@ -6,10 +6,10 @@ import { count } from '@/lib/format';
 import {
   ConsolePanel,
   ConsoleShell,
-  NotBuilt,
   Pager,
   QueueState,
 } from '@/components/console-shell';
+import { ContractsCard } from '@/components/contracts-card';
 import {
   AdminTable,
   FootNote,
@@ -92,16 +92,11 @@ export default async function PartnersPage({
         </ConsolePanel>
 
         {/*
-          عقود الشراكة. The design specifies an upload card and a contract list; there is no
-          `partner_contracts` table, only a single `contract_signed_at` date on the partner. An
-          upload form with nowhere to write would lose the file, so the section states the gap.
+          عقود الشراكة. Backed by `partner_contracts` since 2026-08-04 — the upload supersedes the
+          previous contract of the same kind rather than overwriting it, because which terms were
+          in force on the day of a disputed booking is a question that gets asked.
         */}
-        <ConsolePanel title={AR.sections.partners.contracts}>
-          <p className="mb-3 text-[11.5px] text-faint">
-            {AR.sections.partners.contractsHint}
-          </p>
-          <NotBuilt reason={AR.unbuilt.contracts} />
-        </ConsolePanel>
+        <ContractsCard />
 
         <ConsolePanel title={AR.sections.partners.pendingTitle}>
           <QueueState state={pending}>

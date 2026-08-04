@@ -1,24 +1,237 @@
+import Link from 'next/link';
+
+import { getDisputes, type DisputeItem, type Disputes } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { ConsoleShell, NotBuilt } from '@/components/console-shell';
-import { AR } from '@/lib/strings';
+import { amount, count, shortDateTime } from '@/lib/format';
+import {
+  ConsolePanel,
+  ConsoleShell,
+  Kpi,
+  KpiRow,
+  Pager,
+} from '@/components/console-shell';
+import { FootNote, Ltr, StatusPill, type Tone } from '@/components/admin-table';
+import { TableToolbar } from '@/components/table-toolbar';
+import { CloseDisputeForm } from '@/components/close-dispute-form';
+import { AR, label } from '@/lib/strings';
+import { listParams } from '@/lib/search-params';
 
 /**
- * Disputes — present in the design (handoff §8), not yet backed by any table.
+ * النزاعات — disputes (design handoff §8).
  *
- * The route exists so the sidebar item leads somewhere that EXPLAINS itself, rather than to a
- * 404 or to an empty table. An empty table would be read as "there are none", which for disputes
- * and messages is a materially different — and much worse — claim than "not built".
+ * ## Cards, not a table
  *
- * What it needs and where it sits in the order is in `docs/design-gap-report.md` §4.
+ * The one section the design does NOT draw as a grid, and it is right: a dispute is a paragraph of
+ * context, not a row of fields. The EC tag, the title, the booking, the customer, the evidence
+ * count and the age all have to be readable at once to decide what to pick up next.
+ *
+ * ## The payout freeze is stated on every card it applies to
+ *
+ * "فتح النزاع يجمّد استحقاق تحويل الشريك" is the rule with money attached, and it is the one an
+ * operator forgets. Each unresolved dispute says so explicitly rather than leaving it to the
+ * footnote, because a footnote is read once and a badge is read every time.
  */
 export const dynamic = 'force-dynamic';
 
-export default async function DisputesPage() {
-  const counts = await sidebarCounts();
+export default async function DisputesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { q, cursor } = await listParams(searchParams);
+  const params = await searchParams;
+  const rawStatus = params['status'];
+  const status =
+    (Array.isArray(rawStatus) ? rawStatus[0] : rawStatus)?.trim() || undefined;
+
+  const [result, counts] = await Promise.all([
+    getDisputes({ q, cursor, status }),
+    sidebarCounts(),
+  ]);
 
   return (
     <ConsoleShell title={AR.nav.disputes} counts={counts}>
-      <NotBuilt reason={AR.unbuilt.disputes} />
+      {result === 'unauthenticated' ? (
+        <ConsolePanel>
+          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+        </ConsolePanel>
+      ) : result === 'failed' ? (
+        <ConsolePanel>
+          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+        </ConsolePanel>
+      ) : (
+        <div className="grid gap-4">
+          <Counters counters={result.counters} />
+
+          <ConsolePanel>
+            <TableToolbar
+              action="/disputes"
+              query={q}
+              placeholder={AR.sections.disputes.searchPlaceholder}
+            >
+              <select
+                name="status"
+                defaultValue={status ?? ''}
+                aria-label={AR.table.colStatus}
+                className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+              >
+                <option value="">{AR.sections.bookings.allStatuses}</option>
+                {(['open', 'investigating', 'resolved', 'rejected'] as const).map(
+                  (value) => (
+                    <option key={value} value={value}>
+                      {label(AR.enums.disputeStatus, value)}
+                    </option>
+                  ),
+                )}
+              </select>
+            </TableToolbar>
+
+            {result.items.length === 0 ? (
+              <p className="text-[12.5px] text-faint">{AR.table.empty}</p>
+            ) : (
+              <div className="grid gap-3">
+                {result.items.map((dispute) => (
+                  <DisputeCard key={dispute.reference} dispute={dispute} />
+                ))}
+              </div>
+            )}
+
+            <Pager
+              basePath="/disputes"
+              query={{ q, status }}
+              nextCursor={result.nextCursor}
+            />
+            <FootNote>{AR.sections.disputes.note}</FootNote>
+          </ConsolePanel>
+        </div>
+      )}
     </ConsoleShell>
   );
+}
+
+function Counters({ counters }: { counters: Disputes['counters'] }) {
+  return (
+    <KpiRow label={AR.nav.disputes}>
+      <Kpi
+        label={AR.sections.disputes.kpiOpen}
+        value={count(counters.open)}
+        valueClass={counters.open > 0 ? 'text-bad' : 'text-text'}
+      />
+      <Kpi
+        label={AR.sections.disputes.kpiInvestigating}
+        value={count(counters.investigating)}
+        valueClass="text-warn"
+      />
+      <Kpi
+        label={AR.sections.disputes.kpiOldest}
+        /* A dash when nothing is open — never a zero, which reads as "opened just now". */
+        value={
+          counters.oldestOpenHours === null
+            ? AR.admin.noData
+            : `${count(counters.oldestOpenHours)} ${AR.sections.disputes.hours}`
+        }
+        valueClass={
+          counters.oldestOpenHours !== null && counters.oldestOpenHours > 24
+            ? 'text-bad'
+            : 'text-text'
+        }
+      />
+      <Kpi
+        label={AR.sections.disputes.kpiFrozen}
+        value={count(counters.frozenPayouts)}
+        valueClass={counters.frozenPayouts > 0 ? 'text-warn' : 'text-text'}
+        sub={AR.sections.disputes.kpiFrozenSub}
+      />
+      <Kpi
+        label={AR.sections.disputes.kpiResolved}
+        value={count(counters.resolvedThisMonth)}
+        valueClass="text-ok"
+      />
+    </KpiRow>
+  );
+}
+
+function DisputeCard({ dispute }: { dispute: DisputeItem }) {
+  const closed = dispute.closedAt !== null;
+
+  return (
+    <article
+      /* The design's card: bad-tinted border, 14px radius. */
+      className={`rounded-[14px] border bg-card p-4 ${
+        closed ? 'border-line' : 'border-[rgba(var(--badA),0.35)]'
+      }`}
+    >
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <Ltr className="font-bold text-sky">{dispute.reference}</Ltr>
+            {/* The EC code, in the design's small square tag. */}
+            <span className="rounded bg-[rgba(var(--badA),0.14)] px-2 py-0.5 text-[10px] font-extrabold text-bad">
+              {label(AR.enums.disputeKind, dispute.kind)}
+            </span>
+            {dispute.freezesPayout ? (
+              <StatusPill tone="warn">{AR.sections.disputes.frozen}</StatusPill>
+            ) : null}
+          </div>
+
+          <p className="mt-1.5 text-[13px] font-semibold text-text">{dispute.title}</p>
+
+          <p className="mt-1 text-[11.5px] text-faint">
+            {dispute.bookingReference ? (
+              <Link
+                href={`/bookings/${dispute.bookingReference}`}
+                className="text-sky hover:underline"
+              >
+                <Ltr>{dispute.bookingReference}</Ltr>
+              </Link>
+            ) : null}
+            {dispute.customer ? ` · ${dispute.customer}` : ''}
+            {dispute.partner ? ` · ${dispute.partner}` : ''}
+            {dispute.evidenceCount > 0
+              ? ` · ${AR.sections.disputes.evidence(count(dispute.evidenceCount))}`
+              : ''}
+          </p>
+
+          {/* The resolution, once closed. It is the whole point of requiring one. */}
+          {dispute.resolution ? (
+            <p className="mt-2 rounded-[10px] border border-line bg-field px-3 py-2 text-[11.5px] leading-relaxed text-text2">
+              {dispute.resolution}
+              {dispute.compensationAmount && dispute.compensationCurrency ? (
+                <span className="ms-1.5 font-bold text-gold">
+                  <Ltr>
+                    {amount(dispute.compensationAmount, dispute.compensationCurrency)}
+                  </Ltr>
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="ms-auto flex shrink-0 flex-col items-end gap-2">
+          <StatusPill tone={statusTone(dispute.status)}>
+            {label(AR.enums.disputeStatus, dispute.status)}
+          </StatusPill>
+          <Ltr className="text-[11px] text-faint">
+            {closed ? shortDateTime(dispute.closedAt) : `${count(dispute.ageHours)}h`}
+          </Ltr>
+        </div>
+      </div>
+
+      {/* The close workflow lives on the card, not behind a separate screen. */}
+      {closed ? null : <CloseDisputeForm reference={dispute.reference} />}
+    </article>
+  );
+}
+
+function statusTone(status: string): Tone {
+  switch (status) {
+    case 'open':
+      return 'bad';
+    case 'investigating':
+      return 'warn';
+    case 'resolved':
+      return 'ok';
+    default:
+      return 'faint';
+  }
 }
