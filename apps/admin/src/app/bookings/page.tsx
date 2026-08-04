@@ -13,7 +13,7 @@ import {
   type AdminColumn,
   type Tone,
 } from '@/components/admin-table';
-import { TableToolbar, ToolbarNote } from '@/components/table-toolbar';
+import { OutlineAction, TableToolbar, ToolbarNote } from '@/components/table-toolbar';
 import { AR, bookingStatus } from '@/lib/strings';
 
 /**
@@ -86,9 +86,19 @@ export default async function BookingsPage({
           placeholder={AR.sections.bookings.searchPlaceholder}
           end={
             result === 'failed' || result === 'unauthenticated' ? null : (
-              <ToolbarNote>
-                {AR.sections.bookings.count(count(total(result.counts)))}
-              </ToolbarNote>
+              <>
+                <ToolbarNote>
+                  {AR.sections.bookings.count(count(total(result.counts)))}
+                </ToolbarNote>
+                {/*
+                  The export carries the CURRENT filters, so what downloads is what is on screen.
+                  An export that ignored the filter would have somebody reconcile the wrong set
+                  against a bank statement with no way to tell.
+                */}
+                <OutlineAction href={exportHref({ q, status })} download>
+                  {AR.table.exportCsv}
+                </OutlineAction>
+              </>
             )
           }
         >
@@ -231,4 +241,18 @@ function statusTone(status: string): Tone {
 
 function total(counts: Record<string, number>): number {
   return Object.values(counts).reduce((sum, value) => sum + value, 0);
+}
+
+function exportHref(filters: {
+  q?: string | undefined;
+  status?: string | undefined;
+}): string {
+  const params = new URLSearchParams();
+
+  if (filters.q) params.set('q', filters.q);
+  if (filters.status) params.set('status', filters.status);
+
+  const query = params.toString();
+
+  return `/bookings/export${query ? `?${query}` : ''}`;
 }
