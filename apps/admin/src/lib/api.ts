@@ -168,14 +168,39 @@ export async function getPartner(reference: string) {
   );
 }
 
+/**
+ * §9.2's listing queue.
+ *
+ * No `status`. The endpoint filters on `status = 'pending_review'` and does not select the
+ * column, because every row in this queue is by definition pending — an earlier version of
+ * this schema required it, so `safeParse` failed on every response and the queue rendered
+ * "could not load this list" permanently. Nothing errored anywhere: the parse guard turned a
+ * field that was never sent into a generic failure message.
+ *
+ * The lesson is the schema has to be written against a real response, not against the
+ * columns one would expect. `pendingPropertyFixture` in the test beside this file is a
+ * verbatim capture of one, so the next mismatch fails a test instead of a page.
+ */
 const pendingPropertySchema = z.object({
   reference: z.string(),
   slug: z.string(),
   nameAr: z.string(),
   nameEn: z.string().nullable(),
-  status: z.string(),
+  address: z.string(),
+  reviewNotes: z.string().nullable(),
   createdAt: z.union([z.string(), z.date()]).transform((v) => new Date(v).toISOString()),
+  partner: z.object({
+    reference: z.string(),
+    displayName: z.string(),
+    verification: z.string(),
+  }),
+  city: z.object({ slug: z.string(), nameAr: z.string() }),
 });
+
+export type PendingProperty = z.infer<typeof pendingPropertySchema>;
+
+/** Exported for the schema test, which asserts against a captured response. */
+export const pendingPropertyContract = pendingPropertySchema;
 
 export async function getPendingProperties() {
   return staffFetch('/admin/properties/pending', z.array(pendingPropertySchema));
@@ -424,4 +449,414 @@ export type StaffMember = z.infer<typeof staffMemberSchema>;
 
 export async function getStaff() {
   return staffFetch('/admin/staff', z.object({ staff: z.array(staffMemberSchema) }));
+}
+
+/**
+ * The §9.2 dashboard payload.
+ *
+ * `openDisputes` is nullable because disputes are not implemented — the API returns
+ * `null` rather than `0` so the console can show a dash and say why, instead of a
+ * confident zero for a feature that does not exist.
+ */
+const dashboardSchema = z.object({
+  counters: z.object({
+    bookings_today: z.number(),
+    bookings_yesterday: z.number(),
+    pending_confirmation: z.number(),
+    sla_expiring_soon: z.number(),
+    cancelled_today: z.number(),
+    cancelled_today_with_fine: z.number(),
+    partners_pending_verification: z.number(),
+    properties_pending_review: z.number(),
+    revenue_today_usd: z.string(),
+    revenue_today_syp: z.string(),
+  }),
+  revenue: z.array(z.object({ day: z.string(), amount: z.string() })),
+  recentBookings: z.array(
+    z.object({
+      reference: z.string(),
+      property: z.string(),
+      customer: z.string(),
+      amount: z.string(),
+      currency: z.string(),
+      status: z.string(),
+    }),
+  ),
+  recentAudit: z.array(
+    z.object({
+      action: z.string(),
+      actor: z.string().nullable(),
+      at: z.string(),
+      subject_type: z.string(),
+    }),
+  ),
+  openDisputes: z.number().nullable(),
+});
+
+export type DashboardOverview = z.infer<typeof dashboardSchema>;
+
+export async function getDashboard() {
+  return staffFetch('/admin/dashboard', dashboardSchema);
+}
+
+// ─── §8 registries, finance and operations ────────────────────────────────────
+
+/**
+ * A cursor page, as every registry endpoint returns it.
+ *
+ * `nextCursor` is opaque and is passed back verbatim; the console never builds one. Parsing it
+ * as a plain string rather than validating its shape is deliberate — the encoding is the
+ * server's business and a client that understood it would be a client that could forge it.
+ */
+function cursorPage<T extends z.ZodTypeAny>(item: T) {
+  return z.object({ items: z.array(item), nextCursor: z.string().nullable() });
+}
+
+/** Query builder for the list endpoints. Omits empty values rather than sending blanks. */
+function listQuery(params: {
+  q?: string | undefined;
+  cursor?: string | undefined;
+  status?: string | undefined;
+  limit?: number | undefined;
+}): string {
+  const search = new URLSearchParams();
+
+  if (params.q) search.set('q', params.q);
+  if (params.cursor) search.set('cursor', params.cursor);
+  if (params.status) search.set('status', params.status);
+  search.set('limit', String(params.limit ?? 25));
+
+  return `?${search.toString()}`;
+}
+
+export interface ListParams {
+  readonly q?: string | undefined;
+  readonly cursor?: string | undefined;
+}
+
+// ── الحجوزات ─────────────────────────────────────────────────────────────────
+
+const bookingListItemSchema = z.object({
+  reference: z.string(),
+  property: z.string(),
+  customer: z.string(),
+  checkIn: z.string(),
+  checkOut: z.string(),
+  amount: z.string(),
+  currency: z.string(),
+  status: z.string(),
+});
+
+const bookingListSchema = cursorPage(bookingListItemSchema).extend({
+  counts: z.record(z.string(), z.number()),
+});
+
+export type BookingListItem = z.infer<typeof bookingListItemSchema>;
+export type BookingList = z.infer<typeof bookingListSchema>;
+
+export async function getBookings(params: ListParams & { status?: string | undefined }) {
+  return staffFetch(`/admin/bookings${listQuery(params)}`, bookingListSchema);
+}
+
+// ── الشركاء ──────────────────────────────────────────────────────────────────
+
+const partnerListItemSchema = z.object({
+  reference: z.string(),
+  legalName: z.string(),
+  displayName: z.string(),
+  partnerType: z.string(),
+  city: z.string(),
+  score: z.number(),
+  tier: z.string(),
+  verification: z.string(),
+  suspended: z.boolean(),
+  avgResponseMinutes: z.number().nullable(),
+  cancellationCount: z.number(),
+  complaintCount: z.number(),
+});
+
+export type PartnerListItem = z.infer<typeof partnerListItemSchema>;
+
+export async function getPartnerRegistry(params: ListParams) {
+  return staffFetch(
+    `/admin/partners${listQuery(params)}`,
+    cursorPage(partnerListItemSchema),
+  );
+}
+
+// ── العقارات ─────────────────────────────────────────────────────────────────
+
+const propertyListItemSchema = z.object({
+  reference: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string().nullable(),
+  propertyType: z.string(),
+  city: z.string(),
+  partner: z.string(),
+  partnerReference: z.string().nullable(),
+  status: z.string(),
+});
+
+export type PropertyListItem = z.infer<typeof propertyListItemSchema>;
+
+export async function getPropertyRegistry(params: ListParams) {
+  return staffFetch(
+    `/admin/properties${listQuery(params)}`,
+    cursorPage(propertyListItemSchema),
+  );
+}
+
+// ── العملاء ──────────────────────────────────────────────────────────────────
+
+const customerListItemSchema = z.object({
+  reference: z.string(),
+  fullName: z.string(),
+  isGuest: z.boolean(),
+  bookings: z.number(),
+  walletBalance: z.string().nullable(),
+  walletCurrency: z.string().nullable(),
+  lastActivity: z.string(),
+});
+
+export type CustomerListItem = z.infer<typeof customerListItemSchema>;
+
+export async function getCustomers(params: ListParams) {
+  return staffFetch(
+    `/admin/customers${listQuery(params)}`,
+    cursorPage(customerListItemSchema),
+  );
+}
+
+// ── الدفع والفواتير ──────────────────────────────────────────────────────────
+
+const financeItemSchema = z.object({
+  reference: z.string(),
+  linkedTo: z.string().nullable(),
+  method: z.string(),
+  kind: z.enum(['payment', 'refund', 'fine']),
+  amount: z.string(),
+  currency: z.string(),
+  status: z.string(),
+  at: z.string(),
+});
+
+const financeSchema = cursorPage(financeItemSchema).extend({
+  counters: z.object({
+    captured_today: z.string(),
+    refunded_today: z.string(),
+    fines_collected_month: z.string(),
+    partner_payable_outstanding: z.string(),
+    currency: z.string(),
+  }),
+});
+
+export type FinanceItem = z.infer<typeof financeItemSchema>;
+export type Finance = z.infer<typeof financeSchema>;
+
+export async function getFinance(params: ListParams) {
+  return staffFetch(`/admin/finance${listQuery(params)}`, financeSchema);
+}
+
+// ── المحفظة ──────────────────────────────────────────────────────────────────
+
+const walletItemSchema = z.object({
+  customer: z.string(),
+  customerReference: z.string().nullable(),
+  direction: z.string(),
+  reason: z.string(),
+  amount: z.string(),
+  currency: z.string(),
+  balanceAfter: z.string(),
+  note: z.string().nullable(),
+  bookingReference: z.string().nullable(),
+  at: z.string(),
+});
+
+export type WalletItem = z.infer<typeof walletItemSchema>;
+
+export async function getWalletTransactions(params: ListParams) {
+  return staffFetch(
+    `/admin/wallet-transactions${listQuery(params)}`,
+    cursorPage(walletItemSchema),
+  );
+}
+
+// ── بطاقات الهدايا ───────────────────────────────────────────────────────────
+
+const giftCardItemSchema = z.object({
+  reference: z.string(),
+  codeLast4: z.string(),
+  originalAmount: z.string(),
+  remainingAmount: z.string(),
+  currency: z.string(),
+  status: z.string(),
+  expiresAt: z.string().nullable(),
+  buyer: z.string().nullable(),
+});
+
+export type GiftCardItem = z.infer<typeof giftCardItemSchema>;
+
+export async function getGiftCards(params: ListParams) {
+  return staffFetch(
+    `/admin/gift-cards${listQuery(params)}`,
+    cursorPage(giftCardItemSchema),
+  );
+}
+
+// ── الكوبونات ────────────────────────────────────────────────────────────────
+
+const couponItemSchema = z.object({
+  code: z.string(),
+  type: z.string(),
+  valueKind: z.string(),
+  value: z.string(),
+  currency: z.string().nullable(),
+  minBookingAmount: z.string().nullable(),
+  redemptionsCount: z.number(),
+  maxRedemptions: z.number().nullable(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+  isActive: z.boolean(),
+  expired: z.boolean(),
+  scope: z.string().nullable(),
+});
+
+export type CouponItem = z.infer<typeof couponItemSchema>;
+
+export async function getCoupons(params: ListParams) {
+  return staffFetch(`/admin/coupons${listQuery(params)}`, cursorPage(couponItemSchema));
+}
+
+// ── المدن والدول والعملات ────────────────────────────────────────────────────
+
+const geoSchema = z.object({
+  countries: z.array(
+    z.object({
+      code: z.string(),
+      nameAr: z.string(),
+      currencyCode: z.string().nullable(),
+      activeCities: z.number(),
+      isActive: z.boolean(),
+    }),
+  ),
+  currencies: z.array(
+    z.object({
+      code: z.string(),
+      nameAr: z.string(),
+      symbol: z.string(),
+      isAccounting: z.boolean(),
+      rateToSyp: z.string().nullable(),
+      rateSetAt: z.string().nullable(),
+    }),
+  ),
+  cities: z.array(
+    z.object({
+      slug: z.string(),
+      nameAr: z.string(),
+      country: z.string(),
+      category: z.string(),
+      properties: z.number(),
+      isActive: z.boolean(),
+    }),
+  ),
+});
+
+export type Geography = z.infer<typeof geoSchema>;
+
+export async function getGeography(q?: string) {
+  const search = q ? `?q=${encodeURIComponent(q)}` : '';
+
+  return staffFetch(`/admin/geo${search}`, geoSchema);
+}
+
+// ── التقارير ─────────────────────────────────────────────────────────────────
+
+const reportsSchema = z.object({
+  cards: z.array(
+    z.object({
+      key: z.enum([
+        'commission_revenue',
+        'occupancy',
+        'cancellations',
+        'partner_response',
+      ]),
+      value: z.string(),
+      previous: z.string().nullable(),
+      series: z.array(z.object({ bucket: z.string(), value: z.string() })),
+    }),
+  ),
+});
+
+export type Reports = z.infer<typeof reportsSchema>;
+export type ReportCard = Reports['cards'][number];
+
+export async function getReports() {
+  return staffFetch('/admin/reports', reportsSchema);
+}
+
+// ── الموظفون (overview) ──────────────────────────────────────────────────────
+
+const staffOverviewSchema = z.object({
+  counters: z.object({
+    total: z.number(),
+    active: z.number(),
+    suspended: z.number(),
+    invited: z.number(),
+    signedInToday: z.number(),
+    rolesDefined: z.number(),
+    twoFactorMissing: z.number(),
+  }),
+  matrix: z.object({
+    roles: z.array(z.string()),
+    rows: z.array(z.object({ permission: z.string(), granted: z.array(z.boolean()) })),
+  }),
+  activity: z.array(
+    z.object({
+      actor: z.string().nullable(),
+      action: z.string(),
+      subjectType: z.string(),
+      at: z.string(),
+    }),
+  ),
+});
+
+export type StaffOverview = z.infer<typeof staffOverviewSchema>;
+
+export async function getStaffOverview() {
+  return staffFetch('/admin/staff/overview', staffOverviewSchema);
+}
+
+// ── Emergency Mode ───────────────────────────────────────────────────────────
+
+const emergencyModeSchema = z.object({
+  id: z.string(),
+  scope: z.string(),
+  scopeName: z.string(),
+  flags: z.object({
+    stopBookings: z.boolean(),
+    waiveFines: z.boolean(),
+    broadcast: z.boolean(),
+    suspendSla: z.boolean(),
+  }),
+  reason: z.string().nullable(),
+  activatedBy: z.string().nullable(),
+  activatedAt: z.string(),
+  deactivatedAt: z.string().nullable(),
+  deactivatedBy: z.string().nullable(),
+});
+
+const emergencySchema = z.object({
+  active: z.array(emergencyModeSchema),
+  history: z.array(emergencyModeSchema),
+  scopes: z.object({
+    cities: z.array(z.object({ ref: z.string(), name: z.string() })),
+    countries: z.array(z.object({ ref: z.string(), name: z.string() })),
+  }),
+});
+
+export type EmergencyState = z.infer<typeof emergencySchema>;
+export type EmergencyMode = z.infer<typeof emergencyModeSchema>;
+
+export async function getEmergency() {
+  return staffFetch('/admin/emergency', emergencySchema);
 }
