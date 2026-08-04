@@ -13,6 +13,7 @@ import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 
 export const campaignStatusSchema = z
   .object({
@@ -78,7 +79,7 @@ export class AdvertisingService {
     private readonly audit: AuditService,
   ) {}
 
-  async counters(): Promise<AdCounters> {
+  async counters(actor?: AccessTokenClaims): Promise<AdCounters> {
     const result = await this.db.execute<{
       active: string;
       paused: string;
@@ -100,7 +101,7 @@ export class AdvertisingService {
         coalesce(sum(c.clicks) FILTER (WHERE c.ends_at >= current_date - interval '30 days'), 0)::text
           AS clicks_30d
       FROM ad_campaigns c
-      WHERE c.deleted_at IS NULL
+      WHERE c.deleted_at IS NULL AND ${scopeFilter(actor, 'c.city_id')}
     `);
 
     const row = result.rows[0];
@@ -118,8 +119,12 @@ export class AdvertisingService {
     limit: number;
     cursor?: string | undefined;
     q?: string | undefined;
+    actor?: AccessTokenClaims | undefined;
   }): Promise<CursorPage<CampaignRow>> {
-    const conditions: SQL[] = [sql`c.deleted_at IS NULL`];
+    const conditions: SQL[] = [
+      sql`c.deleted_at IS NULL`,
+      scopeFilter(query.actor, 'c.city_id'),
+    ];
 
     if (query.q) {
       const term = `%${query.q}%`;
@@ -200,8 +205,12 @@ export class AdvertisingService {
     reference: string,
     input: CampaignStatusInput,
   ): Promise<CampaignRow> {
-    const found = await this.db.execute<{ id: string; status: string }>(sql`
-      SELECT id, status::text AS status FROM ad_campaigns
+    const found = await this.db.execute<{
+      id: string;
+      status: string;
+      city_id: string | null;
+    }>(sql`
+      SELECT id, status::text AS status, city_id FROM ad_campaigns
       WHERE reference = ${reference} AND deleted_at IS NULL
       LIMIT 1
     `);
@@ -209,6 +218,9 @@ export class AdvertisingService {
     const campaign = found.rows[0];
 
     if (!campaign) throw new NotFoundException('Campaign not found.');
+
+    // Scope on the write path: a caller can name any reference, so the list is not the gate.
+    assertCanWrite(actor, campaign.city_id);
 
     /*
       An expired campaign cannot be reactivated by flipping the status: its paid window has

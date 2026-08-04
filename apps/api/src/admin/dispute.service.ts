@@ -14,6 +14,7 @@ import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 
 export const closeDisputeSchema = z
   .object({
@@ -113,7 +114,7 @@ export class DisputeService {
     private readonly audit: AuditService,
   ) {}
 
-  async counters(): Promise<DisputeCounters> {
+  async counters(actor?: AccessTokenClaims): Promise<DisputeCounters> {
     const result = await this.db.execute<{
       open: string;
       investigating: string;
@@ -133,7 +134,8 @@ export class DisputeService {
         count(DISTINCT d.booking_id) FILTER (WHERE d.status IN ('open','investigating'))::text
           AS frozen_payouts
       FROM disputes d
-      WHERE d.deleted_at IS NULL
+      LEFT JOIN bookings b ON b.id = d.booking_id
+      WHERE d.deleted_at IS NULL AND ${scopeFilter(actor, 'b.city_id')}
     `);
 
     const row = result.rows[0];
@@ -155,8 +157,16 @@ export class DisputeService {
     cursor?: string | undefined;
     q?: string | undefined;
     status?: string | undefined;
+    actor?: AccessTokenClaims | undefined;
   }): Promise<CursorPage<DisputeRow>> {
-    const conditions: SQL[] = [sql`d.deleted_at IS NULL`];
+    /*
+      A dispute has no city of its own; it inherits the booking's. Scoping through the join is
+      correct rather than convenient — a dispute belongs to wherever the stay was.
+    */
+    const conditions: SQL[] = [
+      sql`d.deleted_at IS NULL`,
+      scopeFilter(query.actor, 'b.city_id'),
+    ];
 
     if (query.status) {
       conditions.push(sql`d.status = ${query.status}::dispute_status`);
@@ -248,12 +258,13 @@ export class DisputeService {
    * Returns references rather than ids so a caller cannot accidentally use it as a join key and
    * couple a money decision to this service's internals.
    */
-  async frozenBookingReferences(): Promise<string[]> {
+  async frozenBookingReferences(actor?: AccessTokenClaims): Promise<string[]> {
     const result = await this.db.execute<{ reference: string }>(sql`
       SELECT DISTINCT b.reference
       FROM disputes d
       JOIN bookings b ON b.id = d.booking_id
       WHERE d.status IN ${UNRESOLVED} AND d.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'b.city_id')}
       ORDER BY b.reference
     `);
 
@@ -280,16 +291,25 @@ export class DisputeService {
       id: string;
       status: string;
       customer_profile_id: string;
+      city_id: string | null;
     }>(sql`
-      SELECT id, status::text AS status, customer_profile_id
-      FROM disputes
-      WHERE reference = ${reference} AND deleted_at IS NULL
+      SELECT d.id, d.status::text AS status, d.customer_profile_id, b.city_id
+      FROM disputes d
+      LEFT JOIN bookings b ON b.id = d.booking_id
+      WHERE d.reference = ${reference} AND d.deleted_at IS NULL
       LIMIT 1
     `);
 
     const dispute = found.rows[0];
 
     if (!dispute) throw new NotFoundException('Dispute not found.');
+
+    /*
+      Geographic scope, checked on the WRITE path even though the list already filtered reads.
+      A caller can name any reference; the list is not the gate. Refused in both modes — read_only
+      widens reads only.
+    */
+    assertCanWrite(actor, dispute.city_id);
 
     /*
       Closing an already-closed dispute is a CONFLICT, not an idempotent no-op. Two staff
@@ -367,6 +387,11 @@ export class DisputeService {
       );
     });
 
+    /*
+      Re-read WITHOUT the actor's scope filter. The write was already authorised above, and a member
+      whose `none` scope excludes this row would otherwise close it successfully and receive a 404 —
+      correct authorisation, nonsensical response.
+    */
     const reread = await this.list({ limit: 1, q: reference });
     const view = reread.items[0];
 

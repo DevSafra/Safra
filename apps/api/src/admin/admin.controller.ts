@@ -52,8 +52,8 @@ export class AdminController {
    */
   @Get('dashboard')
   @RequirePermissions(P.BOOKING_READ_ALL)
-  async dashboardOverview() {
-    return this.dashboard.overview();
+  async dashboardOverview(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return this.dashboard.overview(user);
   }
 
   @Get('properties/pending')

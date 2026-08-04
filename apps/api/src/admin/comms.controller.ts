@@ -81,12 +81,13 @@ export class CommsController {
   @Get('disputes')
   @RequirePermissions(P.DISPUTE_READ)
   async listDisputes(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(new ZodValidationPipe(disputeQuerySchema))
     query: z.infer<typeof disputeQuerySchema>,
   ) {
     const [page, counters] = await Promise.all([
-      this.disputes.list(query),
-      this.disputes.counters(),
+      this.disputes.list({ ...query, actor: user }),
+      this.disputes.counters(user),
     ]);
 
     return { ...page, counters };
@@ -100,8 +101,8 @@ export class CommsController {
    */
   @Get('disputes/frozen-payouts')
   @RequirePermissions(P.PAYOUT_READ)
-  async frozenPayouts() {
-    return { bookings: await this.disputes.frozenBookingReferences() };
+  async frozenPayouts(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return { bookings: await this.disputes.frozenBookingReferences(user) };
   }
 
   /**
@@ -126,9 +127,10 @@ export class CommsController {
   @Get('conversations')
   @RequirePermissions(P.MESSAGE_READ)
   async listConversations(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(new ZodValidationPipe(listQuerySchema)) query: z.infer<typeof listQuerySchema>,
   ) {
-    return this.messaging.conversations(query);
+    return this.messaging.conversations({ ...query, actor: user });
   }
 
   @Get('conversations/:reference')
@@ -153,11 +155,12 @@ export class CommsController {
   @Get('notifications')
   @RequirePermissions(P.NOTIFICATION_READ)
   async listNotifications(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(new ZodValidationPipe(notificationQuerySchema))
     query: z.infer<typeof notificationQuerySchema>,
   ) {
     const [page, counters] = await Promise.all([
-      this.messaging.notifications(query),
+      this.messaging.notifications({ ...query, actor: user }),
       this.messaging.notificationCounters(),
     ]);
 
@@ -173,11 +176,12 @@ export class CommsController {
   @Get('ad-campaigns')
   @RequirePermissions(P.AD_READ)
   async listCampaigns(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(new ZodValidationPipe(listQuerySchema)) query: z.infer<typeof listQuerySchema>,
   ) {
     const [page, counters] = await Promise.all([
-      this.advertising.list(query),
-      this.advertising.counters(),
+      this.advertising.list({ ...query, actor: user }),
+      this.advertising.counters(user),
     ]);
 
     return { ...page, counters };

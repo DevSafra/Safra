@@ -4,6 +4,8 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { scopeFilter } from '../rbac/scope.sql.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
 
 export interface ReportCard {
   readonly key: 'commission_revenue' | 'occupancy' | 'cancellations' | 'partner_response';
@@ -44,12 +46,12 @@ const BUCKETS = 8;
 export class ReportsService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
-  async cards(): Promise<ReportCard[]> {
+  async cards(actor?: AccessTokenClaims): Promise<ReportCard[]> {
     const [revenue, occupancy, cancellations, response] = await Promise.all([
-      this.commissionRevenue(),
-      this.occupancy(),
-      this.cancellations(),
-      this.partnerResponse(),
+      this.commissionRevenue(actor),
+      this.occupancy(actor),
+      this.cancellations(actor),
+      this.partnerResponse(actor),
     ]);
 
     return [revenue, occupancy, cancellations, response];
@@ -61,7 +63,7 @@ export class ReportsService {
    * Never the booking total — that is the partner's money passing through. Getting this wrong
    * would overstate revenue by roughly fourteen times.
    */
-  private async commissionRevenue(): Promise<ReportCard> {
+  private async commissionRevenue(actor?: AccessTokenClaims): Promise<ReportCard> {
     const result = await this.db.execute<{ bucket: string; value: string }>(sql`
       WITH weeks AS (
         SELECT generate_series(
@@ -77,6 +79,7 @@ export class ReportsService {
       LEFT JOIN bookings b
         ON date_trunc('week', b.created_at) = w.bucket
        AND b.status IN ('confirmed','checked_in','completed')
+       AND ${scopeFilter(actor, 'b.city_id')}
       GROUP BY w.bucket
       ORDER BY w.bucket
     `);
@@ -85,7 +88,7 @@ export class ReportsService {
   }
 
   /** Booked nights against recorded availability — see the class note on what this measures. */
-  private async occupancy(): Promise<ReportCard> {
+  private async occupancy(actor?: AccessTokenClaims): Promise<ReportCard> {
     const result = await this.db.execute<{ bucket: string; value: string }>(sql`
       WITH weeks AS (
         SELECT generate_series(
@@ -104,8 +107,14 @@ export class ReportsService {
                     / count(a.unit_id), 1)::text
              END AS value
       FROM weeks w
+      -- Occupancy scopes through the unit's property, which is the only city an availability
+      -- day has. A scoped member sees the occupancy of their own cities, which is the number
+      -- they can act on.
       LEFT JOIN availability_days a
         ON date_trunc('week', a.date) = w.bucket
+      LEFT JOIN units u     ON u.id = a.unit_id
+      LEFT JOIN properties pr ON pr.id = u.property_id
+      WHERE ${scopeFilter(actor, 'pr.city_id')}
       GROUP BY w.bucket
       ORDER BY w.bucket
     `);
@@ -114,7 +123,7 @@ export class ReportsService {
   }
 
   /** Cancellation rate as a percentage of bookings created in the week. */
-  private async cancellations(): Promise<ReportCard> {
+  private async cancellations(actor?: AccessTokenClaims): Promise<ReportCard> {
     const result = await this.db.execute<{ bucket: string; value: string }>(sql`
       WITH weeks AS (
         SELECT generate_series(
@@ -131,6 +140,7 @@ export class ReportsService {
              END AS value
       FROM weeks w
       LEFT JOIN bookings b ON date_trunc('week', b.created_at) = w.bucket
+       AND ${scopeFilter(actor, 'b.city_id')}
       GROUP BY w.bucket
       ORDER BY w.bucket
     `);
@@ -145,7 +155,7 @@ export class ReportsService {
    * a mean far enough to hide that everybody else replies in minutes. The SLA is what matters
    * operationally, and the median is what tells you whether it is being met.
    */
-  private async partnerResponse(): Promise<ReportCard> {
+  private async partnerResponse(actor?: AccessTokenClaims): Promise<ReportCard> {
     const result = await this.db.execute<{ bucket: string; value: string }>(sql`
       WITH weeks AS (
         SELECT generate_series(
@@ -164,6 +174,7 @@ export class ReportsService {
         ON date_trunc('week', b.created_at) = w.bucket
        AND b.paid_at IS NOT NULL
        AND b.partner_responded_at IS NOT NULL
+       AND ${scopeFilter(actor, 'b.city_id')}
       GROUP BY w.bucket
       ORDER BY w.bucket
     `);

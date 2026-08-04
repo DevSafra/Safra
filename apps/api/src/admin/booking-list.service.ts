@@ -5,6 +5,8 @@ import type { Database } from '@safra/db';
 import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { scopeFilter } from '../rbac/scope.sql.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
 
 export interface BookingListRow {
   readonly reference: string;
@@ -18,6 +20,8 @@ export interface BookingListRow {
 }
 
 export interface BookingListQuery {
+  /** The caller, for geographic scope enforcement (§8.2). */
+  readonly actor?: AccessTokenClaims | undefined;
   readonly limit: number;
   readonly cursor?: string | undefined;
   readonly status?: string | undefined;
@@ -51,7 +55,8 @@ export class BookingListService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   async list(query: BookingListQuery): Promise<CursorPage<BookingListRow>> {
-    const conditions: SQL[] = [];
+    // Geographic scope first, so it can never be forgotten behind a later `if`.
+    const conditions: SQL[] = [scopeFilter(query.actor, 'b.city_id')];
 
     if (query.status) {
       /**
@@ -145,10 +150,11 @@ export class BookingListService {
    * Deliberately NOT filtered by the search term: the point of the line is to say how much
    * work exists in each state, which a search would misreport.
    */
-  async counts(): Promise<Record<string, number>> {
+  async counts(actor?: AccessTokenClaims): Promise<Record<string, number>> {
     const result = await this.db.execute<{ status: string; n: string }>(sql`
       SELECT b.status::text AS status, count(*)::text AS n
       FROM bookings b
+      WHERE ${scopeFilter(actor, 'b.city_id')}
       GROUP BY b.status
     `);
 

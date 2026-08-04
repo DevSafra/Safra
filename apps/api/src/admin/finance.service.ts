@@ -5,6 +5,8 @@ import type { Database } from '@safra/db';
 import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { scopeFilter } from '../rbac/scope.sql.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
 
 export interface FinanceRow {
   /** The human reference of the underlying operation. */
@@ -66,7 +68,7 @@ export class FinanceService {
    * later partially refunded shows correctly here and would be overstated if read from the
    * payment row. `partner_payable_outstanding` is what SAFRA owes and has not paid.
    */
-  async counters(): Promise<FinanceCounters> {
+  async counters(actor?: AccessTokenClaims): Promise<FinanceCounters> {
     const result = await this.db.execute<{
       captured_today: string;
       refunded_today: string;
@@ -87,7 +89,8 @@ export class FinanceService {
                     AND v.collected_at >= date_trunc('month', current_date)), 0)::text
           AS fines_collected_month,
         coalesce((SELECT sum(b.partner_payable_amount) FROM bookings b
-                  WHERE b.status IN ('confirmed','checked_in','completed')), 0)::text
+                  WHERE b.status IN ('confirmed','checked_in','completed')
+                    AND ${scopeFilter(actor, 'b.city_id')}), 0)::text
           AS partner_payable_outstanding,
         (SELECT code FROM currencies WHERE code = 'USD' LIMIT 1) AS currency
     `);
@@ -114,8 +117,15 @@ export class FinanceService {
     limit: number;
     cursor?: string | undefined;
     q?: string | undefined;
+    actor?: AccessTokenClaims | undefined;
   }): Promise<CursorPage<FinanceRow>> {
     const bound = this.bound(query.cursor);
+    /*
+      Scope is applied per union branch, not to the union, so each branch keeps its own index. A
+      fine has no booking city of its own and falls back to the partner's, which is where the
+      violation was earned.
+    */
+    const scoped = (column: string): SQL => scopeFilter(query.actor, column);
     const term = query.q ? `%${query.q}%` : null;
 
     /*
@@ -150,7 +160,8 @@ export class FinanceService {
         FROM payments pay
         LEFT JOIN bookings b   ON b.id = pay.booking_id
         LEFT JOIN currencies cur ON cur.id = pay.currency_id
-        WHERE ${bound('pay')} AND ${search(sql`pay.reference || ' ' || coalesce(b.reference,'')`)}
+        WHERE ${bound('pay')} AND ${scoped('b.city_id')}
+          AND ${search(sql`pay.reference || ' ' || coalesce(b.reference,'')`)}
 
         UNION ALL
 
@@ -168,7 +179,8 @@ export class FinanceService {
         LEFT JOIN payments pay2  ON pay2.id = r.payment_id
         LEFT JOIN bookings b2    ON b2.id = r.booking_id
         LEFT JOIN currencies cur2 ON cur2.id = r.currency_id
-        WHERE ${bound('r')} AND ${search(sql`coalesce(pay2.reference,'') || ' ' || coalesce(b2.reference,'')`)}
+        WHERE ${bound('r')} AND ${scoped('b2.city_id')}
+          AND ${search(sql`coalesce(pay2.reference,'') || ' ' || coalesce(b2.reference,'')`)}
 
         UNION ALL
 
@@ -188,7 +200,8 @@ export class FinanceService {
         LEFT JOIN partners p     ON p.id = v.partner_id
         LEFT JOIN bookings b3    ON b3.id = v.booking_id
         LEFT JOIN currencies cur3 ON cur3.id = v.fine_currency_id
-        WHERE ${bound('v')} AND ${search(sql`coalesce(p.reference,'') || ' ' || coalesce(b3.reference,'')`)}
+        WHERE ${bound('v')} AND ${scoped('coalesce(b3.city_id, p.city_id)')}
+          AND ${search(sql`coalesce(p.reference,'') || ' ' || coalesce(b3.reference,'')`)}
       ) rows
       ORDER BY rows.created_at DESC, rows.id DESC
       LIMIT ${query.limit + 1}
@@ -240,6 +253,12 @@ export class FinanceService {
     cursor?: string | undefined;
     q?: string | undefined;
   }): Promise<CursorPage<WalletRow>> {
+    /*
+      NOT scoped, deliberately. A wallet belongs to a CUSTOMER, and a customer belongs to no city —
+      they book in Latakia in July and Damascus in August. Scoping this by the booking a transaction
+      happens to reference would show a partial balance history, which is worse than none: somebody
+      would reconcile against it. Recorded in the enforcement rules.
+    */
     const conditions: SQL[] = [];
 
     if (query.q) {

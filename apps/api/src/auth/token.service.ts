@@ -7,7 +7,13 @@ import { v7 as uuidv7 } from 'uuid';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
-import { TOGGLEABLE_GRANT_KEYS, resolvePermissions } from '@safra/contracts';
+import {
+  TOGGLEABLE_GRANT_KEYS,
+  UNSCOPED,
+  isScopable,
+  resolvePermissions,
+  type StaffScope,
+} from '@safra/contracts';
 import type { Permission, Role } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
@@ -38,6 +44,20 @@ export interface AccessTokenClaims {
    * client did with this flag.
    */
   totpEnabled?: boolean | undefined;
+  /**
+   * Geographic scope (design handoff §8.2), carried in the token for the same reason the owning
+   * ids are: authorization stays off the hot path.
+   *
+   * ADR 0003 already accepts up to fifteen minutes of permission staleness in the GRANTING
+   * direction. Narrowing must be immediate, and it is: `StaffScopeService` revokes the member's
+   * refresh tokens whenever their scope is tightened, so the next request cannot be served on a
+   * token minted under the wider scope. Same mechanism `AdminGrantsService` uses when a runtime
+   * grant is switched off.
+   *
+   * Absent on a token minted before this claim existed, which resolves to `UNSCOPED` — the
+   * pre-existing behaviour, and the only safe default for a claim that cannot be read.
+   */
+  scope?: StaffScope | undefined;
 }
 
 export interface IssuedTokens {
@@ -94,6 +114,19 @@ export class TokenService {
       familyId?: string | undefined;
     },
   ): Promise<IssuedTokens> {
+    /*
+      Every claim is enumerated here explicitly, and that is a trap as well as a safeguard.
+
+      `verify` already carries a note about the opposite mistake — a claim signed in and not read
+      back out. This is the mirror, and it cost a live test to find: `scope` was resolved in
+      `buildClaims`, never listed here, and therefore never signed. Enforcement looked complete in
+      every unit test and did nothing at all against a real token, because the guard read
+      `claims.scope` as `undefined` and defaulted to unrestricted.
+
+      Anything added to `AccessTokenClaims` must be added here AND in `verify`. There is no
+      spread-the-object shortcut on purpose: a spread would carry whatever happens to be on the
+      object, which is how a claim nobody intended to publish ends up in a token clients can read.
+    */
     const accessToken = await new SignJWT({
       role: claims.role,
       permissions: claims.permissions,
@@ -101,6 +134,7 @@ export class TokenService {
       customerProfileId: claims.customerProfileId,
       partnerId: claims.partnerId,
       totpEnabled: claims.totpEnabled,
+      scope: claims.scope,
     })
       .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .setSubject(claims.sub)
@@ -154,6 +188,12 @@ export class TokenService {
         // here is worse than one that never existed: the guard sees `undefined` and
         // every consumer quietly treats an enrolled account as unenrolled.
         totpEnabled: payload['totpEnabled'] === true,
+        /*
+          Parsed, not cast. A malformed or absent scope claim resolves to UNSCOPED rather than
+          throwing: an unreadable scope must not lock a staff member out of the console, and the
+          write guards check the row's city against the resolved scope regardless.
+        */
+        scope: readScope(payload['scope']),
       };
     } catch {
       throw new UnauthorizedException('Invalid or expired token.');
@@ -178,9 +218,34 @@ export class TokenService {
       ),
       locale: user.preferredLocale,
       totpEnabled: user.totpEnabledAt !== null,
+      scope: await this.resolveScope(user),
     };
 
     return this.attachOwningIds(claims, user);
+  }
+
+  /**
+   * Reads a staff member's scope for the token.
+   *
+   * A super admin is never scoped — see `isScopable`. Anybody with `all_cities` gets `UNSCOPED`
+   * without touching `staff_scope_cities`, which is every account today and keeps the common path
+   * at zero extra queries.
+   */
+  private async resolveScope(
+    user: typeof schema.users.$inferSelect,
+  ): Promise<StaffScope> {
+    if (!isScopable(user.role) || user.scopeKind === 'all_cities') return UNSCOPED;
+
+    const rows = await this.db
+      .select({ cityId: schema.staffScopeCities.cityId })
+      .from(schema.staffScopeCities)
+      .where(eq(schema.staffScopeCities.userId, user.id));
+
+    return {
+      kind: 'cities',
+      cityIds: rows.map((row) => row.cityId),
+      outside: user.outsideScopeAccess,
+    };
   }
 
   /**
@@ -355,4 +420,31 @@ function parseDuration(value: string): number {
   const multipliers = { s: 1, m: 60, h: 3600, d: 86_400 } as const;
 
   return amount * multipliers[match[2] as keyof typeof multipliers];
+}
+
+/**
+ * Reads the scope claim back out of a verified token.
+ *
+ * Parsed defensively and defaulting to `UNSCOPED`, for two reasons. A token minted before this
+ * claim existed has no `scope` at all, and must keep working. And an unreadable claim must not lock
+ * a staff member out of the console — the write guards compare a row's city against the resolved
+ * scope on every mutation regardless, so a widened READ from a malformed claim cannot become a
+ * widened WRITE.
+ */
+function readScope(raw: unknown): StaffScope {
+  if (typeof raw !== 'object' || raw === null) return UNSCOPED;
+
+  const value = raw as Record<string, unknown>;
+
+  if (value['kind'] !== 'cities') return UNSCOPED;
+
+  const cityIds = Array.isArray(value['cityIds'])
+    ? value['cityIds'].filter((id): id is string => typeof id === 'string')
+    : [];
+
+  return {
+    kind: 'cities',
+    cityIds,
+    outside: value['outside'] === 'read_only' ? 'read_only' : 'none',
+  };
 }

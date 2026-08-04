@@ -13,6 +13,7 @@ import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 import { DATABASE } from '../database/database.module.js';
 import { redactContactDetails } from '../messaging/redaction.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { scopeFilter } from '../rbac/scope.sql.js';
 
 export const staffReplySchema = z
   .object({
@@ -78,8 +79,17 @@ export class MessagingService {
     limit: number;
     cursor?: string | undefined;
     q?: string | undefined;
+    actor?: AccessTokenClaims | undefined;
   }): Promise<CursorPage<ConversationRow>> {
-    const conditions: SQL[] = [sql`c.deleted_at IS NULL`];
+    /*
+      A conversation has no city; it inherits one from whatever it is about. `coalesce` over the
+      booking and the partner covers all three subject kinds — a dispute-scoped thread reaches a
+      booking through the dispute, and a partner thread uses the partner's own city.
+    */
+    const conditions: SQL[] = [
+      sql`c.deleted_at IS NULL`,
+      scopeFilter(query.actor, 'coalesce(b.city_id, p.city_id)'),
+    ];
 
     if (query.q) {
       const term = `%${query.q}%`;
@@ -248,8 +258,12 @@ export class MessagingService {
     cursor?: string | undefined;
     q?: string | undefined;
     status?: string | undefined;
+    actor?: AccessTokenClaims | undefined;
   }): Promise<CursorPage<NotificationRow>> {
-    const conditions: SQL[] = [sql`n.deleted_at IS NULL`];
+    const conditions: SQL[] = [
+      sql`n.deleted_at IS NULL`,
+      scopeFilter(query.actor, 'coalesce(b.city_id, p.city_id)'),
+    ];
 
     if (query.status) {
       conditions.push(sql`n.status = ${query.status}::notification_status`);

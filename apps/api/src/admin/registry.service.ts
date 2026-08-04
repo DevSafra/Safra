@@ -5,6 +5,8 @@ import type { Database } from '@safra/db';
 import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { scopeFilter } from '../rbac/scope.sql.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
  * The console's registry reads: partners, properties and customers (design handoff §8).
@@ -72,8 +74,9 @@ export class RegistryService {
     limit: number;
     cursor?: string | undefined;
     q?: string | undefined;
+    actor?: AccessTokenClaims | undefined;
   }): Promise<CursorPage<PartnerRow>> {
-    const conditions: SQL[] = [];
+    const conditions: SQL[] = [scopeFilter(query.actor, 'pt.city_id')];
 
     if (query.q) {
       const term = `%${query.q}%`;
@@ -133,8 +136,9 @@ export class RegistryService {
     limit: number;
     cursor?: string | undefined;
     q?: string | undefined;
+    actor?: AccessTokenClaims | undefined;
   }): Promise<CursorPage<PropertyRow>> {
-    const conditions: SQL[] = [];
+    const conditions: SQL[] = [scopeFilter(query.actor, 'pr.city_id')];
 
     if (query.q) {
       const term = `%${query.q}%`;

@@ -1,9 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { scopeFilter } from '../rbac/scope.sql.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /** How many days the revenue sparkline covers, including today. */
 const REVENUE_DAYS = 7;
@@ -31,13 +33,17 @@ const RECENT_AUDIT = 4;
 export class DashboardService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
-  async overview() {
+  async overview(actor?: AccessTokenClaims) {
     const [counters, revenue, bookings, audit, openDisputes] = await Promise.all([
-      this.counters(),
-      this.revenueSeries(),
-      this.recentBookings(),
+      this.counters(actor),
+      this.revenueSeries(actor),
+      this.recentBookings(actor),
+      /*
+        The activity panel is NOT scoped: it reads the audit log, which Bashar's decision keeps
+        global and complete for every staff member. A scoped audit trail is not an audit trail.
+      */
       this.recentAudit(),
-      this.openDisputes(),
+      this.openDisputes(actor),
     ]);
 
     return {
@@ -63,10 +69,12 @@ export class DashboardService {
    * `null` still means "cannot be determined", which is a different statement from zero and is
    * what the client renders differently.
    */
-  private async openDisputes(): Promise<number> {
+  private async openDisputes(actor?: AccessTokenClaims): Promise<number> {
     const result = await this.db.execute<{ n: string }>(sql`
-      SELECT count(*)::text AS n FROM disputes
-      WHERE status IN ('open', 'investigating') AND deleted_at IS NULL
+      SELECT count(*)::text AS n FROM disputes d
+      LEFT JOIN bookings b ON b.id = d.booking_id
+      WHERE d.status IN ('open', 'investigating') AND d.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'b.city_id')}
     `);
 
     return Number(result.rows[0]?.n ?? 0);
@@ -79,43 +87,58 @@ export class DashboardService {
    * sit in different zones, and a dashboard whose totals shift with the reader's clock
    * cannot be reconciled against anything.
    */
-  private async counters() {
+  private async counters(actor?: AccessTokenClaims) {
+    /*
+      Every branch below carries the scope predicate. Hoisted into a local so the eight branches
+      cannot drift — the failure mode of writing it out eight times is that seven are scoped and
+      one is not, and the unscoped one is the number somebody quotes.
+    */
+    const inScope = (alias: string): SQL => scopeFilter(actor, `${alias}.city_id`);
+
     const rows = await this.db.execute<{ metric: string; value: string }>(sql`
       SELECT 'bookings_today' AS metric, COUNT(*)::text AS value
-        FROM bookings WHERE created_at::date = current_date AND deleted_at IS NULL
+        FROM bookings b WHERE b.created_at::date = current_date AND b.deleted_at IS NULL
+          AND ${inScope('b')}
       UNION ALL
       SELECT 'bookings_yesterday', COUNT(*)::text
-        FROM bookings
-        WHERE created_at::date = current_date - 1 AND deleted_at IS NULL
+        FROM bookings b
+        WHERE b.created_at::date = current_date - 1 AND b.deleted_at IS NULL
+          AND ${inScope('b')}
       UNION ALL
       SELECT 'pending_confirmation', COUNT(*)::text
-        FROM bookings WHERE status = 'pending_confirmation' AND deleted_at IS NULL
+        FROM bookings b WHERE b.status = 'pending_confirmation' AND b.deleted_at IS NULL
+          AND ${inScope('b')}
       UNION ALL
       -- The time-critical slice of the above: §6.4's window about to lapse.
       SELECT 'sla_expiring_soon', COUNT(*)::text
-        FROM bookings
-        WHERE status = 'pending_confirmation'
-          AND confirmation_deadline_at IS NOT NULL
-          AND confirmation_deadline_at <= now() + INTERVAL '30 minutes'
-          AND deleted_at IS NULL
+        FROM bookings b
+        WHERE b.status = 'pending_confirmation'
+          AND b.confirmation_deadline_at IS NOT NULL
+          AND b.confirmation_deadline_at <= now() + INTERVAL '30 minutes'
+          AND b.deleted_at IS NULL
+          AND ${inScope('b')}
       UNION ALL
       SELECT 'cancelled_today', COUNT(*)::text
-        FROM bookings
-        WHERE cancelled_at::date = current_date AND deleted_at IS NULL
+        FROM bookings b
+        WHERE b.cancelled_at::date = current_date AND b.deleted_at IS NULL
+          AND ${inScope('b')}
       UNION ALL
       -- A cancellation that cost the partner a fine, which is the one worth a second look.
       SELECT 'cancelled_today_with_fine', COUNT(*)::text
         FROM bookings b
         WHERE b.cancelled_at::date = current_date AND b.deleted_at IS NULL
+          AND ${inScope('b')}
           AND EXISTS (
             SELECT 1 FROM partner_violations v WHERE v.booking_id = b.id
           )
       UNION ALL
       SELECT 'partners_pending_verification', COUNT(*)::text
-        FROM partners WHERE verification = 'pending' AND deleted_at IS NULL
+        FROM partners pt WHERE pt.verification = 'pending' AND pt.deleted_at IS NULL
+          AND ${inScope('pt')}
       UNION ALL
       SELECT 'properties_pending_review', COUNT(*)::text
-        FROM properties WHERE status = 'pending_review' AND deleted_at IS NULL
+        FROM properties pr WHERE pr.status = 'pending_review' AND pr.deleted_at IS NULL
+          AND ${inScope('pr')}
     `);
 
     const counters = Object.fromEntries(
@@ -151,7 +174,7 @@ export class DashboardService {
    * back as zero instead of being missing — a sparkline that silently skips quiet days
    * misrepresents the shape of the week.
    */
-  private async revenueSeries() {
+  private async revenueSeries(actor?: AccessTokenClaims) {
     /**
      * The window offset goes in via `sql.raw`, and this note lives OUTSIDE the template.
      *
@@ -175,6 +198,7 @@ export class DashboardService {
            ) AS d
       LEFT JOIN bookings b
         ON b.paid_at::date = d::date AND b.deleted_at IS NULL
+       AND ${scopeFilter(actor, 'b.city_id')}
       GROUP BY d
       ORDER BY d
     `);
@@ -182,7 +206,7 @@ export class DashboardService {
     return rows.rows.map((row) => ({ day: row.day, amount: row.amount }));
   }
 
-  private async recentBookings() {
+  private async recentBookings(actor?: AccessTokenClaims) {
     const rows = await this.db.execute<{
       reference: string;
       property: string;
@@ -201,7 +225,7 @@ export class DashboardService {
       JOIN properties pr        ON pr.id = b.property_id
       JOIN customer_profiles cp ON cp.id = b.customer_profile_id
       JOIN currencies cur       ON cur.id = b.currency_id
-      WHERE b.deleted_at IS NULL
+      WHERE b.deleted_at IS NULL AND ${scopeFilter(actor, 'b.city_id')}
       ORDER BY b.created_at DESC
       LIMIT ${RECENT_BOOKINGS}
     `);
