@@ -830,6 +830,31 @@ const staffOverviewSchema = z.object({
 
 export type StaffOverview = z.infer<typeof staffOverviewSchema>;
 
+const staffScopeSchema = z.object({
+  userId: z.string(),
+  email: z.string(),
+  role: z.string(),
+  kind: z.string(),
+  outside: z.string(),
+  cities: z.array(z.object({ slug: z.string(), nameAr: z.string() })),
+});
+
+export type StaffScopeRow = z.infer<typeof staffScopeSchema>;
+
+/**
+ * Every staff member's geographic scope (§8.2 النطاق).
+ *
+ * A separate call from `getStaffOverview` because it needs `STAFF_MANAGE` and the overview already
+ * has it — but the two are rendered by different components, and merging them would make the
+ * permission boundary less obvious than it should be for a map of who can see what.
+ */
+export async function getStaffScopes() {
+  return staffFetch(
+    '/admin/staff/scopes',
+    z.object({ scopes: z.array(staffScopeSchema) }),
+  );
+}
+
 export async function getStaffOverview() {
   return staffFetch('/admin/staff/overview', staffOverviewSchema);
 }

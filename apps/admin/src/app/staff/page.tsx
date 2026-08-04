@@ -5,6 +5,7 @@ import { count, shortDateTime } from '@/lib/format';
 import { ConsolePanel, ConsoleShell, Kpi, KpiRow } from '@/components/console-shell';
 import { FootNote, Ltr } from '@/components/admin-table';
 import { StaffAdmin } from '@/components/staff-admin';
+import { ScopePanel } from '@/components/scope-panel';
 import { AR, auditAction, roleName } from '@/lib/strings';
 
 /**
@@ -45,6 +46,13 @@ export default async function StaffPage() {
 
           <FootNote>{AR.sections.staff.note}</FootNote>
         </ConsolePanel>
+
+        {/*
+          نطاق العمل sits between the staff table and the permission matrix, because the two
+          together are the whole answer to "what can this person do": the matrix says WHICH actions,
+          the scope says WHERE.
+        */}
+        <ScopePanel />
 
         {overview === 'failed' || overview === 'unauthenticated' ? null : (
           <>

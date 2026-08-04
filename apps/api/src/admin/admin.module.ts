@@ -27,6 +27,8 @@ import { DisputeService } from './dispute.service.js';
 import { MessagingService } from './messaging.service.js';
 import { AdvertisingService } from './advertising.service.js';
 import { PartnerContractService } from './partner-contract.service.js';
+import { BookingExportService } from './booking-export.service.js';
+import { StaffScopeService } from './staff-scope.service.js';
 
 @Module({
   // StaffService needs AuthTokenService, MailService, PasswordService and
@@ -65,6 +67,9 @@ import { PartnerContractService } from './partner-contract.service.js';
     MessagingService,
     AdvertisingService,
     PartnerContractService,
+    // B-12 staff scope and B-13 the audited export (Bashar, 2026-08-04).
+    StaffScopeService,
+    BookingExportService,
   ],
   exports: [ReviewService],
 })

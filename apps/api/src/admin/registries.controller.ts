@@ -1,8 +1,24 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  Res,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 
-import { PERMISSIONS as P, cursorQuerySchema } from '@safra/contracts';
+import {
+  PERMISSIONS as P,
+  cursorQuerySchema,
+  setStaffScopeSchema,
+  type SetStaffScopeInput,
+} from '@safra/contracts';
 
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
@@ -14,6 +30,8 @@ import { PromotionsService } from './promotions.service.js';
 import { GeoService } from './geo.service.js';
 import { ReportsService } from './reports.service.js';
 import { StaffOverviewService } from './staff-overview.service.js';
+import { BookingExportService } from './booking-export.service.js';
+import { StaffScopeService } from './staff-scope.service.js';
 import {
   EmergencyService,
   activateEmergencySchema,
@@ -32,19 +50,20 @@ const listQuerySchema = cursorQuerySchema.extend({
   q: z.string().trim().min(1).max(80).optional(),
 });
 
+/** One definition, used by both the list and the export, so their filters cannot diverge. */
+const bookingStatusSchema = z.enum([
+  'draft',
+  'pending_payment',
+  'pending_confirmation',
+  'confirmed',
+  'cancelled',
+  'checked_in',
+  'completed',
+  'disputed',
+]);
+
 const bookingListQuerySchema = listQuerySchema.extend({
-  status: z
-    .enum([
-      'draft',
-      'pending_payment',
-      'pending_confirmation',
-      'confirmed',
-      'cancelled',
-      'checked_in',
-      'completed',
-      'disputed',
-    ])
-    .optional(),
+  status: bookingStatusSchema.optional(),
 });
 
 const deactivateEmergencySchema = z
@@ -79,6 +98,8 @@ export class RegistriesController {
     private readonly reports: ReportsService,
     private readonly staffOverview: StaffOverviewService,
     private readonly emergency: EmergencyService,
+    private readonly bookingExport: BookingExportService,
+    private readonly staffScope: StaffScopeService,
   ) {}
 
   // ── الحجوزات ───────────────────────────────────────────────────────────────
@@ -86,15 +107,89 @@ export class RegistriesController {
   @Get('bookings')
   @RequirePermissions(P.BOOKING_READ_ALL)
   async listBookings(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(new ZodValidationPipe(bookingListQuerySchema))
     query: z.infer<typeof bookingListQuerySchema>,
   ) {
     const [page, counts] = await Promise.all([
-      this.bookings.list(query),
-      this.bookings.counts(),
+      this.bookings.list({ ...query, actor: user }),
+      this.bookings.counts(user),
     ]);
 
     return { ...page, counts };
+  }
+
+  /**
+   * تصدير CSV, audited (B-13).
+   *
+   * `Header`-controlled download rather than a JSON payload the client turns into a file: the
+   * browser handles the save, and the API is the only thing that ever sees the whole set — which is
+   * what lets it write one accurate audit row.
+   *
+   * Throttled hard. An export is the cheapest way to pull a large slice of customer data out of the
+   * console, so the limit is about bounding that, not about load.
+   */
+  @Get('bookings/export')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @RequirePermissions(P.BOOKING_READ_ALL)
+  async exportBookings(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Query(
+      new ZodValidationPipe(
+        z
+          .object({
+            q: z.string().trim().min(1).max(80).optional(),
+            status: bookingStatusSchema.optional(),
+          })
+          .strict(),
+      ),
+    )
+    query: { q?: string | undefined; status?: string | undefined },
+    @Res() response: Response,
+  ): Promise<void> {
+    const { csv, rowCount, truncated } = await this.bookingExport.toCsv(user, query);
+
+    response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    response.setHeader(
+      'Content-Disposition',
+      'attachment; filename="safra-bookings.csv"',
+    );
+    /* Never cached: it carries customer names and is generated per request and per scope. */
+    response.setHeader('Cache-Control', 'no-store');
+    response.setHeader('X-Row-Count', String(rowCount));
+    response.setHeader('X-Truncated', String(truncated));
+    response.send(csv);
+  }
+
+  // ── الموظفون: النطاق (§8.2) ─────────────────────────────────────────────────
+
+  /**
+   * Reads every staff member's scope, for the الموظفون table's النطاق column.
+   *
+   * `STAFF_MANAGE`: a scope map is a map of who can see what, which is not something to hand to
+   * every staff role.
+   */
+  @Get('staff/scopes')
+  @RequirePermissions(P.STAFF_MANAGE)
+  async staffScopes() {
+    return { scopes: await this.staffScope.list() };
+  }
+
+  /**
+   * Sets one staff member's scope.
+   *
+   * Narrowing revokes their sessions immediately — see `StaffScopeService`. Widening is allowed to
+   * lag by the token's lifetime, which is the trade ADR 0003 already made for permissions.
+   */
+  @Put('staff/:userId/scope')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @RequirePermissions(P.STAFF_MANAGE)
+  async setStaffScope(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('userId') userId: string,
+    @Body(new ZodValidationPipe(setStaffScopeSchema)) body: SetStaffScopeInput,
+  ) {
+    return this.staffScope.set(user, userId, body);
   }
 
   // ── الشركاء · العقارات · العملاء ────────────────────────────────────────────
@@ -102,17 +197,19 @@ export class RegistriesController {
   @Get('partners')
   @RequirePermissions(P.PARTNER_READ)
   async listPartners(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(new ZodValidationPipe(listQuerySchema)) query: z.infer<typeof listQuerySchema>,
   ) {
-    return this.registry.partners(query);
+    return this.registry.partners({ ...query, actor: user });
   }
 
   @Get('properties')
   @RequirePermissions(P.PROPERTY_READ)
   async listProperties(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(new ZodValidationPipe(listQuerySchema)) query: z.infer<typeof listQuerySchema>,
   ) {
-    return this.registry.properties(query);
+    return this.registry.properties({ ...query, actor: user });
   }
 
   @Get('customers')
@@ -136,11 +233,12 @@ export class RegistriesController {
   @Get('finance')
   @RequirePermissions(P.LEDGER_READ)
   async finances(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(new ZodValidationPipe(listQuerySchema)) query: z.infer<typeof listQuerySchema>,
   ) {
     const [page, counters] = await Promise.all([
-      this.finance.list(query),
-      this.finance.counters(),
+      this.finance.list({ ...query, actor: user }),
+      this.finance.counters(user),
     ]);
 
     return { ...page, counters };
@@ -205,8 +303,8 @@ export class RegistriesController {
 
   @Get('reports')
   @RequirePermissions(P.REPORT_READ)
-  async reportCards() {
-    return { cards: await this.reports.cards() };
+  async reportCards(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return { cards: await this.reports.cards(user) };
   }
 
   // ── الموظفون (overview) ────────────────────────────────────────────────────

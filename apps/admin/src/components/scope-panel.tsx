@@ -1,0 +1,115 @@
+import { getStaffScopes, type StaffScopeRow } from '@/lib/api';
+import { ConsolePanel } from '@/components/console-shell';
+import {
+  AdminTable,
+  FootNote,
+  Ltr,
+  StatusPill,
+  type AdminColumn,
+  type Tone,
+} from '@/components/admin-table';
+import { AR, roleName } from '@/lib/strings';
+
+/**
+ * نطاق العمل — the scope map (design handoff §8.2, Bashar's decision 2026-08-04).
+ *
+ * ## The note is not decoration
+ *
+ * The panel states that scope is enforced SERVER-SIDE and lists what it covers. That sentence is
+ * the difference between a column somebody trusts and a column somebody has to go and verify: the
+ * whole reason this was not built as a display-only field is that a scope which is shown but not
+ * enforced is worse than no scope at all.
+ *
+ * It also states that the audit log stays complete, because that is the one place an operator might
+ * reasonably assume scope applies and it deliberately does not.
+ *
+ * ## Read-only here
+ *
+ * Setting a scope is `PUT /admin/staff/:id/scope` and it revokes the member's sessions when it
+ * narrows. A form for that belongs on the member's own record with a confirmation, not inline in a
+ * table where a mis-click logs a colleague out mid-shift.
+ */
+export async function ScopePanel() {
+  const result = await getStaffScopes();
+
+  return (
+    <ConsolePanel title={AR.sections.staff.scopeTitle}>
+      {result === 'unauthenticated' ? (
+        <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+      ) : result === 'failed' ? (
+        <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+      ) : (
+        <AdminTable
+          columns={COLUMNS}
+          rows={result.scopes}
+          template="1.6fr 1fr 1.6fr 1.1fr"
+          rowKey={(row) => row.userId}
+          minWidth={620}
+          empty={AR.table.empty}
+        />
+      )}
+
+      <FootNote>{AR.sections.staff.scopeNote}</FootNote>
+    </ConsolePanel>
+  );
+}
+
+const COLUMNS: readonly AdminColumn<StaffScopeRow>[] = [
+  {
+    key: 'email',
+    header: AR.sections.staff.inviteEmail,
+    render: (row) => <Ltr className="break-all text-text">{row.email}</Ltr>,
+  },
+  {
+    key: 'role',
+    header: AR.sections.staff.inviteRole,
+    render: (row) => <span className="text-text2">{roleName(row.role)}</span>,
+  },
+  {
+    key: 'scope',
+    header: AR.sections.staff.scope,
+    /*
+      A super admin is shown as unscopable rather than as "all cities". Both are true, and the
+      first one is the fact that matters: it explains why there is no control for them.
+    */
+    render: (row) =>
+      row.role === 'super_admin' ? (
+        <span className="text-[11.5px] text-faint">
+          {AR.sections.staff.scopeSuperAdmin}
+        </span>
+      ) : row.kind === 'all_cities' ? (
+        <StatusPill tone="sky">{AR.sections.staff.scopeAllCities}</StatusPill>
+      ) : row.cities.length === 0 ? (
+        /*
+          A `cities` scope with no cities restricts nothing — see `isRestricted`. Saying "all
+          cities" here would hide a half-finished configuration, so it says what it is.
+        */
+        <span className="text-[11.5px] text-warn">
+          {AR.sections.staff.scopeAllCities} ({AR.sections.staff.scopeNever})
+        </span>
+      ) : (
+        <span className="text-[12px] text-text">
+          {row.cities.map((city) => city.nameAr).join(' · ')}
+        </span>
+      ),
+  },
+  {
+    key: 'outside',
+    header: AR.table.colType,
+    render: (row) =>
+      row.role === 'super_admin' || row.kind === 'all_cities' ? (
+        <span className="text-faint">{AR.admin.noData}</span>
+      ) : (
+        <StatusPill tone={outsideTone(row.outside)}>
+          {row.outside === 'read_only'
+            ? AR.sections.staff.scopeOutsideReadOnly
+            : AR.sections.staff.scopeOutsideNone}
+        </StatusPill>
+      ),
+  },
+];
+
+/** `none` is the stricter mode, so it reads as the affirmative one. */
+function outsideTone(outside: string): Tone {
+  return outside === 'read_only' ? 'warn' : 'ok';
+}
