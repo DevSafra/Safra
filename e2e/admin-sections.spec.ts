@@ -330,6 +330,63 @@ test.describe('honesty rules the design and the register require', () => {
   });
 
   /**
+   * نطاق العمل is stated as SERVER-ENFORCED, and the audit exemption is stated with it.
+   *
+   * Bashar's decision, 2026-08-04. The panel's note is not decoration: a scope that is displayed
+   * but not enforced is worse than no scope, so the screen commits to which it is. And it says the
+   * audit log stays complete, because that is the one place an operator might reasonably assume
+   * scope applies and it deliberately does not.
+   */
+  test('the staff screen states that scope is server-enforced', async ({ page }) => {
+    await page.goto('/staff');
+
+    await expect(
+      page.getByRole('heading', { name: AR.sections.staff.scopeTitle }),
+    ).toBeVisible();
+    await expect(page.getByText(AR.sections.staff.scopeNote)).toBeVisible();
+
+    // A super admin is shown as unscopable rather than as "all cities".
+    await expect(page.getByText(AR.sections.staff.scopeSuperAdmin).first()).toBeVisible();
+  });
+
+  /**
+   * The CSV export downloads through the API, which is what makes it auditable (B-13).
+   *
+   * Asserts the file arrives, carries the on-screen filter, and leads with a UTF-8 BOM — without
+   * which Excel on Windows mangles every Arabic property name, which is most of the file.
+   */
+  test('the bookings export downloads a filtered, BOM-prefixed CSV', async ({ page }) => {
+    await page.goto('/bookings?status=cancelled');
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('link', { name: AR.table.exportCsv }).click(),
+    ]);
+
+    expect(download.suggestedFilename()).toBe('safra-bookings.csv');
+
+    /*
+      `download.path()` returns a string for a completed download; Playwright types it as
+      `Promise<string>`, so no assertion is needed and the linter rightly refuses one.
+    */
+    const path = await download.path();
+
+    const { readFileSync } = await import('node:fs');
+    const text = readFileSync(path, 'utf8');
+    const lines = text.split('\n').filter(Boolean);
+
+    // The BOM, the header, and at least one row.
+    expect(text.charCodeAt(0)).toBe(0xfeff);
+    expect(lines[0]?.replace(/^\uFEFF/, '')).toContain('reference,property,customer');
+    expect(lines.length).toBeGreaterThan(1);
+
+    // The filter was applied: every data row ends in the requested status.
+    for (const line of lines.slice(1).filter((row) => !row.startsWith('#'))) {
+      expect(line.trim().endsWith('cancelled')).toBe(true);
+    }
+  });
+
+  /**
    * The payments screen must admit that partner payouts are not shown.
    *
    * The design has a تحويل شريك row type; there is no payouts table. Deriving one from

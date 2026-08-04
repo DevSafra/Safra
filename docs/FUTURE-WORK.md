@@ -6,10 +6,11 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for who must act
 > on what, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-04 — **all 19 Super Admin console sections are implemented and verified**
-against the design handoff. Two passes: 15 sections, then the schema for the remaining 4 plus
-partner contracts. Full gap analysis, the four answers and every documented deviation:
-**`docs/design-gap-report.md`**.
+**Last updated:** 2026-08-04 — **the Super Admin console is complete against the design handoff.**
+All 19 sections implemented and verified over three passes, with **no backend work outstanding**.
+Staff scope is enforced server-side in both modes and booking exports are audited. The only
+remaining gaps are externally blocked and neither is console work. Full gap analysis, the four
+answers, the enforcement rules and all 17 documented deviations: **`docs/design-gap-report.md`**.
 **Unblocked infrastructure work is otherwise complete.** From here the project waits on
 external decisions; see §3 for who must act on what.
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
@@ -44,11 +45,12 @@ approve or reject a listing, look up any booking with its full money breakdown a
 append-only timeline, read the audit log, and change every operational setting with the
 change attributed and recorded.
 
-**604 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is clean, and the
-suite passes against a freshly migrated and seeded database. A further **56 browser tests**
+**632 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is clean, and the
+suite passes against a freshly migrated and seeded database. A further **58 browser tests**
 (`pnpm e2e`) cover the staff sign-in, all nineteen console sections, table search, pagination,
-filtering, the dispute close workflow, contact-detail redaction and the honesty rules; they are NOT
-part of `pnpm verify` and must be run separately against running servers.
+filtering, the dispute close workflow, contact-detail redaction, the audited CSV export and the
+honesty rules; they are NOT part of `pnpm verify` and must be run separately against running
+servers.
 
 **The staff console renders in Arabic, right-to-left** (Bashar, 2026-08-03). Every section screen
 is translated. What remains English is the four DETAIL screens — partner detail, property detail,
@@ -101,17 +103,20 @@ treat "engineering complete" as a statement about planned scope, not about corre
 These are not open questions. They are settled, and changing one is a decision for
 Bashar, not an implementation detail.
 
-| Decision                                                      | Date           | Detail                                            |
-| ------------------------------------------------------------- | -------------- | ------------------------------------------------- |
-| Work directly on `main`; never branch                         | 2026-07-29     | No feature branches, no PR flow, never force-push |
-| Commit messages are exactly one line, typed prefix            | 2026-07-29     | No body, no `Co-Authored-By`, no tool footers     |
-| Ask before every commit and every push                        | standing       | No batching of approval                           |
-| Merchant of record: Safra Technologies GmbH (Germany)         | 2026-07-29     | ADR 0002                                          |
-| Payment rails and payouts deferred to end of project          | 2026-08-01     | Items 84, 135                                     |
-| Money settings carry a currency, plus `money.always_usd`      | 2026-08-01     | Toggle ON by default; ADR 0006                    |
-| ID documents: store, restrict access, defer retention policy  | 2026-08-01     | Retention is now item **S-4** below               |
-| FX management: `super_admin` only, with a toggle for finance  | 2026-08-01     | `rbac.finance_can_manage_fx`                      |
-| **No new product scope until must-haves M-1…M-6 have a plan** | **2026-08-02** | Bashar, explicit                                  |
+| Decision                                                      | Date           | Detail                                                                          |
+| ------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------- |
+| Work directly on `main`; never branch                         | 2026-07-29     | No feature branches, no PR flow, never force-push                               |
+| Commit messages are exactly one line, typed prefix            | 2026-07-29     | No body, no `Co-Authored-By`, no tool footers                                   |
+| Ask before every commit and every push                        | standing       | No batching of approval                                                         |
+| Merchant of record: Safra Technologies GmbH (Germany)         | 2026-07-29     | ADR 0002                                                                        |
+| Payment rails and payouts deferred to end of project          | 2026-08-01     | Items 84, 135                                                                   |
+| Money settings carry a currency, plus `money.always_usd`      | 2026-08-01     | Toggle ON by default; ADR 0006                                                  |
+| ID documents: store, restrict access, defer retention policy  | 2026-08-01     | Retention is now item **S-4** below                                             |
+| FX management: `super_admin` only, with a toggle for finance  | 2026-08-01     | `rbac.finance_can_manage_fx`                                                    |
+| **No new product scope until must-haves M-1…M-6 have a plan** | **2026-08-02** | Bashar, explicit                                                                |
+| Staff scope is ENFORCED server-side, two modes                | **2026-08-04** | `none` \| `read_only` outside scope; writes refused in both. See gap report §4a |
+| **The audit log is never scoped**                             | **2026-08-04** | Bashar: "a scoped audit log is not a trustworthy audit log"                     |
+| Every booking export writes an audit row                      | **2026-08-04** | who · when · filters · row count; immutable                                     |
 
 ---
 
@@ -567,6 +572,18 @@ Things that are not blockers but will cost someone a day if forgotten.
 - **`pnpm build` regenerates `.next` under a running `next start`.** The running server
   then serves chunk names that no longer exist and the browser fails in ways that look like
   a regression in whatever was just changed. Stop the Next servers, build, then restart.
+- **`AccessTokenClaims` is enumerated TWICE and both lists must be updated.** `issue()` lists every
+  claim it signs and `verify()` lists every claim it reads back. A claim added to the interface and
+  to `buildClaims` but not to `issue()` is resolved, discarded, and read as `undefined` — which is
+  how staff-scope enforcement passed 26 unit tests and did nothing at all against a real token. The
+  spread shortcut is deliberately absent (it would publish whatever happens to be on the object), so
+  the two lists are the price. Found 2026-08-04 by decoding a live token.
+- **Drizzle serialises a JS array as JSON, not a Postgres array literal.** `= ANY(${ids}::uuid[])`
+  sends `["019f…","019f…"]` and Postgres answers `malformed array literal: "[" must introduce
+explicitly-specified array dimensions`. Bind each element separately and join into `IN (…)` — which
+  also keeps them parameters. No unit test can see this: the predicate is only serialised when it
+  reaches a real driver. Found 2026-08-04; every scoped query was 500ing.
+- **A BOM written as a literal character trips `no-irregular-whitespace`.** Use `\uFEFF`.
 - **A `bigint` column reaches the driver as a STRING.** Postgres returns it that way to avoid
   silent precision loss, so `SELECT impressions` gives `"2860"` where a `z.number()` response schema
   expects `2860` — the parse fails and the whole screen renders "could not load this list". Cast to
@@ -775,6 +792,10 @@ Kept because the reason something was blocked is often the reason it returns.
 | 2026-08-04 | The ads screen could never load                            | `impressions` is `bigint`, which the driver returns as a string, against a `z.number()` schema. Same silent-parse-failure shape as the listing queue in the morning. Cast to text and coerced with `Number()`.                                                                                                                                                                                                                                                                                                                           |
 | 2026-08-04 | A partner contract could never become active               | Every upload starts `awaiting_partner_signature` and nothing could move it, so `active` was unreachable and a whole branch of the status vocabulary was dead. Added the mark-signed action; replacing now supersedes an unsigned contract too, which it previously did not.                                                                                                                                                                                                                                                              |
 | 2026-08-04 | The dashboard and the disputes section disagreed           | The dashboard KPI still said "the disputes feature does not exist" while `/disputes` showed six. Wired to the real count; a browser test now asserts the two screens agree, because two screens disagreeing is worse than either being wrong alone.                                                                                                                                                                                                                                                                                      |
+| 2026-08-04 | Staff scope existed only as a design column (B-12)         | Implemented as an enforced server-side model on Bashar's decision: two modes (`none` / `read_only` outside scope), writes refused outside scope in both, 404 rather than 403 under `none` so absence leaks nothing, and the audit log explicitly exempt and verified byte-identical for a scoped member. Applied to 9 registries, all 8 dashboard counters, all 4 reports, the finance ledger and the export. 26 unit tests plus live two-mode verification. Rules in the gap report §4a.                                                |
+| 2026-08-04 | Scope enforcement was silently inert (found during B-12)   | `issue()` enumerates the claims it signs and `scope` was missing, so a real token carried none and every guard defaulted to unrestricted — while 26 unit tests passed. Found by decoding a live token. See the trap in §8.                                                                                                                                                                                                                                                                                                               |
+| 2026-08-04 | Every scoped query returned 500 (found during B-12)        | `= ANY(${array}::uuid[])` — Drizzle sends a JS array as JSON and Postgres rejects it as a malformed array literal. Rewritten as individually-bound parameters. Invisible to unit tests by construction.                                                                                                                                                                                                                                                                                                                                  |
+| 2026-08-04 | Booking exports left no trace (B-13)                       | The export generated CSV in the web tier, which cannot write inside the API's transaction. Moved to `GET /admin/bookings/export`, which records `booking.exported` with the actor, the filters, the row count and whether scope narrowed the set — before the bytes leave, so an abandoned download still leaves a record. Immutable by the append-only trigger; verified by attempting an UPDATE.                                                                                                                                       |
 | 2026-08-04 | 12 of the 19 console sections did not exist                | Built against the design handoff: bookings, customers, payments, wallet, gift cards, coupons, geography, reports and Emergency Mode from scratch; partner/property registries, staff and audit rebuilt. Backed by 12 new keyset-paginated endpoints, each behind its narrowest permission and verified live against the running database.                                                                                                                                                                                                |
 | 2026-08-04 | A client component was importing a server-only module      | `setting-row.tsx` reached the API client — session reading, access tokens — through a formatting helper in `lib/console.ts`. `next build` refused, correctly. Pure formatters moved to `lib/format.ts`, which imports nothing but strings and the locale constant. See the trap in §8.                                                                                                                                                                                                                                                   |
 | 2026-08-04 | The permission matrix filtered on a false belief           | It dropped "permissions no staff role holds", which can never happen: `SUPER_ADMIN` is `Object.values(PERMISSIONS)`. Dead code, found by a unit test written to confirm the filter and failing instead. Removed; the matrix now lists the full catalogue, which is also the more useful answer.                                                                                                                                                                                                                                          |

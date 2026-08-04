@@ -1,6 +1,6 @@
 # Super Admin console — gap report against `design_handoff_safra`
 
-**Date:** 2026-08-04 · **status: sections 1–3 implemented, step 4 outstanding**
+**Date:** 2026-08-04 · **status: COMPLETE — all 19 sections implemented, no backend work outstanding**
 **Handoff:** `~/Privat/design_handoff_safra/` — `README.md` is the specification, `SAFRA.dc.html`
 is the prototype source read for per-section detail (columns, copy, filters, footnotes).
 **Scope of this report:** the admin panel only (handoff §8, §9, §14). The public site (§5),
@@ -90,10 +90,41 @@ flag and the disputes disagree, and money moves on the strength of the stale one
 | **The dashboard said disputes were unavailable while `/disputes` showed six**                                                                                                                                                             | Cross-reading two screens; a test now asserts the two agree                                 |
 | **A backtick inside a `sql\`\`` comment terminated the template** — twice, in two different files                                                                                                                                         | `tsc`                                                                                       |
 
+### What pass 3 added (B-12, B-13)
+
+**Staff scope, enforced server-side.** One additive migration (`0018`): two enums, two columns on
+`users`, and a `staff_scope_cities` join with foreign keys. The scope travels in the access token,
+narrowing revokes sessions immediately, and the predicate is applied to **every** scoped resource —
+nine registries plus all eight dashboard counters, all four reports, the finance ledger and the CSV
+export. Full rules in §4a; 26 unit tests in `apps/api/src/rbac/scope.test.ts`.
+
+**Verified live, both modes, against a real scoped account** (Latakia + Tartus, with all seeded
+bookings in Damascus):
+
+|                                                                   | unscoped     | `none`                     | `read_only` |
+| ----------------------------------------------------------------- | ------------ | -------------------------- | ----------- |
+| bookings · partners · properties · disputes · conversations · ads | rows         | **0 rows**                 | rows        |
+| dashboard counters                                                | 306 / 30 / 3 | **0 / 0 / 0**              | —           |
+| write outside scope                                               | 200          | **404**                    | **403**     |
+| **audit log**                                                     | 10 entries   | **10 entries — identical** | —           |
+
+**Export audit.** The export moved into the API so it can record itself. Rules and the verified
+audit payload in §4b.
+
+### Defects pass 3 found
+
+| Found                                                                                                                                                                                                                                                                                             | How                                            |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| **The scope claim was never signed into the JWT.** `buildClaims` resolved it, `issue()` enumerates claims explicitly, and `scope` was not in the list — so enforcement passed every unit test and did **nothing** against a real token. The guard read `undefined` and defaulted to unrestricted. | Decoding a real token during live verification |
+| **`= ANY(${array}::uuid[])` fails at runtime.** Drizzle serialises a JS array as JSON, so Postgres receives `["019f…"]` and answers `malformed array literal`. Every scoped query 500'd. Rewritten as individually-bound parameters in an `IN (…)` list.                                          | Probing the live endpoint                      |
+
+Both were invisible to the unit suite by construction — one lives in JWT serialisation, the other in
+driver serialisation. Neither could have been found without a real token and a real database.
+
 ### Verification
 
-`pnpm verify` exit 0 — **604 tests**, format, lint, types, no vulnerabilities. `pnpm build` green.
-`pnpm e2e` **56/56**. All 19 routes loaded in a real browser: no console errors, no horizontal
+`pnpm verify` exit 0 — **632 tests**, format, lint, types, no vulnerabilities. `pnpm build` green.
+`pnpm e2e` **58/58**. All 19 routes loaded in a real browser: no console errors, no horizontal
 overflow, no untranslated UI copy, no `LOAD-FAILED`, no "not built" panel.
 
 ---
@@ -159,9 +190,9 @@ Each row states the deviation and what closing it requires.
 
 ---
 
-## 4. Backend work still required — the four answers
+## 4. Final gap analysis — the four answers
 
-The four questions asked of this pass, answered.
+Third pass, 2026-08-04. B-12 and B-13 are implemented. **No backend work remains for parity.**
 
 ### 1. Which sections are fully implemented and verified
 
@@ -170,34 +201,109 @@ browser test asserting it neither fails to load nor shows a placeholder. See §0
 
 ### 2. Which sections differ from the handoff, and why
 
-Twelve documented deviations in §6, plus three added by this pass (13–15). Every one is a
-deliberate decision with a stated reason. There are no undocumented differences.
+**Fifteen documented deviations**, §6. Every one is a deliberate decision with a stated reason.
+There are no undocumented differences.
 
 ### 3. What is still blocked, and by what
 
-| Item                           | Blocked by                                                     | Effect                                                                                                                                                           |
-| ------------------------------ | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Sending** on واتساب والبريد  | **External** — WhatsApp BSP undecided (item 192). Email works. | The log, the template inventory and the per-channel state are built. The ad template is inert until the one-message-maximum can be enforced. The screen says so. |
-| **Executing** a partner payout | **External** — payment rails deferred by decision 2026-08-01   | الدفع والفواتير shows what is owed and states that transfers are not shown. `disputes/frozen-payouts` is built and ready for the payout path to consult.         |
-| **النطاق (staff scope)**       | **A product decision** — see below                             | The column and the invite-form select are absent rather than faked.                                                                                              |
+Two items, **both externally blocked**, neither of them console work:
+
+| Item                           | Blocked by                                              | What exists                                                                                                                                                                                                    |
+| ------------------------------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sending** on واتساب والبريد  | WhatsApp BSP undecided (roadmap item 192). Email works. | The delivery log, the template inventory, per-channel state and the failure/attempt record are all built. The ad template is inert until the one-message-maximum can be enforced. The screen states the block. |
+| **Executing** a partner payout | Payment rails deferred by decision, 2026-08-01          | الدفع والفواتير shows what is owed and states that transfers are not shown. `GET /admin/disputes/frozen-payouts` is built and ready for the payout path to consult.                                            |
 
 ### 4. Backend work still required for complete parity
 
-Two items, and only two.
+**None.**
 
-| #        | Item                                               | Why it is not done                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Proposed schema / plan                                                                                                                                                                                                                                                                                                         |
-| -------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **B-12** | **Staff scope** (النطاق column, نطاق العمل select) | Needs a decision, not code. A scope that is DISPLAYED but not ENFORCED is the exact failure this console avoids everywhere else — an operator would read "كرم عبّود · اللاذقية · طرطوس" and believe Karam cannot see a Damascus booking. Enforcing it is a security-relevant change to who sees what, and the semantics are a product call. **The question for Bashar:** does a Latakia-scoped operations manager see a Damascus booking at all, or see it read-only? And is the audit log scoped (it should not be — a scoped audit trail is not an audit trail)? | `users.scope_kind` enum (`all_cities` \| `cities` \| `outside_syria`) plus a `staff_scope_cities` join to `cities`. Enforcement is one extra predicate on the three city-bearing registries (bookings, partners, properties); finance, settings and audit stay global by nature. Roughly a day once the semantics are decided. |
-| **B-13** | **Audit entry for a CSV export**                   | The export streams from the BFF, which cannot write an audit row inside the API's transaction. An export removes data from the console's access controls and should be recorded.                                                                                                                                                                                                                                                                                                                                                                                   | Move the export behind `GET /admin/bookings/export` in the API, streaming from there and writing one `booking.exported` audit row with the filter and the row count. Half a day.                                                                                                                                               |
+B-12 (staff scope) and B-13 (export audit) were the last two, and both are implemented, enforced and
+tested. The remaining entries below are cosmetic or dev-data only, and none of them affects parity
+with the handoff:
 
-Everything else previously listed here (B-1…B-6) was built in this pass. The data-shape gaps that
-remain are cosmetic or dev-only:
+| #    | Gap                                                              | Effect                                                                                                                                             |
+| ---- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B-7  | `gift_cards` and `coupons` have zero rows in dev                 | The screens render correctly and show an empty state. Worth seeding a handful to see the layout against data.                                      |
+| B-8  | `properties` has one row, `cities` nine                          | Thin dev data; not a code gap.                                                                                                                     |
+| B-10 | `refunds` has no human reference (the design shows `RFD-000342`) | Refund rows are keyed by the payment they reverse. A `reference` column needs a sequence plus a backfill for 591 rows — additive, small, cosmetic. |
 
-| #    | Gap                                                              | Effect                                                                                                                                                          |
-| ---- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B-7  | `gift_cards` and `coupons` have zero rows                        | The screens render correctly and show an empty state. Worth seeding a handful in dev to see the layout against data.                                            |
-| B-8  | `properties` has one row, `cities` nine                          | Thin dev data; not a code gap.                                                                                                                                  |
-| B-10 | `refunds` has no human reference (the design shows `RFD-000342`) | Refund rows are keyed by the payment they reverse. A `reference` column needs a sequence plus a backfill for 591 rows — additive and small, cosmetic in effect. |
+---
+
+## 4a. Staff scope — the enforcement rules (B-12)
+
+Bashar's decision, 2026-08-04: scope is an **enforced server-side permission model**, not a UI
+indicator. These are the exact rules, and `apps/api/src/rbac/scope.test.ts` asserts every cell.
+
+### The modes
+
+| Mode                       | Read inside | Read outside | Write inside | Write outside |
+| -------------------------- | ----------- | ------------ | ------------ | ------------- |
+| `all_cities` (default)     | ✅          | ✅           | ✅           | ✅            |
+| `cities` + **`none`**      | ✅          | ❌ **404**   | ✅           | ❌ **404**    |
+| `cities` + **`read_only`** | ✅          | ✅           | ✅           | ❌ **403**    |
+
+- **Writes are refused outside scope in BOTH modes.** `read_only` widens READ only. There is no
+  configuration in which a Latakia-scoped agent edits a Damascus record.
+- **`none` answers 404, never 403.** A 403 confirms the row exists, which is itself information the
+  member is not scoped to have. 404 is the only answer that leaks nothing.
+- **`read_only` answers 403**, because the member can already see the row and pretending it is
+  absent would make the console look broken rather than restricted.
+- **A row with no city is always in scope.** Scope narrows by geography; it cannot narrow what has
+  no geography.
+- **A `cities` scope with an empty list restricts nothing.** A member switched to `cities` before any
+  city is assigned would otherwise see nothing, which reads as a broken console rather than a
+  half-finished configuration.
+
+### What is scoped
+
+`bookings` · `partners` · `properties` · `disputes` (through the booking's city) · `conversations`
+(through the booking's or partner's city) · `ad_campaigns` · **the dashboard** (all eight counters,
+the revenue series, recent bookings, open disputes) · **all four reports** · **the finance ledger**
+(per union branch) · **the CSV export**.
+
+### What is NOT scoped, and why
+
+| Resource                                 | Why                                                                                                                                                                                                                           |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`audit_log`**                          | Bashar, 2026-08-04: "a scoped audit log is not a trustworthy audit log." Verified live: a scoped finance officer and an unscoped super admin see byte-identical entries. A test asserts it stays on the unscoped list.        |
+| `settings`, `staff`, `geo`, `currencies` | Platform configuration. Not geographic.                                                                                                                                                                                       |
+| `customers`                              | A customer belongs to no city — they book in Latakia in July and Damascus in August.                                                                                                                                          |
+| `wallet`, `gift_cards`, `coupons`        | Customer- or platform-owned value instruments. Scoping a wallet by the booking a transaction happens to reference would show a partial balance history, which is worse than none because somebody would reconcile against it. |
+
+### Mechanics
+
+- Scope travels in the **access token**, the same trade ADR 0003 made for permissions: authorization
+  stays off the hot path.
+- **Narrowing revokes sessions immediately.** Any change to `kind`, any change to `outside`, and any
+  city leaving the list all count as narrowing — detected conservatively, because a false positive
+  costs one re-login and a false negative leaves somebody operating under a revoked scope.
+- **A super admin is never scoped.** Refused by the API. Scoping the only role that can un-scope an
+  account is a lockout whose remedy requires the person locked out.
+- **Nobody scopes themselves.** Refused.
+- `PUT /admin/staff/:userId/scope` is audited as `staff.scope_changed` with before and after.
+
+---
+
+## 4b. Booking export audit (B-13)
+
+`GET /api/v1/admin/bookings/export` — the export now lives in the API rather than the web tier,
+which is what lets it write its own audit row. Every export records:
+
+| Field                | Value                                                        |
+| -------------------- | ------------------------------------------------------------ |
+| **who**              | `actor_user_id` and `actor_role`                             |
+| **when**             | the audit row's own `created_at`                             |
+| **what filters**     | `after.filters` — the search term and the status, verbatim   |
+| **how many records** | `after.rowCount`, plus `matchedCount` and `truncated`        |
+| (also)               | `scoped` — whether the exporter's own scope narrowed the set |
+
+The row is written **before the bytes leave**, so a client that disconnects mid-download still
+leaves a record. It is `booking.exported` in `audit_log`, which is append-only by trigger — verified
+live: an `UPDATE` against it raises `append-only; UPDATE is not permitted`. It appears in سجل التدقيق
+like any other entry.
+
+Also verified live: 2,870 rows with the on-screen filter applied, a UTF-8 BOM so Excel does not
+mangle Arabic, and CSV-formula injection neutralised.
 
 ---
 
@@ -277,6 +383,14 @@ Every deviation in the finished console should be one of these. Anything else is
 15. **The Emergency Mode broadcast records the choice and sends nothing.** The WhatsApp channel is
     blocked on the provider decision, and the form says so when the box is ticked — rather than
     accepting the instruction and silently dropping it.
+16. **نطاق العمل is read-only in the console.** The column is rendered and the enforcement is real,
+    but setting a scope is `PUT /admin/staff/:id/scope` rather than an inline control. Narrowing a
+    scope revokes the member's sessions, and a mis-click in a table would log a colleague out
+    mid-shift; that belongs behind a confirmation on their own record.
+17. **`خارج سوريا` is not a scope KIND.** The design lists it beside كل المدن and the individual
+    cities. It is modelled as a city list containing the non-Syrian cities instead, because a third
+    kind would be a second code path to keep in step with the first for a distinction the data
+    already expresses.
 
 ---
 
@@ -292,16 +406,17 @@ the §9.1 tokens; both are recorded in the future-work register §8a.
 
 ## 8. Execution order — complete
 
-| Step | Work                                                                                      | State                                  |
-| ---- | ----------------------------------------------------------------------------------------- | -------------------------------------- |
-| 1    | Shared primitives: `AdminTable`, `TableToolbar`, `Kpi`, `StatusPill`, `Pager`, `FootNote` | ✅ pass 1                              |
-| 2    | 11 sections backed by existing tables                                                     | ✅ pass 1                              |
-| 3    | Rebuild staff · audit · settings to the design                                            | ✅ pass 1                              |
-| 4    | New domains: contracts → disputes → notification log → ads → conversations                | ✅ pass 2                              |
-| 5    | CSV export                                                                                | ✅ pass 2                              |
-| 6    | Staff scope (B-12)                                                                        | ⏸ awaiting a product decision — see §4 |
-| 7    | Export audit entry (B-13)                                                                 | 📋 half a day, no blocker              |
+| Step | Work                                                                                      | State     |
+| ---- | ----------------------------------------------------------------------------------------- | --------- |
+| 1    | Shared primitives: `AdminTable`, `TableToolbar`, `Kpi`, `StatusPill`, `Pager`, `FootNote` | ✅ pass 1 |
+| 2    | 11 sections backed by existing tables                                                     | ✅ pass 1 |
+| 3    | Rebuild staff · audit · settings to the design                                            | ✅ pass 1 |
+| 4    | New domains: contracts → disputes → notification log → ads → conversations                | ✅ pass 2 |
+| 5    | CSV export                                                                                | ✅ pass 2 |
+| 6    | **Staff scope (B-12) — enforced server-side, both modes, 26 tests**                       | ✅ pass 3 |
+| 7    | **Export audit (B-13) — who, when, filters, row count, immutable**                        | ✅ pass 3 |
 
-**No remaining implementation work can be completed within the current project scope** except B-13,
-which is a small relocation of the export into the API, and B-12, which needs Bashar to answer two
-questions about what scope means before any code is the right code.
+**No remaining implementation work can be completed within the current project scope.** The two
+outstanding items are externally blocked and neither is console work: WhatsApp _sending_ (roadmap
+item 192) and payout _execution_ (deferred by decision, 2026-08-01). Both have their console side
+built, and both screens state the block rather than implying it works.
