@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -5,6 +7,18 @@ import { defineConfig } from 'vitest/config';
  * anywhere runs every suite, and so CI has a single entry point.
  */
 export default defineConfig({
+  resolve: {
+    alias: {
+      /**
+       * `server-only` is resolved by Next's bundler and is not a package on disk, so any
+       * test importing an `apps/admin` server module would fail on module load. See the stub
+       * for why this does not weaken the guard it provides.
+       */
+      'server-only': fileURLToPath(
+        new URL('./test/server-only.stub.ts', import.meta.url),
+      ),
+    },
+  },
   test: {
     include: ['{apps,packages}/*/src/**/*.{test,spec}.ts'],
     environment: 'node',

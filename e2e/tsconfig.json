@@ -3,7 +3,20 @@
   "compilerOptions": {
     "noEmit": true,
     "lib": ["ES2023", "DOM"],
-    "types": ["node"]
+    "types": ["node"],
+    /**
+     * Relaxed for this project only.
+     *
+     * The specs import the console's Arabic string module so a copy change cannot
+     * silently stop them finding anything — and that file lives in a Next app, which has
+     * no `"type": "module"`, so `verbatimModuleSyntax` reports its `export` statements as
+     * CommonJS violations. Playwright's loader handles both formats, and adding
+     * `"type": "module"` to the app instead risks breaking how PostCSS and Tailwind
+     * configs are loaded. The narrow override is the smaller change.
+     */
+    "verbatimModuleSyntax": false,
+    "module": "ESNext",
+    "moduleResolution": "Bundler"
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "../apps/admin/src/lib/strings.ts"]
 }

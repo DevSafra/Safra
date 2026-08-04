@@ -41,5 +41,21 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    /**
+     * Signs in once and saves the session (`e2e/auth.setup.ts`).
+     *
+     * `POST /auth/login` allows five calls a minute per IP and a two-step sign-in spends
+     * two, so tests that live behind the login replay this session instead of signing in
+     * again. Doing it here rather than in a `beforeAll` matters: Playwright restarts the
+     * worker after a failing test and re-runs file hooks, so a hook-based sign-in gets
+     * throttled on the retry and turns one real failure into a whole-suite cascade.
+     */
+    { name: 'setup', testMatch: /.*\.setup\.ts/ },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
+    },
+  ],
 });

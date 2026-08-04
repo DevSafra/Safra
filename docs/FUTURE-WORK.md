@@ -6,12 +6,14 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for who must act
 > on what, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-03 — see §11 for a CSP regression found by opening the app in a
-browser. **Unblocked engineering work is otherwise complete.** From here the
-project waits on external decisions; see §3 for who must act on what.
+**Last updated:** 2026-08-04 — the Super Admin console was built out against the design handoff:
+**15 of its 19 sections are now implemented**, 4 need a schema change first. Full gap analysis and
+every documented deviation: **`docs/design-gap-report.md`**.
+**Unblocked infrastructure work is otherwise complete.** From here the project waits on
+external decisions; see §3 for who must act on what.
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
-**Last pushed:** `422dc33`. Everything after it is committed locally and **not pushed** —
-34 commits as of 2026-08-03.
+**Last pushed:** `90b188c`. Everything after it is committed locally and **not pushed** —
+3 commits as of 2026-08-04, plus the uncommitted Arabic/dashboard work.
 
 ---
 
@@ -41,15 +43,48 @@ approve or reject a listing, look up any booking with its full money breakdown a
 append-only timeline, read the audit log, and change every operational setting with the
 change attributed and recorded.
 
-**549 tests pass** (10 of them re-pointed at an isolated fixture on 2026-08-03). `pnpm verify` (format, lint, types, tests, dependency audit) is
-clean, and the suite passes against a freshly migrated and seeded database.
+**566 tests pass.** `pnpm verify` (format, lint, types, tests, dependency audit) is clean, and the
+suite passes against a freshly migrated and seeded database. A further **51 browser tests**
+(`pnpm e2e`) cover the staff sign-in, all nineteen console sections, table search, pagination,
+filtering and the honesty rules; they are NOT part of `pnpm verify` and must be run separately
+against running servers.
+
+**The staff console renders in Arabic, right-to-left** (Bashar, 2026-08-03). Every section screen
+is translated. What remains English is the four DETAIL screens — partner detail, property detail,
+enrol-2fa, accept-invitation — plus stored data such as audit reasons and wallet notes, which are
+shown as written.
+
+**The console follows the approved design** (built out 2026-08-04). Fifteen of the nineteen
+sections are implemented against real data — dashboard, bookings, partners, properties, customers,
+staff, payments, wallet, gift cards, coupons, geography, reports, settings, audit log and Emergency
+Mode. The remaining four — disputes, messages, WhatsApp/email, ads — have routes that name what is
+missing rather than empty tables, because an empty disputes table reads as "there are none".
+
+**`docs/design-gap-report.md` is the authority on visual fidelity.** It holds the full gap
+analysis, the schema work each remaining section needs (B-1…B-11), and **twelve explicitly
+documented deviations** from the handoff with the reasoning for each. A deviation not on that list
+is a defect.
+
+**The design handoff is at `~/Privat/design_handoff_safra/`** (provided 2026-08-04) and is
+now the authority for anything visual. Its `README.md` is the specification — exact token
+values (§9), the typography scale, the radius and spacing ladders, the interaction rules and
+the copy. `SAFRA.dc.html` / `SAFRA-standalone.html` are prototypes to read, NOT code to port:
+the handoff explicitly says not to carry over the single-file architecture, the `<sc-for>` /
+`{{ }}` template runtime, or inline `style` attributes. It rates itself "high fidelity —
+colors, typography, spacing, radii, shadows, copy and interaction states are final", so a
+value in the codebase that disagrees with §9 is a defect, not a variation.
 
 **What remains is not product.** It is infrastructure, operations and compliance. That
 is the central finding of the 2026-08-02 assessment and it still holds.
 
-**Engineering work that needs no external decision is complete as of 2026-08-03.** The
-next move belongs to Bashar (hosting), Compliance (sanctions registration, retention) and
-Legal — not to engineering. §3 sorts every remaining item by who must act.
+**Infrastructure work that needs no external decision is complete as of 2026-08-03.** The
+next move on the must-have blockers belongs to Bashar (hosting), Compliance (sanctions
+registration, retention) and Legal. §3 sorts every remaining item by who must act.
+
+**That is not the same as "there is nothing left to find."** On 2026-08-04, building the
+dashboard surfaced a listing queue that had never once loaded (§8, §11) — a defect no test
+in the suite could see. Console work continues to turn up defects of exactly that shape, so
+treat "engineering complete" as a statement about planned scope, not about correctness.
 
 ---
 
@@ -81,17 +116,27 @@ perfection — §10 records the residual security risk honestly.
 
 ### ✅ Completed engineering (no further action)
 
-| Item                                                                                                                 | Delivered     |
-| -------------------------------------------------------------------------------------------------------------------- | ------------- |
-| **M-4** Redis-backed rate limiting                                                                                   | 2026-08-02    |
-| **M-5** Staff provisioning — bootstrap command + console invite flow                                                 | 2026-08-02    |
-| **M-6** Liveness and readiness endpoints                                                                             | 2026-08-02    |
-| **S-6** Encryption key rotation with re-encryption                                                                   | 2026-08-02    |
-| **M-1 (partial)** Container images for all three apps, deployment requirements                                       | 2026-08-02    |
-| **S-1 (prerequisite)** Structured JSON logs, correlation ids, access log                                             | 2026-08-02–03 |
-| **S-7 (documented half)** Forward-only migration strategy and rollback answer                                        | 2026-08-03    |
-| Staff console: dashboard, partner verification, listing review, booking detail, audit log, Rules Engine, staff admin | 2026-08-02    |
-| Security hardening — see §10 for the full list and evidence                                                          | 2026-08-02–03 |
+| Item                                                                                                                   | Delivered     |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------- |
+| **M-4** Redis-backed rate limiting                                                                                     | 2026-08-02    |
+| **M-5** Staff provisioning — bootstrap command + console invite flow                                                   | 2026-08-02    |
+| **M-6** Liveness and readiness endpoints                                                                               | 2026-08-02    |
+| **S-6** Encryption key rotation with re-encryption                                                                     | 2026-08-02    |
+| **M-1 (partial)** Container images for all three apps, deployment requirements                                         | 2026-08-02    |
+| **S-1 (prerequisite)** Structured JSON logs, correlation ids, access log                                               | 2026-08-02–03 |
+| **S-7 (documented half)** Forward-only migration strategy and rollback answer                                          | 2026-08-03    |
+| Staff console: dashboard, partner verification, listing review, booking detail, audit log, Rules Engine, staff admin   | 2026-08-02    |
+| Security hardening — see §10 for the full list and evidence                                                            | 2026-08-02–03 |
+| Two-step staff sign-in (password, then authenticator code) + `PasswordField` show/hide rule                            | 2026-08-03    |
+| Playwright browser harness — 22 tests, the only ones that can see a client-side regression                             | 2026-08-03–04 |
+| Staff console Arabic/RTL: login, dashboard, partner queue, listing queue                                               | 2026-08-03–04 |
+| Dashboard rebuilt to the approved design, wired to a single-round-trip `/admin/dashboard`                              | 2026-08-04    |
+| Partner and listing queues promoted to their own sections (`/partners`, `/properties`)                                 | 2026-08-04    |
+| **15 of the 19 design-handoff console sections** — registries, finance, promotions, geography, reports, Emergency Mode | 2026-08-04    |
+| 12 new keyset-paginated admin endpoints on `RegistriesController`, each behind its narrowest permission                | 2026-08-04    |
+| Emergency Mode (EC-009) end to end — activate with a required reason, deactivate, audited history                      | 2026-08-04    |
+| The staff permission matrix, derived from `ROLE_PERMISSIONS` so it cannot drift from the guard                         | 2026-08-04    |
+| Browser suite grown to 51 tests, covering every section plus search, paging and filtering                              | 2026-08-04    |
 
 ### 🏗 Hosting-dependent — waiting on roadmap item 193
 
@@ -127,14 +172,17 @@ unblocks four items and is the highest-leverage action available.**
 
 Bashar's instruction (2026-08-02): no product expansion until the must-haves have a plan.
 
-| Item                                       | Note                                                                                                                                                                                                                       |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Messaging and disputes**                 | The largest gap. SRS §4 defines a support agent as handling bookings, messages and disputes; only bookings exist. Permissions are assigned but there are no tables — which makes the platform look more capable than it is |
-| Remaining 11 of the 18 §9.3 admin sections | The 7 built are those that block onboarding or administration                                                                                                                                                              |
-| Payment rails and payouts (items 84, 135)  | Deferred by decision 2026-08-01                                                                                                                                                                                            |
-| Gift cards and coupons (items 142–143)     | Compose onto the split-payment seam                                                                                                                                                                                        |
-| UK, US and UN sanctions lists              | EU-only is deliberate; revisit before US/UK payments                                                                                                                                                                       |
-| Emergency Mode (EC-009)                    | No operational need yet                                                                                                                                                                                                    |
+| Item                                       | Note                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Messaging and disputes**                 | The largest gap. SRS §4 defines a support agent as handling bookings, messages and disputes; only bookings exist. Permissions are assigned but there are no tables — which makes the platform look more capable than it is                                                             |
+| Remaining 11 of the 18 §9.3 admin sections | The 7 built are those that block onboarding or administration. Since 2026-08-04 all eighteen appear in the sidebar — dimmed and `aria-disabled` when unbuilt — so the console shows how much is missing instead of hiding it                                                           |
+| Payment rails and payouts (items 84, 135)  | Deferred by decision 2026-08-01                                                                                                                                                                                                                                                        |
+| Gift cards and coupons (items 142–143)     | Compose onto the split-payment seam                                                                                                                                                                                                                                                    |
+| UK, US and UN sanctions lists              | EU-only is deliberate; revisit before US/UK payments                                                                                                                                                                                                                                   |
+| Emergency Mode (EC-009)                    | No operational need yet. The control is in the dashboard header, rendered DISABLED — in an emergency a button that looks armed and does nothing is worse than one visibly unavailable                                                                                                  |
+| Arabic for the remaining console screens   | `/staff`, `/audit`, `/settings`, partner and property detail, enrol-2fa, invitation are still English. Copy belongs in `apps/admin/src/lib/strings.ts`; the pattern is established                                                                                                     |
+| Design fidelity outside the dashboard      | The handoff (§4–§8) specifies far more than is built: the sticky 64px shell header, the light theme (§9.2), a search input on **every** admin table, partner contract upload (§8.1), the staff permission matrix (§8.2). Each is a separate piece of work; see the fidelity gaps below |
+| A browsable bookings list                  | §9.4 is a lookup by the reference a customer reads out; an index of every booking is a privacy surface with no operational use. Consequence: the dashboard's SLA alert has no "handle" destination and its action is dimmed                                                            |
 
 ### Highest-risk item
 
@@ -492,19 +540,84 @@ Things that are not blockers but will cost someone a day if forgotten.
 - **Sanctions screening is advisory, not deciding.** The platform scores name similarity
   (0.35 to surface, 0.75 flagged strong) and records the reviewer's conclusion. The human
   remains accountable for the determination.
+- **A response schema that requires a field the API never sends fails SILENTLY.**
+  `staffFetch` returns `'failed'` on any parse error, and the page then renders a generic
+  "could not load this list". `pendingPropertySchema` required `status`, which
+  `GET /admin/properties/pending` does not select — so the listing queue had been
+  permanently broken and looked like a transient API failure. Nothing appeared in any log.
+  **Write response schemas against a captured response, not against the columns you
+  expect**, and keep the capture in a test — `apps/admin/src/lib/api.test.ts` is the
+  pattern. Found and fixed 2026-08-04.
+- **The e2e suite must not sign in per test.** `POST /auth/login` allows five calls a
+  minute per IP and a two-step sign-in spends two, so a handful of extra sign-ins trips the
+  limiter mid-run and every later test fails with "too many attempts" — which reads exactly
+  like a broken login form. Tests behind the login replay a session captured once by the
+  `setup` project (`e2e/auth.setup.ts`). This must be a setup PROJECT, not a `beforeAll`:
+  Playwright restarts the worker after a failing test and re-runs file hooks, so a
+  hook-based sign-in gets throttled on the retry and turns one real failure into a
+  whole-suite cascade. Observed both ways on 2026-08-04; the run also went from 90s to 5.5s.
+- **`pnpm build` regenerates `.next` under a running `next start`.** The running server
+  then serves chunk names that no longer exist and the browser fails in ways that look like
+  a regression in whatever was just changed. Stop the Next servers, build, then restart.
+- **A `server-only` build failure is the guard working, not an obstacle.** A CLIENT component
+  imported a formatting helper from `lib/console.ts`, which imports the API client — so session
+  reading and access-token handling were on their way into the browser bundle. Next refused the
+  build. The fix is to move the shared code, never to drop the `server-only` marker: pure
+  formatters live in `apps/admin/src/lib/format.ts` and import nothing but strings and the locale
+  constant. Found 2026-08-04.
+- **A trailing ISO currency code reorders under RTL.** `3,000.00 USD` renders as `USD 3,000.00`,
+  which reads as a label rather than a figure. Use `amount()` from `lib/format.ts`, which puts a
+  symbol where the handoff puts it — `$3,000.00` for Latin currencies, `12,500 ل.س` for Arabic ones.
+- **`super_admin` holds EVERY permission** — `SUPER_ADMIN` is `Object.values(PERMISSIONS)`. So any
+  logic shaped "drop the permissions no staff role holds" is dead code, and any count of "how many
+  roles can do X" is always at least one. A unit test written on the opposite assumption is what
+  surfaced it (2026-08-04).
+- **`fx_rates` is empty in dev, and that is deliberate.** The seed refuses to invent a rate — a
+  hardcoded one goes stale and a wrong rate is worse than an absent one — and prints ACTION
+  REQUIRED. Pricing then refuses to quote. The audit log holds ~1,900 `fx_rate.set` entries because
+  the integration suite writes rates and cleans them up, while `audit_log` is append-only and keeps
+  the trace. The geography screen now shows the missing rate in red, so an operator sees it too.
+- **Arabic-Indic digits are wrong for this console.** The approved design uses Western
+  digits throughout, and `٠` (Arabic-Indic zero) renders as a small raised dot — "٠ بغرامة
+  شريك" reads as a stray bullet rather than as a zero. Every figure here is also reconciled
+  against something outside the platform (a ledger, a bank statement, a sanctions file),
+  none of which use them. Use `ARABIC_WESTERN_DIGITS` from `apps/admin/src/lib/numerals.ts`,
+  which also pins the Gregorian calendar — an `ar` locale can otherwise resolve to
+  Umm al-Qura and render a different year than the database holds.
+
+---
+
+## 8a. Design fidelity gaps — known, unstarted
+
+Opened 2026-08-04 when the design handoff arrived. These are gaps between the handoff and
+the codebase that are **known and deliberately not yet closed**, so nobody re-discovers them
+as bugs. Each names what unblocks it.
+
+| Gap                                                                    | Where                          | What it takes                                                                                                                                                                                                                                                                                                                                                |
+| ---------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **The customer app still uses Cairo, not IBM Plex Sans Arabic** (§4.1) | `apps/web/src/app/layout.tsx`  | A one-line font swap, but it changes the metrics of every customer page — so it wants a visual pass over the public screens in the same commit, not a drive-by. The admin console was switched on 2026-08-04                                                                                                                                                 |
+| **The customer app is missing half the tokens** (§9.1)                 | `apps/web/src/app/globals.css` | `bg2`, `line2`, `text2`, `faint2`, `barDim`, `star1/2`, the hero/band/voucher fills and all five `*A` triples are absent. Add as the screens that need them are built; adding all of them now would be unused CSS                                                                                                                                            |
+| **The token block is duplicated between the two apps**                 | both `globals.css`             | This duplication is exactly what let the admin palette drift — it was eyeballed while the customer app already had the correct values. Extracting to a shared `packages/ui` CSS entry is the fix; the blocker is that the customer app has a light theme and the console is dark-only, so the shared file needs a theme-agnostic core plus per-app overrides |
+| **No light theme in the console** (§9.2)                               | `apps/admin`                   | Deliberate: staff-only, always dark, and the public app owns the toggle. Reopen only if staff ask                                                                                                                                                                                                                                                            |
+| **No sticky shell header in the console** (§4.2)                       | `apps/admin`                   | The design's admin panel sits inside the public shell (logo, nav, currency, language, theme, account). A staff console needs none of that nav, so the console has no header at all and the sidebar sticks at 24px rather than the design's 84px offset. Revisit if a language or theme toggle is wanted for staff                                            |
+| **Not every admin table has a search input** (§8)                      | `apps/admin`                   | Specified for all of them. The dashboard's bookings panel has one; `/partners`, `/properties`, `/staff` and `/audit` do not. `/audit` has server-side filters instead, which is better at scale than a client substring match — reconcile before copying the pattern blindly                                                                                 |
 
 ---
 
 ## 9. Reference — where things live
 
-| What                                       | Where                                     |
-| ------------------------------------------ | ----------------------------------------- |
-| Binding engineering rules                  | `.claude/CLAUDE.md`                       |
-| Architecture decisions and their rationale | `.claude/memory/` (indexed in its README) |
-| Full roadmap, item by item                 | `ROADMAP.md`                              |
-| Production-readiness narrative, 2026-08-02 | `docs/production-readiness.md`            |
-| Sanctions feed activation procedure        | `docs/runbooks/sanctions-feed.md`         |
-| **This register**                          | `docs/FUTURE-WORK.md`                     |
+| What                                       | Where                                       |
+| ------------------------------------------ | ------------------------------------------- |
+| Binding engineering rules                  | `.claude/CLAUDE.md`                         |
+| Architecture decisions and their rationale | `.claude/memory/` (indexed in its README)   |
+| Full roadmap, item by item                 | `ROADMAP.md`                                |
+| Production-readiness narrative, 2026-08-02 | `docs/production-readiness.md`              |
+| Sanctions feed activation procedure        | `docs/runbooks/sanctions-feed.md`           |
+| **Design spec (authoritative, visual)**    | `~/Privat/design_handoff_safra/README.md`   |
+| Design prototypes — read, do NOT port      | `~/Privat/design_handoff_safra/SAFRA*.html` |
+| Staff console Arabic copy                  | `apps/admin/src/lib/strings.ts`             |
+| Browser tests, and the shared sign-in      | `e2e/` (`pnpm e2e`, needs running servers)  |
+| **This register**                          | `docs/FUTURE-WORK.md`                       |
 
 ---
 
@@ -608,14 +721,25 @@ trees (re-verified 2026-08-03 after retiring the last exception).
 
 Kept because the reason something was blocked is often the reason it returns.
 
-| Date       | Item                                                       | Resolution                                                                                                                                                                                                                                                                                                                                             |
-| ---------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-08-02 | Staff 2FA enforced in the console but not the API          | `AuthService.login` demanded a TOTP code only if the account already had one enabled, so never enrolling was a way to opt out entirely — verified live: a `support_agent` with `totp_enabled_at IS NULL` read booking detail on a password alone. Closed by `StaffTwoFactorGuard`, with narrow exemptions for enrolment, `/auth/me` and public routes. |
-| 2026-08-02 | Production could store ID documents on local disk          | `StorageModule` fell back to `LocalDiskStorage` with only a warning. Now a boot-time refusal, matching the `SMTP_URL` guard.                                                                                                                                                                                                                           |
-| 2026-08-02 | `settings_history` was mutable                             | Its siblings were append-only by trigger; it was not. Same trigger applied, with a regression test verified to fail when the trigger is dropped.                                                                                                                                                                                                       |
-| 2026-08-02 | Booking timestamps rendered in the server's timezone       | `column::text` formats in the session timezone; correct only because the container is `Etc/UTC`. Now explicit `AT TIME ZONE 'UTC'`.                                                                                                                                                                                                                    |
-| 2026-08-02 | Audit log unreadable without SQL access                    | `/audit` console screen plus a filtered, keyset-paginated endpoint.                                                                                                                                                                                                                                                                                    |
-| 2026-08-02 | Settings editable only by hand (P-005)                     | Rules Engine screen with per-schema validation, history and audit in one transaction.                                                                                                                                                                                                                                                                  |
-| 2026-08-02 | Booking detail and timeline (§9.4)                         | Built. Payments section present only for `PAYMENT_READ` holders — absent, not redacted.                                                                                                                                                                                                                                                                |
-| 2026-08-02 | Auth token table and mail delivery                         | Shipped earlier; tracker entry closed.                                                                                                                                                                                                                                                                                                                 |
-| 2026-08-02 | Password reset, email verification, guest-booking claiming | Shipped earlier with 24 integration tests; tracker entries closed.                                                                                                                                                                                                                                                                                     |
+| Date       | Item                                                       | Resolution                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------- | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-02 | Staff 2FA enforced in the console but not the API          | `AuthService.login` demanded a TOTP code only if the account already had one enabled, so never enrolling was a way to opt out entirely — verified live: a `support_agent` with `totp_enabled_at IS NULL` read booking detail on a password alone. Closed by `StaffTwoFactorGuard`, with narrow exemptions for enrolment, `/auth/me` and public routes.                                                                                                                                                                                   |
+| 2026-08-02 | Production could store ID documents on local disk          | `StorageModule` fell back to `LocalDiskStorage` with only a warning. Now a boot-time refusal, matching the `SMTP_URL` guard.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 2026-08-02 | `settings_history` was mutable                             | Its siblings were append-only by trigger; it was not. Same trigger applied, with a regression test verified to fail when the trigger is dropped.                                                                                                                                                                                                                                                                                                                                                                                         |
+| 2026-08-02 | Booking timestamps rendered in the server's timezone       | `column::text` formats in the session timezone; correct only because the container is `Etc/UTC`. Now explicit `AT TIME ZONE 'UTC'`.                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 2026-08-02 | Audit log unreadable without SQL access                    | `/audit` console screen plus a filtered, keyset-paginated endpoint.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 2026-08-02 | Settings editable only by hand (P-005)                     | Rules Engine screen with per-schema validation, history and audit in one transaction.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| 2026-08-02 | Booking detail and timeline (§9.4)                         | Built. Payments section present only for `PAYMENT_READ` holders — absent, not redacted.                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 2026-08-02 | Auth token table and mail delivery                         | Shipped earlier; tracker entry closed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 2026-08-02 | Password reset, email verification, guest-booking claiming | Shipped earlier with 24 integration tests; tracker entries closed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 2026-08-04 | The listing review queue had NEVER loaded                  | `pendingPropertySchema` required a `status` field that `GET /admin/properties/pending` does not select, so `staffFetch` returned `'failed'` on every response and the queue showed "could not load this list" permanently. Silent — no log, no error. Fixed and covered by `apps/admin/src/lib/api.test.ts`, which asserts against a captured response and was verified to fail when `status` is reintroduced. See the trap in §8.                                                                                                       |
+| 2026-08-04 | The dashboard did not resemble the approved design         | Rebuilt from `SAFRA - موقع سفرة 29.07.html`: 220px sidebar with all eighteen §9.3 sections, KPI row, attention panel, latest bookings, revenue sparkline, partner queue, recent activity. Backed by a new `DashboardService` that answers the whole screen in one round trip. Unbuilt sections and Emergency Mode render disabled rather than as dead links.                                                                                                                                                                             |
+| 2026-08-04 | The console showed raw English identifiers in Arabic       | Booking statuses, staff roles and audit actions were rendered as `pending_confirmation`, `super_admin`, `auth.login_succeeded`. All three now map through `apps/admin/src/lib/strings.ts`, falling back to the raw key rather than blank.                                                                                                                                                                                                                                                                                                |
+| 2026-08-04 | Seeded partner named after a sanctioned individual         | `PAR-000002` renamed to `Sham Hospitality Farms` / `مزارع الشام للضيافة` by `UPDATE` — 3,148 bookings reference it, so deletion was not an option. The sanctions test fixtures keep the real designation deliberately: per ADR 0002 the residual EU Syria designations ARE those figures, and the name-folding rule exists to match them.                                                                                                                                                                                                |
+| 2026-08-04 | The console palette was eyeballed, and wrong               | Every colour in `apps/admin/src/app/globals.css` had been sampled from a screenshot before the handoff arrived: `--card` was `#15132a` against the specified `#17142F`, `--field` two shades too light, `--text` a neutral grey where the design uses a warm cream, and `--ok` / `--bad` / `--warn` / `--sky` were Tailwind defaults rather than SAFRA's. Individually invisible; together a different product. Replaced verbatim from handoff §9.1 and verified by reading computed styles in the browser rather than by looking at it. |
+| 2026-08-04 | The console used the wrong UI font                         | Cairo, chosen as a guess before the handoff. §4.1 specifies IBM Plex Sans Arabic, which every spacing value in the handoff was measured against. Swapped for the console; the customer app has NOT been — see §8a.                                                                                                                                                                                                                                                                                                                       |
+| 2026-08-04 | `text-good` / `bg-good` matched no token anywhere          | The colour token is `ok` in both the handoff and the customer app, but twelve console files and two customer files used `good`. Tailwind generates nothing for an undefined token, so those elements silently kept their inherited colour — including two success banners in the customer app. Renamed throughout.                                                                                                                                                                                                                       |
+| 2026-08-04 | `pending_confirmation` was rendered in gold                | The handoff makes it an explicit rule: pending confirmation is purple (`--pend`), never gold. Gold is SAFRA's affirmative accent, and a paid booking still waiting on a partner is not good news.                                                                                                                                                                                                                                                                                                                                        |
+| 2026-08-04 | 12 of the 19 console sections did not exist                | Built against the design handoff: bookings, customers, payments, wallet, gift cards, coupons, geography, reports and Emergency Mode from scratch; partner/property registries, staff and audit rebuilt. Backed by 12 new keyset-paginated endpoints, each behind its narrowest permission and verified live against the running database.                                                                                                                                                                                                |
+| 2026-08-04 | A client component was importing a server-only module      | `setting-row.tsx` reached the API client — session reading, access tokens — through a formatting helper in `lib/console.ts`. `next build` refused, correctly. Pure formatters moved to `lib/format.ts`, which imports nothing but strings and the locale constant. See the trap in §8.                                                                                                                                                                                                                                                   |
+| 2026-08-04 | The permission matrix filtered on a false belief           | It dropped "permissions no staff role holds", which can never happen: `SUPER_ADMIN` is `Object.values(PERMISSIONS)`. Dead code, found by a unit test written to confirm the filter and failing instead. Removed; the matrix now lists the full catalogue, which is also the more useful answer.                                                                                                                                                                                                                                          |

@@ -37,10 +37,11 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        // allowDefaultProject keeps root config files linted even though no
-        // tsconfig includes them.
+        // allowDefaultProject keeps root config files — and the shared test stubs
+        // under `test/`, which belong to no workspace package — linted even though
+        // no tsconfig includes them.
         projectService: {
-          allowDefaultProject: ['*.config.ts'],
+          allowDefaultProject: ['*.config.ts', 'test/*.ts'],
         },
         tsconfigRootDir: import.meta.dirname,
       },
