@@ -52,6 +52,15 @@ export const PERMISSIONS = {
   PARTNER_APPROVE: 'partner.approve',
   PARTNER_SUSPEND: 'partner.suspend',
   PARTNER_DOCUMENT_REVIEW: 'partner.document_review',
+  /**
+   * The COMMERCIAL contract between SAFRA and a partner — distinct from the documents the
+   * partner submits for verification.
+   *
+   * Split read from manage because the commission a contract sets is finance's business to see
+   * and operations' business to negotiate, and uploading one changes what SAFRA is owed.
+   */
+  PARTNER_CONTRACT_READ: 'partner_contract.read',
+  PARTNER_CONTRACT_MANAGE: 'partner_contract.manage',
   PROPERTY_READ: 'property.read',
   PROPERTY_MANAGE_OWN: 'property.manage_own',
   PROPERTY_APPROVE: 'property.approve',
@@ -69,6 +78,14 @@ export const PERMISSIONS = {
   MESSAGE_SEND: 'message.send',
   DISPUTE_READ: 'dispute.read',
   DISPUTE_MANAGE: 'dispute.manage',
+  /**
+   * Reading the WhatsApp/email delivery log.
+   *
+   * Separate from `MESSAGE_READ`: a delivery log says WHAT template went out and whether it
+   * arrived, while a conversation is the customer's own words. Finance legitimately needs to
+   * confirm an invoice email was delivered without being able to read the thread.
+   */
+  NOTIFICATION_READ: 'notification.read',
 
   // ── Platform ──────────────────────────────────────────────────────────────
   /** §3 P-005: commissions, SLA windows and fines are configuration, not code. */
@@ -135,6 +152,7 @@ const SUPPORT_AGENT: Permission[] = [
   P.MESSAGE_SEND,
   P.DISPUTE_READ,
   P.DISPUTE_MANAGE,
+  P.NOTIFICATION_READ,
   P.WALLET_READ,
   P.GIFT_CARD_READ,
 ];
@@ -161,7 +179,11 @@ const FINANCE_OFFICER: Permission[] = [
   P.GIFT_CARD_MANAGE,
   P.COUPON_READ,
   P.PARTNER_READ,
+  /* The commission terms are in the contract; reading them is finance's job. */
+  P.PARTNER_CONTRACT_READ,
   P.VIOLATION_READ,
+  /* Confirming an invoice email was delivered — without reading the conversation. */
+  P.NOTIFICATION_READ,
   P.REPORT_READ,
   P.AUDIT_LOG_READ,
 ];
@@ -185,6 +207,17 @@ const OPERATIONS_MANAGER: Permission[] = [
   P.MESSAGE_SEND,
   P.DISPUTE_READ,
   P.DISPUTE_MANAGE,
+  P.NOTIFICATION_READ,
+  P.PARTNER_CONTRACT_READ,
+  /**
+   * The design marks "رفع وتعديل عقود الشراكة" as ○ for operations — allowed WITH manager
+   * approval. There is no approval tier in the model, so this is a binary decision, and it is
+   * granted: an operations manager who has verified a partner is the person who then files the
+   * signed contract, and routing that through a super admin would make the queue depend on one
+   * person. Every upload is audit-logged with who did it, which is the accountability the ○ was
+   * reaching for. Recorded in docs/design-gap-report.md §6.
+   */
+  P.PARTNER_CONTRACT_MANAGE,
   P.COUPON_READ,
   P.COUPON_MANAGE,
   P.AD_READ,

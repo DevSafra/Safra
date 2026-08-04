@@ -349,3 +349,98 @@ CREATE INDEX IF NOT EXISTS sanctions_entries_name_trgm_idx
 CREATE INDEX IF NOT EXISTS sanctions_snapshots_current_idx
   ON sanctions_snapshots (source, completed_at DESC)
   WHERE completed_at IS NOT NULL;
+
+-- ----------------------------------------------------------------------------
+-- 8. Disputes, conversations, notifications and advertising (2026-08-04)
+-- ----------------------------------------------------------------------------
+--
+-- Added with the four console sections that read these tables. The enums and the
+-- reference sequences already existed — the vocabulary was designed months earlier —
+-- but nothing enforced the invariants the screens now depend on.
+
+-- A dispute closed with no stated outcome is unauditable, and this is the record a
+-- customer, a partner or an insurer asks to see. `resolved` and `rejected` are the
+-- two terminal states, so both require the prose and the timestamp.
+SELECT add_constraint_if_missing('disputes', 'disputes_closed_needs_resolution', $def$
+  CHECK (
+    status NOT IN ('resolved', 'rejected')
+    OR (resolution IS NOT NULL AND closed_at IS NOT NULL)
+  )
+$def$);
+
+-- Compensation is an amount AND a currency or neither. A bare number is not money:
+-- 10 in SYP and 10 in USD differ by four orders of magnitude, and the wallet credit
+-- that follows would be wrong by that factor.
+SELECT add_constraint_if_missing('disputes', 'disputes_compensation_needs_currency', $def$
+  CHECK (
+    (compensation_amount IS NULL AND compensation_currency_id IS NULL)
+    OR (compensation_amount IS NOT NULL AND compensation_currency_id IS NOT NULL)
+  )
+$def$);
+
+SELECT add_constraint_if_missing('disputes', 'disputes_compensation_non_negative',
+  'CHECK (compensation_amount IS NULL OR compensation_amount >= 0)');
+
+-- A conversation must be ABOUT exactly one thing, or it cannot be routed to anybody.
+-- The booking, dispute and partner columns are mutually exclusive rather than merely
+-- "at least one": a thread attached to both a booking and an unrelated partner would
+-- appear in two inboxes with two different sets of participants.
+SELECT add_constraint_if_missing('conversations', 'conversations_exactly_one_subject', $def$
+  CHECK (
+    (booking_id IS NOT NULL)::int
+    + (dispute_id IS NOT NULL)::int
+    + (partner_id IS NOT NULL)::int = 1
+  )
+$def$);
+
+SELECT add_constraint_if_missing('conversations', 'conversations_unread_non_negative',
+  'CHECK (unread_for_staff >= 0)');
+
+-- Messages are append-only.
+--
+-- A thread is consulted precisely when a dispute turns on what somebody promised, so a
+-- message that can be edited afterwards makes the whole record worthless. This is also
+-- what makes the contact-detail redaction meaningful: the redacted body cannot later be
+-- rewritten to restore the phone number that was removed on the way in.
+DROP TRIGGER IF EXISTS messages_immutable ON messages;
+CREATE TRIGGER messages_immutable BEFORE UPDATE OR DELETE ON messages
+  FOR EACH ROW EXECUTE FUNCTION deny_mutation();
+
+SELECT add_constraint_if_missing('messages', 'messages_redacted_count_non_negative',
+  'CHECK (redacted_count >= 0)');
+
+-- Notification counters and window.
+SELECT add_constraint_if_missing('notifications', 'notifications_attempts_non_negative',
+  'CHECK (attempts >= 0)');
+SELECT add_constraint_if_missing('notifications', 'notifications_locale_supported',
+  $def$CHECK (locale IN ('ar', 'en', 'de'))$def$);
+
+-- A campaign that ends before it starts would be billed for negative time.
+SELECT add_constraint_if_missing('ad_campaigns', 'ad_campaigns_window_ordered',
+  'CHECK (ends_at > starts_at)');
+SELECT add_constraint_if_missing('ad_campaigns', 'ad_campaigns_counters_non_negative',
+  'CHECK (impressions >= 0 AND clicks >= 0)');
+-- Clicks cannot exceed impressions: a click without a view means the counters are
+-- being written from two places that disagree, which is worth failing on.
+SELECT add_constraint_if_missing('ad_campaigns', 'ad_campaigns_clicks_within_impressions',
+  'CHECK (clicks <= impressions)');
+SELECT add_constraint_if_missing('ad_campaigns', 'ad_campaigns_price_needs_currency', $def$
+  CHECK (
+    (price_amount IS NULL AND price_currency_id IS NULL)
+    OR (price_amount IS NOT NULL AND price_currency_id IS NOT NULL)
+  )
+$def$);
+
+-- A contract file must have a size, and PDF only — the handoff says PDF ≤ 10MB. The
+-- ceiling is enforced at the upload boundary too; this is the backstop for every other
+-- writer, and 10MB is 10 * 1024 * 1024.
+SELECT add_constraint_if_missing('partner_contracts', 'partner_contracts_pdf_within_limit', $def$
+  CHECK (content_type = 'application/pdf' AND size_bytes > 0 AND size_bytes <= 10485760)
+$def$);
+
+-- Only one ACTIVE contract of a given kind per partner. Replacing supersedes rather
+-- than overwrites, so without this a botched replacement leaves two live contracts and
+-- no way to say which commission applies.
+CREATE UNIQUE INDEX IF NOT EXISTS partner_contracts_one_active_per_kind
+  ON partner_contracts (partner_id, kind)
+  WHERE status = 'active' AND deleted_at IS NULL;

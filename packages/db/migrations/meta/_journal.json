@@ -120,6 +120,13 @@
       "when": 1785680826776,
       "tag": "0016_outgoing_ricochet",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785844766255,
+      "tag": "0017_long_absorbing_man",
+      "breakpoints": true
     }
   ]
 }

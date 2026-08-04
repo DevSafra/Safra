@@ -20,6 +20,10 @@ CREATE SEQUENCE IF NOT EXISTS payment_reference_seq   START 1;
 CREATE SEQUENCE IF NOT EXISTS gift_card_reference_seq START 1;
 CREATE SEQUENCE IF NOT EXISTS dispute_reference_seq   START 1;
 CREATE SEQUENCE IF NOT EXISTS ad_reference_seq        START 1;
+-- Added 2026-08-04 with the conversation and advertiser tables. `IF NOT EXISTS` means this
+-- file stays idempotent and can be re-applied to an existing database.
+CREATE SEQUENCE IF NOT EXISTS conversation_reference_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS advertiser_reference_seq   START 1;
 
 -- Booking references are BKG-<year>-NNNNNN, so the counter restarts each January.
 CREATE OR REPLACE FUNCTION reset_booking_sequence_yearly() RETURNS void AS $$

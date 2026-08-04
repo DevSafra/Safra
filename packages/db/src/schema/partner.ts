@@ -4,6 +4,7 @@ import {
   index,
   integer,
   jsonb,
+  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -144,6 +145,80 @@ export const partnerDocuments = pgTable(
     ...timestamps,
   },
   (t) => [index('partner_documents_partner_status_idx').on(t.partnerId, t.status)],
+);
+
+/**
+ * The signed commercial contract between SAFRA and a partner (design handoff §8.1).
+ *
+ * ## Why this is not a `partner_documents` row
+ *
+ * `partner_documents` holds what the PARTNER submits to be verified — an ID, a commercial
+ * register, an ownership proof — and each one carries a verification decision. A contract is
+ * the opposite direction: SAFRA drafts it, both sides sign it, and it governs the commercial
+ * relationship. It has an expiry that drives a renewal reminder, a kind that changes what it
+ * supersedes, and no "approve/reject" because nobody reviews SAFRA's own contract.
+ *
+ * Forcing both into one table would mean a `status` column meaning two different things.
+ *
+ * ## Superseded, never replaced
+ *
+ * The design's action is "استبدال" — replace. That inserts a NEW row and marks the previous one
+ * superseded; the file is never overwritten. Which terms were in force on the day of a
+ * disputed booking is a question that gets asked, and an in-place replacement destroys the
+ * only record that can answer it.
+ */
+export const partnerContractKind = pgEnum('partner_contract_kind', [
+  /** عقد شراكة أساسي — the base partnership agreement. */
+  'base',
+  /** ملحق تعديل عمولة — an annex changing the commission. */
+  'commission_annex',
+  /** تجديد سنوي — an annual renewal. */
+  'renewal',
+]);
+
+export const partnerContractStatus = pgEnum('partner_contract_status', [
+  'awaiting_partner_signature',
+  'active',
+  'superseded',
+  'terminated',
+]);
+
+export const partnerContracts = pgTable(
+  'partner_contracts',
+  {
+    id: primaryId(),
+    partnerId: foreignId('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    kind: partnerContractKind('kind').notNull(),
+    status: partnerContractStatus('status')
+      .notNull()
+      .default('awaiting_partner_signature'),
+
+    /** Object-storage key, same abstraction as partner documents. PDF only, ≤ 10MB. */
+    fileKey: text('file_key').notNull(),
+    fileName: text('file_name').notNull(),
+    contentType: text('content_type').notNull().default('application/pdf'),
+    sizeBytes: integer('size_bytes').notNull(),
+
+    /** Always a staff member: a partner cannot upload SAFRA's contract. */
+    uploadedByUserId: foreignId('uploaded_by_user_id')
+      .notNull()
+      .references(() => users.id),
+
+    signedAt: timestamp('signed_at', { withTimezone: true }),
+    /** Drives the design's "ينتهي خلال 41 يوماً" warning. */
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    /** Which row replaced this one, when it was superseded. */
+    supersededByContractId: foreignId('superseded_by_contract_id'),
+
+    ...timestamps,
+  },
+  (t) => [
+    index('partner_contracts_partner_idx').on(t.partnerId, t.status),
+    /** The renewal sweep: active contracts by expiry. */
+    index('partner_contracts_expiry_idx').on(t.status, t.expiresAt),
+  ],
 );
 
 /**
