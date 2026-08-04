@@ -22,6 +22,11 @@ import { GeoService } from './geo.service.js';
 import { ReportsService } from './reports.service.js';
 import { StaffOverviewService } from './staff-overview.service.js';
 import { EmergencyService } from './emergency.service.js';
+import { CommsController } from './comms.controller.js';
+import { DisputeService } from './dispute.service.js';
+import { MessagingService } from './messaging.service.js';
+import { AdvertisingService } from './advertising.service.js';
+import { PartnerContractService } from './partner-contract.service.js';
 
 @Module({
   // StaffService needs AuthTokenService, MailService, PasswordService and
@@ -30,6 +35,7 @@ import { EmergencyService } from './emergency.service.js';
   controllers: [
     AdminController,
     RegistriesController,
+    CommsController,
     CityImagesController,
     AdminGrantsController,
     AdminOperationsController,
@@ -54,6 +60,11 @@ import { EmergencyService } from './emergency.service.js';
     ReportsService,
     StaffOverviewService,
     EmergencyService,
+    // §8's customer-facing and commercial domains — see CommsController.
+    DisputeService,
+    MessagingService,
+    AdvertisingService,
+    PartnerContractService,
   ],
   exports: [ReviewService],
 })

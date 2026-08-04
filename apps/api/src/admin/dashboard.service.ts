@@ -32,11 +32,12 @@ export class DashboardService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   async overview() {
-    const [counters, revenue, bookings, audit] = await Promise.all([
+    const [counters, revenue, bookings, audit, openDisputes] = await Promise.all([
       this.counters(),
       this.revenueSeries(),
       this.recentBookings(),
       this.recentAudit(),
+      this.openDisputes(),
     ]);
 
     return {
@@ -44,12 +45,31 @@ export class DashboardService {
       revenue,
       recentBookings: bookings,
       recentAudit: audit,
-      /**
-       * Explicitly absent, not zero. Disputes are not implemented; the console shows a
-       * dash and a note rather than a number nobody should trust.
-       */
-      openDisputes: null,
+      openDisputes,
     };
+  }
+
+  /**
+   * Open disputes, and the age of the oldest.
+   *
+   * ## This used to return null, on purpose
+   *
+   * For months there was no `disputes` table, and this field was hard-coded `null` so the card
+   * could render a dash and say "the feature does not exist" — because a confident `0` next to
+   * "نزاعات مفتوحة" would have been read as "nothing to worry about" by somebody whose job is to
+   * worry about exactly that.
+   *
+   * The table landed on 2026-08-04, so it now returns the real count. The nullable TYPE stays:
+   * `null` still means "cannot be determined", which is a different statement from zero and is
+   * what the client renders differently.
+   */
+  private async openDisputes(): Promise<number> {
+    const result = await this.db.execute<{ n: string }>(sql`
+      SELECT count(*)::text AS n FROM disputes
+      WHERE status IN ('open', 'investigating') AND deleted_at IS NULL
+    `);
+
+    return Number(result.rows[0]?.n ?? 0);
   }
 
   /**
