@@ -133,8 +133,21 @@ export class JsonLogger implements LoggerService {
       const id = request?.requestId ? ` [${request.requestId.slice(0, 8)}]` : '';
       const where = context ? ` [${context}]` : '';
 
+      /**
+       * Serialised, not `String(...)`.
+       *
+       * Nest hands an exception object to `ExceptionsHandler`, and `String(object)` is
+       * "[object Object]" — which is what the log said while a 500 was being diagnosed,
+       * making the one line that held the cause useless. Errors are already unwrapped by
+       * `redact`; anything else is JSON.
+       */
+      const text =
+        typeof entry['message'] === 'string'
+          ? entry['message']
+          : safeStringify(entry['message']);
+
       stream.write(
-        `${level.toUpperCase().padEnd(5)}${where}${id} ${String(entry['message'])}` +
+        `${level.toUpperCase().padEnd(5)}${where}${id} ${text}` +
           `${extras.length > 0 ? ` ${safeStringify(extras)}` : ''}\n`,
       );
       return;

@@ -15,6 +15,7 @@ import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { DashboardService } from './dashboard.service.js';
 import { ReviewService } from './review.service.js';
 import { EU_SOURCE, SanctionsService } from '../sanctions/sanctions.service.js';
 import { parseEuSanctionsXml } from '../sanctions/eu-list.parser.js';
@@ -31,6 +32,7 @@ import { parseEuSanctionsXml } from '../sanctions/eu-list.parser.js';
 export class AdminController {
   constructor(
     private readonly review: ReviewService,
+    private readonly dashboard: DashboardService,
     private readonly sanctions: SanctionsService,
   ) {}
 
@@ -39,6 +41,19 @@ export class AdminController {
   @RequirePermissions(P.BOOKING_READ_ALL)
   async attention() {
     return this.review.attentionCounts();
+  }
+
+  /**
+   * Everything the dashboard renders, in one round trip.
+   *
+   * `BOOKING_READ_ALL` matches `attention` above: the payload is counters and the five
+   * most recent bookings, which every staff role that can see the dashboard can already
+   * see individually.
+   */
+  @Get('dashboard')
+  @RequirePermissions(P.BOOKING_READ_ALL)
+  async dashboardOverview() {
+    return this.dashboard.overview();
   }
 
   @Get('properties/pending')

@@ -5,6 +5,7 @@ import { AdminGrantsController, AdminGrantsService } from './grants.controller.j
 import { AdminController } from './admin.controller.js';
 import { CityImagesController } from './city-images.controller.js';
 import { AuditLogService } from './audit-log.service.js';
+import { DashboardService } from './dashboard.service.js';
 import { BookingDetailService } from './booking-detail.service.js';
 import { AdminOperationsController } from './operations.controller.js';
 import { ReviewService } from './review.service.js';
@@ -12,6 +13,15 @@ import { StaffController, StaffInvitationController } from './staff.controller.j
 import { StaffService } from './staff.service.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { SettingsAdminService } from '../settings/settings-admin.service.js';
+import { RegistriesController } from './registries.controller.js';
+import { BookingListService } from './booking-list.service.js';
+import { RegistryService } from './registry.service.js';
+import { FinanceService } from './finance.service.js';
+import { PromotionsService } from './promotions.service.js';
+import { GeoService } from './geo.service.js';
+import { ReportsService } from './reports.service.js';
+import { StaffOverviewService } from './staff-overview.service.js';
+import { EmergencyService } from './emergency.service.js';
 
 @Module({
   // StaffService needs AuthTokenService, MailService, PasswordService and
@@ -19,6 +29,7 @@ import { SettingsAdminService } from '../settings/settings-admin.service.js';
   imports: [AuthModule],
   controllers: [
     AdminController,
+    RegistriesController,
     CityImagesController,
     AdminGrantsController,
     AdminOperationsController,
@@ -29,10 +40,20 @@ import { SettingsAdminService } from '../settings/settings-admin.service.js';
     ReviewService,
     AdminGrantsService,
     AuditLogService,
+    DashboardService,
     BookingDetailService,
     SettingsAdminService,
     AuditService,
     StaffService,
+    // The §8 registry, finance and operations reads — see RegistriesController.
+    BookingListService,
+    RegistryService,
+    FinanceService,
+    PromotionsService,
+    GeoService,
+    ReportsService,
+    StaffOverviewService,
+    EmergencyService,
   ],
   exports: [ReviewService],
 })
