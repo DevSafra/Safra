@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { AR } from '@/lib/strings';
+
 /**
  * Sign out.
  *
@@ -37,7 +39,7 @@ export function SignOutButton() {
       disabled={busy}
       className="rounded-lg border border-line px-4 py-2 text-sm text-muted transition-colors hover:border-gold/50 hover:text-text disabled:opacity-60"
     >
-      {busy ? 'Signing out…' : 'Sign out'}
+      {busy ? AR.dashboard.signingOut : AR.dashboard.signOut}
     </button>
   );
 }

@@ -1,6 +1,7 @@
 import { safeRedirect } from '@safra/session';
 
 import { StaffLoginForm } from '@/components/staff-login-form';
+import { AR } from '@/lib/strings';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,8 +28,8 @@ export default async function LoginPage({
         <p className="text-3xl text-gold" aria-hidden>
           ۞
         </p>
-        <h1 className="mt-3 text-2xl font-semibold text-text">Command Center</h1>
-        <p className="mt-1 text-sm text-muted">SAFRA staff access only.</p>
+        <h1 className="mt-3 text-2xl font-semibold text-text">{AR.login.title}</h1>
+        <p className="mt-1 text-sm text-muted">{AR.login.subtitle}</p>
 
         <div className="mt-8 rounded-xl border border-line bg-card p-6">
           <StaffLoginForm next={next === '/' ? '/' : next} />

@@ -1,20 +1,42 @@
-import Link from 'next/link';
-
-import { getAuditActions, getAuditLog } from '@/lib/api';
+import { getAuditActions, getAuditLog, type AuditEntry } from '@/lib/api';
+import { sidebarCounts } from '@/lib/console';
+import { clock, shortDate } from '@/lib/format';
+import { ConsolePanel, ConsoleShell, Pager } from '@/components/console-shell';
+import { AdminTable, Ltr, type AdminColumn } from '@/components/admin-table';
+import { TableToolbar } from '@/components/table-toolbar';
+import { AR, auditAction, roleName } from '@/lib/strings';
 
 /**
- * The audit trail (SRS §15, §9.3, roadmap item 65).
+ * سجل التدقيق (SRS §15, design handoff §8).
  *
- * Written since the first endpoint shipped and readable only with SQL access until
- * now — which meant the record designed to answer "who did this" was reachable only
- * by the people least likely to be its subject.
+ * ## Append-only, and the screen says so
  *
- * Filtered rather than searched, and every filter maps onto an existing index. The
- * obvious next request is free-text over the before/after payloads; that is
- * deliberately absent, because an unindexed jsonb scan over a table that only grows
- * would become the slowest query in the system.
+ * The design leads with a red "غير قابل للحذف" badge, and it is not decoration: `audit_log`
+ * rejects UPDATE and DELETE by database trigger, so even a compromised admin session cannot edit
+ * history. Telling the operator that is what makes the log worth consulting — a record that might
+ * have been tampered with answers nothing.
+ *
+ * ## Filtered, not free-text searched
+ *
+ * Every filter maps onto an existing index: action prefix and actor email. The obvious next
+ * request is free text over the `before`/`after` payloads, and it is deliberately absent — those
+ * columns hold redacted jsonb, an unindexed scan over a table that only grows would become the
+ * slowest query in the system, and the honest way to find "the change that set the fee to 1.99"
+ * is to filter by action and read.
+ *
+ * So the design's single search box is an ACTOR filter plus an action select. Recorded as a
+ * documented deviation in `docs/design-gap-report.md`.
+ *
+ * ## `before`/`after` are shown verbatim
+ *
+ * A summary would lose the one detail the question usually turns on: which value, exactly,
+ * changed to what. Rendered under the action rather than in its own column, so the row only grows
+ * for the entries that carry a payload.
  */
 export const dynamic = 'force-dynamic';
+
+/** The design's `grid-template-columns`, verbatim. */
+const TEMPLATE = '.7fr 1fr 2fr 1fr .9fr';
 
 export default async function AuditPage({
   searchParams,
@@ -22,156 +44,150 @@ export default async function AuditPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const query = await searchParams;
+  const first = (key: string): string | undefined => {
+    const raw = query[key];
+    const value = Array.isArray(raw) ? raw[0] : raw;
 
-  const action = first(query['action']);
-  const actorEmail = first(query['actorEmail']);
-  const cursor = first(query['cursor']);
+    return value?.trim() || undefined;
+  };
 
-  const [page, actionList] = await Promise.all([
-    getAuditLog({ action, actorEmail, cursor, limit: '50' }),
+  const action = first('action');
+  const q = first('q');
+  const cursor = first('cursor');
+
+  const [page, actionList, counts] = await Promise.all([
+    getAuditLog({ action, actorEmail: q, cursor, limit: '50' }),
     getAuditActions(),
+    sidebarCounts(),
   ]);
 
-  if (page === 'unauthenticated') {
-    return (
-      <Shell>
-        <p className="text-sm text-muted">
-          Your session expired, or this account cannot read the audit log.
-        </p>
-      </Shell>
-    );
-  }
+  const actions =
+    actionList === 'failed' || actionList === 'unauthenticated' ? [] : actionList.actions;
 
   return (
-    <Shell>
-      <header>
-        <h1 className="text-2xl font-semibold text-text">Audit log</h1>
-        <p className="mt-1 text-sm text-muted">
-          Every recorded action, newest first. Append-only — nothing here can be edited or
-          removed, including by this console.
-        </p>
-      </header>
+    <ConsoleShell title={AR.nav.audit} counts={counts}>
+      <ConsolePanel>
+        <div className="mb-3 flex flex-wrap items-center gap-2.5">
+          {/* The immutability badge, in the design's exact treatment. */}
+          <span className="rounded-full border border-[rgba(var(--badA),0.4)] bg-[rgba(var(--badA),0.12)] px-3 py-0.5 text-[10.5px] font-extrabold text-bad">
+            {AR.sections.audit.immutable}
+          </span>
+          <span className="text-xs text-faint">{AR.sections.audit.hint}</span>
+        </div>
 
-      {/*
-        A GET form, so a filtered view is a shareable URL. An investigation is
-        collaborative: "look at this" should be a link, not a description of which
-        dropdowns to set.
-      */}
-      <form method="get" className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-        <label className="grid gap-1">
-          <span className="text-xs text-muted">Action</span>
+        <TableToolbar
+          action="/audit"
+          query={q}
+          placeholder={AR.sections.audit.searchPlaceholder}
+        >
           <select
             name="action"
             defaultValue={action ?? ''}
-            className="rounded-lg border border-line bg-field px-3 py-2 text-sm text-text"
+            aria-label={AR.sections.audit.colAction}
+            className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
           >
-            <option value="">All actions</option>
-            {actionList !== 'failed' && actionList !== 'unauthenticated'
-              ? actionList.actions.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))
-              : null}
-          </select>
-        </label>
-
-        <label className="grid gap-1">
-          <span className="text-xs text-muted">Actor email</span>
-          <input
-            name="actorEmail"
-            type="email"
-            defaultValue={actorEmail ?? ''}
-            placeholder="anyone"
-            className="rounded-lg border border-line bg-field px-3 py-2 text-sm text-text"
-          />
-        </label>
-
-        <button
-          type="submit"
-          className="self-end rounded-lg border border-line px-4 py-2 text-sm text-muted hover:border-gold/50 hover:text-gold"
-        >
-          Filter
-        </button>
-      </form>
-
-      {page === 'failed' ? (
-        <p className="text-sm text-bad">Could not load the audit log.</p>
-      ) : page.items.length === 0 ? (
-        <p className="rounded-lg border border-line bg-card p-4 text-sm text-faint">
-          Nothing matches those filters.
-        </p>
-      ) : (
-        <>
-          <ul className="grid gap-2">
-            {page.items.map((entry) => (
-              <li
-                key={entry.id}
-                className="rounded-lg border border-line bg-card px-4 py-3"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="text-sm text-text">
-                    {entry.action.replace(/[._]/g, ' ')}
-                  </span>
-                  <span className="text-xs text-faint">
-                    {entry.createdAt.slice(0, 19).replace('T', ' ')} UTC
-                  </span>
-                </div>
-
-                <p className="mt-0.5 text-xs text-muted">
-                  {entry.actorEmail ?? 'system'}
-                  {entry.actorRole
-                    ? ` (${entry.actorRole.replace(/_/g, ' ')})`
-                    : ''} · {entry.subjectType}
-                  {entry.ipAddress ? ` · ${entry.ipAddress}` : ''}
-                </p>
-
-                {entry.reason ? (
-                  <p className="mt-1 text-xs text-muted">“{entry.reason}”</p>
-                ) : null}
-
-                {/*
-                  Before and after verbatim. A summary would lose the one detail the
-                  question usually turns on — which value, exactly, changed to what.
-                */}
-                {entry.before || entry.after ? (
-                  <pre className="mt-2 overflow-x-auto rounded border border-line bg-field p-2 text-xs text-faint">
-                    {JSON.stringify({ before: entry.before, after: entry.after })}
-                  </pre>
-                ) : null}
-              </li>
+            <option value="">{AR.sections.bookings.allStatuses}</option>
+            {actions.map((value) => (
+              <option key={value} value={value}>
+                {auditAction(value)}
+              </option>
             ))}
-          </ul>
+          </select>
+        </TableToolbar>
 
-          {page.nextCursor ? (
-            <Link
-              href={`/audit?${new URLSearchParams({
-                ...(action ? { action } : {}),
-                ...(actorEmail ? { actorEmail } : {}),
-                cursor: page.nextCursor,
-              }).toString()}`}
-              className="justify-self-start rounded-lg border border-line px-4 py-2 text-sm text-muted hover:border-gold/50 hover:text-gold"
-            >
-              Older entries →
-            </Link>
-          ) : null}
-        </>
-      )}
-    </Shell>
+        {page === 'unauthenticated' ? (
+          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+        ) : page === 'failed' ? (
+          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+        ) : (
+          <>
+            <AdminTable
+              columns={COLUMNS}
+              rows={page.items}
+              template={TEMPLATE}
+              rowKey={(row) => row.id}
+              minWidth={800}
+              empty={AR.table.empty}
+            />
+            <Pager basePath="/audit" query={{ q, action }} nextCursor={page.nextCursor} />
+          </>
+        )}
+      </ConsolePanel>
+    </ConsoleShell>
   );
 }
 
-function first(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
+const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
+  {
+    key: 'time',
+    header: AR.table.colTime,
+    /*
+      Clock above date. The log is read newest-first within a day, so the time distinguishes
+      adjacent rows and the date is context — the design shows only the clock, which works for
+      four demo rows and not for fifty spanning a week.
+    */
+    render: (row) => (
+      <div className="grid gap-0.5">
+        <Ltr className="text-sky">{clock(row.createdAt)}</Ltr>
+        <Ltr className="text-[10px] text-faint">{shortDate(row.createdAt)}</Ltr>
+      </div>
+    ),
+  },
+  {
+    key: 'actor',
+    header: AR.sections.audit.colStaff,
+    /* A null actor means the platform acted on its own — an expiry, a scheduled job. */
+    render: (row) => (
+      <div className="grid gap-0.5">
+        <span className="break-all text-text">
+          {row.actorEmail ?? AR.admin.systemActor}
+        </span>
+        {row.actorRole ? (
+          <span className="text-[10px] text-faint">{roleName(row.actorRole)}</span>
+        ) : null}
+      </div>
+    ),
+  },
+  {
+    key: 'action',
+    header: AR.sections.audit.colAction,
+    render: (row) => (
+      <div className="grid gap-0.5">
+        <span className="text-text2">{auditAction(row.action)}</span>
 
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="mx-auto max-w-4xl px-4 py-10">
-      <Link href="/" className="text-sm text-muted hover:text-gold">
-        ← Queues
-      </Link>
-      <div className="mt-4 grid gap-6">{children}</div>
-    </main>
-  );
-}
+        {row.reason ? (
+          <span className="text-[10.5px] leading-relaxed text-faint">{row.reason}</span>
+        ) : null}
+
+        {/* Verbatim payload — see the module note on why it is not summarised. */}
+        {row.before !== null || row.after !== null ? (
+          <pre className="mt-1 overflow-x-auto rounded border border-line bg-field p-1.5 text-[10px] text-faint">
+            {JSON.stringify({ before: row.before, after: row.after })}
+          </pre>
+        ) : null}
+      </div>
+    ),
+  },
+  {
+    key: 'entity',
+    header: AR.sections.audit.colEntity,
+    /*
+      Subject type plus a truncated id. A bare uuid says nothing; the type beside it turns an
+      opaque key into something an operator can act on, and eight characters is enough to match
+      against a full id they already hold.
+    */
+    render: (row) => (
+      <div className="grid gap-0.5">
+        <span className="text-[11px] text-faint">{row.subjectType}</span>
+        {row.subjectId ? (
+          <Ltr className="text-[10.5px] text-sky">{row.subjectId.slice(0, 8)}</Ltr>
+        ) : null}
+      </div>
+    ),
+  },
+  {
+    key: 'ip',
+    header: AR.sections.audit.colIp,
+    render: (row) => <Ltr className="text-muted">{row.ipAddress ?? AR.admin.noData}</Ltr>,
+  },
+];

@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 
 import { PasswordField } from '@safra/ui';
 
+import { AR, apiError } from '@/lib/strings';
+
 /** A six-digit authenticator code, as opposed to a recovery code. */
 const TOTP_PATTERN = /^\d{6}$/;
 
@@ -137,7 +139,7 @@ export function StaffLoginForm({ next }: { next: string }) {
       setError(describe(payload, status));
       setSubmitting(false);
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(AR.errors.unreachable);
       setSubmitting(false);
     }
   }
@@ -174,7 +176,7 @@ export function StaffLoginForm({ next }: { next: string }) {
       setError(describe(payload, status));
       setSubmitting(false);
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(AR.errors.unreachable);
       setSubmitting(false);
     }
   }
@@ -211,13 +213,13 @@ export function StaffLoginForm({ next }: { next: string }) {
           className="grid gap-4"
         >
           <p className="text-sm text-muted">
-            Signing in as <span className="text-text">{email.trim()}</span>
+            {AR.login.signingInAs} <span className="text-text">{email.trim()}</span>
           </p>
 
           <Field
             ref={codeInput}
             name="code"
-            label="Authenticator code"
+            label={AR.login.code}
             value={code}
             onChange={(event) => setCode(event.target.value)}
             inputMode="numeric"
@@ -228,7 +230,7 @@ export function StaffLoginForm({ next }: { next: string }) {
              */
             autoComplete="one-time-code"
             required
-            hint="Enter the code from your two-factor authenticator app. If you've lost your device, you can enter one of your recovery codes."
+            hint={AR.login.codeHint}
           />
 
           <button
@@ -236,7 +238,7 @@ export function StaffLoginForm({ next }: { next: string }) {
             disabled={submitting}
             className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? 'Verifying…' : 'Verify code'}
+            {submitting ? AR.login.submittingCode : AR.login.submitCode}
           </button>
 
           {/* A way back, because the alternative is reloading the page. */}
@@ -245,7 +247,7 @@ export function StaffLoginForm({ next }: { next: string }) {
             onClick={startOver}
             className="cursor-pointer text-sm text-muted underline-offset-4 hover:text-gold hover:underline"
           >
-            Use a different account
+            {AR.login.useDifferentAccount}
           </button>
         </form>
       ) : (
@@ -258,7 +260,7 @@ export function StaffLoginForm({ next }: { next: string }) {
           <Field
             name="email"
             type="email"
-            label="Email"
+            label={AR.login.email}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="username"
@@ -266,7 +268,9 @@ export function StaffLoginForm({ next }: { next: string }) {
           />
           <PasswordField
             name="password"
-            label="Password"
+            label={AR.login.password}
+            showLabel={AR.login.showPassword}
+            hideLabel={AR.login.hidePassword}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="current-password"
@@ -278,7 +282,7 @@ export function StaffLoginForm({ next }: { next: string }) {
             disabled={submitting}
             className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? 'Checking…' : 'Sign in'}
+            {submitting ? AR.login.submittingCredentials : AR.login.submitCredentials}
           </button>
         </form>
       )}
@@ -318,26 +322,26 @@ function describe(body: unknown, status: number): string {
     /**
      * By the time this runs the two-step flow has already handled "code required", so
      * a 401 here is either bad credentials at step one or a bad code at step two. The
-     * API's message distinguishes them and both are safe to show: a wrong code is only
-     * reachable once the password was accepted.
+     * API distinguishes them in English; `apiError` maps that onto Arabic rather than
+     * putting a server string in the middle of an Arabic screen.
      */
     const message = messageOf(body);
 
     return message && /authenticator|recovery|code/i.test(message)
-      ? message
-      : 'That email or password was not accepted.';
+      ? apiError(message)
+      : AR.errors.credentials;
   }
 
   if (status === 400) {
     // Almost always a malformed recovery code, since the code field accepts both shapes.
-    return 'That code was not in a recognised format. Enter six digits, or a recovery code.';
+    return AR.errors.codeFormat;
   }
 
-  if (status === 403) return 'This account does not have access to the command center.';
-  if (status === 423) return 'This account is temporarily locked. Try again shortly.';
-  if (status === 429) return 'Too many attempts. Wait a minute and try again.';
+  if (status === 403) return AR.errors.notStaff;
+  if (status === 423) return AR.errors.locked;
+  if (status === 429) return AR.errors.tooMany;
 
-  return messageOf(body) ?? 'Something went wrong. Please try again.';
+  return apiError(messageOf(body));
 }
 
 function messageOf(body: unknown): string | null {

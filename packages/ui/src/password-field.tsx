@@ -20,6 +20,15 @@ export interface PasswordFieldProps extends Omit<
    */
   readonly showRequiredMark?: boolean;
   readonly ref?: React.Ref<HTMLInputElement>;
+  /**
+   * Accessible labels for the toggle, so a localised app can pass its own.
+   *
+   * Defaulted to English rather than left required: the customer app renders in three
+   * languages and the staff console in Arabic, and a component that forced every caller
+   * to supply both strings would get English hardcoded at each call site anyway.
+   */
+  readonly showLabel?: string;
+  readonly hideLabel?: string;
 }
 
 /**
@@ -52,6 +61,8 @@ export function PasswordField({
   hint,
   error,
   showRequiredMark,
+  showLabel = 'Show password',
+  hideLabel = 'Hide password',
   ref,
   ...rest
 }: PasswordFieldProps) {
@@ -90,10 +101,12 @@ export function PasswordField({
           aria-invalid={error ? 'true' : undefined}
           aria-describedby={describedBy || undefined}
           /**
-           * `pr-11` leaves room for the button so a long value does not run underneath
-           * it. Everything else matches the plain inputs around it.
+           * `pe-11` — padding-inline-end, not `pr-11`. The staff console renders
+           * right-to-left, where the reading direction reverses: a physical `right`
+           * would put the toggle over the START of the text in Arabic. Logical
+           * properties place it after the value in both directions.
            */
-          className={`w-full rounded-lg border bg-field px-3 py-2.5 pr-11 text-text ${
+          className={`w-full rounded-lg border bg-field px-3 py-2.5 pe-11 text-text ${
             error ? 'border-bad' : 'border-line'
           }`}
           {...rest}
@@ -103,10 +116,11 @@ export function PasswordField({
           type="button"
           onClick={() => setRevealed((shown) => !shown)}
           aria-pressed={revealed}
-          aria-label={revealed ? 'Hide password' : 'Show password'}
-          title={revealed ? 'Hide password' : 'Show password'}
+          aria-label={revealed ? hideLabel : showLabel}
+          title={revealed ? hideLabel : showLabel}
           tabIndex={-1}
-          className="absolute inset-y-0 right-0 grid w-11 cursor-pointer place-items-center text-muted transition-colors hover:text-gold"
+          // `end-0` rather than `right-0`, for the same reason as `pe-11` above.
+          className="absolute inset-y-0 end-0 grid w-11 cursor-pointer place-items-center text-muted transition-colors hover:text-gold"
         >
           {revealed ? <EyeOff /> : <Eye />}
         </button>

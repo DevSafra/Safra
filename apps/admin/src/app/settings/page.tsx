@@ -1,63 +1,71 @@
-import Link from 'next/link';
-
 import { getSettings, type EditableSetting } from '@/lib/api';
+import { sidebarCounts } from '@/lib/console';
+import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { FootNote } from '@/components/admin-table';
 import { SettingRow } from '@/components/setting-row';
+import { AR } from '@/lib/strings';
 
 /**
- * The Rules Engine (SRS §9.3, P-005).
+ * الإعدادات — the Rules Engine (SRS §9.3, P-005, design handoff §8).
  *
- * P-005 requires commissions, SLA windows, fines and the same-day cutoff to be
- * configuration rather than code. They have been since the schema was written, and
- * editable only by hand — which honoured the letter of the principle and none of its
- * intent. This is where an operator changes them.
+ * P-005 requires commissions, SLA windows, fines and the same-day cutoff to be configuration
+ * rather than code. They have been since the schema was written, and were editable only by hand —
+ * which honoured the letter of the principle and none of its intent.
  *
- * Grouped by what a setting DOES rather than alphabetically, because somebody
- * adjusting the partner commission is thinking about money, not about the string
- * `commission.partner_rate`.
+ * ## Grouped, not a flat grid
+ *
+ * The design shows eight fields in one `auto-fit` grid. That is right for eight; there are
+ * seventeen settings here and more will arrive, so they are grouped by what a setting DOES.
+ * Somebody adjusting the partner commission is thinking about money, not about the string
+ * `commission.partner_rate`. Within each group the layout is the design's grid, and the field
+ * treatment — label, value, unit suffix, hint line — is the design's exactly.
+ *
+ * ## Saved per field, not with one button
+ *
+ * The design has a single "حفظ الإعدادات". Each row saves itself instead, because every change
+ * writes an audited history row naming the value it replaced: one bulk submit would either
+ * collapse several distinct decisions into one audit entry or write entries for fields nobody
+ * touched. Documented in the gap report.
  */
 export const dynamic = 'force-dynamic';
 
 const GROUPS: ReadonlyArray<{ title: string; note: string; prefixes: string[] }> = [
   {
-    title: 'Money',
-    note: 'What SAFRA charges and what partners are owed. A change never rewrites an existing booking — each one snapshots the values it was made under.',
+    title: 'المال — العمولات والرسوم والاسترداد',
+    note: 'ما تتقاضاه سفرة وما يُستحق للشريك. التعديل لا يُعيد حساب حجز قائم: كل حجز يحتفظ بلقطة من القيم التي أُنشئ بها.',
     prefixes: ['commission.', 'money.', 'refund.'],
   },
   {
-    title: 'Booking rules',
-    note: 'The windows that decide when a booking expires or a partner is late (§6.4, EC-001).',
+    title: 'قواعد الحجز',
+    note: 'المُهل التي تحدد متى يسقط الحجز ومتى يتأخر الشريك (§6.4، EC-001).',
     prefixes: ['booking.'],
   },
   {
-    title: 'Partners and compensation',
-    note: 'Fines, and the wallet credit a customer receives when a partner misses their window (P-007).',
+    title: 'الشركاء والتعويضات',
+    note: 'الغرامات، ورصيد المحفظة الذي يحصل عليه العميل عند تجاوز الشريك مهلته (P-007).',
     prefixes: ['partner.', 'wallet.'],
   },
   {
-    title: 'Access',
-    note: 'Runtime permission grants. Enabling one takes effect within 15 minutes; disabling one revokes every session for that role immediately.',
+    title: 'الصلاحيات',
+    note: 'منح صلاحيات في وقت التشغيل. التمكين يسري خلال 15 دقيقة؛ الإلغاء يُبطل كل جلسات ذلك الدور فوراً.',
     prefixes: ['rbac.'],
   },
 ];
 
 export default async function SettingsPage() {
-  const result = await getSettings();
+  const [result, counts] = await Promise.all([getSettings(), sidebarCounts()]);
 
-  if (result === 'unauthenticated') {
+  if (result === 'unauthenticated' || result === 'failed') {
     return (
-      <Shell>
-        <p className="text-sm text-muted">
-          Your session expired, or this account cannot read settings.
-        </p>
-      </Shell>
-    );
-  }
-
-  if (result === 'failed') {
-    return (
-      <Shell>
-        <p className="text-sm text-bad">Could not load settings.</p>
-      </Shell>
+      <ConsoleShell title={AR.nav.settings} counts={counts}>
+        <ConsolePanel>
+          <p
+            className={`text-[12.5px] ${result === 'failed' ? 'text-bad' : 'text-muted'}`}
+          >
+            {result === 'failed' ? AR.dashboard.queueFailed : AR.dashboard.sessionExpired}
+          </p>
+        </ConsolePanel>
+      </ConsoleShell>
     );
   }
 
@@ -66,7 +74,9 @@ export default async function SettingsPage() {
   const groups = GROUPS.map((group) => {
     const settings = result.settings.filter((setting) => {
       const belongs = group.prefixes.some((prefix) => setting.key.startsWith(prefix));
+
       if (belongs) claimed.add(setting.key);
+
       return belongs;
     });
 
@@ -76,40 +86,41 @@ export default async function SettingsPage() {
   /**
    * Anything unmatched still appears.
    *
-   * A settings screen that silently omits a key is worse than an untidy section: the
-   * setting still governs the platform, and hiding it means nobody knows it is there.
+   * A settings screen that silently omits a key is worse than an untidy section: the setting
+   * still governs the platform, and hiding it means nobody knows it is there.
    */
   const other = result.settings.filter((setting) => !claimed.has(setting.key));
 
   return (
-    <Shell>
-      <header>
-        <h1 className="text-2xl font-semibold text-text">Rules Engine</h1>
-        <p className="mt-1 text-sm text-muted">
-          Operational configuration (P-005). Every change is recorded with who made it,
-          when, and the value it replaced.
-        </p>
-      </header>
+    <ConsoleShell title={AR.nav.settings} counts={counts}>
+      <div className="grid gap-4">
+        <ConsolePanel>
+          <h2 className="text-[14.5px] font-extrabold text-gold">
+            {AR.sections.settings.title}
+          </h2>
+          <FootNote>{AR.sections.settings.hint}</FootNote>
+        </ConsolePanel>
 
-      {groups.map((group) =>
-        group.settings.length === 0 ? null : (
+        {groups.map((group) =>
+          group.settings.length === 0 ? null : (
+            <Group
+              key={group.title}
+              title={group.title}
+              note={group.note}
+              settings={group.settings}
+            />
+          ),
+        )}
+
+        {other.length > 0 ? (
           <Group
-            key={group.title}
-            title={group.title}
-            note={group.note}
-            settings={group.settings}
+            title="إعدادات أخرى"
+            note="إعدادات خارج المجموعات أعلاه. بعضها غير قابل للتعديل من هنا — يوضح الصف السبب."
+            settings={other}
           />
-        ),
-      )}
-
-      {other.length > 0 ? (
-        <Group
-          title="Other"
-          note="Settings outside the groups above. Some cannot be edited here — the row says which, and why."
-          settings={other}
-        />
-      ) : null}
-    </Shell>
+        ) : null}
+      </div>
+    </ConsoleShell>
   );
 }
 
@@ -123,28 +134,15 @@ function Group({
   settings: EditableSetting[];
 }) {
   return (
-    <section>
-      <h2 className="text-lg text-text">{title}</h2>
-      <p className="mt-1 text-xs text-faint">{note}</p>
+    <ConsolePanel title={title}>
+      <p className="mb-3.5 text-[11.5px] leading-relaxed text-faint">{note}</p>
 
-      <ul className="mt-3 grid gap-2">
+      {/* The design's `auto-fit / minmax(220px, 1fr)` field grid. */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3.5">
         {settings.map((setting) => (
-          <li key={setting.key}>
-            <SettingRow setting={setting} />
-          </li>
+          <SettingRow key={setting.key} setting={setting} />
         ))}
-      </ul>
-    </section>
-  );
-}
-
-function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
-      <Link href="/" className="text-sm text-muted hover:text-gold">
-        ← Queues
-      </Link>
-      <div className="mt-4 grid gap-8">{children}</div>
-    </main>
+      </div>
+    </ConsolePanel>
   );
 }

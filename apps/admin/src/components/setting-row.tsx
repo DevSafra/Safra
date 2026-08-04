@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { EditableSetting } from '@/lib/api';
+import { AR } from '@/lib/strings';
+import { shortDate } from '@/lib/format';
 
 /** Schemas this form knows how to render an input for. */
 const EDITABLE = new Set([
@@ -56,7 +58,7 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? 'Could not save that value.');
+        setError(messageOf(body) ?? AR.sections.settings.saveFailed);
         setBusy(false);
         return;
       }
@@ -65,49 +67,62 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
       router.refresh();
       setBusy(false);
     } catch {
-      setError('Could not reach the server.');
+      setError(AR.errors.unreachable);
       setBusy(false);
     }
   }
 
   return (
-    <div className="rounded-lg border border-line bg-card p-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-mono text-xs text-faint">{setting.key}</p>
-          <p className="mt-0.5 text-sm text-text">{display(setting.value)}</p>
-          {setting.descriptionEn ? (
-            <p className="mt-1 text-xs text-muted">{setting.descriptionEn}</p>
-          ) : null}
-          {setting.updatedByEmail ? (
-            <p className="mt-1 text-xs text-faint">
-              Last changed by {setting.updatedByEmail}
-              {setting.updatedAt ? ` on ${setting.updatedAt.slice(0, 10)}` : ''}
-            </p>
-          ) : null}
-        </div>
+    <div>
+      {/*
+        The design's field treatment: 11.5px label, the value at 13.5px, a unit suffix beside it
+        and a 10.5px hint below. The Arabic DESCRIPTION is the label, not the key — somebody
+        adjusting the commission is thinking about money, not about `commission.partner_rate`.
+        The key is still shown, small, because it is what an audit entry and a runbook name.
+      */}
+      <div className="flex flex-wrap items-start gap-2">
+        <label className="text-[11.5px] font-semibold text-muted">
+          {setting.descriptionAr ?? setting.key}
+        </label>
 
         {editable && !editing ? (
           <button
             type="button"
             onClick={() => setEditing(true)}
-            className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold"
+            className="ms-auto cursor-pointer rounded-md border border-line px-2.5 py-0.5 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
           >
-            Change
+            {AR.sections.settings.change}
           </button>
         ) : null}
       </div>
 
+      {!editing ? (
+        <p className="mt-1.5 text-[13.5px] font-bold text-text" dir="ltr">
+          {display(setting.value)}
+        </p>
+      ) : null}
+
+      <p className="mt-1 font-mono text-[10px] text-faint2" dir="ltr">
+        {setting.key}
+      </p>
+
+      {setting.updatedByEmail ? (
+        <p className="mt-1 text-[10.5px] text-faint">
+          {AR.sections.settings.lastChanged(
+            setting.updatedByEmail,
+            shortDate(setting.updatedAt),
+          )}
+        </p>
+      ) : null}
+
       {!editable ? (
-        <p className="mt-2 rounded border border-line bg-field px-3 py-2 text-xs text-faint">
-          This setting is a <code>{setting.valueSchema}</code>, which this form cannot
-          validate. Changing it from a generic input risks breaking it silently, so it
-          stays a deliberate change made with review.
+        <p className="mt-2 rounded border border-line bg-field px-2.5 py-2 text-[10.5px] leading-relaxed text-faint">
+          {AR.sections.settings.notEditable(setting.valueSchema)}
         </p>
       ) : null}
 
       {error ? (
-        <p role="alert" className="mt-2 text-xs text-bad">
+        <p role="alert" className="mt-2 text-[11.5px] text-bad">
           {error}
         </p>
       ) : null}
@@ -129,11 +144,13 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
           <ValueInput setting={setting} />
 
           <label className="grid gap-1">
-            <span className="text-xs text-muted">Why? Recorded against the change.</span>
+            <span className="text-[10.5px] text-faint2">
+              {AR.sections.settings.reason}
+            </span>
             <input
               name="reason"
               maxLength={500}
-              className="rounded-lg border border-line bg-field px-3 py-2 text-sm text-text"
+              className="rounded-[9px] border border-line bg-field px-2.5 py-2 text-[12.5px] text-text"
             />
           </label>
 
@@ -141,16 +158,16 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
             <button
               type="submit"
               disabled={busy}
-              className="rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-60"
+              className="cursor-pointer rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-1.5 text-[11.5px] font-extrabold text-[#241A05] disabled:opacity-60"
             >
-              {busy ? 'Saving…' : 'Save'}
+              {busy ? AR.sections.settings.saving : AR.sections.settings.save}
             </button>
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted"
+              className="cursor-pointer rounded-[9px] border border-line px-4 py-1.5 text-[11.5px] text-muted"
             >
-              Cancel
+              {AR.sections.settings.cancel}
             </button>
           </div>
         </form>
@@ -161,18 +178,19 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
 
 /** The input the setting's own schema calls for. */
 function ValueInput({ setting }: { setting: EditableSetting }) {
-  const common = 'rounded-lg border border-line bg-field px-3 py-2 text-sm text-text';
+  const common =
+    'w-full rounded-[9px] border border-line bg-field px-3 py-2.5 text-[13.5px] text-text';
 
   if (setting.valueSchema === 'boolean') {
     return (
-      <label className="flex items-center gap-2 text-sm text-text">
+      <label className="flex cursor-pointer items-center gap-2 text-[13px] text-text">
         <input
           type="checkbox"
           name="value"
           defaultChecked={setting.value === true}
-          className="accent-gold"
+          className="size-[15px] cursor-pointer accent-gold"
         />
-        Enabled
+        {AR.sections.settings.enabled}
       </label>
     );
   }
@@ -180,10 +198,10 @@ function ValueInput({ setting }: { setting: EditableSetting }) {
   if (setting.valueSchema === 'feeMode') {
     return (
       <label className="grid gap-1">
-        <span className="text-xs text-muted">Mode</span>
+        <span className="text-[10.5px] text-faint2">{AR.sections.settings.mode}</span>
         <select name="value" defaultValue={String(setting.value)} className={common}>
-          <option value="flat">flat — a fixed amount per booking</option>
-          <option value="percent">percent — a share of the stay</option>
+          <option value="flat">{AR.sections.settings.feeFlat}</option>
+          <option value="percent">{AR.sections.settings.feePercent}</option>
         </select>
       </label>
     );
@@ -204,8 +222,8 @@ function ValueInput({ setting }: { setting: EditableSetting }) {
 
     return (
       <label className="grid gap-1">
-        <span className="text-xs text-muted">
-          Amount{currencyOf(setting.value) ? ` (${currencyOf(setting.value)})` : ' (USD)'}
+        <span className="text-[10.5px] text-faint2">
+          {AR.sections.settings.amount} ({currencyOf(setting.value) ?? 'USD'})
         </span>
         <input
           name="value"
@@ -220,24 +238,25 @@ function ValueInput({ setting }: { setting: EditableSetting }) {
 
   const hint =
     setting.valueSchema === 'rate'
-      ? 'A fraction between 0 and 1 — 7% is 0.07.'
+      ? AR.sections.settings.hintRate
       : setting.valueSchema === 'hourOfDay'
-        ? 'An hour from 0 to 23, in the city’s local time.'
+        ? AR.sections.settings.hintHourOfDay
         : setting.valueSchema === 'percent'
-          ? 'A number from 0 to 100.'
-          : 'A whole number.';
+          ? AR.sections.settings.hintPercent
+          : AR.sections.settings.hintInt;
 
   return (
     <label className="grid gap-1">
-      <span className="text-xs text-muted">Value</span>
+      <span className="text-[10.5px] text-faint2">{AR.sections.settings.value}</span>
       <input
         name="value"
         inputMode="decimal"
         defaultValue={scalarText(setting.value)}
         required
+        dir="ltr"
         className={common}
       />
-      <span className="text-xs text-faint">{hint}</span>
+      <span className="text-[10.5px] text-faint2">{hint}</span>
     </label>
   );
 }
@@ -278,8 +297,11 @@ function coerce(
 }
 
 function display(value: unknown): string {
-  if (typeof value === 'boolean') return value ? 'Enabled' : 'Disabled';
-  if (value === null || value === undefined) return '—';
+  if (typeof value === 'boolean') {
+    return value ? AR.sections.settings.enabled : AR.sections.settings.disabled;
+  }
+
+  if (value === null || value === undefined) return AR.admin.noData;
   if (typeof value === 'object') return JSON.stringify(value);
 
   return scalarText(value);
