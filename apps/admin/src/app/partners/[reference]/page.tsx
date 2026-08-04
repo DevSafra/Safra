@@ -181,7 +181,7 @@ function Row({ label, value }: { label: string; value: string }) {
 function StatusPill({ status }: { status: string }) {
   const tone =
     status === 'approved'
-      ? 'border-good/40 bg-good/10 text-good'
+      ? 'border-ok/40 bg-ok/10 text-ok'
       : status === 'rejected'
         ? 'border-bad/40 bg-bad/10 text-bad'
         : 'border-gold/40 bg-gold/10 text-gold';

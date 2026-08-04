@@ -15,25 +15,69 @@
 @source '../../../../packages/ui/src';
 
 /**
- * The staff console shares SAFRA's palette but not its personality.
+ * The console's palette — the "Eastern Night" dark theme, VERBATIM from the design handoff.
  *
- * Deliberately plainer than the public site: no Amiri display face, no gold
- * flourishes beyond the accent. Someone reading a passport scan at 6pm needs
- * contrast and density, not atmosphere — and a console that looks obviously
- * different from the customer site is one nobody confuses for it.
+ * Source of truth: `design_handoff_safra/README.md` §9.1. These are copied, not sampled: an
+ * earlier version of this file was eyeballed from a screenshot and every value was slightly
+ * off — `--card` was `#15132a` against the specified `#17142F`, `--field` was two shades too
+ * light, `--text` had the wrong hue entirely (a neutral grey where the design uses a warm
+ * cream). Individually invisible; together the console read as a different product. The
+ * handoff calls the design "high fidelity, colors are final", so anything here that
+ * disagrees with §9.1 is a defect.
+ *
+ * `*A` tokens are bare RGB triples, not colours, so a rule can set its own alpha:
+ * `rgba(var(--goldA), .14)` for a hairline border against `rgba(var(--goldA), .5)` for an
+ * emphatic one. Tailwind cannot express that from a single hex value. The handoff's tint
+ * ladder is `.06 / .1 / .12 / .14 / .15 / .16 / .22 / .25 / .28 / .35 / .4 / .5` — stay on
+ * it rather than inventing intermediate values.
+ *
+ * The light theme (§9.2) is NOT implemented. The console is staff-only and always dark; the
+ * public app owns the toggle. Adding it here means every token below gains a counterpart, so
+ * it is a deliberate omission rather than an oversight.
  */
 @theme {
   --color-bg: #0c0a1c;
-  --color-card: #15132a;
-  --color-field: #1c1936;
-  --color-line: #2a2745;
-  --color-text: #e8e6f0;
-  --color-muted: #a9a5c0;
-  --color-faint: #726e8f;
+  /** One step up from `bg`, for a raised surface that is not a card. */
+  --color-bg2: #12102b;
+  --color-card: #17142f;
+  --color-field: #0f0d24;
+  --color-line: #2a2450;
+  /** One step darker than `line`, for row separators inside an already-bordered card. */
+  --color-line2: #1f1b3e;
+  --color-text: #f4eedf;
+  /** Secondary body text: dimmer than `text`, brighter than `muted`. */
+  --color-text2: #c9c3e0;
+  --color-muted: #a9a3c4;
+  --color-faint: #736f92;
+  /** Dimmest legible tier — a denied cell in the permission matrix, an unbuilt nav item. */
+  --color-faint2: #4e4a6e;
   --color-gold: #e8bc66;
-  --color-good: #4ade80;
-  --color-bad: #f87171;
-  --color-sky: #7dd3fc;
+  --color-sky: #78aee0;
+  --color-ok: #6fc792;
+  --color-bad: #e06868;
+  --color-warn: #e8a54b;
+  /**
+   * Pending confirmation — purple, NEVER gold.
+   *
+   * An explicit rule in the handoff. Gold is SAFRA's affirmative accent: it marks a price,
+   * a primary action, a section that matters. A booking waiting on a partner is not good
+   * news, and colouring it gold reads as one.
+   */
+  --color-pend: #9f8ce8;
+  /** Inactive bars in the revenue sparkline. */
+  --color-barDim: #3a2f6b;
+}
+
+/**
+ * RGB triples for alpha composition. Kept outside `@theme` because they are not colours
+ * Tailwind should generate utilities for — they exist only to be fed to `rgba()`.
+ */
+:root {
+  --goldA: 232, 188, 102;
+  --skyA: 120, 174, 224;
+  --okA: 111, 199, 146;
+  --badA: 224, 104, 104;
+  --warnA: 232, 165, 75;
 }
 
 html {
@@ -43,5 +87,4 @@ html {
 body {
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 }

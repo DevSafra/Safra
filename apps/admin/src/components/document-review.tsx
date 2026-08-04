@@ -134,7 +134,7 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
             type="button"
             onClick={() => void decide('approve')}
             disabled={busy}
-            className="rounded-lg border border-good/40 bg-good/10 px-3 py-1.5 text-xs text-good disabled:opacity-60"
+            className="rounded-lg border border-ok/40 bg-ok/10 px-3 py-1.5 text-xs text-ok disabled:opacity-60"
           >
             Approve
           </button>
@@ -167,7 +167,7 @@ function kindLabel(kind: string): string {
 function StatusPill({ status }: { status: string }) {
   const tone =
     status === 'approved'
-      ? 'border-good/40 bg-good/10 text-good'
+      ? 'border-ok/40 bg-ok/10 text-ok'
       : status === 'rejected'
         ? 'border-bad/40 bg-bad/10 text-bad'
         : 'border-line bg-field text-faint';

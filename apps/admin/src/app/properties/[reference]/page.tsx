@@ -62,7 +62,7 @@ export default async function PropertyPage({
           Trading as {property.partner.displayName} · {property.partner.reference}
         </p>
         {partnerVerified ? (
-          <p className="mt-2 text-xs text-good">Partner is verified.</p>
+          <p className="mt-2 text-xs text-ok">Partner is verified.</p>
         ) : (
           <p className="mt-2 text-xs text-gold">
             Partner is {property.partner.verification}. This listing cannot be published

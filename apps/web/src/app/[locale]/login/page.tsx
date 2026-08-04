@@ -51,7 +51,7 @@ export default async function LoginPage({
       <p className="mt-2 text-sm text-muted">{t('signInSubtitle')}</p>
 
       {justReset ? (
-        <p className="mt-6 rounded-lg border border-good/40 bg-good/10 p-3 text-sm text-good">
+        <p className="mt-6 rounded-lg border border-ok/40 bg-ok/10 p-3 text-sm text-ok">
           {t('resetDone')}
         </p>
       ) : null}

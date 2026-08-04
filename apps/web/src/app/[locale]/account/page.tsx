@@ -116,7 +116,7 @@ export default async function AccountPage({
                       <span
                         className={
                           entry.direction === 'credit'
-                            ? 'shrink-0 text-good'
+                            ? 'shrink-0 text-ok'
                             : 'shrink-0 text-muted'
                         }
                       >
@@ -197,7 +197,7 @@ export default async function AccountPage({
 function StatusPill({ status, label }: { status: string; label: string }) {
   const tone =
     status === 'confirmed' || status === 'completed' || status === 'checked_in'
-      ? 'border-good/40 bg-good/10 text-good'
+      ? 'border-ok/40 bg-ok/10 text-ok'
       : status === 'cancelled'
         ? 'border-line bg-field text-faint'
         : 'border-sky/40 bg-sky/10 text-sky';

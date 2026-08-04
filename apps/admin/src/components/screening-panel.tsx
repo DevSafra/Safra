@@ -100,7 +100,7 @@ export function ScreeningPanel({
     <div className="rounded-lg border border-line bg-card p-4">
       {screenedAt ? (
         <div>
-          <p className={`text-sm ${previous.matched ? 'text-bad' : 'text-good'}`}>
+          <p className={`text-sm ${previous.matched ? 'text-bad' : 'text-ok'}`}>
             {previous.matched
               ? 'A possible match was recorded — do not approve without escalating.'
               : 'Screened against the EU consolidated list, no match.'}

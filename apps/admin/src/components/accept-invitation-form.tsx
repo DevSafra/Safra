@@ -68,7 +68,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
 
   if (done) {
     return (
-      <div className="rounded-lg border border-good/40 bg-good/10 p-4">
+      <div className="rounded-lg border border-ok/40 bg-ok/10 p-4">
         <p className="text-sm text-text">Your password is set.</p>
         <p className="mt-2 text-xs text-muted">
           Sign in next. You will be asked to set up two-factor authentication before you

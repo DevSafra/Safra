@@ -101,7 +101,7 @@ export function TwoFactorEnrolment() {
   if (recoveryCodes) {
     return (
       <div className="grid gap-4">
-        <p className="rounded-lg border border-good/40 bg-good/10 p-3 text-sm text-good">
+        <p className="rounded-lg border border-ok/40 bg-ok/10 p-3 text-sm text-ok">
           Two-factor authentication is on.
         </p>
 

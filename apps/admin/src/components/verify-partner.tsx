@@ -80,7 +80,7 @@ export function VerifyPartner({
             disabled={!screened}
             onClick={() => setMode('approve')}
             title={screened ? undefined : 'Sanctions screening is required first.'}
-            className="rounded-lg bg-good px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-lg bg-ok px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40"
           >
             Approve partner
           </button>
@@ -118,7 +118,7 @@ export function VerifyPartner({
               type="submit"
               disabled={busy}
               className={`rounded-lg px-4 py-2 text-sm font-semibold text-bg disabled:opacity-60 ${
-                mode === 'approve' ? 'bg-good' : 'bg-bad'
+                mode === 'approve' ? 'bg-ok' : 'bg-bad'
               }`}
             >
               {busy
