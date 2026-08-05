@@ -1,4 +1,9 @@
-import { loginResponseSchema } from '@safra/contracts';
+import {
+  ERROR,
+  isErrorCode,
+  loginResponseSchema,
+  type ErrorCode,
+} from '@safra/contracts';
 
 import { sessionFrom, type Session } from './session.js';
 
@@ -11,9 +16,17 @@ export interface AuthOutcome {
   ok: boolean;
   status: number;
   session?: Session;
-  /** Generic, already safe to show — the API does not leak detail (rule 1). */
+  /**
+   * What went wrong, as a translatable code.
+   *
+   * The caller resolves it against the READER's locale — this package never picks a language,
+   * because a route handler and middleware both use it and neither is the right place to decide.
+   * `message` used to be the only field here, carrying English prose straight to the browser.
+   */
+  code?: ErrorCode;
+  /** English text for the log. NOT for display: it is not in the reader's language. */
   message?: string;
-  /** Field-keyed validation errors, when the API returned any. */
+  /** Field-keyed validation errors. Values are CODES; keys are dotted schema paths. */
   fieldErrors?: Record<string, string>;
 }
 
@@ -46,11 +59,7 @@ export async function callAuth(
       cache: 'no-store',
     });
   } catch {
-    return {
-      ok: false,
-      status: 502,
-      message: 'Could not reach the sign-in service. Please try again.',
-    };
+    return { ok: false, status: 502, code: ERROR.REQUEST_UPSTREAM_UNREACHABLE };
   }
 
   const body: unknown = await response.json().catch(() => null);
@@ -62,7 +71,7 @@ export async function callAuth(
   const parsed = loginResponseSchema.safeParse(body);
 
   if (!parsed.success) {
-    return { ok: false, status: 502, message: 'Unexpected response from the server.' };
+    return { ok: false, status: 502, code: ERROR.REQUEST_UNKNOWN };
   }
 
   /**
@@ -77,11 +86,7 @@ export async function callAuth(
     readSetCookie(response.headers, API_REFRESH_COOKIE) ?? init.refreshToken;
 
   if (!refreshToken) {
-    return {
-      ok: false,
-      status: 502,
-      message: 'The server did not return a session. Please try again.',
-    };
+    return { ok: false, status: 502, code: ERROR.AUTH_SESSION_MISSING };
   }
 
   return {
@@ -160,18 +165,20 @@ export function readSetCookie(headers: Headers, name: string): string | undefine
 }
 
 /**
- * Turns an API error body into something renderable.
+ * Turns an API error body into a code the caller can translate.
  *
- * The API returns generic messages by design and keeps detail in its logs, so this
- * passes the message through rather than inventing a friendlier one — except for
- * validation errors, which are per-field and belong next to the input.
+ * The API answers `{ statusCode, code, message }`. Only the CODE is forwarded for display: the
+ * message is English, and this runs on the way to a browser whose language is not this package's
+ * business. An unrecognised code — an API newer than this build — degrades to the generic one
+ * rather than being passed through as text.
  */
 function describeFailure(body: unknown): {
-  message: string;
+  code: ErrorCode;
+  message?: string;
   fieldErrors?: Record<string, string>;
 } {
   if (typeof body !== 'object' || body === null) {
-    return { message: 'Sign-in failed. Please try again.' };
+    return { code: ERROR.REQUEST_UNKNOWN };
   }
 
   const record = body as Record<string, unknown>;
@@ -186,19 +193,21 @@ function describeFailure(body: unknown): {
     for (const issue of record['errors']) {
       if (typeof issue !== 'object' || issue === null) continue;
 
-      const { field, message } = issue as { field?: unknown; message?: unknown };
+      const { field, code } = issue as { field?: unknown; code?: unknown };
 
-      if (typeof field === 'string' && typeof message === 'string') {
-        fieldErrors[field] = message;
+      // The CODE, not the message: this is on its way to a browser whose language is not
+      // this package's business. `ZodValidationPipe` sends both.
+      if (typeof field === 'string' && typeof code === 'string') {
+        fieldErrors[field] = code;
       }
     }
   }
 
+  const code = record['code'];
+
   return {
-    message:
-      typeof record['message'] === 'string'
-        ? record['message']
-        : 'Sign-in failed. Please try again.',
+    code: isErrorCode(code) ? code : ERROR.REQUEST_UNKNOWN,
+    ...(typeof record['message'] === 'string' ? { message: record['message'] } : {}),
     ...(Object.keys(fieldErrors).length > 0 ? { fieldErrors } : {}),
   };
 }

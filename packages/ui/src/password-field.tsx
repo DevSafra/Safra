@@ -21,14 +21,19 @@ export interface PasswordFieldProps extends Omit<
   readonly showRequiredMark?: boolean;
   readonly ref?: React.Ref<HTMLInputElement>;
   /**
-   * Accessible labels for the toggle, so a localised app can pass its own.
+   * Accessible labels for the toggle. REQUIRED, and deliberately not defaulted.
    *
-   * Defaulted to English rather than left required: the customer app renders in three
-   * languages and the staff console in Arabic, and a component that forced every caller
-   * to supply both strings would get English hardcoded at each call site anyway.
+   * They were `= 'Show password'` / `= 'Hide password'`, which read as a sensible fallback and
+   * was not one: four of the five call sites never overrode it, so an Arabic customer and a
+   * German one both got an English button, and the staff console's invitation form did too. A
+   * default that is wrong in two of three supported languages is not a default, it is a
+   * hardcoded string with an opt-out nobody took.
+   *
+   * Required means the compiler lists every call site that has not supplied them — which is how
+   * this was found and how it stays fixed.
    */
-  readonly showLabel?: string;
-  readonly hideLabel?: string;
+  readonly showLabel: string;
+  readonly hideLabel: string;
 }
 
 /**
@@ -61,8 +66,8 @@ export function PasswordField({
   hint,
   error,
   showRequiredMark,
-  showLabel = 'Show password',
-  hideLabel = 'Hide password',
+  showLabel,
+  hideLabel,
   ref,
   ...rest
 }: PasswordFieldProps) {

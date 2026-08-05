@@ -6,4 +6,6 @@
  * here because "every password field has a show/hide toggle" is a project rule, and a
  * rule enforced by a shared component cannot drift the way a convention does.
  */
+export * from './ornaments.js';
+export * from './theme.js';
 export * from './password-field.js';
