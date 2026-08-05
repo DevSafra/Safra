@@ -1,7 +1,10 @@
 import { authenticator } from 'otplib';
 import { expect, type Page } from '@playwright/test';
 
-import { AR } from '../apps/admin/src/lib/strings.js';
+// The catalogue source directly, not through the admin app: Playwright loads these
+// files as CommonJS, and `@safra/i18n` is ESM-only, so going via `lib/strings.ts`
+// makes Node resolve the package and fail on the missing `require` condition.
+import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
 
 /**
  * Shared plumbing for the staff-console browser tests.
@@ -77,12 +80,12 @@ export async function freshCode(): Promise<string> {
 /** Both steps of the sign-in, ending on the dashboard. */
 export async function signIn(page: Page): Promise<void> {
   await page.goto('/login');
-  await field(page, AR.login.email).fill(EMAIL as string);
-  await field(page, AR.login.password).fill(PASSWORD as string);
+  await field(page, t.login.email).fill(EMAIL as string);
+  await field(page, t.login.password).fill(PASSWORD as string);
   await submit(page).click();
 
-  await field(page, AR.login.code).fill(await freshCode());
+  await field(page, t.login.code).fill(await freshCode());
   await submit(page).click();
 
-  await expect(page.getByRole('heading', { name: AR.admin.title })).toBeVisible();
+  await expect(page.getByRole('heading', { name: t.admin.title })).toBeVisible();
 }

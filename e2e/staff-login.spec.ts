@@ -18,7 +18,10 @@ import { expect, test } from '@playwright/test';
  * are imported from the app's own string module rather than duplicated, which means a
  * copy change cannot silently stop these tests from finding anything.
  */
-import { AR } from '../apps/admin/src/lib/strings.js';
+// The catalogue source directly, not through the admin app: Playwright loads these
+// files as CommonJS, and `@safra/i18n` is ESM-only, so going via `lib/strings.ts`
+// makes Node resolve the package and fail on the missing `require` condition.
+import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
 import {
   EMAIL,
   MISSING_CREDENTIALS,
@@ -48,8 +51,8 @@ test.describe('the console renders in Arabic', () => {
   test('the sign-in page shows Arabic copy, not English', async ({ page }) => {
     await page.goto('/login');
 
-    await expect(page.getByRole('heading', { name: AR.login.title })).toBeVisible();
-    await expect(page.getByText(AR.login.subtitle)).toBeVisible();
+    await expect(page.getByRole('heading', { name: t.login.title })).toBeVisible();
+    await expect(page.getByText(t.login.subtitle)).toBeVisible();
     // The English original must be gone, not merely hidden behind the Arabic.
     await expect(page.getByText('Command Center', { exact: true })).toBeHidden();
     await expect(page.getByText('SAFRA staff access only.')).toBeHidden();
@@ -72,23 +75,23 @@ test.describe('the command-center dashboard', () => {
   });
 
   test('renders in Arabic, not English', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: AR.admin.title })).toBeVisible();
-    await expect(page.getByRole('link', { name: AR.nav.partners })).toBeVisible();
-    await expect(page.getByRole('button', { name: AR.dashboard.signOut })).toBeVisible();
+    await expect(page.getByRole('heading', { name: t.admin.title })).toBeVisible();
+    await expect(page.getByRole('link', { name: t.nav.partners })).toBeVisible();
+    await expect(page.getByRole('button', { name: t.dashboard.signOut })).toBeVisible();
 
     // And the role reads as Arabic rather than `super_admin`.
     await expect(page.getByText('super_admin')).toBeHidden();
   });
 
   test('renders every panel the design specifies', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: AR.admin.title })).toBeVisible();
+    await expect(page.getByRole('heading', { name: t.admin.title })).toBeVisible();
 
     for (const panel of [
-      AR.admin.attention,
-      AR.admin.latestBookings,
-      AR.admin.weekRevenue,
-      AR.admin.pendingPartners,
-      AR.admin.recentActivity,
+      t.admin.attention,
+      t.admin.latestBookings,
+      t.admin.weekRevenue,
+      t.admin.pendingPartners,
+      t.admin.recentActivity,
     ]) {
       await expect(page.getByRole('heading', { name: panel })).toBeVisible();
     }
@@ -98,20 +101,20 @@ test.describe('the command-center dashboard', () => {
       the table below, so an unscoped text match resolves to two elements and fails on
       strict mode — for a page that is entirely correct.
     */
-    const kpis = page.getByRole('region', { name: AR.admin.kpiRow });
+    const kpis = page.getByRole('region', { name: t.admin.kpiRow });
 
     for (const kpi of [
-      AR.admin.kpiBookingsToday,
-      AR.admin.kpiPending,
-      AR.admin.kpiRevenue,
-      AR.admin.kpiCancelled,
-      AR.admin.kpiDisputes,
+      t.admin.kpiBookingsToday,
+      t.admin.kpiPending,
+      t.admin.kpiRevenue,
+      t.admin.kpiCancelled,
+      t.admin.kpiDisputes,
     ]) {
       await expect(kpis.getByText(kpi, { exact: true })).toBeVisible();
     }
 
     // The eighteen-section sidebar, and its heading.
-    await expect(page.getByText(AR.nav.heading)).toBeVisible();
+    await expect(page.getByText(t.nav.heading)).toBeVisible();
   });
 
   /**
@@ -123,10 +126,10 @@ test.describe('the command-center dashboard', () => {
    * amount, is what distinguishes a wired dashboard from a screenshot of one.
    */
   test('the counters come from the API, not the mock', async ({ page }) => {
-    await expect(page.getByText(AR.dashboard.countersFailed)).toBeHidden();
+    await expect(page.getByText(t.dashboard.countersFailed)).toBeHidden();
 
-    const kpis = page.getByRole('region', { name: AR.admin.kpiRow });
-    const revenue = kpis.getByText(AR.admin.kpiRevenue, { exact: true });
+    const kpis = page.getByRole('region', { name: t.admin.kpiRow });
+    const revenue = kpis.getByText(t.admin.kpiRevenue, { exact: true });
 
     await expect(revenue.locator('..')).toContainText(/\$[\d,]+\.\d{2}/);
   });
@@ -144,24 +147,24 @@ test.describe('the command-center dashboard', () => {
    */
   test('the disputes card agrees with the disputes section', async ({ page }) => {
     const card = page
-      .getByRole('region', { name: AR.admin.kpiRow })
-      .getByText(AR.admin.kpiDisputes, { exact: true })
+      .getByRole('region', { name: t.admin.kpiRow })
+      .getByText(t.admin.kpiDisputes, { exact: true })
       .locator('..');
 
-    await expect(card).toContainText(AR.admin.kpiDisputesSub);
-    await expect(card).not.toContainText(AR.admin.kpiDisputesUnavailable);
+    await expect(card).toContainText(t.admin.kpiDisputesSub);
+    await expect(card).not.toContainText(t.admin.kpiDisputesUnavailable);
 
     const onDashboard = (await card.innerText()).match(/\d+/)?.[0] ?? '';
 
     await page.goto('/disputes');
 
     const openCard = page
-      .getByRole('region', { name: AR.nav.disputes })
-      .getByText(AR.sections.disputes.kpiOpen, { exact: true })
+      .getByRole('region', { name: t.nav.disputes })
+      .getByText(t.sections.disputes.kpiOpen, { exact: true })
       .locator('..');
     const investigating = page
-      .getByRole('region', { name: AR.nav.disputes })
-      .getByText(AR.sections.disputes.kpiInvestigating, { exact: true })
+      .getByRole('region', { name: t.nav.disputes })
+      .getByText(t.sections.disputes.kpiInvestigating, { exact: true })
       .locator('..');
 
     const open = Number((await openCard.innerText()).match(/\d+/)?.[0] ?? '0');
@@ -180,20 +183,20 @@ test.describe('the command-center dashboard', () => {
    * implemented, so it asserts the strongest form: the destination shows data, not an apology.
    */
   test('the disputes section is reachable and shows real data', async ({ page }) => {
-    await page.getByRole('link', { name: AR.nav.disputes }).click();
+    await page.getByRole('link', { name: t.nav.disputes }).click();
 
     await expect(page).toHaveURL(/\/disputes$/);
-    await expect(page.getByRole('heading', { name: AR.nav.disputes })).toBeVisible();
-    await expect(page.getByText(AR.unbuilt.heading)).toBeHidden();
-    await expect(page.getByText(AR.dashboard.queueFailed)).toBeHidden();
+    await expect(page.getByRole('heading', { name: t.nav.disputes })).toBeVisible();
+    await expect(page.getByText(t.unbuilt.heading)).toBeHidden();
+    await expect(page.getByText(t.dashboard.queueFailed)).toBeHidden();
   });
 
   /** Emergency Mode is reached from the header, as the prototype's `openEmergency` does. */
   test('the header Emergency Mode button reaches the section', async ({ page }) => {
-    await page.getByRole('link', { name: AR.admin.emergencyMode }).click();
+    await page.getByRole('link', { name: t.admin.emergencyMode }).click();
 
     await expect(page).toHaveURL(/\/emergency$/);
-    await expect(page.getByText(AR.sections.emergency.hint)).toBeVisible();
+    await expect(page.getByText(t.sections.emergency.hint)).toBeVisible();
   });
 
   /** Booking detail is reachable only by reference, so the lookup must survive the rebuild. */
@@ -203,8 +206,8 @@ test.describe('the command-center dashboard', () => {
       .first()
       .innerText();
 
-    await field(page, AR.dashboard.findBookingLabel).fill(reference);
-    await page.getByRole('button', { name: AR.dashboard.findBooking }).click();
+    await field(page, t.dashboard.findBookingLabel).fill(reference);
+    await page.getByRole('button', { name: t.dashboard.findBooking }).click();
 
     /*
       Case-insensitive: `/bookings` upper-cases what it is given, because §13.2 references
@@ -233,9 +236,9 @@ test.describe('staff sign-in', () => {
     });
 
     await page.goto('/login');
-    await field(page, AR.login.email).fill(EMAIL as string);
+    await field(page, t.login.email).fill(EMAIL as string);
 
-    await expect(field(page, AR.login.email)).toHaveValue(EMAIL as string);
+    await expect(field(page, t.login.email)).toHaveValue(EMAIL as string);
     expect(violations, 'CSP violations in the console').toEqual([]);
   });
 
@@ -243,24 +246,24 @@ test.describe('staff sign-in', () => {
     await page.goto('/login');
 
     // Step one shows no code field at all.
-    await expect(field(page, AR.login.code)).toBeHidden();
+    await expect(field(page, t.login.code)).toBeHidden();
 
-    await field(page, AR.login.email).fill(EMAIL as string);
-    await field(page, AR.login.password).fill(PASSWORD as string);
+    await field(page, t.login.email).fill(EMAIL as string);
+    await field(page, t.login.password).fill(PASSWORD as string);
     await submit(page).click();
 
-    await expect(field(page, AR.login.code)).toBeVisible();
-    await expect(page.getByText(AR.login.codeHint)).toBeVisible();
+    await expect(field(page, t.login.code)).toBeVisible();
+    await expect(page.getByText(t.login.codeHint)).toBeVisible();
   });
 
   /** The reported defect: the code box arrived holding the password. */
   test('the code field is empty when it appears', async ({ page }) => {
     await page.goto('/login');
-    await field(page, AR.login.email).fill(EMAIL as string);
-    await field(page, AR.login.password).fill(PASSWORD as string);
+    await field(page, t.login.email).fill(EMAIL as string);
+    await field(page, t.login.password).fill(PASSWORD as string);
     await submit(page).click();
 
-    const code = field(page, AR.login.code);
+    const code = field(page, t.login.code);
     await expect(code).toBeVisible();
     await expect(code).toHaveValue('');
   });
@@ -268,49 +271,49 @@ test.describe('staff sign-in', () => {
   /** The other reported defect: going back cleared the email. */
   test('going back keeps the email and password filled', async ({ page }) => {
     await page.goto('/login');
-    await field(page, AR.login.email).fill(EMAIL as string);
-    await field(page, AR.login.password).fill(PASSWORD as string);
+    await field(page, t.login.email).fill(EMAIL as string);
+    await field(page, t.login.password).fill(PASSWORD as string);
     await submit(page).click();
 
-    await page.getByRole('button', { name: AR.login.useDifferentAccount }).click();
+    await page.getByRole('button', { name: t.login.useDifferentAccount }).click();
 
-    await expect(field(page, AR.login.email)).toHaveValue(EMAIL as string);
-    await expect(field(page, AR.login.password)).toHaveValue(PASSWORD as string);
+    await expect(field(page, t.login.email)).toHaveValue(EMAIL as string);
+    await expect(field(page, t.login.password)).toHaveValue(PASSWORD as string);
   });
 
   test('returning to the code step clears a previously typed code', async ({ page }) => {
     await page.goto('/login');
-    await field(page, AR.login.email).fill(EMAIL as string);
-    await field(page, AR.login.password).fill(PASSWORD as string);
+    await field(page, t.login.email).fill(EMAIL as string);
+    await field(page, t.login.password).fill(PASSWORD as string);
     await submit(page).click();
 
-    await field(page, AR.login.code).fill('123456');
-    await page.getByRole('button', { name: AR.login.useDifferentAccount }).click();
+    await field(page, t.login.code).fill('123456');
+    await page.getByRole('button', { name: t.login.useDifferentAccount }).click();
     await submit(page).click();
 
-    await expect(field(page, AR.login.code)).toHaveValue('');
+    await expect(field(page, t.login.code)).toHaveValue('');
   });
 
   test('signs in with a valid code and reaches the dashboard', async ({ page }) => {
     await page.goto('/login');
-    await field(page, AR.login.email).fill(EMAIL as string);
-    await field(page, AR.login.password).fill(PASSWORD as string);
+    await field(page, t.login.email).fill(EMAIL as string);
+    await field(page, t.login.password).fill(PASSWORD as string);
     await submit(page).click();
 
-    await field(page, AR.login.code).fill(await freshCode());
+    await field(page, t.login.code).fill(await freshCode());
     await submit(page).click();
 
-    await expect(page.getByRole('heading', { name: AR.admin.title })).toBeVisible();
+    await expect(page.getByRole('heading', { name: t.admin.title })).toBeVisible();
   });
 
   test('a wrong password never reaches the code step', async ({ page }) => {
     await page.goto('/login');
-    await field(page, AR.login.email).fill(EMAIL as string);
-    await field(page, AR.login.password).fill('definitely-not-the-password');
+    await field(page, t.login.email).fill(EMAIL as string);
+    await field(page, t.login.password).fill('definitely-not-the-password');
     await submit(page).click();
 
     await expect(page.getByRole('alert')).toBeVisible();
-    await expect(field(page, AR.login.code)).toBeHidden();
+    await expect(field(page, t.login.code)).toBeHidden();
   });
 });
 
@@ -323,17 +326,17 @@ test.describe('the password field', () => {
   test('reveals and re-masks the password', async ({ page }) => {
     await page.goto('/login');
 
-    const password = field(page, AR.login.password);
+    const password = field(page, t.login.password);
     await password.fill(PASSWORD as string);
 
     await expect(password).toHaveAttribute('type', 'password');
 
-    await page.getByRole('button', { name: AR.login.showPassword }).click();
+    await page.getByRole('button', { name: t.login.showPassword }).click();
     await expect(password).toHaveAttribute('type', 'text');
     // The value survives the switch — a toggle that clears the field is worse than none.
     await expect(password).toHaveValue(PASSWORD as string);
 
-    await page.getByRole('button', { name: AR.login.hidePassword }).click();
+    await page.getByRole('button', { name: t.login.hidePassword }).click();
     await expect(password).toHaveAttribute('type', 'password');
   });
 
@@ -349,9 +352,9 @@ test.describe('the password field', () => {
   test('the eye is positioned inside the input', async ({ page }) => {
     await page.goto('/login');
 
-    const input = await field(page, AR.login.password).boundingBox();
+    const input = await field(page, t.login.password).boundingBox();
     const eye = await page
-      .getByRole('button', { name: AR.login.showPassword })
+      .getByRole('button', { name: t.login.showPassword })
       .boundingBox();
 
     expect(input, 'password input has no box').not.toBeNull();
@@ -381,13 +384,13 @@ test.describe('the password field', () => {
   /** It must not submit the form it sits inside. */
   test('toggling does not submit the form', async ({ page }) => {
     await page.goto('/login');
-    await field(page, AR.login.email).fill(EMAIL as string);
-    await field(page, AR.login.password).fill(PASSWORD as string);
+    await field(page, t.login.email).fill(EMAIL as string);
+    await field(page, t.login.password).fill(PASSWORD as string);
 
-    await page.getByRole('button', { name: AR.login.showPassword }).click();
+    await page.getByRole('button', { name: t.login.showPassword }).click();
 
     // Still on step one: no code field, no error.
-    await expect(field(page, AR.login.code)).toBeHidden();
+    await expect(field(page, t.login.code)).toBeHidden();
     await expect(submit(page)).toBeVisible();
   });
 });

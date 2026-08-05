@@ -1,6 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { AR } from '../apps/admin/src/lib/strings.js';
+// The catalogue source directly, not through the admin app: Playwright loads these
+// files as CommonJS, and `@safra/i18n` is ESM-only, so going via `lib/strings.ts`
+// makes Node resolve the package and fail on the missing `require` condition.
+import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -25,34 +28,34 @@ test.use({ storageState: STAFF_STATE });
 
 /** Every section: its route, its heading, and whether it is backed by data yet. */
 const SECTIONS = [
-  { path: '/', title: AR.admin.title, built: true },
-  { path: '/bookings', title: AR.nav.bookings, built: true },
-  { path: '/partners', title: AR.nav.partners, built: true },
-  { path: '/properties', title: AR.nav.properties, built: true },
-  { path: '/customers', title: AR.nav.customers, built: true },
-  { path: '/staff', title: AR.nav.staff, built: true },
-  { path: '/payments', title: AR.nav.payments, built: true },
-  { path: '/wallet', title: AR.nav.wallet, built: true },
-  { path: '/giftcards', title: AR.nav.giftCards, built: true },
-  { path: '/coupons', title: AR.nav.coupons, built: true },
-  { path: '/geo', title: AR.nav.geo, built: true },
-  { path: '/reports', title: AR.nav.reports, built: true },
-  { path: '/settings', title: AR.nav.settings, built: true },
-  { path: '/audit', title: AR.nav.audit, built: true },
-  { path: '/emergency', title: AR.admin.emergencyMode, built: true },
+  { path: '/', title: t.admin.title, built: true },
+  { path: '/bookings', title: t.nav.bookings, built: true },
+  { path: '/partners', title: t.nav.partners, built: true },
+  { path: '/properties', title: t.nav.properties, built: true },
+  { path: '/customers', title: t.nav.customers, built: true },
+  { path: '/staff', title: t.nav.staff, built: true },
+  { path: '/payments', title: t.nav.payments, built: true },
+  { path: '/wallet', title: t.nav.wallet, built: true },
+  { path: '/giftcards', title: t.nav.giftCards, built: true },
+  { path: '/coupons', title: t.nav.coupons, built: true },
+  { path: '/geo', title: t.nav.geo, built: true },
+  { path: '/reports', title: t.nav.reports, built: true },
+  { path: '/settings', title: t.nav.settings, built: true },
+  { path: '/audit', title: t.nav.audit, built: true },
+  { path: '/emergency', title: t.admin.emergencyMode, built: true },
   /*
     These four were `built: false` until 2026-08-04, when the schema they needed landed —
     `disputes`, `conversations`/`messages`, `notifications`, `advertisers`/`ad_campaigns`. All
     nineteen sections are now backed by real tables, so nothing on this list is a placeholder.
   */
-  { path: '/ads', title: AR.nav.ads, built: true },
-  { path: '/disputes', title: AR.nav.disputes, built: true },
-  { path: '/messages', title: AR.nav.messages, built: true },
-  { path: '/comms', title: AR.nav.whatsapp, built: true },
+  { path: '/ads', title: t.nav.ads, built: true },
+  { path: '/disputes', title: t.nav.disputes, built: true },
+  { path: '/messages', title: t.nav.messages, built: true },
+  { path: '/comms', title: t.nav.whatsapp, built: true },
 ] as const;
 
 /** The failure message every section renders when its fetch does not parse. */
-const LOAD_FAILED = AR.dashboard.queueFailed;
+const LOAD_FAILED = t.dashboard.queueFailed;
 
 test.describe('every admin section the design specifies', () => {
   for (const section of SECTIONS) {
@@ -72,14 +75,14 @@ test.describe('every admin section the design specifies', () => {
        * only cheap way to catch a schema that drifted from its endpoint.
        */
       await expect(page.getByText(LOAD_FAILED)).toBeHidden();
-      await expect(page.getByText(AR.dashboard.countersFailed)).toBeHidden();
+      await expect(page.getByText(t.dashboard.countersFailed)).toBeHidden();
 
       /*
         Nothing may render the "not built" panel any more. This assertion is the one that would
         catch a regression to a placeholder, and it is stated for EVERY section rather than only
         the ones that used to be unbuilt.
       */
-      await expect(page.getByText(AR.unbuilt.heading)).toBeHidden();
+      await expect(page.getByText(t.unbuilt.heading)).toBeHidden();
       expect(section.built).toBe(true);
     });
   }
@@ -131,8 +134,8 @@ test.describe('the section tables behave like tables', () => {
 
     test.skip(word.length < 3, 'The seeded partner name is too short to search on');
 
-    await page.getByPlaceholder(AR.sections.partners.searchPlaceholder).fill(word);
-    await page.getByRole('button', { name: AR.table.search }).click();
+    await page.getByPlaceholder(t.sections.partners.searchPlaceholder).fill(word);
+    await page.getByRole('button', { name: t.table.search }).click();
 
     await expect(page).toHaveURL(new RegExp(`q=${encodeURIComponent(word)}`));
     await expect(page.getByText(LOAD_FAILED)).toBeHidden();
@@ -143,7 +146,7 @@ test.describe('the section tables behave like tables', () => {
     await page.goto('/customers');
 
     const firstReference = await firstCell(page);
-    const next = page.getByRole('link', { name: AR.table.nextPage });
+    const next = page.getByRole('link', { name: t.table.nextPage });
 
     test.skip((await next.count()) === 0, 'Not enough seeded customers to page');
 
@@ -162,8 +165,8 @@ test.describe('the section tables behave like tables', () => {
   test('the booking status filter narrows the result set', async ({ page }) => {
     await page.goto('/bookings');
 
-    await page.getByLabel(AR.table.colStatus).selectOption('cancelled');
-    await page.getByRole('button', { name: AR.table.search }).click();
+    await page.getByLabel(t.table.colStatus).selectOption('cancelled');
+    await page.getByRole('button', { name: t.table.search }).click();
 
     await expect(page).toHaveURL(/status=cancelled/);
 
@@ -172,7 +175,7 @@ test.describe('the section tables behave like tables', () => {
     expect(statuses.length).toBeGreaterThan(0);
 
     for (const status of statuses) {
-      expect(status.trim()).toBe(AR.bookingStatus['cancelled']);
+      expect(status.trim()).toBe(t.bookingStatus['cancelled']);
     }
   });
 });
@@ -194,7 +197,7 @@ test.describe('honesty rules the design and the register require', () => {
     await expect(row.locator('td', { hasText: '✓' })).toHaveCount(1);
 
     // And the design's third state is disclaimed rather than drawn.
-    await expect(page.getByText(AR.sections.staff.noApprovalTier)).toBeVisible();
+    await expect(page.getByText(t.sections.staff.noApprovalTier)).toBeVisible();
     await expect(page.locator('table td', { hasText: '○' })).toHaveCount(0);
   });
 
@@ -202,9 +205,9 @@ test.describe('honesty rules the design and the register require', () => {
   test('the audit log declares itself append-only', async ({ page }) => {
     await page.goto('/audit');
 
-    await expect(page.getByText(AR.sections.audit.immutable)).toBeVisible();
+    await expect(page.getByText(t.sections.audit.immutable)).toBeVisible();
     await expect(
-      page.getByRole('columnheader', { name: AR.sections.audit.colIp }),
+      page.getByRole('columnheader', { name: t.sections.audit.colIp }),
     ).toBeVisible();
   });
 
@@ -219,11 +222,11 @@ test.describe('honesty rules the design and the register require', () => {
   }) => {
     await page.goto('/emergency');
 
-    const arm = page.getByRole('button', { name: AR.admin.handle });
+    const arm = page.getByRole('button', { name: t.admin.handle });
 
     await expect(arm).toBeDisabled();
     await expect(
-      page.getByRole('button', { name: AR.sections.emergency.activate }),
+      page.getByRole('button', { name: t.sections.emergency.activate }),
     ).toHaveCount(0);
   });
 
@@ -231,7 +234,7 @@ test.describe('honesty rules the design and the register require', () => {
   test('gift cards show only the last four characters', async ({ page }) => {
     await page.goto('/giftcards');
 
-    await expect(page.getByText(AR.sections.giftcards.codeNote)).toBeVisible();
+    await expect(page.getByText(t.sections.giftcards.codeNote)).toBeVisible();
   });
 
   /**
@@ -245,13 +248,13 @@ test.describe('honesty rules the design and the register require', () => {
   test('a dispute cannot be closed without a resolution', async ({ page }) => {
     await page.goto('/disputes');
 
-    const open = page.getByRole('button', { name: AR.sections.disputes.open }).first();
+    const open = page.getByRole('button', { name: t.sections.disputes.open }).first();
 
     test.skip((await open.count()) === 0, 'No open dispute in the seeded data');
 
     await open.click();
 
-    const confirm = page.getByRole('button', { name: AR.sections.disputes.confirmClose });
+    const confirm = page.getByRole('button', { name: t.sections.disputes.confirmClose });
 
     await expect(confirm).toBeDisabled();
 
@@ -275,8 +278,8 @@ test.describe('honesty rules the design and the register require', () => {
   test('unresolved disputes state the payout freeze', async ({ page }) => {
     await page.goto('/disputes');
 
-    await expect(page.getByText(AR.sections.disputes.frozen).first()).toBeVisible();
-    await expect(page.getByText(AR.sections.disputes.note)).toBeVisible();
+    await expect(page.getByText(t.sections.disputes.frozen).first()).toBeVisible();
+    await expect(page.getByText(t.sections.disputes.note)).toBeVisible();
   });
 
   /**
@@ -289,9 +292,9 @@ test.describe('honesty rules the design and the register require', () => {
   test('the comms log admits WhatsApp is not wired', async ({ page }) => {
     await page.goto('/comms');
 
-    await expect(page.getByText(AR.sections.comms.whatsappBlocked)).toBeVisible();
+    await expect(page.getByText(t.sections.comms.whatsappBlocked)).toBeVisible();
     // And the inert template is labelled rather than hidden.
-    await expect(page.getByText(AR.sections.comms.notWired).first()).toBeVisible();
+    await expect(page.getByText(t.sections.comms.notWired).first()).toBeVisible();
   });
 
   /**
@@ -304,7 +307,7 @@ test.describe('honesty rules the design and the register require', () => {
   test('the ads screen states that ads never affect ranking', async ({ page }) => {
     await page.goto('/ads');
 
-    await expect(page.getByText(AR.sections.ads.noRanking)).toBeVisible();
+    await expect(page.getByText(t.sections.ads.noRanking)).toBeVisible();
   });
 
   /**
@@ -322,7 +325,7 @@ test.describe('honesty rules the design and the register require', () => {
 
     await thread.click();
     await page.getByRole('textbox').first().fill('اتصل بي على 0944123456 بخصوص الحجز');
-    await page.getByRole('button', { name: AR.sections.messages.reply }).click();
+    await page.getByRole('button', { name: t.sections.messages.reply }).click();
 
     // The number is gone; the mask is visible; the booking word survived.
     await expect(page.getByText('0944123456')).toHaveCount(0);
@@ -341,12 +344,12 @@ test.describe('honesty rules the design and the register require', () => {
     await page.goto('/staff');
 
     await expect(
-      page.getByRole('heading', { name: AR.sections.staff.scopeTitle }),
+      page.getByRole('heading', { name: t.sections.staff.scopeTitle }),
     ).toBeVisible();
-    await expect(page.getByText(AR.sections.staff.scopeNote)).toBeVisible();
+    await expect(page.getByText(t.sections.staff.scopeNote)).toBeVisible();
 
     // A super admin is shown as unscopable rather than as "all cities".
-    await expect(page.getByText(AR.sections.staff.scopeSuperAdmin).first()).toBeVisible();
+    await expect(page.getByText(t.sections.staff.scopeSuperAdmin).first()).toBeVisible();
   });
 
   /**
@@ -360,7 +363,7 @@ test.describe('honesty rules the design and the register require', () => {
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('link', { name: AR.table.exportCsv }).click(),
+      page.getByRole('link', { name: t.table.exportCsv }).click(),
     ]);
 
     expect(download.suggestedFilename()).toBe('safra-bookings.csv');
@@ -397,7 +400,7 @@ test.describe('honesty rules the design and the register require', () => {
   }) => {
     await page.goto('/payments');
 
-    await expect(page.getByText(AR.sections.payments.payoutsMissing)).toBeVisible();
+    await expect(page.getByText(t.sections.payments.payoutsMissing)).toBeVisible();
   });
 });
 
