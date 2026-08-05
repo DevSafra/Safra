@@ -1,7 +1,8 @@
 import { getWalletTransactions, type WalletItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { money, shortDateTime } from '@/lib/format';
-import { ConsolePanel, ConsoleShell, Pager } from '@/components/console-shell';
+import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import {
   AdminTable,
   FootNote,
@@ -31,10 +32,10 @@ export default async function WalletPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, cursor } = await listParams(searchParams);
+  const { q, page, size } = await listParams(searchParams);
 
   const [result, counts] = await Promise.all([
-    getWalletTransactions({ q, cursor }),
+    getWalletTransactions({ q, page, limit: size }),
     sidebarCounts(),
   ]);
 
@@ -44,6 +45,7 @@ export default async function WalletPage({
         <TableToolbar
           action="/wallet"
           query={q}
+          size={size}
           placeholder={t.sections.wallet.searchPlaceholder}
         />
 
@@ -61,7 +63,15 @@ export default async function WalletPage({
               minWidth={820}
               empty={t.table.empty}
             />
-            <Pager basePath="/wallet" query={{ q }} nextCursor={result.nextCursor} />
+            <TablePagination
+              basePath="/wallet"
+              query={{ q }}
+              page={result.page}
+              pages={result.pages}
+              total={result.total}
+              capped={result.capped}
+              size={size}
+            />
           </>
         )}
 

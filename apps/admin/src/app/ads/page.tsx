@@ -1,13 +1,8 @@
 import { getCampaigns, type CampaignItem, type Campaigns } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { amount, count, percent, shortDate } from '@/lib/format';
-import {
-  ConsolePanel,
-  ConsoleShell,
-  Kpi,
-  KpiRow,
-  Pager,
-} from '@/components/console-shell';
+import { ConsolePanel, ConsoleShell, Kpi, KpiRow } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import {
   AdminTable,
   FootNote,
@@ -47,10 +42,10 @@ export default async function AdsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, cursor } = await listParams(searchParams);
+  const { q, page, size } = await listParams(searchParams);
 
   const [result, counts] = await Promise.all([
-    getCampaigns({ q, cursor }),
+    getCampaigns({ q, page, limit: size }),
     sidebarCounts(),
   ]);
 
@@ -72,6 +67,7 @@ export default async function AdsPage({
             <TableToolbar
               action="/ads"
               query={q}
+              size={size}
               placeholder={t.sections.ads.searchPlaceholder}
             />
 
@@ -83,7 +79,15 @@ export default async function AdsPage({
               minWidth={860}
               empty={t.table.empty}
             />
-            <Pager basePath="/ads" query={{ q }} nextCursor={result.nextCursor} />
+            <TablePagination
+              basePath="/ads"
+              query={{ q }}
+              page={result.page}
+              pages={result.pages}
+              total={result.total}
+              capped={result.capped}
+              size={size}
+            />
 
             <FootNote>{t.sections.ads.note}</FootNote>
             <FootNote>{t.sections.ads.noRanking}</FootNote>

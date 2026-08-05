@@ -2,21 +2,20 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { COUNT_CAP, type OffsetPage, type PageQuery, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { badRequest } from '../common/errors/app-error.js';
 
 /**
  * The console's registry reads: partners, properties and customers (design handoff §8).
  *
  * ## Why these three share a service
  *
- * They are the same operation on three tables — a keyset-paginated, searchable list of an
- * entity the operator then opens. Splitting them into three files would triple the cursor
- * handling and the search-condition assembly for no boundary anybody has to respect; the
+ * They are the same operation on three tables — a page-numbered, searchable list of an
+ * entity the operator then opens. Splitting them into three files would triple the paging
+ * and the search-condition assembly for no boundary anybody has to respect; the
  * genuine domain logic (verifying a partner, reviewing a listing) already lives in
  * `ReviewService` and is untouched by this. This service reads; it never decides.
  *
@@ -29,36 +28,31 @@ export class RegistryService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   /**
-   * Shared keyset bound.
+   * The row count for a page, over the SAME `FROM … WHERE` the list uses.
    *
-   * Compared at full timestamp precision on purpose: rows written in one transaction share a
-   * `created_at` to the microsecond, and a millisecond-truncated bound ends the page there —
-   * the client sees an empty next page and believes it reached the end.
+   * Sharing one fragment between the list and the count is the whole point, not tidiness: a count
+   * built from a separately written predicate drifts from the list it describes, and "2,531 سجل"
+   * above a table that runs out at 400 is worse than showing no total.
+   *
+   * `::text` because a `bigint` reaches the driver as a string.
    */
-  private cursorBound(cursor: string | undefined, alias: string): SQL | null {
-    if (cursor === undefined) return null;
+  private async countOf(fromWhere: SQL): Promise<number> {
+    /*
+      Counted over a LIMIT-ed subquery, so the database stops reading at COUNT_CAP + 1 rows
+      instead of scanning the whole matching set. An uncapped count(*) is unbounded work on
+      every page view of an ever-growing table — which rule 2 forbids — and nobody reading a
+      console table needs to know the exact size of a set they will never page through.
+    */
+    const result = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (SELECT 1 ${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
 
-    const after = decodeCursor(cursor);
-
-    // A 400, never a silent restart from page 1 — that turns into an infinite client loop.
-    if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
-
-    return sql`(${sql.raw(alias)}.created_at, ${sql.raw(alias)}.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`;
+    return Number(result.rows[0]?.n ?? 0);
   }
 
-  private page<TRow extends { id: string; created_at: string }, TOut>(
-    rows: readonly TRow[],
-    limit: number,
-    map: (row: TRow) => TOut,
-  ): CursorPage<TOut> {
-    const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
-    const last = items.at(-1);
-
-    return {
-      items: items.map(map),
-      nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
-    };
+  /** `OFFSET` for a 1-based page. */
+  private pageOffset(query: PageQuery): SQL {
+    return sql`OFFSET ${(query.page - 1) * query.limit}`;
   }
 
   // ── الشركاء ────────────────────────────────────────────────────────────────
@@ -73,10 +67,10 @@ export class RegistryService {
    */
   async partners(query: {
     limit: number;
-    cursor?: string | undefined;
+    page: number;
     q?: string | undefined;
     actor?: AccessTokenClaims | undefined;
-  }): Promise<CursorPage<PartnerRow>> {
+  }): Promise<OffsetPage<PartnerRow>> {
     const conditions: SQL[] = [scopeFilter(query.actor, 'pt.city_id')];
 
     if (query.q) {
@@ -89,13 +83,18 @@ export class RegistryService {
       );
     }
 
-    const bound = this.cursorBound(query.cursor, 'pt');
-    if (bound) conditions.push(bound);
-
     const where =
       conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
-    const result = await this.db.execute<PartnerRowSql>(sql`
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM partners pt
+      LEFT JOIN partner_types ty ON ty.id = pt.partner_type_id
+      LEFT JOIN cities ci        ON ci.id = pt.city_id
+      ${where}`;
+
+    const [result, total] = await Promise.all([
+      this.db.execute<PartnerRowSql>(sql`
       SELECT pt.id, pt.reference, pt.legal_name, pt.display_name,
              pt.score, pt.tier::text AS tier,
              pt.verification::text   AS verification,
@@ -106,28 +105,31 @@ export class RegistryService {
              coalesce(ci.name_ar, '—') AS city,
              to_char(pt.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at
-      FROM partners pt
-      LEFT JOIN partner_types ty ON ty.id = pt.partner_type_id
-      LEFT JOIN cities ci        ON ci.id = pt.city_id
-      ${where}
-      ORDER BY pt.created_at DESC, pt.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+        ${fromWhere}
+        ORDER BY pt.created_at DESC, pt.id DESC
+        LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    return this.page(result.rows, query.limit, (row) => ({
-      reference: row.reference,
-      legalName: row.legal_name,
-      displayName: row.display_name,
-      partnerType: row.partner_type,
-      city: row.city,
-      score: row.score,
-      tier: row.tier,
-      verification: row.verification,
-      suspended: row.suspended_at !== null,
-      avgResponseMinutes: row.avg_response_minutes,
-      cancellationCount: row.cancellation_count,
-      complaintCount: row.complaint_count,
-    }));
+    return offsetPage(
+      result.rows.map((row) => ({
+        reference: row.reference,
+        legalName: row.legal_name,
+        displayName: row.display_name,
+        partnerType: row.partner_type,
+        city: row.city,
+        score: row.score,
+        tier: row.tier,
+        verification: row.verification,
+        suspended: row.suspended_at !== null,
+        avgResponseMinutes: row.avg_response_minutes,
+        cancellationCount: row.cancellation_count,
+        complaintCount: row.complaint_count,
+      })),
+      total,
+      query,
+    );
   }
 
   // ── العقارات ───────────────────────────────────────────────────────────────
@@ -135,10 +137,10 @@ export class RegistryService {
   /** The listing registry. Carries the partner name, as the design's الشريك column needs it. */
   async properties(query: {
     limit: number;
-    cursor?: string | undefined;
+    page: number;
     q?: string | undefined;
     actor?: AccessTokenClaims | undefined;
-  }): Promise<CursorPage<PropertyRow>> {
+  }): Promise<OffsetPage<PropertyRow>> {
     const conditions: SQL[] = [scopeFilter(query.actor, 'pr.city_id')];
 
     if (query.q) {
@@ -151,13 +153,19 @@ export class RegistryService {
       );
     }
 
-    const bound = this.cursorBound(query.cursor, 'pr');
-    if (bound) conditions.push(bound);
-
     const where =
       conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
-    const result = await this.db.execute<PropertyRowSql>(sql`
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM properties pr
+      LEFT JOIN property_types ty ON ty.id = pr.property_type_id
+      LEFT JOIN cities ci         ON ci.id = pr.city_id
+      LEFT JOIN partners pt       ON pt.id = pr.partner_id
+      ${where}`;
+
+    const [result, total] = await Promise.all([
+      this.db.execute<PropertyRowSql>(sql`
       SELECT pr.id, pr.reference, pr.name_ar, pr.name_en,
              pr.status::text            AS status,
              coalesce(ty.code, '—')     AS property_type,
@@ -166,25 +174,27 @@ export class RegistryService {
              pt.reference               AS partner_reference,
              to_char(pr.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at
-      FROM properties pr
-      LEFT JOIN property_types ty ON ty.id = pr.property_type_id
-      LEFT JOIN cities ci         ON ci.id = pr.city_id
-      LEFT JOIN partners pt       ON pt.id = pr.partner_id
-      ${where}
-      ORDER BY pr.created_at DESC, pr.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+        ${fromWhere}
+        ORDER BY pr.created_at DESC, pr.id DESC
+        LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    return this.page(result.rows, query.limit, (row) => ({
-      reference: row.reference,
-      nameAr: row.name_ar,
-      nameEn: row.name_en,
-      propertyType: row.property_type,
-      city: row.city,
-      partner: row.partner,
-      partnerReference: row.partner_reference,
-      status: row.status,
-    }));
+    return offsetPage(
+      result.rows.map((row) => ({
+        reference: row.reference,
+        nameAr: row.name_ar,
+        nameEn: row.name_en,
+        propertyType: row.property_type,
+        city: row.city,
+        partner: row.partner,
+        partnerReference: row.partner_reference,
+        status: row.status,
+      })),
+      total,
+      query,
+    );
   }
 
   // ── العملاء ────────────────────────────────────────────────────────────────
@@ -202,9 +212,9 @@ export class RegistryService {
    */
   async customers(query: {
     limit: number;
-    cursor?: string | undefined;
+    page: number;
     q?: string | undefined;
-  }): Promise<CursorPage<CustomerRow>> {
+  }): Promise<OffsetPage<CustomerRow>> {
     const conditions: SQL[] = [sql`c.deleted_at IS NULL`];
 
     if (query.q) {
@@ -215,12 +225,21 @@ export class RegistryService {
       );
     }
 
-    const bound = this.cursorBound(query.cursor, 'c');
-    if (bound) conditions.push(bound);
-
     const where = sql`WHERE ${sql.join(conditions, sql` AND `)}`;
 
-    const result = await this.db.execute<CustomerRowSql>(sql`
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM customer_profiles c
+      LEFT JOIN (
+      SELECT customer_profile_id, count(*) AS n, max(created_at) AS last_at
+      FROM bookings GROUP BY customer_profile_id
+      ) b ON b.customer_profile_id = c.id
+      LEFT JOIN wallets w     ON w.customer_profile_id = c.id AND w.deleted_at IS NULL
+      LEFT JOIN currencies cur ON cur.id = w.currency_id
+      ${where}`;
+
+    const [result, total] = await Promise.all([
+      this.db.execute<CustomerRowSql>(sql`
       SELECT c.id, c.reference, c.full_name, c.is_guest,
              coalesce(b.n, 0)::int      AS bookings,
              w.balance::text            AS wallet_balance,
@@ -229,27 +248,26 @@ export class RegistryService {
                AS last_activity,
              to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at
-      FROM customer_profiles c
-      LEFT JOIN (
-        SELECT customer_profile_id, count(*) AS n, max(created_at) AS last_at
-        FROM bookings GROUP BY customer_profile_id
-      ) b ON b.customer_profile_id = c.id
-      LEFT JOIN wallets w     ON w.customer_profile_id = c.id AND w.deleted_at IS NULL
-      LEFT JOIN currencies cur ON cur.id = w.currency_id
-      ${where}
-      ORDER BY c.created_at DESC, c.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+        ${fromWhere}
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    return this.page(result.rows, query.limit, (row) => ({
-      reference: row.reference,
-      fullName: row.full_name,
-      isGuest: row.is_guest,
-      bookings: row.bookings,
-      walletBalance: row.wallet_balance,
-      walletCurrency: row.wallet_currency,
-      lastActivity: row.last_activity,
-    }));
+    return offsetPage(
+      result.rows.map((row) => ({
+        reference: row.reference,
+        fullName: row.full_name,
+        isGuest: row.is_guest,
+        bookings: row.bookings,
+        walletBalance: row.wallet_balance,
+        walletCurrency: row.wallet_currency,
+        lastActivity: row.last_activity,
+      })),
+      total,
+      query,
+    );
   }
 }
 

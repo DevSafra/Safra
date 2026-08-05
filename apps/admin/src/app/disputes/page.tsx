@@ -3,13 +3,8 @@ import Link from 'next/link';
 import { getDisputes, type DisputeItem, type Disputes } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { amount, count, shortDateTime } from '@/lib/format';
-import {
-  ConsolePanel,
-  ConsoleShell,
-  Kpi,
-  KpiRow,
-  Pager,
-} from '@/components/console-shell';
+import { ConsolePanel, ConsoleShell, Kpi, KpiRow } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import { FootNote, Ltr, StatusPill, type Tone } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { CloseDisputeForm } from '@/components/close-dispute-form';
@@ -38,14 +33,14 @@ export default async function DisputesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, cursor } = await listParams(searchParams);
+  const { q, page, size } = await listParams(searchParams);
   const params = await searchParams;
   const rawStatus = params['status'];
   const status =
     (Array.isArray(rawStatus) ? rawStatus[0] : rawStatus)?.trim() || undefined;
 
   const [result, counts] = await Promise.all([
-    getDisputes({ q, cursor, status }),
+    getDisputes({ q, status, page, limit: size }),
     sidebarCounts(),
   ]);
 
@@ -67,6 +62,7 @@ export default async function DisputesPage({
             <TableToolbar
               action="/disputes"
               query={q}
+              size={size}
               placeholder={t.sections.disputes.searchPlaceholder}
             >
               <select
@@ -96,10 +92,14 @@ export default async function DisputesPage({
               </div>
             )}
 
-            <Pager
+            <TablePagination
               basePath="/disputes"
               query={{ q, status }}
-              nextCursor={result.nextCursor}
+              page={result.page}
+              pages={result.pages}
+              total={result.total}
+              capped={result.capped}
+              size={size}
             />
             <FootNote>{t.sections.disputes.note}</FootNote>
           </ConsolePanel>

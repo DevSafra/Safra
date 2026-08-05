@@ -1,10 +1,12 @@
 import { getAuditActions, getAuditLog, type AuditEntry } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { clock, shortDate } from '@/lib/format';
-import { ConsolePanel, ConsoleShell, Pager } from '@/components/console-shell';
+import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import { AdminTable, Ltr, type AdminColumn } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, auditAction, roleName } from '@/lib/strings';
+import { pageNumber, pageSize } from '@/lib/search-params';
 
 /**
  * سجل التدقيق (SRS §15, design handoff §8).
@@ -53,10 +55,16 @@ export default async function AuditPage({
 
   const action = first('action');
   const q = first('q');
-  const cursor = first('cursor');
+  const page = pageNumber(first('page'));
+  /*
+    Rows per page from the URL, replacing a hardcoded 50. The audit log is the one table where a
+    reader routinely wants a long page — reconstructing what happened means reading a sequence,
+    not a screenful — so letting them ask for 100 matters more here than anywhere else.
+  */
+  const size = pageSize(first('size'));
 
-  const [page, actionList, counts] = await Promise.all([
-    getAuditLog({ action, actorEmail: q, cursor, limit: '50' }),
+  const [entries, actionList, counts] = await Promise.all([
+    getAuditLog({ action, actorEmail: q, page: String(page), limit: String(size) }),
     getAuditActions(),
     sidebarCounts(),
   ]);
@@ -78,6 +86,7 @@ export default async function AuditPage({
         <TableToolbar
           action="/audit"
           query={q}
+          size={size}
           placeholder={t.sections.audit.searchPlaceholder}
         >
           <select
@@ -95,21 +104,29 @@ export default async function AuditPage({
           </select>
         </TableToolbar>
 
-        {page === 'unauthenticated' ? (
+        {entries === 'unauthenticated' ? (
           <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
-        ) : page === 'failed' ? (
+        ) : entries === 'failed' ? (
           <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
               columns={COLUMNS}
-              rows={page.items}
+              rows={entries.items}
               template={TEMPLATE}
               rowKey={(row) => row.id}
               minWidth={800}
               empty={t.table.empty}
             />
-            <Pager basePath="/audit" query={{ q, action }} nextCursor={page.nextCursor} />
+            <TablePagination
+              basePath="/audit"
+              query={{ q, action }}
+              page={entries.page}
+              pages={entries.pages}
+              total={entries.total}
+              capped={entries.capped}
+              size={size}
+            />
           </>
         )}
       </ConsolePanel>

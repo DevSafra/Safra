@@ -8,8 +8,10 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { z } from 'zod';
 
 import {
   PERMISSIONS as P,
@@ -21,6 +23,7 @@ import {
   staffInviteSchema,
   staffRoleChangeSchema,
   staffStatusSchema,
+  pageQuerySchema,
 } from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
@@ -41,10 +44,30 @@ import { StaffService } from './staff.service.js';
 export class StaffController {
   constructor(private readonly staff: StaffService) {}
 
+  /**
+   * A page of staff accounts.
+   *
+   * Shape changed 2026-08-05 from `{ staff: [...] }` to a numbered page. The old form returned
+   * every row, which rule 2 has forbidden on list endpoints since the project started — a staff
+   * list sounds small, and it is 165 rows on the development database and grows with the company.
+   *
+   * `staff` is kept as an alias for `items` so the console's schema and any other reader keep
+   * working through the change; both name the same array.
+   */
   @Get()
   @RequirePermissions(P.STAFF_MANAGE)
-  async list() {
-    return { staff: await this.staff.list() };
+  async list(
+    @Query(new ZodValidationPipe(pageQuerySchema))
+    query: z.infer<typeof pageQuerySchema>,
+  ) {
+    const page = await this.staff.list(query);
+
+    /*
+      Spread, rather than listing the fields: an enumerated copy silently drops any field the page
+      shape grows later, and the client's schema then rejects a 200 as a failed load. That already
+      happened once, when `capped` was added.
+    */
+    return { ...page, staff: page.items };
   }
 
   /**

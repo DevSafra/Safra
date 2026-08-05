@@ -42,7 +42,7 @@ export default async function GeoPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q } = await listParams(searchParams);
+  const { q, size } = await listParams(searchParams);
 
   const [result, counts] = await Promise.all([getGeography(q), sidebarCounts()]);
 
@@ -77,6 +77,7 @@ export default async function GeoPage({
             <TableToolbar
               action="/geo"
               query={q}
+              size={size}
               placeholder={t.sections.geo.searchPlaceholder}
             />
 

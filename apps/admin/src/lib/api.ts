@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 
+import { DEFAULT_PAGE_SIZE } from './search-params';
 import { getStaffSession } from './session-server';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
@@ -292,10 +293,7 @@ const auditEntrySchema = z.object({
 
 export type AuditEntry = z.infer<typeof auditEntrySchema>;
 
-const auditPageSchema = z.object({
-  items: z.array(auditEntrySchema),
-  nextCursor: z.string().nullable(),
-});
+const auditPageSchema = offsetPage(auditEntrySchema);
 
 export async function getAuditLog(params: Record<string, string | undefined>) {
   const query = new URLSearchParams();
@@ -447,8 +445,15 @@ const staffMemberSchema = z.object({
 
 export type StaffMember = z.infer<typeof staffMemberSchema>;
 
-export async function getStaff() {
-  return staffFetch('/admin/staff', z.object({ staff: z.array(staffMemberSchema) }));
+/**
+ * A page of staff accounts.
+ *
+ * `/admin/staff` returned every row until 2026-08-05. The response keeps `staff` as an alias for
+ * `items` so both names work; this reads `items` because that is the numbered-page shape every other
+ * registry uses, and one shape means `TablePagination` needs no special case.
+ */
+export async function getStaff(params: { page?: number | undefined; limit: number }) {
+  return staffFetch(`/admin/staff${listQuery(params)}`, offsetPage(staffMemberSchema));
 }
 
 /**
@@ -502,43 +507,45 @@ export async function getDashboard() {
 // ─── §8 registries, finance and operations ────────────────────────────────────
 
 /**
- * A cursor page, as every registry endpoint returns it.
+ * A numbered page, as every registry endpoint returns it.
  *
- * `nextCursor` is opaque and is passed back verbatim; the console never builds one. Parsing it
- * as a plain string rather than validating its shape is deliberate — the encoding is the
- * server's business and a client that understood it would be a client that could forge it.
+ * `total` and `pages` are what the bar under the table prints, and they come from the server for
+ * the same reason the rows do: the console cannot count what it has not fetched, and a total
+ * inferred from "the page was full" is a guess that reads as a fact.
  */
-function cursorPage<T extends z.ZodTypeAny>(item: T) {
-  return z.object({ items: z.array(item), nextCursor: z.string().nullable() });
+function offsetPage<T extends z.ZodTypeAny>(item: T) {
+  return z.object({
+    items: z.array(item),
+    total: z.number().int(),
+    /** True when the server stopped counting at its cap — printed as "more than". */
+    capped: z.boolean(),
+    page: z.number().int(),
+    pages: z.number().int(),
+  });
 }
 
 /** Query builder for the list endpoints. Omits empty values rather than sending blanks. */
 function listQuery(params: {
   q?: string | undefined;
-  cursor?: string | undefined;
+  page?: number | undefined;
   status?: string | undefined;
   limit?: number | undefined;
 }): string {
   const search = new URLSearchParams();
 
   if (params.q) search.set('q', params.q);
-  if (params.cursor) search.set('cursor', params.cursor);
   if (params.status) search.set('status', params.status);
-  search.set('limit', String(params.limit ?? 25));
+  search.set('page', String(params.page ?? 1));
+  search.set('limit', String(params.limit ?? DEFAULT_PAGE_SIZE));
 
   return `?${search.toString()}`;
 }
 
 export interface ListParams {
   readonly q?: string | undefined;
-  readonly cursor?: string | undefined;
-  /**
-   * Page size, defaulting to 25.
-   *
-   * Only the CSV export passes it, and only to walk the cursor in larger strides. Screens leave it
-   * alone: a page size chosen per screen is a page size that drifts, and the API caps it at 100
-   * regardless.
-   */
+  /** 1-based, as the reader types it. */
+  readonly page?: number | undefined;
+  /** Page size, defaulting to 25. The API caps it at 100 regardless of what is asked for. */
   readonly limit?: number | undefined;
 }
 
@@ -555,7 +562,7 @@ const bookingListItemSchema = z.object({
   status: z.string(),
 });
 
-const bookingListSchema = cursorPage(bookingListItemSchema).extend({
+const bookingListSchema = offsetPage(bookingListItemSchema).extend({
   counts: z.record(z.string(), z.number()),
 });
 
@@ -588,7 +595,7 @@ export type PartnerListItem = z.infer<typeof partnerListItemSchema>;
 export async function getPartnerRegistry(params: ListParams) {
   return staffFetch(
     `/admin/partners${listQuery(params)}`,
-    cursorPage(partnerListItemSchema),
+    offsetPage(partnerListItemSchema),
   );
 }
 
@@ -610,7 +617,7 @@ export type PropertyListItem = z.infer<typeof propertyListItemSchema>;
 export async function getPropertyRegistry(params: ListParams) {
   return staffFetch(
     `/admin/properties${listQuery(params)}`,
-    cursorPage(propertyListItemSchema),
+    offsetPage(propertyListItemSchema),
   );
 }
 
@@ -631,7 +638,7 @@ export type CustomerListItem = z.infer<typeof customerListItemSchema>;
 export async function getCustomers(params: ListParams) {
   return staffFetch(
     `/admin/customers${listQuery(params)}`,
-    cursorPage(customerListItemSchema),
+    offsetPage(customerListItemSchema),
   );
 }
 
@@ -648,7 +655,7 @@ const financeItemSchema = z.object({
   at: z.string(),
 });
 
-const financeSchema = cursorPage(financeItemSchema).extend({
+const financeSchema = offsetPage(financeItemSchema).extend({
   counters: z.object({
     captured_today: z.string(),
     refunded_today: z.string(),
@@ -685,7 +692,7 @@ export type WalletItem = z.infer<typeof walletItemSchema>;
 export async function getWalletTransactions(params: ListParams) {
   return staffFetch(
     `/admin/wallet-transactions${listQuery(params)}`,
-    cursorPage(walletItemSchema),
+    offsetPage(walletItemSchema),
   );
 }
 
@@ -707,7 +714,7 @@ export type GiftCardItem = z.infer<typeof giftCardItemSchema>;
 export async function getGiftCards(params: ListParams) {
   return staffFetch(
     `/admin/gift-cards${listQuery(params)}`,
-    cursorPage(giftCardItemSchema),
+    offsetPage(giftCardItemSchema),
   );
 }
 
@@ -732,7 +739,7 @@ const couponItemSchema = z.object({
 export type CouponItem = z.infer<typeof couponItemSchema>;
 
 export async function getCoupons(params: ListParams) {
-  return staffFetch(`/admin/coupons${listQuery(params)}`, cursorPage(couponItemSchema));
+  return staffFetch(`/admin/coupons${listQuery(params)}`, offsetPage(couponItemSchema));
 }
 
 // ── المدن والدول والعملات ────────────────────────────────────────────────────
@@ -848,10 +855,20 @@ export type StaffScopeRow = z.infer<typeof staffScopeSchema>;
  * has it — but the two are rendered by different components, and merging them would make the
  * permission boundary less obvious than it should be for a map of who can see what.
  */
-export async function getStaffScopes() {
+/**
+ * A page of staff scopes.
+ *
+ * `/admin/staff/scopes` returned every row until 2026-08-05 — 165 on the development database,
+ * fetched on every visit to الموظفون. Keeps `scopes` as an alias for `items` server-side; this
+ * reads `items`, the shape every other paged list uses.
+ */
+export async function getStaffScopes(params: {
+  page?: number | undefined;
+  limit: number;
+}) {
   return staffFetch(
-    '/admin/staff/scopes',
-    z.object({ scopes: z.array(staffScopeSchema) }),
+    `/admin/staff/scopes${listQuery(params)}`,
+    offsetPage(staffScopeSchema),
   );
 }
 
@@ -914,7 +931,7 @@ const disputeItemSchema = z.object({
   freezesPayout: z.boolean(),
 });
 
-const disputesSchema = cursorPage(disputeItemSchema).extend({
+const disputesSchema = offsetPage(disputeItemSchema).extend({
   counters: z.object({
     open: z.number(),
     investigating: z.number(),
@@ -949,7 +966,7 @@ export type ConversationItem = z.infer<typeof conversationItemSchema>;
 export async function getConversations(params: ListParams) {
   return staffFetch(
     `/admin/conversations${listQuery(params)}`,
-    cursorPage(conversationItemSchema),
+    offsetPage(conversationItemSchema),
   );
 }
 
@@ -982,7 +999,7 @@ const notificationItemSchema = z.object({
   at: z.string(),
 });
 
-const notificationsSchema = cursorPage(notificationItemSchema).extend({
+const notificationsSchema = offsetPage(notificationItemSchema).extend({
   counters: z.object({
     windowDays: z.number(),
     byChannel: z.record(z.string(), z.record(z.string(), z.number())),
@@ -1022,7 +1039,7 @@ const campaignItemSchema = z.object({
   daysRemaining: z.number(),
 });
 
-const campaignsSchema = cursorPage(campaignItemSchema).extend({
+const campaignsSchema = offsetPage(campaignItemSchema).extend({
   counters: z.object({
     active: z.number(),
     paused: z.number(),

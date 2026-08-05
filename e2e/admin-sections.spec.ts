@@ -146,13 +146,13 @@ test.describe('the section tables behave like tables', () => {
     await page.goto('/customers');
 
     const firstReference = await firstCell(page);
-    const next = page.getByRole('link', { name: t.table.nextPage });
+    const next = page.getByRole('link', { name: t.table.nextPageShort });
 
     test.skip((await next.count()) === 0, 'Not enough seeded customers to page');
 
     await next.click();
 
-    await expect(page).toHaveURL(/cursor=/);
+    await expect(page).toHaveURL(/page=2/);
     expect(await firstCell(page)).not.toBe(firstReference);
   });
 

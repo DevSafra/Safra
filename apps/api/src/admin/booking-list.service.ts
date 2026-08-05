@@ -2,12 +2,11 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { COUNT_CAP, type OffsetPage, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { badRequest } from '../common/errors/app-error.js';
 
 export interface BookingListRow {
   readonly reference: string;
@@ -24,7 +23,8 @@ export interface BookingListQuery {
   /** The caller, for geographic scope enforcement (§8.2). */
   readonly actor?: AccessTokenClaims | undefined;
   readonly limit: number;
-  readonly cursor?: string | undefined;
+  /** 1-based. The screen shows it, so the API speaks in the same terms. */
+  readonly page: number;
   readonly status?: string | undefined;
   readonly q?: string | undefined;
 }
@@ -55,7 +55,33 @@ export interface BookingListQuery {
 export class BookingListService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
-  async list(query: BookingListQuery): Promise<CursorPage<BookingListRow>> {
+  /**
+   * The row count for a page, over the SAME `FROM … WHERE` the list uses.
+   *
+   * Sharing one fragment between the list and the count is the point, not tidiness: a count built
+   * from a separately written predicate drifts from the list it describes, and a total that
+   * disagrees with what the table can page through is worse than showing no total.
+   */
+  private async countOf(fromWhere: SQL): Promise<number> {
+    /*
+      Counted over a LIMIT-ed subquery, so the database stops reading at COUNT_CAP + 1 rows
+      instead of scanning the whole matching set. An uncapped count(*) is unbounded work on
+      every page view of an ever-growing table — which rule 2 forbids — and nobody reading a
+      console table needs to know the exact size of a set they will never page through.
+    */
+    const result = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (SELECT 1 ${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
+
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
+  /** `OFFSET` for a 1-based page. */
+  private pageOffset(query: { page: number; limit: number }): SQL {
+    return sql`OFFSET ${(query.page - 1) * query.limit}`;
+  }
+
+  async list(query: BookingListQuery): Promise<OffsetPage<BookingListRow>> {
     // Geographic scope first, so it can never be forgotten behind a later `if`.
     const conditions: SQL[] = [scopeFilter(query.actor, 'b.city_id')];
 
@@ -79,33 +105,30 @@ export class BookingListService {
       );
     }
 
-    if (query.cursor !== undefined) {
-      const after = decodeCursor(query.cursor);
-
-      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
-
-      // Full timestamp precision — several bookings written in one transaction share a
-      // `created_at` to the microsecond, and a truncated bound would end the page there.
-      conditions.push(
-        sql`(b.created_at, b.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,
-      );
-    }
-
     const where =
       conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
-    const result = await this.db.execute<{
-      id: string;
-      reference: string;
-      property: string;
-      customer: string;
-      check_in: string;
-      check_out: string;
-      amount: string;
-      currency: string;
-      status: string;
-      created_at: string;
-    }>(sql`
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM bookings b
+      LEFT JOIN properties p         ON p.id = b.property_id
+      LEFT JOIN customer_profiles c  ON c.id = b.customer_profile_id
+      LEFT JOIN currencies cur       ON cur.id = b.currency_id
+      ${where}`;
+
+    const [result, total] = await Promise.all([
+      this.db.execute<{
+        id: string;
+        reference: string;
+        property: string;
+        customer: string;
+        check_in: string;
+        check_out: string;
+        amount: string;
+        currency: string;
+        status: string;
+        created_at: string;
+      }>(sql`
       SELECT b.id, b.reference,
              coalesce(p.name_ar, p.name_en, '—') AS property,
              coalesce(c.full_name, '—')          AS customer,
@@ -116,21 +139,15 @@ export class BookingListService {
              b.status::text                      AS status,
              to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at
-      FROM bookings b
-      LEFT JOIN properties p         ON p.id = b.property_id
-      LEFT JOIN customer_profiles c  ON c.id = b.customer_profile_id
-      LEFT JOIN currencies cur       ON cur.id = b.currency_id
-      ${where}
-      ORDER BY b.created_at DESC, b.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+        ${fromWhere}
+        ORDER BY b.created_at DESC, b.id DESC
+        LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    const hasMore = result.rows.length > query.limit;
-    const page = hasMore ? result.rows.slice(0, query.limit) : result.rows;
-    const last = page.at(-1);
-
-    return {
-      items: page.map((row) => ({
+    return offsetPage(
+      result.rows.map((row) => ({
         reference: row.reference,
         property: row.property,
         customer: row.customer,
@@ -140,8 +157,9 @@ export class BookingListService {
         currency: row.currency,
         status: row.status,
       })),
-      nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
-    };
+      total,
+      query,
+    );
   }
 
   /**

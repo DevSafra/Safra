@@ -1,7 +1,8 @@
 import { getCustomers, type CustomerListItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { count, money, shortDate } from '@/lib/format';
-import { ConsolePanel, ConsoleShell, Pager } from '@/components/console-shell';
+import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import {
   AdminTable,
   FootNote,
@@ -36,10 +37,10 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, cursor } = await listParams(searchParams);
+  const { q, page, size } = await listParams(searchParams);
 
   const [result, counts] = await Promise.all([
-    getCustomers({ q, cursor }),
+    getCustomers({ q, page, limit: size }),
     sidebarCounts(),
   ]);
 
@@ -49,6 +50,7 @@ export default async function CustomersPage({
         <TableToolbar
           action="/customers"
           query={q}
+          size={size}
           placeholder={t.sections.customers.searchPlaceholder}
         />
 
@@ -66,7 +68,15 @@ export default async function CustomersPage({
               minWidth={700}
               empty={t.table.empty}
             />
-            <Pager basePath="/customers" query={{ q }} nextCursor={result.nextCursor} />
+            <TablePagination
+              basePath="/customers"
+              query={{ q }}
+              page={result.page}
+              pages={result.pages}
+              total={result.total}
+              capped={result.capped}
+              size={size}
+            />
           </>
         )}
 

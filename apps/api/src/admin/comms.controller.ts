@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 
-import { PERMISSIONS as P, cursorQuerySchema } from '@safra/contracts';
+import { PERMISSIONS as P, pageQuerySchema } from '@safra/contracts';
 
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
@@ -29,7 +29,7 @@ import {
 } from './partner-contract.service.js';
 import { NOTIFICATION_TEMPLATES } from './notification-templates.js';
 
-const listQuerySchema = cursorQuerySchema.extend({
+const listQuerySchema = pageQuerySchema.extend({
   q: z.string().trim().min(1).max(80).optional(),
 });
 

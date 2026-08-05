@@ -25,6 +25,7 @@ import { t } from '@/lib/strings';
 export function TableToolbar({
   action,
   query,
+  size,
   placeholder,
   children,
   end,
@@ -32,6 +33,8 @@ export function TableToolbar({
   /** Where the form submits — normally the section's own path. */
   readonly action: string;
   readonly query: string | undefined;
+  /** Current rows per page, carried through the search so a submit does not reset it. */
+  readonly size: number;
   /** Arabic placeholder, verbatim from the handoff. */
   readonly placeholder: string;
   /** Extra controls that belong INSIDE the form, e.g. a status select. */
@@ -43,6 +46,14 @@ export function TableToolbar({
     <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
       <form action={action} method="get" className="flex flex-wrap items-center gap-2.5">
         {children}
+
+        {/*
+          The chosen size travels with the search as a hidden field.
+          Without it, submitting a search would drop `?size=` and quietly reset the table to 25
+          rows — the size control now lives in the bar UNDER the table, so this form has no visible
+          size input to carry it.
+        */}
+        <input type="hidden" name="size" value={String(size)} />
 
         <input
           type="search"

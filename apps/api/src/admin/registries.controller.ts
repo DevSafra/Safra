@@ -15,7 +15,7 @@ import { z } from 'zod';
 
 import {
   PERMISSIONS as P,
-  cursorQuerySchema,
+  pageQuerySchema,
   setStaffScopeSchema,
   type SetStaffScopeInput,
 } from '@safra/contracts';
@@ -45,7 +45,7 @@ import {
  * typo'd `?status=` cannot silently return the unfiltered list — which on a registry means
  * quietly showing more than the caller asked for.
  */
-const listQuerySchema = cursorQuerySchema.extend({
+const listQuerySchema = pageQuerySchema.extend({
   /** Free text. Bounded because it reaches a `LIKE` pattern. */
   q: z.string().trim().min(1).max(80).optional(),
 });
@@ -171,8 +171,18 @@ export class RegistriesController {
    */
   @Get('staff/scopes')
   @RequirePermissions(P.STAFF_MANAGE)
-  async staffScopes() {
-    return { scopes: await this.staffScope.list() };
+  async staffScopes(
+    @Query(new ZodValidationPipe(pageQuerySchema))
+    query: z.infer<typeof pageQuerySchema>,
+  ) {
+    const page = await this.staffScope.list(query);
+
+    /*
+      `scopes` kept as an alias for `items` so an existing reader survives the change. Spread
+      rather than enumerated: an enumerated copy silently drops any field the page shape grows
+      later, and the client's schema then rejects a 200 as a failed load.
+    */
+    return { ...page, scopes: page.items };
   }
 
   /**

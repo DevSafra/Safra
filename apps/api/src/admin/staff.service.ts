@@ -1,8 +1,15 @@
 import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { ERROR, isStaffRole, type Role } from '@safra/contracts';
+import {
+  COUNT_CAP,
+  ERROR,
+  isStaffRole,
+  type Role,
+  type OffsetPage,
+  offsetPage,
+} from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { AuthTokenService } from '../auth/auth-token.service.js';
@@ -76,27 +83,67 @@ export class StaffService {
     private readonly tokens: TokenService,
   ) {}
 
-  /** Every staff account, for the console (§9.3). Never includes customers. */
-  async list(): Promise<StaffMember[]> {
-    const rows = await this.db.execute<{
-      id: string;
-      email: string;
-      role: Role;
-      status: string;
-      totp_enabled_at: string | null;
-      password_hash: string | null;
-      last_login_at: string | null;
-      created_at: string;
-    }>(sql`
+  /** The row count for a page, capped, over the same `FROM … WHERE` the list uses. */
+  private async countOf(fromWhere: SQL): Promise<number> {
+    /*
+      Counted over a LIMIT-ed subquery, so the database stops reading at COUNT_CAP + 1 rows
+      instead of scanning the whole matching set. An uncapped count(*) is unbounded work on
+      every page view of an ever-growing table — which rule 2 forbids — and nobody reading a
+      console table needs to know the exact size of a set they will never page through.
+    */
+    const result = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (SELECT 1 ${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
+
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
+  /** `OFFSET` for a 1-based page. */
+  private pageOffset(query: { page: number; limit: number }): SQL {
+    return sql`OFFSET ${(query.page - 1) * query.limit}`;
+  }
+
+  /**
+   * A page of staff accounts, for the console (§9.3). Never includes customers.
+   *
+   * ## Paginated as of 2026-08-05
+   *
+   * This returned EVERY row. Rule 2 has required pagination on every list endpoint since the
+   * project started, and this endpoint was the exception nobody noticed because a staff list
+   * sounds small — it is 165 rows on the development database and grows with the company, and
+   * an unbounded list endpoint is a DoS vector regardless of how slowly it grows.
+   *
+   * Offset-paged, matching every other console registry: the reader picks a page number, so the
+   * count and the page have to describe the same set — see `countOf`.
+   */
+  async list(query: { limit: number; page: number }): Promise<OffsetPage<StaffMember>> {
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM users u
+      WHERE u.role <> 'customer' AND u.role <> 'partner' AND u.deleted_at IS NULL`;
+
+    const [rows, total] = await Promise.all([
+      this.db.execute<{
+        id: string;
+        email: string;
+        role: Role;
+        status: string;
+        totp_enabled_at: string | null;
+        password_hash: string | null;
+        last_login_at: string | null;
+        created_at: string;
+      }>(sql`
       SELECT u.id, u.email, u.role::text AS role, u.status::text AS status,
              u.totp_enabled_at::text, u.password_hash,
              u.last_login_at::text, u.created_at::text
-      FROM users u
-      WHERE u.role <> 'customer' AND u.role <> 'partner' AND u.deleted_at IS NULL
-      ORDER BY u.created_at DESC
-    `);
+      ${fromWhere}
+      ORDER BY u.created_at DESC, u.id DESC
+      LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    return rows.rows.map((row) => ({
+    const items = rows.rows.map((row) => ({
       id: row.id,
       email: row.email,
       role: row.role,
@@ -111,6 +158,8 @@ export class StaffService {
       lastLoginAt: row.last_login_at,
       createdAt: row.created_at,
     }));
+
+    return offsetPage(items, total, query);
   }
 
   /**

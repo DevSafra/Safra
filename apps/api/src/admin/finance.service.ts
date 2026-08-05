@@ -2,12 +2,11 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { COUNT_CAP, type OffsetPage, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { badRequest } from '../common/errors/app-error.js';
 
 export interface FinanceRow {
   /** The human reference of the underlying operation. */
@@ -60,6 +59,26 @@ export interface FinanceCounters {
 @Injectable()
 export class FinanceService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
+
+  /** The row count for a page, capped, over the same `FROM … WHERE` the list uses. */
+  private async countOf(fromWhere: SQL): Promise<number> {
+    /*
+      Counted over a LIMIT-ed subquery, so the database stops reading at COUNT_CAP + 1 rows
+      instead of scanning the whole matching set. An uncapped count(*) is unbounded work on
+      every page view of an ever-growing table — which rule 2 forbids — and nobody reading a
+      console table needs to know the exact size of a set they will never page through.
+    */
+    const result = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (SELECT 1 ${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
+
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
+  /** `OFFSET` for a 1-based page. */
+  private pageOffset(query: { page: number; limit: number }): SQL {
+    return sql`OFFSET ${(query.page - 1) * query.limit}`;
+  }
 
   /**
    * The four KPI cards.
@@ -116,11 +135,10 @@ export class FinanceService {
 
   async list(query: {
     limit: number;
-    cursor?: string | undefined;
+    page: number;
     q?: string | undefined;
     actor?: AccessTokenClaims | undefined;
-  }): Promise<CursorPage<FinanceRow>> {
-    const bound = this.bound(query.cursor);
+  }): Promise<OffsetPage<FinanceRow>> {
     /*
       Scope is applied per union branch, not to the union, so each branch keeps its own index. A
       fine has no booking city of its own and falls back to the partner's, which is where the
@@ -136,19 +154,12 @@ export class FinanceService {
     const search = (columns: SQL): SQL =>
       term === null ? sql`TRUE` : sql`(${columns} ILIKE ${term})`;
 
-    const result = await this.db.execute<{
-      id: string;
-      reference: string;
-      linked_to: string | null;
-      method: string;
-      kind: 'payment' | 'refund' | 'fine';
-      amount: string;
-      currency: string;
-      status: string;
-      created_at: string;
-      at: string;
-    }>(sql`
-      SELECT * FROM (
+    /*
+      The whole union is the fragment, so the count runs over exactly the rows the list pages
+      through. Three branches, one total — a per-branch count would be three numbers nobody
+      asked for and would not add up to the page count anyway.
+    */
+    const fromWhere = sql`FROM (
         SELECT pay.id, pay.reference,
                b.reference                AS linked_to,
                pay.method::text           AS method,
@@ -161,7 +172,7 @@ export class FinanceService {
         FROM payments pay
         LEFT JOIN bookings b   ON b.id = pay.booking_id
         LEFT JOIN currencies cur ON cur.id = pay.currency_id
-        WHERE ${bound('pay')} AND ${scoped('b.city_id')}
+        WHERE ${scoped('b.city_id')}
           AND ${search(sql`pay.reference || ' ' || coalesce(b.reference,'')`)}
 
         UNION ALL
@@ -180,7 +191,7 @@ export class FinanceService {
         LEFT JOIN payments pay2  ON pay2.id = r.payment_id
         LEFT JOIN bookings b2    ON b2.id = r.booking_id
         LEFT JOIN currencies cur2 ON cur2.id = r.currency_id
-        WHERE ${bound('r')} AND ${scoped('b2.city_id')}
+        WHERE ${scoped('b2.city_id')}
           AND ${search(sql`coalesce(pay2.reference,'') || ' ' || coalesce(b2.reference,'')`)}
 
         UNION ALL
@@ -201,19 +212,32 @@ export class FinanceService {
         LEFT JOIN partners p     ON p.id = v.partner_id
         LEFT JOIN bookings b3    ON b3.id = v.booking_id
         LEFT JOIN currencies cur3 ON cur3.id = v.fine_currency_id
-        WHERE ${bound('v')} AND ${scoped('coalesce(b3.city_id, p.city_id)')}
+        WHERE ${scoped('coalesce(b3.city_id, p.city_id)')}
           AND ${search(sql`coalesce(p.reference,'') || ' ' || coalesce(b3.reference,'')`)}
-      ) rows
+      ) rows`;
+
+    const [result, total] = await Promise.all([
+      this.db.execute<{
+        id: string;
+        reference: string;
+        linked_to: string | null;
+        method: string;
+        kind: 'payment' | 'refund' | 'fine';
+        amount: string;
+        currency: string;
+        status: string;
+        created_at: string;
+        at: string;
+      }>(sql`
+      SELECT * ${fromWhere}
       ORDER BY rows.created_at DESC, rows.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+      LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    const hasMore = result.rows.length > query.limit;
-    const page = hasMore ? result.rows.slice(0, query.limit) : result.rows;
-    const last = page.at(-1);
-
-    return {
-      items: page.map((row) => ({
+    return offsetPage(
+      result.rows.map((row) => ({
         reference: row.reference,
         linkedTo: row.linked_to,
         method: row.method,
@@ -223,21 +247,12 @@ export class FinanceService {
         status: row.status,
         at: row.at,
       })),
-      nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
-    };
+      total,
+      query,
+    );
   }
 
   /** The keyset bound, applied per union branch so each keeps its own index. */
-  private bound(cursor: string | undefined): (alias: string) => SQL {
-    if (cursor === undefined) return () => sql`TRUE`;
-
-    const after = decodeCursor(cursor);
-
-    if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
-
-    return (alias) =>
-      sql`(${sql.raw(alias)}.created_at, ${sql.raw(alias)}.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`;
-  }
 
   // ── المحفظة ────────────────────────────────────────────────────────────────
 
@@ -251,9 +266,9 @@ export class FinanceService {
    */
   async wallet(query: {
     limit: number;
-    cursor?: string | undefined;
+    page: number;
     q?: string | undefined;
-  }): Promise<CursorPage<WalletRow>> {
+  }): Promise<OffsetPage<WalletRow>> {
     /*
       NOT scoped, deliberately. A wallet belongs to a CUSTOMER, and a customer belongs to no city —
       they book in Latakia in July and Damascus in August. Scoping this by the booking a transaction
@@ -268,33 +283,33 @@ export class FinanceService {
       conditions.push(sql`(c.full_name ILIKE ${term} OR wt.note ILIKE ${term})`);
     }
 
-    if (query.cursor !== undefined) {
-      const after = decodeCursor(query.cursor);
-
-      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
-
-      conditions.push(
-        sql`(wt.created_at, wt.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,
-      );
-    }
-
     const where =
       conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
-    const result = await this.db.execute<{
-      id: string;
-      customer: string;
-      reference: string | null;
-      direction: string;
-      reason: string;
-      amount: string;
-      currency: string;
-      balance_after: string;
-      note: string | null;
-      booking_reference: string | null;
-      created_at: string;
-      at: string;
-    }>(sql`
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM wallet_transactions wt
+      LEFT JOIN wallets w           ON w.id = wt.wallet_id
+      LEFT JOIN customer_profiles c ON c.id = w.customer_profile_id
+      LEFT JOIN currencies cur      ON cur.id = wt.currency_id
+      LEFT JOIN bookings b          ON b.id = wt.booking_id
+      ${where}`;
+
+    const [result, total] = await Promise.all([
+      this.db.execute<{
+        id: string;
+        customer: string;
+        reference: string | null;
+        direction: string;
+        reason: string;
+        amount: string;
+        currency: string;
+        balance_after: string;
+        note: string | null;
+        booking_reference: string | null;
+        created_at: string;
+        at: string;
+      }>(sql`
       SELECT wt.id,
              coalesce(c.full_name, '—')  AS customer,
              c.reference                 AS reference,
@@ -307,22 +322,15 @@ export class FinanceService {
              b.reference                 AS booking_reference,
              wt.created_at,
              to_char(wt.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at
-      FROM wallet_transactions wt
-      LEFT JOIN wallets w           ON w.id = wt.wallet_id
-      LEFT JOIN customer_profiles c ON c.id = w.customer_profile_id
-      LEFT JOIN currencies cur      ON cur.id = wt.currency_id
-      LEFT JOIN bookings b          ON b.id = wt.booking_id
-      ${where}
+      ${fromWhere}
       ORDER BY wt.created_at DESC, wt.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+      LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    const hasMore = result.rows.length > query.limit;
-    const page = hasMore ? result.rows.slice(0, query.limit) : result.rows;
-    const last = page.at(-1);
-
-    return {
-      items: page.map((row) => ({
+    return offsetPage(
+      result.rows.map((row) => ({
         customer: row.customer,
         customerReference: row.reference,
         direction: row.direction,
@@ -334,8 +342,9 @@ export class FinanceService {
         bookingReference: row.booking_reference,
         at: row.at,
       })),
-      nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
-    };
+      total,
+      query,
+    );
   }
 }
 

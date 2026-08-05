@@ -94,3 +94,115 @@ export function decodeCursor(
     return null;
   }
 }
+
+/**
+ * Page-number pagination, for the staff console's registries.
+ *
+ * ## Why this exists alongside the cursor
+ *
+ * The cursor above is the better mechanism and stays the rule for anything customer-facing. It
+ * cannot do one thing, and that thing was asked for (Bashar, 2026-08-05): show "الصفحة 4 من 102"
+ * with a box to jump to page 40. A cursor addresses a POSITION, not an index — reaching page 40
+ * means walking pages 1 to 39 — so a page number requires `OFFSET`, and a total requires
+ * `count(*)`. There is no third option; a screen that shows a page count is choosing this cost.
+ *
+ * ## What it costs, stated plainly
+ *
+ * - `OFFSET n` makes PostgreSQL produce and discard `n` rows, so deep pages cost more than shallow
+ *   ones. `page` is capped below so a hand-edited URL cannot ask for page ten million.
+ * - `count(*)` over the filtered set is a second query per page load, and an uncapped one is
+ *   unbounded work: counting an ever-growing `audit_log` means reading every matching row before
+ *   the first row of the page can be shown. So it is CAPPED — see `COUNT_CAP`. Past the cap the
+ *   total is reported as "more than 10,000" rather than counted, which trades an exact number
+ *   nobody needs for a constant cost, and keeps rule 2's "nothing that degrades at 1M users".
+ * - An OFFSET page can skip or repeat a row when rows arrive underneath the reader. That is real,
+ *   and it is the honest trade for addressable pages: an operator who can say "page 40" is asking
+ *   for a window on a moving list.
+ *
+ * The customer-facing lists — booking history, wallet statement — stay on the cursor. They are
+ * "load more" surfaces where nobody asks for page 40, so they pay none of this.
+ */
+export const pageQuerySchema = z
+  .object({
+    /**
+     * 1-based, because a person reads it.
+     *
+     * Capped at 100,000: past there the OFFSET cost is not worth serving, and nobody reaches page
+     * 100,000 by intent. A refusal rather than a clamp, so a wrong URL is visible instead of
+     * quietly showing page 1.
+     */
+    page: z.coerce.number().int().min(1).max(100_000).default(1),
+    /** Same ceiling as the cursor query — an unbounded list endpoint is a DoS vector. */
+    limit: z.coerce.number().int().min(1).max(100).default(25),
+  })
+  .strict();
+
+export type PageQuery = z.infer<typeof pageQuerySchema>;
+
+/**
+ * How far a total is counted before it is reported as "more than this".
+ *
+ * The number is a product judgement, not a technical limit: nobody reading a console table needs
+ * to know whether the audit log holds 40,000 rows or 41,000, and the difference between those two
+ * answers is a full scan. Ten thousand is past every set an operator will actually page through
+ * and small enough that the count is a bounded amount of work on every table, forever.
+ *
+ * Services implement it as `count(*)` over a `LIMIT COUNT_CAP + 1` subquery — so the database
+ * stops reading at 10,001 rows, and a total of exactly 10,001 means "at least".
+ */
+export const COUNT_CAP = 10_000;
+
+export interface OffsetPage<T> {
+  items: T[];
+  /**
+   * Rows matching the filter, across all pages — exact up to `COUNT_CAP`.
+   *
+   * When `capped` is true this is `COUNT_CAP` and the real total is higher. Clients must print it
+   * as "more than", never as a figure: a capped total shown as an exact one is a lie the reader
+   * has no way to detect.
+   */
+  total: number;
+  /** True when the count stopped at `COUNT_CAP` instead of finishing. */
+  capped: boolean;
+  /** Echoed back so a client never has to trust its own arithmetic. */
+  page: number;
+  /**
+   * Total pages, never below 1.
+   *
+   * An empty table reads "صفحة 1 من 1" rather than "من 0", which looks like a bug.
+   */
+  pages: number;
+}
+
+/**
+ * Shapes rows and a counted total into a page.
+ *
+ * Takes the count separately because only the caller's query knows the filter. The arithmetic lives
+ * here, once, so no service invents its own off-by-one.
+ *
+ * `counted` is the raw result of the capped count, so `COUNT_CAP + 1` is what "there are more"
+ * looks like arriving here — this is the one place that reads it and the only place that decides
+ * what a capped total means.
+ */
+export function offsetPage<T>(
+  items: T[],
+  counted: number,
+  query: PageQuery,
+): OffsetPage<T> {
+  const capped = counted > COUNT_CAP;
+  const total = capped ? COUNT_CAP : counted;
+
+  return {
+    items,
+    total,
+    capped,
+    page: query.page,
+    /*
+      Derived from the CAPPED total, so the page count is bounded too. It understates when the
+      total is capped, which is why the bar prints "أكثر من" beside it — an operator who has paged
+      to the end of a capped set gets more pages, because by then `page × limit` exceeds the cap
+      and the arithmetic below catches up with where they are.
+    */
+    pages: Math.max(1, Math.ceil(total / query.limit), capped ? query.page + 1 : 1),
+  };
+}

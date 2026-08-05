@@ -103,45 +103,6 @@ export function KpiRow({
 }
 
 /**
- * "Next page" for a cursor-paginated table.
- *
- * A forward-only link, not numbered pages: a cursor cannot address page 7 without walking to
- * it, and rendering `1 2 3 … 140` over keyset pagination would be a lie about what the API can
- * do. The cursor lives in the URL, so back/forward and reload behave correctly for free.
- */
-export function Pager({
-  basePath,
-  query,
-  nextCursor,
-}: {
-  basePath: string;
-  /** Current filters, carried forward so paging does not silently drop the search. */
-  query: Record<string, string | undefined>;
-  nextCursor: string | null;
-}) {
-  if (!nextCursor) return null;
-
-  const params = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(query)) {
-    if (value) params.set(key, value);
-  }
-
-  params.set('cursor', nextCursor);
-
-  return (
-    <div className="mt-3.5 flex justify-center">
-      <a
-        href={`${basePath}?${params.toString()}`}
-        className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-1.5 text-xs text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
-      >
-        {t.table.nextPage}
-      </a>
-    </div>
-  );
-}
-
-/**
  * A section that has no data source yet.
  *
  * Rendered instead of a mocked table. Naming what is missing and why is the only honest

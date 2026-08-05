@@ -3,7 +3,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '@safra/db';
-import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { COUNT_CAP, ERROR, type OffsetPage, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
@@ -75,6 +75,26 @@ export class AdvertisingService {
     private readonly audit: AuditService,
   ) {}
 
+  /** The row count for a page, capped, over the same `FROM … WHERE` the list uses. */
+  private async countOf(fromWhere: SQL): Promise<number> {
+    /*
+      Counted over a LIMIT-ed subquery, so the database stops reading at COUNT_CAP + 1 rows
+      instead of scanning the whole matching set. An uncapped count(*) is unbounded work on
+      every page view of an ever-growing table — which rule 2 forbids — and nobody reading a
+      console table needs to know the exact size of a set they will never page through.
+    */
+    const result = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (SELECT 1 ${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
+
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
+  /** `OFFSET` for a 1-based page. */
+  private pageOffset(query: { page: number; limit: number }): SQL {
+    return sql`OFFSET ${(query.page - 1) * query.limit}`;
+  }
+
   async counters(actor?: AccessTokenClaims): Promise<AdCounters> {
     const result = await this.db.execute<{
       active: string;
@@ -113,10 +133,10 @@ export class AdvertisingService {
 
   async list(query: {
     limit: number;
-    cursor?: string | undefined;
+    page: number;
     q?: string | undefined;
     actor?: AccessTokenClaims | undefined;
-  }): Promise<CursorPage<CampaignRow>> {
+  }): Promise<OffsetPage<CampaignRow>> {
     const conditions: SQL[] = [
       sql`c.deleted_at IS NULL`,
       scopeFilter(query.actor, 'c.city_id'),
@@ -132,17 +152,16 @@ export class AdvertisingService {
       );
     }
 
-    if (query.cursor !== undefined) {
-      const after = decodeCursor(query.cursor);
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM ad_campaigns c
+      JOIN advertisers a  ON a.id = c.advertiser_id
+      LEFT JOIN cities ci ON ci.id = c.city_id
+      LEFT JOIN currencies cur ON cur.id = c.price_currency_id
+      WHERE ${sql.join(conditions, sql` AND `)}`;
 
-      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
-
-      conditions.push(
-        sql`(c.created_at, c.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,
-      );
-    }
-
-    const result = await this.db.execute<CampaignRowSql>(sql`
+    const [result, total] = await Promise.all([
+      this.db.execute<CampaignRowSql>(sql`
       SELECT c.id, c.reference,
              a.name              AS advertiser,
              a.kind::text         AS advertiser_kind,
@@ -162,21 +181,15 @@ export class AdvertisingService {
              to_char(c.ends_at   AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS ends_at,
              floor(extract(epoch FROM (c.ends_at - now())) / 86400)::int AS days_remaining,
              c.created_at
-      FROM ad_campaigns c
-      JOIN advertisers a  ON a.id = c.advertiser_id
-      LEFT JOIN cities ci ON ci.id = c.city_id
-      LEFT JOIN currencies cur ON cur.id = c.price_currency_id
-      WHERE ${sql.join(conditions, sql` AND `)}
-      ORDER BY c.created_at DESC, c.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+      ${fromWhere}
+        ORDER BY c.created_at DESC, c.id DESC
+        LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    const hasMore = result.rows.length > query.limit;
-    const page = hasMore ? result.rows.slice(0, query.limit) : result.rows;
-    const last = page.at(-1);
-
-    return {
-      items: page.map((row) => ({
+    return offsetPage(
+      result.rows.map((row) => ({
         reference: row.reference,
         advertiser: row.advertiser,
         advertiserKind: row.advertiser_kind,
@@ -191,8 +204,9 @@ export class AdvertisingService {
         clicks: Number(row.clicks),
         daysRemaining: row.days_remaining,
       })),
-      nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
-    };
+      total,
+      query,
+    );
   }
 
   /** Pauses or resumes a campaign. Audited, because the advertiser paid for the window. */
@@ -248,7 +262,7 @@ export class AdvertisingService {
       );
     });
 
-    const reread = await this.list({ limit: 1, q: reference });
+    const reread = await this.list({ limit: 1, page: 1, q: reference });
     const view = reread.items[0];
 
     if (!view) throw notFound(ERROR.CAMPAIGN_NOT_FOUND);

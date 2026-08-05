@@ -3,10 +3,12 @@ import { getStaffSession } from '@/lib/session-server';
 import { sidebarCounts } from '@/lib/console';
 import { count, shortDateTime } from '@/lib/format';
 import { ConsolePanel, ConsoleShell, Kpi, KpiRow } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import { FootNote, Ltr } from '@/components/admin-table';
 import { StaffAdmin } from '@/components/staff-admin';
 import { ScopePanel } from '@/components/scope-panel';
 import { auditAction, fill, roleName, t } from '@/lib/strings';
+import { listParams, pageNumber, pageSize } from '@/lib/search-params';
 
 /**
  * الموظفون (M-5, SRS §4, design handoff §8.2).
@@ -20,9 +22,24 @@ import { auditAction, fill, roleName, t } from '@/lib/strings';
  */
 export const dynamic = 'force-dynamic';
 
-export default async function StaffPage() {
+export default async function StaffPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { page, size } = await listParams(searchParams);
+  /*
+    The scope map is the second paged table on this route, under its own parameters — see the note
+    in `ScopePanel`. Read here rather than there so the accounts bar can carry them forward.
+  */
+  const params = await searchParams;
+  const scope = {
+    page: pageNumber(single(params['scopePage'])),
+    size: pageSize(single(params['scopeSize'])),
+  };
+
   const [result, overview, session, counts] = await Promise.all([
-    getStaff(),
+    getStaff({ page, limit: size }),
     getStaffOverview(),
     getStaffSession(),
     sidebarCounts(),
@@ -41,7 +58,29 @@ export default async function StaffPage() {
           ) : result === 'failed' ? (
             <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
           ) : (
-            <StaffAdmin staff={result.staff} currentUserId={session?.user.id} />
+            <>
+              <StaffAdmin staff={result.items} currentUserId={session?.user.id} />
+              {/*
+                Paged like every other registry (Bashar, 2026-08-05). This table used to render
+                every staff account in one response — 165 rows on the development database, and
+                growing with the company.
+              */}
+              <TablePagination
+                basePath="/staff"
+                query={{
+                  scopePage: String(scope.page),
+                  scopeSize: String(scope.size),
+                }}
+                page={result.page}
+                pages={result.pages}
+                total={result.total}
+                capped={result.capped}
+                size={size}
+                label={fill(t.table.paginationLabelOf, {
+                  section: t.sections.staff.listLabel,
+                })}
+              />
+            </>
           )}
 
           <FootNote>{t.sections.staff.note}</FootNote>
@@ -52,7 +91,11 @@ export default async function StaffPage() {
           together are the whole answer to "what can this person do": the matrix says WHICH actions,
           the scope says WHERE.
         */}
-        <ScopePanel />
+        <ScopePanel
+          page={scope.page}
+          size={scope.size}
+          query={{ page: String(page), size: String(size) }}
+        />
 
         {overview === 'failed' || overview === 'unauthenticated' ? null : (
           <>
@@ -249,4 +292,9 @@ function Activity({ rows }: { rows: StaffOverview['activity'] }) {
       )}
     </ConsolePanel>
   );
+}
+
+/** Next hands a repeated query key as an array; the first value is the one that counts. */
+function single(raw: string | string[] | undefined): string | undefined {
+  return (Array.isArray(raw) ? raw[0] : raw)?.trim() || undefined;
 }

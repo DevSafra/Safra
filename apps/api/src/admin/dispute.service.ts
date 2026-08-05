@@ -3,13 +3,13 @@ import { sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '@safra/db';
-import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { COUNT_CAP, ERROR, type OffsetPage, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
-import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
+import { conflict, notFound } from '../common/errors/app-error.js';
 
 export const closeDisputeSchema = z
   .object({
@@ -109,6 +109,26 @@ export class DisputeService {
     private readonly audit: AuditService,
   ) {}
 
+  /** The row count for a page, capped, over the same `FROM … WHERE` the list uses. */
+  private async countOf(fromWhere: SQL): Promise<number> {
+    /*
+      Counted over a LIMIT-ed subquery, so the database stops reading at COUNT_CAP + 1 rows
+      instead of scanning the whole matching set. An uncapped count(*) is unbounded work on
+      every page view of an ever-growing table — which rule 2 forbids — and nobody reading a
+      console table needs to know the exact size of a set they will never page through.
+    */
+    const result = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (SELECT 1 ${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
+
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
+  /** `OFFSET` for a 1-based page. */
+  private pageOffset(query: { page: number; limit: number }): SQL {
+    return sql`OFFSET ${(query.page - 1) * query.limit}`;
+  }
+
   async counters(actor?: AccessTokenClaims): Promise<DisputeCounters> {
     const result = await this.db.execute<{
       open: string;
@@ -149,11 +169,11 @@ export class DisputeService {
 
   async list(query: {
     limit: number;
-    cursor?: string | undefined;
+    page: number;
     q?: string | undefined;
     status?: string | undefined;
     actor?: AccessTokenClaims | undefined;
-  }): Promise<CursorPage<DisputeRow>> {
+  }): Promise<OffsetPage<DisputeRow>> {
     /*
       A dispute has no city of its own; it inherits the booking's. Scoping through the join is
       correct rather than convenient — a dispute belongs to wherever the stay was.
@@ -178,17 +198,20 @@ export class DisputeService {
       );
     }
 
-    if (query.cursor !== undefined) {
-      const after = decodeCursor(query.cursor);
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM disputes d
+      LEFT JOIN bookings b          ON b.id = d.booking_id
+      LEFT JOIN partners p          ON p.id = d.partner_id
+      LEFT JOIN customer_profiles c ON c.id = d.customer_profile_id
+      LEFT JOIN currencies cur      ON cur.id = d.compensation_currency_id
+      LEFT JOIN (
+      SELECT dispute_id, count(*) AS n FROM dispute_evidence GROUP BY dispute_id
+      ) ev ON ev.dispute_id = d.id
+      WHERE ${sql.join(conditions, sql` AND `)}`;
 
-      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
-
-      conditions.push(
-        sql`(d.created_at, d.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,
-      );
-    }
-
-    const result = await this.db.execute<DisputeRowSql>(sql`
+    const [result, total] = await Promise.all([
+      this.db.execute<DisputeRowSql>(sql`
       SELECT d.id, d.reference,
              d.kind::text   AS kind,
              d.status::text AS status,
@@ -205,27 +228,17 @@ export class DisputeService {
              to_char(d.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS opened_at,
              to_char(d.closed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS closed_at,
              d.created_at
-      FROM disputes d
-      LEFT JOIN bookings b          ON b.id = d.booking_id
-      LEFT JOIN partners p          ON p.id = d.partner_id
-      LEFT JOIN customer_profiles c ON c.id = d.customer_profile_id
-      LEFT JOIN currencies cur      ON cur.id = d.compensation_currency_id
-      LEFT JOIN (
-        SELECT dispute_id, count(*) AS n FROM dispute_evidence GROUP BY dispute_id
-      ) ev ON ev.dispute_id = d.id
-      WHERE ${sql.join(conditions, sql` AND `)}
-      -- Unresolved first, then oldest first inside each group: the queue's job is to surface
-      -- what has been waiting longest, and a closed dispute is not waiting for anybody.
-      ORDER BY d.created_at DESC, d.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+        ${fromWhere}
+        -- Unresolved first, then oldest first inside each group: the queue's job is to surface
+        -- what has been waiting longest, and a closed dispute is not waiting for anybody.
+        ORDER BY d.created_at DESC, d.id DESC
+        LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    const hasMore = result.rows.length > query.limit;
-    const page = hasMore ? result.rows.slice(0, query.limit) : result.rows;
-    const last = page.at(-1);
-
-    return {
-      items: page.map((row) => ({
+    return offsetPage(
+      result.rows.map((row) => ({
         reference: row.reference,
         kind: row.kind,
         status: row.status,
@@ -242,8 +255,9 @@ export class DisputeService {
         closedAt: row.closed_at,
         freezesPayout: row.freezes_payout,
       })),
-      nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
-    };
+      total,
+      query,
+    );
   }
 
   /**
@@ -387,7 +401,7 @@ export class DisputeService {
       whose `none` scope excludes this row would otherwise close it successfully and receive a 404 —
       correct authorisation, nonsensical response.
     */
-    const reread = await this.list({ limit: 1, q: reference });
+    const reread = await this.list({ limit: 1, page: 1, q: reference });
     const view = reread.items[0];
 
     if (!view) throw notFound(ERROR.DISPUTE_NOT_FOUND);

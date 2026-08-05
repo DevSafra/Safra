@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { getConversations, type ConversationItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { count, shortDateTime } from '@/lib/format';
-import { ConsolePanel, ConsoleShell, Pager } from '@/components/console-shell';
+import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import { FootNote, Ltr, StatusPill } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { fill, t } from '@/lib/strings';
@@ -26,10 +27,10 @@ export default async function MessagesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, cursor } = await listParams(searchParams);
+  const { q, page, size } = await listParams(searchParams);
 
   const [result, counts] = await Promise.all([
-    getConversations({ q, cursor }),
+    getConversations({ q, page, limit: size }),
     sidebarCounts(),
   ]);
 
@@ -39,6 +40,7 @@ export default async function MessagesPage({
         <TableToolbar
           action="/messages"
           query={q}
+          size={size}
           placeholder={t.sections.messages.searchPlaceholder}
         />
 
@@ -57,7 +59,15 @@ export default async function MessagesPage({
                 </li>
               ))}
             </ul>
-            <Pager basePath="/messages" query={{ q }} nextCursor={result.nextCursor} />
+            <TablePagination
+              basePath="/messages"
+              query={{ q }}
+              page={result.page}
+              pages={result.pages}
+              total={result.total}
+              capped={result.capped}
+              size={size}
+            />
           </>
         )}
 

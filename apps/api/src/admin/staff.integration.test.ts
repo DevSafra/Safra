@@ -133,7 +133,9 @@ describeIfDb('StaffService', () => {
       await seedSuperAdmin();
       const invited = await invite('c');
 
-      const listed = (await service.list()).find((s) => s.id === invited.id);
+      const listed = (await service.list({ limit: 100, page: 1 })).items.find(
+        (member) => member.id === invited.id,
+      );
 
       expect(listed?.invitationPending).toBe(true);
       expect(listed?.twoFactorEnabled).toBe(false);
@@ -226,6 +228,91 @@ describeIfDb('StaffService', () => {
         .catch((e: Error) => e.message);
 
       expect(message).not.toMatch(/expired|consumed|unknown|not found/i);
+    });
+  });
+
+  /**
+   * The staff list is paginated (2026-08-05).
+   *
+   * It returned every row until then. Rule 2 has required pagination on every list endpoint
+   * since the project started, and this one was the exception nobody noticed because a staff
+   * list sounds small — an unbounded list endpoint is a DoS vector however slowly it grows.
+   */
+  describe('pagination', () => {
+    it('returns a page, a total and a page count', async () => {
+      await seedSuperAdmin();
+      for (const suffix of ['p1', 'p2', 'p3']) await invite(suffix);
+
+      const first = await service.list({ limit: 2, page: 1 });
+
+      expect(first.items).toHaveLength(2);
+      expect(first.page).toBe(1);
+
+      /*
+        The total counts the whole set, not the page — that is the number the console prints under
+        the table, and a total that only counted the page would read "2 found" on every page.
+      */
+      expect(first.total).toBeGreaterThanOrEqual(4);
+      expect(first.pages).toBe(Math.ceil(first.total / 2));
+    });
+
+    /** Consecutive pages do not overlap. */
+    it('page two shows different rows from page one', async () => {
+      await seedSuperAdmin();
+      for (const suffix of ['q1', 'q2', 'q3']) await invite(suffix);
+
+      const first = await service.list({ limit: 2, page: 1 });
+      const second = await service.list({ limit: 2, page: 2 });
+
+      const firstIds = first.items.map((member) => member.id);
+      const secondIds = second.items.map((member) => member.id);
+
+      expect(secondIds.filter((id) => firstIds.includes(id))).toStrictEqual([]);
+    });
+
+    /**
+     * Walking one row at a time visits the same rows, in the same order, as one larger page.
+     *
+     * Deliberately NOT "walks every row": the development database holds more staff than the
+     * API's 100-row ceiling, so a full walk and a single page are truncated by different limits
+     * and comparing them fails for a reason that has nothing to do with pagination. Comparing
+     * the FIRST N rows either way is what a stable ORDER BY promises across page boundaries.
+     */
+    it('walks the same rows one at a time as it does in one page', async () => {
+      await seedSuperAdmin();
+      for (const suffix of ['w1', 'w2', 'w3']) await invite(suffix);
+
+      const SIZE = 5;
+      const inOnePage = (await service.list({ limit: SIZE, page: 1 })).items.map(
+        (m) => m.id,
+      );
+
+      const walked: string[] = [];
+
+      // Page size one is the harshest walk: every row is a page boundary.
+      for (let page = 1; page <= SIZE; page += 1) {
+        const result = await service.list({ limit: 1, page });
+
+        walked.push(...result.items.map((m) => m.id));
+      }
+
+      expect(walked).toStrictEqual(inOnePage);
+    });
+
+    /**
+     * A page past the end is empty, not an error.
+     *
+     * The reader can type a page number, so out-of-range is a normal input rather than an attack:
+     * an empty table with the total still shown tells them where they are, whereas a 400 loses the
+     * screen. The schema's ceiling is what stops a hostile `?page=1e9` from costing a deep scan.
+     */
+    it('returns an empty page past the last one', async () => {
+      await seedSuperAdmin();
+
+      const result = await service.list({ limit: 10, page: 100_000 });
+
+      expect(result.items).toStrictEqual([]);
+      expect(result.total).toBeGreaterThan(0);
     });
   });
 

@@ -165,8 +165,48 @@ export const ar = {
     /** Shared by the three detail screens, which all return to the same queues. */
     backToQueues: '← القوائم',
     search: 'بحث',
+    pageSizeLabel: 'عدد الصفوف في الصفحة',
+    /** Submits the pagination bar's form — see the note in `table-pagination.tsx`. */
+    apply: 'تطبيق',
     exportCsv: 'تصدير CSV',
-    nextPage: 'الصفحة التالية ←',
+
+    /*
+      The bar under every table: صفحة ‹ [١] › من ١٠٢ — اعرض [٢٥] صفًا — ٢٥٣١ نتيجة.
+
+      Split into fragments rather than one interpolated sentence because the page number is an
+      INPUT sitting inside the sentence, and a placeholder cannot hold a form control. The
+      fragments are ordered by the JSX, which is the one place the visual order is decided.
+    */
+    page: 'صفحة',
+    /** Follows the page input: "من ١٠٢". */
+    pageOf: 'من {n}',
+    pageLabel: 'رقم الصفحة',
+    /** Precedes the rows-per-page select. */
+    show: 'اعرض',
+    /** Follows it, naming what is being counted. */
+    rows: 'صفًا',
+    /** The total the query matched, printed at the end of the bar. */
+    found: '{n} نتيجة',
+    /**
+     * Shown instead of `found` when the count was capped.
+     *
+     * A total over the cap is not counted exactly, because `count(*)` over a table the size of
+     * the audit log is a full scan on every page view. "أكثر من ١٠٠٠٠" is honest about that;
+     * a precise-looking number nobody paid for would not be.
+     */
+    foundCapped: 'أكثر من {n} نتيجة',
+    previousPage: 'الصفحة السابقة',
+    nextPageShort: 'الصفحة التالية',
+    /** Names the whole bar for a screen reader, which lands on it as a landmark. */
+    paginationLabel: 'تنقّل بين الصفحات',
+    /**
+     * Used instead when a route carries TWO paged tables.
+     *
+     * Two landmarks with the same name is a real defect, not a test inconvenience: a screen-reader
+     * user listing the page's navigation regions hears "تنقّل بين الصفحات" twice and cannot tell
+     * which table either one moves.
+     */
+    paginationLabelOf: 'تنقّل بين صفحات {section}',
     empty: 'لا نتائج.',
     open: 'فتح الملف ←',
     manage: 'إدارة ←',
@@ -323,6 +363,8 @@ export const ar = {
 
     staff: {
       searchPlaceholder: 'بحث بالاسم أو البريد أو الدور…',
+      /** Names the list for a screen reader, and gives the paging test a stable hook. */
+      listLabel: 'حسابات الموظفين',
       kpiTotal: 'إجمالي الموظفين',
       kpiTotalSub: '{active} نشطين · {suspended} معطّل · {invited} دعوة',
       kpiSignedIn: 'دخلوا اليوم',

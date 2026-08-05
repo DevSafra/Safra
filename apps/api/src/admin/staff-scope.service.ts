@@ -1,8 +1,15 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { ERROR, isScopable, type SetStaffScopeInput } from '@safra/contracts';
+import {
+  COUNT_CAP,
+  ERROR,
+  isScopable,
+  type SetStaffScopeInput,
+  type OffsetPage,
+  offsetPage,
+} from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
@@ -53,16 +60,54 @@ export class StaffScopeService {
     private readonly audit: AuditService,
   ) {}
 
-  /** Every staff member's scope, for the الموظفون table's النطاق column. */
-  async list(): Promise<StaffScopeView[]> {
-    const result = await this.db.execute<{
-      user_id: string;
-      email: string;
-      role: string;
-      kind: string;
-      outside: string;
-      cities: { slug: string; nameAr: string }[] | null;
-    }>(sql`
+  /** The row count for a page, capped, over the same `FROM … WHERE` the list uses. */
+  private async countOf(fromWhere: SQL): Promise<number> {
+    /*
+      Counted over a LIMIT-ed subquery, so the database stops reading at COUNT_CAP + 1 rows
+      instead of scanning the whole matching set. An uncapped count(*) is unbounded work on
+      every page view of an ever-growing table — which rule 2 forbids — and nobody reading a
+      console table needs to know the exact size of a set they will never page through.
+    */
+    const result = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (SELECT 1 ${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
+
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
+  /** `OFFSET` for a 1-based page. */
+  private pageOffset(query: { page: number; limit: number }): SQL {
+    return sql`OFFSET ${(query.page - 1) * query.limit}`;
+  }
+
+  /**
+   * A page of staff scopes, for the الموظفون screen's النطاق panel.
+   *
+   * This is a scope audit: read alphabetically, because the question it answers is "what is this
+   * person's scope" and you arrive knowing the name. It is the one registry that sorts ASC.
+   *
+   * Paginated 2026-08-05. It returned every row — 165 on the development database, rendered on
+   * every visit to الموظفون — which rule 2 has forbidden on list endpoints since the start.
+   */
+  async list(query: {
+    limit: number;
+    page: number;
+  }): Promise<OffsetPage<StaffScopeView>> {
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM users u
+      WHERE u.deleted_at IS NULL
+        AND u.role IN ('support_agent','finance_officer','operations_manager','super_admin')`;
+
+    const [result, total] = await Promise.all([
+      this.db.execute<{
+        user_id: string;
+        email: string;
+        role: string;
+        kind: string;
+        outside: string;
+        cities: { slug: string; nameAr: string }[] | null;
+      }>(sql`
       SELECT u.id AS user_id, u.email, u.role::text AS role,
              u.scope_kind::text           AS kind,
              u.outside_scope_access::text AS outside,
@@ -75,13 +120,14 @@ export class StaffScopeService {
                JOIN cities ci ON ci.id = sc.city_id
                WHERE sc.user_id = u.id
              ) AS cities
-      FROM users u
-      WHERE u.deleted_at IS NULL
-        AND u.role IN ('support_agent','finance_officer','operations_manager','super_admin')
-      ORDER BY u.email
-    `);
+      ${fromWhere}
+      ORDER BY u.email, u.id
+      LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    return result.rows.map((row) => ({
+    const items = result.rows.map((row) => ({
       userId: row.user_id,
       email: row.email,
       role: row.role,
@@ -89,6 +135,8 @@ export class StaffScopeService {
       outside: row.outside,
       cities: row.cities ?? [],
     }));
+
+    return offsetPage(items, total, query);
   }
 
   async set(
@@ -202,11 +250,61 @@ export class StaffScopeService {
       );
     }
 
-    const view = (await this.list()).find((row) => row.userId === userId);
+    /*
+      One row, by id. This used to call `list()` and `find()` — fine when `list()` returned every
+      staff member, wrong now that it returns a page: the member just edited may sit on page four,
+      and `find` would report them as missing.
+    */
+    const view = await this.viewOf(userId);
 
     if (!view) throw notFound(ERROR.STAFF_NOT_FOUND);
 
     return view;
+  }
+
+  /**
+   * One staff member's scope view.
+   *
+   * Deliberately its own query rather than a filter over `list()`: a page cannot be searched for a
+   * row that is not on it, and this is called immediately after a write, where returning "not
+   * found" for a member who exists would be a confusing lie.
+   */
+  private async viewOf(userId: string): Promise<StaffScopeView | null> {
+    const result = await this.db.execute<{
+      user_id: string;
+      email: string;
+      role: string;
+      kind: string;
+      outside: string;
+      cities: { slug: string; nameAr: string }[] | null;
+    }>(sql`
+      SELECT u.id AS user_id, u.email, u.role::text AS role,
+             u.scope_kind::text           AS kind,
+             u.outside_scope_access::text AS outside,
+             (
+               SELECT json_agg(json_build_object('slug', ci.slug, 'nameAr', ci.name_ar)
+                               ORDER BY ci.name_ar)
+               FROM staff_scope_cities sc
+               JOIN cities ci ON ci.id = sc.city_id
+               WHERE sc.user_id = u.id
+             ) AS cities
+      FROM users u
+      WHERE u.id = ${userId}::uuid AND u.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const row = result.rows[0];
+
+    if (!row) return null;
+
+    return {
+      userId: row.user_id,
+      email: row.email,
+      role: row.role,
+      kind: row.kind,
+      outside: row.outside,
+      cities: row.cities ?? [],
+    };
   }
 
   private async cityIdsOf(userId: string): Promise<string[]> {

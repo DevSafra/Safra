@@ -1,13 +1,8 @@
 import { getFinance, type FinanceItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { amount, money, shortDateTime } from '@/lib/format';
-import {
-  ConsolePanel,
-  ConsoleShell,
-  Kpi,
-  KpiRow,
-  Pager,
-} from '@/components/console-shell';
+import { ConsolePanel, ConsoleShell, Kpi, KpiRow } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import {
   AdminTable,
   FootNote,
@@ -45,10 +40,10 @@ export default async function PaymentsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, cursor } = await listParams(searchParams);
+  const { q, page, size } = await listParams(searchParams);
 
   const [result, counts] = await Promise.all([
-    getFinance({ q, cursor }),
+    getFinance({ q, page, limit: size }),
     sidebarCounts(),
   ]);
 
@@ -97,6 +92,7 @@ export default async function PaymentsPage({
             <TableToolbar
               action="/payments"
               query={q}
+              size={size}
               placeholder={t.sections.payments.searchPlaceholder}
             />
 
@@ -108,7 +104,15 @@ export default async function PaymentsPage({
               minWidth={720}
               empty={t.table.empty}
             />
-            <Pager basePath="/payments" query={{ q }} nextCursor={result.nextCursor} />
+            <TablePagination
+              basePath="/payments"
+              query={{ q }}
+              page={result.page}
+              pages={result.pages}
+              total={result.total}
+              capped={result.capped}
+              size={size}
+            />
 
             <FootNote>{t.sections.payments.note}</FootNote>
             <FootNote>{t.sections.payments.payoutsMissing}</FootNote>

@@ -1,7 +1,8 @@
 import { getNotifications, type NotificationItem, type Notifications } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { count, shortDateTime } from '@/lib/format';
-import { ConsolePanel, ConsoleShell, Pager } from '@/components/console-shell';
+import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import {
   AdminTable,
   FootNote,
@@ -43,14 +44,14 @@ export default async function CommsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, cursor } = await listParams(searchParams);
+  const { q, page, size } = await listParams(searchParams);
   const params = await searchParams;
   const rawStatus = params['status'];
   const status =
     (Array.isArray(rawStatus) ? rawStatus[0] : rawStatus)?.trim() || undefined;
 
   const [result, counts] = await Promise.all([
-    getNotifications({ q, cursor, status }),
+    getNotifications({ q, status, page, limit: size }),
     sidebarCounts(),
   ]);
 
@@ -72,6 +73,7 @@ export default async function CommsPage({
             <TableToolbar
               action="/comms"
               query={q}
+              size={size}
               placeholder={t.sections.comms.searchPlaceholder}
               end={<Summary counters={result.counters} />}
             >
@@ -98,10 +100,14 @@ export default async function CommsPage({
               minWidth={680}
               empty={t.table.empty}
             />
-            <Pager
+            <TablePagination
               basePath="/comms"
               query={{ q, status }}
-              nextCursor={result.nextCursor}
+              page={result.page}
+              pages={result.pages}
+              total={result.total}
+              capped={result.capped}
+              size={size}
             />
 
             <FootNote>{t.sections.comms.note}</FootNote>

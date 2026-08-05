@@ -7,12 +7,8 @@ import {
 } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { shortDate } from '@/lib/format';
-import {
-  ConsolePanel,
-  ConsoleShell,
-  Pager,
-  QueueState,
-} from '@/components/console-shell';
+import { ConsolePanel, ConsoleShell, QueueState } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import {
   AdminTable,
   FootNote,
@@ -42,10 +38,10 @@ export default async function PropertiesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, cursor } = await listParams(searchParams);
+  const { q, page, size } = await listParams(searchParams);
 
   const [registry, pending, counts] = await Promise.all([
-    getPropertyRegistry({ q, cursor }),
+    getPropertyRegistry({ q, page, limit: size }),
     getPendingProperties(),
     sidebarCounts(),
   ]);
@@ -61,6 +57,7 @@ export default async function PropertiesPage({
           <TableToolbar
             action="/properties"
             query={q}
+            size={size}
             placeholder={t.sections.properties.searchPlaceholder}
           />
 
@@ -78,10 +75,14 @@ export default async function PropertiesPage({
                 minWidth={800}
                 empty={t.table.empty}
               />
-              <Pager
+              <TablePagination
                 basePath="/properties"
                 query={{ q }}
-                nextCursor={registry.nextCursor}
+                page={registry.page}
+                pages={registry.pages}
+                total={registry.total}
+                capped={registry.capped}
+                size={size}
               />
             </>
           )}

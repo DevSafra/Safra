@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation';
 import { getBookings, type BookingListItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { count, money, shortDate } from '@/lib/format';
-import { ConsolePanel, ConsoleShell, Pager } from '@/components/console-shell';
+import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import {
   AdminTable,
   FootNote,
@@ -15,6 +16,7 @@ import {
 } from '@/components/admin-table';
 import { OutlineAction, TableToolbar, ToolbarNote } from '@/components/table-toolbar';
 import { bookingStatus, fill, t } from '@/lib/strings';
+import { pageNumber, pageSize } from '@/lib/search-params';
 
 /**
  * الحجوزات — the bookings registry (design handoff §8).
@@ -70,10 +72,11 @@ export default async function BookingsPage({
 
   const q = first('q');
   const status = first('status');
-  const cursor = first('cursor');
+  const page = pageNumber(first('page'));
+  const size = pageSize(first('size'));
 
   const [result, counts] = await Promise.all([
-    getBookings({ q, status, cursor }),
+    getBookings({ q, status, page, limit: size }),
     sidebarCounts(),
   ]);
 
@@ -83,6 +86,7 @@ export default async function BookingsPage({
         <TableToolbar
           action="/bookings"
           query={q}
+          size={size}
           placeholder={t.sections.bookings.searchPlaceholder}
           end={
             result === 'failed' || result === 'unauthenticated' ? null : (
@@ -136,10 +140,14 @@ export default async function BookingsPage({
               minWidth={780}
               empty={t.table.empty}
             />
-            <Pager
+            <TablePagination
               basePath="/bookings"
               query={{ q, status }}
-              nextCursor={result.nextCursor}
+              page={result.page}
+              pages={result.pages}
+              total={result.total}
+              capped={result.capped}
+              size={size}
             />
           </>
         )}

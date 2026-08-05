@@ -1,5 +1,6 @@
 import { getStaffScopes, type StaffScopeRow } from '@/lib/api';
 import { ConsolePanel } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import {
   AdminTable,
   FootNote,
@@ -8,7 +9,7 @@ import {
   type AdminColumn,
   type Tone,
 } from '@/components/admin-table';
-import { t, roleName } from '@/lib/strings';
+import { fill, t, roleName } from '@/lib/strings';
 
 /**
  * نطاق العمل — the scope map (design handoff §8.2, Bashar's decision 2026-08-04).
@@ -29,8 +30,24 @@ import { t, roleName } from '@/lib/strings';
  * narrows. A form for that belongs on the member's own record with a confirmation, not inline in a
  * table where a mis-click logs a colleague out mid-shift.
  */
-export async function ScopePanel() {
-  const result = await getStaffScopes();
+/**
+ * `/staff` holds TWO paged tables, so this one namespaces its URL parameters.
+ *
+ * `?scopePage=`/`?scopeSize=` rather than `?page=`/`?size=`: sharing them would move the accounts
+ * registry and the scope map together, and stepping through 165 scopes would drag the reader's
+ * place in the accounts list along with it. The `query` carries the OTHER table's position, so
+ * paging either one leaves the other where it was.
+ */
+export async function ScopePanel({
+  page,
+  size,
+  query,
+}: {
+  readonly page: number;
+  readonly size: number;
+  readonly query: Record<string, string | undefined>;
+}) {
+  const result = await getStaffScopes({ page, limit: size });
 
   return (
     <ConsolePanel title={t.sections.staff.scopeTitle}>
@@ -39,14 +56,30 @@ export async function ScopePanel() {
       ) : result === 'failed' ? (
         <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
       ) : (
-        <AdminTable
-          columns={COLUMNS}
-          rows={result.scopes}
-          template="1.6fr 1fr 1.6fr 1.1fr"
-          rowKey={(row) => row.userId}
-          minWidth={620}
-          empty={t.table.empty}
-        />
+        <>
+          <AdminTable
+            columns={COLUMNS}
+            rows={result.items}
+            template="1.6fr 1fr 1.6fr 1.1fr"
+            rowKey={(row) => row.userId}
+            minWidth={620}
+            empty={t.table.empty}
+          />
+          <TablePagination
+            basePath="/staff"
+            query={query}
+            page={result.page}
+            pages={result.pages}
+            total={result.total}
+            capped={result.capped}
+            size={size}
+            pageParam="scopePage"
+            sizeParam="scopeSize"
+            label={fill(t.table.paginationLabelOf, {
+              section: t.sections.staff.scopeTitle,
+            })}
+          />
+        </>
       )}
 
       <FootNote>{t.sections.staff.scopeNote}</FootNote>

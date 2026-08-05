@@ -157,7 +157,7 @@ export function StaffAdmin({
         <p className="mt-2.5 text-[11px] text-faint">{t.sections.staff.inviteNote}</p>
       </section>
 
-      <ul className="grid gap-2">
+      <ul aria-label={t.sections.staff.listLabel} className="grid gap-2">
         {staff.map((member) => {
           const isSelf = member.id === currentUserId;
 

@@ -2,10 +2,9 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { COUNT_CAP, type OffsetPage, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
-import { badRequest } from '../common/errors/app-error.js';
 
 export interface AuditEntry {
   readonly id: string;
@@ -23,7 +22,8 @@ export interface AuditEntry {
 
 export interface AuditQuery {
   readonly limit: number;
-  readonly cursor?: string | undefined;
+  /** 1-based. The screen shows it, so the API speaks in the same terms. */
+  readonly page: number;
   readonly action?: string | undefined;
   readonly subjectType?: string | undefined;
   readonly subjectId?: string | undefined;
@@ -55,7 +55,33 @@ export interface AuditQuery {
 export class AuditLogService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
-  async list(query: AuditQuery): Promise<CursorPage<AuditEntry>> {
+  /**
+   * The row count for a page, over the SAME `FROM … WHERE` the list uses.
+   *
+   * Sharing one fragment between the list and the count is the point, not tidiness: a count built
+   * from a separately written predicate drifts from the list it describes, and a total that
+   * disagrees with what the table can page through is worse than showing no total.
+   */
+  private async countOf(fromWhere: SQL): Promise<number> {
+    /*
+      Counted over a LIMIT-ed subquery, so the database stops reading at COUNT_CAP + 1 rows
+      instead of scanning the whole matching set. An uncapped count(*) is unbounded work on
+      every page view of an ever-growing table — which rule 2 forbids — and nobody reading a
+      console table needs to know the exact size of a set they will never page through.
+    */
+    const result = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (SELECT 1 ${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
+
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
+  /** `OFFSET` for a 1-based page. */
+  private pageOffset(query: { page: number; limit: number }): SQL {
+    return sql`OFFSET ${(query.page - 1) * query.limit}`;
+  }
+
+  async list(query: AuditQuery): Promise<OffsetPage<AuditEntry>> {
     const conditions: SQL[] = [];
 
     if (query.action) {
@@ -79,59 +105,45 @@ export class AuditLogService {
       conditions.push(sql`lower(u.email) = lower(${query.actorEmail})`);
     }
 
-    if (query.cursor !== undefined) {
-      const after = decodeCursor(query.cursor);
-
-      // A 400, never a silent restart from page 1 — see BookingsService.list.
-      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
-
-      /**
-       * Row comparison at FULL timestamp precision. Several audit rows written in
-       * one transaction share a `created_at` to the microsecond, and a
-       * millisecond-truncated bound would end the page there — the same defect that
-       * was found in the wallet statement.
-       */
-      conditions.push(
-        sql`(a.created_at, a.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,
-      );
-    }
-
     const where =
       conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
     // One extra row reveals whether a further page exists, without a COUNT over a
     // table that only ever grows.
-    const rows = await this.db.execute<{
-      id: string;
-      action: string;
-      subject_type: string;
-      subject_id: string | null;
-      actor_email: string | null;
-      actor_role: string | null;
-      before: unknown;
-      after: unknown;
-      reason: string | null;
-      ip_address: string | null;
-      created_at: string;
-    }>(sql`
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM audit_log a
+      LEFT JOIN users u ON u.id = a.actor_user_id
+      ${where}`;
+
+    const [rows, total] = await Promise.all([
+      this.db.execute<{
+        id: string;
+        action: string;
+        subject_type: string;
+        subject_id: string | null;
+        actor_email: string | null;
+        actor_role: string | null;
+        before: unknown;
+        after: unknown;
+        reason: string | null;
+        ip_address: string | null;
+        created_at: string;
+      }>(sql`
       SELECT a.id, a.action, a.subject_type, a.subject_id,
              u.email AS actor_email, a.actor_role::text AS actor_role,
              a.before, a.after, a.reason, a.ip_address,
              to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at
-      FROM audit_log a
-      LEFT JOIN users u ON u.id = a.actor_user_id
-      ${where}
-      ORDER BY a.created_at DESC, a.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+        ${fromWhere}
+        ORDER BY a.created_at DESC, a.id DESC
+        LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    const hasMore = rows.rows.length > query.limit;
-    const page = hasMore ? rows.rows.slice(0, query.limit) : rows.rows;
-    const last = page.at(-1);
-
-    return {
-      items: page.map((row) => ({
+    return offsetPage(
+      rows.rows.map((row) => ({
         id: row.id,
         action: row.action,
         subjectType: row.subject_type,
@@ -144,8 +156,9 @@ export class AuditLogService {
         ipAddress: row.ip_address,
         createdAt: row.created_at,
       })),
-      nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
-    };
+      total,
+      query,
+    );
   }
 
   /**

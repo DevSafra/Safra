@@ -282,7 +282,7 @@ test.describe('keyboard and assistive technology', () => {
     await hamburger(page).click();
 
     await expect
-      .poll(async () => page.evaluate(() => document.activeElement?.id)) //
+      .poll(() => page.evaluate(() => document.activeElement?.id)) //
       .toBe('console-nav');
   });
 });

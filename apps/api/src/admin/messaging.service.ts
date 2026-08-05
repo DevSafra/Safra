@@ -3,13 +3,13 @@ import { sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '@safra/db';
-import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { COUNT_CAP, ERROR, type OffsetPage, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { redactContactDetails } from '../messaging/redaction.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
-import { badRequest, notFound } from '../common/errors/app-error.js';
+import { notFound } from '../common/errors/app-error.js';
 
 export const staffReplySchema = z
   .object({
@@ -71,12 +71,32 @@ export interface MessageRow {
 export class MessagingService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
+  /** The row count for a page, capped, over the same `FROM … WHERE` the list uses. */
+  private async countOf(fromWhere: SQL): Promise<number> {
+    /*
+      Counted over a LIMIT-ed subquery, so the database stops reading at COUNT_CAP + 1 rows
+      instead of scanning the whole matching set. An uncapped count(*) is unbounded work on
+      every page view of an ever-growing table — which rule 2 forbids — and nobody reading a
+      console table needs to know the exact size of a set they will never page through.
+    */
+    const result = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (SELECT 1 ${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
+
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
+  /** `OFFSET` for a 1-based page. */
+  private pageOffset(query: { page: number; limit: number }): SQL {
+    return sql`OFFSET ${(query.page - 1) * query.limit}`;
+  }
+
   async conversations(query: {
     limit: number;
-    cursor?: string | undefined;
+    page: number;
     q?: string | undefined;
     actor?: AccessTokenClaims | undefined;
-  }): Promise<CursorPage<ConversationRow>> {
+  }): Promise<OffsetPage<ConversationRow>> {
     /*
       A conversation has no city; it inherits one from whatever it is about. `coalesce` over the
       booking and the partner covers all three subject kinds — a dispute-scoped thread reaches a
@@ -99,31 +119,8 @@ export class MessagingService {
       );
     }
 
-    if (query.cursor !== undefined) {
-      const after = decodeCursor(query.cursor);
-
-      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
-
-      conditions.push(
-        sql`(c.created_at, c.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,
-      );
-    }
-
-    const result = await this.db.execute<ConversationRowSql>(sql`
-      SELECT c.id, c.reference,
-             CASE WHEN c.booking_id IS NOT NULL THEN 'booking'
-                  WHEN c.dispute_id IS NOT NULL THEN 'dispute'
-                  ELSE 'partner' END        AS subject_kind,
-             coalesce(b.reference, d.reference, p.reference) AS subject_reference,
-             cust.full_name                 AS customer,
-             p.display_name                 AS partner,
-             c.unread_for_staff,
-             (c.closed_at IS NOT NULL)      AS closed,
-             coalesce(m.n, 0)::int          AS message_count,
-             last.body                      AS last_message,
-             to_char(c.last_message_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
-               AS last_message_at,
-             c.created_at
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
       FROM conversations c
       LEFT JOIN bookings b          ON b.id = c.booking_id
       LEFT JOIN disputes d          ON d.id = c.dispute_id
@@ -139,17 +136,33 @@ export class MessagingService {
         WHERE conversation_id = c.id AND internal = false
         ORDER BY created_at DESC LIMIT 1
       ) last ON TRUE
-      WHERE ${sql.join(conditions, sql` AND `)}
+      WHERE ${sql.join(conditions, sql` AND `)}`;
+
+    const [result, total] = await Promise.all([
+      this.db.execute<ConversationRowSql>(sql`
+      SELECT c.id, c.reference,
+             CASE WHEN c.booking_id IS NOT NULL THEN 'booking'
+                  WHEN c.dispute_id IS NOT NULL THEN 'dispute'
+                  ELSE 'partner' END        AS subject_kind,
+             coalesce(b.reference, d.reference, p.reference) AS subject_reference,
+             cust.full_name                 AS customer,
+             p.display_name                 AS partner,
+             c.unread_for_staff,
+             (c.closed_at IS NOT NULL)      AS closed,
+             coalesce(m.n, 0)::int          AS message_count,
+             last.body                      AS last_message,
+             to_char(c.last_message_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+               AS last_message_at,
+             c.created_at
+      ${fromWhere}
       ORDER BY c.created_at DESC, c.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+      LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    const hasMore = result.rows.length > query.limit;
-    const page = hasMore ? result.rows.slice(0, query.limit) : result.rows;
-    const last = page.at(-1);
-
-    return {
-      items: page.map((row) => ({
+    return offsetPage(
+      result.rows.map((row) => ({
         reference: row.reference,
         subjectKind: row.subject_kind,
         subjectReference: row.subject_reference,
@@ -161,8 +174,9 @@ export class MessagingService {
         messageCount: row.message_count,
         closed: row.closed,
       })),
-      nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
-    };
+      total,
+      query,
+    );
   }
 
   /** One thread in full, oldest first — the order it was written in. */
@@ -251,11 +265,11 @@ export class MessagingService {
    */
   async notifications(query: {
     limit: number;
-    cursor?: string | undefined;
+    page: number;
     q?: string | undefined;
     status?: string | undefined;
     actor?: AccessTokenClaims | undefined;
-  }): Promise<CursorPage<NotificationRow>> {
+  }): Promise<OffsetPage<NotificationRow>> {
     const conditions: SQL[] = [
       sql`n.deleted_at IS NULL`,
       scopeFilter(query.actor, 'coalesce(b.city_id, p.city_id)'),
@@ -273,17 +287,16 @@ export class MessagingService {
       );
     }
 
-    if (query.cursor !== undefined) {
-      const after = decodeCursor(query.cursor);
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM notifications n
+      LEFT JOIN bookings b ON b.id = n.booking_id
+      LEFT JOIN disputes d ON d.id = n.dispute_id
+      LEFT JOIN partners p ON p.id = n.partner_id
+      WHERE ${sql.join(conditions, sql` AND `)}`;
 
-      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
-
-      conditions.push(
-        sql`(n.created_at, n.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,
-      );
-    }
-
-    const result = await this.db.execute<NotificationRowSql>(sql`
+    const [result, total] = await Promise.all([
+      this.db.execute<NotificationRowSql>(sql`
       SELECT n.id,
              n.channel::text AS channel,
              n.template_key,
@@ -294,21 +307,15 @@ export class MessagingService {
              coalesce(b.reference, d.reference, p.reference) AS subject_reference,
              to_char(n.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS at,
              n.created_at
-      FROM notifications n
-      LEFT JOIN bookings b ON b.id = n.booking_id
-      LEFT JOIN disputes d ON d.id = n.dispute_id
-      LEFT JOIN partners p ON p.id = n.partner_id
-      WHERE ${sql.join(conditions, sql` AND `)}
+      ${fromWhere}
       ORDER BY n.created_at DESC, n.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+      LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    const hasMore = result.rows.length > query.limit;
-    const page = hasMore ? result.rows.slice(0, query.limit) : result.rows;
-    const last = page.at(-1);
-
-    return {
-      items: page.map((row) => ({
+    return offsetPage(
+      result.rows.map((row) => ({
         channel: row.channel,
         templateKey: row.template_key,
         locale: row.locale,
@@ -318,8 +325,9 @@ export class MessagingService {
         subjectReference: row.subject_reference,
         at: row.at,
       })),
-      nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
-    };
+      total,
+      query,
+    );
   }
 
   /**

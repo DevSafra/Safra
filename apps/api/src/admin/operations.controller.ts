@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
 import { z } from 'zod';
 
-import { PERMISSIONS as P } from '@safra/contracts';
+import { PERMISSIONS as P, pageQuerySchema } from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
@@ -11,17 +11,13 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import { AuditLogService } from './audit-log.service.js';
 import { BookingDetailService } from './booking-detail.service.js';
 
-const auditQuerySchema = z
-  .object({
-    limit: z.coerce.number().int().min(1).max(100).default(50),
-    cursor: z.string().max(200).optional(),
-    /** Prefix, so `partner.` finds every partner action. */
-    action: z.string().trim().max(80).optional(),
-    subjectType: z.string().trim().max(40).optional(),
-    subjectId: z.string().uuid().optional(),
-    actorEmail: z.string().trim().max(254).optional(),
-  })
-  .strict();
+const auditQuerySchema = pageQuerySchema.extend({
+  /** Prefix, so `partner.` finds every partner action. */
+  action: z.string().trim().max(80).optional(),
+  subjectType: z.string().trim().max(40).optional(),
+  subjectId: z.string().uuid().optional(),
+  actorEmail: z.string().trim().max(254).optional(),
+});
 
 type AuditQueryInput = z.infer<typeof auditQuerySchema>;
 

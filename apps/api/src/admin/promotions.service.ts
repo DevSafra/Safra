@@ -2,10 +2,9 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { COUNT_CAP, type OffsetPage, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
-import { badRequest } from '../common/errors/app-error.js';
 
 /**
  * بطاقات الهدايا and الكوبونات (design handoff §8).
@@ -18,7 +17,7 @@ import { badRequest } from '../common/errors/app-error.js';
  * **discount**: nobody paid for it, it reduces revenue at the moment of use and never leaves
  * a balance. Merging them would put a liability and a marketing expense in one ledger view.
  *
- * They share this service only for the cursor plumbing, and they have separate screens.
+ * They share this service only for the paging plumbing, and they have separate screens.
  *
  * ## Codes are never returned
  *
@@ -31,21 +30,31 @@ import { badRequest } from '../common/errors/app-error.js';
 export class PromotionsService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
-  private bound(cursor: string | undefined, alias: string): SQL | null {
-    if (cursor === undefined) return null;
+  /** The row count for a page, capped, over the same `FROM … WHERE` the list uses. */
+  private async countOf(fromWhere: SQL): Promise<number> {
+    /*
+      Counted over a LIMIT-ed subquery, so the database stops reading at COUNT_CAP + 1 rows
+      instead of scanning the whole matching set. An uncapped count(*) is unbounded work on
+      every page view of an ever-growing table — which rule 2 forbids — and nobody reading a
+      console table needs to know the exact size of a set they will never page through.
+    */
+    const result = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (SELECT 1 ${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
 
-    const after = decodeCursor(cursor);
+    return Number(result.rows[0]?.n ?? 0);
+  }
 
-    if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
-
-    return sql`(${sql.raw(alias)}.created_at, ${sql.raw(alias)}.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`;
+  /** `OFFSET` for a 1-based page. */
+  private pageOffset(query: { page: number; limit: number }): SQL {
+    return sql`OFFSET ${(query.page - 1) * query.limit}`;
   }
 
   async giftCards(query: {
     limit: number;
-    cursor?: string | undefined;
+    page: number;
     q?: string | undefined;
-  }): Promise<CursorPage<GiftCardRow>> {
+  }): Promise<OffsetPage<GiftCardRow>> {
     const conditions: SQL[] = [sql`g.deleted_at IS NULL`];
 
     if (query.q) {
@@ -58,22 +67,27 @@ export class PromotionsService {
       );
     }
 
-    const bound = this.bound(query.cursor, 'g');
-    if (bound) conditions.push(bound);
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM gift_cards g
+      LEFT JOIN customer_profiles c ON c.id = g.purchased_by_customer_id
+      LEFT JOIN currencies cur      ON cur.id = g.currency_id
+      WHERE ${sql.join(conditions, sql` AND `)}`;
 
-    const result = await this.db.execute<{
-      id: string;
-      reference: string;
-      code_last4: string;
-      original_amount: string;
-      remaining_amount: string;
-      currency: string;
-      status: string;
-      expires_at: string | null;
-      buyer: string | null;
-      recipient: string | null;
-      created_at: string;
-    }>(sql`
+    const [result, total] = await Promise.all([
+      this.db.execute<{
+        id: string;
+        reference: string;
+        code_last4: string;
+        original_amount: string;
+        remaining_amount: string;
+        currency: string;
+        status: string;
+        expires_at: string | null;
+        buyer: string | null;
+        recipient: string | null;
+        created_at: string;
+      }>(sql`
       SELECT g.id, g.reference, g.code_last4,
              g.original_amount::text  AS original_amount,
              g.remaining_amount::text AS remaining_amount,
@@ -84,20 +98,15 @@ export class PromotionsService {
              g.recipient_name         AS recipient,
              to_char(g.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at
-      FROM gift_cards g
-      LEFT JOIN customer_profiles c ON c.id = g.purchased_by_customer_id
-      LEFT JOIN currencies cur      ON cur.id = g.currency_id
-      WHERE ${sql.join(conditions, sql` AND `)}
+      ${fromWhere}
       ORDER BY g.created_at DESC, g.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+      LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    const hasMore = result.rows.length > query.limit;
-    const page = hasMore ? result.rows.slice(0, query.limit) : result.rows;
-    const last = page.at(-1);
-
-    return {
-      items: page.map((row) => ({
+    return offsetPage(
+      result.rows.map((row) => ({
         reference: row.reference,
         codeLast4: row.code_last4,
         originalAmount: row.original_amount,
@@ -107,42 +116,49 @@ export class PromotionsService {
         expiresAt: row.expires_at,
         buyer: row.buyer ?? row.recipient,
       })),
-      nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
-    };
+      total,
+      query,
+    );
   }
 
   async coupons(query: {
     limit: number;
-    cursor?: string | undefined;
+    page: number;
     q?: string | undefined;
-  }): Promise<CursorPage<CouponRow>> {
+  }): Promise<OffsetPage<CouponRow>> {
     const conditions: SQL[] = [sql`cp.deleted_at IS NULL`];
 
     if (query.q) {
       conditions.push(sql`cp.code ILIKE ${query.q + '%'}`);
     }
 
-    const bound = this.bound(query.cursor, 'cp');
-    if (bound) conditions.push(bound);
+    // One fragment, used by both queries below — see `countOf`.
+    const fromWhere = sql`
+      FROM coupons cp
+      LEFT JOIN currencies cur ON cur.id = cp.currency_id
+      LEFT JOIN cities ci      ON ci.id = cp.city_id
+      LEFT JOIN partners pt    ON pt.id = cp.partner_id
+      WHERE ${sql.join(conditions, sql` AND `)}`;
 
-    const result = await this.db.execute<{
-      id: string;
-      code: string;
-      type: string;
-      value_kind: string;
-      value: string;
-      currency: string | null;
-      min_booking_amount: string | null;
-      redemptions_count: number;
-      max_redemptions: number | null;
-      starts_at: string;
-      ends_at: string;
-      is_active: boolean;
-      expired: boolean;
-      city: string | null;
-      partner: string | null;
-      created_at: string;
-    }>(sql`
+    const [result, total] = await Promise.all([
+      this.db.execute<{
+        id: string;
+        code: string;
+        type: string;
+        value_kind: string;
+        value: string;
+        currency: string | null;
+        min_booking_amount: string | null;
+        redemptions_count: number;
+        max_redemptions: number | null;
+        starts_at: string;
+        ends_at: string;
+        is_active: boolean;
+        expired: boolean;
+        city: string | null;
+        partner: string | null;
+        created_at: string;
+      }>(sql`
       SELECT cp.id, cp.code,
              cp.type::text        AS type,
              cp.value_kind::text  AS value_kind,
@@ -159,21 +175,15 @@ export class PromotionsService {
              pt.display_name      AS partner,
              to_char(cp.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at
-      FROM coupons cp
-      LEFT JOIN currencies cur ON cur.id = cp.currency_id
-      LEFT JOIN cities ci      ON ci.id = cp.city_id
-      LEFT JOIN partners pt    ON pt.id = cp.partner_id
-      WHERE ${sql.join(conditions, sql` AND `)}
+      ${fromWhere}
       ORDER BY cp.created_at DESC, cp.id DESC
-      LIMIT ${query.limit + 1}
-    `);
+      LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+    ]);
 
-    const hasMore = result.rows.length > query.limit;
-    const page = hasMore ? result.rows.slice(0, query.limit) : result.rows;
-    const last = page.at(-1);
-
-    return {
-      items: page.map((row) => ({
+    return offsetPage(
+      result.rows.map((row) => ({
         code: row.code,
         type: row.type,
         valueKind: row.value_kind,
@@ -188,8 +198,9 @@ export class PromotionsService {
         expired: row.expired,
         scope: row.city ?? row.partner,
       })),
-      nextCursor: hasMore && last ? encodeCursor(last.created_at, last.id) : null,
-    };
+      total,
+      query,
+    );
   }
 }
 

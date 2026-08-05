@@ -1,7 +1,8 @@
 import { getGiftCards, type GiftCardItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { money, shortDate } from '@/lib/format';
-import { ConsolePanel, ConsoleShell, Pager } from '@/components/console-shell';
+import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { TablePagination } from '@/components/table-pagination';
 import {
   AdminTable,
   FootNote,
@@ -42,10 +43,10 @@ export default async function GiftCardsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, cursor } = await listParams(searchParams);
+  const { q, page, size } = await listParams(searchParams);
 
   const [result, counts] = await Promise.all([
-    getGiftCards({ q, cursor }),
+    getGiftCards({ q, page, limit: size }),
     sidebarCounts(),
   ]);
 
@@ -55,6 +56,7 @@ export default async function GiftCardsPage({
         <TableToolbar
           action="/giftcards"
           query={q}
+          size={size}
           placeholder={t.sections.giftcards.searchPlaceholder}
           end={
             <>
@@ -84,7 +86,15 @@ export default async function GiftCardsPage({
               minWidth={700}
               empty={t.table.empty}
             />
-            <Pager basePath="/giftcards" query={{ q }} nextCursor={result.nextCursor} />
+            <TablePagination
+              basePath="/giftcards"
+              query={{ q }}
+              page={result.page}
+              pages={result.pages}
+              total={result.total}
+              capped={result.capped}
+              size={size}
+            />
           </>
         )}
 
