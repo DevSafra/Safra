@@ -82,6 +82,55 @@
   }
 }
 
+/**
+ * A 40px floor for controls on handheld widths.
+ *
+ * Chasing this per component does not converge: the audit found thirteen distinct offenders, and
+ * fixing them by editing class strings missed sibling branches — the customer header's "sign in"
+ * link and its "account" link are different elements, and only one got the padding. One rule
+ * covers every control, including the ones written next month.
+ *
+ * `button`, `select` and `summary` only. An anchor is INLINE, so `min-height` does nothing to it
+ * without also changing its `display`, and forcing `inline-flex` on every link in the app would
+ * add height to links inside sentences. Anchors styled as controls carry an explicit
+ * `min-h-10`; anchors inside table cells are handled by the rule above.
+ *
+ * Below `lg`, which is exactly where the console's sidebar becomes a drawer. That boundary is the
+ * one that means "the input is probably a finger": a tablet at 768px is as touch-driven as a
+ * phone, and stopping at `md` left every control on an iPad at 22–38px. Above it the input is a
+ * pointer and the design's dense console (§9.4) is what is wanted.
+ *
+ * `:where()` for zero specificity — anything that genuinely needs to be smaller can say so.
+ */
+@media (max-width: 63.999rem) {
+  :where(button, select, summary, [role='button']) {
+    min-height: 2.5rem;
+  }
+}
+
+/**
+ * Grid and flex children may shrink below their content.
+ *
+ * ## The bug this removes as a class
+ *
+ * A grid or flex item defaults to `min-width: auto`, which means it refuses to shrink below its
+ * content's intrinsic minimum. A registry table with a 860px `min-width` therefore made its
+ * containing panel 898px wide inside a 342px column, and the whole page scrolled sideways —
+ * carrying the sidebar off screen — even though the table sat in an `overflow-x-auto` box
+ * intended to scroll on its own. Measured: 7 of the 19 console sections overflowed at 390px,
+ * 3 of them still at 1024px.
+ *
+ * The per-element fix is `min-w-0` on every grid and flex item, forever, remembered by whoever
+ * writes the next panel. This is the same fix applied once, in the one place it cannot be
+ * forgotten.
+ *
+ * `:where()` gives the selector ZERO specificity, so any explicit `min-w-*` utility still wins —
+ * an element that genuinely needs a floor can state one and this will not fight it.
+ */
+:where(.grid, .flex, .inline-flex) > * {
+  min-width: 0;
+}
+
 html {
   background-color: var(--color-bg);
   color: var(--color-text);

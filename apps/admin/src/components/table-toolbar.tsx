@@ -60,7 +60,7 @@ export function TableToolbar({
         */}
         <button
           type="submit"
-          className="cursor-pointer rounded-[9px] border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
         >
           {t.table.search}
         </button>
@@ -87,7 +87,7 @@ export function OutlineAction({
     <a
       href={href}
       {...(download ? { download: '' } : {})}
-      className="cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.35)] px-4 py-1.5 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)]"
+      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.35)] px-4 py-1.5 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)]"
     >
       {children}
     </a>
@@ -110,7 +110,7 @@ export function GoldAction({
   return (
     <a
       href={href}
-      className="cursor-pointer rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[12.5px] font-extrabold text-[#241A05] transition-opacity hover:opacity-90"
+      className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[12.5px] font-extrabold text-[#241A05] transition-opacity hover:opacity-90"
     >
       {children}
     </a>

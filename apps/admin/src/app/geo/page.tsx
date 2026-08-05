@@ -185,7 +185,10 @@ function Currencies({ rows }: { rows: Geography['currencies'] }) {
 
       <FootNote>{t.sections.geo.note}</FootNote>
       <p className="mt-1 text-[11px] text-faint">
-        <Link href="/settings" className="text-sky hover:underline">
+        <Link
+          href="/settings"
+          className="inline-flex min-h-10 items-center lg:min-h-0 text-sky hover:underline"
+        >
           {t.sections.geo.fxElsewhere}
         </Link>
       </p>

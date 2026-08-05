@@ -65,7 +65,7 @@ export function ThemeToggle() {
       onClick={toggle}
       aria-label={label}
       title={label}
-      className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-sm text-muted transition-colors hover:border-gold hover:text-gold"
+      className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-[9px] border border-line bg-field text-sm text-muted transition-colors hover:border-gold hover:text-gold"
     >
       <span aria-hidden>{theme === 'dark' ? ORNAMENT_CRESCENT : ORNAMENT_SUN}</span>
     </button>

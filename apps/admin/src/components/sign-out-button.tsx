@@ -37,7 +37,7 @@ export function SignOutButton() {
       type="button"
       onClick={() => void signOut()}
       disabled={busy}
-      className="cursor-pointer rounded-lg border border-line px-4 py-2 text-sm text-muted transition-colors hover:border-gold/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-60"
+      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-sm text-muted transition-colors hover:border-gold/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-60"
     >
       {busy ? t.dashboard.signingOut : t.dashboard.signOut}
     </button>

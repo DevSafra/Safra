@@ -284,7 +284,10 @@ export default async function BookingPage({
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <Link href="/" className="text-sm text-muted hover:text-gold">
+      <Link
+        href="/"
+        className="inline-flex min-h-10 items-center lg:min-h-0 text-sm text-muted hover:text-gold"
+      >
         {t.table.backToQueues}
       </Link>
       <div className="mt-4 grid gap-8">{children}</div>

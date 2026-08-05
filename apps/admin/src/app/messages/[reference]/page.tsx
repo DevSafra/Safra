@@ -37,7 +37,10 @@ export default async function ThreadPage({
     <ConsoleShell title={t.nav.messages} subtitle={reference} counts={counts}>
       <div className="grid gap-4">
         <ConsolePanel>
-          <Link href="/messages" className="text-[11.5px] text-sky hover:underline">
+          <Link
+            href="/messages"
+            className="inline-flex min-h-10 items-center lg:min-h-0 text-[11.5px] text-sky hover:underline"
+          >
             ← {t.nav.messages}
           </Link>
 

@@ -63,7 +63,7 @@ export default async function LoginPage({
       <p className="mt-4 text-center text-sm">
         <Link
           href={`/${locale}/forgot-password`}
-          className="text-muted hover:text-gold hover:underline"
+          className="inline-flex min-h-10 items-center lg:min-h-0 text-muted hover:text-gold hover:underline"
         >
           {t('forgotPassword')}
         </Link>
@@ -73,7 +73,7 @@ export default async function LoginPage({
         {t('noAccount')}{' '}
         <Link
           href={`/${locale}/register?next=${encodeURIComponent(next)}`}
-          className="text-gold hover:underline"
+          className="inline-flex min-h-10 items-center lg:min-h-0 text-gold hover:underline"
         >
           {t('createAccount')}
         </Link>

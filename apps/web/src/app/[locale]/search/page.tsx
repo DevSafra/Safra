@@ -131,8 +131,8 @@ export default async function SearchPage({
                 aria-current={sort === option.value ? 'true' : undefined}
                 className={
                   sort === option.value
-                    ? 'rounded-lg border border-gold/50 bg-card px-3 py-1.5 text-gold'
-                    : 'rounded-lg border border-line px-3 py-1.5 text-muted transition-colors hover:text-gold'
+                    ? 'inline-flex min-h-10 items-center rounded-lg border border-gold/50 bg-card px-3 py-1.5 text-gold'
+                    : 'inline-flex min-h-10 items-center rounded-lg border border-line px-3 py-1.5 text-muted transition-colors hover:text-gold'
                 }
               >
                 {option.label}

@@ -49,12 +49,17 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           </span>
         </Link>
 
-        <nav aria-label={t('home')} className="hidden items-center gap-1 sm:flex">
+        {/*
+          Visible at EVERY width. It was `hidden … sm:flex`, which took the site's two primary
+          destinations away from every phone with nothing in their place — a visitor could reach
+          الإقامات only by editing the URL. The header already wraps, and two links need no drawer.
+        */}
+        <nav aria-label={t('home')} className="flex items-center gap-1">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-card hover:text-gold"
+              className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-sm text-muted transition-colors hover:bg-card hover:text-gold"
             >
               {link.label}
             </Link>
@@ -74,8 +79,8 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
               aria-current={code === locale ? 'true' : undefined}
               className={
                 code === locale
-                  ? 'rounded-lg border border-gold/50 bg-card px-2.5 py-1.5 text-xs text-gold'
-                  : 'rounded-lg border border-transparent px-2.5 py-1.5 text-xs text-faint transition-colors hover:text-gold'
+                  ? 'inline-flex min-h-10 items-center rounded-lg border border-gold/50 bg-card px-2.5 py-1.5 text-xs text-gold'
+                  : 'inline-flex min-h-10 items-center rounded-lg border border-transparent px-2.5 py-1.5 text-xs text-faint transition-colors hover:text-gold'
               }
             >
               {LOCALE_LABELS[code]}
@@ -91,7 +96,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         {session ? (
           <Link
             href={`/${locale}/account`}
-            className="max-w-[10rem] truncate rounded-lg border border-gold/40 bg-card px-3 py-1.5 text-xs text-gold transition-colors hover:border-gold"
+            className="inline-flex min-h-10 max-w-[10rem] items-center truncate rounded-lg border border-gold/40 bg-card px-3 py-1.5 text-xs text-gold transition-colors hover:border-gold"
             title={session.user.email}
           >
             {auth('account')}
@@ -99,7 +104,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         ) : (
           <Link
             href={`/${locale}/login`}
-            className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted transition-colors hover:border-gold/50 hover:text-gold"
+            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 py-1.5 text-xs text-muted transition-colors hover:border-gold/50 hover:text-gold"
           >
             {auth('signIn')}
           </Link>
