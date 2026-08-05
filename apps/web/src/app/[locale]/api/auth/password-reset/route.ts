@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 
-import { passwordResetConfirmSchema, passwordResetRequestSchema } from '@safra/contracts';
+import {
+  ERROR,
+  passwordResetConfirmSchema,
+  passwordResetRequestSchema,
+} from '@safra/contracts';
 
 import { forwardedHeaders } from '@safra/session';
 
@@ -23,7 +27,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ message: 'Malformed request body.' }, { status: 400 });
+    return NextResponse.json({ code: ERROR.REQUEST_MALFORMED_BODY }, { status: 400 });
   }
 
   const isConfirm = typeof body === 'object' && body !== null && 'token' in body;
@@ -35,10 +39,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!parsed.success) {
     return NextResponse.json(
       {
-        message: 'Validation failed.',
+        code: ERROR.REQUEST_VALIDATION_FAILED,
         errors: parsed.error.issues.map((issue) => ({
           field: issue.path.join('.') || '(root)',
-          message: issue.message,
+          // The schema's `message` IS the code — see `@safra/contracts/error-codes`. It is
+          // forwarded as `code` because that is the field the form resolves against the
+          // reader's locale; sending it as `message` made every field show the generic
+          // "something went wrong" while the API knew exactly which field was wrong.
+          code: issue.message,
         })),
       },
       { status: 400 },
@@ -70,7 +78,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(payload, { status: response.status });
   } catch {
     return NextResponse.json(
-      { message: 'Could not reach the server. Please try again.' },
+      { code: ERROR.REQUEST_UPSTREAM_UNREACHABLE },
       { status: 502 },
     );
   }

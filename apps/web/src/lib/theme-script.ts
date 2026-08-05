@@ -1,10 +1,8 @@
 /**
- * The pre-paint theme script, as a single exported constant.
+ * Re-exported from `@safra/ui`, where the staff console reads it too.
  *
- * Kept here rather than inline in the component so that `next.config.ts` can hash
- * THESE EXACT BYTES for the Content-Security-Policy. A hash written by hand would
- * silently stop matching the moment somebody edited the script — the browser would
- * refuse to run it, the theme would flash on every load, and nothing would say why.
- * Deriving both from one constant makes that drift impossible.
+ * Kept as a module rather than deleted because `next.config.ts` and `ThemeScript` both point
+ * here, and because the reason it must be ONE constant is worth stating at the point somebody
+ * would otherwise be tempted to inline it: the CSP has to hash these exact bytes.
  */
-export const THEME_SCRIPT = `try{var s=localStorage.getItem('safra-theme');if(s==='light'||s==='dark'){document.documentElement.dataset.theme=s}}catch(e){}`;
+export { THEME_SCRIPT } from '@safra/ui';

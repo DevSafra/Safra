@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ERROR } from '@safra/contracts';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -19,7 +20,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ message: 'Malformed request body.' }, { status: 400 });
+    return NextResponse.json({ code: ERROR.REQUEST_MALFORMED_BODY }, { status: 400 });
   }
 
   const forwardedFor = request.headers.get('x-forwarded-for');
@@ -45,7 +46,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(payload, { status: response.status });
   } catch {
     return NextResponse.json(
-      { message: 'Could not reach the booking service. Please try again.' },
+      { code: ERROR.REQUEST_UPSTREAM_UNREACHABLE },
       { status: 502 },
     );
   }

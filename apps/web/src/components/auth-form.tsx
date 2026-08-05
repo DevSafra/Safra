@@ -7,6 +7,8 @@ import { PasswordField } from '@safra/ui';
 import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
+import { errorMessage } from '@safra/i18n';
+import { isErrorCode } from '@safra/contracts';
 
 interface FieldErrors {
   [field: string]: string | undefined;
@@ -78,6 +80,7 @@ export function AuthForm({
           setFormError,
           setFieldErrors,
           t,
+          locale,
         });
         setSubmitting(false);
         return;
@@ -149,6 +152,8 @@ export function AuthForm({
 
       <PasswordField
         name="password"
+        showLabel={t('showPassword')}
+        hideLabel={t('hidePassword')}
         label={t('password')}
         showRequiredMark
         // "new-password" tells a password manager to OFFER one on registration and
@@ -241,10 +246,12 @@ function applyError(
   handlers: {
     setFormError: (message: string) => void;
     setFieldErrors: (errors: FieldErrors) => void;
-    t: (key: string) => string;
+    t: ReturnType<typeof useTranslations<'auth'>>;
+    /** The reader's locale — the API answers with codes, and this is what resolves them. */
+    locale: Locale;
   },
 ): void {
-  const { setFormError, setFieldErrors, t } = handlers;
+  const { setFormError, setFieldErrors, t, locale } = handlers;
 
   if (typeof body === 'object' && body !== null) {
     const record = body as Record<string, unknown>;
@@ -254,9 +261,20 @@ function applyError(
 
       for (const entry of record['errors']) {
         if (typeof entry === 'object' && entry !== null && 'field' in entry) {
-          const item = entry as { field?: unknown; message?: unknown };
-          if (typeof item.field === 'string' && typeof item.message === 'string') {
-            mapped[item.field] = item.message;
+          const item = entry as { field?: unknown; code?: unknown };
+          if (typeof item.field === 'string') {
+            /*
+              Read `code`, never `message`.
+
+              `message` is the English text the API sends for logs and for clients that have not
+              been taught the codes. This line used to write it straight into the error under the
+              input, which made the one place on the page where wording matters most the one
+              place that ignored the reader's language.
+            */
+            mapped[item.field] = errorMessage(
+              typeof item.code === 'string' ? item.code : null,
+              locale,
+            );
           }
         }
       }
@@ -266,6 +284,24 @@ function applyError(
         setFormError(t('fixFields'));
         return;
       }
+    }
+  }
+
+  /*
+    The CODE first, the status only as a fallback.
+
+    Matching on status alone is what this did before, and it is too coarse to be honest: every
+    401 said "email or password is wrong", including the one that really meant "your
+    authenticator code is required" and the one that meant "this account is locked". Somebody
+    typing a correct password was told it was wrong. The code says which it is, so it wins; the
+    status remains the answer for a response that predates the codes or never had a body.
+  */
+  if (typeof body === 'object' && body !== null) {
+    const code = (body as { code?: unknown }).code;
+
+    if (isErrorCode(code)) {
+      setFormError(errorMessage(code, locale));
+      return;
     }
   }
 

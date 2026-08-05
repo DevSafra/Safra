@@ -6,6 +6,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { formatMoney } from '@/lib/localise';
 import { getProperty, imageUrl, type PropertyDetail } from '@/lib/property';
+import { dynamicMessage } from '@/lib/dynamic-message';
 
 /**
  * Property page (SRS §5.6).
@@ -68,6 +69,7 @@ export default async function PropertyPage({
   if (!property) notFound();
 
   const t = await getTranslations('property');
+  const tnav = await getTranslations('nav');
   const ta = await getTranslations('amenities');
   const tt = await getTranslations('propertyTypes');
   const tc = await getTranslations('city');
@@ -81,7 +83,7 @@ export default async function PropertyPage({
 
   return (
     <article className="mx-auto max-w-6xl px-4 py-8">
-      <nav aria-label="breadcrumb" className="text-sm text-faint">
+      <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
         <Link href={`/${locale}`} className="hover:text-gold">
           {tc('backHome')}
         </Link>
@@ -107,7 +109,8 @@ export default async function PropertyPage({
               {name}
             </h1>
             <p className="mt-2 text-sm text-muted">
-              {tt(property.propertyTypeCode)} · {cityName}
+              {dynamicMessage(tt, property.propertyTypeCode, property.propertyTypeCode)} ·{' '}
+              {cityName}
               {property.rating ? ` · ★ ${property.rating}` : ''}
               {property.reviewsCount > 0
                 ? ` · ${t('reviews', { count: property.reviewsCount })}`
@@ -150,7 +153,7 @@ export default async function PropertyPage({
                     <span aria-hidden className="text-ok">
                       ✓
                     </span>
-                    {safeAmenity(ta, code)}
+                    {dynamicMessage(ta, code, code)}
                   </li>
                 ))}
               </ul>
@@ -390,14 +393,6 @@ function policyDescription(
  * database — an admin can add one before a translation exists. Falling back to the
  * raw code beats crashing the page.
  */
-function safeAmenity(t: (key: string) => string, code: string): string {
-  try {
-    return t(code);
-  } catch {
-    return code;
-  }
-}
-
 function dayClasses(status: string): string {
   if (status === 'available') return 'border-ok/40 bg-ok/10 text-ok';
   if (status === 'booked') return 'border-pend/40 bg-pend/10 text-pend';

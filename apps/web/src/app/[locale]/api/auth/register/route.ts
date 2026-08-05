@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { registerSchema } from '@safra/contracts';
+import { ERROR, registerSchema } from '@safra/contracts';
 
 import {
   CUSTOMER_SESSION_COOKIE,
@@ -28,7 +28,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ message: 'Malformed request body.' }, { status: 400 });
+    return NextResponse.json({ code: ERROR.REQUEST_MALFORMED_BODY }, { status: 400 });
   }
 
   const parsed = registerSchema.safeParse(body);
@@ -36,10 +36,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!parsed.success) {
     return NextResponse.json(
       {
-        message: 'Validation failed.',
+        code: ERROR.REQUEST_VALIDATION_FAILED,
         errors: parsed.error.issues.map((issue) => ({
           field: issue.path.join('.') || '(root)',
-          message: issue.message,
+          // The schema's `message` IS the code — see `@safra/contracts/error-codes`. It is
+          // forwarded as `code` because that is the field the form resolves against the
+          // reader's locale; sending it as `message` made every field show the generic
+          // "something went wrong" while the API knew exactly which field was wrong.
+          code: issue.message,
         })),
       },
       { status: 400 },
@@ -54,8 +58,21 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!outcome.ok || !outcome.session) {
     return NextResponse.json(
       {
-        message: outcome.message,
-        ...(outcome.fieldErrors ? { errors: outcome.fieldErrors } : {}),
+        code: outcome.code,
+        /*
+          Forwarded as an ARRAY, because that is what the form reads (`Array.isArray(errors)`).
+          `callAuth` returns a field→code MAP, and passing it through unchanged meant every
+          upstream field error was silently dropped: the map failed the array check and the form
+          fell back to a status-based message.
+        */
+        ...(outcome.fieldErrors
+          ? {
+              errors: Object.entries(outcome.fieldErrors).map(([field, code]) => ({
+                field,
+                code,
+              })),
+            }
+          : {}),
       },
       { status: outcome.status },
     );

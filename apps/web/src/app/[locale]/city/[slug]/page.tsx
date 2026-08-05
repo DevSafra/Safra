@@ -10,6 +10,7 @@ import { getCities, getCity } from '@/lib/catalog';
 import { localisedDescription, localisedName } from '@/lib/localise';
 import { searchSafely } from '@/lib/api';
 import { todayInDamascus } from '@/lib/settings';
+import { dynamicMessage } from '@/lib/dynamic-message';
 
 /**
  * City page (SRS §5.4).
@@ -72,6 +73,7 @@ export default async function CityPage({
   if (!city) notFound();
 
   const t = await getTranslations('city');
+  const tnav = await getTranslations('nav');
   const tc = await getTranslations('cityCategories');
   const ts = await getTranslations('search');
 
@@ -107,7 +109,7 @@ export default async function CityPage({
           className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-20%,color-mix(in_oklab,var(--color-sky)_28%,transparent),transparent_65%)]"
         />
         <div className="relative mx-auto max-w-6xl px-4 py-14 sm:py-20">
-          <nav aria-label="breadcrumb" className="text-sm text-faint">
+          <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
             <Link href={`/${locale}`} className="hover:text-gold">
               {t('backHome')}
             </Link>
@@ -118,7 +120,7 @@ export default async function CityPage({
           </nav>
 
           <p className="mt-4 text-sm tracking-wide text-sky">
-            {city.categories.map((c) => tc(c)).join(' · ')}
+            {city.categories.map((c) => dynamicMessage(tc, c, c)).join(' · ')}
           </p>
           <h1 className="mt-2 font-display text-4xl font-bold text-gold sm:text-5xl">
             {name}

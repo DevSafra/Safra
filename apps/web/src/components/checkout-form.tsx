@@ -8,6 +8,8 @@ import type { CustomerFacingMethod } from '@safra/contracts';
 
 import type { Locale } from '@/i18n/routing';
 import { formatMoney } from '@/lib/localise';
+import { errorMessage } from '@safra/i18n';
+import { dynamicMessage } from '@/lib/dynamic-message';
 
 interface FieldErrors {
   [field: string]: string | undefined;
@@ -117,7 +119,7 @@ export function CheckoutForm({
       const body: unknown = await response.json().catch(() => null);
 
       if (!response.ok) {
-        applyError(body, response.status, { setFormError, setFieldErrors, t });
+        applyError(body, response.status, { setFormError, setFieldErrors, t, locale });
         return;
       }
 
@@ -263,7 +265,9 @@ export function CheckoutForm({
                   className="mt-0.5 accent-gold"
                 />
                 <span>
-                  <span className="block text-sm text-text">{tm(option)}</span>
+                  <span className="block text-sm text-text">
+                    {dynamicMessage(tm, option, option)}
+                  </span>
                   <span className="block text-xs text-faint">
                     {methodHint(option, tm)}
                   </span>
@@ -297,7 +301,10 @@ export function CheckoutForm({
  * alarming), that Klarna defers the charge, and that Sham Cash only works inside
  * Syria. Grouped in one function so the mapping is readable in one place.
  */
-function methodHint(method: CustomerFacingMethod, tm: (key: string) => string): string {
+function methodHint(
+  method: CustomerFacingMethod,
+  tm: ReturnType<typeof useTranslations<'paymentMethods'>>,
+): string {
   switch (method) {
     case 'klarna':
       return tm('klarnaHint');
@@ -491,10 +498,12 @@ function applyError(
   handlers: {
     setFormError: (message: string) => void;
     setFieldErrors: (errors: FieldErrors) => void;
-    t: (key: string, values?: Record<string, string | number>) => string;
+    t: ReturnType<typeof useTranslations<'checkout'>>;
+    /** The reader's locale — the API answers with codes, and this is what resolves them. */
+    locale: Locale;
   },
 ): void {
-  const { setFormError, setFieldErrors, t } = handlers;
+  const { setFormError, setFieldErrors, t, locale } = handlers;
 
   if (typeof body === 'object' && body !== null) {
     const record = body as Record<string, unknown>;
@@ -505,9 +514,20 @@ function applyError(
 
       for (const entry of record['errors']) {
         if (typeof entry === 'object' && entry !== null && 'field' in entry) {
-          const item = entry as { field?: unknown; message?: unknown };
-          if (typeof item.field === 'string' && typeof item.message === 'string') {
-            mapped[item.field] = item.message;
+          const item = entry as { field?: unknown; code?: unknown };
+          if (typeof item.field === 'string') {
+            /*
+              Read `code`, never `message`.
+
+              `message` is the English text the API sends for logs and for clients that have not
+              been taught the codes. This line used to write it straight into the error under the
+              input, which made the one place on the page where wording matters most the one
+              place that ignored the reader's language.
+            */
+            mapped[item.field] = errorMessage(
+              typeof item.code === 'string' ? item.code : null,
+              locale,
+            );
           }
         }
       }

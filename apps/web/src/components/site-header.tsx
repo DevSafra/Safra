@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { LOCALE_LABELS, type Locale, routing } from '@/i18n/routing';
 import { getSession } from '@/lib/session-server';
 import { ThemeToggle } from './theme-toggle';
+import { ORNAMENT_BRAND } from '@safra/ui';
 
 /**
  * Site header, following the prototype's layout.
@@ -38,7 +39,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
             aria-hidden
             className="grid size-10 place-items-center rounded-xl border border-gold/40 bg-card text-lg text-gold"
           >
-            ۞
+            {ORNAMENT_BRAND}
           </span>
           <span className="leading-tight">
             <span className="block font-display text-lg font-bold text-gold">

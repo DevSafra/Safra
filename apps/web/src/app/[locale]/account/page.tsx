@@ -8,6 +8,7 @@ import { isLocale } from '@/i18n/routing';
 import { getMyBookings, getMyWallet, getMyWalletTransactions } from '@/lib/account';
 import { formatMoney } from '@/lib/localise';
 import { getSession } from '@/lib/session-server';
+import { dynamicMessage } from '@/lib/dynamic-message';
 
 /**
  * The customer's account (SRS §2.3, §4).
@@ -101,7 +102,7 @@ export default async function AccountPage({
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-text">
-                          {t(`reason.${entry.reason}`)}
+                          {dynamicMessage(t, `reason.${entry.reason}`, entry.reason)}
                         </span>
                         <span className="block text-xs text-faint">
                           {entry.createdAt.slice(0, 10)}
@@ -174,7 +175,11 @@ export default async function AccountPage({
                   <span className="flex items-center gap-3">
                     <StatusPill
                       status={booking.status}
-                      label={t(`status.${booking.status}`)}
+                      label={dynamicMessage(
+                        t,
+                        `status.${booking.status}`,
+                        booking.status,
+                      )}
                     />
                     <span className="text-sm text-gold">{booking.totalAmount}</span>
                   </span>

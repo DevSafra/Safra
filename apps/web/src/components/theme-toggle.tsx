@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { ORNAMENT_CRESCENT, ORNAMENT_SUN } from '@safra/ui';
 
 type Theme = 'dark' | 'light';
 
@@ -49,7 +50,7 @@ export function ThemeToggle() {
       title={t('theme')}
       className="rounded-lg border border-line bg-field px-3 py-2 text-sm text-muted transition-colors hover:border-gold hover:text-gold"
     >
-      {theme === 'dark' ? '☾' : '☀'}
+      {theme === 'dark' ? ORNAMENT_CRESCENT : ORNAMENT_SUN}
     </button>
   );
 }

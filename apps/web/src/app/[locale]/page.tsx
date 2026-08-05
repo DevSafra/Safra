@@ -7,6 +7,8 @@ import { isLocale } from '@/i18n/routing';
 import { getCities, getPropertyTypes, getPublicSettings } from '@/lib/catalog';
 import { formatCustomerFee, todayInDamascus } from '@/lib/settings';
 import { localisedName } from '@/lib/localise';
+import { ORNAMENT_BRAND, ORNAMENT_CRESCENT, ORNAMENT_STAR } from '@safra/ui';
+import { dynamicMessage } from '@/lib/dynamic-message';
 
 export const revalidate = 300;
 
@@ -83,7 +85,9 @@ export default async function HomePage({
                     {localisedName(city, locale)}
                   </h3>
                   <p className="mt-1 text-sm text-faint">
-                    {city.categories.map((category) => tc(category)).join(' · ')}
+                    {city.categories
+                      .map((category) => dynamicMessage(tc, category, category))
+                      .join(' · ')}
                   </p>
                 </div>
                 <p className="mt-4 text-sm text-muted">
@@ -109,9 +113,11 @@ export default async function HomePage({
                   className="flex h-full flex-col items-center gap-2 rounded-card border border-line bg-card p-4 text-center transition-colors hover:border-gold/60"
                 >
                   <span aria-hidden className="text-2xl">
-                    {type.glyph ?? '✦'}
+                    {type.glyph ?? ORNAMENT_STAR}
                   </span>
-                  <span className="text-sm text-text">{tt(type.code)}</span>
+                  <span className="text-sm text-text">
+                    {dynamicMessage(tt, type.code, type.code)}
+                  </span>
                 </Link>
               </li>
             ))}
@@ -131,9 +137,13 @@ export default async function HomePage({
           <SectionHeading title={t('pledgesTitle')} subtitle={t('pledgesSubtitle')} />
           <ul className="mt-8 grid gap-5 md:grid-cols-3">
             {[
-              { glyph: '☾', title: t('pledge1Title'), body: t('pledge1Body') },
-              { glyph: '✦', title: t('pledge2Title'), body: t('pledge2Body') },
-              { glyph: '۞', title: t('pledge3Title'), body: t('pledge3Body') },
+              {
+                glyph: ORNAMENT_CRESCENT,
+                title: t('pledge1Title'),
+                body: t('pledge1Body'),
+              },
+              { glyph: ORNAMENT_STAR, title: t('pledge2Title'), body: t('pledge2Body') },
+              { glyph: ORNAMENT_BRAND, title: t('pledge3Title'), body: t('pledge3Body') },
             ].map((pledge) => (
               <li
                 key={pledge.title}

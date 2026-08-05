@@ -117,6 +117,8 @@ export function PasswordResetForm({
         />
       ) : (
         <PasswordField
+          showLabel={t('showPassword')}
+          hideLabel={t('hidePassword')}
           name="password"
           label={t('newPassword')}
           autoComplete="new-password"
@@ -143,7 +145,10 @@ function text(form: FormData, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
-async function describe(response: Response, t: (key: string) => string): Promise<string> {
+async function describe(
+  response: Response,
+  t: ReturnType<typeof useTranslations<'auth'>>,
+): Promise<string> {
   const body: unknown = await response.json().catch(() => null);
 
   if (typeof body === 'object' && body !== null && 'errors' in body) {

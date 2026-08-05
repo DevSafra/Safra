@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import type { Locale } from '@/i18n/routing';
 import type { SearchResultItem } from '@/lib/api';
 import { formatMoney } from '@/lib/localise';
+import { dynamicMessage } from '@/lib/dynamic-message';
 
 /**
  * A search result card (§5.5, §5.6).
@@ -43,7 +44,8 @@ export async function PropertyCard({
       </div>
 
       <p className="mt-1 text-sm text-faint">
-        {tt(item.propertyTypeCode)} · {locale === 'ar' ? item.cityNameAr : item.citySlug}
+        {dynamicMessage(tt, item.propertyTypeCode, item.propertyTypeCode)} ·{' '}
+        {locale === 'ar' ? item.cityNameAr : item.citySlug}
       </p>
 
       {/* Trust badges (§5.6). Awarded by SAFRA, never set by the partner. */}
