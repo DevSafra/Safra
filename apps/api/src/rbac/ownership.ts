@@ -1,9 +1,8 @@
-import { ForbiddenException } from '@nestjs/common';
-
-import { PERMISSIONS as P } from '@safra/contracts';
+import { ERROR, PERMISSIONS as P } from '@safra/contracts';
 import type { Permission } from '@safra/contracts';
 
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { forbidden } from '../common/errors/app-error.js';
 
 /**
  * Resource-level authorization.
@@ -85,17 +84,17 @@ export function requirePartnerId(
   permission: Permission,
 ): string {
   if (!claims) {
-    throw new ForbiddenException('Authentication required.');
+    throw forbidden(ERROR.AUTH_REQUIRED);
   }
 
   if (!(claims.permissions ?? []).includes(permission)) {
-    throw new ForbiddenException(`Missing required permission: ${permission}.`);
+    throw forbidden(ERROR.PERMISSION_DENIED);
   }
 
   if (!claims.partnerId) {
     // A partner-role token without a partner record is a data problem, not an
     // authorization one — but it still must not fall through to an unscoped write.
-    throw new ForbiddenException('This account is not linked to a partner profile.');
+    throw forbidden(ERROR.PARTNER_PROFILE_MISSING);
   }
 
   return claims.partnerId;
@@ -109,7 +108,7 @@ export function assertReadable(
   scope: AccessScope,
 ): Exclude<AccessScope, { kind: 'none' }> {
   if (scope.kind === 'none') {
-    throw new ForbiddenException('You do not have access to this resource.');
+    throw forbidden(ERROR.PERMISSION_DENIED);
   }
 
   return scope;

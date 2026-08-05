@@ -1,15 +1,10 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 import {
+  ERROR,
   PERMISSIONS as P,
   type PropertyCreateInput,
   type PropertyUpdateInput,
@@ -21,6 +16,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
+import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
 /**
  * A partner may edit a listing only while it is theirs AND still editable.
@@ -84,14 +80,11 @@ export class PropertiesService {
       }),
     ]);
 
-    if (!city) throw new BadRequestException(`Unknown city: ${input.citySlug}`);
-    if (!type)
-      throw new BadRequestException(`Unknown property type: ${input.propertyTypeCode}`);
+    if (!city) throw badRequest(ERROR.GEO_CITY_UNKNOWN);
+    if (!type) throw badRequest(ERROR.PROPERTY_TYPE_UNKNOWN);
     if (!policy) {
       // §7.4: partners pick from SAFRA-approved policies; they cannot invent terms.
-      throw new BadRequestException(
-        `Unknown cancellation policy: ${input.cancellationPolicyCode}`,
-      );
+      throw badRequest(ERROR.PROPERTY_CANCELLATION_POLICY_UNKNOWN);
     }
 
     const slug = await this.uniqueSlug(input.name.ar, input.name.en);
@@ -154,9 +147,7 @@ export class PropertiesService {
         property.status as (typeof STRUCTURALLY_EDITABLE)[number],
       )
     ) {
-      throw new ConflictException(
-        `A ${property.status} listing cannot be edited structurally. Contact SAFRA support to request a change.`,
-      );
+      throw conflict(ERROR.PROPERTY_NOT_STRUCTURALLY_EDITABLE);
     }
 
     const patch: Record<string, unknown> = {};
@@ -184,7 +175,7 @@ export class PropertiesService {
         ),
         columns: { id: true },
       });
-      if (!city) throw new BadRequestException(`Unknown city: ${input.citySlug}`);
+      if (!city) throw badRequest(ERROR.GEO_CITY_UNKNOWN);
       patch['cityId'] = city.id;
     }
 
@@ -194,15 +185,13 @@ export class PropertiesService {
         columns: { id: true },
       });
       if (!policy) {
-        throw new BadRequestException(
-          `Unknown cancellation policy: ${input.cancellationPolicyCode}`,
-        );
+        throw badRequest(ERROR.PROPERTY_CANCELLATION_POLICY_UNKNOWN);
       }
       patch['cancellationPolicyId'] = policy.id;
     }
 
     if (Object.keys(patch).length === 0) {
-      throw new BadRequestException('No updatable fields were provided.');
+      throw badRequest(ERROR.SETTING_NO_UPDATABLE_FIELDS);
     }
 
     await this.db.transaction(async (tx) => {
@@ -236,9 +225,7 @@ export class PropertiesService {
     const property = await this.findOwned(partnerId, reference);
 
     if (property.status !== 'draft' && property.status !== 'rejected') {
-      throw new ConflictException(
-        `Only a draft or rejected listing can be submitted for review (this one is ${property.status}).`,
-      );
+      throw conflict(ERROR.PROPERTY_NOT_SUBMITTABLE);
     }
 
     // A listing with no bookable unit cannot be reviewed meaningfully.
@@ -251,9 +238,7 @@ export class PropertiesService {
     });
 
     if (units.length === 0) {
-      throw new BadRequestException(
-        'Add at least one unit before submitting for review.',
-      );
+      throw badRequest(ERROR.PROPERTY_UNIT_REQUIRED);
     }
 
     await this.db.transaction(async (tx) => {
@@ -302,8 +287,7 @@ export class PropertiesService {
       columns: { id: true },
     });
 
-    if (!currency)
-      throw new BadRequestException(`Unknown currency: ${input.currencyCode}`);
+    if (!currency) throw badRequest(ERROR.GEO_CURRENCY_UNKNOWN);
 
     const amenityIds = await this.resolveAmenityIds(input.amenityCodes);
 
@@ -386,7 +370,7 @@ export class PropertiesService {
     if (input.isActive !== undefined) patch['isActive'] = input.isActive;
 
     if (Object.keys(patch).length === 0 && input.amenityCodes === undefined) {
-      throw new BadRequestException('No updatable fields were provided.');
+      throw badRequest(ERROR.SETTING_NO_UPDATABLE_FIELDS);
     }
 
     await this.db.transaction(async (tx) => {
@@ -443,7 +427,7 @@ export class PropertiesService {
       columns: { id: true, status: true, slug: true },
     });
 
-    if (!property) throw new NotFoundException('Property not found.');
+    if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);
 
     return property;
   }
@@ -464,7 +448,7 @@ export class PropertiesService {
       )
       .limit(1);
 
-    if (rows.length === 0) throw new NotFoundException('Unit not found.');
+    if (rows.length === 0) throw notFound(ERROR.UNIT_NOT_FOUND);
   }
 
   private async resolveAmenityIds(codes: string[]): Promise<string[]> {
@@ -477,7 +461,7 @@ export class PropertiesService {
 
     const missing = codes.filter((c) => !found.some((f) => f.code === c));
     if (missing.length > 0) {
-      throw new BadRequestException(`Unknown amenity codes: ${missing.join(', ')}`);
+      throw badRequest(ERROR.PROPERTY_AMENITIES_UNKNOWN);
     }
 
     return found.map((f) => f.id);
@@ -507,7 +491,7 @@ export class PropertiesService {
       if (!clash) return candidate;
     }
 
-    throw new ConflictException('Could not derive a unique slug; please vary the name.');
+    throw conflict(ERROR.PROPERTY_SLUG_NOT_DERIVABLE);
   }
 }
 

@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -11,6 +11,9 @@ import { SettingsService } from '../settings/settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { canTransition, type Actor, type BookingStatus } from './booking-state.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { ERROR } from '@safra/contracts';
+import { notFound } from '../common/errors/app-error.js';
+import { conflict } from '../common/errors/app-error.js';
 
 /**
  * State transitions on an existing booking (§6.3 steps 5–8, §6.4).
@@ -70,7 +73,7 @@ export class BookingActionsService {
     `);
 
     const amounts = money.rows[0];
-    if (!amounts) throw new NotFoundException('Booking not found.');
+    if (!amounts) throw notFound(ERROR.BOOKING_NOT_FOUND);
 
     const windowMinutes = await this.settings.getNumber(
       'booking.confirmation_window_minutes',
@@ -202,7 +205,7 @@ export class BookingActionsService {
     // Ownership is part of the check, and a mismatch is 404 rather than 403 so a
     // partner cannot probe other partners' references.
     if (booking.partner_id !== partnerId) {
-      throw new NotFoundException('Booking not found.');
+      throw notFound(ERROR.BOOKING_NOT_FOUND);
     }
 
     const target: BookingStatus = decision === 'confirm' ? 'confirmed' : 'cancelled';
@@ -426,16 +429,19 @@ export class BookingActionsService {
     `);
 
     const booking = rows.rows[0];
-    if (!booking) throw new NotFoundException('Booking not found.');
+    if (!booking) throw notFound(ERROR.BOOKING_NOT_FOUND);
 
     return booking;
   }
 
   private assertTransition(from: BookingStatus, to: BookingStatus, actor: Actor): void {
     if (!canTransition(from, to, actor)) {
-      throw new ConflictException(
-        `A booking cannot move from ${from} to ${to}${actor === 'system' ? '' : ` as ${actor}`}.`,
-      );
+      /*
+        The states are NOT named to the client any more. `from`/`to` are enum identifiers and
+        the actor is an internal role — all three go to the log via the thrown code, and none of
+        them tells a customer anything they can act on.
+      */
+      throw conflict(ERROR.BOOKING_TRANSITION_INVALID);
     }
   }
 }

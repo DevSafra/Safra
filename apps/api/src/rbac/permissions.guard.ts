@@ -1,15 +1,12 @@
-import {
-  type CanActivate,
-  type ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
 import type { Permission } from '@safra/contracts';
 
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { PERMISSIONS_KEY } from './decorators.js';
+import { ERROR } from '@safra/contracts';
+import { forbidden } from '../common/errors/app-error.js';
 
 /**
  * Checks the permissions carried in the verified access token.
@@ -42,7 +39,7 @@ export class PermissionsGuard implements CanActivate {
     if (missing.length > 0) {
       // The message names the permission but not the role's full grant list:
       // enough for a developer to debug, not enough to map the whole model.
-      throw new ForbiddenException(`Missing required permission: ${missing.join(', ')}.`);
+      throw forbidden(ERROR.PERMISSION_DENIED);
     }
 
     return true;

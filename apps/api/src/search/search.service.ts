@@ -1,16 +1,12 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { type SearchQuery, evaluateArrival } from '@safra/contracts';
+import { ERROR, type SearchQuery, evaluateArrival } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { badRequest, notFound } from '../common/errors/app-error.js';
 
 export interface SearchResultItem {
   propertyReference: string;
@@ -82,7 +78,7 @@ export class SearchService {
     );
 
     if (nights > maxNights) {
-      throw new BadRequestException(`A stay may not exceed ${maxNights} nights.`);
+      throw badRequest(ERROR.BOOKING_STAY_TOO_LONG, { maxNights });
     }
 
     /**
@@ -279,7 +275,7 @@ export class SearchService {
     const timezone = found.rows[0]?.timezone;
 
     if (!timezone) {
-      throw new NotFoundException(`Unknown city: ${citySlug}`);
+      throw notFound(ERROR.GEO_CITY_NOT_FOUND);
     }
 
     return timezone;
@@ -301,7 +297,7 @@ export class SearchService {
     const raw = Number(Buffer.from(cursor, 'base64url').toString('utf8'));
 
     if (!Number.isInteger(raw) || raw < 0 || raw > 1_000) {
-      throw new BadRequestException('Malformed pagination cursor.');
+      throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
     }
 
     return raw;

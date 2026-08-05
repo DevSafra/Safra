@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -10,6 +10,8 @@ import { DATABASE } from '../database/database.module.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { WalletService, type WalletMovementResult } from './wallet.service.js';
+import { ERROR } from '@safra/contracts';
+import { badRequest } from '../common/errors/app-error.js';
 
 /**
  * Finance moving a balance by hand (SRS §2.3, §4.1).
@@ -45,7 +47,7 @@ export class WalletAdjustmentService {
       // The permission guard has already run, so a missing subject means a token
       // shape this route cannot attribute an action to. Refusing is the only
       // option that keeps the audit trail honest.
-      throw new BadRequestException('An adjustment must be attributable to a user.');
+      throw badRequest(ERROR.INTERNAL_ACTOR_REQUIRED);
     }
 
     const currencyId = await this.currencyId(input.currency);
@@ -180,7 +182,7 @@ export class WalletAdjustmentService {
     const id = rows.rows[0]?.id;
 
     // Unlike a missing FX rate this IS the caller's mistake, so it is a 400.
-    if (!id) throw new BadRequestException(`Unknown currency "${code}".`);
+    if (!id) throw badRequest(ERROR.GEO_CURRENCY_UNKNOWN);
 
     return id;
   }

@@ -1,10 +1,4 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -20,6 +14,8 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { IntentOutcome } from './payment-provider.port.js';
 import { PaymentProviderUnavailableError } from './payment-provider.port.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
+import { ERROR } from '@safra/contracts';
+import { conflict, forbidden } from '../common/errors/app-error.js';
 
 /** Statuses from which a fresh payment attempt is legitimate. */
 const PAYABLE_BOOKING_STATUSES = ['pending_payment'];
@@ -108,9 +104,7 @@ export class PaymentIntentService {
        * already proved they hold this booking's token, and "already paid" versus
        * "expired" is exactly what they need to know to act.
        */
-      throw new ConflictException(
-        `This booking is ${booking.status.replace(/_/g, ' ')} and cannot be paid.`,
-      );
+      throw conflict(ERROR.BOOKING_NOT_PAYABLE_IN_STATUS);
     }
 
     const context = await this.loadPaymentContext(booking.id);
@@ -184,7 +178,7 @@ export class PaymentIntentService {
        */
       if (error instanceof PaymentProviderUnavailableError) {
         this.logger.error(`Provider ${error.provider} unavailable: ${error.message}`);
-        throw new ConflictException('Payment is temporarily unavailable. Please retry.');
+        throw conflict(ERROR.PAYMENT_UNAVAILABLE);
       }
 
       throw error;
@@ -244,9 +238,7 @@ export class PaymentIntentService {
     const signedInProfile = input.claims?.customerProfileId;
 
     if (!signedInProfile || signedInProfile !== booking.customerProfileId) {
-      throw new ForbiddenException(
-        'Sign in to the account that holds this booking to use your balance.',
-      );
+      throw forbidden(ERROR.WALLET_WRONG_ACCOUNT);
     }
 
     const wallet = await this.wallet.findByCustomer(booking.customerProfileId);
@@ -315,9 +307,7 @@ export class PaymentIntentService {
           `${error instanceof Error ? error.message : String(error)}`,
       );
 
-      throw new ConflictException(
-        'Your balance changed while this payment was being prepared. Please try again.',
-      );
+      throw conflict(ERROR.WALLET_BALANCE_CHANGED);
     }
   }
 
@@ -408,7 +398,7 @@ export class PaymentIntentService {
     `);
 
     const row = rows.rows[0];
-    if (!row) throw new ConflictException('This booking can no longer be paid.');
+    if (!row) throw conflict(ERROR.BOOKING_NOT_PAYABLE);
 
     const walletMinor = toMinor(row.wallet_amount, MONEY_SCALE);
 

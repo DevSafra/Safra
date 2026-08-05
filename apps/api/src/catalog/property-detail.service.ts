@@ -1,10 +1,12 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { ERROR } from '@safra/contracts';
+import { notFound } from '../common/errors/app-error.js';
 
 /**
  * How many days of calendar the property page shows (§5.6 requires the calendar
@@ -64,7 +66,7 @@ export class PropertyDetailService {
     `);
 
     const row = rows.rows[0];
-    if (!row) throw new NotFoundException('Property not found.');
+    if (!row) throw notFound(ERROR.PROPERTY_NOT_FOUND);
 
     const [units, images, calendar, fees] = await Promise.all([
       this.units(slug),

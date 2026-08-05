@@ -1,12 +1,13 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { badRequest } from '../common/errors/app-error.js';
 
 /**
  * The console's registry reads: partners, properties and customers (design handoff §8).
@@ -40,7 +41,7 @@ export class RegistryService {
     const after = decodeCursor(cursor);
 
     // A 400, never a silent restart from page 1 — that turns into an infinite client loop.
-    if (!after) throw new BadRequestException('Malformed pagination cursor.');
+    if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
 
     return sql`(${sql.raw(alias)}.created_at, ${sql.raw(alias)}.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`;
   }

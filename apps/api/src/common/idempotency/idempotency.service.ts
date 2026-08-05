@@ -1,16 +1,14 @@
 import { createHash } from 'node:crypto';
 
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-  UnprocessableEntityException,
-} from '@nestjs/common';
+import { Inject, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../../database/database.module.js';
+import { ERROR } from '@safra/contracts';
+import { conflict } from '../errors/app-error.js';
+import { errorMessage } from '@safra/i18n';
 
 /** How long a completed response is replayable. */
 const RETENTION_HOURS = 24;
@@ -104,9 +102,7 @@ export class IdempotencyService {
     // The row vanished between the failed insert and this read — a concurrent
     // failure released it. Treat as a conflict so the client simply retries.
     if (!record) {
-      throw new ConflictException(
-        'That request is already being processed. Please retry.',
-      );
+      throw conflict(ERROR.REQUEST_IN_PROGRESS);
     }
 
     /**
@@ -115,16 +111,16 @@ export class IdempotencyService {
      * they just submitted rather than the earlier ones.
      */
     if (record.request_hash !== requestHash) {
-      throw new UnprocessableEntityException(
-        'This idempotency key was already used with a different request.',
-      );
+      throw new UnprocessableEntityException({
+        statusCode: 422,
+        code: ERROR.REQUEST_IDEMPOTENCY_KEY_REUSED,
+        message: errorMessage(ERROR.REQUEST_IDEMPOTENCY_KEY_REUSED, 'en'),
+      });
     }
 
     if (record.status === 'in_progress') {
       // Still running. 409 rather than blocking, so the client controls the retry.
-      throw new ConflictException(
-        'That request is still being processed. Please retry shortly.',
-      );
+      throw conflict(ERROR.REQUEST_STILL_PROCESSING);
     }
 
     return record.response_body as T;

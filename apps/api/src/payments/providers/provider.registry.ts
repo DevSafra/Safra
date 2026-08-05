@@ -1,6 +1,10 @@
-import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 
-import { CUSTOMER_FACING_METHODS, type CustomerFacingMethod } from '@safra/contracts';
+import {
+  ERROR,
+  CUSTOMER_FACING_METHODS,
+  type CustomerFacingMethod,
+} from '@safra/contracts';
 
 import type { Env } from '../../config/env.js';
 import { ENV } from '../../config/env.js';
@@ -8,6 +12,7 @@ import { SettingsService } from '../../settings/settings.service.js';
 import type { PaymentProvider } from '../payment-provider.port.js';
 import { ManualTransferProvider } from './manual-transfer.provider.js';
 import { SimulatorProvider } from './simulator.provider.js';
+import { unavailable } from '../../common/errors/app-error.js';
 
 /**
  * Settings key holding the routing table (P-005 — rails are configuration).
@@ -163,6 +168,6 @@ export class PaymentProviderRegistry {
         }.`,
     );
 
-    throw new ServiceUnavailableException('Payment is temporarily unavailable.');
+    throw unavailable(ERROR.PAYMENT_UNAVAILABLE);
   }
 }

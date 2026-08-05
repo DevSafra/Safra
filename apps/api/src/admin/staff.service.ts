@@ -1,15 +1,8 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { isStaffRole, type Role } from '@safra/contracts';
+import { ERROR, isStaffRole, type Role } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { AuthTokenService } from '../auth/auth-token.service.js';
@@ -20,6 +13,7 @@ import { staffInvitationMail } from '../mail/mail.templates.js';
 import { PasswordService } from '../common/crypto/password.service.js';
 import { TokenService } from '../auth/token.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { badRequest, forbidden, notFound } from '../common/errors/app-error.js';
 
 /**
  * An invitation is valid for 48 hours.
@@ -132,9 +126,7 @@ export class StaffService {
     const email = input.email.trim().toLowerCase();
 
     if (!isStaffRole(input.role)) {
-      throw new BadRequestException(
-        `${input.role} is not a staff role. This endpoint creates console accounts only.`,
-      );
+      throw badRequest(ERROR.STAFF_ROLE_INVALID_CONSOLE);
     }
 
     const existing = await this.db.execute<{ id: string }>(
@@ -147,9 +139,7 @@ export class StaffService {
      * an ordinary invitation in the audit log.
      */
     if (existing.rows.length > 0) {
-      throw new BadRequestException(
-        'An account with that email already exists. Change its role instead of inviting it.',
-      );
+      throw badRequest(ERROR.STAFF_EMAIL_TAKEN);
     }
 
     const created = await this.db.execute<{ id: string }>(sql`
@@ -186,9 +176,7 @@ export class StaffService {
     const target = await this.staffById(userId);
 
     if (target.password_hash !== null) {
-      throw new BadRequestException(
-        'That account has already been activated. Use a password reset instead.',
-      );
+      throw badRequest(ERROR.STAFF_ALREADY_ACTIVATED);
     }
 
     await this.audit.record({
@@ -217,7 +205,7 @@ export class StaffService {
     const target = await this.staffById(userId);
 
     if (!isStaffRole(role)) {
-      throw new BadRequestException(`${role} is not a staff role.`);
+      throw badRequest(ERROR.STAFF_ROLE_INVALID);
     }
 
     /**
@@ -228,9 +216,7 @@ export class StaffService {
      * be another administrator's decision.
      */
     if (actor?.sub === userId) {
-      throw new ForbiddenException(
-        'You cannot change your own role. Ask another super admin.',
-      );
+      throw forbidden(ERROR.STAFF_CANNOT_CHANGE_OWN_ROLE);
     }
 
     await this.assertNotLastSuperAdmin(target, role === 'super_admin');
@@ -265,7 +251,7 @@ export class StaffService {
 
     /** Refusal 2: no suspending yourself — an instant, self-inflicted lockout. */
     if (actor?.sub === userId) {
-      throw new ForbiddenException('You cannot suspend your own account.');
+      throw forbidden(ERROR.STAFF_CANNOT_SUSPEND_SELF);
     }
 
     if (status === 'suspended') {
@@ -308,9 +294,7 @@ export class StaffService {
      * existed" tells someone probing invitation links which guesses were close.
      */
     if (!redeemed) {
-      throw new BadRequestException(
-        'That invitation link is invalid or has already been used.',
-      );
+      throw badRequest(ERROR.STAFF_INVITATION_INVALID);
     }
 
     const hash = await this.passwords.hash(password);
@@ -378,7 +362,7 @@ export class StaffService {
     const user = rows.rows[0];
 
     if (!user || !isStaffRole(user.role)) {
-      throw new NotFoundException('No such staff account.');
+      throw notFound(ERROR.STAFF_NOT_FOUND);
     }
 
     return user;

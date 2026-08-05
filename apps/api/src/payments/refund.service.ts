@@ -1,11 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -17,6 +10,8 @@ import { MONEY_SCALE, applyRate, fromMinor, toMinor } from '../common/money.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { ERROR } from '@safra/contracts';
+import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
 /** The shape snapshotted onto the booking at creation. */
 interface PolicySnapshot {
@@ -93,15 +88,13 @@ export class RefundService {
     const quote = await this.computeQuote(booking);
 
     if (toMinor(quote.refundAmount, MONEY_SCALE) <= 0n) {
-      throw new ConflictException('No refundable amount remains on this booking.');
+      throw conflict(ERROR.BOOKING_NO_REFUNDABLE_AMOUNT);
     }
 
     const payment = await this.findCapturedPayment(booking.id);
 
     if (!payment) {
-      throw new ConflictException(
-        'This booking has no captured payment, so there is nothing to refund.',
-      );
+      throw conflict(ERROR.BOOKING_NO_CAPTURED_PAYMENT);
     }
 
     const needsProvider = toMinor(quote.providerAmount, MONEY_SCALE) > 0n;
@@ -124,9 +117,7 @@ export class RefundService {
       this.logger.error(
         `Refund for ${reference} needs provider "${payment.provider}", which is not registered.`,
       );
-      throw new ConflictException(
-        'Refunds through the original payment method are temporarily unavailable.',
-      );
+      throw conflict(ERROR.PAYMENT_REFUND_UNAVAILABLE);
     }
 
     const refundId = await this.db.transaction(async (tx) => {
@@ -465,10 +456,10 @@ export class RefundService {
     `);
 
     const booking = rows.rows[0];
-    if (!booking) throw new NotFoundException('Booking not found.');
+    if (!booking) throw notFound(ERROR.BOOKING_NOT_FOUND);
 
     if (booking.status === 'draft') {
-      throw new BadRequestException('A draft booking has no payment to refund.');
+      throw badRequest(ERROR.BOOKING_DRAFT_NOT_REFUNDABLE);
     }
 
     return booking;

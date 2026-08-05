@@ -1,9 +1,7 @@
 import {
-  BadRequestException,
   Controller,
   Delete,
   Inject,
-  NotFoundException,
   Param,
   Post,
   UploadedFile,
@@ -14,13 +12,14 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
-import { PERMISSIONS as P } from '@safra/contracts';
+import { ERROR, PERMISSIONS as P } from '@safra/contracts';
 
 import { Audited } from '../common/audit/audit.interceptor.js';
 import { DATABASE } from '../database/database.module.js';
 import { ImageService } from '../storage/image.service.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { badRequest, notFound } from '../common/errors/app-error.js';
 
 const MAX_IMAGES_PER_CITY = 12;
 
@@ -49,7 +48,7 @@ export class CityImagesController {
     @UploadedFile() file: { buffer: Buffer } | undefined,
   ) {
     if (!file?.buffer) {
-      throw new BadRequestException('No file was uploaded under the field name "file".');
+      throw badRequest(ERROR.UPLOAD_FILE_MISSING);
     }
 
     const city = await this.db.query.cities.findFirst({
@@ -57,7 +56,7 @@ export class CityImagesController {
       columns: { id: true, slug: true },
     });
 
-    if (!city) throw new NotFoundException('City not found.');
+    if (!city) throw notFound(ERROR.GEO_CITY_NOT_FOUND);
 
     const existing = await this.db.execute<{ count: string }>(
       sql`SELECT COUNT(*)::text AS count FROM city_images
@@ -66,9 +65,7 @@ export class CityImagesController {
     const count = Number(existing.rows[0]?.count ?? 0);
 
     if (count >= MAX_IMAGES_PER_CITY) {
-      throw new BadRequestException(
-        `A city may have at most ${MAX_IMAGES_PER_CITY} images.`,
-      );
+      throw badRequest(ERROR.GEO_CITY_IMAGE_LIMIT, { max: MAX_IMAGES_PER_CITY });
     }
 
     // Same pipeline as property images: decoded, re-encoded, EXIF stripped.
@@ -122,7 +119,7 @@ export class CityImagesController {
       )
       .limit(1);
 
-    if (rows.length === 0) throw new NotFoundException('Image not found.');
+    if (rows.length === 0) throw notFound(ERROR.IMAGE_NOT_FOUND);
 
     await this.db
       .update(schema.cityImages)

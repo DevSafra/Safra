@@ -1,11 +1,17 @@
-import { Controller, ForbiddenException, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 
-import { PERMISSIONS as P, type CursorQuery, cursorQuerySchema } from '@safra/contracts';
+import {
+  ERROR,
+  PERMISSIONS as P,
+  type CursorQuery,
+  cursorQuerySchema,
+} from '@safra/contracts';
 
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { WalletService } from './wallet.service.js';
+import { forbidden } from '../common/errors/app-error.js';
 
 /**
  * The customer's own wallet (SRS §2.3).
@@ -73,15 +79,15 @@ export class WalletController {
  */
 function requireCustomerProfileId(claims: AccessTokenClaims | undefined): string {
   if (!claims) {
-    throw new ForbiddenException('Authentication required.');
+    throw forbidden(ERROR.AUTH_REQUIRED);
   }
 
   if (!(claims.permissions ?? []).includes(P.WALLET_READ)) {
-    throw new ForbiddenException(`Missing required permission: ${P.WALLET_READ}.`);
+    throw forbidden(ERROR.PERMISSION_DENIED);
   }
 
   if (!claims.customerProfileId) {
-    throw new ForbiddenException('This account has no customer profile.');
+    throw forbidden(ERROR.CUSTOMER_PROFILE_MISSING);
   }
 
   return claims.customerProfileId;

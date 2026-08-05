@@ -9,6 +9,8 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { WalletAdjustmentService } from './wallet-adjustment.service.js';
 import { WalletService } from './wallet.service.js';
 import type { FxRateService } from '../fx/fx-rate.service.js';
+import { ERROR } from '@safra/contracts';
+import { codeOf } from '../common/errors/app-error.js';
 
 /**
  * Wallet balances against a REAL PostgreSQL.
@@ -173,16 +175,24 @@ describeIfDb('customer wallet', () => {
       ).rejects.toThrow(/positive amount/i);
     });
 
-    /** §4.1 — a manual movement that nobody is accountable for must not exist. */
+    /**
+     * §4.1 — a manual movement that nobody is accountable for must not exist.
+     *
+     * Asserted on the CODE rather than the wording. This condition is a programming error, not
+     * something a customer can cause, so the client is told only "something went wrong" (rule 1:
+     * the detail belongs in the log). The old assertion matched `/acting user/i` against the
+     * response prose, which made the test a hostage of a message this deliberately made generic.
+     */
     it('refuses an admin adjustment with no acting user', async () => {
-      await expect(
-        wallet.credit(db, {
-          customerProfileId: profileId,
-          amount: '10.00',
-          currencyId: await currencyId(db, 'USD'),
-          reason: 'admin_adjustment',
-        }),
-      ).rejects.toThrow(/acting user/i);
+      const attempt = wallet.credit(db, {
+        customerProfileId: profileId,
+        amount: '10.00',
+        currencyId: await currencyId(db, 'USD'),
+        reason: 'admin_adjustment',
+      });
+
+      await expect(attempt).rejects.toThrow();
+      await expect(attempt.catch(codeOf)).resolves.toBe(ERROR.INTERNAL_ACTOR_REQUIRED);
     });
   });
 

@@ -1,19 +1,15 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '@safra/db';
-import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
+import { badRequest, notFound } from '../common/errors/app-error.js';
 
 export const campaignStatusSchema = z
   .object({
@@ -139,7 +135,7 @@ export class AdvertisingService {
     if (query.cursor !== undefined) {
       const after = decodeCursor(query.cursor);
 
-      if (!after) throw new BadRequestException('Malformed pagination cursor.');
+      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
 
       conditions.push(
         sql`(c.created_at, c.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,
@@ -217,7 +213,7 @@ export class AdvertisingService {
 
     const campaign = found.rows[0];
 
-    if (!campaign) throw new NotFoundException('Campaign not found.');
+    if (!campaign) throw notFound(ERROR.CAMPAIGN_NOT_FOUND);
 
     // Scope on the write path: a caller can name any reference, so the list is not the gate.
     assertCanWrite(actor, campaign.city_id);
@@ -228,9 +224,7 @@ export class AdvertisingService {
       correct answer, and the refusal says so rather than appearing to work.
     */
     if (campaign.status === 'expired') {
-      throw new BadRequestException(
-        'This campaign has expired. Create a new campaign for a new window.',
-      );
+      throw badRequest(ERROR.CAMPAIGN_EXPIRED);
     }
 
     await this.db.transaction(async (tx) => {
@@ -257,7 +251,7 @@ export class AdvertisingService {
     const reread = await this.list({ limit: 1, q: reference });
     const view = reread.items[0];
 
-    if (!view) throw new NotFoundException('Campaign not found.');
+    if (!view) throw notFound(ERROR.CAMPAIGN_NOT_FOUND);
 
     return view;
   }

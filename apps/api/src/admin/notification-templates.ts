@@ -11,15 +11,16 @@
  * The delivery LOG is data, in `notifications`. This is the catalogue, and the console shows both:
  * a template that has never been sent must still appear, and a query over the log cannot do that.
  *
- * ## The six are the handoff's six, verbatim
+ * ## The keys are identifiers; the NAMES are not here
  *
- * Their Arabic names are quoted from §8 rather than paraphrased, because they are what staff call
- * them when they ask why one did not arrive.
+ * Each entry carries only its stable key. What staff call a template — "تأكيد الحجز + قسيمة + QR"
+ * — is UI copy and lives in `@safra/i18n` under `notificationTemplate`, keyed by that same key.
+ * It used to be a `nameAr` field on this interface, which put Arabic into a JSON response and gave
+ * any second client nothing it could display.
  */
 export interface NotificationTemplate {
   /** Stable key, written to `notifications.template_key`. */
   readonly key: string;
-  readonly nameAr: string;
   /** Which channels this template can go out on. */
   readonly channels: readonly ('whatsapp' | 'email')[];
   /** Locales the copy exists in. All six exist in all three (§8: "ع · EN · DE"). */
@@ -33,7 +34,6 @@ const ALL_LOCALES = ['ar', 'en', 'de'] as const;
 export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
   {
     key: 'booking.confirmed',
-    nameAr: 'تأكيد الحجز + قسيمة + QR',
     channels: ['whatsapp', 'email'],
     locales: ALL_LOCALES,
     /*
@@ -46,35 +46,30 @@ export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
   },
   {
     key: 'booking.invoice',
-    nameAr: 'الفاتورة',
     channels: ['email'],
     locales: ALL_LOCALES,
     implemented: true,
   },
   {
     key: 'booking.cancelled_refund',
-    nameAr: 'الإلغاء والاسترداد',
     channels: ['whatsapp', 'email'],
     locales: ALL_LOCALES,
     implemented: true,
   },
   {
     key: 'wallet.compensation',
-    nameAr: 'تعويض المحفظة',
     channels: ['whatsapp', 'email'],
     locales: ALL_LOCALES,
     implemented: true,
   },
   {
     key: 'partner.deadline_reminder',
-    nameAr: 'تذكير الشريك بالمهلة',
     channels: ['whatsapp', 'email'],
     locales: ALL_LOCALES,
     implemented: true,
   },
   {
     key: 'ad.single_offer',
-    nameAr: 'عرض إعلاني (رسالة واحدة)',
     channels: ['whatsapp'],
     locales: ALL_LOCALES,
     /*

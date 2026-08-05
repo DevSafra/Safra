@@ -7,13 +7,13 @@ import {
   Post,
   Req,
   Res,
-  UnauthorizedException,
   UsePipes,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 
 import {
+  ERROR,
   type EmailVerificationConfirmInput,
   type LoginInput,
   type LoginResponse,
@@ -40,6 +40,7 @@ import {
   type RequestContext,
 } from './auth.service.js';
 import { TokenService, type AccessTokenClaims } from './token.service.js';
+import { unauthorized } from '../common/errors/app-error.js';
 
 @Controller('auth')
 export class AuthController {
@@ -180,7 +181,7 @@ export class AuthController {
     const token = readRefreshCookie(request);
 
     if (!token) {
-      throw new UnauthorizedException('No active session.');
+      throw unauthorized(ERROR.AUTH_SESSION_MISSING);
     }
 
     const result = await this.auth.refresh(token, contextOf(request));
@@ -261,7 +262,7 @@ export class AuthController {
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Req() request: Request,
   ): Promise<void> {
-    if (!user) throw new UnauthorizedException('Authentication required.');
+    if (!user) throw unauthorized(ERROR.AUTH_REQUIRED);
 
     await this.recovery.requestEmailVerification(user.sub, contextOf(request));
   }
@@ -296,7 +297,7 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: AccessTokenClaims | undefined): AccessTokenClaims {
     if (!user) {
-      throw new UnauthorizedException('Authentication required.');
+      throw unauthorized(ERROR.AUTH_REQUIRED);
     }
     return user;
   }

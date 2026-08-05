@@ -23,6 +23,8 @@
  * a rule, it is a different database column holding the same phone number.
  */
 
+import { contentMessages } from '@safra/i18n';
+
 /**
  * Patterns, each anchored to something structural rather than to length alone.
  *
@@ -71,8 +73,14 @@ const PATTERNS: readonly { readonly name: string; readonly pattern: RegExp }[] =
   },
 ] as const;
 
-/** What replaces a removed span. Visible on purpose: the recipient must see it happened. */
-const MASK = '⟨محجوب⟩';
+/**
+ * What replaces a removed span. Visible on purpose: the recipient must see it happened.
+ *
+ * Read from the `content` catalogue at `DEFAULT_LOCALE`, because this is baked into the stored
+ * message rather than rendered per reader — see `@safra/i18n/content.ts` for why that is its own
+ * category, and what it costs a German customer reading an Arabic thread.
+ */
+const MASK = contentMessages().redactionMask;
 
 export interface Redaction {
   /** The message as it will be stored and shown. */

@@ -1,10 +1,12 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { ERROR } from '@safra/contracts';
+import { notFound } from '../common/errors/app-error.js';
 
 /**
  * Public reference data for the storefront (SRS §5.1, §5.4).
@@ -80,7 +82,7 @@ export class CatalogService {
       },
     });
 
-    if (!city) throw new NotFoundException('City not found.');
+    if (!city) throw notFound(ERROR.GEO_CITY_NOT_FOUND);
 
     // §5.4's hero band. Hero first, then by sort order.
     const images = await this.db.execute<Record<string, unknown>>(sql`

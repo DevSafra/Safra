@@ -1,19 +1,13 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { isScopable, type SetStaffScopeInput } from '@safra/contracts';
+import { ERROR, isScopable, type SetStaffScopeInput } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { badRequest, forbidden, notFound } from '../common/errors/app-error.js';
 
 export interface StaffScopeView {
   readonly userId: string;
@@ -103,7 +97,7 @@ export class StaffScopeService {
     input: SetStaffScopeInput,
   ): Promise<StaffScopeView> {
     if (actor?.sub === userId) {
-      throw new ForbiddenException('You cannot change your own scope.');
+      throw forbidden(ERROR.STAFF_CANNOT_CHANGE_OWN_SCOPE);
     }
 
     const found = await this.db.execute<{
@@ -121,10 +115,10 @@ export class StaffScopeService {
 
     const user = found.rows[0];
 
-    if (!user) throw new NotFoundException('Staff member not found.');
+    if (!user) throw notFound(ERROR.STAFF_NOT_FOUND);
 
     if (!isScopable(user.role as never)) {
-      throw new BadRequestException('This role cannot be scoped.');
+      throw badRequest(ERROR.STAFF_ROLE_NOT_SCOPABLE);
     }
 
     /*
@@ -141,7 +135,7 @@ export class StaffScopeService {
       `);
 
       if (cities.rows.length !== new Set(input.citySlugs).size) {
-        throw new BadRequestException('One or more cities were not recognised.');
+        throw badRequest(ERROR.STAFF_CITIES_UNRECOGNISED);
       }
 
       cityIds.push(...cities.rows.map((row) => row.id));
@@ -210,7 +204,7 @@ export class StaffScopeService {
 
     const view = (await this.list()).find((row) => row.userId === userId);
 
-    if (!view) throw new NotFoundException('Staff member not found.');
+    if (!view) throw notFound(ERROR.STAFF_NOT_FOUND);
 
     return view;
   }

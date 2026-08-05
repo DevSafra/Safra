@@ -1,11 +1,13 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { ERROR } from '@safra/contracts';
+import { notFound } from '../common/errors/app-error.js';
 
 /** 256 bits. Enough that guessing is not a threat model worth modelling. */
 const TOKEN_BYTES = 32;
@@ -103,7 +105,7 @@ export class BookingAccessService {
     const matches = equalsConstantTime(stored, supplied);
 
     if (!booking || !booking.access_token_hash || !matches || booking.expired) {
-      throw new NotFoundException('Booking not found.');
+      throw notFound(ERROR.BOOKING_NOT_FOUND);
     }
 
     return {

@@ -1,12 +1,13 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { badRequest } from '../common/errors/app-error.js';
 
 export interface FinanceRow {
   /** The human reference of the underlying operation. */
@@ -232,7 +233,7 @@ export class FinanceService {
 
     const after = decodeCursor(cursor);
 
-    if (!after) throw new BadRequestException('Malformed pagination cursor.');
+    if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
 
     return (alias) =>
       sql`(${sql.raw(alias)}.created_at, ${sql.raw(alias)}.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`;
@@ -270,7 +271,7 @@ export class FinanceService {
     if (query.cursor !== undefined) {
       const after = decodeCursor(query.cursor);
 
-      if (!after) throw new BadRequestException('Malformed pagination cursor.');
+      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
 
       conditions.push(
         sql`(wt.created_at, wt.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,

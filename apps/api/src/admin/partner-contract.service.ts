@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -13,6 +8,8 @@ import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { ERROR } from '@safra/contracts';
+import { badRequest, notFound } from '../common/errors/app-error.js';
 
 /** The handoff's ceiling: PDF ≤ 10MB. Also a database CHECK, for every other writer. */
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -142,7 +139,7 @@ export class PartnerContractService {
     const bytes = Buffer.from(input.content, 'base64');
 
     if (bytes.byteLength === 0 || bytes.byteLength > MAX_BYTES) {
-      throw new BadRequestException('A contract must be a PDF of 10MB or less.');
+      throw badRequest(ERROR.CONTRACT_PDF_REQUIRED);
     }
 
     /*
@@ -151,7 +148,7 @@ export class PartnerContractService {
       failed is a probing aid and the remedy is identical either way.
     */
     if (bytes.subarray(0, 5).toString('latin1') !== '%PDF-') {
-      throw new BadRequestException('A contract must be a PDF of 10MB or less.');
+      throw badRequest(ERROR.CONTRACT_PDF_REQUIRED);
     }
 
     const partner = await this.db.execute<{ id: string }>(sql`
@@ -160,7 +157,7 @@ export class PartnerContractService {
 
     const partnerId = partner.rows[0]?.id;
 
-    if (!partnerId) throw new NotFoundException('Partner not found.');
+    if (!partnerId) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
     /*
       The object key is derived from ids, never from the uploaded filename. A filename is
@@ -272,10 +269,10 @@ export class PartnerContractService {
 
     const contract = found.rows[0];
 
-    if (!contract) throw new NotFoundException('Contract not found.');
+    if (!contract) throw notFound(ERROR.CONTRACT_NOT_FOUND);
 
     if (contract.status !== 'awaiting_partner_signature') {
-      throw new BadRequestException('Only a contract awaiting signature can be signed.');
+      throw badRequest(ERROR.CONTRACT_NOT_AWAITING_SIGNATURE);
     }
 
     await this.db.transaction(async (tx) => {

@@ -1,7 +1,7 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import {
+  ERROR,
   UNSCOPED,
   canWriteInCity,
   isRestricted,
@@ -9,6 +9,7 @@ import {
 } from '@safra/contracts';
 
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { forbidden, notFound } from '../common/errors/app-error.js';
 
 /**
  * Turning a staff scope into SQL and into write refusals (design handoff §8.2).
@@ -121,8 +122,8 @@ export function assertCanWrite(
   if (canWriteInCity(scope, cityId)) return;
 
   if (scope.outside === 'read_only') {
-    throw new ForbiddenException('This record is outside your assigned scope.');
+    throw forbidden(ERROR.SCOPE_OUTSIDE);
   }
 
-  throw new NotFoundException('Not found.');
+  throw notFound(ERROR.REQUEST_NOT_FOUND);
 }

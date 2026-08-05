@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -12,6 +12,8 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { AuthTokenService } from './auth-token.service.js';
 import { TokenService } from './token.service.js';
+import { ERROR } from '@safra/contracts';
+import { badRequest } from '../common/errors/app-error.js';
 
 /** §4: long enough to act on, short enough that a leaked link goes stale fast. */
 const RESET_TTL_MS = 60 * 60_000;
@@ -132,7 +134,7 @@ export class AccountRecoveryService {
     const redeemed = await this.authTokens.redeem(token, 'password_reset');
 
     if (!redeemed) {
-      throw new BadRequestException('This reset link is invalid or has expired.');
+      throw badRequest(ERROR.AUTH_RESET_LINK_INVALID);
     }
 
     const passwordHash = await this.passwords.hash(newPassword);
@@ -230,7 +232,7 @@ export class AccountRecoveryService {
     const redeemed = await this.authTokens.redeem(token, 'email_verification');
 
     if (!redeemed) {
-      throw new BadRequestException('This confirmation link is invalid or has expired.');
+      throw badRequest(ERROR.AUTH_CONFIRMATION_LINK_INVALID);
     }
 
     return this.db.transaction(async (tx) => {

@@ -1,9 +1,7 @@
 import {
-  BadRequestException,
   Controller,
   Delete,
   Inject,
-  NotFoundException,
   Param,
   Post,
   UploadedFile,
@@ -15,7 +13,7 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
-import { PERMISSIONS as P } from '@safra/contracts';
+import { ERROR, PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { AuditService } from '../common/audit/audit.service.js';
@@ -24,6 +22,7 @@ import { ImageService } from '../storage/image.service.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
+import { badRequest, notFound } from '../common/errors/app-error.js';
 
 /** §5.5 rewards photo count in the ranking, so a cap keeps that from being gamed. */
 const MAX_IMAGES_PER_PROPERTY = 30;
@@ -68,7 +67,7 @@ export class PartnerImagesController {
     const partnerId = requirePartnerId(user, P.PROPERTY_MANAGE_OWN);
 
     if (!file?.buffer) {
-      throw new BadRequestException('No file was uploaded under the field name "file".');
+      throw badRequest(ERROR.UPLOAD_FILE_MISSING);
     }
 
     const property = await this.db.query.properties.findFirst({
@@ -81,7 +80,7 @@ export class PartnerImagesController {
     });
 
     // 404 rather than 403 — another partner's reference must not be confirmable.
-    if (!property) throw new NotFoundException('Property not found.');
+    if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);
 
     const existing = await this.db.execute<{ count: string }>(
       sql`SELECT COUNT(*)::text AS count FROM property_images
@@ -89,9 +88,7 @@ export class PartnerImagesController {
     );
 
     if (Number(existing.rows[0]?.count ?? 0) >= MAX_IMAGES_PER_PROPERTY) {
-      throw new BadRequestException(
-        `A property may have at most ${MAX_IMAGES_PER_PROPERTY} images.`,
-      );
+      throw badRequest(ERROR.PROPERTY_IMAGE_LIMIT, { max: MAX_IMAGES_PER_PROPERTY });
     }
 
     /**
@@ -186,7 +183,7 @@ export class PartnerImagesController {
       .limit(1);
 
     const image = rows[0];
-    if (!image) throw new NotFoundException('Image not found.');
+    if (!image) throw notFound(ERROR.IMAGE_NOT_FOUND);
 
     await this.db.transaction(async (tx) => {
       await tx

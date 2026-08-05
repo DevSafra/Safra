@@ -1,12 +1,13 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { badRequest } from '../common/errors/app-error.js';
 
 export interface BookingListRow {
   readonly reference: string;
@@ -81,7 +82,7 @@ export class BookingListService {
     if (query.cursor !== undefined) {
       const after = decodeCursor(query.cursor);
 
-      if (!after) throw new BadRequestException('Malformed pagination cursor.');
+      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
 
       // Full timestamp precision — several bookings written in one transaction share a
       // `created_at` to the microsecond, and a truncated bound would end the page there.

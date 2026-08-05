@@ -1,15 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  PayloadTooLargeException,
-} from '@nestjs/common';
+import { Injectable, Logger, PayloadTooLargeException } from '@nestjs/common';
 import sharp from 'sharp';
 import type { Metadata } from 'sharp';
 
 import { StorageService } from './storage.service.js';
+import { ERROR } from '@safra/contracts';
+import { badRequest } from '../common/errors/app-error.js';
+import { errorMessage } from '@safra/i18n';
 
 /** 10 MB. Generous for a phone photo, bounded enough to survive abuse. */
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -62,13 +60,17 @@ export class ImageService {
     context: { kind: 'properties' | 'cities'; owner: string },
   ): Promise<ProcessedImage> {
     if (buffer.byteLength === 0) {
-      throw new BadRequestException('The uploaded file is empty.');
+      throw badRequest(ERROR.UPLOAD_FILE_EMPTY);
     }
 
     if (buffer.byteLength > MAX_BYTES) {
-      throw new PayloadTooLargeException(
-        `Images must be ${Math.floor(MAX_BYTES / 1024 / 1024)} MB or smaller.`,
-      );
+      throw new PayloadTooLargeException({
+        statusCode: 413,
+        code: ERROR.UPLOAD_FILE_TOO_LARGE,
+        message: errorMessage(ERROR.UPLOAD_FILE_TOO_LARGE, 'en', {
+          maxMb: Math.floor(MAX_BYTES / 1024 / 1024),
+        }),
+      });
     }
 
     // `failOn: 'error'` makes sharp reject malformed input rather than trying to
@@ -81,7 +83,7 @@ export class ImageService {
     } catch {
       // Deliberately generic: echoing a decoder error tells an attacker which
       // parser they reached.
-      throw new BadRequestException('The file could not be read as an image.');
+      throw badRequest(ERROR.UPLOAD_NOT_AN_IMAGE);
     }
 
     const format = metadata.format;
@@ -92,19 +94,15 @@ export class ImageService {
     // document format that can carry script, and it is not what a property photo
     // needs.
     if (!format || !['jpeg', 'png', 'webp', 'avif', 'heif', 'tiff'].includes(format)) {
-      throw new BadRequestException(
-        'Only JPEG, PNG, WebP, AVIF, HEIF or TIFF images are accepted.',
-      );
+      throw badRequest(ERROR.UPLOAD_IMAGE_TYPE_UNSUPPORTED);
     }
 
     if (width < MIN_DIMENSION || height < MIN_DIMENSION) {
-      throw new BadRequestException(
-        `Images must be at least ${MIN_DIMENSION}×${MIN_DIMENSION} pixels.`,
-      );
+      throw badRequest(ERROR.UPLOAD_IMAGE_TOO_SMALL, { min: MIN_DIMENSION });
     }
 
     if (width * height > MAX_PIXELS) {
-      throw new BadRequestException('Image dimensions are too large.');
+      throw badRequest(ERROR.UPLOAD_IMAGE_TOO_LARGE);
     }
 
     // The key is generated here and contains nothing from the client. A

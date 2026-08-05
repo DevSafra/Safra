@@ -1,10 +1,12 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { ERROR } from '@safra/contracts';
+import { notFound } from '../common/errors/app-error.js';
 
 /**
  * Renders a `timestamptz` as an explicit UTC ISO-8601 string.
@@ -78,7 +80,7 @@ export class BookingDetailService {
     `);
 
     const booking = rows.rows[0];
-    if (!booking) throw new NotFoundException('Booking not found.');
+    if (!booking) throw notFound(ERROR.BOOKING_NOT_FOUND);
 
     const bookingId = booking['id'] as string;
 

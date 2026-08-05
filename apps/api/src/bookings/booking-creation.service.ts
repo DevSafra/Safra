@@ -3,13 +3,12 @@ import {
   ConflictException,
   Inject,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
-import { evaluateArrival } from '@safra/contracts';
+import { ERROR, evaluateArrival } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
@@ -17,6 +16,7 @@ import { SettingsService } from '../settings/settings.service.js';
 import { BookingAccessService } from './booking-access.service.js';
 import { PricingService } from './pricing.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
 /** PostgreSQL raises 23P01 when an EXCLUDE constraint rejects a row. */
 const EXCLUSION_VIOLATION = '23P01';
@@ -115,12 +115,12 @@ export class BookingCreationService {
     `);
 
     const unit = unitRows.rows[0];
-    if (!unit) throw new NotFoundException('Unit not found.');
+    if (!unit) throw notFound(ERROR.UNIT_NOT_FOUND);
 
     // Only published inventory is bookable (P-002). A draft or suspended listing is
     // reported as not found, exactly as search hides it.
     if (unit.property_status !== 'published') {
-      throw new NotFoundException('Unit not found.');
+      throw notFound(ERROR.UNIT_NOT_FOUND);
     }
 
     // ── §5.3 same-day cutoff, in the CITY's local time ──────────────────────
@@ -144,9 +144,10 @@ export class BookingCreationService {
     // ── Party size and stay length ──────────────────────────────────────────
     const guests = input.adults + (input.children ?? 0); // infants do not occupy a bed
     if (guests > unit.max_guests) {
-      throw new BadRequestException(
-        `This unit accommodates ${unit.max_guests} guests; ${guests} were requested.`,
-      );
+      throw badRequest(ERROR.UNIT_GUEST_LIMIT, {
+        max: unit.max_guests,
+        requested: guests,
+      });
     }
 
     const nights = Math.round(
@@ -156,24 +157,18 @@ export class BookingCreationService {
     );
 
     if (nights < 1) {
-      throw new BadRequestException(
-        'Departure must be at least one night after arrival.',
-      );
+      throw badRequest(ERROR.BOOKING_DEPARTURE_AFTER_ARRIVAL);
     }
     if (nights < unit.min_nights) {
-      throw new BadRequestException(
-        `This unit requires at least ${unit.min_nights} nights.`,
-      );
+      throw badRequest(ERROR.UNIT_MIN_NIGHTS, { min: unit.min_nights });
     }
     if (unit.max_nights !== null && nights > unit.max_nights) {
-      throw new BadRequestException(
-        `This unit allows at most ${unit.max_nights} nights.`,
-      );
+      throw badRequest(ERROR.UNIT_MAX_NIGHTS, { max: unit.max_nights });
     }
 
     const maxNights = await this.settings.getNumber('search.max_nights', 90);
     if (nights > maxNights) {
-      throw new BadRequestException(`A stay may not exceed ${maxNights} nights.`);
+      throw badRequest(ERROR.BOOKING_STAY_TOO_LONG, { maxNights });
     }
 
     // ── Partner-declared availability ───────────────────────────────────────
@@ -192,9 +187,7 @@ export class BookingCreationService {
 
     const blockedDay = blocked.rows[0];
     if (blockedDay) {
-      throw new ConflictException(
-        `The unit is not available on ${blockedDay.date} (${blockedDay.status}).`,
-      );
+      throw conflict(ERROR.UNIT_UNAVAILABLE_ON, { date: blockedDay.date });
     }
 
     const perDayMinimum = await this.db.execute<{ min_nights: number }>(sql`
@@ -207,9 +200,10 @@ export class BookingCreationService {
 
     const arrivalMinimum = perDayMinimum.rows[0]?.min_nights;
     if (arrivalMinimum !== undefined && nights < arrivalMinimum) {
-      throw new BadRequestException(
-        `Arrivals on ${input.checkIn} require at least ${arrivalMinimum} nights.`,
-      );
+      throw badRequest(ERROR.BOOKING_ARRIVAL_MINIMUM_NIGHTS, {
+        date: input.checkIn,
+        nights: arrivalMinimum,
+      });
     }
 
     // ── Price, with every rate snapshotted ──────────────────────────────────

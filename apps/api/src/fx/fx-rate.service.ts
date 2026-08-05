@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -12,6 +6,8 @@ import type { Role } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
+import { ERROR } from '@safra/contracts';
+import { badRequest, unavailable } from '../common/errors/app-error.js';
 
 /** SYP is the accounting currency, so its rate against itself is definitionally 1. */
 const ACCOUNTING_CURRENCY = 'SYP';
@@ -119,9 +115,7 @@ export class FxRateService {
           `defaulting to 1, which would understate every SYP figure.`,
       );
 
-      throw new ServiceUnavailableException(
-        'Pricing is temporarily unavailable. Please try again shortly.',
-      );
+      throw unavailable(ERROR.PRICING_UNAVAILABLE);
     }
 
     const effectiveFrom = new Date(row.effective_from);
@@ -222,9 +216,7 @@ export class FxRateService {
          * The SELECT matched nothing, so the currency code is not one SAFRA knows.
          * A 400 is right: unlike a missing rate, this IS the caller's mistake.
          */
-        throw new BadRequestException(
-          `Unknown currency "${input.currency}". It must exist in the currencies table.`,
-        );
+        throw badRequest(ERROR.GEO_CURRENCY_UNKNOWN);
       }
 
       /**

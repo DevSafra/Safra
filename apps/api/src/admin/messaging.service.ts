@@ -1,19 +1,15 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '@safra/db';
-import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { redactContactDetails } from '../messaging/redaction.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
+import { badRequest, notFound } from '../common/errors/app-error.js';
 
 export const staffReplySchema = z
   .object({
@@ -106,7 +102,7 @@ export class MessagingService {
     if (query.cursor !== undefined) {
       const after = decodeCursor(query.cursor);
 
-      if (!after) throw new BadRequestException('Malformed pagination cursor.');
+      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
 
       conditions.push(
         sql`(c.created_at, c.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,
@@ -221,7 +217,7 @@ export class MessagingService {
 
     const conversation = found.rows[0];
 
-    if (!conversation) throw new NotFoundException('Conversation not found or closed.');
+    if (!conversation) throw notFound(ERROR.CONVERSATION_NOT_FOUND_OR_CLOSED);
 
     // Staff are not exempt — see the class note.
     const redacted = redactContactDetails(input.body);
@@ -280,7 +276,7 @@ export class MessagingService {
     if (query.cursor !== undefined) {
       const after = decodeCursor(query.cursor);
 
-      if (!after) throw new BadRequestException('Malformed pagination cursor.');
+      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
 
       conditions.push(
         sql`(n.created_at, n.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,

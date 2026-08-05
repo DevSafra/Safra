@@ -1,20 +1,15 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '@safra/db';
-import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
+import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
 export const closeDisputeSchema = z
   .object({
@@ -186,7 +181,7 @@ export class DisputeService {
     if (query.cursor !== undefined) {
       const after = decodeCursor(query.cursor);
 
-      if (!after) throw new BadRequestException('Malformed pagination cursor.');
+      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
 
       conditions.push(
         sql`(d.created_at, d.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`,
@@ -302,7 +297,7 @@ export class DisputeService {
 
     const dispute = found.rows[0];
 
-    if (!dispute) throw new NotFoundException('Dispute not found.');
+    if (!dispute) throw notFound(ERROR.DISPUTE_NOT_FOUND);
 
     /*
       Geographic scope, checked on the WRITE path even though the list already filtered reads.
@@ -317,7 +312,7 @@ export class DisputeService {
       silently keeping the first outcome would leave the second person believing theirs applied.
     */
     if (dispute.status === 'resolved' || dispute.status === 'rejected') {
-      throw new ConflictException('This dispute is already closed.');
+      throw conflict(ERROR.DISPUTE_ALREADY_CLOSED);
     }
 
     await this.db.transaction(async (tx) => {
@@ -395,7 +390,7 @@ export class DisputeService {
     const reread = await this.list({ limit: 1, q: reference });
     const view = reread.items[0];
 
-    if (!view) throw new NotFoundException('Dispute not found.');
+    if (!view) throw notFound(ERROR.DISPUTE_NOT_FOUND);
 
     return view;
   }

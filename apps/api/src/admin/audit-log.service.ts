@@ -1,10 +1,11 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
+import { ERROR, type CursorPage, decodeCursor, encodeCursor } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { badRequest } from '../common/errors/app-error.js';
 
 export interface AuditEntry {
   readonly id: string;
@@ -82,7 +83,7 @@ export class AuditLogService {
       const after = decodeCursor(query.cursor);
 
       // A 400, never a silent restart from page 1 — see BookingsService.list.
-      if (!after) throw new BadRequestException('Malformed pagination cursor.');
+      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
 
       /**
        * Row comparison at FULL timestamp precision. Several audit rows written in

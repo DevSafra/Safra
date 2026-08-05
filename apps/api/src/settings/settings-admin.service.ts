@@ -8,6 +8,8 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from './settings.service.js';
 import { normalise } from './money-settings.service.js';
+import { ERROR } from '@safra/contracts';
+import { badRequest } from '../common/errors/app-error.js';
 
 export interface EditableSetting {
   readonly key: string;
@@ -109,9 +111,7 @@ export class SettingsAdminService {
      * the real setting silently in force.
      */
     if (!row) {
-      throw new BadRequestException(
-        `No setting named "${key}". Settings are seeded, not created from this screen.`,
-      );
+      throw badRequest(ERROR.SETTING_UNKNOWN);
     }
 
     const validated = validate(value, row.value_schema, key);
@@ -215,9 +215,7 @@ function validate(value: unknown, valueSchema: string, key: string): unknown {
       const rate = Number(value);
 
       if (typeof value !== 'number' || !Number.isFinite(rate) || rate < 0 || rate > 1) {
-        throw new BadRequestException(
-          `${key} is a rate and must be a number between 0 and 1 (7% is 0.07).`,
-        );
+        throw badRequest(ERROR.SETTING_VALUE_RATE, { key });
       }
 
       return rate;
@@ -225,7 +223,7 @@ function validate(value: unknown, valueSchema: string, key: string): unknown {
 
     case 'percent': {
       if (typeof value !== 'number' || value < 0 || value > 100) {
-        throw new BadRequestException(`${key} must be a number between 0 and 100.`);
+        throw badRequest(ERROR.SETTING_VALUE_PERCENT_RANGE, { key });
       }
 
       return value;
@@ -233,7 +231,7 @@ function validate(value: unknown, valueSchema: string, key: string): unknown {
 
     case 'positiveInt': {
       if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
-        throw new BadRequestException(`${key} must be a whole number of at least 1.`);
+        throw badRequest(ERROR.SETTING_VALUE_POSITIVE_INT, { key });
       }
 
       return value;
@@ -246,7 +244,7 @@ function validate(value: unknown, valueSchema: string, key: string): unknown {
         value < 0 ||
         value > 23
       ) {
-        throw new BadRequestException(`${key} must be an hour between 0 and 23.`);
+        throw badRequest(ERROR.SETTING_VALUE_HOUR_OF_DAY, { key });
       }
 
       return value;
@@ -272,7 +270,7 @@ function validate(value: unknown, valueSchema: string, key: string): unknown {
 
     case 'boolean': {
       if (typeof value !== 'boolean') {
-        throw new BadRequestException(`${key} must be true or false.`);
+        throw badRequest(ERROR.SETTING_VALUE_BOOLEAN, { key });
       }
 
       return value;
@@ -280,7 +278,7 @@ function validate(value: unknown, valueSchema: string, key: string): unknown {
 
     case 'feeMode': {
       if (value !== 'flat' && value !== 'percent') {
-        throw new BadRequestException(`${key} must be "flat" or "percent".`);
+        throw badRequest(ERROR.SETTING_VALUE_FLAT_OR_PERCENT, { key });
       }
 
       return value;

@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -15,6 +9,8 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { SanctionsService } from '../sanctions/sanctions.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { ERROR } from '@safra/contracts';
+import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
 /**
  * Staff verification of partners and listings (SRS §8.1, §9.2).
@@ -138,7 +134,7 @@ export class ReviewService {
       },
     });
 
-    if (!property) throw new NotFoundException('Property not found.');
+    if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);
 
     return property;
   }
@@ -164,12 +160,10 @@ export class ReviewService {
       columns: { id: true, status: true, partnerId: true },
     });
 
-    if (!property) throw new NotFoundException('Property not found.');
+    if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);
 
     if (property.status !== 'pending_review') {
-      throw new ConflictException(
-        `Only a listing awaiting review can be reviewed (this one is ${property.status}).`,
-      );
+      throw conflict(ERROR.PROPERTY_NOT_REVIEWABLE);
     }
 
     if (input.decision === 'approve') {
@@ -186,9 +180,7 @@ export class ReviewService {
       });
 
       if (partner?.verification !== 'approved') {
-        throw new ConflictException(
-          `Partner ${partner?.reference ?? ''} is not verified yet. Verify the partner before publishing their listings.`,
-        );
+        throw conflict(ERROR.PARTNER_NOT_VERIFIED);
       }
     }
 
@@ -286,7 +278,7 @@ export class ReviewService {
       },
     });
 
-    if (!partner) throw new NotFoundException('Partner not found.');
+    if (!partner) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
     /**
      * Their listings, so the reviewer sees the consequence of approving.
@@ -341,16 +333,14 @@ export class ReviewService {
       columns: { id: true, verification: true, sanctionsScreenedAt: true },
     });
 
-    if (!partner) throw new NotFoundException('Partner not found.');
+    if (!partner) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
     if (partner.verification === 'approved' && input.decision === 'approve') {
-      throw new ConflictException('Partner is already verified.');
+      throw conflict(ERROR.PARTNER_ALREADY_VERIFIED);
     }
 
     if (input.decision === 'approve' && partner.sanctionsScreenedAt === null) {
-      throw new BadRequestException(
-        'Sanctions screening must be recorded before a partner can be verified.',
-      );
+      throw badRequest(ERROR.PARTNER_SANCTIONS_SCREENING_REQUIRED);
     }
 
     const nextStatus = input.decision === 'approve' ? 'approved' : 'rejected';
@@ -436,7 +426,7 @@ export class ReviewService {
       columns: { id: true, legalName: true, displayName: true },
     });
 
-    if (!partner) throw new NotFoundException('Partner not found.');
+    if (!partner) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
     /**
      * Both names are searched. A designation may name the company or the person

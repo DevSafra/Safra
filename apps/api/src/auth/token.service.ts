@@ -1,6 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 import { SignJWT, jwtVerify } from 'jose';
 import { v7 as uuidv7 } from 'uuid';
@@ -8,6 +8,7 @@ import { v7 as uuidv7 } from 'uuid';
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 import {
+  ERROR,
   TOGGLEABLE_GRANT_KEYS,
   UNSCOPED,
   isScopable,
@@ -19,6 +20,7 @@ import type { Permission, Role } from '@safra/contracts';
 import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { unauthorized } from '../common/errors/app-error.js';
 
 export interface AccessTokenClaims {
   sub: string;
@@ -196,7 +198,7 @@ export class TokenService {
         scope: readScope(payload['scope']),
       };
     } catch {
-      throw new UnauthorizedException('Invalid or expired token.');
+      throw unauthorized(ERROR.AUTH_TOKEN_INVALID);
     }
   }
 

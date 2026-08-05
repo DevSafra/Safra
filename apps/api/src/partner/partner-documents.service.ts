@@ -1,12 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import sharp from 'sharp';
 
@@ -17,6 +11,8 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { StorageService } from '../storage/storage.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { ERROR } from '@safra/contracts';
+import { badRequest, notFound } from '../common/errors/app-error.js';
 
 /** §8.1 requires proof of identity and of the right to let the property. */
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -76,11 +72,11 @@ export class PartnerDocumentsService {
     actor: AccessTokenClaims | undefined,
   ): Promise<DocumentRecord> {
     if (!file?.buffer?.byteLength) {
-      throw new BadRequestException('No file was uploaded.');
+      throw badRequest(ERROR.UPLOAD_FILE_MISSING);
     }
 
     if (file.buffer.byteLength > MAX_BYTES) {
-      throw new BadRequestException('That file is larger than 8 MB.');
+      throw badRequest(ERROR.UPLOAD_FILE_TOO_LARGE, { maxMb: 8 });
     }
 
     const detected = detectType(file.buffer);
@@ -91,9 +87,7 @@ export class PartnerDocumentsService {
        * ZIP" is a probing oracle for what the filter accepts; the caller only needs
        * to know which formats are allowed.
        */
-      throw new BadRequestException(
-        'Only PDF, JPEG and PNG files are accepted for verification documents.',
-      );
+      throw badRequest(ERROR.DOCUMENT_TYPE_UNSUPPORTED);
     }
 
     const existing = await this.db.execute<{ count: string }>(sql`
@@ -102,9 +96,7 @@ export class PartnerDocumentsService {
     `);
 
     if (Number(existing.rows[0]?.count ?? 0) >= MAX_PER_PARTNER) {
-      throw new BadRequestException(
-        `A partner may hold at most ${MAX_PER_PARTNER} documents. Remove one first.`,
-      );
+      throw badRequest(ERROR.DOCUMENT_LIMIT_REACHED, { max: MAX_PER_PARTNER });
     }
 
     const { body, contentType, extension } = await this.normalise(file.buffer, detected);
@@ -163,7 +155,7 @@ export class PartnerDocumentsService {
     `);
 
     const partnerId = rows.rows[0]?.id;
-    if (!partnerId) throw new NotFoundException('Partner not found.');
+    if (!partnerId) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
     return this.list(partnerId);
   }
@@ -223,17 +215,17 @@ export class PartnerDocumentsService {
     const doc = rows.rows[0];
 
     // 404 rather than 403 for someone else's document: a 403 confirms it exists.
-    if (!doc) throw new NotFoundException('Document not found.');
+    if (!doc) throw notFound(ERROR.DOCUMENT_NOT_FOUND);
 
     if (restrictToPartnerId && doc.partner_id !== restrictToPartnerId) {
-      throw new NotFoundException('Document not found.');
+      throw notFound(ERROR.DOCUMENT_NOT_FOUND);
     }
 
     const body = await this.storage.get(doc.file_key);
 
     if (!body) {
       this.logger.error(`Document ${documentId} has no object at ${doc.file_key}.`);
-      throw new NotFoundException('Document not found.');
+      throw notFound(ERROR.DOCUMENT_NOT_FOUND);
     }
 
     await this.audit.record({
@@ -266,7 +258,7 @@ export class PartnerDocumentsService {
     actor: AccessTokenClaims | undefined,
   ): Promise<DocumentRecord> {
     if (decision === 'reject' && !notes?.trim()) {
-      throw new BadRequestException('Rejecting a document requires a reason.');
+      throw badRequest(ERROR.DOCUMENT_REJECTION_REASON_REQUIRED);
     }
 
     // `approved`, not `verified` — the enum is shared with partner and property
@@ -295,7 +287,7 @@ export class PartnerDocumentsService {
       `);
 
       const row = rows.rows[0];
-      if (!row) throw new NotFoundException('Document not found.');
+      if (!row) throw notFound(ERROR.DOCUMENT_NOT_FOUND);
 
       await this.audit.record(
         {
@@ -346,7 +338,7 @@ export class PartnerDocumentsService {
       return { body, contentType: 'image/jpeg', extension: 'jpg' };
     } catch {
       // Magic bytes said image, the decoder disagreed. Trust the decoder.
-      throw new BadRequestException('That image could not be read.');
+      throw badRequest(ERROR.UPLOAD_IMAGE_UNREADABLE);
     }
   }
 }

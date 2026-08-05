@@ -1,15 +1,12 @@
-import {
-  type CanActivate,
-  type ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 
 import { TokenService, type AccessTokenClaims } from '../auth/token.service.js';
 import { setRequestUser } from '../common/logging/request-context.js';
 import { PUBLIC_KEY } from './decorators.js';
+import { ERROR } from '@safra/contracts';
+import { unauthorized } from '../common/errors/app-error.js';
 
 /**
  * Registered globally in AppModule, so every route requires a valid access token
@@ -48,7 +45,7 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     if (!token) {
-      throw new UnauthorizedException('Authentication required.');
+      throw unauthorized(ERROR.AUTH_REQUIRED);
     }
 
     request.user = await this.tokens.verifyAccessToken(token);

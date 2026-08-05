@@ -236,11 +236,21 @@ async function teardown(db: Database): Promise<void> {
 
   await db.execute(sql`DELETE FROM availability_days WHERE unit_id IN (${units})`);
   /**
-   * Bookings are cleared before units because a booking holds a foreign key to one.
-   * Scoped to this fixture's property, so a booking belonging to any other suite is
+   * Bookings are cleared before units, because a booking holds a foreign key to one.
+   *
+   * Matched on `unit_id` as well as `property_id`, and that is not belt-and-braces: a booking
+   * carries BOTH columns, and clearing only by property leaves any row whose `property_id`
+   * says something else while its `unit_id` still points here. The next statement then trips
+   * `bookings_unit_id_units_id_fk` and the whole file fails in teardown with every test
+   * passing — which is exactly how this failed once, on a run where the id in the error no
+   * longer existed by the time it was investigated.
+   *
+   * Still scoped to this fixture's own units, so a booking belonging to any other suite is
    * untouched.
    */
-  await db.execute(sql`DELETE FROM bookings WHERE property_id = ${PROPERTY_ID}::uuid`);
+  await db.execute(sql`
+    DELETE FROM bookings
+    WHERE property_id = ${PROPERTY_ID}::uuid OR unit_id IN (${units})`);
   await db.execute(sql`DELETE FROM units WHERE property_id = ${PROPERTY_ID}::uuid`);
   await db.execute(sql`DELETE FROM properties WHERE id = ${PROPERTY_ID}::uuid`);
   await db.execute(sql`DELETE FROM partners WHERE id = ${PARTNER_ID}::uuid`);

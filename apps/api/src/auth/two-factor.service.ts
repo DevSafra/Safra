@@ -1,19 +1,13 @@
 import { randomBytes } from 'node:crypto';
 
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 import {
+  ERROR,
   isStaffRole,
   type TotpEnableResponse,
   type TotpSetupResponse,
@@ -24,6 +18,12 @@ import { DATABASE } from '../database/database.module.js';
 import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import { PasswordService } from '../common/crypto/password.service.js';
 import { TokenService, type AccessTokenClaims } from './token.service.js';
+import {
+  badRequest,
+  conflict,
+  forbidden,
+  unauthorized,
+} from '../common/errors/app-error.js';
 
 const RECOVERY_CODE_COUNT = 8;
 const ISSUER = 'SAFRA';
@@ -53,9 +53,7 @@ export class TwoFactorService {
     const user = await this.requireStaff(claims);
 
     if (user.totpEnabledAt !== null) {
-      throw new ConflictException(
-        'Two-factor authentication is already enabled. Disable it first to re-enrol.',
-      );
+      throw conflict(ERROR.AUTH_TWO_FACTOR_ALREADY_ENABLED_REENROL);
     }
 
     const secret = authenticator.generateSecret();
@@ -84,21 +82,17 @@ export class TwoFactorService {
     const user = await this.requireStaff(claims);
 
     if (user.totpEnabledAt !== null) {
-      throw new ConflictException('Two-factor authentication is already enabled.');
+      throw conflict(ERROR.AUTH_TWO_FACTOR_ALREADY_ENABLED);
     }
 
     if (!user.totpSecretEncrypted) {
-      throw new BadRequestException(
-        'Start setup before enabling two-factor authentication.',
-      );
+      throw badRequest(ERROR.AUTH_TWO_FACTOR_SETUP_REQUIRED);
     }
 
     const secret = this.encryption.decrypt(user.totpSecretEncrypted);
 
     if (!authenticator.verify({ token: code, secret })) {
-      throw new UnauthorizedException(
-        'That code is not valid. Check your authenticator app.',
-      );
+      throw unauthorized(ERROR.AUTH_CODE_INVALID_CHECK_APP);
     }
 
     const plainCodes = Array.from({ length: RECOVERY_CODE_COUNT }, () =>
@@ -145,24 +139,24 @@ export class TwoFactorService {
     const user = await this.requireStaff(claims);
 
     if (user.totpEnabledAt === null) {
-      throw new ConflictException('Two-factor authentication is not enabled.');
+      throw conflict(ERROR.AUTH_TWO_FACTOR_NOT_ENABLED);
     }
 
     if (
       !user.passwordHash ||
       !(await this.passwords.verify(user.passwordHash, password))
     ) {
-      throw new UnauthorizedException('Password is incorrect.');
+      throw unauthorized(ERROR.AUTH_PASSWORD_INCORRECT);
     }
 
     if (!user.totpSecretEncrypted) {
-      throw new BadRequestException('No authenticator is configured.');
+      throw badRequest(ERROR.AUTH_NO_AUTHENTICATOR);
     }
 
     const secret = this.encryption.decrypt(user.totpSecretEncrypted);
 
     if (!authenticator.verify({ token: code, secret })) {
-      throw new UnauthorizedException('That code is not valid.');
+      throw unauthorized(ERROR.AUTH_CODE_MALFORMED);
     }
 
     await this.db.transaction(async (tx) => {
@@ -236,18 +230,16 @@ export class TwoFactorService {
    * it for staff, and forcing it on guests would conflict with §4's guest checkout.
    */
   private async requireStaff(claims: AccessTokenClaims | undefined) {
-    if (!claims) throw new UnauthorizedException('Authentication required.');
+    if (!claims) throw unauthorized(ERROR.AUTH_REQUIRED);
 
     const user = await this.db.query.users.findFirst({
       where: eq(schema.users.id, claims.sub),
     });
 
-    if (!user) throw new UnauthorizedException('Authentication required.');
+    if (!user) throw unauthorized(ERROR.AUTH_REQUIRED);
 
     if (!isStaffRole(user.role)) {
-      throw new ForbiddenException(
-        'Two-factor authentication is available to staff accounts only.',
-      );
+      throw forbidden(ERROR.AUTH_TWO_FACTOR_STAFF_ONLY);
     }
 
     return user;

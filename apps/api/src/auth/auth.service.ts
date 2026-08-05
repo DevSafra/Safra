@@ -1,17 +1,18 @@
 import {
-  ConflictException,
+  HttpStatus,
   Inject,
   Injectable,
   Logger,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { authenticator } from 'otplib';
 
+import { errorMessage } from '@safra/i18n';
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 import {
+  ERROR,
   type AuthUser,
   type LoginInput,
   type RegisterInput,
@@ -23,6 +24,7 @@ import { FieldEncryptionService } from '../common/crypto/field-encryption.servic
 import { PasswordService } from '../common/crypto/password.service.js';
 import { TokenService, type IssuedTokens } from './token.service.js';
 import { TwoFactorService } from './two-factor.service.js';
+import { conflict, unauthorized, unavailable } from '../common/errors/app-error.js';
 
 /**
  * Thrown when credentials were ACCEPTED and only the second factor is outstanding.
@@ -33,8 +35,22 @@ import { TwoFactorService } from './two-factor.service.js';
  * incomplete attempt, not a rejected one — the password was right.
  */
 export class SecondFactorRequiredException extends UnauthorizedException {
-  constructor(message: string) {
-    super(message);
+  /**
+   * Carries the standard error body, so the sign-in form can advance on a CODE.
+   *
+   * It used to take a message and pass it to `super(message)`, which produced
+   * `{ message, error, statusCode }` and no `code` — so the console detected "credentials
+   * were right, now ask for the code" by regex-matching the English prose. This is the one
+   * error in the product where getting that wrong means nobody can sign in at all, and it
+   * was the only exception the code migration missed, because it is a custom subclass rather
+   * than one of Nest's.
+   */
+  constructor() {
+    super({
+      statusCode: HttpStatus.UNAUTHORIZED,
+      code: ERROR.AUTH_CODE_REQUIRED,
+      message: errorMessage(ERROR.AUTH_CODE_REQUIRED, 'en'),
+    });
   }
 }
 
@@ -82,7 +98,7 @@ export class AuthService {
       // already reveals whether an email is taken by design, so pretending
       // otherwise adds no privacy while making the UX incoherent. The LOGIN path
       // stays strictly non-committal — that is where enumeration actually matters.
-      throw new ConflictException('An account with this email already exists.');
+      throw conflict(ERROR.AUTH_EMAIL_TAKEN);
     }
 
     const passwordHash = await this.passwords.hash(input.password);
@@ -141,7 +157,7 @@ export class AuthService {
    * otherwise the endpoint becomes a customer-list oracle.
    */
   async login(input: LoginInput, context: RequestContext): Promise<AuthResult> {
-    const genericFailure = new UnauthorizedException('Invalid email or password.');
+    const genericFailure = unauthorized(ERROR.AUTH_CREDENTIALS_INVALID);
 
     const user = await this.db.query.users.findFirst({
       where: and(eq(schema.users.email, input.email), isNull(schema.users.deletedAt)),
@@ -154,9 +170,7 @@ export class AuthService {
     }
 
     if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
-      throw new UnauthorizedException(
-        'Account temporarily locked after repeated failed attempts. Try again later.',
-      );
+      throw unauthorized(ERROR.AUTH_LOCKED);
     }
 
     if (user.status !== 'active') {
@@ -175,7 +189,7 @@ export class AuthService {
     // never sufficient, and so TOTP state does not leak for a wrong password.
     if (isStaffRole(user.role) && user.totpEnabledAt && user.totpSecretEncrypted) {
       if (!input.totpCode && !input.recoveryCode) {
-        throw new SecondFactorRequiredException('Authenticator code required.');
+        throw new SecondFactorRequiredException();
       }
 
       if (input.recoveryCode) {
@@ -188,7 +202,7 @@ export class AuthService {
 
         if (!accepted) {
           await this.registerFailedAttempt(user.id);
-          throw new UnauthorizedException('Invalid recovery code.');
+          throw unauthorized(ERROR.AUTH_RECOVERY_CODE_INVALID);
         }
       } else {
         let secret: string;
@@ -233,14 +247,12 @@ export class AuthService {
               `(${error instanceof Error ? error.message : String(error)})`,
           );
 
-          throw new ServiceUnavailableException(
-            'Sign-in is temporarily unavailable. Please contact support.',
-          );
+          throw unavailable(ERROR.AUTH_UNAVAILABLE);
         }
 
         if (!authenticator.verify({ token: input.totpCode as string, secret })) {
           await this.registerFailedAttempt(user.id);
-          throw new UnauthorizedException('Invalid authenticator code.');
+          throw unauthorized(ERROR.AUTH_CODE_INVALID);
         }
       }
     }
@@ -257,7 +269,7 @@ export class AuthService {
     const rotated = await this.tokens.rotate(refreshToken, context);
 
     if (!rotated) {
-      throw new UnauthorizedException('Session expired. Please sign in again.');
+      throw unauthorized(ERROR.AUTH_SESSION_EXPIRED);
     }
 
     const user = await this.db.query.users.findFirst({
@@ -266,7 +278,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Session expired. Please sign in again.');
+      throw unauthorized(ERROR.AUTH_SESSION_EXPIRED);
     }
 
     return {

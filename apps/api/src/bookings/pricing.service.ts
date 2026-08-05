@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -12,6 +12,8 @@ import {
   multiplyDecimalStrings,
   toMinor,
 } from '../common/money.js';
+import { ERROR } from '@safra/contracts';
+import { notFound } from '../common/errors/app-error.js';
 
 /**
  * Every amount is a decimal STRING, never a number — see `common/money.ts` for why
@@ -81,11 +83,11 @@ export class PricingService {
 
     const nights = rows.rows;
     if (nights.length === 0) {
-      throw new NotFoundException('Unit not found, or the date range is empty.');
+      throw notFound(ERROR.UNIT_NOT_FOUND_OR_RANGE_EMPTY);
     }
 
     const first = nights[0];
-    if (!first) throw new NotFoundException('Unit not found.');
+    if (!first) throw notFound(ERROR.UNIT_NOT_FOUND);
 
     const scale = first.decimals;
 

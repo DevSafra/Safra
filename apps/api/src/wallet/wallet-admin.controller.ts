@@ -4,7 +4,6 @@ import {
   Get,
   HttpCode,
   HttpStatus,
-  NotFoundException,
   Param,
   ParseUUIDPipe,
   Post,
@@ -13,6 +12,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 
 import {
+  ERROR,
   PERMISSIONS as P,
   type CursorQuery,
   type WalletAdjustInput,
@@ -26,6 +26,7 @@ import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { WalletAdjustmentService } from './wallet-adjustment.service.js';
 import { WalletService } from './wallet.service.js';
+import { notFound } from '../common/errors/app-error.js';
 
 /**
  * Staff-side wallet access (SRS §2.3, §4.1, §9.3).
@@ -53,7 +54,7 @@ export class WalletAdminController {
   async balance(@Param('customerProfileId', ParseUUIDPipe) customerProfileId: string) {
     const wallet = await this.wallet.findByCustomer(customerProfileId);
 
-    if (!wallet) throw new NotFoundException('This customer has no wallet.');
+    if (!wallet) throw notFound(ERROR.WALLET_NOT_FOUND);
 
     return {
       walletId: wallet.walletId,
@@ -77,7 +78,7 @@ export class WalletAdminController {
   ) {
     const wallet = await this.wallet.findByCustomer(customerProfileId);
 
-    if (!wallet) throw new NotFoundException('This customer has no wallet.');
+    if (!wallet) throw notFound(ERROR.WALLET_NOT_FOUND);
 
     return this.wallet.listTransactions(wallet.walletId, query);
   }

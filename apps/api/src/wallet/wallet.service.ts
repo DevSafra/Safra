@@ -1,15 +1,10 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 import {
+  ERROR,
   type CursorPage,
   type CursorQuery,
   decodeCursor,
@@ -25,6 +20,7 @@ import {
   multiplyDecimalStrings,
   toMinor,
 } from '../common/money.js';
+import { badRequest } from '../common/errors/app-error.js';
 
 /**
  * SRS §2.3 — the reasons a balance is allowed to move.
@@ -156,7 +152,7 @@ export class WalletService {
      * says nothing happened, and a caller asking for one has a bug worth seeing.
      */
     if (requested <= 0n) {
-      throw new BadRequestException('A wallet movement must be a positive amount.');
+      throw badRequest(ERROR.WALLET_AMOUNT_NOT_POSITIVE);
     }
 
     if (movement.reason === 'admin_adjustment' && !movement.createdByUserId) {
@@ -165,7 +161,7 @@ export class WalletService {
        * `created_by_user_id` for exactly this. An unattributable one is worse than
        * no feature at all: it is money moved by nobody.
        */
-      throw new BadRequestException('A manual adjustment must record the acting user.');
+      throw badRequest(ERROR.INTERNAL_ACTOR_REQUIRED);
     }
 
     return tx.transaction((scoped) =>
@@ -286,7 +282,7 @@ export class WalletService {
        * insert, so this is close to unreachable — but falling through would leave
        * the caller with an unexplained undefined.
        */
-      throw new BadRequestException('No such customer profile.');
+      throw badRequest(ERROR.CUSTOMER_NOT_FOUND);
     }
 
     return created;
@@ -363,7 +359,7 @@ export class WalletService {
     `);
 
     const code = rows.rows[0]?.code;
-    if (!code) throw new BadRequestException('Unknown currency.');
+    if (!code) throw badRequest(ERROR.GEO_CURRENCY_UNKNOWN);
 
     return code;
   }
@@ -419,7 +415,7 @@ export class WalletService {
       after = decodeCursor(query.cursor);
 
       // A 400, never a silent restart from page 1 — see BookingsService.list.
-      if (!after) throw new BadRequestException('Malformed pagination cursor.');
+      if (!after) throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
     }
 
     /**

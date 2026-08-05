@@ -1,9 +1,10 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 import {
+  ERROR,
   PERMISSIONS as P,
   type CalendarDay,
   type CalendarQuery,
@@ -14,6 +15,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
+import { notFound } from '../common/errors/app-error.js';
 
 @Injectable()
 export class CalendarService {
@@ -188,6 +190,6 @@ export class CalendarService {
       )
       .limit(1);
 
-    if (rows.length === 0) throw new NotFoundException('Unit not found.');
+    if (rows.length === 0) throw notFound(ERROR.UNIT_NOT_FOUND);
   }
 }

@@ -1,14 +1,10 @@
-import {
-  BadRequestException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 import {
+  ERROR,
   type CursorPage,
   type CursorQuery,
   decodeCursor,
@@ -22,6 +18,7 @@ import {
   assertReadable,
   resolveBookingScope,
 } from '../rbac/ownership.js';
+import { badRequest, notFound } from '../common/errors/app-error.js';
 
 /** The projection any authenticated caller may see. */
 const BOOKING_COLUMNS = {
@@ -77,7 +74,7 @@ export class BookingsService {
       after = decodeCursor(query.cursor);
 
       if (!after) {
-        throw new BadRequestException('Malformed pagination cursor.');
+        throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
       }
     }
 
@@ -149,7 +146,7 @@ export class BookingsService {
     });
 
     if (!booking) {
-      throw new NotFoundException('Booking not found.');
+      throw notFound(ERROR.BOOKING_NOT_FOUND);
     }
 
     return booking;

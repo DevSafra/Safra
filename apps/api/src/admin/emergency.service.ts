@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -7,6 +7,8 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
+import { ERROR } from '@safra/contracts';
+import { forbidden } from '../common/errors/app-error.js';
 
 /**
  * The four levers Emergency Mode pulls (EC-009, design handoff §8.3).
@@ -146,7 +148,7 @@ export class EmergencyService {
     const target = await this.resolveScope(input.scope, input.scopeRef);
 
     if (!target) {
-      throw new ForbiddenException('Emergency mode could not be activated.');
+      throw forbidden(ERROR.EMERGENCY_ACTIVATION_FAILED);
     }
 
     const inserted = await this.db.execute<{ id: string }>(sql`
@@ -187,7 +189,7 @@ export class EmergencyService {
       The freshly-inserted row is re-read rather than synthesised from the input, so what the
       console shows is what the database holds — including any default the schema applied.
     */
-    if (!view) throw new ForbiddenException('Emergency mode could not be activated.');
+    if (!view) throw forbidden(ERROR.EMERGENCY_ACTIVATION_FAILED);
 
     return view;
   }
@@ -260,7 +262,7 @@ export class EmergencyService {
   private requireSuperAdmin(actor: AccessTokenClaims | undefined): void {
     if (actor?.role !== 'super_admin') {
       // Generic to the client; the guard already logged the specifics.
-      throw new ForbiddenException('Emergency mode could not be activated.');
+      throw forbidden(ERROR.EMERGENCY_ACTIVATION_FAILED);
     }
   }
 }

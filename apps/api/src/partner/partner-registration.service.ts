@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -13,6 +7,8 @@ import type { PartnerRegisterInput } from '@safra/contracts';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { PasswordService } from '../common/crypto/password.service.js';
+import { ERROR } from '@safra/contracts';
+import { badRequest, conflict } from '../common/errors/app-error.js';
 
 export interface PartnerRegistrationResult {
   readonly reference: string;
@@ -76,7 +72,7 @@ export class PartnerRegistrationService {
        * privacy while making the error incomprehensible. Login remains the place
        * where enumeration is actually resisted (ADR 0003).
        */
-      throw new ConflictException('An account with this email already exists.');
+      throw conflict(ERROR.AUTH_EMAIL_TAKEN);
     }
 
     const passwordHash = await this.passwords.hash(input.password);
@@ -164,7 +160,7 @@ export class PartnerRegistrationService {
     const row = rows.rows[0];
 
     // The caller's mistake, so a 400 naming the field rather than a generic failure.
-    if (!row) throw new BadRequestException(`Unknown partner type "${code}".`);
+    if (!row) throw badRequest(ERROR.PARTNER_TYPE_UNKNOWN);
 
     return row;
   }
@@ -175,7 +171,7 @@ export class PartnerRegistrationService {
     `);
 
     const row = rows.rows[0];
-    if (!row) throw new BadRequestException(`Unknown city "${slug}".`);
+    if (!row) throw badRequest(ERROR.GEO_CITY_UNKNOWN);
 
     return row;
   }
