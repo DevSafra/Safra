@@ -24,6 +24,7 @@
     "@node-rs/argon2": "^2.0.0",
     "@safra/contracts": "workspace:*",
     "@safra/db": "workspace:*",
+    "@safra/i18n": "workspace:*",
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.2",
     "express": "^5.1.0",
