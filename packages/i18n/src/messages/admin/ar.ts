@@ -219,6 +219,15 @@ export const ar = {
     colCity: 'المدينة',
     colAmount: 'المبلغ',
     colDates: 'التواريخ',
+    /**
+     * A stay, with the month and year the two dates share written once — «٠٤ ← ٠٨-٠٩-٢٠٢٦».
+     *
+     * A template rather than a formatter's own literal, because the arrow's SIDE is language:
+     * this reads right-to-left, so «←» leads from the check-in on the right to the check-out on
+     * the left. A locale that reads the other way needs «→» and the two values swapped, which is
+     * an edit here rather than in `dateRange()`.
+     */
+    dateRange: '{from} ← {to}',
     colTime: 'الوقت',
   },
 

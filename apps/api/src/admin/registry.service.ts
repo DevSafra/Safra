@@ -101,7 +101,11 @@ export class RegistryService {
              pt.suspended_at,
              pt.avg_response_minutes,
              pt.cancellation_count, pt.complaint_count,
-             coalesce(ty.code, '—')  AS partner_type,
+             -- name_ar, not code: this registry is read on the Arabic-only console, and the
+             -- column beside it already localizes. code printed «accommodation» in a النوع
+             -- column, which is English a person reads — the one thing the copy rule forbids.
+             -- (No backticks in here: this is a JS template literal, and one would close it.)
+             coalesce(ty.name_ar, '—') AS partner_type,
              coalesce(ci.name_ar, '—') AS city,
              to_char(pt.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at

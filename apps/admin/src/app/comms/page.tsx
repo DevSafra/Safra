@@ -97,7 +97,7 @@ export default async function CommsPage({
               rows={result.items}
               template={TEMPLATE}
               rowKey={(row) => `${row.at}-${row.templateKey}-${row.channel}`}
-              minWidth={680}
+              minWidth={780}
               empty={t.table.empty}
             />
             <TablePagination

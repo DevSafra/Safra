@@ -12,7 +12,7 @@
  * string table and the locale constant, and both sides can use it.
  */
 import { ARABIC_WESTERN_DIGITS } from '@/lib/numerals';
-import { t } from '@/lib/strings';
+import { fill, t } from '@/lib/strings';
 
 /**
  * Money, two decimals, Western digits.
@@ -65,6 +65,82 @@ export function shortDate(iso: string | null | undefined): string {
   const [year, month, day] = iso.slice(0, 10).split('-');
 
   return day && month && year ? `${day}-${month}-${year}` : iso;
+}
+
+/**
+ * A stay, with the parts the two dates SHARE written once — `04 ← 08-09-2026`.
+ *
+ * ## Why not two full dates
+ *
+ * It used to render `shortDate(checkIn) ← shortDate(checkOut)`, which is 159px of content in a
+ * 133px column: the range overflowed its cell and painted on top of المبلغ, so `201.99 USD` and
+ * the check-in date were printed over each other. Collapsing the shared month and year takes the
+ * common case to 104px, which fits.
+ *
+ * It is also what the handoff draws — its bookings table reads `25 ← 28 تموز 2026`, one month and
+ * one year for the pair. Repeating them says the same thing twice and costs the column that
+ * pays for it. This keeps the console's numeric `DD-MM-YYYY` rather than the handoff's month
+ * names, because every other date in the console is numeric and one screen in a different format
+ * is a worse inconsistency than a shorter one — recorded in `docs/design-gap-report.md`.
+ *
+ * ## Where a range may break, and the two characters that decide it
+ *
+ * Nothing here is `whitespace-nowrap`: a value too wide for its column has to WRAP rather than
+ * paint over المبلغ, which is the bug this function was written for. But a plain hyphen is also a
+ * break opportunity, so a squeezed column split a date itself — measured between 940px and 1180px
+ * of table width, `03-01-2027` rendered as `03-01-` and `2027` on two lines.
+ *
+ * The break therefore has to be forbidden inside a date and allowed at the space beside the arrow.
+ * Two characters were tried:
+ *
+ * - `U+2011` NON-BREAKING HYPHEN, in place of `-`. WRONG, and wrong in a way that looks fine in a
+ *   left-to-right test: it is bidi class ON (Other Neutral), so it SEPARATES the digit groups into
+ *   three runs which an RTL line then lays out right-to-left. The console rendered `2026-09-08`.
+ *   `U+002D` is class ES (European Separator) and joins them into one number run, which is exactly
+ *   why the date survives an RTL line as written.
+ * - `U+2060` WORD JOINER, fencing each `-`. RIGHT. It is class BN (Boundary Neutral), which UAX #9
+ *   removes before resolving direction, so it cannot affect the order — and UAX #14 forbids a line
+ *   break at it. Verified both ways in a browser, not assumed.
+ *
+ * So the hyphens stay `U+002D` and are fenced with word joiners. `minWidth` on each table is
+ * separately set so the common cases never need to wrap at all, and `e2e/table-overflow.spec.ts`
+ * holds that at three widths.
+ */
+export function dateRange(
+  checkIn: string | null | undefined,
+  checkOut: string | null | undefined,
+): string {
+  if (!checkIn || !checkOut) return t.admin.noData;
+
+  const from = checkIn.slice(0, 10).split('-');
+  const to = checkOut.slice(0, 10).split('-');
+
+  // Anything unexpected falls back to both dates in full rather than to a wrong date.
+  if (from.length !== 3 || to.length !== 3) {
+    return fill(t.table.dateRange, { from: shortDate(checkIn), to: shortDate(checkOut) });
+  }
+
+  const [fromYear, fromMonth, fromDay] = from as [string, string, string];
+  const [toYear, toMonth, toDay] = to as [string, string, string];
+
+  /** `U+2060` either side of each hyphen — bidi-transparent, and unbreakable. See above. */
+  const glue = '\u2060-\u2060';
+  const full = (day: string, month: string, year: string) =>
+    `${day}${glue}${month}${glue}${year}`;
+
+  // A one-night stay checking in and out on the same date reads as one date, not a range.
+  if (fromYear === toYear && fromMonth === toMonth && fromDay === toDay) {
+    return full(toDay, toMonth, toYear);
+  }
+
+  const start =
+    fromYear !== toYear
+      ? full(fromDay, fromMonth, fromYear)
+      : fromMonth !== toMonth
+        ? `${fromDay}${glue}${fromMonth}`
+        : fromDay;
+
+  return fill(t.table.dateRange, { from: start, to: full(toDay, toMonth, toYear) });
 }
 
 /**

@@ -201,7 +201,7 @@ browser test asserting it neither fails to load nor shows a placeholder. See §0
 
 ### 2. Which sections differ from the handoff, and why
 
-**Fifteen documented deviations**, §6. Every one is a deliberate decision with a stated reason.
+**Nineteen documented deviations**, §6. Every one is a deliberate decision with a stated reason.
 There are no undocumented differences.
 
 ### 3. What is still blocked, and by what
@@ -397,6 +397,18 @@ Every deviation in the finished console should be one of these. Anything else is
     cities. It is modelled as a city list containing the non-Syrian cities instead, because a third
     kind would be a second code path to keep in step with the first for a distinction the data
     already expresses.
+18. **The الحجوزات stay column collapses to numeric dates, not the handoff's month names.** The
+    handoff draws `25 ← 28 تموز 2026` — one month and one year for the pair. This renders
+    `04 ← 08-09-2026`: the same collapsing, which is the part that matters, but keeping the
+    console's numeric `DD-MM-YYYY`. Every other date in the console is numeric, and one screen in a
+    different format is a worse inconsistency than a shorter one. Arabic month names are also not
+    reliably narrower — `كانون الأول` is longer than `-12-` — so they would not have fixed the
+    overflow this change existed to fix.
+19. **Four tables declare a wider `minWidth` than the handoff's layout implies**, so they scroll
+    inside their own box sooner. The floor is a measurement, not a preference: the table is
+    `table-fixed`, so a cell wider than its column paints over its neighbour rather than widening
+    it. الحجوزات printed `201.99 USD` over a booking's dates at 1024px. `e2e/table-overflow.spec.ts`
+    holds every table to it at three widths.
 
 ---
 

@@ -72,7 +72,7 @@ export default async function PropertiesPage({
                 rows={registry.items}
                 template={TEMPLATE}
                 rowKey={(row) => row.reference}
-                minWidth={800}
+                minWidth={1040}
                 empty={t.table.empty}
               />
               <TablePagination

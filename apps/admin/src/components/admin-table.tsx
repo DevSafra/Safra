@@ -64,7 +64,25 @@ export function AdminTable<T>({
   /** The design's `grid-template-columns` value, verbatim. */
   readonly template: string;
   readonly rowKey: (row: T) => string;
-  /** Below this the table scrolls inside its own box rather than squashing. */
+  /**
+   * Below this the table scrolls inside its own box rather than squashing.
+   *
+   * ## This number is a MEASUREMENT, not a preference
+   *
+   * The table is `table-fixed` with `<col>` percentages, so a column's width comes from
+   * `template` and never from its content. A cell wider than its column is neither widened nor
+   * clipped — it spills into the neighbour and the two are drawn on top of each other. So this
+   * floor has to be wide enough that `template`'s TIGHTEST share still fits that column's widest
+   * value: `(content + 20px padding) ÷ share`.
+   *
+   * Set too low, the failure is invisible on a wide monitor and appears at 1024px, which is why
+   * `e2e/table-overflow.spec.ts` asserts it at three widths. That test found four tables whose
+   * floor was below what their content needed — the bookings amount column printed `201.99 USD`
+   * over a booking's dates.
+   *
+   * A wider floor costs a horizontal scroll INSIDE this box on a narrow window, which is the
+   * documented trade: eight columns of Arabic squeezed into 320px is unreadable, not responsive.
+   */
   readonly minWidth?: number;
   readonly empty: string;
 }) {

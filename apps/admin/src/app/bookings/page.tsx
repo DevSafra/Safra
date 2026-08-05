@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { getBookings, type BookingListItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { count, money, shortDate } from '@/lib/format';
+import { count, dateRange, money } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import {
@@ -38,6 +38,20 @@ import { pageNumber, pageSize } from '@/lib/search-params';
  * internal notes. Those live on the detail screen behind their own permissions.
  */
 export const dynamic = 'force-dynamic';
+
+/**
+ * Below this the table scrolls inside its own box — measured, not chosen.
+ *
+ * At 1000px the التواريخ column is 125px wide, which fits the widest range `dateRange` produces
+ * for a stay inside one year (`28-08 ← 03-09-2026`, 124px), and المبلغ gets 87px for `201.99 USD`
+ * at 70px. It was 780px, where التواريخ had 113px and the range printed over the amount — the bug
+ * this number exists to prevent.
+ *
+ * A stay crossing a New Year is 159px and would need 1236px. It is allowed to wrap onto two lines
+ * at the arrow instead: 236px of horizontal scroll on every table view, every day of the year, to
+ * keep one rare row on one line is the wrong trade. `e2e/table-overflow.spec.ts` holds all of it.
+ */
+const MIN_WIDTH = 1000;
 
 /** The design's own `grid-template-columns` for this table, verbatim. */
 const TEMPLATE = '1.1fr 1.3fr 1fr 1fr .7fr 1fr .8fr';
@@ -137,7 +151,7 @@ export default async function BookingsPage({
               rows={result.items}
               template={TEMPLATE}
               rowKey={(row) => row.reference}
-              minWidth={780}
+              minWidth={MIN_WIDTH}
               empty={t.table.empty}
             />
             <TablePagination
@@ -184,10 +198,21 @@ const COLUMNS: readonly AdminColumn<BookingListItem>[] = [
   {
     key: 'dates',
     header: t.table.colDates,
+    /*
+      Deliberately NOT wrapped in `Ltr`, unlike the reference and the amount.
+
+      `Ltr` forces the run left-to-right, which put the check-IN on the left and left the «←»
+      pointing away from the check-out — the arrow said the stay ran backwards. Left to the RTL
+      context, the bidirectional algorithm places the first value on the right, so the arrow leads
+      from the check-in rightwards-to-leftwards into the check-out, which is how the handoff draws
+      it and how the sentence is read.
+
+      No `whitespace-nowrap` either: the range must be allowed to break at its space rather than
+      paint over المبلغ when the column is narrow. `dateRange` uses non-breaking hyphens so the
+      break can only happen beside the arrow and never inside a date.
+    */
     render: (row) => (
-      <Ltr className="whitespace-nowrap text-muted">
-        {shortDate(row.checkIn)} ← {shortDate(row.checkOut)}
-      </Ltr>
+      <span className="text-muted">{dateRange(row.checkIn, row.checkOut)}</span>
     ),
   },
   {
