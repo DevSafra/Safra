@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ERROR } from './error-codes.js';
 
 /**
  * Staff two-factor enrolment (SRS §4.1 sensitive operations, project rule 1).
@@ -10,7 +11,7 @@ import { z } from 'zod';
 export const totpCodeSchema = z
   .string()
   .trim()
-  .regex(/^\d{6}$/, 'Authenticator code must be 6 digits.');
+  .regex(/^\d{6}$/, ERROR.VALIDATION_CODE_SIX_DIGITS);
 
 /** Confirming enrolment proves the authenticator app is genuinely configured. */
 export const totpEnableSchema = z.object({ code: totpCodeSchema }).strict();
@@ -35,10 +36,7 @@ export const recoveryCodeSchema = z
   .string()
   .trim()
   .toUpperCase()
-  .regex(
-    /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/,
-    'Recovery code format is XXXX-XXXX-XXXX.',
-  );
+  .regex(/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/, ERROR.VALIDATION_RECOVERY_CODE_FORMAT);
 
 export interface TotpSetupResponse {
   /** otpauth:// URI for an authenticator app to scan. */

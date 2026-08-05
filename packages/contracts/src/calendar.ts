@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { calendarDateSchema } from './search.js';
+import { ERROR } from './error-codes.js';
 
 /**
  * Availability calendar contract (SRS §8.4).
@@ -41,7 +42,7 @@ export const calendarRangeUpdateSchema = z
   })
   .strict()
   .refine((v) => v.to >= v.from, {
-    message: 'End date must not be before the start date.',
+    message: ERROR.VALIDATION_END_BEFORE_START,
     path: ['to'],
   })
   .refine(
@@ -50,7 +51,7 @@ export const calendarRangeUpdateSchema = z
       v.price !== undefined ||
       v.minNights !== undefined ||
       v.note !== undefined,
-    { message: 'Provide at least one field to update.' },
+    { message: ERROR.VALIDATION_ONE_FIELD_REQUIRED },
   )
   .refine(
     (v) => {
@@ -61,7 +62,7 @@ export const calendarRangeUpdateSchema = z
         86_400_000;
       return days <= 730;
     },
-    { message: 'A calendar range may not exceed 730 days.', path: ['to'] },
+    { message: ERROR.VALIDATION_RANGE_TOO_LONG, path: ['to'] },
   );
 
 export type CalendarRangeUpdate = z.infer<typeof calendarRangeUpdateSchema>;
@@ -73,7 +74,7 @@ export const calendarQuerySchema = z
   })
   .strict()
   .refine((v) => v.to >= v.from, {
-    message: 'End date must not be before the start date.',
+    message: ERROR.VALIDATION_END_BEFORE_START,
     path: ['to'],
   });
 

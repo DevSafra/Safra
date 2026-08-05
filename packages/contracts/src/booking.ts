@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { calendarDateSchema, tripAttributeSchema } from './search.js';
 import { emailSchema, phoneSchema } from './auth.js';
+import { ERROR } from './error-codes.js';
 
 /**
  * Booking creation (SRS §6.3).
@@ -34,7 +35,7 @@ export const bookingCreateSchema = z
   })
   .strict()
   .refine((b) => b.checkOut > b.checkIn, {
-    message: 'Departure must be after arrival.',
+    message: ERROR.VALIDATION_DEPARTURE_AFTER_ARRIVAL,
     path: ['checkOut'],
   });
 
@@ -49,7 +50,7 @@ export const partnerBookingDecisionSchema = z
   })
   .strict()
   .refine((v) => v.decision !== 'reject' || (v.reason?.length ?? 0) > 0, {
-    message: 'A rejection must include a reason.',
+    message: ERROR.VALIDATION_REJECTION_REASON_REQUIRED,
     path: ['reason'],
   });
 
@@ -71,7 +72,7 @@ export const bookingQuoteSchema = z
   })
   .strict()
   .refine((q) => q.checkOut > q.checkIn, {
-    message: 'Departure must be after arrival.',
+    message: ERROR.VALIDATION_DEPARTURE_AFTER_ARRIVAL,
     path: ['checkOut'],
   });
 

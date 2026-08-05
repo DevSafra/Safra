@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ERROR } from './error-codes.js';
 
 /**
  * Search contract and the same-day booking cutoff (SRS §5.2, §5.3).
@@ -11,7 +12,7 @@ import { z } from 'zod';
 /** Calendar date, `YYYY-MM-DD`. Deliberately a string, never a Date. */
 export const calendarDateSchema = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format.')
+  .regex(/^\d{4}-\d{2}-\d{2}$/, ERROR.VALIDATION_DATE_FORMAT)
   .refine((v) => {
     const [y, m, d] = v.split('-').map(Number) as [number, number, number];
     const probe = new Date(Date.UTC(y, m - 1, d));
@@ -21,7 +22,7 @@ export const calendarDateSchema = z
       probe.getUTCMonth() === m - 1 &&
       probe.getUTCDate() === d
     );
-  }, 'Date is not a real calendar date.');
+  }, ERROR.VALIDATION_DATE_UNREAL);
 
 /**
  * §5.2 makes arrival, departure and guest count MANDATORY — "searching or booking
@@ -89,14 +90,14 @@ export const searchQuerySchema = z
   })
   .strict()
   .refine((q) => q.checkOut > q.checkIn, {
-    message: 'Departure date must be after the arrival date.',
+    message: ERROR.VALIDATION_DEPARTURE_AFTER_ARRIVAL,
     path: ['checkOut'],
   })
   .refine(
     (q) =>
       q.minPrice === undefined || q.maxPrice === undefined || q.minPrice <= q.maxPrice,
     {
-      message: 'Minimum price cannot exceed maximum price.',
+      message: ERROR.VALIDATION_PRICE_RANGE,
       path: ['minPrice'],
     },
   );

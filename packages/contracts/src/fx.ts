@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ERROR } from './error-codes.js';
 
 /**
  * Setting an FX rate to SYP (SRS §1.4).
@@ -14,8 +15,8 @@ export const setFxRateSchema = z
     /** Base currency, ISO 4217. The pair is completed with SYP. */
     currency: z
       .string()
-      .regex(/^[A-Z]{3}$/, 'Must be a three-letter uppercase ISO 4217 code.')
-      .refine((v) => v !== 'SYP', 'The SYP→SYP rate is always 1 and cannot be set.'),
+      .regex(/^[A-Z]{3}$/, ERROR.VALIDATION_CURRENCY_CODE)
+      .refine((v) => v !== 'SYP', ERROR.VALIDATION_RATE_SYP_FIXED),
 
     /**
      * A decimal STRING, never a number.
@@ -26,8 +27,8 @@ export const setFxRateSchema = z
      */
     rate: z
       .string()
-      .regex(/^\d+(\.\d{1,8})?$/, 'Must be a positive decimal string, e.g. "13000.00".')
-      .refine((v) => Number(v) > 0, 'Rate must be greater than zero.'),
+      .regex(/^\d+(\.\d{1,8})?$/, ERROR.VALIDATION_DECIMAL_STRING)
+      .refine((v) => Number(v) > 0, ERROR.VALIDATION_RATE_POSITIVE),
 
     /**
      * When it takes effect. Future-dating is allowed so a rate change can be

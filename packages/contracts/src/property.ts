@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { emailSchema, localeSchema, passwordSchema, phoneSchema } from './auth.js';
 import { tripAttributeSchema } from './search.js';
+import { ERROR } from './error-codes.js';
 
 /**
  * Partner-facing property and unit management (SRS §8.3).
@@ -28,13 +29,13 @@ const translatedText = (max: number) =>
 /** Decimal degrees as strings, so no precision is lost through a float. */
 const latitudeSchema = z
   .string()
-  .regex(/^-?\d{1,2}(\.\d{1,8})?$/, 'Latitude must be decimal degrees.')
-  .refine((v) => Math.abs(Number(v)) <= 90, 'Latitude must be between -90 and 90.');
+  .regex(/^-?\d{1,2}(\.\d{1,8})?$/, ERROR.VALIDATION_LATITUDE_FORMAT)
+  .refine((v) => Math.abs(Number(v)) <= 90, ERROR.VALIDATION_LATITUDE_RANGE);
 
 const longitudeSchema = z
   .string()
-  .regex(/^-?\d{1,3}(\.\d{1,8})?$/, 'Longitude must be decimal degrees.')
-  .refine((v) => Math.abs(Number(v)) <= 180, 'Longitude must be between -180 and 180.');
+  .regex(/^-?\d{1,3}(\.\d{1,8})?$/, ERROR.VALIDATION_LONGITUDE_FORMAT)
+  .refine((v) => Math.abs(Number(v)) <= 180, ERROR.VALIDATION_LONGITUDE_RANGE);
 
 export const propertyCreateSchema = z
   .object({
@@ -83,7 +84,7 @@ export const unitCreateSchema = z
   })
   .strict()
   .refine((u) => u.maxNights === undefined || u.maxNights >= u.minNights, {
-    message: 'Maximum nights cannot be lower than minimum nights.',
+    message: ERROR.VALIDATION_NIGHTS_MIN_MAX,
     path: ['maxNights'],
   });
 
@@ -128,7 +129,7 @@ export const propertyReviewSchema = z
   })
   .strict()
   .refine((v) => v.decision !== 'reject' || (v.notes?.length ?? 0) > 0, {
-    message: 'Rejection requires notes explaining what must change.',
+    message: ERROR.VALIDATION_REJECTION_NOTES_REQUIRED,
     path: ['notes'],
   });
 
@@ -211,7 +212,7 @@ export const partnerDocumentReviewSchema = z
      * "Rejected" with no reason forces the partner to guess and re-upload blind,
      * which turns one review cycle into several.
      */
-    message: 'Rejection requires notes explaining what is wrong with the document.',
+    message: ERROR.VALIDATION_DOCUMENT_REJECTION_NOTES_REQUIRED,
     path: ['notes'],
   });
 
@@ -225,7 +226,7 @@ export const partnerVerifySchema = z
   })
   .strict()
   .refine((v) => v.decision !== 'reject' || (v.notes?.length ?? 0) > 0, {
-    message: 'Rejection requires notes explaining what must change.',
+    message: ERROR.VALIDATION_REJECTION_NOTES_REQUIRED,
     path: ['notes'],
   });
 

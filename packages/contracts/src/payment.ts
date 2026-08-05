@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ERROR } from './error-codes.js';
 
 /**
  * Every payment rail the system knows. Mirrors the `payment_method` database enum.
@@ -57,7 +58,7 @@ const accessTokenSchema = z
   .string()
   .min(43)
   .max(64)
-  .regex(/^[A-Za-z0-9_-]+$/, 'Malformed access token.');
+  .regex(/^[A-Za-z0-9_-]+$/, ERROR.VALIDATION_ACCESS_TOKEN_MALFORMED);
 
 /**
  * Starting a payment.
@@ -68,7 +69,7 @@ const accessTokenSchema = z
  */
 export const startPaymentSchema = z
   .object({
-    reference: z.string().regex(/^BKG-\d{4}-\d{6}$/, 'Malformed booking reference.'),
+    reference: z.string().regex(/^BKG-\d{4}-\d{6}$/, ERROR.VALIDATION_BOOKING_REFERENCE),
     accessToken: accessTokenSchema,
     /**
      * Restricted to the customer-facing four, not all of PAYMENT_METHODS. A client

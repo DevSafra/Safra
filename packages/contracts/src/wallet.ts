@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ERROR } from './error-codes.js';
 
 /**
  * A manual wallet adjustment by finance (SRS §2.3, §4.1).
@@ -19,8 +20,8 @@ export const walletAdjustSchema = z
      */
     amount: z
       .string()
-      .regex(/^\d+(\.\d{1,2})?$/, 'Must be a positive decimal string, e.g. "10.00".')
-      .refine((v) => Number(v) > 0, 'Amount must be greater than zero.'),
+      .regex(/^\d+(\.\d{1,2})?$/, ERROR.VALIDATION_DECIMAL_STRING)
+      .refine((v) => Number(v) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE),
 
     /**
      * Credit hands money to the customer; debit takes it back.
@@ -32,7 +33,7 @@ export const walletAdjustSchema = z
     direction: z.enum(['credit', 'debit']),
 
     /** ISO 4217. The wallet converts through SYP if it is denominated otherwise. */
-    currency: z.string().regex(/^[A-Z]{3}$/, 'Must be a three-letter ISO 4217 code.'),
+    currency: z.string().regex(/^[A-Z]{3}$/, ERROR.VALIDATION_CURRENCY_CODE),
 
     /**
      * Mandatory, and not a free-for-all length.
@@ -40,11 +41,7 @@ export const walletAdjustSchema = z
      * An adjustment with no stated reason is unreviewable, which defeats the audit
      * requirement that justifies allowing it at all.
      */
-    note: z
-      .string()
-      .trim()
-      .min(10, 'Explain the adjustment — this is the audit record.')
-      .max(500),
+    note: z.string().trim().min(10, ERROR.VALIDATION_REASON_REQUIRED).max(500),
   })
   .strict();
 

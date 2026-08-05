@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ERROR } from './error-codes.js';
 
 /**
  * The single definition of what an auth request may contain. The API validates
@@ -25,14 +26,14 @@ export type Locale = z.infer<typeof localeSchema>;
  */
 export const passwordSchema = z
   .string()
-  .min(12, 'Password must be at least 12 characters.')
-  .max(256, 'Password must be at most 256 characters.');
+  .min(12, ERROR.VALIDATION_PASSWORD_TOO_SHORT)
+  .max(256, ERROR.VALIDATION_PASSWORD_TOO_LONG);
 
 export const emailSchema = z
   .string()
   .trim()
   .toLowerCase()
-  .email('A valid email address is required.')
+  .email(ERROR.VALIDATION_EMAIL_INVALID)
   .max(254);
 
 /**
@@ -42,10 +43,7 @@ export const emailSchema = z
 export const phoneSchema = z
   .string()
   .trim()
-  .regex(
-    /^\+[1-9]\d{7,14}$/,
-    'Phone must be in international format, e.g. +963912345678.',
-  );
+  .regex(/^\+[1-9]\d{7,14}$/, ERROR.VALIDATION_PHONE_FORMAT);
 
 export const registerSchema = z
   .object({
@@ -65,7 +63,7 @@ export const loginSchema = z
     /** Required only once a staff account has TOTP enabled. */
     totpCode: z
       .string()
-      .regex(/^\d{6}$/, 'Authenticator code must be 6 digits.')
+      .regex(/^\d{6}$/, ERROR.VALIDATION_CODE_SIX_DIGITS)
       .optional(),
     /**
      * Accepted in place of totpCode when the authenticator is lost. Single-use:
@@ -101,7 +99,7 @@ export type PasswordResetRequestInput = z.infer<typeof passwordResetRequestSchem
 const authTokenSchema = z
   .string()
   .length(43)
-  .regex(/^[A-Za-z0-9_-]+$/, 'Malformed link token.');
+  .regex(/^[A-Za-z0-9_-]+$/, ERROR.VALIDATION_TOKEN_MALFORMED);
 
 /**
  * Choosing the new password.

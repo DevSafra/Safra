@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import type { Role } from './permissions.js';
+import { ERROR } from './error-codes.js';
 
 /**
  * Geographic scope for a staff member (design handoff §8.2, نطاق العمل).
@@ -135,7 +136,7 @@ export const setStaffScopeSchema = z
     silently ignoring the list would leave somebody believing a restriction is in force.
   */
   .refine((input) => input.kind === 'cities' || input.citySlugs.length === 0, {
-    message: 'An all-cities scope cannot carry a city list.',
+    message: ERROR.VALIDATION_SCOPE_ALL_CITIES_CONFLICT,
   });
 
 export type SetStaffScopeInput = z.infer<typeof setStaffScopeSchema>;
