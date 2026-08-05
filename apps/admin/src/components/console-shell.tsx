@@ -1,6 +1,6 @@
 import { AdminSidebar, type SidebarCounts } from '@/components/admin-sidebar';
-import { SignOutButton } from '@/components/sign-out-button';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { ConsoleHeader } from '@/components/console-header';
+import { SidebarBackdrop } from '@/components/sidebar-backdrop';
 import { t } from '@/lib/strings';
 
 /**
@@ -11,8 +11,9 @@ import { t } from '@/lib/strings';
  * fetch the counters itself on every navigation — a second round trip for numbers the page
  * has usually already loaded.
  *
- * The dashboard does not use this: its header carries the date, the role and the emergency
- * control, which no other section has.
+ * The dashboard does not use this — its sidebar counters come from a different payload — but it
+ * renders the SAME `ConsoleHeader`, so the title row cannot drift between them again.
+ *
  */
 export function ConsoleShell({
   title,
@@ -26,28 +27,15 @@ export function ConsoleShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto grid max-w-[1380px] gap-5 px-6 pt-6 pb-16 lg:grid-cols-[220px_1fr] lg:items-start">
-      <AdminSidebar counts={counts} />
-
-      <main className="min-w-0">
-        <header className="mb-4 flex flex-wrap items-center gap-3">
-          <div>
-            <h1 className="font-[family-name:var(--font-amiri)] text-[28px] leading-tight text-text">
-              {title}
-            </h1>
-            {subtitle ? (
-              <p className="mt-0.5 text-[11.5px] text-faint">{subtitle}</p>
-            ) : null}
-          </div>
-
-          <div className="ms-auto flex items-center gap-2">
-            <ThemeToggle />
-            <SignOutButton />
-          </div>
-        </header>
+    <div className="console-layout mx-auto max-w-[1380px] px-6 pt-6 pb-16">
+      <main className="console-main min-w-0">
+        <ConsoleHeader title={title} {...(subtitle ? { subtitle } : {})} />
 
         {children}
       </main>
+
+      <AdminSidebar counts={counts} />
+      <SidebarBackdrop />
     </div>
   );
 }
@@ -145,7 +133,7 @@ export function Pager({
     <div className="mt-3.5 flex justify-center">
       <a
         href={`${basePath}?${params.toString()}`}
-        className="cursor-pointer rounded-lg border border-line px-4 py-1.5 text-xs text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
+        className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-1.5 text-xs text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
       >
         {t.table.nextPage}
       </a>

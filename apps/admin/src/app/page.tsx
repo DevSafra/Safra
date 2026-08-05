@@ -6,14 +6,12 @@ import {
   type DashboardOverview,
   type PendingPartner,
 } from '@/lib/api';
-import { getStaffSession } from '@/lib/session-server';
 import { amount, count } from '@/lib/format';
-import { ARABIC_WESTERN_DIGITS } from '@/lib/numerals';
 import { AdminSidebar } from '@/components/admin-sidebar';
 import { RevenueChart } from '@/components/revenue-chart';
-import { SignOutButton } from '@/components/sign-out-button';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { t, auditAction, bookingStatus, roleName } from '@/lib/strings';
+import { ConsoleHeader } from '@/components/console-header';
+import { SidebarBackdrop } from '@/components/sidebar-backdrop';
+import { t, auditAction, bookingStatus } from '@/lib/strings';
 import { ORNAMENT_BRAND } from '@safra/ui';
 
 /**
@@ -38,54 +36,31 @@ import { ORNAMENT_BRAND } from '@safra/ui';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const [overview, partners, session] = await Promise.all([
-    getDashboard(),
-    getPendingPartners(),
-    getStaffSession(),
-  ]);
+  const [overview, partners] = await Promise.all([getDashboard(), getPendingPartners()]);
 
   const loaded = overview !== 'failed' && overview !== 'unauthenticated';
 
   return (
-    <div className="mx-auto grid max-w-[1380px] gap-5 px-6 pt-6 pb-16 lg:grid-cols-[220px_1fr] lg:items-start">
-      <AdminSidebar
-        counts={
-          loaded
-            ? {
-                bookings: overview.counters.pending_confirmation,
-                partners: overview.counters.partners_pending_verification,
-                properties: overview.counters.properties_pending_review,
-              }
-            : {}
-        }
-      />
-
-      <main className="min-w-0">
-        <header className="mb-4 flex flex-wrap items-center gap-3">
-          <h1 className="font-[family-name:var(--font-amiri)] text-[28px] leading-tight text-text">
-            {t.admin.title}
-          </h1>
-          <span className="text-[11.5px] text-faint">
-            {today()} · {roleName(session?.user.role)}
-          </span>
-
-          <div className="ms-auto flex items-center gap-2">
-            {/*
+    <div className="console-layout mx-auto max-w-[1380px] px-6 pt-6 pb-16">
+      <main className="console-main min-w-0">
+        <ConsoleHeader
+          title={t.admin.title}
+          actions={
+            /*
               Emergency Mode (EC-009), reached from the header exactly as the prototype's
               `openEmergency` does. It was a disabled placeholder until the section was built;
               it now navigates, and the destination requires a target, a written reason and a
-              confirmation before anything is armed.
-            */}
+              confirmation before anything is armed. Passed as an action because it is the one
+              control no other section has.
+            */
             <Link
               href="/emergency"
-              className="cursor-pointer rounded-[9px] border border-[rgba(var(--badA),0.5)] bg-[rgba(var(--badA),0.1)] px-4 py-2 text-xs font-extrabold text-bad transition-colors hover:bg-[rgba(var(--badA),0.18)]"
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-[rgba(var(--badA),0.5)] bg-[rgba(var(--badA),0.1)] px-4 py-2 text-xs font-extrabold text-bad transition-colors hover:bg-[rgba(var(--badA),0.18)]"
             >
               {t.admin.emergencyMode}
             </Link>
-            <ThemeToggle />
-            <SignOutButton />
-          </div>
-        </header>
+          }
+        />
 
         {overview === 'unauthenticated' ? (
           <Card>
@@ -99,6 +74,19 @@ export default async function DashboardPage() {
           <Overview overview={overview} partners={partners} />
         )}
       </main>
+
+      <AdminSidebar
+        counts={
+          loaded
+            ? {
+                bookings: overview.counters.pending_confirmation,
+                partners: overview.counters.partners_pending_verification,
+                properties: overview.counters.properties_pending_review,
+              }
+            : {}
+        }
+      />
+      <SidebarBackdrop />
     </div>
   );
 }
@@ -256,7 +244,7 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
               {row.href ? (
                 <Link
                   href={row.href}
-                  className="ms-auto cursor-pointer rounded-[7px] border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)]"
+                  className="ms-auto inline-flex min-h-10 cursor-pointer items-center rounded-[7px] border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
                 >
                   {t.admin.handle}
                 </Link>
@@ -456,7 +444,7 @@ function RecentActivity({ rows }: { rows: DashboardOverview['recentAudit'] }) {
 
       <Link
         href="/audit"
-        className="mt-3 inline-block cursor-pointer text-[11.5px] text-sky hover:underline"
+        className="mt-3 inline-flex min-h-10 cursor-pointer items-center text-[11.5px] text-sky hover:underline lg:min-h-0"
       >
         {t.admin.viewAll}
       </Link>
@@ -531,21 +519,3 @@ function Card({ children }: { children: React.ReactNode }) {
 
 /** How many queue rows the dashboard previews before deferring to the full section. */
 const QUEUE_PREVIEW = 4;
-
-/**
- * Today's date in Arabic, as the design's header shows it.
- *
- * Formatted on the server from the server's clock so it agrees with the counters beside
- * it — a browser-rendered date can disagree across a midnight boundary, and "today's
- * bookings" under yesterday's date is the kind of small inconsistency that costs trust in
- * every other number on the screen.
- */
-function today(): string {
-  return new Intl.DateTimeFormat(ARABIC_WESTERN_DIGITS, {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(new Date());
-}

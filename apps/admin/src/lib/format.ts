@@ -67,6 +67,35 @@ export function shortDate(iso: string | null | undefined): string {
   return day && month && year ? `${day}-${month}-${year}` : iso;
 }
 
+/**
+ * Today's date written out in Arabic — "الأربعاء، 5 آب 2026".
+ *
+ * Formatted on the SERVER from the server's clock, so it agrees with the counters beside it. A
+ * browser-rendered date can disagree across a midnight boundary, and "today's bookings" under
+ * yesterday's date is the kind of small inconsistency that costs trust in every other number on
+ * the screen.
+ *
+ * `ARABIC_WESTERN_DIGITS` for the same reason every other figure in the console uses it: Arabic
+ * with Western digits, so `5` and `2026` are the numerals staff read everywhere else rather than
+ * `٥` and `٢٠٢٦` on this one line.
+ *
+ * UTC deliberately. Every launch market is UTC+2/+3, and the API reports its counters on UTC
+ * calendar days — a date rendered in the viewer's zone would occasionally name a different day
+ * than the numbers underneath it.
+ *
+ * Lives here rather than in the dashboard because the shell shows it on all nineteen other
+ * sections too, and two copies of a date format drift.
+ */
+export function todayLong(): string {
+  return new Intl.DateTimeFormat(ARABIC_WESTERN_DIGITS, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date());
+}
+
 /** `DD-MM-YYYY HH:MM` for an audit or ledger timestamp. */
 export function shortDateTime(iso: string | null | undefined): string {
   if (!iso) return t.admin.noData;

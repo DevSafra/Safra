@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { ARABIC_WESTERN_DIGITS } from '@/lib/numerals';
-import { t } from '@/lib/strings';
+import { SignOutButton } from '@/components/sign-out-button';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { SIDEBAR_ID, t } from '@/lib/strings';
 
 /**
  * One entry in the command-center sidebar.
@@ -73,12 +75,35 @@ export function AdminSidebar({ counts }: { counts: SidebarCounts }) {
 
   // 14px radius and 14px padding — the handoff's sidebar values (§9.5, §9.6).
   return (
-    <aside className="sticky top-6 rounded-[14px] border border-[rgba(var(--goldA),0.14)] bg-card p-3.5">
+    /*
+      Second in the DOM, first in the desktop grid — `console-sidebar` places it back in column 1
+      from `lg` up. Rendered before `main`, its nineteen links pushed every section below the fold
+      on a phone, so the console opened on a list of links rather than on what you navigated to.
+
+      `tabIndex={-1}` makes it focusable by SCRIPT but not by tab, so opening the drawer can move
+      focus into it without adding a stop to the desktop tab order where it is just a column.
+      Positioning, stickiness and the three visibility states are all in `globals.css`: they depend
+      on an attribute on `<html>` and must be right in the first painted frame.
+    */
+    <aside
+      id={SIDEBAR_ID}
+      tabIndex={-1}
+      aria-label={t.nav.heading}
+      className="console-sidebar flex flex-col rounded-[14px] border border-[rgba(var(--goldA),0.14)] bg-card p-3.5"
+    >
       <p className="px-2.5 py-1 text-[11px] font-bold tracking-[0.1em] text-faint">
         {t.nav.heading}
       </p>
 
-      <nav className="mt-1 grid gap-0.5">
+      {/*
+        The NAV scrolls, not the whole sidebar.
+        
+        `min-h-0` is the load-bearing half: a flex item defaults to `min-height: auto` and refuses
+        to shrink below its content, so without it nineteen rows push the footer past the bottom of
+        the drawer and sign-out sits below the scroll. With it the nav takes the leftover space and
+        scrolls inside itself, and the controls stay visible.
+      */}
+      <nav className="mt-1 grid min-h-0 flex-1 gap-0.5 overflow-y-auto">
         {NAV.map((item) => {
           const label = t.nav[item.key];
           const badge = item.badge ? counts[item.badge] : undefined;
@@ -116,7 +141,7 @@ export function AdminSidebar({ counts }: { counts: SidebarCounts }) {
 
           // 8px radius on nav items (§9.5).
           const shared =
-            'flex items-center justify-between rounded-lg px-2.5 py-2 text-[13px]';
+            'flex min-h-10 items-center justify-between rounded-lg px-2.5 py-2 text-[13px]';
 
           if (!item.href) {
             /**
@@ -152,6 +177,22 @@ export function AdminSidebar({ counts }: { counts: SidebarCounts }) {
           );
         })}
       </nav>
+
+      {/*
+        The account controls, at the foot of the sidebar (Bashar, 2026-08-05).
+        
+        They were in the page header, where on a phone they wrapped onto a second row under the
+        title — 390px cannot hold a hamburger, a 28px title, the date and role, a theme toggle and
+        a sign-out button on one line, and the wrap read as two headers rather than one.
+        
+        `mt-auto` pins them to the bottom of the DRAWER, which is full height, while on a desktop
+        the aside is only as tall as its content so they sit immediately under the nav. One rule,
+        both shapes, because the aside is a flex column.
+      */}
+      <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line2 pt-3">
+        <ThemeToggle />
+        <SignOutButton />
+      </div>
     </aside>
   );
 }

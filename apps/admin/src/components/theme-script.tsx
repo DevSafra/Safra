@@ -1,12 +1,16 @@
 import { headers } from 'next/headers';
 
-import { THEME_SCRIPT } from '@safra/ui';
+import { SIDEBAR_SCRIPT, THEME_SCRIPT } from '@safra/ui';
 
 /**
- * Applies the saved theme BEFORE first paint.
+ * Applies the saved theme AND sidebar state BEFORE first paint.
  *
  * This has to be a blocking inline script. Doing it in an effect would render the dark default
- * first and repaint to light — a visible flash on every navigation for anyone who chose light.
+ * first and repaint to light — a visible flash on every navigation for anyone who chose light. The
+ * sidebar matters more: it is 220px of LAYOUT, so resolving it after hydration would reflow the
+ * whole page in front of the reader rather than merely recolour it.
+ *
+ * Both preferences in ONE script, concatenated, so there is one nonce'd tag rather than two.
  *
  * ## The nonce is the whole difficulty
  *
@@ -27,7 +31,7 @@ export async function ThemeScript() {
   return (
     <script
       {...(nonce ? { nonce } : {})}
-      dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }}
+      dangerouslySetInnerHTML={{ __html: `${THEME_SCRIPT}${SIDEBAR_SCRIPT}` }}
     />
   );
 }

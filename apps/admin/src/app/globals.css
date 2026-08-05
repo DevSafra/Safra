@@ -140,6 +140,180 @@
  * for. Light is available, and it is opt-in.
  */
 
+/**
+ * Grid and flex children may shrink below their content.
+ *
+ * ## The bug this removes as a class
+ *
+ * A grid or flex item defaults to `min-width: auto`, which means it refuses to shrink below its
+ * content's intrinsic minimum. A registry table with a 860px `min-width` therefore made its
+ * containing panel 898px wide inside a 342px column, and the whole page scrolled sideways —
+ * carrying the sidebar off screen — even though the table sat in an `overflow-x-auto` box
+ * intended to scroll on its own. Measured: 7 of the 19 console sections overflowed at 390px,
+ * 3 of them still at 1024px.
+ *
+ * The per-element fix is `min-w-0` on every grid and flex item, forever, remembered by whoever
+ * writes the next panel. This is the same fix applied once, in the one place it cannot be
+ * forgotten.
+ *
+ * `:where()` gives the selector ZERO specificity, so any explicit `min-w-*` utility still wins —
+ * an element that genuinely needs a floor can state one and this will not fight it.
+ */
+/**
+ * The console layout, and the sidebar's three states.
+ *
+ * ## Why this is CSS and not Tailwind utilities
+ *
+ * The layout depends on an attribute on `<html>`, and expressing that in utilities means an
+ * arbitrary variant — `[html[data-sidebar=hidden]_&]:grid-cols-1` — repeated on every element
+ * that reacts. Written once here it is legible, and it is applied in the first painted frame by
+ * the pre-paint script rather than after hydration. A 220px column that appears late reflows the
+ * whole page in front of the reader.
+ *
+ * ## The three states
+ *
+ * - **No attribute** — nobody has chosen. A column from `lg` up, hidden below, which is the right
+ *   default in both places: room for it on a laptop, no room on a phone.
+ * - **`shown`** — a column from `lg` up, an overlay DRAWER below. A drawer rather than a stacked
+ *   block because pushing nineteen nav rows above the content is what made the phone layout
+ *   unusable before.
+ * - **`hidden`** — gone at every width, and the content takes the space back.
+ *
+ * An explicit choice wins at every width. That is the whole point of the hamburger being
+ * available on a desktop too.
+ */
+.console-layout {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.console-backdrop {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  /* Default and `shown`: the sidebar is a column. */
+  .console-layout {
+    grid-template-columns: 220px 1fr;
+  }
+
+  :root[data-sidebar='hidden'] .console-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .console-sidebar {
+    position: sticky;
+    top: 1.5rem;
+    grid-column-start: 1;
+    grid-row-start: 1;
+  }
+
+  .console-main {
+    grid-column-start: 2;
+    grid-row-start: 1;
+  }
+
+  /* With no column beside it, the content occupies the only one. */
+  :root[data-sidebar='hidden'] .console-main {
+    grid-column-start: 1;
+  }
+}
+
+:root[data-sidebar='hidden'] .console-sidebar {
+  display: none;
+}
+
+/**
+ * Below `lg`, a shown sidebar is a drawer over the content.
+ *
+ * `inset-inline-start` rather than `left`: in RTL the drawer must come from the RIGHT, and a
+ * physical property would slide it in from the wrong edge — the same class of bug the project's
+ * logical-property rule exists to prevent.
+ *
+ * `max-width: 88vw` so the backdrop is always visible behind it, which is what tells a first-time
+ * user the drawer is dismissible.
+ */
+@media (max-width: 63.999rem) {
+  .console-sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 50;
+    width: 260px;
+    max-width: 88vw;
+    /*
+      The drawer does NOT scroll — its nav does. Letting the aside scroll put the account
+      controls below the fold on a phone, which is the one place they must not be.
+    */
+    overflow: hidden;
+    border-radius: 0;
+  }
+
+  /* Hidden below `lg` unless explicitly shown. */
+  :root:not([data-sidebar='shown']) .console-sidebar {
+    display: none;
+  }
+
+  :root[data-sidebar='shown'] .console-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: block;
+    background: rgb(0 0 0 / 0.55);
+  }
+}
+
+/**
+ * A 40px floor for controls on handheld widths.
+ *
+ * Chasing this per component does not converge: the audit found thirteen distinct offenders, and
+ * fixing them by editing class strings missed sibling branches — the customer header's "sign in"
+ * link and its "account" link are different elements, and only one got the padding. One rule
+ * covers every control, including the ones written next month.
+ *
+ * `button`, `select` and `summary` only. An anchor is INLINE, so `min-height` does nothing to it
+ * without also changing its `display`, and forcing `inline-flex` on every link in the app would
+ * add height to links inside sentences. Anchors styled as controls carry an explicit
+ * `min-h-10`; anchors inside table cells are handled by the rule above.
+ *
+ * Below `lg`, which is exactly where the console's sidebar becomes a drawer. That boundary is the
+ * one that means "the input is probably a finger": a tablet at 768px is as touch-driven as a
+ * phone, and stopping at `md` left every control on an iPad at 22–38px. Above it the input is a
+ * pointer and the design's dense console (§9.4) is what is wanted.
+ *
+ * `:where()` for zero specificity — anything that genuinely needs to be smaller can say so.
+ */
+@media (max-width: 63.999rem) {
+  :where(button, select, summary, [role='button']) {
+    min-height: 2.5rem;
+  }
+}
+
+/**
+ * A tap-sized target for links inside a table, on handheld widths only.
+ *
+ * Measured at 375px: a reference link was 104 × 19 and a row action 60 × 17. Both fail even WCAG
+ * 2.5.8's 24 × 24 floor, let alone the 40px a thumb wants — and there are hundreds of them across
+ * the registries, so fixing them at each call site is twelve files and a convention to remember.
+ *
+ * Only below `lg`, matching the control floor and the sidebar's drawer breakpoint. The design
+ * specifies a dense desktop table (§9.4) and taller rows there would be a different table, so the
+ * desktop stays exactly as drawn: this trades vertical space for reachability precisely where the
+ * input is a finger.
+ */
+@media (max-width: 63.999rem) {
+  :where(td, th) a {
+    display: inline-flex;
+    min-height: 2.5rem;
+    align-items: center;
+  }
+}
+
+:where(.grid, .flex, .inline-flex) > * {
+  min-width: 0;
+}
+
 html {
   /* Both, so form controls and scrollbars follow whichever is active. */
   color-scheme: dark light;

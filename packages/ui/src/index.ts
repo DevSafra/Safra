@@ -9,3 +9,4 @@
 export * from './ornaments.js';
 export * from './theme.js';
 export * from './password-field.js';
+export * from './sidebar.js';

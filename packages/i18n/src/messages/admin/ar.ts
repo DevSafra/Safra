@@ -88,6 +88,9 @@ export const ar = {
   /** The command-center sidebar, in the approved design's order. */
   nav: {
     heading: 'مركز قيادة سفرة',
+    /** The hamburger names the ACTION, so it says which way the button goes. */
+    showSidebar: 'إظهار قائمة التنقل',
+    hideSidebar: 'إخفاء قائمة التنقل',
     notBuilt: 'لم يُبنَ هذا القسم بعد',
     dashboard: 'لوحة الإدارة',
     bookings: 'الحجوزات',

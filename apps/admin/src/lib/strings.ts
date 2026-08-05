@@ -28,6 +28,14 @@ export const CONSOLE_LOCALE: Locale = 'ar';
 
 export const t = adminAr;
 
+/**
+ * The sidebar's element id, shared by the hamburger's `aria-controls` and the aside itself.
+ *
+ * A constant rather than a literal in both files: `aria-controls` pointing at an id that does not
+ * exist is invisible to everyone except the screen-reader user it was added for.
+ */
+export const SIDEBAR_ID = 'console-nav';
+
 /** Re-exported so components interpolate copy without also importing the package. */
 export { fill };
 
