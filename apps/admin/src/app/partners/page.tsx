@@ -20,7 +20,7 @@ import {
   type Tone,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { AR, label } from '@/lib/strings';
+import { t, label } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -57,19 +57,19 @@ export default async function PartnersPage({
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.partners} subtitle={AR.partners.subtitle} counts={counts}>
+    <ConsoleShell title={t.nav.partners} subtitle={t.partners.subtitle} counts={counts}>
       <div className="grid gap-4">
-        <ConsolePanel title={AR.sections.partners.title}>
+        <ConsolePanel title={t.sections.partners.title}>
           <TableToolbar
             action="/partners"
             query={q}
-            placeholder={AR.sections.partners.searchPlaceholder}
+            placeholder={t.sections.partners.searchPlaceholder}
           />
 
           {registry === 'unauthenticated' ? (
-            <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+            <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
           ) : registry === 'failed' ? (
-            <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+            <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
           ) : (
             <>
               <AdminTable
@@ -78,7 +78,7 @@ export default async function PartnersPage({
                 template={TEMPLATE}
                 rowKey={(row) => row.reference}
                 minWidth={860}
-                empty={AR.table.empty}
+                empty={t.table.empty}
               />
               <Pager
                 basePath="/partners"
@@ -88,7 +88,7 @@ export default async function PartnersPage({
             </>
           )}
 
-          <FootNote>{AR.sections.partners.note}</FootNote>
+          <FootNote>{t.sections.partners.note}</FootNote>
         </ConsolePanel>
 
         {/*
@@ -98,7 +98,7 @@ export default async function PartnersPage({
         */}
         <ContractsCard />
 
-        <ConsolePanel title={AR.sections.partners.pendingTitle}>
+        <ConsolePanel title={t.sections.partners.pendingTitle}>
           <QueueState state={pending}>
             {(rows) =>
               rows.map((partner) => (
@@ -113,7 +113,7 @@ export default async function PartnersPage({
                       </span>
                       <span className="block text-[11px] text-faint">
                         <Ltr>{partner.reference}</Ltr> · {partner.city.nameAr} ·{' '}
-                        {partner.documents.length} {AR.dashboard.documents}
+                        {partner.documents.length} {t.dashboard.documents}
                       </span>
                     </span>
 
@@ -126,8 +126,8 @@ export default async function PartnersPage({
                     <span className="ms-auto shrink-0">
                       <StatusPill tone={partner.sanctionsScreenedAt ? 'ok' : 'warn'}>
                         {partner.sanctionsScreenedAt
-                          ? AR.dashboard.screened
-                          : AR.dashboard.notScreened}
+                          ? t.dashboard.screened
+                          : t.dashboard.notScreened}
                       </StatusPill>
                     </span>
                   </Link>
@@ -136,7 +136,7 @@ export default async function PartnersPage({
             }
           </QueueState>
 
-          <FootNote>{AR.admin.pendingPartnersNote}</FootNote>
+          <FootNote>{t.admin.pendingPartnersNote}</FootNote>
         </ConsolePanel>
       </div>
     </ConsoleShell>
@@ -146,7 +146,7 @@ export default async function PartnersPage({
 const COLUMNS: readonly AdminColumn<PartnerListItem>[] = [
   {
     key: 'reference',
-    header: AR.table.colId,
+    header: t.table.colId,
     render: (row) => (
       <Link
         href={`/partners/${row.reference}`}
@@ -158,7 +158,7 @@ const COLUMNS: readonly AdminColumn<PartnerListItem>[] = [
   },
   {
     key: 'partner',
-    header: AR.sections.partners.colPartner,
+    header: t.sections.partners.colPartner,
     /*
       Legal name first, display name below. They differ often — "وليد بركات" trades as "شقق
       الميناء" — and a contract or a sanctions check is against the legal entity, so that is the
@@ -177,17 +177,17 @@ const COLUMNS: readonly AdminColumn<PartnerListItem>[] = [
   },
   {
     key: 'type',
-    header: AR.table.colType,
+    header: t.table.colType,
     render: (row) => <span className="text-text2">{row.partnerType}</span>,
   },
   {
     key: 'city',
-    header: AR.table.colCity,
+    header: t.table.colCity,
     render: (row) => <span className="text-muted">{row.city}</span>,
   },
   {
     key: 'score',
-    header: AR.sections.partners.colScore,
+    header: t.sections.partners.colScore,
     /* The handoff's ladder: ≥80 ok, ≥60 warn, below that bad. */
     render: (row) => (
       <ToneText tone={scoreTone(row.score)}>
@@ -197,38 +197,38 @@ const COLUMNS: readonly AdminColumn<PartnerListItem>[] = [
   },
   {
     key: 'tier',
-    header: AR.sections.partners.colTier,
+    header: t.sections.partners.colTier,
     render: (row) => (
       <ToneText tone={tierTone(row.tier)}>
-        {label(AR.enums.partnerTier, row.tier)}
+        {label(t.enums.partnerTier, row.tier)}
       </ToneText>
     ),
   },
   {
     key: 'status',
-    header: AR.table.colStatus,
+    header: t.table.colStatus,
     /*
       Suspension outranks verification: an approved partner who is suspended is not trading, and
       showing "معتمد" for them would be true and useless.
     */
     render: (row) =>
       row.suspended ? (
-        <StatusPill tone="bad">موقوف مؤقتاً</StatusPill>
+        <StatusPill tone="bad">{t.sections.partners.suspended}</StatusPill>
       ) : (
         <StatusPill tone={verificationTone(row.verification)}>
-          {label(AR.enums.verification, row.verification)}
+          {label(t.enums.verification, row.verification)}
         </StatusPill>
       ),
   },
   {
     key: 'action',
-    header: AR.table.colAction,
+    header: t.table.colAction,
     render: (row) => (
       <Link
         href={`/partners/${row.reference}`}
         className="text-[11.5px] text-sky hover:underline"
       >
-        {AR.table.manage}
+        {t.table.manage}
       </Link>
     ),
   },

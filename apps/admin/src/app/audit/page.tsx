@@ -4,7 +4,7 @@ import { clock, shortDate } from '@/lib/format';
 import { ConsolePanel, ConsoleShell, Pager } from '@/components/console-shell';
 import { AdminTable, Ltr, type AdminColumn } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { AR, auditAction, roleName } from '@/lib/strings';
+import { t, auditAction, roleName } from '@/lib/strings';
 
 /**
  * سجل التدقيق (SRS §15, design handoff §8).
@@ -65,28 +65,28 @@ export default async function AuditPage({
     actionList === 'failed' || actionList === 'unauthenticated' ? [] : actionList.actions;
 
   return (
-    <ConsoleShell title={AR.nav.audit} counts={counts}>
+    <ConsoleShell title={t.nav.audit} counts={counts}>
       <ConsolePanel>
         <div className="mb-3 flex flex-wrap items-center gap-2.5">
           {/* The immutability badge, in the design's exact treatment. */}
           <span className="rounded-full border border-[rgba(var(--badA),0.4)] bg-[rgba(var(--badA),0.12)] px-3 py-0.5 text-[10.5px] font-extrabold text-bad">
-            {AR.sections.audit.immutable}
+            {t.sections.audit.immutable}
           </span>
-          <span className="text-xs text-faint">{AR.sections.audit.hint}</span>
+          <span className="text-xs text-faint">{t.sections.audit.hint}</span>
         </div>
 
         <TableToolbar
           action="/audit"
           query={q}
-          placeholder={AR.sections.audit.searchPlaceholder}
+          placeholder={t.sections.audit.searchPlaceholder}
         >
           <select
             name="action"
             defaultValue={action ?? ''}
-            aria-label={AR.sections.audit.colAction}
+            aria-label={t.sections.audit.colAction}
             className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
           >
-            <option value="">{AR.sections.bookings.allStatuses}</option>
+            <option value="">{t.sections.bookings.allStatuses}</option>
             {actions.map((value) => (
               <option key={value} value={value}>
                 {auditAction(value)}
@@ -96,9 +96,9 @@ export default async function AuditPage({
         </TableToolbar>
 
         {page === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : page === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -107,7 +107,7 @@ export default async function AuditPage({
               template={TEMPLATE}
               rowKey={(row) => row.id}
               minWidth={800}
-              empty={AR.table.empty}
+              empty={t.table.empty}
             />
             <Pager basePath="/audit" query={{ q, action }} nextCursor={page.nextCursor} />
           </>
@@ -120,7 +120,7 @@ export default async function AuditPage({
 const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
   {
     key: 'time',
-    header: AR.table.colTime,
+    header: t.table.colTime,
     /*
       Clock above date. The log is read newest-first within a day, so the time distinguishes
       adjacent rows and the date is context — the design shows only the clock, which works for
@@ -135,12 +135,12 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
   },
   {
     key: 'actor',
-    header: AR.sections.audit.colStaff,
+    header: t.sections.audit.colStaff,
     /* A null actor means the platform acted on its own — an expiry, a scheduled job. */
     render: (row) => (
       <div className="grid gap-0.5">
         <span className="break-all text-text">
-          {row.actorEmail ?? AR.admin.systemActor}
+          {row.actorEmail ?? t.admin.systemActor}
         </span>
         {row.actorRole ? (
           <span className="text-[10px] text-faint">{roleName(row.actorRole)}</span>
@@ -150,7 +150,7 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
   },
   {
     key: 'action',
-    header: AR.sections.audit.colAction,
+    header: t.sections.audit.colAction,
     render: (row) => (
       <div className="grid gap-0.5">
         <span className="text-text2">{auditAction(row.action)}</span>
@@ -170,7 +170,7 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
   },
   {
     key: 'entity',
-    header: AR.sections.audit.colEntity,
+    header: t.sections.audit.colEntity,
     /*
       Subject type plus a truncated id. A bare uuid says nothing; the type beside it turns an
       opaque key into something an operator can act on, and eight characters is enough to match
@@ -187,7 +187,7 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
   },
   {
     key: 'ip',
-    header: AR.sections.audit.colIp,
-    render: (row) => <Ltr className="text-muted">{row.ipAddress ?? AR.admin.noData}</Ltr>,
+    header: t.sections.audit.colIp,
+    render: (row) => <Ltr className="text-muted">{row.ipAddress ?? t.admin.noData}</Ltr>,
   },
 ];

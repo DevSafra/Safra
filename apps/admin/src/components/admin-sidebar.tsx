@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { ARABIC_WESTERN_DIGITS } from '@/lib/numerals';
-import { AR } from '@/lib/strings';
+import { t } from '@/lib/strings';
 
 /**
  * One entry in the command-center sidebar.
@@ -15,7 +15,7 @@ import { AR } from '@/lib/strings';
  * item that navigates to a 404 is worse than one that visibly does not navigate yet.
  */
 interface NavItem {
-  readonly key: keyof typeof AR.nav;
+  readonly key: keyof typeof t.nav;
   readonly href?: string;
   /** Which counter, if any, drives the badge. */
   readonly badge?: 'bookings' | 'partners' | 'properties' | 'staff';
@@ -75,12 +75,12 @@ export function AdminSidebar({ counts }: { counts: SidebarCounts }) {
   return (
     <aside className="sticky top-6 rounded-[14px] border border-[rgba(var(--goldA),0.14)] bg-card p-3.5">
       <p className="px-2.5 py-1 text-[11px] font-bold tracking-[0.1em] text-faint">
-        {AR.nav.heading}
+        {t.nav.heading}
       </p>
 
       <nav className="mt-1 grid gap-0.5">
         {NAV.map((item) => {
-          const label = AR.nav[item.key];
+          const label = t.nav[item.key];
           const badge = item.badge ? counts[item.badge] : undefined;
 
           /**
@@ -128,7 +128,7 @@ export function AdminSidebar({ counts }: { counts: SidebarCounts }) {
               <span
                 key={item.key}
                 aria-disabled="true"
-                title={AR.nav.notBuilt}
+                title={t.nav.notBuilt}
                 className={`${shared} cursor-not-allowed text-faint2`}
               >
                 {row}

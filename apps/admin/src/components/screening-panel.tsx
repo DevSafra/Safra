@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { fill, t } from '@/lib/strings';
 
 interface Candidate {
   name: string;
@@ -85,13 +86,10 @@ export function ScreeningPanel({
       <div className="rounded-lg border border-bad/40 bg-bad/10 p-4">
         <p className="text-sm text-bad">
           {listStatus.imported
-            ? `The sanctions list is ${listStatus.ageDays} days old and cannot be screened against.`
-            : 'No sanctions list has been imported.'}
+            ? fill(t.sections.screening.listStale, { days: listStatus.ageDays ?? 0 })
+            : t.sections.screening.listMissing}
         </p>
-        <p className="mt-2 text-xs text-muted">
-          Partner verification is blocked until this is resolved. Screening against a list
-          that cannot be shown to be current would look like compliance without being it.
-        </p>
+        <p className="mt-2 text-xs text-muted">{t.sections.screening.blockedNote}</p>
       </div>
     );
   }
@@ -102,14 +100,16 @@ export function ScreeningPanel({
         <div>
           <p className={`text-sm ${previous.matched ? 'text-bad' : 'text-ok'}`}>
             {previous.matched
-              ? 'A possible match was recorded — do not approve without escalating.'
-              : 'Screened against the EU consolidated list, no match.'}
+              ? t.sections.screening.possibleMatch
+              : t.sections.screening.noMatch}
           </p>
           <p className="mt-1 text-xs text-faint">
-            Recorded {screenedAt.slice(0, 10)}
             {previous.searched.length > 0
-              ? ` · searched ${previous.searched.join(', ')}`
-              : ''}
+              ? fill(t.sections.screening.recordedOnSearched, {
+                  date: screenedAt.slice(0, 10),
+                  terms: previous.searched.join(', '),
+                })
+              : fill(t.sections.screening.recordedOn, { date: screenedAt.slice(0, 10) })}
           </p>
 
           {previous.candidates.length > 0 ? (
@@ -130,9 +130,18 @@ export function ScreeningPanel({
                     blanket dismissal.
                   */}
                   <p className="mt-1 text-xs text-faint">
-                    {candidate.subjectType} · similarity {candidate.similarity} · shared
-                    name parts {candidate.tokenOverlap}
-                    {candidate.programme ? ` · ${candidate.programme}` : ''}
+                    {candidate.programme
+                      ? fill(t.sections.screening.matchLineProgramme, {
+                          subject: candidate.subjectType,
+                          similarity: candidate.similarity,
+                          parts: candidate.tokenOverlap,
+                          programme: candidate.programme,
+                        })
+                      : fill(t.sections.screening.matchLine, {
+                          subject: candidate.subjectType,
+                          similarity: candidate.similarity,
+                          parts: candidate.tokenOverlap,
+                        })}
                   </p>
                   {candidate.details ? (
                     <p className="mt-1 text-xs text-muted">{candidate.details}</p>
@@ -143,9 +152,7 @@ export function ScreeningPanel({
           ) : null}
         </div>
       ) : (
-        <p className="text-sm text-gold">
-          Not screened. A partner cannot be verified until a screening has been run.
-        </p>
+        <p className="text-sm text-gold">{t.sections.screening.notScreened}</p>
       )}
 
       {error ? (
@@ -159,7 +166,7 @@ export function ScreeningPanel({
           type="button"
           onClick={() => void run()}
           disabled={busy}
-          className="rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-60"
+          className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {busy ? 'Searching…' : screenedAt ? 'Screen again' : 'Run screening'}
         </button>
@@ -174,7 +181,7 @@ export function ScreeningPanel({
               type="button"
               onClick={() => setOverride(previous.matched ? false : true)}
               disabled={busy}
-              className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold disabled:opacity-60"
+              className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {previous.matched ? 'Record as not a match' : 'Flag as a match anyway'}
             </button>
@@ -194,16 +201,16 @@ export function ScreeningPanel({
               type="button"
               onClick={() => void run(override)}
               disabled={busy}
-              className="rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-60"
+              className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Confirm override
+              {t.sections.screening.confirmOverride}
             </button>
             <button
               type="button"
               onClick={() => setOverride(null)}
-              className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted"
+              className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs text-muted"
             >
-              Cancel
+              {t.sections.settings.cancel}
             </button>
           </div>
         </div>

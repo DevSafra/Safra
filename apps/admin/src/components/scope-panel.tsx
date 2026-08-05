@@ -8,7 +8,7 @@ import {
   type AdminColumn,
   type Tone,
 } from '@/components/admin-table';
-import { AR, roleName } from '@/lib/strings';
+import { t, roleName } from '@/lib/strings';
 
 /**
  * نطاق العمل — the scope map (design handoff §8.2, Bashar's decision 2026-08-04).
@@ -33,11 +33,11 @@ export async function ScopePanel() {
   const result = await getStaffScopes();
 
   return (
-    <ConsolePanel title={AR.sections.staff.scopeTitle}>
+    <ConsolePanel title={t.sections.staff.scopeTitle}>
       {result === 'unauthenticated' ? (
-        <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+        <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
       ) : result === 'failed' ? (
-        <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+        <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
       ) : (
         <AdminTable
           columns={COLUMNS}
@@ -45,11 +45,11 @@ export async function ScopePanel() {
           template="1.6fr 1fr 1.6fr 1.1fr"
           rowKey={(row) => row.userId}
           minWidth={620}
-          empty={AR.table.empty}
+          empty={t.table.empty}
         />
       )}
 
-      <FootNote>{AR.sections.staff.scopeNote}</FootNote>
+      <FootNote>{t.sections.staff.scopeNote}</FootNote>
     </ConsolePanel>
   );
 }
@@ -57,17 +57,17 @@ export async function ScopePanel() {
 const COLUMNS: readonly AdminColumn<StaffScopeRow>[] = [
   {
     key: 'email',
-    header: AR.sections.staff.inviteEmail,
+    header: t.sections.staff.inviteEmail,
     render: (row) => <Ltr className="break-all text-text">{row.email}</Ltr>,
   },
   {
     key: 'role',
-    header: AR.sections.staff.inviteRole,
+    header: t.sections.staff.inviteRole,
     render: (row) => <span className="text-text2">{roleName(row.role)}</span>,
   },
   {
     key: 'scope',
-    header: AR.sections.staff.scope,
+    header: t.sections.staff.scope,
     /*
       A super admin is shown as unscopable rather than as "all cities". Both are true, and the
       first one is the fact that matters: it explains why there is no control for them.
@@ -75,17 +75,17 @@ const COLUMNS: readonly AdminColumn<StaffScopeRow>[] = [
     render: (row) =>
       row.role === 'super_admin' ? (
         <span className="text-[11.5px] text-faint">
-          {AR.sections.staff.scopeSuperAdmin}
+          {t.sections.staff.scopeSuperAdmin}
         </span>
       ) : row.kind === 'all_cities' ? (
-        <StatusPill tone="sky">{AR.sections.staff.scopeAllCities}</StatusPill>
+        <StatusPill tone="sky">{t.sections.staff.scopeAllCities}</StatusPill>
       ) : row.cities.length === 0 ? (
         /*
           A `cities` scope with no cities restricts nothing — see `isRestricted`. Saying "all
           cities" here would hide a half-finished configuration, so it says what it is.
         */
         <span className="text-[11.5px] text-warn">
-          {AR.sections.staff.scopeAllCities} ({AR.sections.staff.scopeNever})
+          {t.sections.staff.scopeAllCities} ({t.sections.staff.scopeNever})
         </span>
       ) : (
         <span className="text-[12px] text-text">
@@ -95,15 +95,15 @@ const COLUMNS: readonly AdminColumn<StaffScopeRow>[] = [
   },
   {
     key: 'outside',
-    header: AR.table.colType,
+    header: t.table.colType,
     render: (row) =>
       row.role === 'super_admin' || row.kind === 'all_cities' ? (
-        <span className="text-faint">{AR.admin.noData}</span>
+        <span className="text-faint">{t.admin.noData}</span>
       ) : (
         <StatusPill tone={outsideTone(row.outside)}>
           {row.outside === 'read_only'
-            ? AR.sections.staff.scopeOutsideReadOnly
-            : AR.sections.staff.scopeOutsideNone}
+            ? t.sections.staff.scopeOutsideReadOnly
+            : t.sections.staff.scopeOutsideNone}
         </StatusPill>
       ),
   },

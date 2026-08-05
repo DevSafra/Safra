@@ -14,7 +14,7 @@ import {
   type Tone,
 } from '@/components/admin-table';
 import { OutlineAction, TableToolbar, ToolbarNote } from '@/components/table-toolbar';
-import { AR, bookingStatus } from '@/lib/strings';
+import { bookingStatus, fill, t } from '@/lib/strings';
 
 /**
  * الحجوزات — the bookings registry (design handoff §8).
@@ -78,17 +78,17 @@ export default async function BookingsPage({
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.bookings} counts={counts}>
+    <ConsoleShell title={t.nav.bookings} counts={counts}>
       <ConsolePanel>
         <TableToolbar
           action="/bookings"
           query={q}
-          placeholder={AR.sections.bookings.searchPlaceholder}
+          placeholder={t.sections.bookings.searchPlaceholder}
           end={
             result === 'failed' || result === 'unauthenticated' ? null : (
               <>
                 <ToolbarNote>
-                  {AR.sections.bookings.count(count(total(result.counts)))}
+                  {fill(t.sections.bookings.count, { n: count(total(result.counts)) })}
                 </ToolbarNote>
                 {/*
                   The export carries the CURRENT filters, so what downloads is what is on screen.
@@ -96,7 +96,7 @@ export default async function BookingsPage({
                   against a bank statement with no way to tell.
                 */}
                 <OutlineAction href={exportHref({ q, status })} download>
-                  {AR.table.exportCsv}
+                  {t.table.exportCsv}
                 </OutlineAction>
               </>
             )
@@ -110,10 +110,10 @@ export default async function BookingsPage({
           <select
             name="status"
             defaultValue={status ?? ''}
-            aria-label={AR.table.colStatus}
+            aria-label={t.table.colStatus}
             className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
           >
-            <option value="">{AR.sections.bookings.allStatuses}</option>
+            <option value="">{t.sections.bookings.allStatuses}</option>
             {STATUSES.map((value) => (
               <option key={value} value={value}>
                 {bookingStatus(value)}
@@ -123,9 +123,9 @@ export default async function BookingsPage({
         </TableToolbar>
 
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -134,7 +134,7 @@ export default async function BookingsPage({
               template={TEMPLATE}
               rowKey={(row) => row.reference}
               minWidth={780}
-              empty={AR.table.empty}
+              empty={t.table.empty}
             />
             <Pager
               basePath="/bookings"
@@ -144,7 +144,7 @@ export default async function BookingsPage({
           </>
         )}
 
-        <FootNote>{AR.sections.bookings.note}</FootNote>
+        <FootNote>{t.sections.bookings.note}</FootNote>
       </ConsolePanel>
     </ConsoleShell>
   );
@@ -153,7 +153,7 @@ export default async function BookingsPage({
 const COLUMNS: readonly AdminColumn<BookingListItem>[] = [
   {
     key: 'reference',
-    header: AR.admin.colReference,
+    header: t.admin.colReference,
     render: (row) => (
       <Link
         href={`/bookings/${row.reference}`}
@@ -165,17 +165,17 @@ const COLUMNS: readonly AdminColumn<BookingListItem>[] = [
   },
   {
     key: 'property',
-    header: AR.admin.colProperty,
+    header: t.admin.colProperty,
     render: (row) => <span className="text-text">{row.property}</span>,
   },
   {
     key: 'customer',
-    header: AR.admin.colCustomer,
+    header: t.admin.colCustomer,
     render: (row) => <span className="text-text2">{row.customer}</span>,
   },
   {
     key: 'dates',
-    header: AR.table.colDates,
+    header: t.table.colDates,
     render: (row) => (
       <Ltr className="whitespace-nowrap text-muted">
         {shortDate(row.checkIn)} ← {shortDate(row.checkOut)}
@@ -184,7 +184,7 @@ const COLUMNS: readonly AdminColumn<BookingListItem>[] = [
   },
   {
     key: 'amount',
-    header: AR.admin.colAmount,
+    header: t.admin.colAmount,
     render: (row) => (
       <Ltr className="font-bold whitespace-nowrap text-gold">
         {money(row.amount)} {row.currency}
@@ -193,20 +193,20 @@ const COLUMNS: readonly AdminColumn<BookingListItem>[] = [
   },
   {
     key: 'status',
-    header: AR.admin.colStatus,
+    header: t.admin.colStatus,
     render: (row) => (
       <StatusPill tone={statusTone(row.status)}>{bookingStatus(row.status)}</StatusPill>
     ),
   },
   {
     key: 'action',
-    header: AR.table.colAction,
+    header: t.table.colAction,
     render: (row) => (
       <Link
         href={`/bookings/${row.reference}`}
         className="text-[11.5px] text-sky hover:underline"
       >
-        {AR.table.open}
+        {t.table.open}
       </Link>
     ),
   },

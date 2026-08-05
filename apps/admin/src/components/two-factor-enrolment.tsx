@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { t } from '@/lib/strings';
 
 interface Setup {
   otpauthUri: string;
@@ -102,14 +103,13 @@ export function TwoFactorEnrolment() {
     return (
       <div className="grid gap-4">
         <p className="rounded-lg border border-ok/40 bg-ok/10 p-3 text-sm text-ok">
-          Two-factor authentication is on.
+          {t.sections.twoFactor.enabled}
         </p>
 
         <div>
-          <p className="text-sm text-text">Save your recovery codes</p>
+          <p className="text-sm text-text">{t.sections.twoFactor.saveRecoveryCodes}</p>
           <p className="mt-1 text-xs text-faint">
-            Each works once, in place of your authenticator. They are stored hashed and
-            cannot be shown again.
+            {t.sections.twoFactor.recoveryCodesNote}
           </p>
 
           <ul className="mt-3 grid grid-cols-2 gap-2 font-mono text-sm text-text">
@@ -129,9 +129,9 @@ export function TwoFactorEnrolment() {
             router.refresh();
             router.push('/');
           }}
-          className="rounded-lg bg-gold px-5 py-3 font-semibold text-bg"
+          className="cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg"
         >
-          I have saved them — continue
+          {t.sections.twoFactor.savedContinue}
         </button>
       </div>
     );
@@ -149,13 +149,13 @@ export function TwoFactorEnrolment() {
       ) : null}
 
       <ol className="grid gap-2 text-sm text-muted">
-        <li>1. Open your authenticator app and add an account manually.</li>
-        <li>2. Enter the key below.</li>
-        <li>3. Type the six-digit code it shows.</li>
+        <li>{t.sections.twoFactor.step1}</li>
+        <li>{t.sections.twoFactor.step2}</li>
+        <li>{t.sections.twoFactor.step3}</li>
       </ol>
 
       <div>
-        <p className="text-xs text-faint">Setup key</p>
+        <p className="text-xs text-faint">{t.sections.twoFactor.setupKey}</p>
         <p className="mt-1 break-all rounded-lg border border-line bg-field px-3 py-2.5 font-mono text-sm text-text">
           {setup?.secret ?? 'Loading…'}
         </p>
@@ -163,7 +163,7 @@ export function TwoFactorEnrolment() {
 
       <form onSubmit={(event) => void confirm(event)} className="grid gap-3">
         <label htmlFor="code" className="text-sm text-muted">
-          Six-digit code
+          {t.sections.twoFactor.sixDigitCode}
         </label>
         <input
           id="code"
@@ -178,7 +178,7 @@ export function TwoFactorEnrolment() {
         <button
           type="submit"
           disabled={busy || !setup}
-          className="rounded-lg bg-gold px-5 py-3 font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
+          className="cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? 'Checking…' : 'Turn on two-factor'}
         </button>

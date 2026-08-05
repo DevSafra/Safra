@@ -12,7 +12,7 @@ import {
   type Tone,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { AR, label } from '@/lib/strings';
+import { fill, label, t } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -55,14 +55,14 @@ export default async function CommsPage({
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.whatsapp} counts={counts}>
+    <ConsoleShell title={t.nav.whatsapp} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -72,19 +72,19 @@ export default async function CommsPage({
             <TableToolbar
               action="/comms"
               query={q}
-              placeholder={AR.sections.comms.searchPlaceholder}
+              placeholder={t.sections.comms.searchPlaceholder}
               end={<Summary counters={result.counters} />}
             >
               <select
                 name="status"
                 defaultValue={status ?? ''}
-                aria-label={AR.table.colStatus}
+                aria-label={t.table.colStatus}
                 className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
               >
-                <option value="">{AR.sections.bookings.allStatuses}</option>
+                <option value="">{t.sections.bookings.allStatuses}</option>
                 {(['queued', 'sent', 'delivered', 'failed'] as const).map((value) => (
                   <option key={value} value={value}>
-                    {label(AR.enums.notificationStatus, value)}
+                    {label(t.enums.notificationStatus, value)}
                   </option>
                 ))}
               </select>
@@ -96,7 +96,7 @@ export default async function CommsPage({
               template={TEMPLATE}
               rowKey={(row) => `${row.at}-${row.templateKey}-${row.channel}`}
               minWidth={680}
-              empty={AR.table.empty}
+              empty={t.table.empty}
             />
             <Pager
               basePath="/comms"
@@ -104,8 +104,8 @@ export default async function CommsPage({
               nextCursor={result.nextCursor}
             />
 
-            <FootNote>{AR.sections.comms.note}</FootNote>
-            <FootNote>{AR.sections.comms.whatsappBlocked}</FootNote>
+            <FootNote>{t.sections.comms.note}</FootNote>
+            <FootNote>{t.sections.comms.whatsappBlocked}</FootNote>
           </ConsolePanel>
         </div>
       )}
@@ -118,10 +118,10 @@ function Templates({ templates }: { templates: Notifications['templates'] }) {
     <ConsolePanel>
       <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
         <h2 className="text-[14px] font-extrabold text-gold">
-          {AR.sections.comms.templates}
+          {t.sections.comms.templates}
         </h2>
         <span className="ms-auto text-[11px] text-faint">
-          {AR.sections.comms.templatesLocales}
+          {t.sections.comms.templatesLocales}
         </span>
       </div>
 
@@ -141,9 +141,9 @@ function Templates({ templates }: { templates: Notifications['templates'] }) {
                   : 'border-dashed border-line text-faint2'
               }`}
             >
-              {template.nameAr}
+              {label(t.notificationTemplate, template.key)}
               {template.implemented ? null : (
-                <span className="ms-1.5 text-[10px]">({AR.sections.comms.notWired})</span>
+                <span className="ms-1.5 text-[10px]">({t.sections.comms.notWired})</span>
               )}
             </span>
           </li>
@@ -161,7 +161,7 @@ function Summary({ counters }: { counters: Notifications['counters'] }) {
 
   return (
     <span className="text-[11px] text-faint">
-      {AR.sections.comms.window(count(counters.windowDays))}
+      {fill(t.sections.comms.window, { days: count(counters.windowDays) })}
       {entries.map(([channel, statuses]) => {
         const failed = statuses['failed'] ?? 0;
         const delivered = (statuses['delivered'] ?? 0) + (statuses['sent'] ?? 0);
@@ -180,7 +180,7 @@ function Summary({ counters }: { counters: Notifications['counters'] }) {
 const COLUMNS: readonly AdminColumn<NotificationItem>[] = [
   {
     key: 'channel',
-    header: AR.sections.comms.colChannel,
+    header: t.sections.comms.colChannel,
     render: (row) => (
       <ToneText tone={row.channel === 'whatsapp' ? 'ok' : 'sky'}>
         {channelLabel(row.channel)}
@@ -189,7 +189,7 @@ const COLUMNS: readonly AdminColumn<NotificationItem>[] = [
   },
   {
     key: 'template',
-    header: AR.sections.comms.colTemplate,
+    header: t.sections.comms.colTemplate,
     render: (row) => (
       <span className="text-text">
         {row.templateKey}
@@ -199,23 +199,23 @@ const COLUMNS: readonly AdminColumn<NotificationItem>[] = [
   },
   {
     key: 'linked',
-    header: AR.sections.payments.colLinked,
+    header: t.sections.payments.colLinked,
     render: (row) => (
-      <Ltr className="text-sky">{row.subjectReference ?? AR.admin.noData}</Ltr>
+      <Ltr className="text-sky">{row.subjectReference ?? t.admin.noData}</Ltr>
     ),
   },
   {
     key: 'at',
-    header: AR.table.colTime,
+    header: t.table.colTime,
     render: (row) => <Ltr className="text-muted">{shortDateTime(row.at)}</Ltr>,
   },
   {
     key: 'status',
-    header: AR.table.colStatus,
+    header: t.table.colStatus,
     render: (row) => (
       <div className="grid gap-1">
         <StatusPill tone={statusTone(row.status)}>
-          {label(AR.enums.notificationStatus, row.status)}
+          {label(t.enums.notificationStatus, row.status)}
         </StatusPill>
         {/*
           The failure reason and the attempt count, because a retry that hid the previous error
@@ -223,7 +223,7 @@ const COLUMNS: readonly AdminColumn<NotificationItem>[] = [
         */}
         {row.status === 'failed' ? (
           <span className="text-[10px] leading-tight text-faint">
-            {AR.sections.comms.attempts(count(row.attempts))}
+            {fill(t.sections.comms.attempts, { n: count(row.attempts) })}
             {row.failureReason ? ` · ${row.failureReason}` : ''}
           </span>
         ) : null}
@@ -235,11 +235,11 @@ const COLUMNS: readonly AdminColumn<NotificationItem>[] = [
 function channelLabel(channel: string): string {
   switch (channel) {
     case 'whatsapp':
-      return AR.sections.comms.channelWhatsapp;
+      return t.sections.comms.channelWhatsapp;
     case 'email':
-      return AR.sections.comms.channelEmail;
+      return t.sections.comms.channelEmail;
     default:
-      return AR.sections.comms.channelInApp;
+      return t.sections.comms.channelInApp;
   }
 }
 

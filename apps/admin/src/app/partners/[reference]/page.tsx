@@ -5,6 +5,7 @@ import { getPartner, getSanctionsStatus } from '@/lib/api';
 import { DocumentReview } from '@/components/document-review';
 import { ScreeningPanel } from '@/components/screening-panel';
 import { VerifyPartner } from '@/components/verify-partner';
+import { fill, label, t } from '@/lib/strings';
 
 /**
  * One partner's application, and the decision (SRS §8.1).
@@ -39,7 +40,7 @@ export default async function PartnerPage({
   if (partner === 'unauthenticated') {
     return (
       <Shell reference={reference}>
-        <p className="text-sm text-muted">Your session expired. Sign in again.</p>
+        <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
       </Shell>
     );
   }
@@ -57,28 +58,33 @@ export default async function PartnerPage({
         <p className="text-xs text-faint">{partner.reference}</p>
         <h1 className="mt-1 text-2xl font-semibold text-text">{partner.legalName}</h1>
         <p className="mt-1 text-sm text-muted">
-          Trading as {partner.displayName} · {partner.partnerType.code} ·{' '}
-          {partner.city.nameEn ?? partner.city.nameAr}
+          {fill(t.sections.partnerDetail.tradingAs, {
+            name: `${partner.displayName} · ${partner.partnerType.code} · ${
+              partner.city.nameAr ?? partner.city.nameEn
+            }`,
+          })}
         </p>
         <StatusPill status={partner.verification} />
       </header>
 
       {/* ── Contact and identity ──────────────────────────────────────────── */}
-      <Section title="Applicant">
+      <Section title={t.sections.partnerDetail.applicant}>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <Row label="Email" value={partner.email} />
-          <Row label="Phone" value={partner.phone} />
-          <Row label="Address" value={partner.address} />
-          <Row label="Applied" value={partner.createdAt?.slice(0, 10) ?? '—'} />
+          <Row label={t.sections.partnerDetail.email} value={partner.email} />
+          <Row label={t.sections.partnerDetail.phone} value={partner.phone} />
+          <Row label={t.sections.partnerDetail.address} value={partner.address} />
+          <Row
+            label={t.sections.partnerDetail.applied}
+            value={partner.createdAt?.slice(0, 10) ?? '—'}
+          />
         </dl>
       </Section>
 
       {/* ── §8.1 documents, reviewed one at a time (item 121) ─────────────── */}
-      <Section title="Documents">
+      <Section title={t.sections.partnerDetail.documents}>
         {partner.documents.length === 0 ? (
           <p className="rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm text-gold">
-            No documents uploaded yet. §8.1 requires identity, commercial register and
-            proof of the right to let before this partner can be verified.
+            {t.sections.partnerDetail.noDocuments}
           </p>
         ) : (
           <ul className="grid gap-2">
@@ -92,7 +98,7 @@ export default async function PartnerPage({
       </Section>
 
       {/* ── Sanctions screening (ADR 0002) ────────────────────────────────── */}
-      <Section title="Sanctions screening">
+      <Section title={t.sections.partnerDetail.sanctionsScreening}>
         <ScreeningPanel
           reference={partner.reference}
           screenedAt={partner.sanctionsScreenedAt}
@@ -106,9 +112,9 @@ export default async function PartnerPage({
       </Section>
 
       {/* ── What approving will publish (item 116) ────────────────────────── */}
-      <Section title="Their listings">
+      <Section title={t.sections.partnerDetail.theirListings}>
         {partner.properties.length === 0 ? (
-          <p className="text-sm text-faint">No listings submitted.</p>
+          <p className="text-sm text-faint">{t.sections.partnerDetail.noListings}</p>
         ) : (
           <ul className="grid gap-2 text-sm">
             {partner.properties.map((property) => (
@@ -127,11 +133,17 @@ export default async function PartnerPage({
       </Section>
 
       {/* ── The decision ──────────────────────────────────────────────────── */}
-      <Section title="Decision">
+      <Section title={t.sections.partnerDetail.decision}>
         {decided ? (
           <p className="rounded-lg border border-line bg-card p-4 text-sm text-muted">
-            This partner was already {partner.verification}
-            {partner.verifiedAt ? ` on ${partner.verifiedAt.slice(0, 10)}` : ''}.
+            {partner.verifiedAt
+              ? fill(t.sections.partnerDetail.alreadyDecidedOn, {
+                  status: label(t.enums.verification, partner.verification),
+                  date: partner.verifiedAt.slice(0, 10),
+                })
+              : fill(t.sections.partnerDetail.alreadyDecided, {
+                  status: label(t.enums.verification, partner.verification),
+                })}
           </p>
         ) : (
           <VerifyPartner reference={partner.reference} screened={screened} />
@@ -151,7 +163,7 @@ function Shell({
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
       <Link href="/" className="text-sm text-muted hover:text-gold">
-        ← Queues
+        {t.table.backToQueues}
       </Link>
       <div className="mt-4 grid gap-8" data-partner={reference}>
         {children}

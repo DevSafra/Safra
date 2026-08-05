@@ -10,7 +10,7 @@ import {
   type Tone,
 } from '@/components/admin-table';
 import { TableToolbar, ToolbarNote } from '@/components/table-toolbar';
-import { AR, label } from '@/lib/strings';
+import { t, label } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -40,30 +40,30 @@ export default async function CouponsPage({
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.coupons} counts={counts}>
+    <ConsoleShell title={t.nav.coupons} counts={counts}>
       <ConsolePanel>
         <TableToolbar
           action="/coupons"
           query={q}
-          placeholder={AR.sections.coupons.searchPlaceholder}
+          placeholder={t.sections.coupons.searchPlaceholder}
           end={
             <>
-              <ToolbarNote>{AR.sections.coupons.hint}</ToolbarNote>
+              <ToolbarNote>{t.sections.coupons.hint}</ToolbarNote>
               <span
                 aria-disabled="true"
-                title={AR.nav.notBuilt}
+                title={t.nav.notBuilt}
                 className="cursor-not-allowed rounded-[9px] border border-line px-4 py-1.5 text-[12.5px] font-extrabold text-faint2"
               >
-                {AR.sections.coupons.create}
+                {t.sections.coupons.create}
               </span>
             </>
           }
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -72,7 +72,7 @@ export default async function CouponsPage({
               template={TEMPLATE}
               rowKey={(row) => row.code}
               minWidth={760}
-              empty={AR.table.empty}
+              empty={t.table.empty}
             />
             <Pager basePath="/coupons" query={{ q }} nextCursor={result.nextCursor} />
           </>
@@ -85,7 +85,7 @@ export default async function CouponsPage({
 const COLUMNS: readonly AdminColumn<CouponItem>[] = [
   {
     key: 'code',
-    header: AR.sections.giftcards.colCode,
+    header: t.sections.giftcards.colCode,
     /*
       A coupon code IS public — it is printed in campaigns — so unlike a gift card code there is
       nothing to protect and showing it in full is correct.
@@ -94,37 +94,37 @@ const COLUMNS: readonly AdminColumn<CouponItem>[] = [
   },
   {
     key: 'type',
-    header: AR.table.colType,
+    header: t.table.colType,
     render: (row) => (
       <span className="text-text2">
-        {label(AR.enums.couponType, row.type)}
+        {label(t.enums.couponType, row.type)}
         {row.scope ? <span className="text-faint"> ({row.scope})</span> : null}
       </span>
     ),
   },
   {
     key: 'discount',
-    header: AR.sections.coupons.colDiscount,
+    header: t.sections.coupons.colDiscount,
     render: (row) => (
       <Ltr className="font-bold whitespace-nowrap text-gold">
         {row.valueKind === 'percent'
-          ? `${Number(row.value).toLocaleString('en-US')}٪`
+          ? `${Number(row.value).toLocaleString('en-US')}${t.percentSign}`
           : `${money(row.value)} ${row.currency ?? ''}`}
       </Ltr>
     ),
   },
   {
     key: 'min',
-    header: AR.sections.coupons.colMin,
+    header: t.sections.coupons.colMin,
     render: (row) => (
       <Ltr className="text-muted">
-        {row.minBookingAmount === null ? AR.admin.noData : money(row.minBookingAmount)}
+        {row.minBookingAmount === null ? t.admin.noData : money(row.minBookingAmount)}
       </Ltr>
     ),
   },
   {
     key: 'usage',
-    header: AR.sections.coupons.colUsage,
+    header: t.sections.coupons.colUsage,
     /* `∞` for an uncapped coupon, matching the design's own `412 / ∞`. */
     render: (row) => (
       <Ltr className="text-text2">
@@ -135,7 +135,7 @@ const COLUMNS: readonly AdminColumn<CouponItem>[] = [
   },
   {
     key: 'period',
-    header: AR.sections.coupons.colPeriod,
+    header: t.sections.coupons.colPeriod,
     render: (row) => (
       <Ltr className="whitespace-nowrap text-muted">
         {shortDate(row.startsAt)} ← {shortDate(row.endsAt)}
@@ -144,7 +144,7 @@ const COLUMNS: readonly AdminColumn<CouponItem>[] = [
   },
   {
     key: 'status',
-    header: AR.table.colStatus,
+    header: t.table.colStatus,
     render: (row) => <StatusPill tone={tone(row)}>{statusLabel(row)}</StatusPill>,
   },
 ];
@@ -157,10 +157,10 @@ const COLUMNS: readonly AdminColumn<CouponItem>[] = [
  * checkout. Expiry wins.
  */
 function statusLabel(row: CouponItem): string {
-  if (row.expired) return AR.enums.giftCardStatus['expired'] ?? 'منتهي';
-  if (!row.isActive) return AR.enums.giftCardStatus['cancelled'] ?? 'موقوف';
+  if (row.expired) return label(t.enums.couponStatus, 'expired');
+  if (!row.isActive) return label(t.enums.couponStatus, 'suspended');
 
-  return AR.enums.giftCardStatus['active'] ?? 'نشط';
+  return label(t.enums.couponStatus, 'active');
 }
 
 function tone(row: CouponItem): Tone {

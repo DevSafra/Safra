@@ -1,6 +1,7 @@
 import { AdminSidebar, type SidebarCounts } from '@/components/admin-sidebar';
 import { SignOutButton } from '@/components/sign-out-button';
-import { AR } from '@/lib/strings';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { t } from '@/lib/strings';
 
 /**
  * The console frame: sidebar, title row, content.
@@ -39,7 +40,8 @@ export function ConsoleShell({
             ) : null}
           </div>
 
-          <div className="ms-auto">
+          <div className="ms-auto flex items-center gap-2">
+            <ThemeToggle />
             <SignOutButton />
           </div>
         </header>
@@ -145,7 +147,7 @@ export function Pager({
         href={`${basePath}?${params.toString()}`}
         className="cursor-pointer rounded-lg border border-line px-4 py-1.5 text-xs text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
       >
-        {AR.table.nextPage}
+        {t.table.nextPage}
       </a>
     </div>
   );
@@ -161,11 +163,11 @@ export function Pager({
 export function NotBuilt({ reason }: { reason: string }) {
   return (
     <section className="rounded-[15px] border border-dashed border-[rgba(var(--goldA),0.35)] bg-card p-6">
-      <h2 className="text-[14.5px] font-extrabold text-warn">{AR.unbuilt.heading}</h2>
+      <h2 className="text-[14.5px] font-extrabold text-warn">{t.unbuilt.heading}</h2>
       <p className="mt-2.5 max-w-[70ch] text-[12.5px] leading-relaxed text-text2">
         {reason}
       </p>
-      <p className="mt-3 text-[11px] text-faint">{AR.unbuilt.seeRegister}</p>
+      <p className="mt-3 text-[11px] text-faint">{t.unbuilt.seeRegister}</p>
     </section>
   );
 }
@@ -185,15 +187,15 @@ export function QueueState<T>({
   children: (rows: T[]) => React.ReactNode;
 }) {
   if (state === 'failed') {
-    return <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>;
+    return <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>;
   }
 
   if (state === 'unauthenticated') {
-    return <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>;
+    return <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>;
   }
 
   if (state.length === 0) {
-    return <p className="text-[12.5px] text-faint">{AR.dashboard.nothingWaiting}</p>;
+    return <p className="text-[12.5px] text-faint">{t.dashboard.nothingWaiting}</p>;
   }
 
   return <ul className="grid gap-2.5">{children(state)}</ul>;

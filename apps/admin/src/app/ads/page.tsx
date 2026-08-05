@@ -18,7 +18,7 @@ import {
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { CampaignStatusButton } from '@/components/campaign-status-button';
-import { AR, label } from '@/lib/strings';
+import { fill, label, t } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -55,14 +55,14 @@ export default async function AdsPage({
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.ads} counts={counts}>
+    <ConsoleShell title={t.nav.ads} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -72,7 +72,7 @@ export default async function AdsPage({
             <TableToolbar
               action="/ads"
               query={q}
-              placeholder={AR.sections.ads.searchPlaceholder}
+              placeholder={t.sections.ads.searchPlaceholder}
             />
 
             <AdminTable
@@ -81,12 +81,12 @@ export default async function AdsPage({
               template={TEMPLATE}
               rowKey={(row) => row.reference}
               minWidth={860}
-              empty={AR.table.empty}
+              empty={t.table.empty}
             />
             <Pager basePath="/ads" query={{ q }} nextCursor={result.nextCursor} />
 
-            <FootNote>{AR.sections.ads.note}</FootNote>
-            <FootNote>{AR.sections.ads.noRanking}</FootNote>
+            <FootNote>{t.sections.ads.note}</FootNote>
+            <FootNote>{t.sections.ads.noRanking}</FootNote>
           </ConsolePanel>
         </div>
       )}
@@ -101,31 +101,31 @@ function Counters({ counters }: { counters: Campaigns['counters'] }) {
       : (counters.clicks30d / counters.impressions30d) * 100;
 
   return (
-    <KpiRow label={AR.nav.ads}>
+    <KpiRow label={t.nav.ads}>
       <Kpi
-        label={AR.sections.ads.kpiActive}
+        label={t.sections.ads.kpiActive}
         value={count(counters.active)}
         valueClass="text-ok"
       />
-      <Kpi label={AR.sections.ads.kpiPaused} value={count(counters.paused)} />
+      <Kpi label={t.sections.ads.kpiPaused} value={count(counters.paused)} />
       <Kpi
-        label={AR.sections.ads.kpiEnding}
+        label={t.sections.ads.kpiEnding}
         value={count(counters.endingWithinWeek)}
         valueClass={counters.endingWithinWeek > 0 ? 'text-warn' : 'text-text'}
       />
       <Kpi
-        label={AR.sections.ads.kpiImpressions}
+        label={t.sections.ads.kpiImpressions}
         value={count(counters.impressions30d)}
         valueClass="text-gold"
       />
       <Kpi
-        label={AR.sections.ads.kpiClicks}
+        label={t.sections.ads.kpiClicks}
         value={count(counters.clicks30d)}
         /* A dash when there is nothing to divide — never 0%, which reads as "nobody clicked". */
         sub={
           ctr === null
-            ? AR.admin.noData
-            : `${AR.sections.ads.ctr} ${percent(ctr.toFixed(1))}`
+            ? t.admin.noData
+            : `${t.sections.ads.ctr} ${percent(ctr.toFixed(1))}`
         }
       />
     </KpiRow>
@@ -135,31 +135,31 @@ function Counters({ counters }: { counters: Campaigns['counters'] }) {
 const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
   {
     key: 'reference',
-    header: AR.table.colId,
+    header: t.table.colId,
     render: (row) => <Ltr className="font-semibold text-sky">{row.reference}</Ltr>,
   },
   {
     key: 'advertiser',
-    header: AR.sections.ads.colAdvertiser,
+    header: t.sections.ads.colAdvertiser,
     render: (row) => <span className="font-semibold text-text">{row.advertiser}</span>,
   },
   {
     key: 'kind',
-    header: AR.table.colType,
+    header: t.table.colType,
     render: (row) => (
       <span className="text-text2">
-        {label(AR.enums.advertiserKind, row.advertiserKind)}
+        {label(t.enums.advertiserKind, row.advertiserKind)}
       </span>
     ),
   },
   {
     key: 'city',
-    header: AR.table.colCity,
+    header: t.table.colCity,
     render: (row) => <span className="text-muted">{row.city}</span>,
   },
   {
     key: 'period',
-    header: AR.sections.ads.colPeriod,
+    header: t.sections.ads.colPeriod,
     render: (row) => (
       <span className="text-muted">
         {periodLabel(row.billingPeriod)}
@@ -173,12 +173,12 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
   },
   {
     key: 'impressions',
-    header: AR.sections.ads.colImpressions,
+    header: t.sections.ads.colImpressions,
     render: (row) => <Ltr className="text-text2">{count(row.impressions)}</Ltr>,
   },
   {
     key: 'clicks',
-    header: AR.sections.ads.colClicks,
+    header: t.sections.ads.colClicks,
     render: (row) => (
       <span>
         <Ltr className="text-text2">{count(row.clicks)}</Ltr>
@@ -192,17 +192,17 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
   },
   {
     key: 'status',
-    header: AR.table.colStatus,
+    header: t.table.colStatus,
     render: (row) => (
       <div className="grid gap-1.5">
         <StatusPill tone={statusTone(row.status)}>
-          {label(AR.enums.adStatus, row.status)}
+          {label(t.enums.adStatus, row.status)}
         </StatusPill>
         {/* The design's "ينتهي بعد 4 أيام" — a window closing is what needs the operator. */}
         <Ltr className="text-[10px] text-faint">
           {row.daysRemaining < 0
-            ? AR.sections.ads.ended
-            : AR.sections.ads.endsIn(count(row.daysRemaining))}
+            ? t.sections.ads.ended
+            : fill(t.sections.ads.endsIn, { days: count(row.daysRemaining) })}
         </Ltr>
         <span className="text-[10px] text-faint2">
           <Ltr>
@@ -220,11 +220,11 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
 function periodLabel(period: string): string {
   switch (period) {
     case 'weekly':
-      return AR.sections.ads.weekly;
+      return t.sections.ads.weekly;
     case 'quarterly':
-      return AR.sections.ads.quarterly;
+      return t.sections.ads.quarterly;
     default:
-      return AR.sections.ads.monthly;
+      return t.sections.ads.monthly;
   }
 }
 

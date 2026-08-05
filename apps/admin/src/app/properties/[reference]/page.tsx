@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 
 import { getProperty } from '@/lib/api';
 import { ReviewProperty } from '@/components/review-property';
+import { fill, label, t } from '@/lib/strings';
 
 /**
  * One listing, and the decision to publish it (SRS §8.1, P-002).
@@ -24,7 +25,7 @@ export default async function PropertyPage({
   if (property === 'unauthenticated') {
     return (
       <Shell>
-        <p className="text-sm text-muted">Your session expired. Sign in again.</p>
+        <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
       </Shell>
     );
   }
@@ -59,32 +60,40 @@ export default async function PropertyPage({
       >
         <p className="text-sm text-text">{property.partner.legalName}</p>
         <p className="mt-0.5 text-xs text-faint">
-          Trading as {property.partner.displayName} · {property.partner.reference}
+          {fill(t.sections.propertyDetail.tradingAs, {
+            name: `${property.partner.displayName} · ${property.partner.reference}`,
+          })}
         </p>
         {partnerVerified ? (
-          <p className="mt-2 text-xs text-ok">Partner is verified.</p>
+          <p className="mt-2 text-xs text-ok">
+            {t.sections.propertyDetail.partnerVerified}
+          </p>
         ) : (
           <p className="mt-2 text-xs text-gold">
-            Partner is {property.partner.verification}. This listing cannot be published
-            until they are verified —{' '}
+            {fill(t.sections.propertyDetail.partnerNotVerified, {
+              status: label(t.enums.verification, property.partner.verification),
+            })}{' '}
             <Link
               href={`/partners/${property.partner.reference}`}
               className="underline hover:text-gold"
             >
-              review the partner
+              {t.sections.propertyDetail.reviewThePartner}
             </Link>
             .
           </p>
         )}
       </section>
 
-      <Section title="Listing">
+      <Section title={t.sections.propertyDetail.listing}>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <Row label="Address" value={property.address} />
-          <Row label="Slug" value={property.slug} />
-          <Row label="Submitted" value={property.createdAt?.slice(0, 10) ?? '—'} />
+          <Row label={t.sections.propertyDetail.address} value={property.address} />
+          <Row label={t.sections.propertyDetail.slug} value={property.slug} />
           <Row
-            label="Coordinates"
+            label={t.sections.propertyDetail.submitted}
+            value={property.createdAt?.slice(0, 10) ?? '—'}
+          />
+          <Row
+            label={t.sections.propertyDetail.coordinates}
             value={
               property.latitude && property.longitude
                 ? `${property.latitude}, ${property.longitude}`
@@ -98,7 +107,9 @@ export default async function PropertyPage({
             {property.descriptionEn ?? property.descriptionAr}
           </p>
         ) : (
-          <p className="mt-3 text-sm text-faint">No description provided.</p>
+          <p className="mt-3 text-sm text-faint">
+            {t.sections.propertyDetail.noDescription}
+          </p>
         )}
 
         {property.attributes && property.attributes.length > 0 ? (
@@ -123,32 +134,29 @@ export default async function PropertyPage({
         storage layer has a signed-URL story. Saying "6 photos" and admitting they are
         not shown is honest; showing nothing and implying there are none is not.
       */}
-      <Section title="Photos">
+      <Section title={t.sections.propertyDetail.photos}>
         {property.images.length === 0 ? (
           <p className="rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm text-gold">
-            No photos uploaded. §5.6 expects a gallery, and the ranking score rewards
-            photo count — publishing without any is possible but rarely right.
+            {t.sections.propertyDetail.noPhotos}
           </p>
         ) : (
           <p className="text-sm text-muted">
-            {property.images.length} photo{property.images.length === 1 ? '' : 's'}{' '}
-            uploaded
-            {property.images.some((image) => image.isCover)
-              ? ', cover set'
-              : ', no cover set'}
-            .{' '}
+            {fill(t.sections.propertyDetail.photoCount, {
+              count: property.images.length,
+              cover: property.images.some((image) => image.isCover)
+                ? t.sections.propertyDetail.coverSet
+                : t.sections.propertyDetail.coverMissing,
+            })}{' '}
             <span className="text-faint">
-              Previews are not shown here yet — see roadmap 159a.
+              {t.sections.propertyDetail.previewsPending}
             </span>
           </p>
         )}
       </Section>
 
-      <Section title="Units">
+      <Section title={t.sections.propertyDetail.units}>
         {property.units.length === 0 ? (
-          <p className="text-sm text-bad">
-            No units. A listing with no unit cannot be booked and should not publish.
-          </p>
+          <p className="text-sm text-bad">{t.sections.propertyDetail.noUnits}</p>
         ) : (
           <ul className="grid gap-2 text-sm">
             {property.units.map((unit) => (
@@ -158,8 +166,11 @@ export default async function PropertyPage({
               >
                 <span className="text-text">{unit.nameEn}</span>
                 <span className="text-xs text-faint">
-                  up to {unit.maxGuests} guests · {unit.basePrice} / night · min{' '}
-                  {unit.minNights} night{unit.minNights === 1 ? '' : 's'}
+                  {fill(t.sections.propertyDetail.unitLine, {
+                    guests: unit.maxGuests,
+                    price: unit.basePrice,
+                    minNights: unit.minNights,
+                  })}
                 </span>
               </li>
             ))}
@@ -167,7 +178,7 @@ export default async function PropertyPage({
         )}
       </Section>
 
-      <Section title="Decision">
+      <Section title={t.sections.propertyDetail.decision}>
         {reviewable ? (
           <ReviewProperty
             reference={property.reference}
@@ -177,8 +188,9 @@ export default async function PropertyPage({
         ) : (
           <div className="rounded-lg border border-line bg-card p-4">
             <p className="text-sm text-muted">
-              This listing is {property.status.replace(/_/g, ' ')} and is not awaiting
-              review.
+              {fill(t.sections.propertyDetail.notAwaitingReview, {
+                status: label(t.enums.propertyStatus, property.status),
+              })}
             </p>
             {property.reviewNotes ? (
               <p className="mt-2 text-xs text-faint">{property.reviewNotes}</p>
@@ -194,7 +206,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
       <Link href="/" className="text-sm text-muted hover:text-gold">
-        ← Queues
+        {t.table.backToQueues}
       </Link>
       <div className="mt-4 grid gap-8">{children}</div>
     </main>

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { AR, apiError } from '@/lib/strings';
+import { t, apiError } from '@/lib/strings';
 
 /**
  * Closing a dispute (design handoff §8, "فتح النزاع ←").
@@ -91,7 +91,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
       setCompensationAmount('');
       router.refresh();
     } catch {
-      setError(AR.errors.unreachable);
+      setError(t.errors.unreachable);
     } finally {
       setBusy(false);
     }
@@ -105,7 +105,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
           onClick={() => setOpen(true)}
           className="cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)]"
         >
-          {AR.sections.disputes.open}
+          {t.sections.disputes.open}
         </button>
       </div>
     );
@@ -114,7 +114,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
   return (
     <div className="mt-3 grid gap-3 rounded-[10px] border border-line bg-field p-3.5">
       <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-        {AR.sections.disputes.outcome}
+        {t.sections.disputes.outcome}
         <select
           value={outcome}
           onChange={(event) =>
@@ -122,13 +122,13 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
           }
           className="cursor-pointer rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
         >
-          <option value="resolved">{AR.sections.disputes.outcomeResolved}</option>
-          <option value="rejected">{AR.sections.disputes.outcomeRejected}</option>
+          <option value="resolved">{t.sections.disputes.outcomeResolved}</option>
+          <option value="rejected">{t.sections.disputes.outcomeRejected}</option>
         </select>
       </label>
 
       <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-        {AR.sections.disputes.resolution}
+        {t.sections.disputes.resolution}
         <textarea
           value={resolution}
           onChange={(event) => setResolution(event.target.value)}
@@ -137,7 +137,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
           className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text"
         />
         <span className="text-[10.5px] font-normal text-faint2">
-          {AR.sections.disputes.resolutionHint}
+          {t.sections.disputes.resolutionHint}
         </span>
       </label>
 
@@ -148,12 +148,12 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
           onChange={(event) => setCompensate(event.target.checked)}
           className="size-[15px] cursor-pointer accent-gold"
         />
-        {AR.sections.disputes.compensation}
+        {t.sections.disputes.compensation}
       </label>
 
       {compensate ? (
         <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-          <span className="sr-only">{AR.sections.disputes.compensation}</span>
+          <span className="sr-only">{t.sections.disputes.compensation}</span>
           <input
             value={compensationAmount}
             onChange={(event) => setCompensationAmount(event.target.value)}
@@ -166,7 +166,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
             }`}
           />
           <span className="text-[10.5px] font-normal text-faint2">
-            {AR.sections.disputes.compensationHint}
+            {t.sections.disputes.compensationHint}
           </span>
         </label>
       ) : null}
@@ -184,14 +184,14 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
           onClick={() => void submit()}
           className="cursor-pointer rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[12.5px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {busy ? AR.sections.disputes.closing : AR.sections.disputes.confirmClose}
+          {busy ? t.sections.disputes.closing : t.sections.disputes.confirmClose}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="cursor-pointer rounded-[9px] border border-line px-5 py-2 text-[12.5px] text-muted"
         >
-          {AR.sections.settings.cancel}
+          {t.sections.settings.cancel}
         </button>
       </div>
     </div>

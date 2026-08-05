@@ -10,7 +10,7 @@ import {
   type AdminColumn,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { AR } from '@/lib/strings';
+import { t } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -44,18 +44,18 @@ export default async function CustomersPage({
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.customers} counts={counts}>
+    <ConsoleShell title={t.nav.customers} counts={counts}>
       <ConsolePanel>
         <TableToolbar
           action="/customers"
           query={q}
-          placeholder={AR.sections.customers.searchPlaceholder}
+          placeholder={t.sections.customers.searchPlaceholder}
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -64,13 +64,13 @@ export default async function CustomersPage({
               template={TEMPLATE}
               rowKey={(row) => row.reference}
               minWidth={700}
-              empty={AR.table.empty}
+              empty={t.table.empty}
             />
             <Pager basePath="/customers" query={{ q }} nextCursor={result.nextCursor} />
           </>
         )}
 
-        <FootNote>{AR.sections.customers.note}</FootNote>
+        <FootNote>{t.sections.customers.note}</FootNote>
       </ConsolePanel>
     </ConsoleShell>
   );
@@ -79,17 +79,17 @@ export default async function CustomersPage({
 const COLUMNS: readonly AdminColumn<CustomerListItem>[] = [
   {
     key: 'reference',
-    header: AR.table.colId,
+    header: t.table.colId,
     render: (row) => <Ltr className="font-semibold text-sky">{row.reference}</Ltr>,
   },
   {
     key: 'name',
-    header: AR.sections.customers.colName,
+    header: t.sections.customers.colName,
     render: (row) => <span className="font-semibold text-text">{row.fullName}</span>,
   },
   {
     key: 'type',
-    header: AR.table.colType,
+    header: t.table.colType,
     /*
       Guest and registered are coloured differently because they lead to different support
       conversations: a guest holds only one booking's data and can be upgraded; a registered
@@ -97,23 +97,23 @@ const COLUMNS: readonly AdminColumn<CustomerListItem>[] = [
     */
     render: (row) =>
       row.isGuest ? (
-        <ToneText tone="sky">{AR.sections.customers.guest}</ToneText>
+        <ToneText tone="sky">{t.sections.customers.guest}</ToneText>
       ) : (
-        <ToneText tone="ok">{AR.sections.customers.registered}</ToneText>
+        <ToneText tone="ok">{t.sections.customers.registered}</ToneText>
       ),
   },
   {
     key: 'bookings',
-    header: AR.sections.customers.colBookings,
+    header: t.sections.customers.colBookings,
     render: (row) => <span className="text-text2">{count(row.bookings)}</span>,
   },
   {
     key: 'wallet',
-    header: AR.sections.customers.colWallet,
+    header: t.sections.customers.colWallet,
     /* A customer with no wallet row shows a dash, not $0.00 — they are different facts. */
     render: (row) =>
       row.walletBalance === null ? (
-        <span className="text-faint">{AR.admin.noData}</span>
+        <span className="text-faint">{t.admin.noData}</span>
       ) : (
         <Ltr className="font-bold whitespace-nowrap text-gold">
           {money(row.walletBalance)} {row.walletCurrency ?? ''}
@@ -122,7 +122,7 @@ const COLUMNS: readonly AdminColumn<CustomerListItem>[] = [
   },
   {
     key: 'last',
-    header: AR.sections.customers.colLast,
+    header: t.sections.customers.colLast,
     render: (row) => <Ltr className="text-muted">{shortDate(row.lastActivity)}</Ltr>,
   },
 ];

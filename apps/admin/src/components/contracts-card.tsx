@@ -2,7 +2,7 @@ import { getContracts, type ContractItem } from '@/lib/api';
 import { shortDate } from '@/lib/format';
 import { ConsolePanel } from '@/components/console-shell';
 import { FootNote, Ltr, StatusPill, type Tone } from '@/components/admin-table';
-import { AR } from '@/lib/strings';
+import { fill, t } from '@/lib/strings';
 
 /**
  * عقود الشراكة — the contract list and upload (design handoff §8.1).
@@ -24,15 +24,15 @@ export async function ContractsCard({ partnerReference }: { partnerReference?: s
   const result = await getContracts(partnerReference);
 
   return (
-    <ConsolePanel title={AR.sections.contracts.title}>
-      <p className="mb-3 text-[11.5px] text-faint">{AR.sections.contracts.hint}</p>
+    <ConsolePanel title={t.sections.contracts.title}>
+      <p className="mb-3 text-[11.5px] text-faint">{t.sections.contracts.hint}</p>
 
       {result === 'unauthenticated' ? (
-        <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+        <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
       ) : result === 'failed' ? (
-        <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+        <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
       ) : result.contracts.length === 0 ? (
-        <p className="text-[12.5px] text-faint">{AR.sections.contracts.none}</p>
+        <p className="text-[12.5px] text-faint">{t.sections.contracts.none}</p>
       ) : (
         <ul className="grid gap-2.25">
           {result.contracts.map((contract) => (
@@ -43,7 +43,7 @@ export async function ContractsCard({ partnerReference }: { partnerReference?: s
         </ul>
       )}
 
-      <FootNote>{AR.sections.contracts.supersedeNote}</FootNote>
+      <FootNote>{t.sections.contracts.supersedeNote}</FootNote>
     </ConsolePanel>
   );
 }
@@ -65,10 +65,10 @@ function ContractRow({ contract }: { contract: ContractItem }) {
         </Ltr>
         <span className="block text-[11px] text-faint">
           <Ltr>{contract.partnerReference}</Ltr> · {kindLabel(contract.kind)} ·{' '}
-          {AR.sections.contracts.uploadedBy(
-            shortDate(contract.uploadedAt),
-            contract.uploadedBy ?? AR.admin.systemActor,
-          )}
+          {fill(t.sections.contracts.uploadedBy, {
+            date: shortDate(contract.uploadedAt),
+            who: contract.uploadedBy ?? t.admin.systemActor,
+          })}
         </span>
       </span>
 
@@ -78,10 +78,10 @@ function ContractRow({ contract }: { contract: ContractItem }) {
 
       <span
         aria-disabled="true"
-        title={AR.nav.notBuilt}
+        title={t.nav.notBuilt}
         className="shrink-0 cursor-not-allowed rounded-lg border border-line px-3.5 py-1 text-[11.5px] font-bold text-faint2"
       >
-        {AR.sections.contracts.view}
+        {t.sections.contracts.view}
       </span>
     </div>
   );
@@ -90,11 +90,11 @@ function ContractRow({ contract }: { contract: ContractItem }) {
 function kindLabel(kind: string): string {
   switch (kind) {
     case 'commission_annex':
-      return AR.sections.contracts.kindCommissionAnnex;
+      return t.sections.contracts.kindCommissionAnnex;
     case 'renewal':
-      return AR.sections.contracts.kindRenewal;
+      return t.sections.contracts.kindRenewal;
     default:
-      return AR.sections.contracts.kindBase;
+      return t.sections.contracts.kindBase;
   }
 }
 
@@ -105,19 +105,20 @@ function kindLabel(kind: string): string {
  * showing "ساري" for it would be true of the column and false of the world.
  */
 function statusLabel(contract: ContractItem): string {
-  if (contract.status === 'superseded') return AR.sections.contracts.superseded;
-  if (contract.status === 'terminated') return AR.sections.contracts.terminated;
+  if (contract.status === 'superseded') return t.sections.contracts.superseded;
+  if (contract.status === 'terminated') return t.sections.contracts.terminated;
   if (contract.status === 'awaiting_partner_signature') {
-    return AR.sections.contracts.awaitingSignature;
+    return t.sections.contracts.awaitingSignature;
   }
 
-  if (contract.daysToExpiry === null) return AR.sections.contracts.validUntil('—');
-  if (contract.daysToExpiry < 0) return AR.sections.contracts.expired;
+  if (contract.daysToExpiry === null)
+    return fill(t.sections.contracts.validUntil, { date: '—' });
+  if (contract.daysToExpiry < 0) return t.sections.contracts.expired;
 
   /* Inside 60 days the message becomes a countdown, which is what prompts a renewal. */
   return contract.daysToExpiry <= 60
-    ? AR.sections.contracts.expiringIn(String(contract.daysToExpiry))
-    : AR.sections.contracts.validUntil(shortDate(contract.expiresAt));
+    ? fill(t.sections.contracts.expiringIn, { days: String(contract.daysToExpiry) })
+    : fill(t.sections.contracts.validUntil, { date: shortDate(contract.expiresAt) });
 }
 
 function statusTone(contract: ContractItem): Tone {

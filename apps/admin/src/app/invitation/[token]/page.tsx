@@ -1,4 +1,5 @@
 import { AcceptInvitationForm } from '@/components/accept-invitation-form';
+import { t } from '@/lib/strings';
 
 /**
  * Accepting a staff invitation (M-5).
@@ -22,20 +23,16 @@ export default async function InvitationPage({
 
   return (
     <main className="mx-auto grid min-h-screen max-w-md content-center px-4 py-10">
-      <h1 className="text-2xl font-semibold text-text">Set your password</h1>
-      <p className="mt-1 text-sm text-muted">
-        You have been invited to the SAFRA admin console. Choose a password to activate
-        your account.
-      </p>
+      <h1 className="text-2xl font-semibold text-text">
+        {t.sections.invitation.setPassword}
+      </h1>
+      <p className="mt-1 text-sm text-muted">{t.sections.invitation.invitedNote}</p>
 
       <div className="mt-6">
         <AcceptInvitationForm token={token} />
       </div>
 
-      <p className="mt-6 text-xs text-faint">
-        If you were not expecting this invitation, close this page and tell the SAFRA
-        team. Do not set a password.
-      </p>
+      <p className="mt-6 text-xs text-faint">{t.sections.invitation.unexpectedNote}</p>
     </main>
   );
 }

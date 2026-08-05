@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { AR } from '@/lib/strings';
+import { t } from '@/lib/strings';
 
 /**
  * Pauses or resumes an ad campaign.
@@ -49,10 +49,10 @@ export function CampaignStatusButton({
       className="cursor-pointer justify-self-start rounded-md border border-line px-2.5 py-0.5 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold disabled:opacity-50"
     >
       {busy
-        ? AR.sections.ads.pausing
+        ? t.sections.ads.pausing
         : next === 'paused'
-          ? AR.sections.ads.pause
-          : AR.sections.ads.resume}
+          ? t.sections.ads.pause
+          : t.sections.ads.resume}
     </button>
   );
 }

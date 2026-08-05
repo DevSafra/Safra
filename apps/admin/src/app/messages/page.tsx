@@ -6,7 +6,7 @@ import { count, shortDateTime } from '@/lib/format';
 import { ConsolePanel, ConsoleShell, Pager } from '@/components/console-shell';
 import { FootNote, Ltr, StatusPill } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { AR } from '@/lib/strings';
+import { fill, t } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -34,20 +34,20 @@ export default async function MessagesPage({
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.messages} counts={counts}>
+    <ConsoleShell title={t.nav.messages} counts={counts}>
       <ConsolePanel>
         <TableToolbar
           action="/messages"
           query={q}
-          placeholder={AR.sections.messages.searchPlaceholder}
+          placeholder={t.sections.messages.searchPlaceholder}
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         ) : result.items.length === 0 ? (
-          <p className="text-[12.5px] text-faint">{AR.table.empty}</p>
+          <p className="text-[12.5px] text-faint">{t.table.empty}</p>
         ) : (
           <>
             <ul className="grid gap-2.5">
@@ -61,8 +61,8 @@ export default async function MessagesPage({
           </>
         )}
 
-        <FootNote>{AR.sections.messages.note}</FootNote>
-        <FootNote>{AR.sections.messages.redactionNote}</FootNote>
+        <FootNote>{t.sections.messages.note}</FootNote>
+        <FootNote>{t.sections.messages.redactionNote}</FootNote>
       </ConsolePanel>
     </ConsoleShell>
   );
@@ -86,14 +86,17 @@ function Thread({ thread }: { thread: ConversationItem }) {
       <span className="min-w-[200px] flex-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className="text-[13px] font-bold text-text">
-            {AR.sections.messages.parties(other, thread.partner ?? '—')}
+            {fill(t.sections.messages.parties, {
+              customer: other,
+              partner: thread.partner ?? '—',
+            })}
           </span>
           {thread.subjectReference ? (
             <Ltr className="text-[11px] text-sky">{thread.subjectReference}</Ltr>
           ) : null}
         </span>
         <span className="mt-1 block truncate text-xs text-muted">
-          {thread.lastMessage ?? AR.sections.messages.noMessages}
+          {thread.lastMessage ?? t.sections.messages.noMessages}
         </span>
       </span>
 
@@ -109,7 +112,7 @@ function Thread({ thread }: { thread: ConversationItem }) {
         ) : null}
         {thread.closed ? (
           <span className="mt-1.5 block">
-            <StatusPill tone="faint">{AR.sections.messages.closed}</StatusPill>
+            <StatusPill tone="faint">{t.sections.messages.closed}</StatusPill>
           </span>
         ) : null}
       </span>

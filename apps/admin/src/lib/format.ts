@@ -12,7 +12,7 @@
  * string table and the locale constant, and both sides can use it.
  */
 import { ARABIC_WESTERN_DIGITS } from '@/lib/numerals';
-import { AR } from '@/lib/strings';
+import { t } from '@/lib/strings';
 
 /**
  * Money, two decimals, Western digits.
@@ -21,11 +21,11 @@ import { AR } from '@/lib/strings';
  * statement, a payment provider — and none of those render Arabic-Indic digits.
  */
 export function money(amount: string | null | undefined): string {
-  if (amount === null || amount === undefined) return AR.admin.noData;
+  if (amount === null || amount === undefined) return t.admin.noData;
 
   const value = Number(amount);
 
-  if (!Number.isFinite(value)) return AR.admin.noData;
+  if (!Number.isFinite(value)) return t.admin.noData;
 
   return value.toLocaleString(ARABIC_WESTERN_DIGITS, {
     minimumFractionDigits: 2,
@@ -47,9 +47,9 @@ export function count(value: number): string {
 export function percent(value: string): string {
   const parsed = Number(value);
 
-  if (!Number.isFinite(parsed)) return AR.admin.noData;
+  if (!Number.isFinite(parsed)) return t.admin.noData;
 
-  return `${parsed.toLocaleString(ARABIC_WESTERN_DIGITS, { maximumFractionDigits: 1 })}٪`;
+  return `${parsed.toLocaleString(ARABIC_WESTERN_DIGITS, { maximumFractionDigits: 1 })}${t.percentSign}`;
 }
 
 /**
@@ -60,7 +60,7 @@ export function percent(value: string): string {
  * Date from `2026-08-04` shifts it a day west of Greenwich.
  */
 export function shortDate(iso: string | null | undefined): string {
-  if (!iso) return AR.admin.noData;
+  if (!iso) return t.admin.noData;
 
   const [year, month, day] = iso.slice(0, 10).split('-');
 
@@ -69,14 +69,14 @@ export function shortDate(iso: string | null | undefined): string {
 
 /** `DD-MM-YYYY HH:MM` for an audit or ledger timestamp. */
 export function shortDateTime(iso: string | null | undefined): string {
-  if (!iso) return AR.admin.noData;
+  if (!iso) return t.admin.noData;
 
   return `${shortDate(iso)} ${iso.slice(11, 16)}`;
 }
 
 /** Just the clock part, for the audit table's الوقت column. */
 export function clock(iso: string | null | undefined): string {
-  return iso ? iso.slice(11, 16) : AR.admin.noData;
+  return iso ? iso.slice(11, 16) : t.admin.noData;
 }
 
 /**
@@ -87,13 +87,7 @@ export function clock(iso: string | null | undefined): string {
  * bidirectional algorithm inside an RTL line and renders as `USD 3,000.00`, which reads as a
  * label rather than an amount. Observed on the payments KPI cards.
  */
-const SYMBOLS: Record<string, string> = {
-  USD: '$',
-  EUR: '€',
-  SYP: 'ل.س',
-  JOD: 'د.أ',
-  LBP: 'ل.ل',
-};
+const SYMBOLS = t.currencySymbol;
 
 /**
  * An amount with its symbol, in the position that reads correctly.
@@ -103,7 +97,7 @@ const SYMBOLS: Record<string, string> = {
  * run is treated as one left-to-right token.
  */
 export function amount(value: string | null | undefined, currency: string): string {
-  if (value === null || value === undefined) return AR.admin.noData;
+  if (value === null || value === undefined) return t.admin.noData;
 
   const symbol = SYMBOLS[currency] ?? currency;
 

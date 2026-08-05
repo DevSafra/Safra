@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import { text } from '@/lib/form';
 import type { StaffMember } from '@/lib/api';
-import { AR, roleName } from '@/lib/strings';
+import { fill, roleName, t } from '@/lib/strings';
 import { shortDate } from '@/lib/format';
 
 const ROLES = [
@@ -68,7 +68,7 @@ export function StaffAdmin({
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? AR.sections.staff.actionFailed);
+        setError(messageOf(body) ?? t.sections.staff.actionFailed);
         setBusy(null);
         return;
       }
@@ -76,7 +76,7 @@ export function StaffAdmin({
       if (successMessage) setNotice(successMessage);
       router.refresh();
     } catch {
-      setError(AR.errors.unreachable);
+      setError(t.errors.unreachable);
     }
 
     setBusy(null);
@@ -100,10 +100,10 @@ export function StaffAdmin({
 
       <section className="rounded-lg border border-line bg-card p-4">
         <h2 className="text-[14.5px] font-extrabold text-gold">
-          {AR.sections.staff.invite}
+          {t.sections.staff.invite}
         </h2>
         <p className="mt-1 text-[11.5px] leading-relaxed text-faint">
-          {AR.sections.staff.inviteHint}
+          {t.sections.staff.inviteHint}
         </p>
 
         <form
@@ -117,7 +117,7 @@ export function StaffAdmin({
               'invite',
               '/api/staff',
               { method: 'POST', body: { email, role: text(form, 'role') } },
-              AR.sections.staff.inviteSent(email),
+              fill(t.sections.staff.inviteSent, { email }),
             );
             event.currentTarget.reset();
           }}
@@ -126,15 +126,15 @@ export function StaffAdmin({
             name="email"
             type="email"
             required
-            placeholder="name@safra.com"
-            aria-label={AR.sections.staff.inviteEmail}
+            placeholder={t.sections.staff.inviteEmailPlaceholder}
+            aria-label={t.sections.staff.inviteEmail}
             dir="ltr"
             className="rounded-[9px] border border-line bg-field px-3 py-2.5 text-[12.5px] text-text"
           />
           <select
             name="role"
             defaultValue="support_agent"
-            aria-label={AR.sections.staff.inviteRole}
+            aria-label={t.sections.staff.inviteRole}
             className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2.5 text-[12.5px] text-text"
           >
             {ROLES.map((role) => (
@@ -149,12 +149,12 @@ export function StaffAdmin({
             className="cursor-pointer rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2.5 text-[12.5px] font-extrabold text-[#241A05] disabled:opacity-60"
           >
             {busy === 'invite'
-              ? AR.sections.staff.inviteSending
-              : AR.sections.staff.inviteSend}
+              ? t.sections.staff.inviteSending
+              : t.sections.staff.inviteSend}
           </button>
         </form>
 
-        <p className="mt-2.5 text-[11px] text-faint">{AR.sections.staff.inviteNote}</p>
+        <p className="mt-2.5 text-[11px] text-faint">{t.sections.staff.inviteNote}</p>
       </section>
 
       <ul className="grid gap-2">
@@ -168,26 +168,28 @@ export function StaffAdmin({
                   <p className="text-sm text-text">
                     {member.email}
                     {isSelf ? (
-                      <span className="text-faint"> {AR.sections.staff.you}</span>
+                      <span className="text-faint"> {t.sections.staff.you}</span>
                     ) : null}
                   </p>
                   <p className="mt-0.5 text-xs text-muted">
                     {roleName(member.role)} ·{' '}
                     {member.lastLoginAt
-                      ? AR.sections.staff.lastSignIn(shortDate(member.lastLoginAt))
-                      : AR.sections.staff.neverSignedIn}
+                      ? fill(t.sections.staff.lastSignIn, {
+                          when: shortDate(member.lastLoginAt),
+                        })
+                      : t.sections.staff.neverSignedIn}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
                   {member.invitationPending ? (
-                    <Pill tone="gold">{AR.sections.staff.invitationPending}</Pill>
+                    <Pill tone="gold">{t.sections.staff.invitationPending}</Pill>
                   ) : null}
                   {!member.twoFactorEnabled && !member.invitationPending ? (
-                    <Pill tone="gold">{AR.sections.staff.twoFactorMissing}</Pill>
+                    <Pill tone="gold">{t.sections.staff.twoFactorMissing}</Pill>
                   ) : null}
                   {member.status === 'suspended' ? (
-                    <Pill tone="bad">{AR.sections.staff.suspended}</Pill>
+                    <Pill tone="bad">{t.sections.staff.suspended}</Pill>
                   ) : null}
                 </div>
               </div>
@@ -207,13 +209,13 @@ export function StaffAdmin({
                         member.id,
                         `/api/staff/${member.id}/role`,
                         { method: 'PATCH', body: { role: event.target.value } },
-                        AR.sections.staff.roleChanged(
-                          member.email,
-                          roleName(event.target.value),
-                        ),
+                        fill(t.sections.staff.roleChanged, {
+                          email: member.email,
+                          role: roleName(event.target.value),
+                        }),
                       )
                     }
-                    className="rounded-lg border border-line bg-field px-3 py-1.5 text-xs text-text"
+                    className="cursor-pointer rounded-lg border border-line bg-field px-3 py-1.5 text-xs text-text disabled:cursor-not-allowed"
                   >
                     {ROLES.map((role) => (
                       <option key={role.value} value={role.value}>
@@ -237,15 +239,19 @@ export function StaffAdmin({
                           },
                         },
                         member.status === 'suspended'
-                          ? AR.sections.staff.reinstatedNotice(member.email)
-                          : AR.sections.staff.suspendedNotice(member.email),
+                          ? fill(t.sections.staff.reinstatedNotice, {
+                              email: member.email,
+                            })
+                          : fill(t.sections.staff.suspendedNotice, {
+                              email: member.email,
+                            }),
                       )
                     }
-                    className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold"
+                    className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold disabled:cursor-not-allowed"
                   >
                     {member.status === 'suspended'
-                      ? AR.sections.staff.reinstate
-                      : AR.sections.staff.suspend}
+                      ? t.sections.staff.reinstate
+                      : t.sections.staff.suspend}
                   </button>
 
                   {member.invitationPending ? (
@@ -257,12 +263,12 @@ export function StaffAdmin({
                           member.id,
                           `/api/staff/${member.id}/resend-invitation`,
                           { method: 'POST' },
-                          AR.sections.staff.inviteResent(member.email),
+                          fill(t.sections.staff.inviteResent, { email: member.email }),
                         )
                       }
-                      className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold"
+                      className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold disabled:cursor-not-allowed"
                     >
-                      {AR.sections.staff.inviteResend}
+                      {t.sections.staff.inviteResend}
                     </button>
                   ) : null}
                 </div>

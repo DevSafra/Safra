@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { EditableSetting } from '@/lib/api';
-import { AR } from '@/lib/strings';
+import { fill, t } from '@/lib/strings';
 import { shortDate } from '@/lib/format';
 
 /** Schemas this form knows how to render an input for. */
@@ -58,7 +58,7 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? AR.sections.settings.saveFailed);
+        setError(messageOf(body) ?? t.sections.settings.saveFailed);
         setBusy(false);
         return;
       }
@@ -67,7 +67,7 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
       router.refresh();
       setBusy(false);
     } catch {
-      setError(AR.errors.unreachable);
+      setError(t.errors.unreachable);
       setBusy(false);
     }
   }
@@ -91,7 +91,7 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
             onClick={() => setEditing(true)}
             className="ms-auto cursor-pointer rounded-md border border-line px-2.5 py-0.5 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
           >
-            {AR.sections.settings.change}
+            {t.sections.settings.change}
           </button>
         ) : null}
       </div>
@@ -108,16 +108,16 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
 
       {setting.updatedByEmail ? (
         <p className="mt-1 text-[10.5px] text-faint">
-          {AR.sections.settings.lastChanged(
-            setting.updatedByEmail,
-            shortDate(setting.updatedAt),
-          )}
+          {fill(t.sections.settings.lastChanged, {
+            who: setting.updatedByEmail,
+            when: shortDate(setting.updatedAt),
+          })}
         </p>
       ) : null}
 
       {!editable ? (
         <p className="mt-2 rounded border border-line bg-field px-2.5 py-2 text-[10.5px] leading-relaxed text-faint">
-          {AR.sections.settings.notEditable(setting.valueSchema)}
+          {fill(t.sections.settings.notEditable, { schema: setting.valueSchema })}
         </p>
       ) : null}
 
@@ -145,7 +145,7 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
 
           <label className="grid gap-1">
             <span className="text-[10.5px] text-faint2">
-              {AR.sections.settings.reason}
+              {t.sections.settings.reason}
             </span>
             <input
               name="reason"
@@ -160,14 +160,14 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
               disabled={busy}
               className="cursor-pointer rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-1.5 text-[11.5px] font-extrabold text-[#241A05] disabled:opacity-60"
             >
-              {busy ? AR.sections.settings.saving : AR.sections.settings.save}
+              {busy ? t.sections.settings.saving : t.sections.settings.save}
             </button>
             <button
               type="button"
               onClick={() => setEditing(false)}
               className="cursor-pointer rounded-[9px] border border-line px-4 py-1.5 text-[11.5px] text-muted"
             >
-              {AR.sections.settings.cancel}
+              {t.sections.settings.cancel}
             </button>
           </div>
         </form>
@@ -190,7 +190,7 @@ function ValueInput({ setting }: { setting: EditableSetting }) {
           defaultChecked={setting.value === true}
           className="size-[15px] cursor-pointer accent-gold"
         />
-        {AR.sections.settings.enabled}
+        {t.sections.settings.enabled}
       </label>
     );
   }
@@ -198,10 +198,14 @@ function ValueInput({ setting }: { setting: EditableSetting }) {
   if (setting.valueSchema === 'feeMode') {
     return (
       <label className="grid gap-1">
-        <span className="text-[10.5px] text-faint2">{AR.sections.settings.mode}</span>
-        <select name="value" defaultValue={String(setting.value)} className={common}>
-          <option value="flat">{AR.sections.settings.feeFlat}</option>
-          <option value="percent">{AR.sections.settings.feePercent}</option>
+        <span className="text-[10.5px] text-faint2">{t.sections.settings.mode}</span>
+        <select
+          name="value"
+          defaultValue={String(setting.value)}
+          className={`${common} cursor-pointer`}
+        >
+          <option value="flat">{t.sections.settings.feeFlat}</option>
+          <option value="percent">{t.sections.settings.feePercent}</option>
         </select>
       </label>
     );
@@ -223,7 +227,7 @@ function ValueInput({ setting }: { setting: EditableSetting }) {
     return (
       <label className="grid gap-1">
         <span className="text-[10.5px] text-faint2">
-          {AR.sections.settings.amount} ({currencyOf(setting.value) ?? 'USD'})
+          {t.sections.settings.amount} ({currencyOf(setting.value) ?? 'USD'})
         </span>
         <input
           name="value"
@@ -238,16 +242,16 @@ function ValueInput({ setting }: { setting: EditableSetting }) {
 
   const hint =
     setting.valueSchema === 'rate'
-      ? AR.sections.settings.hintRate
+      ? t.sections.settings.hintRate
       : setting.valueSchema === 'hourOfDay'
-        ? AR.sections.settings.hintHourOfDay
+        ? t.sections.settings.hintHourOfDay
         : setting.valueSchema === 'percent'
-          ? AR.sections.settings.hintPercent
-          : AR.sections.settings.hintInt;
+          ? t.sections.settings.hintPercent
+          : t.sections.settings.hintInt;
 
   return (
     <label className="grid gap-1">
-      <span className="text-[10.5px] text-faint2">{AR.sections.settings.value}</span>
+      <span className="text-[10.5px] text-faint2">{t.sections.settings.value}</span>
       <input
         name="value"
         inputMode="decimal"
@@ -298,10 +302,10 @@ function coerce(
 
 function display(value: unknown): string {
   if (typeof value === 'boolean') {
-    return value ? AR.sections.settings.enabled : AR.sections.settings.disabled;
+    return value ? t.sections.settings.enabled : t.sections.settings.disabled;
   }
 
-  if (value === null || value === undefined) return AR.admin.noData;
+  if (value === null || value === undefined) return t.admin.noData;
   if (typeof value === 'object') return JSON.stringify(value);
 
   return scalarText(value);

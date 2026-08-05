@@ -11,7 +11,7 @@ import {
   type Tone,
 } from '@/components/admin-table';
 import { TableToolbar, ToolbarNote } from '@/components/table-toolbar';
-import { AR, label } from '@/lib/strings';
+import { t, label } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -50,30 +50,30 @@ export default async function GiftCardsPage({
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.giftCards} counts={counts}>
+    <ConsoleShell title={t.nav.giftCards} counts={counts}>
       <ConsolePanel>
         <TableToolbar
           action="/giftcards"
           query={q}
-          placeholder={AR.sections.giftcards.searchPlaceholder}
+          placeholder={t.sections.giftcards.searchPlaceholder}
           end={
             <>
-              <ToolbarNote>{AR.sections.giftcards.hint}</ToolbarNote>
+              <ToolbarNote>{t.sections.giftcards.hint}</ToolbarNote>
               <span
                 aria-disabled="true"
-                title={AR.nav.notBuilt}
+                title={t.nav.notBuilt}
                 className="cursor-not-allowed rounded-[9px] border border-line px-4 py-1.5 text-[12.5px] font-extrabold text-faint2"
               >
-                {AR.sections.giftcards.create}
+                {t.sections.giftcards.create}
               </span>
             </>
           }
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -82,14 +82,14 @@ export default async function GiftCardsPage({
               template={TEMPLATE}
               rowKey={(row) => row.reference}
               minWidth={700}
-              empty={AR.table.empty}
+              empty={t.table.empty}
             />
             <Pager basePath="/giftcards" query={{ q }} nextCursor={result.nextCursor} />
           </>
         )}
 
-        <FootNote>{AR.sections.giftcards.note}</FootNote>
-        <FootNote>{AR.sections.giftcards.codeNote}</FootNote>
+        <FootNote>{t.sections.giftcards.note}</FootNote>
+        <FootNote>{t.sections.giftcards.codeNote}</FootNote>
       </ConsolePanel>
     </ConsoleShell>
   );
@@ -98,7 +98,7 @@ export default async function GiftCardsPage({
 const COLUMNS: readonly AdminColumn<GiftCardItem>[] = [
   {
     key: 'reference',
-    header: AR.sections.giftcards.colCode,
+    header: t.sections.giftcards.colCode,
     render: (row) => (
       <span>
         <Ltr className="font-semibold text-sky">{row.reference}</Ltr>
@@ -108,7 +108,7 @@ const COLUMNS: readonly AdminColumn<GiftCardItem>[] = [
   },
   {
     key: 'original',
-    header: AR.sections.giftcards.colValue,
+    header: t.sections.giftcards.colValue,
     render: (row) => (
       <Ltr className="whitespace-nowrap text-text2">
         {money(row.originalAmount)} {row.currency}
@@ -117,7 +117,7 @@ const COLUMNS: readonly AdminColumn<GiftCardItem>[] = [
   },
   {
     key: 'remaining',
-    header: AR.sections.giftcards.colRemaining,
+    header: t.sections.giftcards.colRemaining,
     /* Gold, because the remaining balance is the liability — the number that still matters. */
     render: (row) => (
       <Ltr className="font-bold whitespace-nowrap text-gold">
@@ -127,20 +127,20 @@ const COLUMNS: readonly AdminColumn<GiftCardItem>[] = [
   },
   {
     key: 'buyer',
-    header: AR.sections.giftcards.colBuyer,
-    render: (row) => <span className="text-text2">{row.buyer ?? AR.admin.noData}</span>,
+    header: t.sections.giftcards.colBuyer,
+    render: (row) => <span className="text-text2">{row.buyer ?? t.admin.noData}</span>,
   },
   {
     key: 'expiry',
-    header: AR.sections.giftcards.colExpiry,
+    header: t.sections.giftcards.colExpiry,
     render: (row) => <Ltr className="text-muted">{shortDate(row.expiresAt)}</Ltr>,
   },
   {
     key: 'status',
-    header: AR.table.colStatus,
+    header: t.table.colStatus,
     render: (row) => (
       <StatusPill tone={statusTone(row.status)}>
-        {label(AR.enums.giftCardStatus, row.status)}
+        {label(t.enums.giftCardStatus, row.status)}
       </StatusPill>
     ),
   },

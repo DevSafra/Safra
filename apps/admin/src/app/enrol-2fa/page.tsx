@@ -1,5 +1,6 @@
 import { TwoFactorEnrolment } from '@/components/two-factor-enrolment';
 import { getStaffSession } from '@/lib/session-server';
+import { t } from '@/lib/strings';
 
 /**
  * Forced 2FA enrolment (SRS §4.1).
@@ -19,13 +20,8 @@ export default async function EnrolPage() {
   return (
     <main className="mx-auto grid min-h-screen max-w-md place-content-center px-4">
       <div className="w-full">
-        <h1 className="text-2xl font-semibold text-text">
-          Set up two-factor authentication
-        </h1>
-        <p className="mt-2 text-sm text-muted">
-          Required before you can use the command center. It protects partner documents,
-          wallet balances and approval decisions.
-        </p>
+        <h1 className="text-2xl font-semibold text-text">{t.sections.twoFactor.title}</h1>
+        <p className="mt-2 text-sm text-muted">{t.sections.twoFactor.requiredNote}</p>
         <p className="mt-1 text-xs text-faint">{session?.user.email}</p>
 
         <div className="mt-8 rounded-xl border border-line bg-card p-6">

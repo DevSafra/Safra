@@ -3,7 +3,7 @@ import { sidebarCounts } from '@/lib/console';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { FootNote } from '@/components/admin-table';
 import { SettingRow } from '@/components/setting-row';
-import { AR } from '@/lib/strings';
+import { t } from '@/lib/strings';
 
 /**
  * الإعدادات — the Rules Engine (SRS §9.3, P-005, design handoff §8).
@@ -31,23 +31,23 @@ export const dynamic = 'force-dynamic';
 
 const GROUPS: ReadonlyArray<{ title: string; note: string; prefixes: string[] }> = [
   {
-    title: 'المال — العمولات والرسوم والاسترداد',
-    note: 'ما تتقاضاه سفرة وما يُستحق للشريك. التعديل لا يُعيد حساب حجز قائم: كل حجز يحتفظ بلقطة من القيم التي أُنشئ بها.',
+    title: t.sections.settings.groupMoney,
+    note: t.sections.settings.groupMoneyNote,
     prefixes: ['commission.', 'money.', 'refund.'],
   },
   {
-    title: 'قواعد الحجز',
-    note: 'المُهل التي تحدد متى يسقط الحجز ومتى يتأخر الشريك (§6.4، EC-001).',
+    title: t.sections.settings.groupBooking,
+    note: t.sections.settings.groupBookingNote,
     prefixes: ['booking.'],
   },
   {
-    title: 'الشركاء والتعويضات',
-    note: 'الغرامات، ورصيد المحفظة الذي يحصل عليه العميل عند تجاوز الشريك مهلته (P-007).',
+    title: t.sections.settings.groupPartners,
+    note: t.sections.settings.groupPartnersNote,
     prefixes: ['partner.', 'wallet.'],
   },
   {
-    title: 'الصلاحيات',
-    note: 'منح صلاحيات في وقت التشغيل. التمكين يسري خلال 15 دقيقة؛ الإلغاء يُبطل كل جلسات ذلك الدور فوراً.',
+    title: t.sections.settings.groupPermissions,
+    note: t.sections.settings.groupPermissionsNote,
     prefixes: ['rbac.'],
   },
 ];
@@ -57,12 +57,12 @@ export default async function SettingsPage() {
 
   if (result === 'unauthenticated' || result === 'failed') {
     return (
-      <ConsoleShell title={AR.nav.settings} counts={counts}>
+      <ConsoleShell title={t.nav.settings} counts={counts}>
         <ConsolePanel>
           <p
             className={`text-[12.5px] ${result === 'failed' ? 'text-bad' : 'text-muted'}`}
           >
-            {result === 'failed' ? AR.dashboard.queueFailed : AR.dashboard.sessionExpired}
+            {result === 'failed' ? t.dashboard.queueFailed : t.dashboard.sessionExpired}
           </p>
         </ConsolePanel>
       </ConsoleShell>
@@ -92,13 +92,13 @@ export default async function SettingsPage() {
   const other = result.settings.filter((setting) => !claimed.has(setting.key));
 
   return (
-    <ConsoleShell title={AR.nav.settings} counts={counts}>
+    <ConsoleShell title={t.nav.settings} counts={counts}>
       <div className="grid gap-4">
         <ConsolePanel>
           <h2 className="text-[14.5px] font-extrabold text-gold">
-            {AR.sections.settings.title}
+            {t.sections.settings.title}
           </h2>
-          <FootNote>{AR.sections.settings.hint}</FootNote>
+          <FootNote>{t.sections.settings.hint}</FootNote>
         </ConsolePanel>
 
         {groups.map((group) =>
@@ -114,8 +114,8 @@ export default async function SettingsPage() {
 
         {other.length > 0 ? (
           <Group
-            title="إعدادات أخرى"
-            note="إعدادات خارج المجموعات أعلاه. بعضها غير قابل للتعديل من هنا — يوضح الصف السبب."
+            title={t.sections.settings.groupOther}
+            note={t.sections.settings.groupOtherNote}
             settings={other}
           />
         ) : null}

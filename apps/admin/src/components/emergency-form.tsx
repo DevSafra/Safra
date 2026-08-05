@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 
 import type { EmergencyState } from '@/lib/api';
-import { AR, apiError } from '@/lib/strings';
+import { t, apiError } from '@/lib/strings';
 
 /**
  * The Emergency Mode control (EC-009, design handoff §8.3).
@@ -86,7 +86,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
       // The banner and history live on the server component, so a refresh is the update.
       router.refresh();
     } catch {
-      setError(AR.errors.unreachable);
+      setError(t.errors.unreachable);
     } finally {
       setBusy(false);
     }
@@ -95,15 +95,15 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
   return (
     <section className="max-w-[640px] rounded-[15px] border border-[rgba(var(--badA),0.5)] bg-card p-5.5">
       <h2 className="text-[15px] font-extrabold text-bad">
-        {AR.sections.emergency.title}
+        {t.sections.emergency.title}
       </h2>
       <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">
-        {AR.sections.emergency.hint}
+        {t.sections.emergency.hint}
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-          {AR.sections.emergency.scope}
+          {t.sections.emergency.scope}
           <select
             value={scope}
             onChange={(event) => {
@@ -115,13 +115,13 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
             }}
             className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2.5 text-[13px] text-text"
           >
-            <option value="city">{AR.sections.emergency.scopeCity}</option>
-            <option value="country">{AR.sections.emergency.scopeCountry}</option>
+            <option value="city">{t.sections.emergency.scopeCity}</option>
+            <option value="country">{t.sections.emergency.scopeCountry}</option>
           </select>
         </label>
 
         <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-          {AR.sections.emergency.target}
+          {t.sections.emergency.target}
           <select
             value={scopeRef}
             onChange={(event) => {
@@ -141,14 +141,14 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
       </div>
 
       <fieldset className="mt-4 grid gap-2.5 text-[13px] text-text2">
-        <legend className="sr-only">{AR.sections.emergency.title}</legend>
+        <legend className="sr-only">{t.sections.emergency.title}</legend>
 
         {(
           [
-            ['stopBookings', AR.sections.emergency.stopBookings],
-            ['waiveFines', AR.sections.emergency.waiveFines],
-            ['broadcast', AR.sections.emergency.broadcast],
-            ['suspendSla', AR.sections.emergency.suspendSla],
+            ['stopBookings', t.sections.emergency.stopBookings],
+            ['waiveFines', t.sections.emergency.waiveFines],
+            ['broadcast', t.sections.emergency.broadcast],
+            ['suspendSla', t.sections.emergency.suspendSla],
           ] as const
         ).map(([key, text]) => (
           <label key={key} className="flex cursor-pointer items-center gap-2.5">
@@ -169,12 +169,12 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
       {/* The broadcast has no send path yet; saying so beats a checkbox that quietly does nothing. */}
       {flags.broadcast ? (
         <p className="mt-2.5 text-[11px] leading-relaxed text-warn">
-          {AR.sections.emergency.broadcastPending}
+          {t.sections.emergency.broadcastPending}
         </p>
       ) : null}
 
       <label className="mt-4 grid gap-1.5 text-[11.5px] font-semibold text-muted">
-        {AR.sections.emergency.reason}
+        {t.sections.emergency.reason}
         <textarea
           id={`${formId}-reason`}
           value={reason}
@@ -187,7 +187,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
           className="rounded-[9px] border border-line bg-field px-3 py-2.5 text-[13px] text-text"
         />
         <span className="text-[10.5px] font-normal text-faint2">
-          {AR.sections.emergency.reasonHint}
+          {t.sections.emergency.reasonHint}
         </span>
       </label>
 
@@ -206,10 +206,10 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
           */}
           <p className="text-[12.5px] font-bold text-bad">{selected.name}</p>
           <ul className="mt-1.5 grid gap-0.5 text-[11.5px] text-text2">
-            {flags.stopBookings ? <li>• {AR.sections.emergency.stopBookings}</li> : null}
-            {flags.waiveFines ? <li>• {AR.sections.emergency.waiveFines}</li> : null}
-            {flags.broadcast ? <li>• {AR.sections.emergency.broadcast}</li> : null}
-            {flags.suspendSla ? <li>• {AR.sections.emergency.suspendSla}</li> : null}
+            {flags.stopBookings ? <li>• {t.sections.emergency.stopBookings}</li> : null}
+            {flags.waiveFines ? <li>• {t.sections.emergency.waiveFines}</li> : null}
+            {flags.broadcast ? <li>• {t.sections.emergency.broadcast}</li> : null}
+            {flags.suspendSla ? <li>• {t.sections.emergency.suspendSla}</li> : null}
           </ul>
         </div>
       ) : null}
@@ -227,7 +227,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
           }}
           className="cursor-pointer rounded-[9px] bg-bad px-6 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {confirming ? AR.sections.emergency.activate : AR.admin.handle}
+          {confirming ? t.sections.emergency.activate : t.admin.handle}
         </button>
 
         {confirming ? (
@@ -236,7 +236,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
             onClick={() => setConfirming(false)}
             className="cursor-pointer rounded-[9px] border border-line px-6 py-3 text-[13px] text-muted"
           >
-            {AR.login.useDifferentAccount}
+            {t.login.useDifferentAccount}
           </button>
         ) : null}
       </div>
@@ -274,7 +274,7 @@ export function DeactivateButton({ id, scopeName }: { id: string; scopeName: str
       onClick={() => void deactivate()}
       className="ms-auto cursor-pointer rounded-lg bg-bad px-4.5 py-1.75 text-xs font-extrabold whitespace-nowrap text-white disabled:opacity-50"
     >
-      {AR.sections.emergency.deactivate}
+      {t.sections.emergency.deactivate}
     </button>
   );
 }

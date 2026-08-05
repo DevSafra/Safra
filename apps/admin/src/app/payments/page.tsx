@@ -18,7 +18,7 @@ import {
   type Tone,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { AR, label } from '@/lib/strings';
+import { t, label } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -53,38 +53,38 @@ export default async function PaymentsPage({
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.payments} counts={counts}>
+    <ConsoleShell title={t.nav.payments} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
-          <KpiRow label={AR.nav.payments}>
+          <KpiRow label={t.nav.payments}>
             <Kpi
-              label={AR.sections.payments.kpiCaptured}
+              label={t.sections.payments.kpiCaptured}
               value={amount(result.counters.captured_today, result.counters.currency)}
               valueClass="text-gold"
             />
             <Kpi
-              label={AR.sections.payments.kpiRefunded}
+              label={t.sections.payments.kpiRefunded}
               value={amount(result.counters.refunded_today, result.counters.currency)}
               valueClass="text-bad"
             />
             <Kpi
-              label={AR.sections.payments.kpiPayable}
+              label={t.sections.payments.kpiPayable}
               value={amount(
                 result.counters.partner_payable_outstanding,
                 result.counters.currency,
               )}
-              sub={AR.sections.payments.payableNote}
+              sub={t.sections.payments.payableNote}
             />
             <Kpi
-              label={AR.sections.payments.kpiFines}
+              label={t.sections.payments.kpiFines}
               value={amount(
                 result.counters.fines_collected_month,
                 result.counters.currency,
@@ -97,7 +97,7 @@ export default async function PaymentsPage({
             <TableToolbar
               action="/payments"
               query={q}
-              placeholder={AR.sections.payments.searchPlaceholder}
+              placeholder={t.sections.payments.searchPlaceholder}
             />
 
             <AdminTable
@@ -106,12 +106,12 @@ export default async function PaymentsPage({
               template={TEMPLATE}
               rowKey={(row) => `${row.kind}-${row.reference}-${row.at}`}
               minWidth={720}
-              empty={AR.table.empty}
+              empty={t.table.empty}
             />
             <Pager basePath="/payments" query={{ q }} nextCursor={result.nextCursor} />
 
-            <FootNote>{AR.sections.payments.note}</FootNote>
-            <FootNote>{AR.sections.payments.payoutsMissing}</FootNote>
+            <FootNote>{t.sections.payments.note}</FootNote>
+            <FootNote>{t.sections.payments.payoutsMissing}</FootNote>
           </ConsolePanel>
         </div>
       )}
@@ -122,17 +122,17 @@ export default async function PaymentsPage({
 const COLUMNS: readonly AdminColumn<FinanceItem>[] = [
   {
     key: 'reference',
-    header: AR.table.colId,
+    header: t.table.colId,
     render: (row) => <Ltr className="font-semibold text-sky">{row.reference}</Ltr>,
   },
   {
     key: 'linked',
-    header: AR.sections.payments.colLinked,
-    render: (row) => <Ltr className="text-text2">{row.linkedTo ?? AR.admin.noData}</Ltr>,
+    header: t.sections.payments.colLinked,
+    render: (row) => <Ltr className="text-text2">{row.linkedTo ?? t.admin.noData}</Ltr>,
   },
   {
     key: 'method',
-    header: AR.sections.payments.colMethod,
+    header: t.sections.payments.colMethod,
     /*
       A fine has no payment method; the column carries its violation KIND instead, which is the
       equivalent fact — why the money moved. Both maps fall back to the raw value.
@@ -140,19 +140,19 @@ const COLUMNS: readonly AdminColumn<FinanceItem>[] = [
     render: (row) => (
       <span className="text-text2">
         {row.kind === 'fine'
-          ? label(AR.enums.violationKind, row.method)
-          : label(AR.enums.paymentMethod, row.method)}
+          ? label(t.enums.violationKind, row.method)
+          : label(t.enums.paymentMethod, row.method)}
       </span>
     ),
   },
   {
     key: 'kind',
-    header: AR.table.colType,
+    header: t.table.colType,
     render: (row) => <ToneText tone={kindTone(row.kind)}>{kindLabel(row.kind)}</ToneText>,
   },
   {
     key: 'amount',
-    header: AR.admin.colAmount,
+    header: t.admin.colAmount,
     render: (row) => (
       <Ltr className="font-bold whitespace-nowrap text-gold">
         {money(row.amount)} {row.currency}
@@ -161,11 +161,11 @@ const COLUMNS: readonly AdminColumn<FinanceItem>[] = [
   },
   {
     key: 'status',
-    header: AR.table.colStatus,
+    header: t.table.colStatus,
     render: (row) => (
       <div className="grid gap-1">
         <StatusPill tone={statusTone(row.status)}>
-          {label(AR.enums.paymentStatus, row.status)}
+          {label(t.enums.paymentStatus, row.status)}
         </StatusPill>
         <Ltr className="text-[10.5px] text-faint">{shortDateTime(row.at)}</Ltr>
       </div>
@@ -176,11 +176,11 @@ const COLUMNS: readonly AdminColumn<FinanceItem>[] = [
 function kindLabel(kind: FinanceItem['kind']): string {
   switch (kind) {
     case 'payment':
-      return AR.sections.payments.typePayment;
+      return t.sections.payments.typePayment;
     case 'refund':
-      return AR.sections.payments.typeRefund;
+      return t.sections.payments.typeRefund;
     default:
-      return AR.sections.payments.typeFine;
+      return t.sections.payments.typeFine;
   }
 }
 

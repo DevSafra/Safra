@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { totpEnableSchema } from '@safra/contracts';
+import { ERROR, totpEnableSchema } from '@safra/contracts';
 
 import { proxy } from '@/lib/proxy';
 
@@ -15,7 +15,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const parsed = totpEnableSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ message: 'Enter the six-digit code.' }, { status: 400 });
+    return NextResponse.json({ code: ERROR.VALIDATION_CODE_SIX_DIGITS }, { status: 400 });
   }
 
   return proxy('/auth/2fa/enable', { method: 'POST', body: parsed.data });

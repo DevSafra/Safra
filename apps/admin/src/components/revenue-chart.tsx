@@ -1,15 +1,28 @@
-import { AR } from '@/lib/strings';
+import { CONSOLE_LOCALE, t } from '@/lib/strings';
 
-/** Weekday names, indexed by `Date.getUTCDay()`. */
-const WEEKDAYS = [
-  'الأحد',
-  'الاثنين',
-  'الثلاثاء',
-  'الأربعاء',
-  'الخميس',
-  'الجمعة',
-  'السبت',
-] as const;
+/**
+ * Weekday names, indexed by `Date.getUTCDay()`.
+ *
+ * Derived from `Intl` rather than written out. Seven names per language is exactly the kind of
+ * copy a platform library already has, correctly, for every locale — and a catalogue entry for
+ * each would be seven more strings to translate per language that could only ever be wrong.
+ *
+ * Verified against the design handoff before switching: `Intl` on `ar` produces الأحد …
+ * السبت, the same seven names the design specifies, in the same order.
+ *
+ * 2026-01-04 is a Sunday, so the seven consecutive days from it land on `getUTCDay()` 0–6 in
+ * order. UTC throughout, because the bars are keyed by `getUTCDay()`.
+ */
+const WEEKDAYS = ((): readonly string[] => {
+  const format = new Intl.DateTimeFormat(CONSOLE_LOCALE, {
+    weekday: 'long',
+    timeZone: 'UTC',
+  });
+
+  return Array.from({ length: 7 }, (_, day) =>
+    format.format(new Date(Date.UTC(2026, 0, 4 + day))),
+  );
+})();
 
 const CHART_WIDTH = 280;
 const CHART_HEIGHT = 120;
@@ -45,14 +58,14 @@ export function RevenueChart({
   return (
     <div className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       {/* `h2` like every other panel title, so the console has one heading outline. */}
-      <h2 className="text-[14.5px] font-extrabold text-gold">{AR.admin.weekRevenue}</h2>
-      <p className="mt-1 mb-3.5 text-[11px] text-faint">{AR.admin.weekRevenueSub}</p>
+      <h2 className="text-[14.5px] font-extrabold text-gold">{t.admin.weekRevenue}</h2>
+      <p className="mt-1 mb-3.5 text-[11px] text-faint">{t.admin.weekRevenueSub}</p>
 
       <svg
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
         className="block w-full"
         role="img"
-        aria-label={AR.admin.weekRevenue}
+        aria-label={t.admin.weekRevenue}
       >
         <defs>
           <linearGradient id="safra-goldbar" x1="0" y1="0" x2="0" y2="1">
@@ -89,7 +102,7 @@ export function RevenueChart({
       <div dir="ltr" className="mt-1.5 flex justify-between text-[10px] text-faint">
         {series.map((point, index) => (
           <span key={point.day} className="w-[38px] text-center">
-            {index === series.length - 1 ? AR.admin.today : weekday(point.day)}
+            {index === series.length - 1 ? t.admin.today : weekday(point.day)}
           </span>
         ))}
       </div>

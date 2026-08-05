@@ -7,11 +7,14 @@ import {
   type PendingPartner,
 } from '@/lib/api';
 import { getStaffSession } from '@/lib/session-server';
+import { amount, count } from '@/lib/format';
 import { ARABIC_WESTERN_DIGITS } from '@/lib/numerals';
 import { AdminSidebar } from '@/components/admin-sidebar';
 import { RevenueChart } from '@/components/revenue-chart';
 import { SignOutButton } from '@/components/sign-out-button';
-import { AR, auditAction, bookingStatus, roleName } from '@/lib/strings';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { t, auditAction, bookingStatus, roleName } from '@/lib/strings';
+import { ORNAMENT_BRAND } from '@safra/ui';
 
 /**
  * The command center (§9.2), built to the approved design (SAFRA 29.07).
@@ -60,7 +63,7 @@ export default async function DashboardPage() {
       <main className="min-w-0">
         <header className="mb-4 flex flex-wrap items-center gap-3">
           <h1 className="font-[family-name:var(--font-amiri)] text-[28px] leading-tight text-text">
-            {AR.admin.title}
+            {t.admin.title}
           </h1>
           <span className="text-[11.5px] text-faint">
             {today()} · {roleName(session?.user.role)}
@@ -77,19 +80,20 @@ export default async function DashboardPage() {
               href="/emergency"
               className="cursor-pointer rounded-[9px] border border-[rgba(var(--badA),0.5)] bg-[rgba(var(--badA),0.1)] px-4 py-2 text-xs font-extrabold text-bad transition-colors hover:bg-[rgba(var(--badA),0.18)]"
             >
-              {AR.admin.emergencyMode}
+              {t.admin.emergencyMode}
             </Link>
+            <ThemeToggle />
             <SignOutButton />
           </div>
         </header>
 
         {overview === 'unauthenticated' ? (
           <Card>
-            <p className="text-sm text-muted">{AR.dashboard.sessionExpired}</p>
+            <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
           </Card>
         ) : overview === 'failed' ? (
           <Card>
-            <p className="text-sm text-bad">{AR.dashboard.countersFailed}</p>
+            <p className="text-sm text-bad">{t.dashboard.countersFailed}</p>
           </Card>
         ) : (
           <Overview overview={overview} partners={partners} />
@@ -119,30 +123,30 @@ function Overview({
         that means "the counter" rather than "any element with that word in it".
       */}
       <section
-        aria-label={AR.admin.kpiRow}
+        aria-label={t.admin.kpiRow}
         className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3"
       >
         <Kpi
-          label={AR.admin.kpiBookingsToday}
+          label={t.admin.kpiBookingsToday}
           value={count(counters.bookings_today)}
-          sub={`${delta < 0 ? '↓' : '↑'} ${count(Math.abs(delta))} ${AR.admin.kpiBookingsTodaySub}`}
+          sub={`${delta < 0 ? '↓' : '↑'} ${count(Math.abs(delta))} ${t.admin.kpiBookingsTodaySub}`}
         />
         <Kpi
-          label={AR.admin.kpiPending}
+          label={t.admin.kpiPending}
           value={count(counters.pending_confirmation)}
           valueClass="text-sky"
-          sub={`${AR.admin.ofWhich} ${count(counters.sla_expiring_soon)} ${AR.admin.kpiPendingSub}`}
+          sub={`${t.admin.ofWhich} ${count(counters.sla_expiring_soon)} ${t.admin.kpiPendingSub}`}
         />
         <Kpi
-          label={AR.admin.kpiRevenue}
-          value={`$${money(counters.revenue_today_usd)}`}
+          label={t.admin.kpiRevenue}
+          value={amount(counters.revenue_today_usd, 'USD')}
           valueClass="text-gold"
-          sub={`${money(counters.revenue_today_syp)} ل.س`}
+          sub={amount(counters.revenue_today_syp, 'SYP')}
         />
         <Kpi
-          label={AR.admin.kpiCancelled}
+          label={t.admin.kpiCancelled}
           value={count(counters.cancelled_today)}
-          sub={`${AR.admin.ofWhich} ${count(counters.cancelled_today_with_fine)} ${AR.admin.kpiCancelledSub}`}
+          sub={`${t.admin.ofWhich} ${count(counters.cancelled_today_with_fine)} ${t.admin.kpiCancelledSub}`}
         />
         {/*
           Real since 2026-08-04, when the disputes table landed. It showed a dash and "the
@@ -151,11 +155,9 @@ function Overview({
           different statement from zero and must never be conflated with it.
         */}
         <Kpi
-          label={AR.admin.kpiDisputes}
+          label={t.admin.kpiDisputes}
           value={
-            overview.openDisputes === null
-              ? AR.admin.noData
-              : count(overview.openDisputes)
+            overview.openDisputes === null ? t.admin.noData : count(overview.openDisputes)
           }
           valueClass={
             overview.openDisputes === null
@@ -166,8 +168,8 @@ function Overview({
           }
           sub={
             overview.openDisputes === null
-              ? AR.admin.kpiDisputesUnavailable
-              : AR.admin.kpiDisputesSub
+              ? t.admin.kpiDisputesUnavailable
+              : t.admin.kpiDisputesSub
           }
         />
       </section>
@@ -202,7 +204,7 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
     counters.sla_expiring_soon > 0
       ? {
           code: 'EC-008',
-          text: `${count(counters.sla_expiring_soon)} ${AR.admin.attentionSla}`,
+          text: `${count(counters.sla_expiring_soon)} ${t.admin.attentionSla}`,
           /*
             No destination: §9.4 is a lookup by reference and there is deliberately no
             browsable list of bookings, so there is nowhere to send a reviewer with "the
@@ -215,14 +217,14 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
     counters.partners_pending_verification > 0
       ? {
           code: 'P-002',
-          text: `${count(counters.partners_pending_verification)} ${AR.admin.attentionPartners}`,
+          text: `${count(counters.partners_pending_verification)} ${t.admin.attentionPartners}`,
           href: '/partners',
         }
       : null,
     counters.properties_pending_review > 0
       ? {
           code: 'P-002',
-          text: `${count(counters.properties_pending_review)} ${AR.admin.attentionProperties}`,
+          text: `${count(counters.properties_pending_review)} ${t.admin.attentionProperties}`,
           href: '/properties',
         }
       : null,
@@ -233,10 +235,10 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
 
   return (
     <section className="rounded-[15px] border border-[rgba(var(--badA),0.45)] bg-card p-4.5">
-      <h2 className="mb-3 text-[14.5px] font-extrabold text-bad">{AR.admin.attention}</h2>
+      <h2 className="mb-3 text-[14.5px] font-extrabold text-bad">{t.admin.attention}</h2>
 
       {rows.length === 0 ? (
-        <p className="text-[12.5px] text-muted">{AR.admin.attentionEmpty}</p>
+        <p className="text-[12.5px] text-muted">{t.admin.attentionEmpty}</p>
       ) : (
         <ul className="grid gap-2.5">
           {rows.map((row) => (
@@ -256,15 +258,15 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
                   href={row.href}
                   className="ms-auto cursor-pointer rounded-[7px] border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)]"
                 >
-                  {AR.admin.handle}
+                  {t.admin.handle}
                 </Link>
               ) : (
                 <span
                   aria-disabled="true"
-                  title={AR.nav.notBuilt}
+                  title={t.nav.notBuilt}
                   className="ms-auto cursor-not-allowed rounded-[7px] border border-line px-3.5 py-1 text-[11.5px] font-bold text-faint/60"
                 >
-                  {AR.admin.handle}
+                  {t.admin.handle}
                 </span>
               )}
             </li>
@@ -280,7 +282,7 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
     <section className="min-w-0 rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h2 className="text-[14.5px] font-extrabold text-gold">
-          {AR.admin.latestBookings}
+          {t.admin.latestBookings}
         </h2>
 
         {/*
@@ -294,8 +296,8 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
         <form action="/bookings" method="get" className="ms-auto flex gap-2">
           <input
             name="reference"
-            placeholder={AR.dashboard.bookingReferencePlaceholder}
-            aria-label={AR.dashboard.findBookingLabel}
+            placeholder={t.dashboard.bookingReferencePlaceholder}
+            aria-label={t.dashboard.findBookingLabel}
             dir="ltr"
             className="min-w-[260px] rounded-[9px] border border-line bg-field px-3.5 py-2 text-[12.5px] text-text placeholder:text-faint"
           />
@@ -303,13 +305,13 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
             type="submit"
             className="cursor-pointer rounded-[9px] border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
           >
-            {AR.dashboard.findBooking}
+            {t.dashboard.findBooking}
           </button>
         </form>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-[12.5px] text-faint">{AR.dashboard.nothingWaiting}</p>
+        <p className="text-[12.5px] text-faint">{t.dashboard.nothingWaiting}</p>
       ) : (
         /*
           A real `<table>`, though the design draws a CSS grid. This is tabular data and a
@@ -321,11 +323,11 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
           <table className="w-full min-w-[540px] border-collapse text-[12.5px]">
             <thead>
               <tr>
-                <Th>{AR.admin.colReference}</Th>
-                <Th>{AR.admin.colProperty}</Th>
-                <Th>{AR.admin.colCustomer}</Th>
-                <Th>{AR.admin.colAmount}</Th>
-                <Th>{AR.admin.colStatus}</Th>
+                <Th>{t.admin.colReference}</Th>
+                <Th>{t.admin.colProperty}</Th>
+                <Th>{t.admin.colCustomer}</Th>
+                <Th>{t.admin.colAmount}</Th>
+                <Th>{t.admin.colStatus}</Th>
               </tr>
             </thead>
             <tbody>
@@ -347,7 +349,7 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
                     {row.customer}
                   </td>
                   <td dir="ltr" className="whitespace-nowrap p-2.5 font-bold text-gold">
-                    {money(row.amount)} {row.currency}
+                    {amount(row.amount, row.currency)}
                   </td>
                   <td className="p-2.5">
                     <StatusPill status={row.status} />
@@ -370,15 +372,15 @@ function PartnerQueue({
   return (
     <section className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       <h2 className="mb-3 text-[14.5px] font-extrabold text-gold">
-        {AR.admin.pendingPartners}
+        {t.admin.pendingPartners}
       </h2>
 
       {partners === 'failed' ? (
-        <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+        <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
       ) : partners === 'unauthenticated' ? (
-        <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+        <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
       ) : partners.length === 0 ? (
-        <p className="text-[12.5px] text-faint">{AR.dashboard.nothingWaiting}</p>
+        <p className="text-[12.5px] text-faint">{t.dashboard.nothingWaiting}</p>
       ) : (
         <ul className="grid gap-2.5">
           {/*
@@ -396,7 +398,7 @@ function PartnerQueue({
                   aria-hidden
                   className="grid size-[34px] shrink-0 place-items-center rounded-[9px] border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] font-[family-name:var(--font-amiri)] text-base text-gold"
                 >
-                  ۞
+                  {ORNAMENT_BRAND}
                 </span>
                 <span className="min-w-0">
                   <span className="block truncate text-[12.5px] font-bold text-text">
@@ -418,8 +420,8 @@ function PartnerQueue({
                   }`}
                 >
                   {partner.sanctionsScreenedAt
-                    ? AR.dashboard.screened
-                    : AR.dashboard.notScreened}
+                    ? t.dashboard.screened
+                    : t.dashboard.notScreened}
                 </span>
               </Link>
             </li>
@@ -428,7 +430,7 @@ function PartnerQueue({
       )}
 
       <p className="mt-2.5 text-[10.5px] leading-relaxed text-faint">
-        {AR.admin.pendingPartnersNote}
+        {t.admin.pendingPartnersNote}
       </p>
     </section>
   );
@@ -438,7 +440,7 @@ function RecentActivity({ rows }: { rows: DashboardOverview['recentAudit'] }) {
   return (
     <section className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       <h2 className="mb-2.5 text-[14.5px] font-extrabold text-gold">
-        {AR.admin.recentActivity}
+        {t.admin.recentActivity}
       </h2>
 
       <div className="grid gap-2 text-[11.5px] leading-relaxed text-muted">
@@ -447,7 +449,7 @@ function RecentActivity({ rows }: { rows: DashboardOverview['recentAudit'] }) {
             <span dir="ltr" className="text-sky">
               {row.at.slice(0, 16).replace('T', ' ')}
             </span>{' '}
-            · {row.actor ?? AR.admin.systemActor} — {auditAction(row.action)}
+            · {row.actor ?? t.admin.systemActor} — {auditAction(row.action)}
           </p>
         ))}
       </div>
@@ -456,7 +458,7 @@ function RecentActivity({ rows }: { rows: DashboardOverview['recentAudit'] }) {
         href="/audit"
         className="mt-3 inline-block cursor-pointer text-[11.5px] text-sky hover:underline"
       >
-        {AR.admin.viewAll}
+        {t.admin.viewAll}
       </Link>
     </section>
   );
@@ -546,17 +548,4 @@ function today(): string {
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date());
-}
-
-/** Counts, grouped. */
-function count(value: number): string {
-  return value.toLocaleString(ARABIC_WESTERN_DIGITS);
-}
-
-/** Money, two decimals. */
-function money(amount: string): string {
-  return Number(amount).toLocaleString(ARABIC_WESTERN_DIGITS, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 }

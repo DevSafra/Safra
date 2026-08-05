@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { AR } from '@/lib/strings';
+import { t } from '@/lib/strings';
 
 /**
  * Sign out.
@@ -37,9 +37,9 @@ export function SignOutButton() {
       type="button"
       onClick={() => void signOut()}
       disabled={busy}
-      className="rounded-lg border border-line px-4 py-2 text-sm text-muted transition-colors hover:border-gold/50 hover:text-text disabled:opacity-60"
+      className="cursor-pointer rounded-lg border border-line px-4 py-2 text-sm text-muted transition-colors hover:border-gold/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-60"
     >
-      {busy ? AR.dashboard.signingOut : AR.dashboard.signOut}
+      {busy ? t.dashboard.signingOut : t.dashboard.signOut}
     </button>
   );
 }

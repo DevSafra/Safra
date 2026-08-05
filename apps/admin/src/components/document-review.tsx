@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { PartnerDocument } from '@/lib/api';
+import { fill, t } from '@/lib/strings';
 
 /**
  * One document, with its own approve/reject (§8.1, item 121).
@@ -57,7 +58,10 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
         <div className="min-w-0">
           <p className="text-sm text-text">{kindLabel(document.kind)}</p>
           <p className="truncate text-xs text-faint">
-            {document.fileName} · uploaded {document.createdAt?.slice(0, 10) ?? '—'}
+            {fill(t.sections.documentReview.fileLine, {
+              fileName: document.fileName,
+              when: document.createdAt?.slice(0, 10) ?? t.admin.noData,
+            })}
           </p>
         </div>
 
@@ -74,7 +78,7 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
             rel="noreferrer noopener"
             className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold"
           >
-            Open
+            {t.sections.documentReview.open}
           </a>
         </div>
       </div>
@@ -101,7 +105,7 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
           }}
         >
           <label htmlFor={`notes-${document.id}`} className="text-xs text-muted">
-            What is wrong with it? The partner sees this.
+            {t.sections.documentReview.rejectHint}
           </label>
           <textarea
             id={`notes-${document.id}`}
@@ -115,16 +119,16 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
             <button
               type="submit"
               disabled={busy}
-              className="rounded-lg bg-bad px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-60"
+              className="cursor-pointer rounded-lg bg-bad px-3 py-1.5 text-xs font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
             >
               {busy ? 'Saving…' : 'Reject document'}
             </button>
             <button
               type="button"
               onClick={() => setRejecting(false)}
-              className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted"
+              className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs text-muted"
             >
-              Cancel
+              {t.sections.settings.cancel}
             </button>
           </div>
         </form>
@@ -134,17 +138,17 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
             type="button"
             onClick={() => void decide('approve')}
             disabled={busy}
-            className="rounded-lg border border-ok/40 bg-ok/10 px-3 py-1.5 text-xs text-ok disabled:opacity-60"
+            className="cursor-pointer rounded-lg border border-ok/40 bg-ok/10 px-3 py-1.5 text-xs text-ok disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Approve
+            {t.sections.documentReview.approve}
           </button>
           <button
             type="button"
             onClick={() => setRejecting(true)}
             disabled={busy}
-            className="rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-bad/50 hover:text-bad disabled:opacity-60"
+            className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-bad/50 hover:text-bad disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            Reject
+            {t.sections.documentReview.reject}
           </button>
         </div>
       )}

@@ -2,7 +2,7 @@ import { getReports, type ReportCard } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { money, percent } from '@/lib/format';
 import { ConsoleShell } from '@/components/console-shell';
-import { AR } from '@/lib/strings';
+import { t } from '@/lib/strings';
 
 /**
  * التقارير (design handoff §8).
@@ -36,11 +36,11 @@ export default async function ReportsPage() {
   const [result, counts] = await Promise.all([getReports(), sidebarCounts()]);
 
   return (
-    <ConsoleShell title={AR.nav.reports} counts={counts}>
+    <ConsoleShell title={t.nav.reports} counts={counts}>
       {result === 'unauthenticated' ? (
-        <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+        <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
       ) : result === 'failed' ? (
-        <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+        <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-4">
           {result.cards.map((card) => (
@@ -100,7 +100,7 @@ function Card({ card }: { card: ReportCard }) {
 function Trend({ card }: { card: ReportCard }) {
   if (card.previous === null) {
     return (
-      <p className="mt-1 text-[11.5px] text-faint">{AR.sections.reports.noPrevious}</p>
+      <p className="mt-1 text-[11.5px] text-faint">{t.sections.reports.noPrevious}</p>
     );
   }
 
@@ -110,7 +110,7 @@ function Trend({ card }: { card: ReportCard }) {
 
   if (!Number.isFinite(delta) || Math.abs(delta) < 0.05) {
     return (
-      <p className="mt-1 text-[11.5px] text-faint">— {AR.sections.reports.vsPrevious}</p>
+      <p className="mt-1 text-[11.5px] text-faint">— {t.sections.reports.vsPrevious}</p>
     );
   }
 
@@ -120,27 +120,27 @@ function Trend({ card }: { card: ReportCard }) {
   return (
     <p className={`mt-1 text-[11.5px] ${good ? 'text-ok' : 'text-bad'}`}>
       {rising ? '↑' : '↓'} {formatDelta(card, Math.abs(delta))}{' '}
-      {AR.sections.reports.vsPrevious}
+      {t.sections.reports.vsPrevious}
     </p>
   );
 }
 
 const COPY: Record<ReportCard['key'], { title: string; sub: string }> = {
   commission_revenue: {
-    title: AR.sections.reports.commissionRevenue,
-    sub: AR.sections.reports.commissionRevenueSub,
+    title: t.sections.reports.commissionRevenue,
+    sub: t.sections.reports.commissionRevenueSub,
   },
   occupancy: {
-    title: AR.sections.reports.occupancy,
-    sub: AR.sections.reports.occupancySub,
+    title: t.sections.reports.occupancy,
+    sub: t.sections.reports.occupancySub,
   },
   cancellations: {
-    title: AR.sections.reports.cancellations,
-    sub: AR.sections.reports.cancellationsSub,
+    title: t.sections.reports.cancellations,
+    sub: t.sections.reports.cancellationsSub,
   },
   partner_response: {
-    title: AR.sections.reports.partnerResponse,
-    sub: AR.sections.reports.partnerResponseSub,
+    title: t.sections.reports.partnerResponse,
+    sub: t.sections.reports.partnerResponseSub,
   },
 };
 
@@ -150,7 +150,7 @@ function format(card: ReportCard): string {
     case 'commission_revenue':
       return `$${money(card.value)}`;
     case 'partner_response':
-      return `${Number(card.value).toLocaleString('en-US')} ${AR.sections.reports.minutes}`;
+      return `${Number(card.value).toLocaleString('en-US')} ${t.sections.reports.minutes}`;
     default:
       return percent(card.value);
   }
@@ -161,7 +161,7 @@ function formatDelta(card: ReportCard, delta: number): string {
     case 'commission_revenue':
       return `$${money(String(delta))}`;
     case 'partner_response':
-      return `${Math.round(delta).toLocaleString('en-US')} ${AR.sections.reports.minutes}`;
+      return `${Math.round(delta).toLocaleString('en-US')} ${t.sections.reports.minutes}`;
     default:
       return percent(String(delta));
   }

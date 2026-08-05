@@ -22,7 +22,7 @@ import {
   type Tone,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { AR, label } from '@/lib/strings';
+import { t, label } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -52,22 +52,22 @@ export default async function PropertiesPage({
 
   return (
     <ConsoleShell
-      title={AR.nav.properties}
-      subtitle={AR.properties.subtitle}
+      title={t.nav.properties}
+      subtitle={t.properties.subtitle}
       counts={counts}
     >
       <div className="grid gap-4">
-        <ConsolePanel title={AR.sections.properties.title}>
+        <ConsolePanel title={t.sections.properties.title}>
           <TableToolbar
             action="/properties"
             query={q}
-            placeholder={AR.sections.properties.searchPlaceholder}
+            placeholder={t.sections.properties.searchPlaceholder}
           />
 
           {registry === 'unauthenticated' ? (
-            <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+            <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
           ) : registry === 'failed' ? (
-            <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+            <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
           ) : (
             <>
               <AdminTable
@@ -76,7 +76,7 @@ export default async function PropertiesPage({
                 template={TEMPLATE}
                 rowKey={(row) => row.reference}
                 minWidth={800}
-                empty={AR.table.empty}
+                empty={t.table.empty}
               />
               <Pager
                 basePath="/properties"
@@ -86,10 +86,10 @@ export default async function PropertiesPage({
             </>
           )}
 
-          <FootNote>{AR.sections.properties.note}</FootNote>
+          <FootNote>{t.sections.properties.note}</FootNote>
         </ConsolePanel>
 
-        <ConsolePanel title={AR.dashboard.propertiesPending}>
+        <ConsolePanel title={t.dashboard.propertiesPending}>
           <QueueState state={pending}>
             {(rows) =>
               rows.map((property) => (
@@ -103,7 +103,7 @@ export default async function PropertiesPage({
                     </span>
                     <span className="block text-[11px] text-faint">
                       <Ltr>{property.reference}</Ltr> · {property.city.nameAr} ·{' '}
-                      {property.partner.displayName} · {AR.dashboard.submitted}{' '}
+                      {property.partner.displayName} · {t.dashboard.submitted}{' '}
                       <Ltr>{shortDate(property.createdAt)}</Ltr>
                     </span>
 
@@ -131,7 +131,7 @@ export default async function PropertiesPage({
 const COLUMNS: readonly AdminColumn<PropertyListItem>[] = [
   {
     key: 'reference',
-    header: AR.table.colId,
+    header: t.table.colId,
     render: (row) => (
       <Link
         href={`/properties/${row.reference}`}
@@ -143,24 +143,24 @@ const COLUMNS: readonly AdminColumn<PropertyListItem>[] = [
   },
   {
     key: 'property',
-    header: AR.sections.properties.colProperty,
+    header: t.sections.properties.colProperty,
     render: (row) => (
       <span className="block truncate font-semibold text-text">{row.nameAr}</span>
     ),
   },
   {
     key: 'type',
-    header: AR.table.colType,
+    header: t.table.colType,
     render: (row) => <span className="text-text2">{row.propertyType}</span>,
   },
   {
     key: 'city',
-    header: AR.table.colCity,
+    header: t.table.colCity,
     render: (row) => <span className="text-muted">{row.city}</span>,
   },
   {
     key: 'partner',
-    header: AR.sections.properties.colPartner,
+    header: t.sections.properties.colPartner,
     render: (row) =>
       row.partnerReference ? (
         <Link
@@ -175,10 +175,10 @@ const COLUMNS: readonly AdminColumn<PropertyListItem>[] = [
   },
   {
     key: 'status',
-    header: AR.table.colStatus,
+    header: t.table.colStatus,
     render: (row) => (
       <StatusPill tone={statusTone(row.status)}>
-        {label(AR.enums.propertyStatus, row.status)}
+        {label(t.enums.propertyStatus, row.status)}
       </StatusPill>
     ),
   },

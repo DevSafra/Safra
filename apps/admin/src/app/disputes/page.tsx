@@ -13,7 +13,7 @@ import {
 import { FootNote, Ltr, StatusPill, type Tone } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { CloseDisputeForm } from '@/components/close-dispute-form';
-import { AR, label } from '@/lib/strings';
+import { fill, label, t } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -50,14 +50,14 @@ export default async function DisputesPage({
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.disputes} counts={counts}>
+    <ConsoleShell title={t.nav.disputes} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -67,19 +67,19 @@ export default async function DisputesPage({
             <TableToolbar
               action="/disputes"
               query={q}
-              placeholder={AR.sections.disputes.searchPlaceholder}
+              placeholder={t.sections.disputes.searchPlaceholder}
             >
               <select
                 name="status"
                 defaultValue={status ?? ''}
-                aria-label={AR.table.colStatus}
+                aria-label={t.table.colStatus}
                 className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
               >
-                <option value="">{AR.sections.bookings.allStatuses}</option>
+                <option value="">{t.sections.bookings.allStatuses}</option>
                 {(['open', 'investigating', 'resolved', 'rejected'] as const).map(
                   (value) => (
                     <option key={value} value={value}>
-                      {label(AR.enums.disputeStatus, value)}
+                      {label(t.enums.disputeStatus, value)}
                     </option>
                   ),
                 )}
@@ -87,7 +87,7 @@ export default async function DisputesPage({
             </TableToolbar>
 
             {result.items.length === 0 ? (
-              <p className="text-[12.5px] text-faint">{AR.table.empty}</p>
+              <p className="text-[12.5px] text-faint">{t.table.empty}</p>
             ) : (
               <div className="grid gap-3">
                 {result.items.map((dispute) => (
@@ -101,7 +101,7 @@ export default async function DisputesPage({
               query={{ q, status }}
               nextCursor={result.nextCursor}
             />
-            <FootNote>{AR.sections.disputes.note}</FootNote>
+            <FootNote>{t.sections.disputes.note}</FootNote>
           </ConsolePanel>
         </div>
       )}
@@ -111,24 +111,24 @@ export default async function DisputesPage({
 
 function Counters({ counters }: { counters: Disputes['counters'] }) {
   return (
-    <KpiRow label={AR.nav.disputes}>
+    <KpiRow label={t.nav.disputes}>
       <Kpi
-        label={AR.sections.disputes.kpiOpen}
+        label={t.sections.disputes.kpiOpen}
         value={count(counters.open)}
         valueClass={counters.open > 0 ? 'text-bad' : 'text-text'}
       />
       <Kpi
-        label={AR.sections.disputes.kpiInvestigating}
+        label={t.sections.disputes.kpiInvestigating}
         value={count(counters.investigating)}
         valueClass="text-warn"
       />
       <Kpi
-        label={AR.sections.disputes.kpiOldest}
+        label={t.sections.disputes.kpiOldest}
         /* A dash when nothing is open — never a zero, which reads as "opened just now". */
         value={
           counters.oldestOpenHours === null
-            ? AR.admin.noData
-            : `${count(counters.oldestOpenHours)} ${AR.sections.disputes.hours}`
+            ? t.admin.noData
+            : `${count(counters.oldestOpenHours)} ${t.sections.disputes.hours}`
         }
         valueClass={
           counters.oldestOpenHours !== null && counters.oldestOpenHours > 24
@@ -137,13 +137,13 @@ function Counters({ counters }: { counters: Disputes['counters'] }) {
         }
       />
       <Kpi
-        label={AR.sections.disputes.kpiFrozen}
+        label={t.sections.disputes.kpiFrozen}
         value={count(counters.frozenPayouts)}
         valueClass={counters.frozenPayouts > 0 ? 'text-warn' : 'text-text'}
-        sub={AR.sections.disputes.kpiFrozenSub}
+        sub={t.sections.disputes.kpiFrozenSub}
       />
       <Kpi
-        label={AR.sections.disputes.kpiResolved}
+        label={t.sections.disputes.kpiResolved}
         value={count(counters.resolvedThisMonth)}
         valueClass="text-ok"
       />
@@ -167,10 +167,10 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
             <Ltr className="font-bold text-sky">{dispute.reference}</Ltr>
             {/* The EC code, in the design's small square tag. */}
             <span className="rounded bg-[rgba(var(--badA),0.14)] px-2 py-0.5 text-[10px] font-extrabold text-bad">
-              {label(AR.enums.disputeKind, dispute.kind)}
+              {label(t.enums.disputeKind, dispute.kind)}
             </span>
             {dispute.freezesPayout ? (
-              <StatusPill tone="warn">{AR.sections.disputes.frozen}</StatusPill>
+              <StatusPill tone="warn">{t.sections.disputes.frozen}</StatusPill>
             ) : null}
           </div>
 
@@ -188,7 +188,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
             {dispute.customer ? ` · ${dispute.customer}` : ''}
             {dispute.partner ? ` · ${dispute.partner}` : ''}
             {dispute.evidenceCount > 0
-              ? ` · ${AR.sections.disputes.evidence(count(dispute.evidenceCount))}`
+              ? ` · ${fill(t.sections.disputes.evidence, { n: count(dispute.evidenceCount) })}`
               : ''}
           </p>
 
@@ -209,7 +209,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
 
         <div className="ms-auto flex shrink-0 flex-col items-end gap-2">
           <StatusPill tone={statusTone(dispute.status)}>
-            {label(AR.enums.disputeStatus, dispute.status)}
+            {label(t.enums.disputeStatus, dispute.status)}
           </StatusPill>
           <Ltr className="text-[11px] text-faint">
             {closed ? shortDateTime(dispute.closedAt) : `${count(dispute.ageHours)}h`}

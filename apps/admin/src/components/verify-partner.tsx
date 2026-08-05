@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { t } from '@/lib/strings';
 
 /**
  * The approve/reject decision (§8.1).
@@ -62,8 +63,7 @@ export function VerifyPartner({
     <div className="rounded-lg border border-line bg-card p-4">
       {!screened ? (
         <p className="mb-3 rounded border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-gold">
-          Record a sanctions screening result before approving. Verifying an unscreened
-          counterparty is a legal risk for the German entity, not a formality.
+          {t.sections.verifyPartner.screeningRequired}
         </p>
       ) : null}
 
@@ -80,16 +80,16 @@ export function VerifyPartner({
             disabled={!screened}
             onClick={() => setMode('approve')}
             title={screened ? undefined : 'Sanctions screening is required first.'}
-            className="rounded-lg bg-ok px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40"
+            className="cursor-pointer rounded-lg bg-ok px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Approve partner
+            {t.sections.verifyPartner.approve}
           </button>
           <button
             type="button"
             onClick={() => setMode('reject')}
-            className="rounded-lg border border-line px-4 py-2 text-sm text-muted hover:border-bad/50 hover:text-bad"
+            className="cursor-pointer rounded-lg border border-line px-4 py-2 text-sm text-muted hover:border-bad/50 hover:text-bad"
           >
-            Reject application
+            {t.sections.verifyPartner.reject}
           </button>
         </div>
       ) : (
@@ -117,7 +117,7 @@ export function VerifyPartner({
             <button
               type="submit"
               disabled={busy}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold text-bg disabled:opacity-60 ${
+              className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60 ${
                 mode === 'approve' ? 'bg-ok' : 'bg-bad'
               }`}
             >
@@ -130,9 +130,9 @@ export function VerifyPartner({
             <button
               type="button"
               onClick={() => setMode('idle')}
-              className="rounded-lg border border-line px-4 py-2 text-sm text-muted"
+              className="cursor-pointer rounded-lg border border-line px-4 py-2 text-sm text-muted"
             >
-              Cancel
+              {t.sections.settings.cancel}
             </button>
           </div>
         </form>

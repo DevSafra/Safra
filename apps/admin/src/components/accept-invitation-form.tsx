@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PasswordField } from '@safra/ui';
 
 import { text } from '@/lib/form';
+import { t } from '@/lib/strings';
 
 /**
  * Setting a first password from an invitation link (M-5).
@@ -69,17 +70,14 @@ export function AcceptInvitationForm({ token }: { token: string }) {
   if (done) {
     return (
       <div className="rounded-lg border border-ok/40 bg-ok/10 p-4">
-        <p className="text-sm text-text">Your password is set.</p>
-        <p className="mt-2 text-xs text-muted">
-          Sign in next. You will be asked to set up two-factor authentication before you
-          can do anything — that is required for every staff account.
-        </p>
+        <p className="text-sm text-text">{t.sections.invitation.passwordSet}</p>
+        <p className="mt-2 text-xs text-muted">{t.sections.invitation.signInNext}</p>
         <button
           type="button"
           onClick={() => router.push('/login')}
-          className="mt-4 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-bg"
+          className="cursor-pointer mt-4 rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-bg"
         >
-          Go to sign in
+          {t.sections.invitation.goToSignIn}
         </button>
       </div>
     );
@@ -97,8 +95,10 @@ export function AcceptInvitationForm({ token }: { token: string }) {
       ) : null}
 
       <PasswordField
+        showLabel={t.login.showPassword}
+        hideLabel={t.login.hidePassword}
         name="password"
-        label="New password"
+        label={t.sections.invitation.newPassword}
         required
         minLength={12}
         autoComplete="new-password"
@@ -106,8 +106,10 @@ export function AcceptInvitationForm({ token }: { token: string }) {
       />
 
       <PasswordField
+        showLabel={t.login.showPassword}
+        hideLabel={t.login.hidePassword}
         name="confirm"
-        label="Confirm password"
+        label={t.sections.invitation.confirmPassword}
         required
         minLength={12}
         autoComplete="new-password"
@@ -116,7 +118,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
       <button
         type="submit"
         disabled={submitting}
-        className="rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-bg disabled:opacity-60"
+        className="cursor-pointer rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? 'Setting your password…' : 'Set password'}
       </button>

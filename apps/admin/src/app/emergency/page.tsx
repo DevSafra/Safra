@@ -4,7 +4,7 @@ import { shortDateTime } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { Ltr, StatusPill } from '@/components/admin-table';
 import { DeactivateButton, EmergencyForm } from '@/components/emergency-form';
-import { AR } from '@/lib/strings';
+import { fill, t } from '@/lib/strings';
 
 /**
  * Emergency Mode (EC-009) — the 19th admin section (design handoff §8.3).
@@ -23,14 +23,14 @@ export default async function EmergencyPage() {
   const [result, counts] = await Promise.all([getEmergency(), sidebarCounts()]);
 
   return (
-    <ConsoleShell title={AR.admin.emergencyMode} counts={counts}>
+    <ConsoleShell title={t.admin.emergencyMode} counts={counts}>
       {result === 'unauthenticated' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         </ConsolePanel>
       ) : result === 'failed' ? (
         <ConsolePanel>
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         </ConsolePanel>
       ) : (
         <div className="grid gap-4">
@@ -40,9 +40,9 @@ export default async function EmergencyPage() {
 
           <EmergencyForm scopes={result.scopes} />
 
-          <ConsolePanel title={AR.sections.emergency.history}>
+          <ConsolePanel title={t.sections.emergency.history}>
             {result.history.length === 0 ? (
-              <p className="text-[12.5px] text-faint">{AR.sections.emergency.never}</p>
+              <p className="text-[12.5px] text-faint">{t.sections.emergency.never}</p>
             ) : (
               <ul className="grid gap-2.5">
                 {result.history.map((mode) => (
@@ -55,7 +55,9 @@ export default async function EmergencyPage() {
                         {mode.scopeName}
                       </span>
                       <StatusPill tone={mode.deactivatedAt === null ? 'bad' : 'faint'}>
-                        {mode.deactivatedAt === null ? 'مفعّل' : 'منتهٍ'}
+                        {mode.deactivatedAt === null
+                          ? t.sections.emergency.stateActive
+                          : t.sections.emergency.stateEnded}
                       </StatusPill>
                       <Ltr className="ms-auto text-[10.5px] text-faint">
                         {shortDateTime(mode.activatedAt)}
@@ -92,7 +94,7 @@ function ActiveBanner({ mode }: { mode: EmergencyMode }) {
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-xl border border-bad bg-[rgba(var(--badA),0.12)] px-4 py-3">
       <span className="text-[13px] font-extrabold text-bad">
-        {AR.sections.emergency.activeBanner(mode.scopeName)}
+        {fill(t.sections.emergency.activeBanner, { scope: mode.scopeName })}
       </span>
       <span className="text-xs text-text2">{flagSummary(mode)}</span>
       <DeactivateButton id={mode.id} scopeName={mode.scopeName} />
@@ -103,10 +105,10 @@ function ActiveBanner({ mode }: { mode: EmergencyMode }) {
 /** Which levers are pulled, in one line — the design's own banner phrasing. */
 function flagSummary(mode: EmergencyMode): string {
   const parts: string[] = [
-    mode.flags.stopBookings ? AR.sections.emergency.stopBookings : null,
-    mode.flags.waiveFines ? AR.sections.emergency.waiveFines : null,
-    mode.flags.broadcast ? AR.sections.emergency.broadcast : null,
-    mode.flags.suspendSla ? AR.sections.emergency.suspendSla : null,
+    mode.flags.stopBookings ? t.sections.emergency.stopBookings : null,
+    mode.flags.waiveFines ? t.sections.emergency.waiveFines : null,
+    mode.flags.broadcast ? t.sections.emergency.broadcast : null,
+    mode.flags.suspendSla ? t.sections.emergency.suspendSla : null,
   ].filter((part) => part !== null);
 
   return parts.length > 0 ? `${parts.join(' · ')} (EC-009)` : '(EC-009)';

@@ -10,7 +10,7 @@ import {
   type AdminColumn,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { AR, label } from '@/lib/strings';
+import { t, label } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -39,18 +39,18 @@ export default async function WalletPage({
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.wallet} counts={counts}>
+    <ConsoleShell title={t.nav.wallet} counts={counts}>
       <ConsolePanel>
         <TableToolbar
           action="/wallet"
           query={q}
-          placeholder={AR.sections.wallet.searchPlaceholder}
+          placeholder={t.sections.wallet.searchPlaceholder}
         />
 
         {result === 'unauthenticated' ? (
-          <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+          <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
-          <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+          <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
         ) : (
           <>
             <AdminTable
@@ -59,13 +59,13 @@ export default async function WalletPage({
               template={TEMPLATE}
               rowKey={(row) => `${row.at}-${row.customerReference ?? ''}-${row.amount}`}
               minWidth={820}
-              empty={AR.table.empty}
+              empty={t.table.empty}
             />
             <Pager basePath="/wallet" query={{ q }} nextCursor={result.nextCursor} />
           </>
         )}
 
-        <FootNote>{AR.sections.wallet.note}</FootNote>
+        <FootNote>{t.sections.wallet.note}</FootNote>
       </ConsolePanel>
     </ConsoleShell>
   );
@@ -74,7 +74,7 @@ export default async function WalletPage({
 const COLUMNS: readonly AdminColumn<WalletItem>[] = [
   {
     key: 'operation',
-    header: AR.sections.wallet.colOperation,
+    header: t.sections.wallet.colOperation,
     /*
       `wallet_transactions` has no human reference, so the operation is identified by what it
       was FOR — the booking it belongs to — rather than by a fabricated `WTX-…` id. When there
@@ -82,13 +82,13 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
     */
     render: (row) => (
       <Ltr className="font-semibold text-sky">
-        {row.bookingReference ?? AR.admin.noData}
+        {row.bookingReference ?? t.admin.noData}
       </Ltr>
     ),
   },
   {
     key: 'customer',
-    header: AR.sections.wallet.colCustomer,
+    header: t.sections.wallet.colCustomer,
     render: (row) => (
       <span className="text-text">
         {row.customer}
@@ -100,16 +100,16 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
   },
   {
     key: 'reason',
-    header: AR.table.colType,
+    header: t.table.colType,
     render: (row) => (
       <ToneText tone={row.direction === 'credit' ? 'ok' : 'bad'}>
-        {label(AR.enums.walletReason, row.reason)}
+        {label(t.enums.walletReason, row.reason)}
       </ToneText>
     ),
   },
   {
     key: 'amount',
-    header: AR.admin.colAmount,
+    header: t.admin.colAmount,
     /* Signed, so direction is legible without reading the type column. */
     render: (row) => (
       <Ltr
@@ -124,16 +124,16 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
   },
   {
     key: 'note',
-    header: AR.sections.wallet.colReason,
+    header: t.sections.wallet.colReason,
     render: (row) => (
       <span className="text-text2">
-        {row.note ?? label(AR.enums.walletReason, row.reason)}
+        {row.note ?? label(t.enums.walletReason, row.reason)}
       </span>
     ),
   },
   {
     key: 'at',
-    header: AR.sections.wallet.colBalanceAfter,
+    header: t.sections.wallet.colBalanceAfter,
     render: (row) => (
       <div className="grid gap-0.5">
         <Ltr className="font-bold text-text2">{money(row.balanceAfter)}</Ltr>

@@ -990,7 +990,6 @@ const notificationsSchema = cursorPage(notificationItemSchema).extend({
   templates: z.array(
     z.object({
       key: z.string(),
-      nameAr: z.string(),
       channels: z.array(z.string()),
       locales: z.array(z.string()),
       implemented: z.boolean(),

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { t } from '@/lib/strings';
 
 /**
  * Publish or reject a listing (§8.1, P-002).
@@ -85,16 +86,16 @@ export function ReviewProperty({
             type="button"
             disabled={!canApprove}
             onClick={() => setMode('approve')}
-            className="rounded-lg bg-ok px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40"
+            className="cursor-pointer rounded-lg bg-ok px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Approve and publish
+            {t.sections.reviewProperty.approveAndPublish}
           </button>
           <button
             type="button"
             onClick={() => setMode('reject')}
-            className="rounded-lg border border-line px-4 py-2 text-sm text-muted hover:border-bad/50 hover:text-bad"
+            className="cursor-pointer rounded-lg border border-line px-4 py-2 text-sm text-muted hover:border-bad/50 hover:text-bad"
           >
-            Reject listing
+            {t.sections.reviewProperty.reject}
           </button>
         </div>
       ) : (
@@ -122,7 +123,7 @@ export function ReviewProperty({
             <button
               type="submit"
               disabled={busy}
-              className={`rounded-lg px-4 py-2 text-sm font-semibold text-bg disabled:opacity-60 ${
+              className={`cursor-pointer rounded-lg px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60 ${
                 mode === 'approve' ? 'bg-ok' : 'bg-bad'
               }`}
             >
@@ -135,9 +136,9 @@ export function ReviewProperty({
             <button
               type="button"
               onClick={() => setMode('idle')}
-              className="rounded-lg border border-line px-4 py-2 text-sm text-muted"
+              className="cursor-pointer rounded-lg border border-line px-4 py-2 text-sm text-muted"
             >
-              Cancel
+              {t.sections.settings.cancel}
             </button>
           </div>
         </form>

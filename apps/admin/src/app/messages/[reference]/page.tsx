@@ -6,7 +6,7 @@ import { count, shortDateTime } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { FootNote, Ltr } from '@/components/admin-table';
 import { ReplyForm } from '@/components/reply-form';
-import { AR } from '@/lib/strings';
+import { fill, t } from '@/lib/strings';
 
 /**
  * One three-party thread, in the order it was written (design handoff §8).
@@ -34,20 +34,20 @@ export default async function ThreadPage({
   const [result, counts] = await Promise.all([getThread(reference), sidebarCounts()]);
 
   return (
-    <ConsoleShell title={AR.nav.messages} subtitle={reference} counts={counts}>
+    <ConsoleShell title={t.nav.messages} subtitle={reference} counts={counts}>
       <div className="grid gap-4">
         <ConsolePanel>
           <Link href="/messages" className="text-[11.5px] text-sky hover:underline">
-            ← {AR.nav.messages}
+            ← {t.nav.messages}
           </Link>
 
           {result === 'unauthenticated' ? (
-            <p className="mt-3 text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+            <p className="mt-3 text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
           ) : result === 'failed' ? (
-            <p className="mt-3 text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+            <p className="mt-3 text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
           ) : result.messages.length === 0 ? (
             <p className="mt-3 text-[12.5px] text-faint">
-              {AR.sections.messages.noMessages}
+              {t.sections.messages.noMessages}
             </p>
           ) : (
             <ul className="mt-3 grid gap-2.5">
@@ -59,7 +59,7 @@ export default async function ThreadPage({
             </ul>
           )}
 
-          <FootNote>{AR.sections.messages.note}</FootNote>
+          <FootNote>{t.sections.messages.note}</FootNote>
         </ConsolePanel>
 
         {result === 'unauthenticated' || result === 'failed' ? null : (
@@ -94,7 +94,7 @@ function Message({ message }: { message: ThreadMessage }) {
         ) : null}
         {message.internal ? (
           <span className="rounded bg-[rgba(var(--warnA),0.15)] px-2 py-px text-[10px] font-bold text-warn">
-            {AR.sections.messages.internalNote}
+            {t.sections.messages.internalNote}
           </span>
         ) : null}
         <Ltr className="ms-auto text-[10.5px] text-faint">
@@ -106,7 +106,7 @@ function Message({ message }: { message: ThreadMessage }) {
 
       {message.redactedCount > 0 ? (
         <p className="mt-1 text-[10.5px] text-warn">
-          {AR.sections.messages.redacted(count(message.redactedCount))}
+          {fill(t.sections.messages.redacted, { n: count(message.redactedCount) })}
         </p>
       ) : null}
     </div>
@@ -116,12 +116,12 @@ function Message({ message }: { message: ThreadMessage }) {
 function senderLabel(kind: string): string {
   switch (kind) {
     case 'customer':
-      return AR.sections.messages.senderCustomer;
+      return t.sections.messages.senderCustomer;
     case 'partner':
-      return AR.sections.messages.senderPartner;
+      return t.sections.messages.senderPartner;
     case 'staff':
-      return AR.sections.messages.senderStaff;
+      return t.sections.messages.senderStaff;
     default:
-      return AR.sections.messages.senderSystem;
+      return t.sections.messages.senderSystem;
   }
 }

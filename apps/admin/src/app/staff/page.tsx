@@ -6,7 +6,7 @@ import { ConsolePanel, ConsoleShell, Kpi, KpiRow } from '@/components/console-sh
 import { FootNote, Ltr } from '@/components/admin-table';
 import { StaffAdmin } from '@/components/staff-admin';
 import { ScopePanel } from '@/components/scope-panel';
-import { AR, auditAction, roleName } from '@/lib/strings';
+import { auditAction, fill, roleName, t } from '@/lib/strings';
 
 /**
  * الموظفون (M-5, SRS §4, design handoff §8.2).
@@ -29,7 +29,7 @@ export default async function StaffPage() {
   ]);
 
   return (
-    <ConsoleShell title={AR.nav.staff} counts={counts}>
+    <ConsoleShell title={t.nav.staff} counts={counts}>
       <div className="grid gap-4">
         {overview === 'failed' || overview === 'unauthenticated' ? null : (
           <Counters counters={overview.counters} />
@@ -37,14 +37,14 @@ export default async function StaffPage() {
 
         <ConsolePanel>
           {result === 'unauthenticated' ? (
-            <p className="text-[12.5px] text-muted">{AR.dashboard.sessionExpired}</p>
+            <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
           ) : result === 'failed' ? (
-            <p className="text-[12.5px] text-bad">{AR.dashboard.queueFailed}</p>
+            <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
           ) : (
             <StaffAdmin staff={result.staff} currentUserId={session?.user.id} />
           )}
 
-          <FootNote>{AR.sections.staff.note}</FootNote>
+          <FootNote>{t.sections.staff.note}</FootNote>
         </ConsolePanel>
 
         {/*
@@ -67,26 +67,26 @@ export default async function StaffPage() {
 
 function Counters({ counters }: { counters: StaffOverview['counters'] }) {
   return (
-    <KpiRow label={AR.nav.staff}>
+    <KpiRow label={t.nav.staff}>
       <Kpi
-        label={AR.sections.staff.kpiTotal}
+        label={t.sections.staff.kpiTotal}
         value={count(counters.total)}
-        sub={AR.sections.staff.kpiTotalSub(
-          count(counters.active),
-          count(counters.suspended),
-          count(counters.invited),
-        )}
+        sub={fill(t.sections.staff.kpiTotalSub, {
+          active: count(counters.active),
+          suspended: count(counters.suspended),
+          invited: count(counters.invited),
+        })}
       />
       <Kpi
-        label={AR.sections.staff.kpiSignedIn}
+        label={t.sections.staff.kpiSignedIn}
         value={count(counters.signedInToday)}
         valueClass="text-ok"
       />
       <Kpi
-        label={AR.sections.staff.kpiRoles}
+        label={t.sections.staff.kpiRoles}
         value={count(counters.rolesDefined)}
         valueClass="text-gold"
-        sub={AR.sections.staff.kpiRolesSub}
+        sub={t.sections.staff.kpiRolesSub}
       />
       {/*
         The design's fourth card is "دعوات معلقة". This shows it, and swaps in the
@@ -95,16 +95,16 @@ function Counters({ counters }: { counters: StaffOverview['counters'] }) {
       */}
       {counters.twoFactorMissing > 0 ? (
         <Kpi
-          label={AR.sections.staff.kpiTwoFactor}
+          label={t.sections.staff.kpiTwoFactor}
           value={count(counters.twoFactorMissing)}
           valueClass="text-bad"
         />
       ) : (
         <Kpi
-          label={AR.sections.staff.kpiInvites}
+          label={t.sections.staff.kpiInvites}
           value={count(counters.invited)}
           valueClass="text-warn"
-          sub={AR.sections.staff.kpiInvitesSub}
+          sub={t.sections.staff.kpiInvitesSub}
         />
       )}
     </KpiRow>
@@ -129,9 +129,9 @@ function Matrix({ matrix }: { matrix: StaffOverview['matrix'] }) {
     <ConsolePanel>
       <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
         <h2 className="text-[14.5px] font-extrabold text-gold">
-          {AR.sections.staff.matrix}
+          {t.sections.staff.matrix}
         </h2>
-        <span className="text-[11.5px] text-faint">{AR.sections.staff.matrixHint}</span>
+        <span className="text-[11.5px] text-faint">{t.sections.staff.matrixHint}</span>
       </div>
 
       <div className="overflow-x-auto">
@@ -154,7 +154,7 @@ function Matrix({ matrix }: { matrix: StaffOverview['matrix'] }) {
                 scope="col"
                 className="border-b border-line px-2.5 py-2 text-start text-[11px] font-bold text-faint"
               >
-                {AR.sections.staff.permission}
+                {t.sections.staff.permission}
               </th>
               {matrix.roles.map((role) => (
                 <th
@@ -190,7 +190,7 @@ function Matrix({ matrix }: { matrix: StaffOverview['matrix'] }) {
                     <span
                       className={granted ? 'text-ok' : 'text-faint2'}
                       aria-label={`${row.permission}: ${
-                        granted ? AR.sections.staff.allowed : AR.sections.staff.denied
+                        granted ? t.sections.staff.allowed : t.sections.staff.denied
                       }`}
                     >
                       {granted ? '✓' : '—'}
@@ -205,14 +205,14 @@ function Matrix({ matrix }: { matrix: StaffOverview['matrix'] }) {
 
       <div className="mt-3 flex flex-wrap gap-4 text-[11px] text-faint">
         <span>
-          <b className="text-ok">✓</b> {AR.sections.staff.allowed}
+          <b className="text-ok">✓</b> {t.sections.staff.allowed}
         </span>
         <span>
-          <b className="text-faint2">—</b> {AR.sections.staff.denied}
+          <b className="text-faint2">—</b> {t.sections.staff.denied}
         </span>
       </div>
 
-      <FootNote>{AR.sections.staff.noApprovalTier}</FootNote>
+      <FootNote>{t.sections.staff.noApprovalTier}</FootNote>
     </ConsolePanel>
   );
 }
@@ -225,9 +225,9 @@ function Matrix({ matrix }: { matrix: StaffOverview['matrix'] }) {
  */
 function Activity({ rows }: { rows: StaffOverview['activity'] }) {
   return (
-    <ConsolePanel title={AR.sections.staff.activity}>
+    <ConsolePanel title={t.sections.staff.activity}>
       {rows.length === 0 ? (
-        <p className="text-[12.5px] text-faint">{AR.dashboard.nothingWaiting}</p>
+        <p className="text-[12.5px] text-faint">{t.dashboard.nothingWaiting}</p>
       ) : (
         <ul className="grid gap-2.25 text-[12.5px]">
           {rows.map((row) => (
@@ -236,7 +236,7 @@ function Activity({ rows }: { rows: StaffOverview['activity'] }) {
               className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-line bg-field px-3.25 py-2.5"
             >
               <span className="font-bold text-text">
-                {row.actor ?? AR.admin.systemActor}
+                {row.actor ?? t.admin.systemActor}
               </span>
               <span className="text-text2">{auditAction(row.action)}</span>
               <span className="text-[11px] text-faint">{row.subjectType}</span>

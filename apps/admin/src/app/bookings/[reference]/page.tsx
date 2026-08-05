@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { getBooking } from '@/lib/api';
+import { fill, t } from '@/lib/strings';
 
 /**
  * One booking, end to end (SRS §9.4).
@@ -28,7 +29,7 @@ export default async function BookingPage({
   if (booking === 'unauthenticated') {
     return (
       <Shell>
-        <p className="text-sm text-muted">Your session expired. Sign in again.</p>
+        <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
       </Shell>
     );
   }
@@ -41,10 +42,20 @@ export default async function BookingPage({
         <p className="font-mono text-xs text-faint">{booking.reference}</p>
         <h1 className="mt-1 text-2xl font-semibold text-text">{booking.property.name}</h1>
         <p className="mt-1 text-sm text-muted">
-          {booking.stay.checkIn} → {booking.stay.checkOut} · {booking.stay.nights} night
-          {booking.stay.nights === 1 ? '' : 's'} · {booking.stay.adults} adult
-          {booking.stay.adults === 1 ? '' : 's'}
-          {booking.stay.children > 0 ? `, ${booking.stay.children} children` : ''}
+          {booking.stay.children > 0
+            ? fill(t.sections.bookingDetail.stayWithChildren, {
+                checkIn: booking.stay.checkIn,
+                checkOut: booking.stay.checkOut,
+                nights: booking.stay.nights,
+                adults: booking.stay.adults,
+                children: booking.stay.children,
+              })
+            : fill(t.sections.bookingDetail.stay, {
+                checkIn: booking.stay.checkIn,
+                checkOut: booking.stay.checkOut,
+                nights: booking.stay.nights,
+                adults: booking.stay.adults,
+              })}
         </p>
         <StatusPill status={booking.status} />
       </header>
@@ -57,7 +68,7 @@ export default async function BookingPage({
       */}
       <section className="grid gap-3 sm:grid-cols-3">
         <Party
-          title="Customer"
+          title={t.sections.bookingDetail.customer}
           name={booking.customer.name}
           reference={booking.customer.reference}
           lines={[
@@ -67,14 +78,14 @@ export default async function BookingPage({
           ]}
         />
         <Party
-          title="Partner"
+          title={t.sections.bookingDetail.partner}
           name={booking.partner.name}
           reference={booking.partner.reference}
           lines={[booking.partner.phone]}
           href={`/partners/${booking.partner.reference}`}
         />
         <Party
-          title="Property"
+          title={t.sections.bookingDetail.property}
           name={booking.property.name}
           reference={booking.property.reference}
           lines={[booking.property.unit, booking.property.citySlug]}
@@ -83,55 +94,67 @@ export default async function BookingPage({
       </section>
 
       {/* ── The clock (§6.4, EC-001) ──────────────────────────────────────── */}
-      <Section title="Dates">
+      <Section title={t.sections.bookingDetail.dates}>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <Stamp label="Booked" value={booking.dates.createdAt} />
-          <Stamp label="Paid" value={booking.dates.paidAt} />
+          <Stamp
+            label={t.sections.bookingDetail.booked}
+            value={booking.dates.createdAt}
+          />
+          <Stamp label={t.sections.bookingDetail.paid} value={booking.dates.paidAt} />
           {/*
             The confirmation deadline is on the screen even once it has passed. "Was
             the partner actually late?" is the first question in an SLA dispute, and
             hiding a spent deadline makes it unanswerable without the timeline.
           */}
-          <Stamp label="Confirmation due" value={booking.dates.confirmationDeadlineAt} />
-          <Stamp label="Confirmed" value={booking.dates.confirmedAt} />
+          <Stamp
+            label={t.sections.bookingDetail.confirmationDue}
+            value={booking.dates.confirmationDeadlineAt}
+          />
+          <Stamp
+            label={t.sections.bookingDetail.confirmed}
+            value={booking.dates.confirmedAt}
+          />
           {booking.dates.cancelledAt ? (
-            <Stamp label="Cancelled" value={booking.dates.cancelledAt} />
+            <Stamp
+              label={t.sections.bookingDetail.cancelled}
+              value={booking.dates.cancelledAt}
+            />
           ) : null}
         </dl>
       </Section>
 
       {/* ── Money (§13.3) ─────────────────────────────────────────────────── */}
-      <Section title="Money">
+      <Section title={t.sections.bookingDetail.money}>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <Amount
-            label="Base"
+            label={t.sections.bookingDetail.base}
             value={booking.money.baseAmount}
             currency={booking.money.currencyCode}
           />
           <Amount
-            label="Service fee"
+            label={t.sections.bookingDetail.serviceFee}
             value={booking.money.customerFeeAmount}
             currency={booking.money.currencyCode}
           />
           {booking.money.walletAmount !== '0.00' ? (
             <Amount
-              label="Paid from wallet"
+              label={t.sections.bookingDetail.paidFromWallet}
               value={booking.money.walletAmount}
               currency={booking.money.currencyCode}
             />
           ) : null}
           <Amount
-            label="Customer total"
+            label={t.sections.bookingDetail.customerTotal}
             value={booking.money.totalAmount}
             currency={booking.money.currencyCode}
           />
           <Amount
-            label="Partner commission"
+            label={t.sections.bookingDetail.partnerCommission}
             value={booking.money.partnerCommissionAmount}
             currency={booking.money.currencyCode}
           />
           <Amount
-            label="Partner payable"
+            label={t.sections.bookingDetail.partnerPayable}
             value={booking.money.partnerPayableAmount}
             currency={booking.money.currencyCode}
           />
@@ -142,16 +165,18 @@ export default async function BookingPage({
           the books months later.
         */}
         <p className="mt-3 text-xs text-faint">
-          {booking.money.totalSyp} SYP at a rate of {booking.money.fxRateToSyp},
-          snapshotted when the booking was made.
+          {fill(t.sections.bookingDetail.fxSnapshot, {
+            amount: booking.money.totalSyp,
+            rate: booking.money.fxRateToSyp,
+          })}
         </p>
       </Section>
 
       {/* ── Payments, finance only (§4, §7.2) ─────────────────────────────── */}
       {booking.payments ? (
-        <Section title="Payments">
+        <Section title={t.sections.bookingDetail.payments}>
           {booking.payments.attempts.length === 0 ? (
-            <p className="text-sm text-faint">No payment attempts.</p>
+            <p className="text-sm text-faint">{t.sections.bookingDetail.noPayments}</p>
           ) : (
             <ul className="grid gap-2 text-sm">
               {booking.payments.attempts.map((attempt) => (
@@ -166,7 +191,11 @@ export default async function BookingPage({
                     {attempt.amount} {booking.money.currencyCode}
                   </span>
                   <span className="text-xs text-muted">
-                    {attempt.method} via {attempt.provider} · {attempt.status}
+                    {fill(t.sections.bookingDetail.attemptVia, {
+                      method: attempt.method,
+                      provider: attempt.provider,
+                      status: attempt.status,
+                    })}
                   </span>
                 </li>
               ))}
@@ -181,10 +210,16 @@ export default async function BookingPage({
                   className="rounded-lg border border-line bg-card px-4 py-3"
                 >
                   <span className="text-text">
-                    Refunded {refund.amount} {booking.money.currencyCode}
-                    {refund.walletAmount !== '0.00'
-                      ? ` (${refund.walletAmount} to wallet)`
-                      : ''}
+                    {refund.walletAmount === '0.00'
+                      ? fill(t.sections.bookingDetail.refunded, {
+                          amount: refund.amount,
+                          currency: booking.money.currencyCode,
+                        })
+                      : fill(t.sections.bookingDetail.refundedToWallet, {
+                          amount: refund.amount,
+                          currency: booking.money.currencyCode,
+                          walletAmount: refund.walletAmount,
+                        })}
                   </span>
                   <span className="block text-xs text-faint">
                     {refund.status} · {refund.reason}
@@ -197,9 +232,9 @@ export default async function BookingPage({
       ) : null}
 
       {/* ── The timeline (§9.4) ───────────────────────────────────────────── */}
-      <Section title="Timeline">
+      <Section title={t.sections.bookingDetail.timeline}>
         {booking.timeline.length === 0 ? (
-          <p className="text-sm text-faint">Nothing recorded yet.</p>
+          <p className="text-sm text-faint">{t.sections.bookingDetail.nothingRecorded}</p>
         ) : (
           <ol className="grid gap-2">
             {booking.timeline.map((event) => (
@@ -216,7 +251,9 @@ export default async function BookingPage({
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-muted">
-                  by {event.actorEmail ?? event.actorType}
+                  {fill(t.sections.bookingDetail.actorLine, {
+                    who: event.actorEmail ?? event.actorType,
+                  })}
                 </p>
                 {/*
                   The payload verbatim. A timeline that summarises loses the detail a
@@ -234,7 +271,7 @@ export default async function BookingPage({
       </Section>
 
       {booking.cancellationReason ? (
-        <Section title="Cancellation">
+        <Section title={t.sections.bookingDetail.cancellation}>
           <p className="rounded-lg border border-line bg-card p-4 text-sm text-muted">
             {booking.cancellationReason}
           </p>
@@ -248,7 +285,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
       <Link href="/" className="text-sm text-muted hover:text-gold">
-        ← Queues
+        {t.table.backToQueues}
       </Link>
       <div className="mt-4 grid gap-8">{children}</div>
     </main>

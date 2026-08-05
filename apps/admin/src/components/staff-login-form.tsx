@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 
 import { PasswordField } from '@safra/ui';
 
-import { AR, apiError } from '@/lib/strings';
+import { t, apiError } from '@/lib/strings';
+import { ERROR } from '@safra/contracts';
 
 /** A six-digit authenticator code, as opposed to a recovery code. */
 const TOTP_PATTERN = /^\d{6}$/;
@@ -139,7 +140,7 @@ export function StaffLoginForm({ next }: { next: string }) {
       setError(describe(payload, status));
       setSubmitting(false);
     } catch {
-      setError(AR.errors.unreachable);
+      setError(t.errors.unreachable);
       setSubmitting(false);
     }
   }
@@ -176,7 +177,7 @@ export function StaffLoginForm({ next }: { next: string }) {
       setError(describe(payload, status));
       setSubmitting(false);
     } catch {
-      setError(AR.errors.unreachable);
+      setError(t.errors.unreachable);
       setSubmitting(false);
     }
   }
@@ -213,13 +214,13 @@ export function StaffLoginForm({ next }: { next: string }) {
           className="grid gap-4"
         >
           <p className="text-sm text-muted">
-            {AR.login.signingInAs} <span className="text-text">{email.trim()}</span>
+            {t.login.signingInAs} <span className="text-text">{email.trim()}</span>
           </p>
 
           <Field
             ref={codeInput}
             name="code"
-            label={AR.login.code}
+            label={t.login.code}
             value={code}
             onChange={(event) => setCode(event.target.value)}
             inputMode="numeric"
@@ -230,7 +231,7 @@ export function StaffLoginForm({ next }: { next: string }) {
              */
             autoComplete="one-time-code"
             required
-            hint={AR.login.codeHint}
+            hint={t.login.codeHint}
           />
 
           <button
@@ -238,7 +239,7 @@ export function StaffLoginForm({ next }: { next: string }) {
             disabled={submitting}
             className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? AR.login.submittingCode : AR.login.submitCode}
+            {submitting ? t.login.submittingCode : t.login.submitCode}
           </button>
 
           {/* A way back, because the alternative is reloading the page. */}
@@ -247,7 +248,7 @@ export function StaffLoginForm({ next }: { next: string }) {
             onClick={startOver}
             className="cursor-pointer text-sm text-muted underline-offset-4 hover:text-gold hover:underline"
           >
-            {AR.login.useDifferentAccount}
+            {t.login.useDifferentAccount}
           </button>
         </form>
       ) : (
@@ -260,7 +261,7 @@ export function StaffLoginForm({ next }: { next: string }) {
           <Field
             name="email"
             type="email"
-            label={AR.login.email}
+            label={t.login.email}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             autoComplete="username"
@@ -268,9 +269,9 @@ export function StaffLoginForm({ next }: { next: string }) {
           />
           <PasswordField
             name="password"
-            label={AR.login.password}
-            showLabel={AR.login.showPassword}
-            hideLabel={AR.login.hidePassword}
+            label={t.login.password}
+            showLabel={t.login.showPassword}
+            hideLabel={t.login.hidePassword}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             autoComplete="current-password"
@@ -282,7 +283,7 @@ export function StaffLoginForm({ next }: { next: string }) {
             disabled={submitting}
             className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {submitting ? AR.login.submittingCredentials : AR.login.submitCredentials}
+            {submitting ? t.login.submittingCredentials : t.login.submitCredentials}
           </button>
         </form>
       )}
@@ -301,14 +302,26 @@ function requiresEnrolment(body: unknown): boolean {
 /**
  * Whether a 401 means "credentials fine, now the code" rather than a real failure.
  *
- * Matched on the API's message because that is the only signal it gives. A status code
- * alone cannot distinguish the two, and treating every 401 as "ask for the code" would
- * present the second step to someone who simply mistyped their password.
+ * Matched on the CODE. A status alone cannot distinguish the two, and treating every 401 as
+ * "ask for the code" would present the second step to somebody who simply mistyped their
+ * password.
+ *
+ * This was a regex over the API's English prose (`/authenticator code required/i`), which is
+ * the most load-bearing string match in the product: get it wrong and nobody signs in. It
+ * broke exactly that way during the migration to codes, because `SecondFactorRequiredException`
+ * is a custom subclass and was the one exception left carrying a bare message.
  */
 function needsSecondFactor(body: unknown): boolean {
-  const message = messageOf(body);
+  return codeOf(body) === ERROR.AUTH_CODE_REQUIRED;
+}
 
-  return message !== null && /authenticator code required/i.test(message);
+/** The error code from a response body, if it carries one of ours. */
+function codeOf(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null || !('code' in body)) return null;
+
+  const { code } = body;
+
+  return typeof code === 'string' ? code : null;
 }
 
 /**
@@ -320,36 +333,25 @@ function needsSecondFactor(body: unknown): boolean {
 function describe(body: unknown, status: number): string {
   if (status === 401) {
     /**
-     * By the time this runs the two-step flow has already handled "code required", so
-     * a 401 here is either bad credentials at step one or a bad code at step two. The
-     * API distinguishes them in English; `apiError` maps that onto Arabic rather than
-     * putting a server string in the middle of an Arabic screen.
+     * By the time this runs the two-step flow has already handled "code required", so a 401
+     * here is either bad credentials at step one or a bad code at step two. The API's code
+     * says which, and `apiError` resolves it to Arabic — no prose matching involved.
      */
-    const message = messageOf(body);
+    const code = codeOf(body);
 
-    return message && /authenticator|recovery|code/i.test(message)
-      ? apiError(message)
-      : AR.errors.credentials;
+    return code ? apiError(code) : t.errors.credentials;
   }
 
   if (status === 400) {
     // Almost always a malformed recovery code, since the code field accepts both shapes.
-    return AR.errors.codeFormat;
+    return t.errors.codeFormat;
   }
 
-  if (status === 403) return AR.errors.notStaff;
-  if (status === 423) return AR.errors.locked;
-  if (status === 429) return AR.errors.tooMany;
+  if (status === 403) return t.errors.notStaff;
+  if (status === 423) return t.errors.locked;
+  if (status === 429) return t.errors.tooMany;
 
-  return apiError(messageOf(body));
-}
-
-function messageOf(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
-
-  const { message } = body;
-
-  return typeof message === 'string' ? message : null;
+  return apiError(codeOf(body));
 }
 
 const Field = function Field({

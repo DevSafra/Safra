@@ -1,6 +1,9 @@
 import { Amiri, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import type { Metadata } from 'next';
 
+import { ThemeScript } from '@/components/theme-script';
+import { t } from '@/lib/strings';
+
 import './globals.css';
 
 /**
@@ -42,7 +45,7 @@ const amiri = Amiri({
  * and there is no version of this app that should ever appear in a search result.
  */
 export const metadata: Metadata = {
-  title: 'سفرة — مركز القيادة',
+  title: t.meta.title,
   robots: { index: false, follow: false, nocache: true },
 };
 
@@ -57,6 +60,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
    */
   return (
     <html lang="ar" dir="rtl" className={`${plex.variable} ${amiri.variable}`}>
+      <head>
+        {/*
+          Before anything paints. `<head>` rather than the top of `<body>` so the attribute is
+          on `<html>` while the first stylesheet is still being applied — in `<body>` the dark
+          background has already been painted and the light theme arrives as a visible flash.
+        */}
+        <ThemeScript />
+      </head>
       <body className="min-h-screen font-[family-name:var(--font-plex)]">{children}</body>
     </html>
   );

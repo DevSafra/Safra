@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { AR } from '@/lib/strings';
+import { t } from '@/lib/strings';
 
 /**
  * The row above every admin table: search, filters, a count, an action.
@@ -62,7 +62,7 @@ export function TableToolbar({
           type="submit"
           className="cursor-pointer rounded-[9px] border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
         >
-          {AR.table.search}
+          {t.table.search}
         </button>
       </form>
 

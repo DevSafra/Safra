@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { AR, apiError } from '@/lib/strings';
+import { t, apiError } from '@/lib/strings';
 
 /**
  * A staff reply into a three-party thread.
@@ -62,7 +62,7 @@ export function ReplyForm({ reference }: { reference: string }) {
       setBody('');
       router.refresh();
     } catch {
-      setError(AR.errors.unreachable);
+      setError(t.errors.unreachable);
     } finally {
       setBusy(false);
     }
@@ -71,13 +71,13 @@ export function ReplyForm({ reference }: { reference: string }) {
   return (
     <div className="grid gap-2.5">
       <label className="grid gap-1.5">
-        <span className="sr-only">{AR.sections.messages.replyPlaceholder}</span>
+        <span className="sr-only">{t.sections.messages.replyPlaceholder}</span>
         <textarea
           value={body}
           onChange={(event) => setBody(event.target.value)}
           rows={3}
           maxLength={4000}
-          placeholder={AR.sections.messages.replyPlaceholder}
+          placeholder={t.sections.messages.replyPlaceholder}
           className="rounded-[9px] border border-line bg-field px-3 py-2.5 text-[12.5px] leading-relaxed text-text placeholder:text-faint"
         />
       </label>
@@ -89,11 +89,11 @@ export function ReplyForm({ reference }: { reference: string }) {
           onChange={(event) => setInternal(event.target.checked)}
           className="size-[15px] cursor-pointer accent-warn"
         />
-        {AR.sections.messages.replyInternal}
+        {t.sections.messages.replyInternal}
       </label>
 
       {willRedact ? (
-        <p className="text-[11px] text-warn">{AR.sections.messages.redactionNote}</p>
+        <p className="text-[11px] text-warn">{t.sections.messages.redactionNote}</p>
       ) : null}
 
       {error ? (
@@ -109,7 +109,7 @@ export function ReplyForm({ reference }: { reference: string }) {
           onClick={() => void send()}
           className="cursor-pointer rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[12.5px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {busy ? AR.sections.messages.replying : AR.sections.messages.reply}
+          {busy ? t.sections.messages.replying : t.sections.messages.reply}
         </button>
       </div>
     </div>
