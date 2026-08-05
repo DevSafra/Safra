@@ -31,9 +31,10 @@
  * ladder is `.06 / .1 / .12 / .14 / .15 / .16 / .22 / .25 / .28 / .35 / .4 / .5` — stay on
  * it rather than inventing intermediate values.
  *
- * The light theme (§9.2) is NOT implemented. The console is staff-only and always dark; the
- * public app owns the toggle. Adding it here means every token below gains a counterpart, so
- * it is a deliberate omission rather than an oversight.
+ * The light theme (§9.2) is below, and every token here has a counterpart there — including the
+ * `*A` triples, which is the half that is easy to forget. Bashar asked for the toggle on
+ * 2026-08-04; before that the console was dark-only and the gap report recorded it as a
+ * deliberate omission.
  */
 @theme {
   --color-bg: #0c0a1c;
@@ -80,8 +81,69 @@
   --warnA: 232, 165, 75;
 }
 
+/**
+ * The light theme — "Eastern Day", VERBATIM from the design handoff §9.2.
+ *
+ * Copied, not derived. The handoff ships a complete light palette, so inventing one by lightening
+ * the dark values would have produced a console that is nearly right and consistently off — the
+ * same mistake an earlier version of the dark theme made by sampling a screenshot.
+ *
+ * ## Every token, including the alpha triples
+ *
+ * The `*A` overrides are the ones worth pointing at. Roughly forty rules in this console compose
+ * a tint with `rgba(var(--goldA), .12)`, and the dark gold (`232,188,102`) over a white card is a
+ * pale yellow wash rather than the handoff's `168,122,31`. Overriding the `--color-*` set alone
+ * looks finished and leaves every tinted surface, badge and hairline reading as the dark theme's.
+ *
+ * ## `data-theme`, not the handoff's `html.theme-light`
+ *
+ * The handoff names a class. This uses the attribute the customer app already uses, so both apps
+ * share one mechanism, one storage key and one pre-paint script (`@safra/ui/theme`). A second
+ * mechanism for the same feature is how the two drift.
+ */
+:root[data-theme='light'] {
+  --color-bg: #f5f6fa;
+  --color-bg2: #eceef5;
+  --color-card: #ffffff;
+  --color-field: #f1f3f8;
+  --color-line: #dfe3ed;
+  --color-line2: #eaedf4;
+  --color-text: #1d2333;
+  --color-text2: #3a415a;
+  --color-muted: #5c6377;
+  --color-faint: #7c8296;
+  --color-faint2: #a5aabc;
+  --color-gold: #a87a1f;
+  --color-sky: #2e66a8;
+  --color-ok: #1f7d53;
+  --color-bad: #c23f3f;
+  --color-warn: #9e6e15;
+  --color-pend: #6c51c9;
+  --color-barDim: #d5dae8;
+
+  --goldA: 168, 122, 31;
+  --skyA: 46, 102, 168;
+  --okA: 31, 125, 83;
+  --badA: 194, 63, 63;
+  --warnA: 158, 110, 21;
+
+  color-scheme: light;
+}
+
+/**
+ * The OS preference is deliberately NOT honoured here.
+ *
+ * The customer app has a `prefers-color-scheme` block; this one does not, and the difference is
+ * intentional. The console is designed dark (§9.1) and was dark-only until Bashar asked for the
+ * toggle. Reacting to the OS would relight the console for every staff member on a light-mode
+ * laptop the moment this shipped — a change to the tool they use all day that none of them asked
+ * for. Light is available, and it is opt-in.
+ */
+
 html {
-  color-scheme: dark;
+  /* Both, so form controls and scrollbars follow whichever is active. */
+  color-scheme: dark light;
+  background: var(--color-bg);
 }
 
 body {
