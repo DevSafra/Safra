@@ -12,7 +12,8 @@
     "account": "حسابي",
     "theme": "تغيير المظهر",
     "language": "اللغة",
-    "currency": "العملة"
+    "currency": "العملة",
+    "breadcrumb": "مسار التنقل"
   },
   "home": {
     "heroCountries": "سوريا · الأردن · لبنان",
@@ -74,6 +75,20 @@
     "internet": "إنترنت",
     "business": "أعمال"
   },
+  "amenities": {
+    "accessible": "مهيأ لذوي الاحتياجات",
+    "air_conditioning": "تكييف",
+    "breakfast": "إفطار",
+    "family_friendly": "مناسب للعائلات",
+    "heating": "تدفئة",
+    "kitchen": "مطبخ",
+    "parking": "موقف سيارات",
+    "pets_allowed": "الحيوانات مسموحة",
+    "pool": "مسبح",
+    "reception_24h": "استقبال 24 ساعة",
+    "sea_view": "إطلالة على البحر",
+    "wifi": "واي فاي"
+  },
   "cityCategories": {
     "coastal": "ساحلية",
     "mountain": "جبلية",
@@ -120,6 +135,10 @@
     "error": "حدث خطأ",
     "retry": "حاول مرة أخرى",
     "skipToContent": "تخطَّ إلى المحتوى"
+  },
+  "notFound": {
+    "title": "الصفحة غير موجودة",
+    "home": "العودة إلى الصفحة الرئيسية"
   },
   "calendar": {
     "title": "التوفر — الأيام القادمة",
@@ -243,7 +262,9 @@
     "claimedBookings": "كما ربطنا {count} حجزًا سابقًا بهذا العنوان بحسابك.",
     "verifyBanner": "أكّد بريدك الإلكتروني لربط حجوزاتك السابقة كضيف وتأمين حسابك.",
     "verifyResend": "أعد إرسال الرابط",
-    "verifyResent": "تم الإرسال. تحقّق من بريدك."
+    "verifyResent": "تم الإرسال. تحقّق من بريدك.",
+    "showPassword": "إظهار كلمة المرور",
+    "hidePassword": "إخفاء كلمة المرور"
   },
   "account": {
     "title": "حسابي",

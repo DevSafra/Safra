@@ -12,7 +12,8 @@
     "account": "Mein Konto",
     "theme": "Design wechseln",
     "language": "Sprache",
-    "currency": "Währung"
+    "currency": "Währung",
+    "breadcrumb": "Brotkrümelnavigation"
   },
   "home": {
     "heroCountries": "Syrien · Jordanien · Libanon",
@@ -74,6 +75,20 @@
     "internet": "Internet",
     "business": "Business"
   },
+  "amenities": {
+    "accessible": "Barrierefrei",
+    "air_conditioning": "Klimaanlage",
+    "breakfast": "Frühstück",
+    "family_friendly": "Familienfreundlich",
+    "heating": "Heizung",
+    "kitchen": "Küche",
+    "parking": "Parkplatz",
+    "pets_allowed": "Haustiere erlaubt",
+    "pool": "Pool",
+    "reception_24h": "Rezeption rund um die Uhr",
+    "sea_view": "Meerblick",
+    "wifi": "WLAN"
+  },
   "cityCategories": {
     "coastal": "Küste",
     "mountain": "Berge",
@@ -120,6 +135,10 @@
     "error": "Etwas ist schiefgelaufen",
     "retry": "Erneut versuchen",
     "skipToContent": "Zum Inhalt springen"
+  },
+  "notFound": {
+    "title": "Seite nicht gefunden",
+    "home": "Zurück zur Startseite"
   },
   "calendar": {
     "title": "Verfügbarkeit — kommende Tage",
@@ -243,7 +262,9 @@
     "claimedBookings": "Wir haben außerdem {count} frühere Buchung(en) mit dieser Adresse Ihrem Konto zugeordnet.",
     "verifyBanner": "Bestätigen Sie Ihre E-Mail-Adresse, um frühere Gastbuchungen zuzuordnen und Ihr Konto zu sichern.",
     "verifyResend": "Link erneut senden",
-    "verifyResent": "Gesendet. Prüfen Sie Ihren Posteingang."
+    "verifyResent": "Gesendet. Prüfen Sie Ihren Posteingang.",
+    "showPassword": "Passwort anzeigen",
+    "hidePassword": "Passwort verbergen"
   },
   "account": {
     "title": "Mein Konto",

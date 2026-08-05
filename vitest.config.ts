@@ -20,7 +20,13 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['{apps,packages}/*/src/**/*.{test,spec}.ts'],
+    include: [
+      '{apps,packages}/*/src/**/*.{test,spec}.ts',
+      // The local ESLint rules live outside any workspace package: they are build tooling,
+      // not shipped code. They still get tested — a lint rule that over-reports gets
+      // switched off, which is worse than not having it.
+      'tools/eslint-rules/*.test.ts',
+    ],
     environment: 'node',
     // Security-relevant paths must stay covered as the codebase grows.
     coverage: {

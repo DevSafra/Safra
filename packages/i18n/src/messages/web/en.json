@@ -12,7 +12,8 @@
     "account": "My account",
     "theme": "Switch theme",
     "language": "Language",
-    "currency": "Currency"
+    "currency": "Currency",
+    "breadcrumb": "Breadcrumb"
   },
   "home": {
     "heroCountries": "Syria · Jordan · Lebanon",
@@ -74,6 +75,20 @@
     "internet": "Internet",
     "business": "Business"
   },
+  "amenities": {
+    "accessible": "Accessible",
+    "air_conditioning": "Air conditioning",
+    "breakfast": "Breakfast",
+    "family_friendly": "Family friendly",
+    "heating": "Heating",
+    "kitchen": "Kitchen",
+    "parking": "Parking",
+    "pets_allowed": "Pets allowed",
+    "pool": "Pool",
+    "reception_24h": "24-hour reception",
+    "sea_view": "Sea view",
+    "wifi": "Wi-Fi"
+  },
   "cityCategories": {
     "coastal": "Coastal",
     "mountain": "Mountain",
@@ -120,6 +135,10 @@
     "error": "Something went wrong",
     "retry": "Try again",
     "skipToContent": "Skip to content"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "home": "Back to the home page"
   },
   "calendar": {
     "title": "Availability — coming days",
@@ -243,7 +262,9 @@
     "claimedBookings": "We also linked {count} earlier booking(s) made with this address to your account.",
     "verifyBanner": "Confirm your email address to link earlier guest bookings and secure your account.",
     "verifyResend": "Send the link again",
-    "verifyResent": "Sent. Check your inbox."
+    "verifyResent": "Sent. Check your inbox.",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
   },
   "account": {
     "title": "My account",

@@ -1,6 +1,7 @@
 export * from './auth.js';
 export * from './booking.js';
 export * from './calendar.js';
+export * from './error-codes.js';
 export * from './fx.js';
 export * from './pagination.js';
 export * from './payment.js';
