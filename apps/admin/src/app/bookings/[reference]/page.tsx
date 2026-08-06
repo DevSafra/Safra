@@ -2,7 +2,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { getBooking } from '@/lib/api';
-import { fill, t } from '@/lib/strings';
+import { BackLink } from '@/components/back-link';
+import { StatusPill } from '@/components/admin-table';
+import { returnHref } from '@/lib/search-params';
+import { bookingStatusTone } from '@/lib/status-tone';
+import { bookingStatus, fill, t } from '@/lib/strings';
 
 /**
  * One booking, end to end (SRS §9.4).
@@ -20,15 +24,24 @@ export const dynamic = 'force-dynamic';
 
 export default async function BookingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ reference: string }>;
+  /*
+    The list position the reader came from, so «رجوع» returns to the page and filter they
+    left rather than to the top of the registry (Bashar, 2026-08-05). Absent when the booking was
+    reached from a bookmark, the dashboard or the reference lookup — then the link goes to the
+    plain registry, which is the right answer for a reader who was never in a list.
+  */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { reference } = await params;
+  const back = returnHref('/bookings', await searchParams, reference);
   const booking = await getBooking(reference);
 
   if (booking === 'unauthenticated') {
     return (
-      <Shell>
+      <Shell back={back}>
         <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
       </Shell>
     );
@@ -37,7 +50,7 @@ export default async function BookingPage({
   if (booking === 'failed') notFound();
 
   return (
-    <Shell>
+    <Shell back={back}>
       <header>
         <p className="font-mono text-xs text-faint">{booking.reference}</p>
         <h1 className="mt-1 text-2xl font-semibold text-text">{booking.property.name}</h1>
@@ -57,7 +70,17 @@ export default async function BookingPage({
                 adults: booking.stay.adults,
               })}
         </p>
-        <StatusPill status={booking.status} />
+        {/*
+          The registry's pill, not a second one built here. Both the WORD and the COLOUR come from
+          the shared lookups, so the الحجوزات table and this screen cannot disagree about a status
+          — they did, in both (Bashar, 2026-08-05): the word was the raw enum and the colour was a
+          local three-branch guess that painted «بانتظار الدفع» gold where the table paints it amber.
+        */}
+        <p className="mt-3">
+          <StatusPill tone={bookingStatusTone(booking.status)}>
+            {bookingStatus(booking.status)}
+          </StatusPill>
+        </p>
       </header>
 
       {/*
@@ -74,7 +97,9 @@ export default async function BookingPage({
           lines={[
             booking.customer.email,
             booking.customer.phone,
-            booking.customer.isGuest ? 'Booked as a guest' : 'Has an account',
+            booking.customer.isGuest
+              ? t.sections.bookingDetail.bookedAsGuest
+              : t.sections.bookingDetail.hasAccount,
           ]}
         />
         <Party
@@ -88,7 +113,7 @@ export default async function BookingPage({
           title={t.sections.bookingDetail.property}
           name={booking.property.name}
           reference={booking.property.reference}
-          lines={[booking.property.unit, booking.property.citySlug]}
+          lines={[booking.property.unit, booking.property.city]}
           href={`/properties/${booking.property.reference}`}
         />
       </section>
@@ -281,15 +306,10 @@ export default async function BookingPage({
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ back, children }: { back: string; children: React.ReactNode }) {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <Link
-        href="/"
-        className="inline-flex min-h-10 items-center lg:min-h-0 text-sm text-muted hover:text-gold"
-      >
-        {t.table.backToQueues}
-      </Link>
+      <BackLink href={back} section={t.nav.bookings} />
       <div className="mt-4 grid gap-8">{children}</div>
     </main>
   );
@@ -374,20 +394,5 @@ function Stamp({ label, value }: { label: string; value: string | null }) {
         {value ? `${value.slice(0, 19).replace('T', ' ')} UTC` : '—'}
       </dd>
     </div>
-  );
-}
-
-function StatusPill({ status }: { status: string }) {
-  const tone =
-    status === 'confirmed' || status === 'completed' || status === 'checked_in'
-      ? 'border-ok/40 bg-ok/10 text-ok'
-      : status === 'cancelled' || status === 'disputed'
-        ? 'border-bad/40 bg-bad/10 text-bad'
-        : 'border-gold/40 bg-gold/10 text-gold';
-
-  return (
-    <span className={`mt-3 inline-block rounded-full border px-3 py-1 text-xs ${tone}`}>
-      {status.replace(/_/g, ' ')}
-    </span>
   );
 }

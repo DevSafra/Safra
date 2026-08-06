@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 
 import { getProperty } from '@/lib/api';
 import { ReviewProperty } from '@/components/review-property';
+import { BackLink } from '@/components/back-link';
+import { returnHref } from '@/lib/search-params';
 import { fill, label, t } from '@/lib/strings';
 
 /**
@@ -16,15 +18,19 @@ export const dynamic = 'force-dynamic';
 
 export default async function PropertyPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ reference: string }>;
+  /* The list position to return to — see the note in the bookings detail screen. */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { reference } = await params;
+  const back = returnHref('/properties', await searchParams, reference);
   const property = await getProperty(reference);
 
   if (property === 'unauthenticated') {
     return (
-      <Shell>
+      <Shell back={back}>
         <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
       </Shell>
     );
@@ -36,7 +42,7 @@ export default async function PropertyPage({
   const reviewable = property.status === 'pending_review';
 
   return (
-    <Shell>
+    <Shell back={back}>
       <header>
         <p className="text-xs text-faint">{property.reference}</p>
         <h1 className="mt-1 text-2xl font-semibold text-text">
@@ -202,15 +208,10 @@ export default async function PropertyPage({
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ back, children }: { back: string; children: React.ReactNode }) {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <Link
-        href="/"
-        className="inline-flex min-h-10 items-center lg:min-h-0 text-sm text-muted hover:text-gold"
-      >
-        {t.table.backToQueues}
-      </Link>
+      <BackLink href={back} section={t.nav.properties} />
       <div className="mt-4 grid gap-8">{children}</div>
     </main>
   );

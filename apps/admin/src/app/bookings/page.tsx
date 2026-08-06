@@ -12,11 +12,11 @@ import {
   Ltr,
   StatusPill,
   type AdminColumn,
-  type Tone,
 } from '@/components/admin-table';
 import { OutlineAction, TableToolbar, ToolbarNote } from '@/components/table-toolbar';
 import { bookingStatus, fill, t } from '@/lib/strings';
-import { pageNumber, pageSize } from '@/lib/search-params';
+import { pageNumber, pageSize, returnQuery } from '@/lib/search-params';
+import { bookingStatusTone } from '@/lib/status-tone';
 
 /**
  * الحجوزات — the bookings registry (design handoff §8).
@@ -89,6 +89,9 @@ export default async function BookingsPage({
   const page = pageNumber(first('page'));
   const size = pageSize(first('size'));
 
+  // Carried into every row link, so «رجوع» on the detail screen comes back here.
+  const back = returnQuery({ page, size, q, status });
+
   const [result, counts] = await Promise.all([
     getBookings({ q, status, page, limit: size }),
     sidebarCounts(),
@@ -147,7 +150,7 @@ export default async function BookingsPage({
         ) : (
           <>
             <AdminTable
-              columns={COLUMNS}
+              columns={columns(back)}
               rows={result.items}
               template={TEMPLATE}
               rowKey={(row) => row.reference}
@@ -172,13 +175,18 @@ export default async function BookingsPage({
   );
 }
 
-const COLUMNS: readonly AdminColumn<BookingListItem>[] = [
+/**
+ * Built per request rather than as a constant, so every row link carries the reader's place in the
+ * list — see `returnQuery`. Opening a booking from page 4 of a filtered search and coming back to
+ * the top of an unfiltered registry is the failure this exists to prevent (Bashar, 2026-08-05).
+ */
+const columns = (back: string): readonly AdminColumn<BookingListItem>[] => [
   {
     key: 'reference',
     header: t.admin.colReference,
     render: (row) => (
       <Link
-        href={`/bookings/${row.reference}`}
+        href={`/bookings/${row.reference}${back}`}
         className="font-semibold text-sky hover:underline"
       >
         <Ltr>{row.reference}</Ltr>
@@ -228,7 +236,9 @@ const COLUMNS: readonly AdminColumn<BookingListItem>[] = [
     key: 'status',
     header: t.admin.colStatus,
     render: (row) => (
-      <StatusPill tone={statusTone(row.status)}>{bookingStatus(row.status)}</StatusPill>
+      <StatusPill tone={bookingStatusTone(row.status)}>
+        {bookingStatus(row.status)}
+      </StatusPill>
     ),
   },
   {
@@ -236,7 +246,7 @@ const COLUMNS: readonly AdminColumn<BookingListItem>[] = [
     header: t.table.colAction,
     render: (row) => (
       <Link
-        href={`/bookings/${row.reference}`}
+        href={`/bookings/${row.reference}${back}`}
         className="text-[11.5px] text-sky hover:underline"
       >
         {t.table.open}
@@ -244,33 +254,6 @@ const COLUMNS: readonly AdminColumn<BookingListItem>[] = [
     ),
   },
 ];
-
-/**
- * Status colour, following the handoff's vocabulary exactly.
- *
- * `pending_confirmation` is `--pend` purple — an explicit rule (§1, §14) — because a paid
- * booking still waiting on a partner is not good news and gold would read as if it were.
- * `pending_payment` is amber: there the platform is waiting on the CUSTOMER, which is a
- * different situation calling for a different action.
- */
-function statusTone(status: string): Tone {
-  switch (status) {
-    case 'confirmed':
-      return 'ok';
-    case 'checked_in':
-      return 'sky';
-    case 'pending_confirmation':
-      return 'pend';
-    case 'pending_payment':
-      return 'warn';
-    case 'cancelled':
-    case 'disputed':
-      return 'bad';
-    default:
-      // `completed` and `draft` — done or not started; neither needs attention.
-      return 'faint';
-  }
-}
 
 function total(counts: Record<string, number>): number {
   return Object.values(counts).reduce((sum, value) => sum + value, 0);

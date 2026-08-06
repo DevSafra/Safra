@@ -65,10 +65,10 @@ export class BookingDetailService {
              cp.is_guest AS customer_is_guest,
              p.reference AS partner_reference, p.display_name AS partner_name,
              p.phone AS partner_phone,
-             pr.reference AS property_reference, pr.name_en AS property_name_en,
-             pr.name_ar AS property_name_ar,
-             u.name_en AS unit_name,
-             ci.slug AS city_slug
+             pr.reference AS property_reference,
+             coalesce(pr.name_ar, pr.name_en) AS property_name,
+             coalesce(u.name_ar, u.name_en)   AS unit_name,
+             ci.name_ar AS city_name
       FROM bookings b
       JOIN currencies cur       ON cur.id = b.currency_id
       JOIN customer_profiles cp ON cp.id = b.customer_profile_id
@@ -128,11 +128,22 @@ export class BookingDetailService {
         name: booking['partner_name'],
         phone: booking['partner_phone'],
       },
+      /*
+        Arabic first, in all three — the only reader of this endpoint is the Arabic-only staff
+        console, and it was printing the English unit name and the city's URL SLUG ("damascus")
+        next to Arabic labels (Bashar, 2026-08-05). The property name preferred `name_en` outright,
+        so the same booking read one way in the الحجوزات registry — which has always coalesced
+        Arabic first — and another on its own detail screen.
+
+        `coalesce` on the two name pairs even though both columns are NOT NULL: the fallback costs
+        nothing and is what every other admin service does, so a future nullable column cannot turn
+        a name into a blank cell here.
+      */
       property: {
         reference: booking['property_reference'],
-        name: booking['property_name_en'] ?? booking['property_name_ar'],
+        name: booking['property_name'],
         unit: booking['unit_name'],
-        citySlug: booking['city_slug'],
+        city: booking['city_name'],
       },
       money: {
         currencyCode: booking['currency_code'],

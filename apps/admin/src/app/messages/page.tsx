@@ -8,7 +8,7 @@ import { TablePagination } from '@/components/table-pagination';
 import { FootNote, Ltr, StatusPill } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { fill, t } from '@/lib/strings';
-import { listParams } from '@/lib/search-params';
+import { listParams, returnQuery, rowAnchor } from '@/lib/search-params';
 
 /**
  * الرسائل — the three-party inbox (design handoff §8).
@@ -28,6 +28,9 @@ export default async function MessagesPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { q, page, size } = await listParams(searchParams);
+
+  // Carried into every thread link, so «رجوع» on the thread screen comes back here.
+  const back = returnQuery({ page, size, q });
 
   const [result, counts] = await Promise.all([
     getConversations({ q, page, limit: size }),
@@ -52,10 +55,19 @@ export default async function MessagesPage({
           <p className="text-[12.5px] text-faint">{t.table.empty}</p>
         ) : (
           <>
+            {/*
+              Addressable like a table row. "Table" means any paged list, not the `<table>`
+              element: this is a `<ul>` of cards and it pages, returns and scrolls back like every
+              other registry. See `rowAnchor`.
+            */}
             <ul className="grid gap-2.5">
               {result.items.map((thread) => (
-                <li key={thread.reference}>
-                  <Thread thread={thread} />
+                <li
+                  key={thread.reference}
+                  id={rowAnchor(thread.reference)}
+                  className="scroll-mt-24 target:rounded-[11px] target:bg-[rgba(var(--goldA),0.14)]"
+                >
+                  <Thread thread={thread} back={back} />
                 </li>
               ))}
             </ul>
@@ -78,12 +90,12 @@ export default async function MessagesPage({
   );
 }
 
-function Thread({ thread }: { thread: ConversationItem }) {
+function Thread({ thread, back }: { thread: ConversationItem; back: string }) {
   const other = thread.customer ?? thread.partner ?? '—';
 
   return (
     <Link
-      href={`/messages/${thread.reference}`}
+      href={`/messages/${thread.reference}${back}`}
       className="flex flex-wrap items-center gap-3 rounded-[11px] border border-line bg-field px-4 py-3 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
     >
       <span

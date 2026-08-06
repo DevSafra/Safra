@@ -1,10 +1,11 @@
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { getPartner, getSanctionsStatus } from '@/lib/api';
 import { DocumentReview } from '@/components/document-review';
 import { ScreeningPanel } from '@/components/screening-panel';
 import { VerifyPartner } from '@/components/verify-partner';
+import { BackLink } from '@/components/back-link';
+import { returnHref } from '@/lib/search-params';
 import { fill, label, t } from '@/lib/strings';
 
 /**
@@ -23,10 +24,14 @@ export const dynamic = 'force-dynamic';
 
 export default async function PartnerPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ reference: string }>;
+  /* The list position to return to — see the note in the bookings detail screen. */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { reference } = await params;
+  const back = returnHref('/partners', await searchParams, reference);
 
   /**
    * The list's health is fetched alongside the partner, so the screening panel can
@@ -39,7 +44,7 @@ export default async function PartnerPage({
 
   if (partner === 'unauthenticated') {
     return (
-      <Shell reference={reference}>
+      <Shell reference={reference} back={back}>
         <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
       </Shell>
     );
@@ -53,7 +58,7 @@ export default async function PartnerPage({
   const decided = partner.verification !== 'pending';
 
   return (
-    <Shell reference={reference}>
+    <Shell reference={reference} back={back}>
       <header>
         <p className="text-xs text-faint">{partner.reference}</p>
         <h1 className="mt-1 text-2xl font-semibold text-text">{partner.legalName}</h1>
@@ -155,19 +160,16 @@ export default async function PartnerPage({
 
 function Shell({
   reference,
+  back,
   children,
 }: {
   reference: string;
+  back: string;
   children: React.ReactNode;
 }) {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <Link
-        href="/"
-        className="inline-flex min-h-10 items-center lg:min-h-0 text-sm text-muted hover:text-gold"
-      >
-        {t.table.backToQueues}
-      </Link>
+      <BackLink href={back} section={t.nav.partners} />
       <div className="mt-4 grid gap-8" data-partner={reference}>
         {children}
       </div>

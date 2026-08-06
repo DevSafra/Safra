@@ -359,7 +359,7 @@ const bookingDetailSchema = z.object({
     reference: z.string(),
     name: z.string(),
     unit: z.string(),
-    citySlug: z.string(),
+    city: z.string(),
   }),
   money: z.object({
     currencyCode: z.string(),

@@ -19,7 +19,7 @@ import {
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
-import { listParams } from '@/lib/search-params';
+import { listParams, returnQuery } from '@/lib/search-params';
 
 /**
  * العقارات (design handoff §8).
@@ -39,6 +39,9 @@ export default async function PropertiesPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { q, page, size } = await listParams(searchParams);
+
+  // Carried into every row link, so «رجوع» on the detail screen comes back here.
+  const back = returnQuery({ page, size, q });
 
   const [registry, pending, counts] = await Promise.all([
     getPropertyRegistry({ q, page, limit: size }),
@@ -68,7 +71,7 @@ export default async function PropertiesPage({
           ) : (
             <>
               <AdminTable
-                columns={COLUMNS}
+                columns={columns(back)}
                 rows={registry.items}
                 template={TEMPLATE}
                 rowKey={(row) => row.reference}
@@ -96,7 +99,7 @@ export default async function PropertiesPage({
               rows.map((property) => (
                 <li key={property.reference}>
                   <Link
-                    href={`/properties/${property.reference}`}
+                    href={`/properties/${property.reference}${back}`}
                     className="block rounded-[10px] border border-line bg-field px-3.5 py-3 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
                   >
                     <span className="block truncate text-[13px] font-bold text-text">
@@ -129,13 +132,18 @@ export default async function PropertiesPage({
   );
 }
 
-const COLUMNS: readonly AdminColumn<PropertyListItem>[] = [
+/**
+ * Built per request rather than as a constant, so every row link carries the reader's place in the
+ * list — see `returnQuery`. Opening a property from page 4 of a filtered search and coming back to
+ * the top of an unfiltered registry is the failure this exists to prevent (Bashar, 2026-08-05).
+ */
+const columns = (back: string): readonly AdminColumn<PropertyListItem>[] => [
   {
     key: 'reference',
     header: t.table.colId,
     render: (row) => (
       <Link
-        href={`/properties/${row.reference}`}
+        href={`/properties/${row.reference}${back}`}
         className="font-semibold text-sky hover:underline"
       >
         <Ltr>{row.reference}</Ltr>

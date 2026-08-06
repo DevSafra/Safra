@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 // The catalogue source directly, not through the admin app: Playwright loads these
 // files as CommonJS, and `@safra/i18n` is ESM-only, so going via `lib/strings.ts`
@@ -402,7 +402,93 @@ test.describe('honesty rules the design and the register require', () => {
 
     await expect(page.getByText(t.sections.payments.payoutsMissing)).toBeVisible();
   });
+
+  /**
+   * The booking detail speaks Arabic, including the values it gets from the database.
+   *
+   * Bashar reported four English leaks on one screen (2026-08-05): the status pill printed the raw
+   * enum `confirmed`, the property card printed the unit's `name_en` and the city's URL SLUG
+   * («damascus»), and the customer card carried `Booked as a guest` written straight into the
+   * component. Three of the four came from the API selecting the wrong COLUMN, which no amount of
+   * catalogue discipline in the console would have caught — the copy was never in the console.
+   *
+   * Asserted against the catalogue and the party cards only. The screen legitimately contains
+   * Latin elsewhere — references, emails, currency codes, timeline event types and their JSON —
+   * so a blanket "no Latin on the page" rule would fail on correct output.
+   */
+  test('the booking detail translates its status, unit and city', async ({ page }) => {
+    await page.goto('/bookings?size=5');
+    await page.locator('tbody tr a').first().click();
+    await page.waitForURL(/\/bookings\/BKG/);
+
+    // The status pill: one of the catalogue's Arabic names, never the enum it came from.
+    const status = page.locator('header span').last();
+
+    expect(Object.values(t.bookingStatus)).toContain((await status.innerText()).trim());
+
+    /*
+      `exact`, because the party card's title «العميل» is also a substring of the money section's
+      «إجمالي العميل» — a loose match resolves to both and Playwright refuses to guess.
+    */
+    const card = (title: string) => page.getByText(title, { exact: true }).locator('..');
+
+    // The customer card ends in a full Arabic clause, whichever of the two applies.
+    const account = await card(t.sections.bookingDetail.customer).innerText();
+
+    expect(
+      account.includes(t.sections.bookingDetail.bookedAsGuest) ||
+        account.includes(t.sections.bookingDetail.hasAccount),
+    ).toBe(true);
+
+    /*
+      The property card's last line is the city. A slug is the specific thing that shipped, and it
+      is recognisable: lowercase Latin, hyphens for spaces, never a space.
+    */
+    const property = await card(t.sections.bookingDetail.property).innerText();
+    const lines = property.split('\n').map((line) => line.trim());
+    const city = lines.at(-1) ?? '';
+
+    expect(city).not.toMatch(/^[a-z][a-z-]*$/);
+  });
+
+  /**
+   * A status is the same word AND the same colour in the الحجوزات table and on the booking's own
+   * screen.
+   *
+   * Bashar reported the mismatch (2026-08-05). The detail screen had built its own pill from a
+   * three-branch guess: `checked_in` green where the table says sky, `completed` green where the
+   * table says faint, and everything unrecognised GOLD — which caught `pending_confirmation`, the
+   * one status §14 makes an explicit rule about, and painted the purple "waiting on the partner"
+   * as if it were good news. Both screens now share `bookingStatusTone`.
+   *
+   * Compared on the COMPUTED colour of the same row's status, read before and after clicking
+   * through. Asserting a class name would pass on two pills that resolve to different paint, and
+   * asserting a fixed colour would pin whichever status the seed happens to put first.
+   */
+  test('a booking status is the same colour in the table and on its own screen', async ({
+    page,
+  }) => {
+    await page.goto('/bookings?size=5');
+
+    const row = page.locator('tbody tr').first();
+    const inTable = await pill(row.locator('span.rounded-full').first());
+
+    await row.locator('a').first().click();
+    await page.waitForURL(/\/bookings\/BKG/);
+
+    const onDetail = await pill(page.locator('header span.rounded-full').first());
+
+    expect(onDetail).toStrictEqual(inTable);
+  });
 });
+
+/** A status pill's word and painted colour, which is what the two screens must agree on. */
+async function pill(locator: Locator): Promise<{ text: string; color: string }> {
+  return {
+    text: (await locator.innerText()).trim(),
+    color: await locator.evaluate((el) => getComputedStyle(el).color),
+  };
+}
 
 /** The first body cell of the first row — used to prove a page actually changed. */
 async function firstCell(page: Page): Promise<string> {

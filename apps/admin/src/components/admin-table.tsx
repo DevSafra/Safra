@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { rowAnchor } from '@/lib/search-params';
+
 /**
  * The console's table, built to the design handoff's admin-table spec (§8).
  *
@@ -125,9 +127,24 @@ export function AdminTable<T>({
           </tr>
         </thead>
 
+        {/*
+          Every row is addressable, so a detail screen's «رجوع» can scroll back to the one it was
+          opened from — see `rowAnchor`. On EVERY table rather than only the four with a detail
+          screen: an id costs nothing, and a table that opts in later would otherwise ship the
+          landing-at-the-top bug once more before anyone noticed.
+
+          `scroll-mt-24` keeps the row off the very top edge of the viewport, where a row flush
+          against the browser chrome reads as the first row of the table rather than as the one
+          being pointed at. `:target` tints it for the same reason: scrolling somewhere without
+          marking anything leaves the reader to guess which of the visible rows they came from.
+        */}
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)}>
+            <tr
+              key={rowKey(row)}
+              id={rowAnchor(rowKey(row))}
+              className="scroll-mt-24 target:bg-[rgba(var(--goldA),0.14)]"
+            >
               {columns.map((column) => (
                 <td
                   key={column.key}

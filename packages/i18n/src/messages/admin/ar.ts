@@ -162,8 +162,32 @@ export const ar = {
 
   /** Shared table chrome. */
   table: {
-    /** Shared by the three detail screens, which all return to the same queues. */
-    backToQueues: '← القوائم',
+    /**
+     * The back control on a detail screen — «رجوع», with the arrow at its RIGHT.
+     *
+     * The visible word is the ACTION, not the destination (Bashar, 2026-08-05). It replaced
+     * «← الحجوزات», which in turn replaced «القوائم»: naming the section made the control as wide
+     * as the section's name and repeated a word the reader had just clicked. The destination is
+     * still announced — see `backToLabel`, which screen readers get.
+     */
+    back: 'رجوع',
+    /**
+     * The accessible name, so «رجوع» on four different screens is still distinguishable.
+     *
+     * Visible text is «رجوع» and it is CONTAINED in this string, which is what WCAG 2.5.3 asks
+     * of a label that differs from its accessible name — a voice-control user saying "رجوع"
+     * still matches.
+     */
+    backToLabel: 'الرجوع إلى {section}',
+    /**
+     * The glyph in the back control, alone in the catalogue because its DIRECTION is language.
+     *
+     * Arabic reads right-to-left, so going back means going RIGHT and the arrow is «→». A
+     * left-to-right locale flips it to «←» here and nowhere else — its SIDE is not language and
+     * is not written down: the control is a flex row, so the arrow follows the writing direction
+     * on its own. Neither glyph is bidi-mirrored, so what is written here is what is drawn.
+     */
+    backArrow: '→',
     search: 'بحث',
     pageSizeLabel: 'عدد الصفوف في الصفحة',
     /** Submits the pagination bar's form — see the note in `table-pagination.tsx`. */
@@ -636,9 +660,15 @@ export const ar = {
        * translation. These read the count as a value and phrase the sentence around it, which is
        * what every locale can then do in its own way.
        */
-      stay: '{checkIn} → {checkOut} · {nights} ليلة · {adults} بالغ',
+      /*
+        «←», not «→». The two dates are digit runs, so an RTL line places the check-in on the RIGHT
+        and the check-out on the LEFT — and «→» then pointed from the check-out back at the
+        check-in, saying the stay ran backwards. Neither arrow is bidi-mirrored, so the character
+        written here is the character shown. Same correction as the الحجوزات table's stay column.
+      */
+      stay: '{checkIn} ← {checkOut} · {nights} ليلة · {adults} بالغ',
       stayWithChildren:
-        '{checkIn} → {checkOut} · {nights} ليلة · {adults} بالغ، {children} طفل',
+        '{checkIn} ← {checkOut} · {nights} ليلة · {adults} بالغ، {children} طفل',
       fxSnapshot: '{amount} ل.س بسعر صرف {rate}، مثبَّت لحظة إنشاء الحجز.',
       attemptVia: '{method} عبر {provider} · {status}',
       refunded: 'استُرد {amount} {currency}',
@@ -647,6 +677,15 @@ export const ar = {
       customer: 'العميل',
       partner: 'الشريك',
       property: 'العقار',
+      /**
+       * The last line of the customer card, which shipped as the English `Booked as a guest` /
+       * `Has an account` written straight into the component.
+       *
+       * A full clause rather than the registry's one-word «ضيف» / «مسجل»: those sit under a
+       * «النوع» column header that supplies the question, and this line has no header above it.
+       */
+      bookedAsGuest: 'حجز كضيف',
+      hasAccount: 'لديه حساب',
       dates: 'التواريخ',
       booked: 'تاريخ الحجز',
       paid: 'تاريخ الدفع',
