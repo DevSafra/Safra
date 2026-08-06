@@ -82,6 +82,7 @@ const propertySchema = z.object({
   city: z.string().nullable(),
   propertyType: z.string().nullable(),
   coverKey: z.string().nullable(),
+  coverWidths: z.array(z.number()),
   unitCount: z.number(),
   /** The CHEAPEST unit's nightly rate — the "from" price. See the note on `listOwn`. */
   fromPrice: z.string().nullable(),

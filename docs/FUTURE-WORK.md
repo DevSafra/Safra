@@ -506,6 +506,64 @@ database on 2026-08-06 held **12,297 users** (2,262 of them super admins), 5,250
 **Owner:** engineering. Not blocking, and it will keep costing an afternoon every few weeks until
 it is done.
 
+### O-partner-1 — التقييمات has no schema, and the sidebar badge depends on it
+
+**What:** The handoff's §7.3 specifies a full reviews page — guest name, property as listed, unit,
+★ score, date, body, and **رد** / **إبلاغ** buttons — plus the rule quoted verbatim in the design:
+_"لا يمكن حذف تقييم — يمكنك الرد عليه أو الإبلاغ عنه (P-006)"_. There is no `reviews` table, no API
+and no aggregate.
+
+**What depends on it beyond the page itself:**
+
+- The sidebar's `التقييمات 4.7` badge (§7).
+- `properties.rating` and `reviews_count`, which are columns the testbed currently SEEDS. Once
+  reviews exist they must become an aggregate of real rows, or the card's ★ is a number nobody
+  wrote.
+- §7.3's header line _"المعدل العام ★ 4.7 من 132 تقييماً"_.
+
+**What it needs:** a `reviews` table keyed on the booking (one review per stay, which is also what
+stops a review from a guest who never came), a partner reply and a report flag on the same row,
+`no DELETE` enforced by the same append-only trigger pattern the audit tables use, and a recompute
+of the property aggregate on write.
+
+**Owner:** engineering. It is the largest remaining piece of the partner portal.
+
+### O-partner-2 — The payout line has no payout model, and must not invent one
+
+**What:** §7.1 draws a payout line on the partner dashboard —
+_"تحويل مستحقات 1,240$ مجدول يوم الخميس"_. There is no payouts table. `bookings.partner_payable_amount`
+exists, but it is an OBLIGATION per booking, not a transfer that happened or is scheduled.
+
+**Why it is not simply a sum.** The console's الدفع screen already faced this and refused: it
+renders `payoutsMissing` — an explicit statement that partner transfers are absent — rather than
+deriving a figure. Summing payables on the partner dashboard would present the same obligation as a
+scheduled transfer, to the person it is owed to, which is worse than saying nothing. Two surfaces
+must not disagree about whether SAFRA has a payout ledger.
+
+**The two honest options, in order:**
+
+1. **Build the model.** A `partner_payouts` table (period, amount, currency, status, scheduled
+   date, paid date, the bookings it covers), a job that accrues it, and a staff screen to release
+   one. This is a finance feature with an audit trail, not a widget.
+2. **Say so on the dashboard.** An explicit "payouts are not yet scheduled through SAFRA" line, the
+   same shape as the console's, until (1) exists.
+
+Until (1) is decided, (2) is what ships — chosen deliberately, not by omission.
+
+**Owner:** Bashar (product decision on whether SAFRA operates a payout ledger), then engineering.
+
+### O-partner-3 — No per-unit calendar read for the dashboard
+
+**What:** §7.1 draws a booking calendar on the partner dashboard. `availability_days` holds per-day
+state per unit and `GET /partner/units/:id/calendar` reads ONE unit, which is the editing view. A
+month grid across a partner's whole portfolio needs a different read — bookings and blocks for all
+their units in a date range, in one query.
+
+**Why it is not the existing endpoint:** a partner with six units would make six calls to render
+one month, which is the N+1 rule 2 forbids on a screen loaded daily.
+
+**Owner:** engineering, alongside the dashboard.
+
 ### O-page-1 — What numbered pages cost, and when it stops being affordable
 
 **What:** The console's fifteen registries moved from keyset cursors to `OFFSET` + `count(*)` on
@@ -1146,6 +1204,9 @@ Kept because the reason something was blocked is often the reason it returns.
 | 2026-08-05 | «القوائم» was unstyled text, linked to the dashboard, and lost the reader's place       | Bashar reported both. The control is now «رجوع» with the arrow on its right, styled like the console's other secondary controls, and returns to the exact page, size and filter: each registry row carries its list position into the detail link, and the detail screen rebuilds the list URL from a LITERAL base path — never from the URL, so a crafted link cannot redirect off the console. Unified across all four detail screens, which each had their own copy. Reached without a list (bookmark, dashboard, reference lookup) it falls back to the plain registry. `e2e/detail-return.spec.ts`                                                                                                                                                                                                  |
 | 2026-08-05 | The back control's arrow drifted to the left edge, and naming the section overshot      | Two corrections to the above, same day. «→» is bidi-NEUTRAL, so `'← {section}'` as a single string let the bidi algorithm choose the side and it chose the left; the arrow is now its own flex item, placed by `flex-direction: row` under `dir="rtl"`, which puts the first item on the right unconditionally — only the GLYPH is now a translation decision. And the visible label became the action, «رجوع», because naming the destination repeated the section the reader had just clicked out of; the destination survives as the `aria-label`, so four identical-looking controls are still distinguishable to a screen reader. Asserted on painted geometry, not DOM order.                                                                                                                      |
 | 2026-08-05 | The booking detail printed `confirmed`, `Unit`, `damascus` and `Booked as a guest`      | Bashar's screenshot. Only the last was copy written into a component; the other three were the API selecting the wrong COLUMN — `u.name_en`, `ci.slug`, and a `name_en ?? name_ar` that made the same booking read Arabic in the الحجوزات registry and English on its own detail screen. All three now coalesce Arabic first, like every other admin service. The status pill goes through `bookingStatus()`, the same lookup the registry's pill uses, so the two cannot disagree. Regression test asserts the pill against the catalogue and the city line against the slug shape.                                                                                                                                                                                                                     |
+| 2026-08-06 | لوحة الشريك did not exist — partners could only be driven by curl                       | A fourth app, `apps/partner` on 3002, for the reason ADR 0001 gives for the console being the third: a partner sees their own listings, guests and money and nothing of the other two surfaces. Own cookie, own CSP, own catalogue. Sign-in, the §7 shell, عقاراتي and an honest empty التقييمات. No 2FA gate, deliberately: the API asks partners for no second factor, so a gate would lock every partner out of an app they cannot enter.                                                                                                                                                                                                                                                                                                                                                             |
+| 2026-08-06 | The partner card showed a name and nothing else; the sidebar showed an email            | `listOwn` now returns cover image, trip traits, "from" price, unit count, city, type, rating and badges in ONE query with two lateral joins — per-listing fetches would be the N+1 rule 2 forbids. The price is the CHEAPEST unit: a property with a $45 single and a $140 suite has no single nightly price and an average matches nothing bookable. Traits come from `TRIP_ATTRIBUTES`, the shared vocabulary the checklist says not to fork. The name comes from a new `GET /partner/me` rather than a JWT claim — tokens are cached 15 minutes and are sent on every request — and it takes no id, so ownership cannot be forgotten.                                                                                                                                                                 |
+| 2026-08-06 | The partner image proxy pointed at an endpoint that does not exist                      | Found by the gap analysis, not by a test: no listing has a photo yet, so the route never fired. It was wrong twice — there is no GET to serve an image, and a listing photo is PUBLIC content already on safra.com, which is the line `StorageService` draws between `publicUrl` and an authenticated read. Replaced with the customer site's established `imageUrl` pattern, picking from `variantWidths` because the pipeline never upscales.                                                                                                                                                                                                                                                                                                                                                          |
 | 2026-08-06 | The database held 12,297 users and nothing anybody could test against                   | Bashar asked for the test data cleared and three شريك accounts added. `db:reset-dev` (guarded, transactional, refuses without `--yes` and outside localhost) removed 12,296 accounts and cleared 27 tables, keeping `ops@safra.test`, reference data and the append-only triggers. `db:testbed` then built three approved partners with six published properties, 88 bookings in every status, 28 payments, 16 guests, 12 staff, a dispute and a three-party thread. Both are idempotent. Amounts are computed the way `PricingService` computes them so the console's figures reconcile by hand.                                                                                                                                                                                                        |
 | 2026-08-06 | Property title links on the customer search page were 21px tall                         | Under the 40px touch floor the responsive rule requires, and `responsive.spec.ts` had been GREEN — because the search page had no results to render. The clean testbed gave it six published properties and the violation appeared immediately. An anchor is inline, so the global floor in `globals.css` cannot reach it; it needs `inline-flex min-h-10 … lg:min-h-0`, and it is not exempt as an "inline" link because it is the card's main action.                                                                                                                                                                                                                                                                                                                                                  |
 | 2026-08-06 | Three fixture bugs the database refused, correctly                                      | Writing the testbed hit three guarantees in a row: the `EXCLUDE USING gist` double-booking constraint (the generator reused units with overlapping dates), `conversations_exactly_one_subject` (a thread attached to both a booking and a partner would appear in two inboxes), and the append-only trigger on `messages` — a SEVENTH immutable table the reset script's own check had missed. Each was the schema doing its job; the fixture was wrong every time.                                                                                                                                                                                                                                                                                                                                      |

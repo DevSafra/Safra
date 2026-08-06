@@ -4,6 +4,7 @@ import { Ltr } from '@/components/ltr';
 import { statusTone, type Tone } from '@safra/ui';
 
 import { amount } from '@/lib/format';
+import { coverUrl } from '@/lib/media';
 import { fill, propertyStatus, propertyType, t, tripAttribute } from '@/lib/strings';
 
 /**
@@ -74,12 +75,12 @@ function Card({ property }: { readonly property: PartnerProperty }) {
       <div className="relative h-[140px] bg-field">
         {property.coverKey ? (
           /*
-            A plain `<img>`, not `next/image`. The optimiser fetches the source itself and cannot
-            carry the session cookie, so it would 401 on every listing photo — these are streamed
-            through a proxy route precisely because they are authenticated.
+            A plain `<img>`, not `next/image`. The media host is configured per environment and
+            Next's optimiser would need it in `remotePatterns` at build time; these are already
+            rendered to fixed variants by the upload pipeline, so there is nothing left to optimise.
           */
           <img
-            src={`/api/images/${encodeURIComponent(property.coverKey)}`}
+            src={coverUrl(property.coverKey, property.coverWidths, 560)}
             alt=""
             className="h-full w-full object-cover"
           />

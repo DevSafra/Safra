@@ -111,6 +111,7 @@ export class PropertiesService {
       city_name_ar: string | null;
       property_type: string | null;
       cover_key: string | null;
+      cover_widths: number[] | null;
       unit_count: number;
       from_price: string | null;
       currency_code: string | null;
@@ -121,6 +122,7 @@ export class PropertiesService {
              ci.name_ar AS city_name_ar,
              pt.code    AS property_type,
              img.file_key AS cover_key,
+             img.variant_widths AS cover_widths,
              coalesce(u.unit_count, 0)::int AS unit_count,
              u.from_price::text AS from_price,
              u.currency_code,
@@ -129,7 +131,7 @@ export class PropertiesService {
       JOIN cities ci        ON ci.id = pr.city_id
       JOIN property_types pt ON pt.id = pr.property_type_id
       LEFT JOIN LATERAL (
-        SELECT pi.file_key FROM property_images pi
+        SELECT pi.file_key, pi.variant_widths FROM property_images pi
         WHERE pi.property_id = pr.id AND pi.deleted_at IS NULL
         ORDER BY pi.is_cover DESC, pi.sort_order ASC
         LIMIT 1
@@ -159,7 +161,14 @@ export class PropertiesService {
       badges: row.badges ?? [],
       city: row.city_name_ar,
       propertyType: row.property_type,
+      /*
+        The KEY and its rendered widths, not a URL. The media base differs per environment and the
+        pipeline never upscales, so only the caller knows which variant to ask for — the customer
+        site's `imageUrl()` has encoded that rule since the gallery shipped, and a second rule here
+        would be a second thing to keep in step.
+      */
       coverKey: row.cover_key,
+      coverWidths: row.cover_widths ?? [],
       unitCount: row.unit_count,
       fromPrice: row.from_price,
       currencyCode: row.currency_code,

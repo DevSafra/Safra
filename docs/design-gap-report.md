@@ -412,6 +412,56 @@ Every deviation in the finished console should be one of these. Anything else is
 
 ---
 
+## 8. لوحة الشريك — Partner Portal gap analysis (2026-08-06)
+
+`apps/partner`, port 3002. Assessed against handoff §7 the same way §1–§6 assessed the console:
+by opening each screen against real data, not by reading the code.
+
+### 8.1 Which partner pages are fully implemented
+
+| Screen           | Handoff                                                         | State                                                                                                                                                                                                                    |
+| ---------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Sign-in          | — (not drawn)                                                   | **Complete.** Email + password, partner role enforced server-side, own cookie (`safra_partner_session`), own CSP with a per-request nonce, `next=` path re-validated. `PasswordField` per the project rule.              |
+| Shell §7         | 220px sidebar, sticky, three items, badge pills, support footer | **Complete except badges.** Sidebar, active state, the partner's business name, `partners@safra.com` footer, sign-out at the FOOT. The handoff's count badges (`عقاراتي 3`, `التقييمات 4.7`) are not rendered — see 8.3. |
+| عقاراتي §7.2     | header, add form, listing cards                                 | **Cards complete; add form absent.** Each card carries the 140px image slot, the status pill positioned over it, name + ★ rating, the meta line, the trait chips, the "from" price and تعديل/التقويم.                    |
+| التقييمات §7.3   | reviews list, رد, إبلاغ                                         | **Not implemented.** Renders an honest empty state naming the reason. No `reviews` table exists.                                                                                                                         |
+| لوحة التحكم §7.1 | KPIs, calendar, activity, payout line                           | **Skeleton only.** One KPI (listing count). No calendar, no activity, no payout line.                                                                                                                                    |
+
+### 8.2 Which workflows are complete
+
+- **Sign in → see only your own listings → sign out.** Complete and browser-tested, including that
+  the listings shown are the signed-in partner's _by name_, not merely three of something.
+- **Partner data isolation.** Enforced server-side: `listOwn` and `profile` both derive `partnerId`
+  from the VERIFIED token via `requirePartnerId`, never from a parameter. There is no endpoint that
+  accepts a partner id.
+- Everything else in §7 is a read that does not exist yet or a write that has no screen.
+
+### 8.3 Backend and API gaps that remain
+
+| Gap                                         | Blocks                                                                                           | Note                                                                                                                                                                                                     |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No `reviews` table, API or aggregate        | التقييمات entirely; the sidebar's `4.7` badge; the card's ★ is a seeded column, not an aggregate | The largest single piece. §7.3 plus P-006 (reply or report, never delete).                                                                                                                               |
+| No payouts model                            | The §7.1 payout line _"تحويل مستحقات 1,240$ مجدول يوم الخميس"_                                   | `bookings.partner_payable_amount` is an OBLIGATION, not a transfer. The console's الدفع screen already refuses to present one as the other; this must not diverge from that decision. See `O-partner-2`. |
+| No partner bookings/calendar endpoint       | §7.1's calendar and activity panels                                                              | `GET /bookings` is role-scoped and returns a partner's own, but there is no per-unit calendar read shaped for a month grid. `availability_days` exists.                                                  |
+| No image serving story confirmed end to end | The card's photo                                                                                 | `StorageService.publicUrl` exists and the upload path writes variants, but no seeded listing has an image, so the rendered `<img>` is unproven against a real file.                                      |
+| `listOwn` returns no unit detail            | تعديل and التقويم screens                                                                        | The card needs only a "from" price; editing needs the units themselves.                                                                                                                                  |
+
+### 8.4 Externally blocked
+
+- **Nothing in the partner portal is blocked on a third party.** The payout line is blocked on an
+  internal decision (see `O-partner-2`), not on an external dependency. This is unlike the
+  console, whose WhatsApp and sanctions-feed items wait on accounts SAFRA does not yet hold.
+
+### 8.5 Deviations, and why
+
+| Deviation                                                                   | Reason                                                                                                                                                                                                                           |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No 2FA gate, unlike the console                                             | The API asks a partner for no second factor. A gate would lock every partner out of an app they cannot enter, rather than raising anybody's security. `hasTwoFactor` is already in `@safra/session` for when partner 2FA exists. |
+| تعديل and التقويم render disabled with a title                              | The screens do not exist. The console makes the same call for its unbuilt sections; a control that navigates nowhere is worse than one that admits it.                                                                           |
+| The card's photo falls back to «لا صورة بعد»                                | No seeded listing has an image. A stock photograph would be a picture of somewhere the guest is not going.                                                                                                                       |
+| Property status pills use a filled background, unlike the console's outline | The pill sits over a photograph. The COLOUR still comes from the shared `statusTone`, so «منشور» is the same green everywhere.                                                                                                   |
+| The sidebar has no count badges                                             | `عقاراتي 3` is derivable today; `التقييمات 4.7` is not, and shipping one without the other would imply the second is coming from data. Both land with reviews.                                                                   |
+
 ## 7. Out of scope for this pass
 
 Listed so they are not read as gaps in the admin console: the public site (§5 — home, results,
