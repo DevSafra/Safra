@@ -21,7 +21,8 @@
     "db:studio": "drizzle-kit studio",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "db:seed": "tsx src/seed/index.ts"
+    "db:seed": "tsx src/seed/index.ts",
+    "db:reset-dev": "tsx src/scripts/reset-dev.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

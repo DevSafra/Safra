@@ -31,8 +31,17 @@ export async function PropertyCard({
       <div className="flex items-start justify-between gap-3">
         <h3 className="font-display text-lg text-text">
           {/* The whole card is not a link: the heading is, so screen readers get one
-              clear target instead of a wall of duplicated link text. */}
-          <Link href={`/${locale}/property/${item.slug}`} className="hover:text-gold">
+              clear target instead of a wall of duplicated link text.
+
+              `min-h-10` below `lg` because this is the primary target on a result card and a
+              finger has to hit it. It rendered 21px tall — an anchor is inline, so the global
+              40px floor in `globals.css` (which covers `button`, `select`, `summary`) cannot
+              reach it, exactly as the responsive rule warns. It is not exempt as an "inline"
+              link either: it is a card's main action, not a word inside a sentence. */}
+          <Link
+            href={`/${locale}/property/${item.slug}`}
+            className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
+          >
             {name}
           </Link>
         </h3>

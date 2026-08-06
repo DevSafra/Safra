@@ -67,7 +67,14 @@ test.describe('the back control', () => {
       a size that equals the default — a URL stating the default is noise. So `size=10` would have
       tested that the parameter is correctly absent, which is a different promise from this one.
     */
-    const view = `/bookings?size=${NON_DEFAULT}&page=4&status=cancelled`;
+    /*
+      A small size and page three, rather than page four at twenty-five. The promise under test is
+      that page, size and filter all survive the round trip — it needs a page that EXISTS, not a
+      large one, and demanding 76 cancelled bookings only coupled this test to how much data
+      happened to be lying around.
+    */
+    const size = 2;
+    const view = `/bookings?size=${size}&page=3&status=cancelled`;
 
     await page.goto(view);
 
@@ -77,8 +84,8 @@ test.describe('the back control', () => {
     // The detail URL carries the list state, which is how the back link can be built at all.
     const detail = new URL(page.url()).searchParams;
 
-    expect(detail.get('page')).toBe('4');
-    expect(detail.get('size')).toBe(String(NON_DEFAULT));
+    expect(detail.get('page')).toBe('3');
+    expect(detail.get('size')).toBe(String(size));
     expect(detail.get('status')).toBe('cancelled');
 
     await backTo(page, t.nav.bookings).click();
@@ -87,12 +94,12 @@ test.describe('the back control', () => {
     const returned = new URL(page.url());
 
     expect(returned.pathname).toBe('/bookings');
-    expect(returned.searchParams.get('page')).toBe('4');
-    expect(returned.searchParams.get('size')).toBe(String(NON_DEFAULT));
+    expect(returned.searchParams.get('page')).toBe('3');
+    expect(returned.searchParams.get('size')).toBe(String(size));
     expect(returned.searchParams.get('status')).toBe('cancelled');
 
     // And the reader is actually looking at that page, not just at a URL that says so.
-    await expect(page.getByLabel(t.table.pageLabel).first()).toHaveValue('4');
+    await expect(page.getByLabel(t.table.pageLabel).first()).toHaveValue('3');
   });
 
   /** A search survives the trip too, not only the paging. */
