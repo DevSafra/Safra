@@ -128,6 +128,14 @@ export function sessionCookieOptions(maxAgeSeconds: number) {
  */
 export const CUSTOMER_SESSION_COOKIE = 'safra_session';
 export const STAFF_SESSION_COOKIE = 'safra_admin_session';
+/**
+ * لوحة الشريك, a fourth app on a fourth port for the same reason the console is a third.
+ *
+ * A partner is not staff and not a customer: they see their own listings, their own guests' names
+ * and their own money, and none of the other two surfaces. Sharing a cookie with either would mean
+ * a bug on one becoming a way into the other, which ADR 0001 already rejected once.
+ */
+export const PARTNER_SESSION_COOKIE = 'safra_partner_session';
 
 /**
  * Pulls one claim out of a JWT payload WITHOUT verifying the signature.

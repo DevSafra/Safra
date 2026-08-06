@@ -450,6 +450,62 @@ forty places, and the register is where that belongs until it is fixed.
 
 **Owner:** engineering. Small and independent; can be done in one pass whenever there is room.
 
+### O-data-1 — The append-only guarantee does not survive TRUNCATE
+
+**What:** Seven tables are append-only — `audit_log`, `ledger_entries`, `timeline_events`,
+`wallet_transactions`, `gift_card_transactions`, `settings_history` and `messages` — enforced by
+`BEFORE UPDATE OR DELETE ... FOR EACH ROW` triggers in `post/0001_constraints.sql`. PostgreSQL does
+**not** fire row-level triggers on `TRUNCATE`, so every one of them can be emptied by anyone with
+table privileges, with no error and no trace.
+
+**How it was found:** `reset-dev.ts` cleared 17,067 audit rows and 8,681 timeline events without
+touching a trigger (2026-08-06). That was convenient for a dev reset and is the wrong outcome
+everywhere else — the whole point of the trigger is that "a bug that tries to rewrite history
+should fail loudly in CI, not succeed quietly in production".
+
+**The fix:** a statement-level trigger on the same seven tables:
+
+```sql
+CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
+  EXECUTE FUNCTION deny_mutation();
+```
+
+`deny_mutation()` already raises with `TG_OP`, so it needs no change. Add it to the same `FOREACH`
+loop that installs the row triggers.
+
+**What it costs:** `reset-dev.ts` and the testbed's `TRUNCATE messages, conversations` would then
+have to drop and restore the triggers explicitly — which is the correct trade, because it makes the
+suspension deliberate and visible rather than an accident of which statement you happened to use.
+
+**Owner:** engineering. Small, and it closes a P-003 hole.
+
+### O-data-2 — The integration suite repopulates the database it runs against
+
+**What:** `pnpm vitest run` with `DATABASE_URL` set creates real rows and does not remove them.
+A single full run adds roughly 100 users and 37 partners. Left alone this accumulates: the
+database on 2026-08-06 held **12,297 users** (2,262 of them super admins), 5,250 bookings and
+17,067 audit rows, none of it authored by a person.
+
+**Why it matters beyond tidiness:**
+
+- A console with 4,967 partners in الشركاء cannot be judged by eye, which is what a staff console
+  is for.
+- It masks defects. `responsive.spec.ts` passed for months because the customer search page had no
+  results to render; the moment the testbed gave it six published properties, a 21px touch target
+  appeared that had always been there.
+- It makes `db:reset-dev` a point-in-time clean rather than a stable state.
+
+**What would fix it,** roughly in order of value:
+
+1. A transactional fixture per integration test — begin, run, roll back — so nothing is left.
+   Most of these tests do not need committed data.
+2. Failing that, a per-run marker column or email prefix plus an `afterAll` cleanup.
+3. A separate database for the integration suite, so a developer's testbed is never its dumping
+   ground.
+
+**Owner:** engineering. Not blocking, and it will keep costing an afternoon every few weeks until
+it is done.
+
 ### O-page-1 — What numbered pages cost, and when it stops being affordable
 
 **What:** The console's fifteen registries moved from keyset cursors to `OFFSET` + `count(*)` on
@@ -1090,6 +1146,9 @@ Kept because the reason something was blocked is often the reason it returns.
 | 2026-08-05 | «القوائم» was unstyled text, linked to the dashboard, and lost the reader's place       | Bashar reported both. The control is now «رجوع» with the arrow on its right, styled like the console's other secondary controls, and returns to the exact page, size and filter: each registry row carries its list position into the detail link, and the detail screen rebuilds the list URL from a LITERAL base path — never from the URL, so a crafted link cannot redirect off the console. Unified across all four detail screens, which each had their own copy. Reached without a list (bookmark, dashboard, reference lookup) it falls back to the plain registry. `e2e/detail-return.spec.ts`                                                                                                                                                                                                  |
 | 2026-08-05 | The back control's arrow drifted to the left edge, and naming the section overshot      | Two corrections to the above, same day. «→» is bidi-NEUTRAL, so `'← {section}'` as a single string let the bidi algorithm choose the side and it chose the left; the arrow is now its own flex item, placed by `flex-direction: row` under `dir="rtl"`, which puts the first item on the right unconditionally — only the GLYPH is now a translation decision. And the visible label became the action, «رجوع», because naming the destination repeated the section the reader had just clicked out of; the destination survives as the `aria-label`, so four identical-looking controls are still distinguishable to a screen reader. Asserted on painted geometry, not DOM order.                                                                                                                      |
 | 2026-08-05 | The booking detail printed `confirmed`, `Unit`, `damascus` and `Booked as a guest`      | Bashar's screenshot. Only the last was copy written into a component; the other three were the API selecting the wrong COLUMN — `u.name_en`, `ci.slug`, and a `name_en ?? name_ar` that made the same booking read Arabic in the الحجوزات registry and English on its own detail screen. All three now coalesce Arabic first, like every other admin service. The status pill goes through `bookingStatus()`, the same lookup the registry's pill uses, so the two cannot disagree. Regression test asserts the pill against the catalogue and the city line against the slug shape.                                                                                                                                                                                                                     |
+| 2026-08-06 | The database held 12,297 users and nothing anybody could test against                   | Bashar asked for the test data cleared and three شريك accounts added. `db:reset-dev` (guarded, transactional, refuses without `--yes` and outside localhost) removed 12,296 accounts and cleared 27 tables, keeping `ops@safra.test`, reference data and the append-only triggers. `db:testbed` then built three approved partners with six published properties, 88 bookings in every status, 28 payments, 16 guests, 12 staff, a dispute and a three-party thread. Both are idempotent. Amounts are computed the way `PricingService` computes them so the console's figures reconcile by hand.                                                                                                                                                                                                        |
+| 2026-08-06 | Property title links on the customer search page were 21px tall                         | Under the 40px touch floor the responsive rule requires, and `responsive.spec.ts` had been GREEN — because the search page had no results to render. The clean testbed gave it six published properties and the violation appeared immediately. An anchor is inline, so the global floor in `globals.css` cannot reach it; it needs `inline-flex min-h-10 … lg:min-h-0`, and it is not exempt as an "inline" link because it is the card's main action.                                                                                                                                                                                                                                                                                                                                                  |
+| 2026-08-06 | Three fixture bugs the database refused, correctly                                      | Writing the testbed hit three guarantees in a row: the `EXCLUDE USING gist` double-booking constraint (the generator reused units with overlapping dates), `conversations_exactly_one_subject` (a thread attached to both a booking and a partner would appear in two inboxes), and the append-only trigger on `messages` — a SEVENTH immutable table the reset script's own check had missed. Each was the schema doing its job; the fixture was wrong every time.                                                                                                                                                                                                                                                                                                                                      |
 | 2026-08-06 | Tables opened at 25 rows and forgot a change the moment you left                        | Bashar asked for ten everywhere, remembered against the ACCOUNT. Stored per table in a new `users.table_page_sizes` jsonb column, because ten bookings is a queue you scan and a hundred audit rows is a log you search. The section is an allow-list of fourteen literals — it becomes a KEY in a column read on every authenticated request — and the endpoint takes no user id at all, so ownership is not a check that can be forgotten. The bar became a POST that redirects: it was a GET form, and a GET that writes would let a prefetch or a pasted link change somebody's saved preference.                                                                                                                                                                                                    |
 | 2026-08-06 | Saving a preference made the e2e suite stateful, and it failed a LATER run              | Found by the change itself. `pagination.spec.ts` submits the size bar, which now writes to the shared staff account, so `navigation.spec.ts`'s "every table starts at ten rows" failed on the next run — a failure with no relationship to the code that caused it. The submitting spec now restores what it changed and the asserting one resets first, and the rule is written down: any spec that submits the bar puts the size back.                                                                                                                                                                                                                                                                                                                                                                 |
 | 2026-08-06 | One status was three different colours depending on the screen                          | Bashar's instruction. Eleven tone functions and four hand-rolled pills across two apps: `expired` was red in الدفع, grey in الإعلانات, amber in بطاقات الهدايا; `approved` was sky for a property and green for a partner; a cancelled booking was red to staff and grey to the customer. One `statusTone()` in `@safra/ui` now keys every vocabulary by the status VALUE, and one `StatusPill` draws them. Three conflicts had to be settled — `expired`→warn, `approved`→ok, `completed`→ok — each recorded with its reasoning. A browser sweep over all 19 sections fails if one status text is painted two colours.                                                                                                                                                                                  |

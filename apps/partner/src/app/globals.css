@@ -1,0 +1,348 @@
+@import 'tailwindcss';
+
+/**
+ * Tailwind must be told to scan the shared UI package.
+ *
+ * v4 auto-detects sources under the app, and `@safra/ui` resolves through a
+ * node_modules symlink — which Tailwind skips. Without this line every class used ONLY
+ * in that package is absent from the stylesheet, so the component renders completely
+ * unstyled: the password field's eye button appeared as a plain button BELOW the input
+ * rather than positioned inside it. Nothing errors; the classes simply do not exist.
+ *
+ * Points at `src` rather than `dist` so a change is picked up without rebuilding the
+ * package first.
+ */
+@source '../../../../packages/ui/src';
+
+/**
+ * The console's palette — the "Eastern Night" dark theme, VERBATIM from the design handoff.
+ *
+ * Source of truth: `design_handoff_safra/README.md` §9.1. These are copied, not sampled: an
+ * earlier version of this file was eyeballed from a screenshot and every value was slightly
+ * off — `--card` was `#15132a` against the specified `#17142F`, `--field` was two shades too
+ * light, `--text` had the wrong hue entirely (a neutral grey where the design uses a warm
+ * cream). Individually invisible; together the console read as a different product. The
+ * handoff calls the design "high fidelity, colors are final", so anything here that
+ * disagrees with §9.1 is a defect.
+ *
+ * `*A` tokens are bare RGB triples, not colours, so a rule can set its own alpha:
+ * `rgba(var(--goldA), .14)` for a hairline border against `rgba(var(--goldA), .5)` for an
+ * emphatic one. Tailwind cannot express that from a single hex value. The handoff's tint
+ * ladder is `.06 / .1 / .12 / .14 / .15 / .16 / .22 / .25 / .28 / .35 / .4 / .5` — stay on
+ * it rather than inventing intermediate values.
+ *
+ * The light theme (§9.2) is below, and every token here has a counterpart there — including the
+ * `*A` triples, which is the half that is easy to forget. Bashar asked for the toggle on
+ * 2026-08-04; before that the console was dark-only and the gap report recorded it as a
+ * deliberate omission.
+ */
+@theme {
+  --color-bg: #0c0a1c;
+  /** One step up from `bg`, for a raised surface that is not a card. */
+  --color-bg2: #12102b;
+  --color-card: #17142f;
+  --color-field: #0f0d24;
+  --color-line: #2a2450;
+  /** One step darker than `line`, for row separators inside an already-bordered card. */
+  --color-line2: #1f1b3e;
+  --color-text: #f4eedf;
+  /** Secondary body text: dimmer than `text`, brighter than `muted`. */
+  --color-text2: #c9c3e0;
+  --color-muted: #a9a3c4;
+  --color-faint: #736f92;
+  /** Dimmest legible tier — a denied cell in the permission matrix, an unbuilt nav item. */
+  --color-faint2: #4e4a6e;
+  --color-gold: #e8bc66;
+  --color-sky: #78aee0;
+  --color-ok: #6fc792;
+  --color-bad: #e06868;
+  --color-warn: #e8a54b;
+  /**
+   * Pending confirmation — purple, NEVER gold.
+   *
+   * An explicit rule in the handoff. Gold is SAFRA's affirmative accent: it marks a price,
+   * a primary action, a section that matters. A booking waiting on a partner is not good
+   * news, and colouring it gold reads as one.
+   */
+  --color-pend: #9f8ce8;
+  /** Inactive bars in the revenue sparkline. */
+  /*
+    Seven tones added 2026-08-06 so that no two statuses VISIBLE ON ONE SCREEN share a colour
+    (Bashar). The widest vocabulary is the payments registry, which unions payment, refund and
+    wallet statuses onto one table — thirteen values, so thirteen colours. Hues are spread around
+    the wheel rather than shaded, because two greens at different lightness are what a reader
+    scanning a column cannot tell apart.
+  */
+  --color-teal: #4fc9c4;
+  --color-lime: #b5cf5f;
+  --color-indigo: #7f93ea;
+  --color-orange: #e8814b;
+  --color-crimson: #d8557f;
+  /** Two further neutrals: `refunded`, `partially_refunded` and `waived` share one screen. */
+  --color-slate: #8e9ab8;
+  --color-stone: #a8968a;
+  --color-barDim: #3a2f6b;
+}
+
+/**
+ * RGB triples for alpha composition. Kept outside `@theme` because they are not colours
+ * Tailwind should generate utilities for — they exist only to be fed to `rgba()`.
+ */
+:root {
+  --goldA: 232, 188, 102;
+  --skyA: 120, 174, 224;
+  --okA: 111, 199, 146;
+  --badA: 224, 104, 104;
+  --warnA: 232, 165, 75;
+}
+
+/**
+ * The light theme — "Eastern Day", VERBATIM from the design handoff §9.2.
+ *
+ * Copied, not derived. The handoff ships a complete light palette, so inventing one by lightening
+ * the dark values would have produced a console that is nearly right and consistently off — the
+ * same mistake an earlier version of the dark theme made by sampling a screenshot.
+ *
+ * ## Every token, including the alpha triples
+ *
+ * The `*A` overrides are the ones worth pointing at. Roughly forty rules in this console compose
+ * a tint with `rgba(var(--goldA), .12)`, and the dark gold (`232,188,102`) over a white card is a
+ * pale yellow wash rather than the handoff's `168,122,31`. Overriding the `--color-*` set alone
+ * looks finished and leaves every tinted surface, badge and hairline reading as the dark theme's.
+ *
+ * ## `data-theme`, not the handoff's `html.theme-light`
+ *
+ * The handoff names a class. This uses the attribute the customer app already uses, so both apps
+ * share one mechanism, one storage key and one pre-paint script (`@safra/ui/theme`). A second
+ * mechanism for the same feature is how the two drift.
+ */
+:root[data-theme='light'] {
+  --color-bg: #f5f6fa;
+  --color-bg2: #eceef5;
+  --color-card: #ffffff;
+  --color-field: #f1f3f8;
+  --color-line: #dfe3ed;
+  --color-line2: #eaedf4;
+  --color-text: #1d2333;
+  --color-text2: #3a415a;
+  --color-muted: #5c6377;
+  --color-faint: #7c8296;
+  --color-faint2: #a5aabc;
+  --color-gold: #a87a1f;
+  --color-sky: #2e66a8;
+  --color-ok: #1f7d53;
+  --color-bad: #c23f3f;
+  --color-warn: #9e6e15;
+  --color-pend: #6c51c9;
+  --color-teal: #0f7d78;
+  --color-lime: #5f7d16;
+  --color-indigo: #4356b8;
+  --color-orange: #b35418;
+  --color-crimson: #a8285c;
+  --color-slate: #5a6480;
+  --color-stone: #7a6a5e;
+  --color-barDim: #d5dae8;
+
+  --goldA: 168, 122, 31;
+  --skyA: 46, 102, 168;
+  --okA: 31, 125, 83;
+  --badA: 194, 63, 63;
+  --warnA: 158, 110, 21;
+
+  color-scheme: light;
+}
+
+/**
+ * The OS preference is deliberately NOT honoured here.
+ *
+ * The customer app has a `prefers-color-scheme` block; this one does not, and the difference is
+ * intentional. The console is designed dark (§9.1) and was dark-only until Bashar asked for the
+ * toggle. Reacting to the OS would relight the console for every staff member on a light-mode
+ * laptop the moment this shipped — a change to the tool they use all day that none of them asked
+ * for. Light is available, and it is opt-in.
+ */
+
+/**
+ * Grid and flex children may shrink below their content.
+ *
+ * ## The bug this removes as a class
+ *
+ * A grid or flex item defaults to `min-width: auto`, which means it refuses to shrink below its
+ * content's intrinsic minimum. A registry table with a 860px `min-width` therefore made its
+ * containing panel 898px wide inside a 342px column, and the whole page scrolled sideways —
+ * carrying the sidebar off screen — even though the table sat in an `overflow-x-auto` box
+ * intended to scroll on its own. Measured: 7 of the 19 console sections overflowed at 390px,
+ * 3 of them still at 1024px.
+ *
+ * The per-element fix is `min-w-0` on every grid and flex item, forever, remembered by whoever
+ * writes the next panel. This is the same fix applied once, in the one place it cannot be
+ * forgotten.
+ *
+ * `:where()` gives the selector ZERO specificity, so any explicit `min-w-*` utility still wins —
+ * an element that genuinely needs a floor can state one and this will not fight it.
+ */
+/**
+ * The console layout, and the sidebar's three states.
+ *
+ * ## Why this is CSS and not Tailwind utilities
+ *
+ * The layout depends on an attribute on `<html>`, and expressing that in utilities means an
+ * arbitrary variant — `[html[data-sidebar=hidden]_&]:grid-cols-1` — repeated on every element
+ * that reacts. Written once here it is legible, and it is applied in the first painted frame by
+ * the pre-paint script rather than after hydration. A 220px column that appears late reflows the
+ * whole page in front of the reader.
+ *
+ * ## The three states
+ *
+ * - **No attribute** — nobody has chosen. A column from `lg` up, hidden below, which is the right
+ *   default in both places: room for it on a laptop, no room on a phone.
+ * - **`shown`** — a column from `lg` up, an overlay DRAWER below. A drawer rather than a stacked
+ *   block because pushing nineteen nav rows above the content is what made the phone layout
+ *   unusable before.
+ * - **`hidden`** — gone at every width, and the content takes the space back.
+ *
+ * An explicit choice wins at every width. That is the whole point of the hamburger being
+ * available on a desktop too.
+ */
+.console-layout {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.console-backdrop {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  /* Default and `shown`: the sidebar is a column. */
+  .console-layout {
+    grid-template-columns: 220px 1fr;
+  }
+
+  :root[data-sidebar='hidden'] .console-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .console-sidebar {
+    position: sticky;
+    top: 1.5rem;
+    grid-column-start: 1;
+    grid-row-start: 1;
+  }
+
+  .console-main {
+    grid-column-start: 2;
+    grid-row-start: 1;
+  }
+
+  /* With no column beside it, the content occupies the only one. */
+  :root[data-sidebar='hidden'] .console-main {
+    grid-column-start: 1;
+  }
+}
+
+:root[data-sidebar='hidden'] .console-sidebar {
+  display: none;
+}
+
+/**
+ * Below `lg`, a shown sidebar is a drawer over the content.
+ *
+ * `inset-inline-start` rather than `left`: in RTL the drawer must come from the RIGHT, and a
+ * physical property would slide it in from the wrong edge — the same class of bug the project's
+ * logical-property rule exists to prevent.
+ *
+ * `max-width: 88vw` so the backdrop is always visible behind it, which is what tells a first-time
+ * user the drawer is dismissible.
+ */
+@media (max-width: 63.999rem) {
+  .console-sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 50;
+    width: 260px;
+    max-width: 88vw;
+    /*
+      The drawer does NOT scroll — its nav does. Letting the aside scroll put the account
+      controls below the fold on a phone, which is the one place they must not be.
+    */
+    overflow: hidden;
+    border-radius: 0;
+  }
+
+  /* Hidden below `lg` unless explicitly shown. */
+  :root:not([data-sidebar='shown']) .console-sidebar {
+    display: none;
+  }
+
+  :root[data-sidebar='shown'] .console-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: block;
+    background: rgb(0 0 0 / 0.55);
+  }
+}
+
+/**
+ * A 40px floor for controls on handheld widths.
+ *
+ * Chasing this per component does not converge: the audit found thirteen distinct offenders, and
+ * fixing them by editing class strings missed sibling branches — the customer header's "sign in"
+ * link and its "account" link are different elements, and only one got the padding. One rule
+ * covers every control, including the ones written next month.
+ *
+ * `button`, `select` and `summary` only. An anchor is INLINE, so `min-height` does nothing to it
+ * without also changing its `display`, and forcing `inline-flex` on every link in the app would
+ * add height to links inside sentences. Anchors styled as controls carry an explicit
+ * `min-h-10`; anchors inside table cells are handled by the rule above.
+ *
+ * Below `lg`, which is exactly where the console's sidebar becomes a drawer. That boundary is the
+ * one that means "the input is probably a finger": a tablet at 768px is as touch-driven as a
+ * phone, and stopping at `md` left every control on an iPad at 22–38px. Above it the input is a
+ * pointer and the design's dense console (§9.4) is what is wanted.
+ *
+ * `:where()` for zero specificity — anything that genuinely needs to be smaller can say so.
+ */
+@media (max-width: 63.999rem) {
+  :where(button, select, summary, [role='button']) {
+    min-height: 2.5rem;
+  }
+}
+
+/**
+ * A tap-sized target for links inside a table, on handheld widths only.
+ *
+ * Measured at 375px: a reference link was 104 × 19 and a row action 60 × 17. Both fail even WCAG
+ * 2.5.8's 24 × 24 floor, let alone the 40px a thumb wants — and there are hundreds of them across
+ * the registries, so fixing them at each call site is twelve files and a convention to remember.
+ *
+ * Only below `lg`, matching the control floor and the sidebar's drawer breakpoint. The design
+ * specifies a dense desktop table (§9.4) and taller rows there would be a different table, so the
+ * desktop stays exactly as drawn: this trades vertical space for reachability precisely where the
+ * input is a finger.
+ */
+@media (max-width: 63.999rem) {
+  :where(td, th) a {
+    display: inline-flex;
+    min-height: 2.5rem;
+    align-items: center;
+  }
+}
+
+:where(.grid, .flex, .inline-flex) > * {
+  min-width: 0;
+}
+
+html {
+  /* Both, so form controls and scrollbars follow whichever is active. */
+  color-scheme: dark light;
+  background: var(--color-bg);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
