@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import type { Tone } from '@safra/ui';
+
 import { rowAnchor } from '@/lib/search-params';
 
 /**
@@ -169,22 +171,40 @@ export function AdminTable<T>({
  * The handoff uses `color: X; border: 1px solid X` with no background — the colour carries
  * the meaning and the outline keeps it legible against `--card` and `--field` alike.
  */
-const TONES = {
+const TONES: Record<Tone, string> = {
   ok: 'text-ok border-ok',
-  warn: 'text-warn border-warn',
-  bad: 'text-bad border-bad',
+  teal: 'text-teal border-teal',
+  lime: 'text-lime border-lime',
   sky: 'text-sky border-sky',
+  indigo: 'text-indigo border-indigo',
   /** Pending confirmation. Purple, never gold — handoff §1 and §14. */
   pend: 'text-pend border-pend',
   gold: 'text-gold border-gold',
+  warn: 'text-warn border-warn',
+  orange: 'text-orange border-orange',
+  bad: 'text-bad border-bad',
+  crimson: 'text-crimson border-crimson',
   faint: 'text-faint border-faint',
-} as const;
+  slate: 'text-slate border-slate',
+  stone: 'text-stone border-stone',
+};
 
-export type Tone = keyof typeof TONES;
+/**
+ * Re-exported so the console's many `import { type Tone } from '@/components/admin-table'` keep
+ * working. The vocabulary itself lives in `@safra/ui`, because the customer app paints the same
+ * statuses and the two must not drift — see `statusTone`.
+ */
+export type { Tone };
 
 export function StatusPill({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (
+    /*
+      `data-status-pill` so the browser sweep can find every status on a screen and nothing else.
+      Without it the selector was `span.rounded-full`, which also matches sidebar count badges and
+      avatar initials — and a test that reports «4,895 and 1 are both red» reports nothing.
+    */
     <span
+      data-status-pill
       className={`inline-block whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[10.5px] font-bold ${TONES[tone]}`}
     >
       {children}

@@ -39,6 +39,21 @@
   --color-warn: #e8a54b;
   --color-bad: #e06868;
   --color-pend: #9f8ce8;
+  /*
+    Seven tones added 2026-08-06 so that no two statuses VISIBLE ON ONE SCREEN share a colour
+    (Bashar). The widest vocabulary is the payments registry, which unions payment, refund and
+    wallet statuses onto one table — thirteen values, so thirteen colours. Hues are spread around
+    the wheel rather than shaded, because two greens at different lightness are what a reader
+    scanning a column cannot tell apart.
+  */
+  --color-teal: #4fc9c4;
+  --color-lime: #b5cf5f;
+  --color-indigo: #7f93ea;
+  --color-orange: #e8814b;
+  --color-crimson: #d8557f;
+  /** Two further neutrals: `refunded`, `partially_refunded` and `waived` share one screen. */
+  --color-slate: #8e9ab8;
+  --color-stone: #a8968a;
 
   --radius-card: 0.875rem;
 }
@@ -62,6 +77,13 @@
   --color-warn: #9e6e15;
   --color-bad: #c23f3f;
   --color-pend: #6c51c9;
+  --color-teal: #0f7d78;
+  --color-lime: #5f7d16;
+  --color-indigo: #4356b8;
+  --color-orange: #b35418;
+  --color-crimson: #a8285c;
+  --color-slate: #5a6480;
+  --color-stone: #7a6a5e;
 }
 
 @media (prefers-color-scheme: light) {
@@ -79,6 +101,13 @@
     --color-warn: #9e6e15;
     --color-bad: #c23f3f;
     --color-pend: #6c51c9;
+    --color-teal: #0f7d78;
+    --color-lime: #5f7d16;
+    --color-indigo: #4356b8;
+    --color-orange: #b35418;
+    --color-crimson: #a8285c;
+    --color-slate: #5a6480;
+    --color-stone: #7a6a5e;
   }
 }
 

@@ -148,7 +148,11 @@ const partnerDetailSchema = z.object({
     nameAr: z.string(),
     nameEn: z.string().nullable(),
   }),
-  partnerType: z.object({ code: z.string() }),
+  partnerType: z.object({
+    code: z.string(),
+    nameAr: z.string(),
+    nameEn: z.string(),
+  }),
   documents: z.array(partnerDocumentSchema),
   properties: z.array(
     z.object({

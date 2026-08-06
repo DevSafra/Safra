@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { PartnerDocument } from '@/lib/api';
-import { fill, t } from '@/lib/strings';
+import { fill, label, t } from '@/lib/strings';
+import { StatusPill } from '@/components/admin-table';
+import { statusTone } from '@/lib/status-tone';
 
 /**
  * One document, with its own approve/reject (§8.1, item 121).
@@ -56,7 +58,9 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
     <div className="rounded-lg border border-line bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm text-text">{kindLabel(document.kind)}</p>
+          <p className="text-sm text-text">
+            {label(t.enums.documentKind, document.kind)}
+          </p>
           <p className="truncate text-xs text-faint">
             {fill(t.sections.documentReview.fileLine, {
               fileName: document.fileName,
@@ -66,7 +70,9 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <StatusPill status={document.status} />
+          <StatusPill tone={statusTone(document.status)}>
+            {label(t.enums.verification, document.status)}
+          </StatusPill>
           {/*
             A plain link, not a fetch: the browser's own download handling is what
             makes `Content-Disposition: attachment` do its job. Opening in a new tab
@@ -153,31 +159,6 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
         </div>
       )}
     </div>
-  );
-}
-
-function kindLabel(kind: string): string {
-  const labels: Record<string, string> = {
-    identity: 'Identity document',
-    commercial_register: 'Commercial register',
-    ownership_proof: 'Proof of ownership',
-    management_contract: 'Management contract',
-    bank_confirmation: 'Bank confirmation',
-  };
-
-  return labels[kind] ?? kind.replace(/_/g, ' ');
-}
-
-function StatusPill({ status }: { status: string }) {
-  const tone =
-    status === 'approved'
-      ? 'border-ok/40 bg-ok/10 text-ok'
-      : status === 'rejected'
-        ? 'border-bad/40 bg-bad/10 text-bad'
-        : 'border-line bg-field text-faint';
-
-  return (
-    <span className={`rounded-full border px-2.5 py-0.5 text-xs ${tone}`}>{status}</span>
   );
 }
 

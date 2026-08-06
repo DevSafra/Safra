@@ -3,11 +3,11 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import { getBooking } from '@/lib/api';
-import { BackLink } from '@/components/back-link';
+import { BackLink, type BackTarget } from '@/components/back-link';
 import { Ltr, StatusPill } from '@/components/admin-table';
 import { amount, money, rate } from '@/lib/format';
-import { returnHref } from '@/lib/search-params';
-import { bookingStatusTone } from '@/lib/status-tone';
+import { backTarget, detailHref, origin } from '@/lib/search-params';
+import { statusTone } from '@/lib/status-tone';
 import {
   bookingStatus,
   cancellationReason,
@@ -45,7 +45,8 @@ export default async function BookingPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { reference } = await params;
-  const back = returnHref('/bookings', await searchParams, reference);
+  const query = await searchParams;
+  const back = backTarget('/bookings', query, reference);
   const booking = await getBooking(reference);
 
   if (booking === 'unauthenticated') {
@@ -86,7 +87,7 @@ export default async function BookingPage({
           local three-branch guess that painted «بانتظار الدفع» gold where the table paints it amber.
         */}
         <p className="mt-3">
-          <StatusPill tone={bookingStatusTone(booking.status)}>
+          <StatusPill tone={statusTone(booking.status)}>
             {bookingStatus(booking.status)}
           </StatusPill>
         </p>
@@ -116,14 +117,24 @@ export default async function BookingPage({
           name={booking.partner.name}
           reference={booking.partner.reference}
           lines={[<Ltr key="phone">{booking.partner.phone}</Ltr>]}
-          href={`/partners/${booking.partner.reference}`}
+          href={detailHref(
+            '/partners',
+            booking.partner.reference,
+            origin('bookings', booking.reference),
+            query,
+          )}
         />
         <Party
           title={t.sections.bookingDetail.property}
           name={booking.property.name}
           reference={booking.property.reference}
           lines={[booking.property.unit, booking.property.city]}
-          href={`/properties/${booking.property.reference}`}
+          href={detailHref(
+            '/properties',
+            booking.property.reference,
+            origin('bookings', booking.reference),
+            query,
+          )}
         />
       </section>
 
@@ -357,10 +368,10 @@ export default async function BookingPage({
   );
 }
 
-function Shell({ back, children }: { back: string; children: React.ReactNode }) {
+function Shell({ back, children }: { back: BackTarget; children: React.ReactNode }) {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <BackLink href={back} section={t.nav.bookings} />
+      <BackLink target={back} section={t.nav.bookings} />
       <div className="mt-4 grid gap-8">{children}</div>
     </main>
   );

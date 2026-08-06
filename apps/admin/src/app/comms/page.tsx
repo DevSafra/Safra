@@ -10,10 +10,10 @@ import {
   StatusPill,
   ToneText,
   type AdminColumn,
-  type Tone,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { fill, label, t } from '@/lib/strings';
+import { statusTone } from '@/lib/status-tone';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -246,18 +246,5 @@ function channelLabel(channel: string): string {
       return t.sections.comms.channelEmail;
     default:
       return t.sections.comms.channelInApp;
-  }
-}
-
-function statusTone(status: string): Tone {
-  switch (status) {
-    case 'delivered':
-      return 'ok';
-    case 'sent':
-      return 'sky';
-    case 'failed':
-      return 'bad';
-    default:
-      return 'warn';
   }
 }

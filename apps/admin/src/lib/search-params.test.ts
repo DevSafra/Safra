@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { returnHref, returnQuery, rowAnchor } from './search-params';
+import {
+  backTarget,
+  detailHref,
+  oneOf,
+  origin,
+  resolveOrigin,
+  returnHref,
+  returnQuery,
+  rowAnchor,
+} from './search-params';
 
 /**
  * The link a detail screen offers back to the list it was opened from.
@@ -91,5 +100,244 @@ describe('rowAnchor', () => {
   it('folds anything that would not survive a URL fragment', () => {
     expect(rowAnchor('BKG 001#x')).toBe('row-BKG_001_x');
     expect(rowAnchor('a/b?c')).toBe('row-a_b_c');
+  });
+});
+
+/**
+ * `?from=` decides where the back control GOES, which makes it a redirect surface, which makes it
+ * the one thing in this file worth attacking.
+ *
+ * The design is that a URL picks a KEY from a fixed map and supplies at most a reference; it never
+ * supplies a path. These tests are written against that promise rather than against the
+ * implementation, so they still mean something if the parsing is rewritten.
+ */
+describe('resolveOrigin', () => {
+  it('resolves a record origin to that record', () => {
+    expect(resolveOrigin('bookings:BKG-2026-000431')).toStrictEqual({
+      path: '/bookings/BKG-2026-000431',
+      key: 'bookings',
+      record: true,
+    });
+  });
+
+  it('resolves a bare key to that screen', () => {
+    expect(resolveOrigin('properties')).toStrictEqual({
+      path: '/properties',
+      key: 'properties',
+      record: false,
+    });
+    expect(resolveOrigin('dashboard')?.path).toBe('/');
+  });
+
+  /**
+   * Every one of these must resolve to `null`, and the caller then falls back to its own registry.
+   *
+   * The `dashboard:` cases are the sharpest: its path is `/`, so a reference appended to it would
+   * build `//PAR-000002` — which a browser reads as protocol-relative and resolves to
+   * `https://PAR-000002`. That is a real open redirect, and it is refused because a screen with no
+   * rows accepts no reference at all.
+   */
+  it.each([
+    ['//evil.test'],
+    ['https://evil.test'],
+    ['http://evil.test/x'],
+    ['javascript:alert(1)'],
+    ['/settings'],
+    ['bookings:../../settings'],
+    ['bookings:..%2F..%2Fsettings'],
+    ['bookings:%2F%2Fevil.test'],
+    ['bookings://evil.test'],
+    ['bookings:BKG-1/../../evil'],
+    ['bookings:'],
+    ['bookings:bkg-lowercase'],
+    ['bookings:TOOLONG-' + 'x'.repeat(60)],
+    ['dashboard:PAR-000002'],
+    ['dashboard://evil.test'],
+    ['disputes:DSP-000001'],
+    ['constructor'],
+    ['__proto__'],
+    ['__proto__:BKG-000001'],
+    ['toString'],
+    ['settings'],
+    [''],
+  ])('refuses %s', (raw) => {
+    expect(resolveOrigin(raw)).toBeNull();
+  });
+
+  it('refuses nothing at all', () => {
+    expect(resolveOrigin(undefined)).toBeNull();
+  });
+
+  /**
+   * Whatever it returns, the path is a same-origin absolute path — one leading slash, never two.
+   * A second leading slash is the whole protocol-relative trick, so it is asserted directly.
+   */
+  it('never produces a path a browser could read as an absolute URL', () => {
+    for (const key of [
+      'bookings',
+      'partners',
+      'properties',
+      'messages',
+      'disputes',
+      'dashboard',
+    ]) {
+      for (const raw of [key, `${key}:BKG-000001`, `${key}:PAR-000002`]) {
+        const resolved = resolveOrigin(raw);
+
+        if (resolved === null) continue;
+
+        expect(resolved.path.startsWith('/')).toBe(true);
+        expect(resolved.path.startsWith('//')).toBe(false);
+        expect(resolved.path).not.toMatch(/^[a-z]+:/i);
+      }
+    }
+  });
+});
+
+describe('backTarget', () => {
+  /** The reported bug: a partner opened from a booking returned to the partners REGISTRY. */
+  it('returns to the record the reader came from', () => {
+    const target = backTarget('/partners', { from: 'bookings:BKG-000012' }, 'PAR-000002');
+
+    expect(target.href).toBe('/bookings/BKG-000012');
+    expect(target.origin).toStrictEqual({
+      path: '/bookings/BKG-000012',
+      key: 'bookings',
+      record: true,
+    });
+  });
+
+  /**
+   * The trip composes: the original list position travels ON to the origin, so pressing back
+   * twice reaches the right page of the right filtered registry rather than the top of it.
+   */
+  it('carries the original list position through to the origin', () => {
+    const target = backTarget(
+      '/partners',
+      { from: 'bookings:BKG-000012', page: '4', size: '10', status: 'cancelled' },
+      'PAR-000002',
+    );
+
+    expect(target.href).toBe('/bookings/BKG-000012?page=4&size=10&status=cancelled');
+  });
+
+  it('returns to a LIST origin, at the reader’s page', () => {
+    expect(
+      backTarget('/partners', { from: 'properties', page: '3' }, 'PAR-000002').href,
+    ).toBe('/properties?page=3');
+  });
+
+  /** An origin this console did not issue is ignored entirely, not followed. */
+  it('falls back to its own registry when the origin is not one of ours', () => {
+    const target = backTarget('/partners', { from: '//evil.test' }, 'PAR-000002');
+
+    expect(target.href).toBe('/partners#row-PAR-000002');
+    expect(target.origin).toBeNull();
+  });
+
+  it('behaves as before when there is no origin at all', () => {
+    expect(backTarget('/partners', { page: '2' }, 'PAR-000002').href).toBe(
+      '/partners?page=2#row-PAR-000002',
+    );
+  });
+});
+
+describe('detailHref', () => {
+  it('names where the reader is now and keeps the list they came from', () => {
+    const href = detailHref('/partners', 'PAR-000002', origin('bookings', 'BKG-000012'), {
+      page: '4',
+      size: '10',
+      status: 'cancelled',
+    });
+    const url = new URL(href, 'https://console.test');
+
+    expect(url.pathname).toBe('/partners/PAR-000002');
+    expect(url.searchParams.get('from')).toBe('bookings:BKG-000012');
+    expect(url.searchParams.get('page')).toBe('4');
+    expect(url.searchParams.get('status')).toBe('cancelled');
+  });
+
+  /** The round trip, as one assertion: what `detailHref` writes, `backTarget` must resolve. */
+  it('produces a link the back control can follow home', () => {
+    const href = detailHref(
+      '/properties',
+      'PRO-000102',
+      origin('bookings', 'BKG-000012'),
+      {
+        page: '4',
+      },
+    );
+    const url = new URL(href, 'https://console.test');
+    const params = Object.fromEntries(url.searchParams.entries());
+
+    expect(backTarget('/properties', params, 'PRO-000102').href).toBe(
+      '/bookings/BKG-000012?page=4',
+    );
+  });
+});
+
+/**
+ * A closed vocabulary read from the URL — `?status=`.
+ *
+ * The registries used to forward whatever the URL said to the API, whose `.strict()` enum answers
+ * 400, which the console renders as a screen with no table on it. A status is something a person
+ * types or keeps in a bookmark after the vocabulary changes, so it degrades to "no filter".
+ */
+describe('oneOf', () => {
+  const STATUSES = ['confirmed', 'cancelled'] as const;
+
+  it('keeps a value the section actually has', () => {
+    expect(oneOf('cancelled', STATUSES)).toBe('cancelled');
+    expect(oneOf(['confirmed'], STATUSES)).toBe('confirmed');
+    expect(oneOf('  cancelled  ', STATUSES)).toBe('cancelled');
+  });
+
+  /**
+   * `open` is a real DISPUTE status and not a booking one, which is the case that actually
+   * occurs: a status carried between two sections whose vocabularies differ.
+   */
+  it('drops a value from another section’s vocabulary', () => {
+    expect(oneOf('open', STATUSES)).toBeUndefined();
+  });
+
+  it.each([['nonsense'], [''], ['   '], ['CONFIRMED'], ['constructor'], ['__proto__']])(
+    'drops %s',
+    (raw) => {
+      expect(oneOf(raw, STATUSES)).toBeUndefined();
+    },
+  );
+
+  it('drops nothing at all', () => {
+    expect(oneOf(undefined, STATUSES)).toBeUndefined();
+    expect(oneOf([], STATUSES)).toBeUndefined();
+  });
+});
+
+/**
+ * A reference reaching a URL PATH is encoded, matching what every `app/api/` route handler and the
+ * الحجوزات lookup already do.
+ *
+ * References are database-generated and none needs encoding today. The value of the test is that
+ * this function cannot quietly become the one place a reference reaches a path raw — which is what
+ * it was until a review compared it against the rest of the codebase.
+ */
+describe('detailHref encodes the reference', () => {
+  it('cannot be walked out of its own section', () => {
+    const href = detailHref(
+      '/partners',
+      '../../settings',
+      origin('bookings', 'BKG-1'),
+      {},
+    );
+    const url = new URL(href, 'https://console.test');
+
+    expect(url.pathname).toBe('/partners/..%2F..%2Fsettings');
+    expect(url.pathname.startsWith('/partners/')).toBe(true);
+  });
+
+  it('leaves an ordinary reference readable', () => {
+    expect(
+      detailHref('/partners', 'PAR-000002', origin('bookings', 'BKG-1'), {}),
+    ).toContain('/partners/PAR-000002?');
   });
 });

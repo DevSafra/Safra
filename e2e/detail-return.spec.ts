@@ -218,6 +218,81 @@ test.describe('the back control', () => {
   });
 
   /**
+   * Opening a linked record from a detail screen and coming back returns to THAT screen.
+   *
+   * Bashar's report (2026-08-06): from a booking, clicking the الشريك or العقار card and pressing
+   * back landed on the partners or properties REGISTRY — a list the reader had never been in, with
+   * their booking gone.
+   */
+  test('returns to the booking a partner was opened from', async ({ page }) => {
+    const view = '/bookings?size=10&page=2';
+
+    await page.goto(view);
+    await page.locator('tbody tr a').first().click();
+    await page.waitForURL(/\/bookings\/BKG/);
+
+    const booking = new URL(page.url()).pathname;
+
+    // The الشريك card.
+    await page.getByText(t.sections.bookingDetail.partner, { exact: true }).click();
+    await page.waitForURL(/\/partners\/PAR/);
+
+    await backTo(page, t.table.backToOrigin['bookings']!).click();
+    await page.waitForURL(/\/bookings\/BKG/);
+
+    expect(new URL(page.url()).pathname).toBe(booking);
+
+    /*
+      And the trip COMPOSES: the booking still knows its list position, so one more press reaches
+      page 2 of الحجوزات rather than the top. This is the half that a naive `from` would lose.
+    */
+    await backTo(page, t.nav.bookings).click();
+    await page.waitForURL(/\/bookings(\?|#)/);
+
+    const returned = new URL(page.url());
+
+    expect(returned.pathname).toBe('/bookings');
+    expect(returned.searchParams.get('page')).toBe('2');
+  });
+
+  /** The same for the العقار card, which is the other half of what Bashar screenshotted. */
+  test('returns to the booking a property was opened from', async ({ page }) => {
+    await page.goto('/bookings?size=10');
+    await page.locator('tbody tr a').first().click();
+    await page.waitForURL(/\/bookings\/BKG/);
+
+    const booking = new URL(page.url()).pathname;
+
+    await page.getByText(t.sections.bookingDetail.property, { exact: true }).click();
+    await page.waitForURL(/\/properties\/PRO/);
+
+    await backTo(page, t.table.backToOrigin['bookings']!).click();
+    await page.waitForURL(/\/bookings\/BKG/);
+
+    expect(new URL(page.url()).pathname).toBe(booking);
+  });
+
+  /**
+   * A `?from=` this console did not issue is ignored, not followed.
+   *
+   * The unit tests cover the parsing exhaustively; this is the one that proves the parsing is
+   * actually WIRED to the rendered link, which is the part a refactor can quietly sever.
+   */
+  test('never follows an origin from outside the console', async ({ page }) => {
+    await page.goto('/bookings?size=5');
+
+    const reference = (await page.locator('tbody tr a').first().innerText()).trim();
+
+    for (const hostile of ['//evil.test', 'https://evil.test', 'dashboard:PAR-000002']) {
+      await page.goto(`/bookings/${reference}?from=${encodeURIComponent(hostile)}`);
+
+      const href = await backTo(page, t.nav.bookings).getAttribute('href');
+
+      expect(href).toBe(`/bookings#row-${reference}`);
+    }
+  });
+
+  /**
    * The arrow sits on the RIGHT of «رجوع», which is the leading edge of an RTL control.
    *
    * Bashar reported it on the left (2026-08-05). The cause was that «→» is bidi-NEUTRAL, so

@@ -2,12 +2,13 @@ import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 
 import { getPartner, getSanctionsStatus } from '@/lib/api';
-import { Ltr } from '@/components/admin-table';
+import { Ltr, StatusPill } from '@/components/admin-table';
+import { statusTone } from '@/lib/status-tone';
 import { DocumentReview } from '@/components/document-review';
 import { ScreeningPanel } from '@/components/screening-panel';
 import { VerifyPartner } from '@/components/verify-partner';
-import { BackLink } from '@/components/back-link';
-import { returnHref } from '@/lib/search-params';
+import { BackLink, type BackTarget } from '@/components/back-link';
+import { backTarget } from '@/lib/search-params';
 import { fill, label, t } from '@/lib/strings';
 
 /**
@@ -33,7 +34,8 @@ export default async function PartnerPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { reference } = await params;
-  const back = returnHref('/partners', await searchParams, reference);
+  const query = await searchParams;
+  const back = backTarget('/partners', query, reference);
 
   /**
    * The list's health is fetched alongside the partner, so the screening panel can
@@ -66,12 +68,21 @@ export default async function PartnerPage({
         <h1 className="mt-1 text-2xl font-semibold text-text">{partner.legalName}</h1>
         <p className="mt-1 text-sm text-muted">
           {fill(t.sections.partnerDetail.tradingAs, {
-            name: `${partner.displayName} · ${partner.partnerType.code} · ${
+            name: `${partner.displayName} · ${partner.partnerType.nameAr ?? partner.partnerType.nameEn} · ${
               partner.city.nameAr ?? partner.city.nameEn
             }`,
           })}
         </p>
-        <StatusPill status={partner.verification} />
+        {/*
+          The registry's pill and the registry's colour. This screen used to build its own, which
+          printed the raw enum («approved») and painted anything it did not recognise GOLD — so a
+          partner awaiting verification looked like good news (Bashar, 2026-08-06).
+        */}
+        <p className="mt-3">
+          <StatusPill tone={statusTone(partner.verification)}>
+            {label(t.enums.verification, partner.verification)}
+          </StatusPill>
+        </p>
       </header>
 
       {/* ── Contact and identity ──────────────────────────────────────────── */}
@@ -142,7 +153,8 @@ export default async function PartnerPage({
               >
                 <span className="text-text">{property.nameEn ?? property.nameAr}</span>
                 <span className="text-xs text-faint">
-                  {property.reference} · {property.status.replace(/_/g, ' ')}
+                  <Ltr>{property.reference}</Ltr> ·{' '}
+                  {label(t.enums.propertyStatus, property.status)}
                 </span>
               </li>
             ))}
@@ -177,12 +189,12 @@ function Shell({
   children,
 }: {
   reference: string;
-  back: string;
+  back: BackTarget;
   children: React.ReactNode;
 }) {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <BackLink href={back} section={t.nav.partners} />
+      <BackLink target={back} section={t.nav.partners} />
       <div className="mt-4 grid gap-8" data-partner={reference}>
         {children}
       </div>
@@ -205,20 +217,5 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
       <dt className="text-xs text-faint">{label}</dt>
       <dd className="mt-0.5 break-words text-text">{value}</dd>
     </div>
-  );
-}
-
-function StatusPill({ status }: { status: string }) {
-  const tone =
-    status === 'approved'
-      ? 'border-ok/40 bg-ok/10 text-ok'
-      : status === 'rejected'
-        ? 'border-bad/40 bg-bad/10 text-bad'
-        : 'border-gold/40 bg-gold/10 text-gold';
-
-  return (
-    <span className={`mt-3 inline-block rounded-full border px-3 py-1 text-xs ${tone}`}>
-      {status}
-    </span>
   );
 }

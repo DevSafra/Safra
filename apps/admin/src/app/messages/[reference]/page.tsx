@@ -5,7 +5,7 @@ import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { FootNote, Ltr } from '@/components/admin-table';
 import { ReplyForm } from '@/components/reply-form';
 import { BackLink } from '@/components/back-link';
-import { returnHref } from '@/lib/search-params';
+import { backTarget } from '@/lib/search-params';
 import { fill, t } from '@/lib/strings';
 
 /**
@@ -33,7 +33,8 @@ export default async function ThreadPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { reference } = await params;
-  const back = returnHref('/messages', await searchParams, reference);
+  const query = await searchParams;
+  const back = backTarget('/messages', query, reference);
 
   const [result, counts] = await Promise.all([getThread(reference), sidebarCounts()]);
 
@@ -41,7 +42,7 @@ export default async function ThreadPage({
     <ConsoleShell title={t.nav.messages} subtitle={reference} counts={counts}>
       <div className="grid gap-4">
         <ConsolePanel>
-          <BackLink href={back} section={t.nav.messages} />
+          <BackLink target={back} section={t.nav.messages} />
 
           {result === 'unauthenticated' ? (
             <p className="mt-3 text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>

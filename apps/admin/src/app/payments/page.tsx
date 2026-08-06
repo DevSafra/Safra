@@ -14,6 +14,7 @@ import {
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
+import { statusTone } from '@/lib/status-tone';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -196,25 +197,6 @@ function kindTone(kind: FinanceItem['kind']): Tone {
     case 'refund':
       return 'bad';
     default:
-      return 'warn';
-  }
-}
-
-function statusTone(status: string): Tone {
-  switch (status) {
-    case 'captured':
-    case 'completed':
-    case 'collected':
-      return 'ok';
-    case 'failed':
-    case 'expired':
-      return 'bad';
-    case 'refunded':
-    case 'partially_refunded':
-    case 'waived':
-      return 'faint';
-    default:
-      // initiated · requires_action · authorized · pending · processing — all still in flight.
       return 'warn';
   }
 }

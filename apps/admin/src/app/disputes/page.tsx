@@ -5,11 +5,12 @@ import { sidebarCounts } from '@/lib/console';
 import { amount, count, shortDateTime } from '@/lib/format';
 import { ConsolePanel, ConsoleShell, Kpi, KpiRow } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
-import { FootNote, Ltr, StatusPill, type Tone } from '@/components/admin-table';
+import { FootNote, Ltr, StatusPill } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { CloseDisputeForm } from '@/components/close-dispute-form';
 import { fill, label, t } from '@/lib/strings';
-import { listParams } from '@/lib/search-params';
+import { statusTone } from '@/lib/status-tone';
+import { listParams, oneOf } from '@/lib/search-params';
 
 /**
  * النزاعات — disputes (design handoff §8).
@@ -28,6 +29,9 @@ import { listParams } from '@/lib/search-params';
  */
 export const dynamic = 'force-dynamic';
 
+/** The dispute vocabulary — the filter's options and the values a URL may carry, from one list. */
+const DISPUTE_STATUSES = ['open', 'investigating', 'resolved', 'rejected'] as const;
+
 export default async function DisputesPage({
   searchParams,
 }: {
@@ -35,9 +39,13 @@ export default async function DisputesPage({
 }) {
   const { q, page, size } = await listParams(searchParams);
   const params = await searchParams;
-  const rawStatus = params['status'];
-  const status =
-    (Array.isArray(rawStatus) ? rawStatus[0] : rawStatus)?.trim() || undefined;
+  /*
+    Checked against THIS section's vocabulary, which is not the bookings one. It used to pass
+    whatever the URL said straight to the API, whose `.strict()` enum answers 400 — and the console
+    renders that as «تعذّر تحميل القائمة», a screen with no table. A status is something a person
+    types or keeps in a bookmark, so an unrecognised one drops to "all" (see `oneOf`).
+  */
+  const status = oneOf(params['status'], DISPUTE_STATUSES);
 
   const [result, counts] = await Promise.all([
     getDisputes({ q, status, page, limit: size }),
@@ -72,13 +80,11 @@ export default async function DisputesPage({
                 className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
               >
                 <option value="">{t.sections.bookings.allStatuses}</option>
-                {(['open', 'investigating', 'resolved', 'rejected'] as const).map(
-                  (value) => (
-                    <option key={value} value={value}>
-                      {label(t.enums.disputeStatus, value)}
-                    </option>
-                  ),
-                )}
+                {DISPUTE_STATUSES.map((value) => (
+                  <option key={value} value={value}>
+                    {label(t.enums.disputeStatus, value)}
+                  </option>
+                ))}
               </select>
             </TableToolbar>
 
@@ -176,10 +182,11 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
 
           <p className="mt-1.5 text-[13px] font-semibold text-text">{dispute.title}</p>
 
+          {/* Back from the booking returns to النزاعات, the list the reader is actually in. */}
           <p className="mt-1 text-[11.5px] text-faint">
             {dispute.bookingReference ? (
               <Link
-                href={`/bookings/${dispute.bookingReference}`}
+                href={`/bookings/${dispute.bookingReference}?from=disputes`}
                 className="text-sky hover:underline"
               >
                 <Ltr>{dispute.bookingReference}</Ltr>
@@ -221,17 +228,4 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
       {closed ? null : <CloseDisputeForm reference={dispute.reference} />}
     </article>
   );
-}
-
-function statusTone(status: string): Tone {
-  switch (status) {
-    case 'open':
-      return 'bad';
-    case 'investigating':
-      return 'warn';
-    case 'resolved':
-      return 'ok';
-    default:
-      return 'faint';
-  }
 }

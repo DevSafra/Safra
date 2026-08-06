@@ -1,4 +1,11 @@
+import type { Origin } from '@/lib/search-params';
 import { fill, t } from '@/lib/strings';
+
+/** Where the control goes; `origin` is null when it goes to this screen's own list. */
+export interface BackTarget {
+  readonly href: string;
+  readonly origin: Origin | null;
+}
 
 /**
  * The control at the top of a detail screen that returns to the list it was opened from.
@@ -51,18 +58,34 @@ import { fill, t } from '@/lib/strings';
  * covers `button`, `select` and `summary` — cannot reach it. See `globals.css`.
  */
 export function BackLink({
-  href,
+  target,
   section,
 }: {
-  /** Built with `returnHref` from a LITERAL base path, never from the URL. */
-  readonly href: string;
-  /** The list's own name, e.g. `t.nav.bookings`. Announced, not drawn. */
+  /**
+   * Built by `backTarget` from a LITERAL base path or a LITERAL origin prefix, never from a path
+   * found in the URL — see the `ORIGINS` map, which is the security boundary here.
+   */
+  readonly target: BackTarget;
+  /** The screen's own list, e.g. `t.nav.bookings` — used when the reader came from that list. */
   readonly section: string;
 }) {
+  /*
+    Three destinations, three names. This screen's own list keeps the name the caller passed. An
+    origin that is one RECORD is named in the singular — «الرجوع إلى الحجز», because «الحجوزات»
+    would be a lie about where the control goes. An origin that is a LIST reuses that section's
+    nav name, which is already the plural and already translated.
+  */
+  const destination =
+    target.origin === null
+      ? section
+      : target.origin.record
+        ? (t.table.backToOrigin[target.origin.key] ?? section)
+        : (t.nav[target.origin.key] ?? section);
+
   return (
     <a
-      href={href}
-      aria-label={fill(t.table.backToLabel, { section })}
+      href={target.href}
+      aria-label={fill(t.table.backToLabel, { section: destination })}
       className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[9px] border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold lg:min-h-0"
     >
       <span aria-hidden="true">{t.table.backArrow}</span>

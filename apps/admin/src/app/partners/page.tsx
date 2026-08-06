@@ -17,6 +17,7 @@ import {
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
+import { statusTone } from '@/lib/status-tone';
 import { listParams, returnQuery } from '@/lib/search-params';
 
 /**
@@ -128,7 +129,14 @@ export default async function PartnersPage({
                       building up unnoticed.
                     */}
                     <span className="ms-auto shrink-0">
-                      <StatusPill tone={partner.sanctionsScreenedAt ? 'ok' : 'warn'}>
+                      {/*
+                        Teal and orange rather than green and amber. الشركاء draws three kinds of
+                        pill at once — verification, contract, screening — and «تم الفحص» came out
+                        the same green as an in-force contract, so two unrelated facts looked like
+                        one signal (Bashar, 2026-08-06). Neither colour is used by the other two
+                        vocabularies on this screen.
+                      */}
+                      <StatusPill tone={partner.sanctionsScreenedAt ? 'teal' : 'orange'}>
                         {partner.sanctionsScreenedAt
                           ? t.dashboard.screened
                           : t.dashboard.notScreened}
@@ -224,7 +232,7 @@ const columns = (back: string): readonly AdminColumn<PartnerListItem>[] => [
       row.suspended ? (
         <StatusPill tone="bad">{t.sections.partners.suspended}</StatusPill>
       ) : (
-        <StatusPill tone={verificationTone(row.verification)}>
+        <StatusPill tone={statusTone(row.verification)}>
           {label(t.enums.verification, row.verification)}
         </StatusPill>
       ),
@@ -258,19 +266,6 @@ function tierTone(tier: string): Tone {
       return 'faint';
     default:
       // `new` and `needs_improvement` both mean "not yet proven".
-      return 'warn';
-  }
-}
-
-function verificationTone(verification: string): Tone {
-  switch (verification) {
-    case 'approved':
-      return 'ok';
-    case 'rejected':
-      return 'bad';
-    case 'in_review':
-      return 'sky';
-    default:
       return 'warn';
   }
 }

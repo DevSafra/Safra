@@ -188,6 +188,21 @@ export const ar = {
      * on its own. Neither glyph is bidi-mirrored, so what is written here is what is drawn.
      */
     backArrow: '→',
+    /**
+     * What the back control announces when it returns to a specific RECORD rather than to a list.
+     *
+     * Singular, because the destination is one booking, not الحجوزات. Opening the الشريك card from
+     * a booking and pressing back returned to the partners REGISTRY (Bashar, 2026-08-06); it now
+     * returns to the booking, and has to be able to say so.
+     */
+    backToOrigin: {
+      bookings: 'الحجز',
+      partners: 'الشريك',
+      properties: 'العقار',
+      messages: 'المحادثة',
+      disputes: 'النزاعات',
+      dashboard: 'لوحة الإدارة',
+    } as Record<string, string>,
     search: 'بحث',
     pageSizeLabel: 'عدد الصفوف في الصفحة',
     /** Submits the pagination bar's form — see the note in `table-pagination.tsx`. */
@@ -922,6 +937,20 @@ export const ar = {
       archived: 'مؤرشف',
     } as Record<string, string>,
 
+    /**
+     * The five documents a partner uploads for verification (§8.1).
+     *
+     * They were a `Record<string, string>` of English labels inside `document-review.tsx`, so the
+     * reviewer's screen named every one of them in English (Bashar, 2026-08-06).
+     */
+    documentKind: {
+      identity: 'وثيقة هوية',
+      commercial_register: 'سجل تجاري',
+      ownership_proof: 'إثبات ملكية',
+      management_contract: 'عقد إدارة',
+      bank_confirmation: 'تأكيد مصرفي',
+    } as Record<string, string>,
+
     verification: {
       pending: 'بانتظار التحقق',
       in_review: 'قيد المراجعة',
@@ -955,7 +984,13 @@ export const ar = {
       expired: 'منتهية',
       refunded: 'مستردة',
       partially_refunded: 'مستردة جزئياً',
-      pending: 'قيد المعالجة',
+      /*
+        `pending` and `processing` both read «قيد المعالجة» until 2026-08-06, which put two
+        DIFFERENT statuses on one screen under one word. Once every status has its own colour that
+        is worse than a shared colour: one word in two colours reads as a rendering bug. They are
+        also genuinely different — nothing has started yet, versus the provider is working on it.
+      */
+      pending: 'بالانتظار',
       processing: 'قيد المعالجة',
       completed: 'مكتمل',
       collected: 'محصلة',

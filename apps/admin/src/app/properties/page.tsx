@@ -15,10 +15,10 @@ import {
   Ltr,
   StatusPill,
   type AdminColumn,
-  type Tone,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
+import { statusTone } from '@/lib/status-tone';
 import { listParams, returnQuery } from '@/lib/search-params';
 
 /**
@@ -172,8 +172,13 @@ const columns = (back: string): readonly AdminColumn<PropertyListItem>[] => [
     header: t.sections.properties.colPartner,
     render: (row) =>
       row.partnerReference ? (
+        /*
+          Carries this registry as the origin, so «رجوع» on the partner comes back to العقارات
+          rather than dropping the reader into الشركاء — a list they were never in. Same defect as
+          the booking detail's cards (Bashar, 2026-08-06).
+        */
         <Link
-          href={`/partners/${row.partnerReference}`}
+          href={`/partners/${row.partnerReference}?from=properties`}
           className="block truncate text-text2 hover:text-gold hover:underline"
         >
           {row.partner}
@@ -192,20 +197,3 @@ const columns = (back: string): readonly AdminColumn<PropertyListItem>[] => [
     ),
   },
 ];
-
-function statusTone(status: string): Tone {
-  switch (status) {
-    case 'published':
-      return 'ok';
-    case 'approved':
-      return 'sky';
-    case 'pending_review':
-      return 'warn';
-    case 'rejected':
-    case 'suspended':
-      return 'bad';
-    default:
-      // `draft` and `archived` — not live, and not waiting on anybody.
-      return 'faint';
-  }
-}

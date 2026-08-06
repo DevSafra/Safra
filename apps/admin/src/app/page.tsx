@@ -12,6 +12,8 @@ import { RevenueChart } from '@/components/revenue-chart';
 import { ConsoleHeader } from '@/components/console-header';
 import { SidebarBackdrop } from '@/components/sidebar-backdrop';
 import { t, auditAction, bookingStatus } from '@/lib/strings';
+import { StatusPill } from '@/components/admin-table';
+import { statusTone } from '@/lib/status-tone';
 import { ORNAMENT_BRAND } from '@safra/ui';
 
 /**
@@ -323,7 +325,7 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
                 <tr key={row.reference} className="border-t border-line2">
                   <td className="p-2.5">
                     <Link
-                      href={`/bookings/${row.reference}`}
+                      href={`/bookings/${row.reference}?from=dashboard`}
                       dir="ltr"
                       className="font-semibold text-sky hover:underline"
                     >
@@ -340,7 +342,9 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
                     {amount(row.amount, row.currency)}
                   </td>
                   <td className="p-2.5">
-                    <StatusPill status={row.status} />
+                    <StatusPill tone={statusTone(row.status)}>
+                      {bookingStatus(row.status)}
+                    </StatusPill>
                   </td>
                 </tr>
               ))}
@@ -379,7 +383,7 @@ function PartnerQueue({
           {partners.slice(0, QUEUE_PREVIEW).map((partner) => (
             <li key={partner.reference}>
               <Link
-                href={`/partners/${partner.reference}`}
+                href={`/partners/${partner.reference}?from=dashboard`}
                 className="flex items-center gap-2.5 rounded-[10px] border border-line bg-field px-3 py-2.5 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
               >
                 <span
@@ -481,27 +485,6 @@ function Kpi({
  * platform is waiting on the customer, which is a different kind of waiting and calls for a
  * different action.
  */
-function StatusPill({ status }: { status: string }) {
-  const tone =
-    status === 'completed'
-      ? 'border-ok/40 bg-ok/10 text-ok'
-      : status === 'cancelled' || status === 'disputed'
-        ? 'border-bad/40 bg-bad/10 text-bad'
-        : status === 'pending_confirmation'
-          ? 'border-pend/40 bg-pend/10 text-pend'
-          : status === 'pending_payment'
-            ? 'border-warn/40 bg-warn/10 text-warn'
-            : 'border-sky/40 bg-sky/10 text-sky';
-
-  return (
-    <span
-      className={`inline-block whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[10.5px] font-bold ${tone}`}
-    >
-      {bookingStatus(status)}
-    </span>
-  );
-}
-
 function Th({ children }: { children: React.ReactNode }) {
   return (
     <th

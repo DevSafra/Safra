@@ -9,11 +9,11 @@ import {
   Ltr,
   StatusPill,
   type AdminColumn,
-  type Tone,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { CampaignStatusButton } from '@/components/campaign-status-button';
 import { fill, label, t } from '@/lib/strings';
+import { statusTone } from '@/lib/status-tone';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -229,18 +229,5 @@ function periodLabel(period: string): string {
       return t.sections.ads.quarterly;
     default:
       return t.sections.ads.monthly;
-  }
-}
-
-function statusTone(status: string): Tone {
-  switch (status) {
-    case 'active':
-      return 'ok';
-    case 'paused':
-      return 'warn';
-    case 'expired':
-      return 'faint';
-    default:
-      return 'sky';
   }
 }

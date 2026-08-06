@@ -3,8 +3,10 @@ import { notFound } from 'next/navigation';
 
 import { getProperty } from '@/lib/api';
 import { ReviewProperty } from '@/components/review-property';
-import { BackLink } from '@/components/back-link';
-import { returnHref } from '@/lib/search-params';
+import { BackLink, type BackTarget } from '@/components/back-link';
+import { StatusPill } from '@/components/admin-table';
+import { backTarget, detailHref, origin } from '@/lib/search-params';
+import { statusTone } from '@/lib/status-tone';
 import { fill, label, t } from '@/lib/strings';
 
 /**
@@ -25,7 +27,8 @@ export default async function PropertyPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { reference } = await params;
-  const back = returnHref('/properties', await searchParams, reference);
+  const query = await searchParams;
+  const back = backTarget('/properties', query, reference);
   const property = await getProperty(reference);
 
   if (property === 'unauthenticated') {
@@ -48,9 +51,19 @@ export default async function PropertyPage({
         <h1 className="mt-1 text-2xl font-semibold text-text">
           {property.nameEn ?? property.nameAr}
         </h1>
+        {/*
+          Arabic city name first, and the status through the catalogue rather than the raw enum
+          spaced out — this line read «apartment · Damascus · pending review» on an Arabic screen
+          (Bashar, 2026-08-06). The status also gets the registry's pill, so العقارات and this
+          screen cannot disagree about its colour.
+        */}
         <p className="mt-1 text-sm text-muted">
-          {property.propertyType.code} · {property.city.nameEn ?? property.city.nameAr} ·{' '}
-          {property.status.replace(/_/g, ' ')}
+          {property.propertyType.code} · {property.city.nameAr ?? property.city.nameEn}
+        </p>
+        <p className="mt-2">
+          <StatusPill tone={statusTone(property.status)}>
+            {label(t.enums.propertyStatus, property.status)}
+          </StatusPill>
         </p>
       </header>
 
@@ -80,7 +93,12 @@ export default async function PropertyPage({
               status: label(t.enums.verification, property.partner.verification),
             })}{' '}
             <Link
-              href={`/partners/${property.partner.reference}`}
+              href={detailHref(
+                '/partners',
+                property.partner.reference,
+                origin('properties', property.reference),
+                query,
+              )}
               className="underline hover:text-gold"
             >
               {t.sections.propertyDetail.reviewThePartner}
@@ -208,10 +226,10 @@ export default async function PropertyPage({
   );
 }
 
-function Shell({ back, children }: { back: string; children: React.ReactNode }) {
+function Shell({ back, children }: { back: BackTarget; children: React.ReactNode }) {
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
-      <BackLink href={back} section={t.nav.properties} />
+      <BackLink target={back} section={t.nav.properties} />
       <div className="mt-4 grid gap-8">{children}</div>
     </main>
   );

@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
+import { statusTone, type Tone } from '@safra/ui';
+
 import { SignOutButton } from '@/components/sign-out-button';
 import { isLocale } from '@/i18n/routing';
 import { getMyBookings, getMyWallet, getMyWalletTransactions } from '@/lib/account';
@@ -199,15 +201,38 @@ export default async function AccountPage({
  * Colour is never the only signal — the label carries the meaning — so the palette
  * is reinforcement for sighted users rather than the information itself (§14.1).
  */
-function StatusPill({ status, label }: { status: string; label: string }) {
-  const tone =
-    status === 'confirmed' || status === 'completed' || status === 'checked_in'
-      ? 'border-ok/40 bg-ok/10 text-ok'
-      : status === 'cancelled'
-        ? 'border-line bg-field text-faint'
-        : 'border-sky/40 bg-sky/10 text-sky';
+/**
+ * The tone classes. The console draws its pills as a coloured outline on no fill; this app keeps
+ * its softer tinted style, because the two are different products read by different people.
+ *
+ * What they share is the COLOUR — `statusTone` decides that for both, so a booking a customer sees
+ * as cancelled is the same red an operator sees. It used to be `faint` here and `bad` there, which
+ * meant a support call started with the two of them looking at differently-coloured versions of
+ * one booking (Bashar, 2026-08-06).
+ */
+const TONES: Record<Tone, string> = {
+  ok: 'border-ok/40 bg-ok/10 text-ok',
+  teal: 'border-teal/40 bg-teal/10 text-teal',
+  lime: 'border-lime/40 bg-lime/10 text-lime',
+  sky: 'border-sky/40 bg-sky/10 text-sky',
+  indigo: 'border-indigo/40 bg-indigo/10 text-indigo',
+  pend: 'border-pend/40 bg-pend/10 text-pend',
+  gold: 'border-gold/40 bg-gold/10 text-gold',
+  warn: 'border-warn/40 bg-warn/10 text-warn',
+  orange: 'border-orange/40 bg-orange/10 text-orange',
+  bad: 'border-bad/40 bg-bad/10 text-bad',
+  crimson: 'border-crimson/40 bg-crimson/10 text-crimson',
+  faint: 'border-line bg-field text-faint',
+  slate: 'border-slate/40 bg-slate/10 text-slate',
+  stone: 'border-stone/40 bg-stone/10 text-stone',
+};
 
+function StatusPill({ status, label }: { status: string; label: string }) {
   return (
-    <span className={`rounded-full border px-2.5 py-0.5 text-xs ${tone}`}>{label}</span>
+    <span
+      className={`rounded-full border px-2.5 py-0.5 text-xs ${TONES[statusTone(status)]}`}
+    >
+      {label}
+    </span>
   );
 }

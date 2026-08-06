@@ -3,6 +3,7 @@ import { shortDate } from '@/lib/format';
 import { ConsolePanel } from '@/components/console-shell';
 import { FootNote, Ltr, StatusPill, type Tone } from '@/components/admin-table';
 import { fill, t } from '@/lib/strings';
+import { statusTone } from '@/lib/status-tone';
 
 /**
  * عقود الشراكة — the contract list and upload (design handoff §8.1).
@@ -73,7 +74,7 @@ function ContractRow({ contract }: { contract: ContractItem }) {
       </span>
 
       <span className="ms-auto shrink-0">
-        <StatusPill tone={statusTone(contract)}>{statusLabel(contract)}</StatusPill>
+        <StatusPill tone={contractTone(contract)}>{statusLabel(contract)}</StatusPill>
       </span>
 
       <span
@@ -121,12 +122,25 @@ function statusLabel(contract: ContractItem): string {
     : fill(t.sections.contracts.validUntil, { date: shortDate(contract.expiresAt) });
 }
 
-function statusTone(contract: ContractItem): Tone {
-  if (contract.status === 'superseded' || contract.status === 'terminated')
-    return 'faint';
-  if (contract.status === 'awaiting_partner_signature') return 'warn';
-  if (contract.daysToExpiry !== null && contract.daysToExpiry < 0) return 'bad';
-  if (contract.daysToExpiry !== null && contract.daysToExpiry <= 60) return 'bad';
+/**
+ * A contract's colour, which is its STATUS unless the calendar overrules it.
+ *
+ * The one place in the console that does not simply call `statusTone(value)`, and the reason is
+ * the same one `statusLabel` gives above: an `active` contract that expired last week is not in
+ * force, and painting it green would be true of the column and false of the world. Expiry is a
+ * fact the status column does not know.
+ *
+ * Everything else DELEGATES, so `superseded`, `terminated` and `awaiting_partner_signature` are
+ * whatever they are everywhere else. The old version repeated all three inline and would have
+ * drifted from the shared map the first time one of them changed.
+ */
+function contractTone(contract: ContractItem): Tone {
+  if (contract.status === 'active' && contract.daysToExpiry !== null) {
+    if (contract.daysToExpiry < 0) return 'bad';
 
-  return 'ok';
+    /* Inside 60 days it is a countdown, and a countdown is a warning, not a failure. */
+    if (contract.daysToExpiry <= 60) return 'warn';
+  }
+
+  return statusTone(contract.status);
 }

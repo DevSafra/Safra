@@ -7,6 +7,7 @@
  * rule enforced by a shared component cannot drift the way a convention does.
  */
 export * from './ornaments.js';
+export * from './status.js';
 export * from './theme.js';
 export * from './password-field.js';
 export * from './sidebar.js';

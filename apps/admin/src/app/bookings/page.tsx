@@ -15,8 +15,8 @@ import {
 } from '@/components/admin-table';
 import { OutlineAction, TableToolbar, ToolbarNote } from '@/components/table-toolbar';
 import { bookingStatus, fill, t } from '@/lib/strings';
-import { pageNumber, pageSize, returnQuery } from '@/lib/search-params';
-import { bookingStatusTone } from '@/lib/status-tone';
+import { oneOf, pageNumber, pageSize, returnQuery } from '@/lib/search-params';
+import { statusTone } from '@/lib/status-tone';
 
 /**
  * الحجوزات — the bookings registry (design handoff §8).
@@ -85,7 +85,8 @@ export default async function BookingsPage({
   if (reference) redirect(`/bookings/${encodeURIComponent(reference)}`);
 
   const q = first('q');
-  const status = first('status');
+  // Dropped rather than forwarded if it is not a real status — see `oneOf`.
+  const status = oneOf(params['status'], STATUSES);
   const page = pageNumber(first('page'));
   const size = pageSize(first('size'));
 
@@ -236,9 +237,7 @@ const columns = (back: string): readonly AdminColumn<BookingListItem>[] => [
     key: 'status',
     header: t.admin.colStatus,
     render: (row) => (
-      <StatusPill tone={bookingStatusTone(row.status)}>
-        {bookingStatus(row.status)}
-      </StatusPill>
+      <StatusPill tone={statusTone(row.status)}>{bookingStatus(row.status)}</StatusPill>
     ),
   },
   {

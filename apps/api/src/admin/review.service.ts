@@ -263,7 +263,13 @@ export class ReviewService {
       },
       with: {
         city: { columns: { slug: true, nameAr: true, nameEn: true } },
-        partnerType: { columns: { code: true } },
+        /*
+          `nameAr` alongside the code. The console printed the CODE — «accommodation» beside
+          Arabic on the partner screen (Bashar, 2026-08-06) — while the الشركاء registry has
+          selected the Arabic name since the same defect was fixed there. The code stays in the
+          response because it is the machine identifier; the name is what a person reads.
+        */
+        partnerType: { columns: { code: true, nameAr: true, nameEn: true } },
         documents: {
           columns: {
             id: true,

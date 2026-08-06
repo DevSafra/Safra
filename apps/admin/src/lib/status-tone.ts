@@ -1,42 +1,17 @@
-import type { Tone } from '@/components/admin-table';
-
 /**
- * A booking status's colour, in one place because two screens draw it.
+ * The console's status colours — re-exported from `@safra/ui`, which owns the vocabulary.
  *
- * ## Why this is not a local `statusTone` like every other section's
+ * ## Why this file still exists
  *
- * Every registry defines its own — properties, payments, ads, disputes, gift cards, comms — and
- * that is right while a status is drawn in exactly one table. Bookings is the exception: the
- * الحجوزات registry and the booking DETAIL screen both show one, and they had drifted (Bashar,
- * 2026-08-05). The detail screen's own copy called `checked_in` green where the table calls it
- * sky, `completed` green where the table calls it faint, and coloured everything it did not
- * recognise GOLD — so a booking waiting on the customer was amber in the table and gold one click
- * later, and a booking waiting on the PARTNER lost the purple that §14 makes an explicit rule.
+ * It briefly held `bookingStatusTone`, a booking-only map extracted because the الحجوزات table and
+ * the booking detail had drifted apart (Bashar, 2026-08-05). The same drift then turned out to run
+ * across the whole console — eleven tone functions and four hand-rolled pills, disagreeing about
+ * what colour `expired` or `approved` is (Bashar, 2026-08-06). So the map moved up to `@safra/ui`,
+ * where the customer app can read it too: bookings are painted in both apps, and a colour rule
+ * that lives in one app is a colour rule that drifts.
  *
- * Sharing the function is the fix, not copying the switch: a copy is what drifted.
- *
- * ## The vocabulary, from the handoff
- *
- * `pending_confirmation` is `--pend` purple — an explicit rule (§1, §14) — because a paid booking
- * still waiting on a partner is not good news and gold would read as if it were. `pending_payment`
- * is amber: there the platform is waiting on the CUSTOMER, which is a different situation calling
- * for a different action.
+ * This module is kept as the console's import point so pages depend on `@/lib/status-tone` rather
+ * than reaching into the package directly, and so a console-only exception — if one is ever truly
+ * justified — has an obvious home that is not a switch statement inside a page.
  */
-export function bookingStatusTone(status: string): Tone {
-  switch (status) {
-    case 'confirmed':
-      return 'ok';
-    case 'checked_in':
-      return 'sky';
-    case 'pending_confirmation':
-      return 'pend';
-    case 'pending_payment':
-      return 'warn';
-    case 'cancelled':
-    case 'disputed':
-      return 'bad';
-    default:
-      // `completed` and `draft` — done or not started; neither needs attention.
-      return 'faint';
-  }
-}
+export { statusTone, type Tone } from '@safra/ui';

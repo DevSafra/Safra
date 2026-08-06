@@ -9,10 +9,10 @@ import {
   Ltr,
   StatusPill,
   type AdminColumn,
-  type Tone,
 } from '@/components/admin-table';
 import { TableToolbar, ToolbarNote } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
+import { statusTone } from '@/lib/status-tone';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -155,16 +155,3 @@ const COLUMNS: readonly AdminColumn<GiftCardItem>[] = [
     ),
   },
 ];
-
-function statusTone(status: string): Tone {
-  switch (status) {
-    case 'active':
-      return 'ok';
-    case 'used':
-      return 'faint';
-    case 'expired':
-      return 'warn';
-    default:
-      return 'bad';
-  }
-}
