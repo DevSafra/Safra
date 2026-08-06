@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 
 import { getPartner, getSanctionsStatus } from '@/lib/api';
+import { Ltr } from '@/components/admin-table';
 import { DocumentReview } from '@/components/document-review';
 import { ScreeningPanel } from '@/components/screening-panel';
 import { VerifyPartner } from '@/components/verify-partner';
@@ -75,8 +77,19 @@ export default async function PartnerPage({
       {/* ── Contact and identity ──────────────────────────────────────────── */}
       <Section title={t.sections.partnerDetail.applicant}>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
-          <Row label={t.sections.partnerDetail.email} value={partner.email} />
-          <Row label={t.sections.partnerDetail.phone} value={partner.phone} />
+          {/*
+            Email and phone are Latin runs on an Arabic line. The phone is the one that broke:
+            `+` is bidi-neutral, so a leading `+` is pushed to the far end and `+963900000001`
+            rendered as `963900000001+` (Bashar, 2026-08-06).
+          */}
+          <Row
+            label={t.sections.partnerDetail.email}
+            value={<Ltr>{partner.email}</Ltr>}
+          />
+          <Row
+            label={t.sections.partnerDetail.phone}
+            value={<Ltr>{partner.phone}</Ltr>}
+          />
           <Row label={t.sections.partnerDetail.address} value={partner.address} />
           <Row
             label={t.sections.partnerDetail.applied}
@@ -186,7 +199,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-lg border border-line bg-card px-4 py-3">
       <dt className="text-xs text-faint">{label}</dt>

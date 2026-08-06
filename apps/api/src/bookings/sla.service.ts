@@ -89,7 +89,8 @@ export class SlaService {
         UPDATE bookings
         SET status = 'cancelled',
             cancelled_at = now(),
-            cancellation_reason = 'Payment not completed within the allowed window (EC-001).'
+            -- A CODE, not a sentence. See the note on cancellation reasons below.
+            cancellation_reason = 'system.payment_expired'
         WHERE status = 'pending_payment'
           AND confirmation_deadline_at IS NOT NULL
           AND confirmation_deadline_at < now()
@@ -228,7 +229,7 @@ export class SlaService {
             UPDATE bookings
             SET status = 'cancelled',
                 cancelled_at = now(),
-                cancellation_reason = 'Partner did not respond within the confirmation window (§6.4).'
+                cancellation_reason = 'system.partner_no_response'
             WHERE id = ${booking.id} AND status = 'pending_confirmation'
           `);
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dateRange, shortDate } from './format';
+import { dateRange, money, rate, shortDate } from './format';
 
 /**
  * The separator `dateRange` writes inside a date: a `U+002D` hyphen fenced by `U+2060` WORD
@@ -117,5 +117,42 @@ describe('shortDate', () => {
 
   it('reports a dash for nothing', () => {
     expect(shortDate(null)).toBe('—');
+  });
+});
+
+/**
+ * The two figures on the booking detail's FX line, which reached the screen straight from their
+ * `numeric` columns: `2625870.00 ل.س بسعر صرف 13000.00000000` (Bashar, 2026-08-06).
+ */
+describe('money', () => {
+  it('groups thousands so a six-figure total can be read', () => {
+    expect(money('2625870.00')).toBe('2,625,870.00');
+  });
+
+  /** Always two decimals — an amount is a money value even when it is round. */
+  it('keeps both decimals', () => {
+    expect(money('201.9')).toBe('201.90');
+    expect(money('13000')).toBe('13,000.00');
+  });
+});
+
+describe('rate', () => {
+  it('drops the numeric(18,8) tail from a round rate', () => {
+    expect(rate('13000.00000000')).toBe('13,000');
+  });
+
+  /**
+   * The important one. A rate is printed beside the SYP total it produced so the two can be
+   * multiplied out by hand months later; rounding it to two places would show a figure that does
+   * NOT reproduce that total. So every significant decimal survives — only the padding goes.
+   */
+  it('keeps every significant decimal rather than rounding', () => {
+    expect(rate('12999.87654321')).toBe('12,999.87654321');
+    expect(rate('0.85000000')).toBe('0.85');
+  });
+
+  it('reports a dash for nothing, and for nonsense', () => {
+    expect(rate(null)).toBe('—');
+    expect(rate('not-a-rate')).toBe('—');
   });
 });

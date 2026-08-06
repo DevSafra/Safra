@@ -243,7 +243,7 @@ export class BookingActionsService {
           SET status = 'cancelled',
               partner_responded_at = now(),
               cancelled_at = now(),
-              cancellation_reason = ${reason ?? 'Rejected by partner.'}
+              cancellation_reason = ${reason ?? 'system.partner_rejected'}
           WHERE id = ${booking.id} AND status = 'pending_confirmation'
         `);
 

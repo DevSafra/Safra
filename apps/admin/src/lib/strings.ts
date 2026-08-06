@@ -67,6 +67,60 @@ export function cityCategories(joined: string): string {
     .join(' · ');
 }
 
+/**
+ * A cancellation reason, which is EITHER a `system.*` code or a person's own sentence.
+ *
+ * Deliberately not `label()`: that falls back to `value.replace(/_/g, ' ')`, which is right for an
+ * enum key and wrong for prose — it would quietly rewrite a reason somebody typed. So an unknown
+ * value is returned exactly as stored, which covers both a human's words and the English
+ * sentences written into rows before the codes existed.
+ */
+export function cancellationReason(reason: string): string {
+  return t.enums.cancellationReason[reason] ?? reason;
+}
+
+/**
+ * A timeline event's payload, as readable label/value pairs.
+ *
+ * Replaces printing the JSON verbatim. The reasoning for showing the payload at all is that a
+ * timeline which SUMMARISES loses the detail a dispute turns on — which fine was applied, which
+ * occurrence number — and that argues for dropping no field, not for showing braces. So every
+ * entry survives: an unknown key falls back to itself, and an unknown value is printed as stored.
+ *
+ * A non-scalar value (a nested object, an array) is re-serialised rather than flattened, because
+ * flattening it is where a field would actually go missing.
+ */
+export function payloadEntries(
+  payload: unknown,
+): readonly { key: string; label: string; value: string }[] {
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload))
+    return [];
+
+  return Object.entries(payload as Record<string, unknown>).map(([key, value]) => ({
+    key,
+    label: t.enums.payloadKey[key] ?? key,
+    value: payloadValue(value),
+  }));
+}
+
+/**
+ * Each scalar type named rather than `String(value)` over whatever is left.
+ *
+ * `String()` on an unexpected object yields `[object Object]`, which is a field silently replaced
+ * by nothing — the one outcome this rendering exists to prevent. Lint flags it; the fix is to say
+ * what a string, a number and a boolean each become, and to let everything else keep its JSON.
+ */
+function payloadValue(value: unknown): string {
+  if (value === null || value === undefined) return t.admin.noData;
+
+  // Only a string can be a code, so only a string is looked up.
+  if (typeof value === 'string') return t.enums.payloadValue[value] ?? value;
+
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+
+  return JSON.stringify(value) ?? t.admin.noData;
+}
+
 /** The Arabic name for an audit action, falling back to the raw key rather than blank. */
 export function auditAction(action: string): string {
   return t.auditAction[action] ?? action.replace(/[._]/g, ' ');

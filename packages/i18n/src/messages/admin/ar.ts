@@ -962,6 +962,123 @@ export const ar = {
       waived: 'ملغاة',
     } as Record<string, string>,
 
+    /**
+     * Who processed a payment.
+     *
+     * Real providers keep their own names — a brand is not translated, and support quoting a
+     * reference to Sham Cash needs the word Sham Cash. `simulator` is not a brand: it is this
+     * codebase's own stand-in, and it appeared on an Arabic screen as the English word.
+     */
+    paymentProvider: {
+      simulator: 'محاكاة',
+      sham_cash: 'Sham Cash',
+      stripe: 'Stripe',
+      klarna: 'Klarna',
+    } as Record<string, string>,
+
+    /**
+     * The field names inside a timeline event's `payload`.
+     *
+     * The payload used to be printed as raw JSON — `{"reason":"EC-001"}` — which is a developer
+     * reading their own data structure, not a support agent reading a booking (Bashar,
+     * 2026-08-06). Every field is still shown; only the braces and quotes are gone.
+     *
+     * A field with no entry here falls back to its raw key, so a payload gaining a field stays
+     * fully visible rather than silently losing it. That is load-bearing: the point of showing
+     * the payload at all is that a dispute can turn on which fine was applied.
+     */
+    payloadKey: {
+      reason: 'السبب',
+      reference: 'المرجع',
+      notes: 'ملاحظات',
+      total: 'الإجمالي',
+      currency: 'العملة',
+      city: 'المدينة',
+      type: 'النوع',
+      amount: 'المبلغ',
+      toWallet: 'إلى المحفظة',
+      toProvider: 'إلى مزود الدفع',
+      percent: 'النسبة',
+      tier: 'شريحة الاسترداد',
+      occurrence: 'رقم التكرار',
+      fine: 'الغرامة',
+      compensation: 'التعويض',
+      creditedAmount: 'المبلغ المضاف',
+      creditedCurrency: 'عملة الإضافة',
+      walletBalance: 'رصيد المحفظة',
+    } as Record<string, string>,
+
+    /**
+     * Payload VALUES that are codes rather than data.
+     *
+     * `EC-001` is the SRS's identifier for an abandoned checkout — the customer closed the page
+     * mid-payment, the booking expired and the dates were released. It is meaningful in the
+     * requirements document and meaningless on a support screen, so the screen says what happened
+     * and the record keeps the code.
+     *
+     * Only codes belong here. A `reason` a person typed is their own words and falls through
+     * unchanged, exactly like a typed cancellation reason.
+     */
+    payloadValue: {
+      'EC-001': 'أُغلقت صفحة الدفع قبل إتمامه، فانتهت مهلة الحجز وأُعيدت التواريخ',
+    } as Record<string, string>,
+
+    /**
+     * The cancellations the platform decides for itself, keyed on the `system.*` code stored in
+     * `bookings.cancellation_reason`.
+     *
+     * Only these three. A reason a PERSON typed is not in here and never will be — it is shown as
+     * written, because it is their statement about a booking. The resolver therefore falls back to
+     * the raw value rather than to «—», which also keeps rows written before the codes existed
+     * readable in the English they were stored in.
+     */
+    cancellationReason: {
+      'system.payment_expired': 'لم يكتمل الدفع خلال المهلة المسموحة (EC-001).',
+      'system.partner_no_response': 'لم يرد الشريك خلال مهلة التأكيد (§6.4).',
+      'system.partner_rejected': 'رفض الشريك الحجز.',
+    } as Record<string, string>,
+
+    /**
+     * Who or what performed a timeline event.
+     *
+     * `system` is the one that shows most — every SLA expiry and capture is attributed to it —
+     * and it read as «بواسطة system» beside Arabic on the booking screen.
+     */
+    actorType: {
+      system: 'النظام',
+      staff: 'موظف',
+      partner: 'الشريك',
+      customer: 'العميل',
+    } as Record<string, string>,
+
+    /**
+     * A booking's timeline entries, keyed on `timeline_events.event_type`.
+     *
+     * The key is a machine identifier and part of the append-only record — deliberately NOT
+     * translated at the source, exactly like `auditAction` above. It used to reach the screen as
+     * `event_type.replace(/[._]/g, ' ')`, which is how «booking payment expired» appeared under
+     * «الخط الزمني» (Bashar, 2026-08-06).
+     *
+     * Every type the API writes is listed. One added later falls back to its spaced-out raw key,
+     * which is ugly but never wrong and reads as a prompt to add it here.
+     */
+    timelineEvent: {
+      'booking.payment_started': 'بدء الدفع',
+      'booking.payment_captured': 'تحصيل الدفع',
+      'booking.payment_expired': 'انتهاء مهلة الدفع',
+      'booking.confirmed': 'تأكيد الحجز',
+      'booking.rejected_by_partner': 'رفض الشريك للحجز',
+      'booking.cancelled': 'إلغاء الحجز',
+      'booking.sla_expired': 'انتهاء مهلة التأكيد',
+      'booking.refund_issued': 'إصدار استرداد',
+      'partner.registered': 'تسجيل شريك',
+      'partner.approved': 'الموافقة على الشريك',
+      'partner.rejected': 'رفض الشريك',
+      'property.submitted_for_review': 'إرسال العقار للمراجعة',
+      'property.published': 'نشر العقار',
+      'property.rejected': 'رفض العقار',
+    } as Record<string, string>,
+
     violationKind: {
       no_response: 'عدم الرد',
       rejected_after_payment: 'رفض بعد الدفع',

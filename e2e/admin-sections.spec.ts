@@ -452,6 +452,89 @@ test.describe('honesty rules the design and the register require', () => {
   });
 
   /**
+   * The timeline shows no raw JSON, on any booking.
+   *
+   * It printed `{"reason":"EC-001"}` — a developer reading their own data structure, not a support
+   * agent reading a booking (Bashar, 2026-08-06). Every payload field is still on screen; the
+   * braces, quotes and camelCase keys are not.
+   *
+   * Swept across a page of bookings rather than asserted on one, because which payload shape a
+   * booking carries depends on how it ended, and the one that regresses is the one not opened.
+   */
+  test('no booking timeline prints a raw JSON payload', async ({ page }) => {
+    await page.goto('/bookings?size=10');
+
+    const references = await page.locator('tbody tr td:first-child a').allInnerTexts();
+    const raw: string[] = [];
+
+    for (const reference of references) {
+      await page.goto(`/bookings/${reference.trim()}`);
+
+      const timeline = page
+        .getByRole('heading', { name: t.sections.bookingDetail.timeline })
+        .locator('..');
+
+      if ((await timeline.count()) === 0) continue;
+
+      const text = await timeline.innerText();
+
+      // `{"` is the signature of a stringified object; a translated label never contains it.
+      if (text.includes('{"')) raw.push(`${reference.trim()}: ${text.slice(0, 60)}`);
+    }
+
+    expect(raw).toStrictEqual([]);
+  });
+
+  /**
+   * The booking detail's Latin runs survive an RTL line, and its figures are formatted.
+   *
+   * Bashar reported three on one screen (2026-08-06): `+963900000001` rendered as
+   * `963900000001+`, and the FX line read `2625870.00 ل.س بسعر صرف 13000.00000000`.
+   *
+   * The phone is the case that needs a BROWSER. The character order in the DOM was always
+   * correct — `+` first — and it is the bidirectional algorithm, at paint time, that moves a
+   * neutral leading character to the far end. Reading the DOM text would have shown a passing
+   * `+963…` while the screen showed `963…+`, so this asserts on `dir`, which is what decides it.
+   */
+  test('the booking detail keeps its phone and figures readable', async ({ page }) => {
+    await page.goto('/bookings?size=5');
+    await page.locator('tbody tr a').first().click();
+    await page.waitForURL(/\/bookings\/BKG/);
+
+    // Every phone is inside an explicit left-to-right run, which is what pins the `+`.
+    const phones = page.locator('p', { hasText: /^\+\d{6,}$/ });
+
+    expect(await phones.count()).toBeGreaterThan(0);
+
+    for (const phone of await phones.all()) {
+      /*
+        Looking DOWN, not up: the paragraph itself inherits `rtl` from the document, and the fix
+        is the `Ltr` run INSIDE it. Walking up with `closest` finds `<html dir="rtl">` and passes
+        or fails for a reason that has nothing to do with this.
+      */
+      const wrapped = await phone.evaluate(
+        (el) => el.matches('[dir="ltr"]') || el.querySelector('[dir="ltr"]') !== null,
+      );
+
+      expect(wrapped).toBe(true);
+    }
+
+    /*
+      The FX line: a grouped SYP total, and a rate with no `numeric(18,8)` tail. Matched by shape
+      rather than by value — the seed's amounts change, the formatting rules do not.
+    */
+    const fx = await page
+      .getByText(t.sections.bookingDetail.fxSnapshot.split('{amount}')[1]!.slice(0, 6), {
+        exact: false,
+      })
+      .first()
+      .innerText();
+
+    expect(fx).not.toMatch(/\d\.\d{3,}/);
+    expect(fx).toMatch(/\d{1,3}(,\d{3})+/);
+  });
+
+  /**
    * A status is the same word AND the same colour in the الحجوزات table and on the booking's own
    * screen.
    *

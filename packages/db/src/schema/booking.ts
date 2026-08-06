@@ -144,6 +144,21 @@ export const bookings = pgTable(
     confirmedByUserId: foreignId('confirmed_by_user_id').references(() => users.id),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     cancelledByUserId: foreignId('cancelled_by_user_id').references(() => users.id),
+    /**
+     * Why the booking was cancelled: either a `system.*` CODE or a person's own words.
+     *
+     * The three cancellations this platform decides for itself store a code —
+     * `system.payment_expired`, `system.partner_no_response`, `system.partner_rejected` — which
+     * the reader's locale resolves at render. They used to store English sentences, so an Arabic
+     * console printed "Payment not completed within the allowed window (EC-001)."
+     * (Bashar, 2026-08-06).
+     *
+     * A cancellation someone TYPED is stored verbatim and shown verbatim: it is that person's
+     * statement about a booking, and paraphrasing it is not this system's job. Rows written
+     * before the change still hold English and still render as written, which is why the
+     * resolver falls back to the raw value instead of to a placeholder — no migration, and no
+     * row loses its reason.
+     */
     cancellationReason: text('cancellation_reason'),
     checkedInAt: timestamp('checked_in_at', { withTimezone: true }),
     completedAt: timestamp('completed_at', { withTimezone: true }),

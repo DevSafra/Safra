@@ -39,6 +39,37 @@ export function count(value: number): string {
 }
 
 /**
+ * An FX rate — grouped, with trailing zeros dropped and every significant decimal KEPT.
+ *
+ * `fx_rate_to_syp` is `numeric(18,8)`, so the column hands back `13000.00000000` and that is what
+ * reached the screen (Bashar, 2026-08-06). Eight zeros after a round rate is noise that makes the
+ * figure harder to read, not more precise.
+ *
+ * ## Why the decimals are trimmed but never ROUNDED
+ *
+ * The obvious fix is `maximumFractionDigits: 2`, and it is wrong here. This rate is printed beside
+ * the SYP total it produced, and the pair exists so the booking can be reconciled against the
+ * books months later — `201.99 × 13,000 = 2,625,870` has to check out by hand. Rounding a rate of
+ * `12999.87654321` to `12,999.88` shows a figure that does NOT reproduce the total beside it, and
+ * a reconciliation that fails by a few pounds is worse than a long number.
+ *
+ * So the maximum is the column's own precision and the minimum is zero: a round rate loses its
+ * zeros, and a rate that genuinely has eight decimals still prints all eight.
+ */
+export function rate(value: string | null | undefined): string {
+  if (value === null || value === undefined) return t.admin.noData;
+
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) return t.admin.noData;
+
+  return parsed.toLocaleString(ARABIC_WESTERN_DIGITS, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 8,
+  });
+}
+
+/**
  * A percentage, one decimal.
  *
  * One decimal rather than none: a cancellation rate moving from 4.2% to 4.8% is a real signal
