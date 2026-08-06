@@ -62,6 +62,9 @@ export const ar = {
     perNight: '/ ليلة',
     units: '{n} وحدة',
     reviews: 'من {n} تقييماً',
+    /** Shown where a listing has no photo yet, in place of the 140px image. */
+    noPhoto: 'لا صورة بعد',
+    from: 'من',
     edit: 'تعديل',
     calendar: 'التقويم',
     notBuilt: 'لم يُبنَ هذا القسم بعد',
@@ -76,6 +79,43 @@ export const ar = {
     rejected: 'مرفوض',
     suspended: 'موقوف',
     archived: 'مؤرشف',
+  } as Record<string, string>,
+
+  /**
+   * صفات الرحلة — the ONE shared vocabulary (§5.6 and the acceptance checklist).
+   *
+   * The keys are `TRIP_ATTRIBUTES` from `@safra/contracts`, the same list the public search, the
+   * filters and the property page use. The handoff is explicit that it must not be forked, so
+   * this is a translation of that list and never a second one.
+   */
+  tripAttribute: {
+    sea: 'بحر',
+    mountain: 'جبل',
+    history: 'تاريخ',
+    nature: 'طبيعة',
+    families: 'عائلات',
+    honeymoon: 'شهر عسل',
+    pool: 'مسبح',
+    parking: 'موقف',
+    internet: 'إنترنت',
+    business: 'أعمال',
+  } as Record<string, string>,
+
+  /**
+   * Property types, keyed on `property_types.code`.
+   *
+   * The card's meta line printed «دمشق · hotel · 2 وحدة» — the code, raw, on an Arabic screen.
+   * The table has `name_ar`, so the alternative was to select it; a catalogue is used instead
+   * because these are a closed vocabulary the UI names, like every other enum in the project.
+   */
+  propertyType: {
+    hotel: 'فندق',
+    apartment: 'شقة',
+    chalet: 'شاليه',
+    villa: 'فيلا',
+    farm: 'مزرعة',
+    camp: 'مخيم',
+    rural_house: 'بيت ريفي',
   } as Record<string, string>,
 
   reviews: {

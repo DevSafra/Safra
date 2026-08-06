@@ -82,6 +82,29 @@ export class PartnerController {
     });
   }
 
+  /**
+   * Who the signed-in partner IS — their business name, city, tier and score.
+   *
+   * ## Why this is an endpoint and not a token claim
+   *
+   * The obvious alternative is to put the display name in the JWT. It is the wrong place: access
+   * tokens live 15 minutes and are cached, so a partner who corrects their trading name would keep
+   * seeing the old one until it expired; and a token is sent on every request to every endpoint,
+   * so anything added to it is paid for on all of them.
+   *
+   * This is one primary-key lookup, read once per render by an app that is server-rendered anyway.
+   *
+   * ## Why it takes no id
+   *
+   * It reads `claims.partnerId` from the VERIFIED token and nothing else, so "can this partner see
+   * that partner's profile" is a question the endpoint cannot be asked — the same shape as the
+   * console's `admin/me`.
+   */
+  @Get('me')
+  async me(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return this.properties.profile(user);
+  }
+
   @Get('properties')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   async listProperties(@CurrentUser() user: AccessTokenClaims | undefined) {

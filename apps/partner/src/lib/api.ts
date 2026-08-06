@@ -76,13 +76,38 @@ const propertySchema = z.object({
   status: z.string(),
   rating: z.string().nullable(),
   reviewsCount: z.number(),
-  recommendationScore: z.string().nullable(),
-  verifiedAt: z.union([z.string(), z.date()]).nullable(),
-  createdAt: z.union([z.string(), z.date()]),
+  /** The shared trip-trait vocabulary — `TRIP_ATTRIBUTES`, not a list forked for this app. */
+  attributes: z.array(z.string()),
+  badges: z.array(z.string()),
+  city: z.string().nullable(),
+  propertyType: z.string().nullable(),
+  coverKey: z.string().nullable(),
+  unitCount: z.number(),
+  /** The CHEAPEST unit's nightly rate — the "from" price. See the note on `listOwn`. */
+  fromPrice: z.string().nullable(),
+  currencyCode: z.string().nullable(),
+  createdAt: z.string(),
 });
 
 export type PartnerProperty = z.infer<typeof propertySchema>;
 
 export async function getMyProperties() {
   return partnerFetch('/partner/properties', z.array(propertySchema));
+}
+
+/** The signed-in partner's own profile — the name §7 heads the sidebar with. */
+const profileSchema = z.object({
+  reference: z.string(),
+  displayName: z.string(),
+  legalName: z.string(),
+  verification: z.string(),
+  score: z.number(),
+  tier: z.string(),
+  city: z.string().nullable(),
+});
+
+export type PartnerProfile = z.infer<typeof profileSchema>;
+
+export async function getMyProfile() {
+  return partnerFetch('/partner/me', profileSchema);
 }

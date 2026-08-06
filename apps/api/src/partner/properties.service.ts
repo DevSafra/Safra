@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
@@ -35,28 +35,136 @@ export class PropertiesService {
     private readonly audit: AuditService,
   ) {}
 
+  /**
+   * The signed-in partner's own profile — the name the dashboard is headed with.
+   *
+   * The handoff's §7 sidebar shows the partner's business name («فندق قصر الشرق»), not an email
+   * address. Scoped to the token's `partnerId`, so it can only ever return the caller's own row.
+   */
+  async profile(claims: AccessTokenClaims | undefined) {
+    const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
+
+    const rows = await this.db.execute<{
+      reference: string;
+      display_name: string;
+      legal_name: string;
+      verification: string;
+      score: number;
+      tier: string;
+      city_name_ar: string | null;
+    }>(sql`
+      SELECT pa.reference, pa.display_name, pa.legal_name,
+             pa.verification::text AS verification, pa.score, pa.tier::text AS tier,
+             ci.name_ar AS city_name_ar
+      FROM partners pa
+      LEFT JOIN cities ci ON ci.id = pa.city_id
+      WHERE pa.id = ${partnerId} AND pa.deleted_at IS NULL
+    `);
+
+    const row = rows.rows[0];
+
+    if (!row) throw notFound(ERROR.PARTNER_NOT_FOUND);
+
+    return {
+      reference: row.reference,
+      displayName: row.display_name,
+      legalName: row.legal_name,
+      verification: row.verification,
+      score: row.score,
+      tier: row.tier,
+      city: row.city_name_ar,
+    };
+  }
+
+  /**
+   * Every listing this partner owns, with what the design handoff's §7.2 card actually draws.
+   *
+   * ## Why one query and not five
+   *
+   * The card needs a cover image, the trip-trait chips, a nightly price and a unit count. Fetching
+   * those per listing is the N+1 the scale rules forbid, and a partner with thirty listings would
+   * pay for it on every page view. The price and the count come from a lateral aggregate over
+   * `units`, and the cover from a lateral pick of the first image — both indexed by `property_id`.
+   *
+   * ## The price is the CHEAPEST unit, and says so
+   *
+   * The handoff's card shows one figure with "/ ليلة". A property with a $45 single and a $140
+   * suite has no single nightly price, so this returns the minimum — the "from" price the public
+   * search also advertises. Returning an average would be a number that matches nothing bookable.
+   *
+   * Scoped to `partnerId` from the VERIFIED token, so this cannot return another partner's
+   * listing regardless of what the caller asks for.
+   */
   async listOwn(claims: AccessTokenClaims | undefined) {
     const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
 
-    return this.db.query.properties.findMany({
-      where: and(
-        eq(schema.properties.partnerId, partnerId),
-        isNull(schema.properties.deletedAt),
-      ),
-      columns: {
-        reference: true,
-        slug: true,
-        nameAr: true,
-        nameEn: true,
-        status: true,
-        rating: true,
-        reviewsCount: true,
-        recommendationScore: true,
-        verifiedAt: true,
-        createdAt: true,
-      },
-      orderBy: (p, { desc }) => [desc(p.createdAt)],
-    });
+    const rows = await this.db.execute<{
+      reference: string;
+      slug: string;
+      name_ar: string;
+      name_en: string | null;
+      status: string;
+      rating: string | null;
+      reviews_count: number;
+      attributes: string[] | null;
+      badges: string[] | null;
+      city_name_ar: string | null;
+      property_type: string | null;
+      cover_key: string | null;
+      unit_count: number;
+      from_price: string | null;
+      currency_code: string | null;
+      created_at: string;
+    }>(sql`
+      SELECT pr.reference, pr.slug, pr.name_ar, pr.name_en, pr.status::text AS status,
+             pr.rating::text AS rating, pr.reviews_count, pr.attributes, pr.badges,
+             ci.name_ar AS city_name_ar,
+             pt.code    AS property_type,
+             img.file_key AS cover_key,
+             coalesce(u.unit_count, 0)::int AS unit_count,
+             u.from_price::text AS from_price,
+             u.currency_code,
+             to_char(pr.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS created_at
+      FROM properties pr
+      JOIN cities ci        ON ci.id = pr.city_id
+      JOIN property_types pt ON pt.id = pr.property_type_id
+      LEFT JOIN LATERAL (
+        SELECT pi.file_key FROM property_images pi
+        WHERE pi.property_id = pr.id AND pi.deleted_at IS NULL
+        ORDER BY pi.is_cover DESC, pi.sort_order ASC
+        LIMIT 1
+      ) img ON true
+      LEFT JOIN LATERAL (
+        SELECT count(*)::int AS unit_count,
+               min(un.base_price) AS from_price,
+               min(cur.code)      AS currency_code
+        FROM units un
+        JOIN currencies cur ON cur.id = un.currency_id
+        WHERE un.property_id = pr.id AND un.deleted_at IS NULL
+      ) u ON true
+      WHERE pr.partner_id = ${partnerId} AND pr.deleted_at IS NULL
+      ORDER BY pr.created_at DESC
+    `);
+
+    return rows.rows.map((row) => ({
+      reference: row.reference,
+      slug: row.slug,
+      nameAr: row.name_ar,
+      nameEn: row.name_en,
+      status: row.status,
+      rating: row.rating,
+      reviewsCount: row.reviews_count,
+      /* Always an array, so the card never has to guard before mapping. */
+      attributes: row.attributes ?? [],
+      badges: row.badges ?? [],
+      city: row.city_name_ar,
+      propertyType: row.property_type,
+      coverKey: row.cover_key,
+      unitCount: row.unit_count,
+      fromPrice: row.from_price,
+      currencyCode: row.currency_code,
+      createdAt: row.created_at,
+    }));
   }
 
   async create(claims: AccessTokenClaims | undefined, input: PropertyCreateInput) {

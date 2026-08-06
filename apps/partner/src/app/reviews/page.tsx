@@ -1,4 +1,4 @@
-import { getPartnerSession } from '@/lib/session-server';
+import { getMyProfile } from '@/lib/api';
 import { Shell } from '@/components/shell';
 import { t } from '@/lib/strings';
 
@@ -16,14 +16,12 @@ import { t } from '@/lib/strings';
 export const dynamic = 'force-dynamic';
 
 export default async function ReviewsPage() {
-  const session = await getPartnerSession();
+  const profile = await getMyProfile();
+  const name =
+    profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
 
   return (
-    <Shell
-      title={t.reviews.title}
-      partnerName={session?.user.email ?? ''}
-      active="reviews"
-    >
+    <Shell title={t.reviews.title} partnerName={name} active="reviews">
       <p className="rounded-[14px] border border-gold/30 bg-gold/5 p-4 text-sm text-gold">
         {t.reviews.notBuilt}
       </p>

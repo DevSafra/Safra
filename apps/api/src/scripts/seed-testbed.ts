@@ -66,6 +66,10 @@ interface PropertySpec {
   readonly type: string;
   readonly address: string;
   readonly descriptionAr: string;
+  /** From `TRIP_ATTRIBUTES` — the ONE shared vocabulary (§5.6). Never a list forked here. */
+  readonly attributes: readonly string[];
+  readonly rating: string;
+  readonly reviewsCount: number;
   readonly units: readonly UnitSpec[];
 }
 
@@ -98,6 +102,9 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'فندق قصر الشرق — المالكي',
         nameEn: 'Qasr Al-Sharq Hotel — Malki',
         slug: 'qasr-al-sharq-malki',
+        rating: '4.7',
+        reviewsCount: 132,
+        attributes: ['history', 'business', 'internet', 'parking'],
         citySlug: 'damascus',
         type: 'hotel',
         address: 'المالكي، دمشق',
@@ -111,6 +118,9 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'فندق قصر الشرق — أبو رمانة',
         nameEn: 'Qasr Al-Sharq Hotel — Abu Rummaneh',
         slug: 'qasr-al-sharq-abu-rummaneh',
+        rating: '4.4',
+        reviewsCount: 58,
+        attributes: ['history', 'business', 'internet'],
         citySlug: 'damascus',
         type: 'hotel',
         address: 'أبو رمانة، دمشق',
@@ -121,6 +131,9 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'شقق قصر الشرق المخدومة',
         nameEn: 'Qasr Al-Sharq Serviced Apartments',
         slug: 'qasr-al-sharq-apartments',
+        rating: '4.6',
+        reviewsCount: 41,
+        attributes: ['families', 'internet', 'parking'],
         citySlug: 'damascus',
         type: 'apartment',
         address: 'المزة، دمشق',
@@ -151,6 +164,9 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'شاليهات الساحل — بلوران',
         nameEn: 'Coastal Chalets — Blouran',
         slug: 'coastal-chalets-blouran',
+        rating: '4.8',
+        reviewsCount: 96,
+        attributes: ['sea', 'pool', 'families'],
         citySlug: 'latakia',
         type: 'chalet',
         address: 'بلوران، اللاذقية',
@@ -164,6 +180,9 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'منتجع الساحل',
         nameEn: 'Coastal Resort',
         slug: 'coastal-resort',
+        rating: '4.5',
+        reviewsCount: 73,
+        attributes: ['sea', 'pool', 'honeymoon'],
         citySlug: 'latakia',
         type: 'hotel',
         address: 'الشاطئ الأزرق، اللاذقية',
@@ -189,6 +208,9 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'بيت الياسمين الدمشقي',
         nameEn: 'Beit Al-Yasmine Damascene House',
         slug: 'beit-al-yasmine',
+        rating: '4.9',
+        reviewsCount: 118,
+        attributes: ['history', 'honeymoon', 'nature'],
         citySlug: 'damascus',
         type: 'rural_house',
         address: 'باب توما، دمشق القديمة',
@@ -258,6 +280,63 @@ async function main(): Promise<void> {
   } finally {
     await db.$client.end();
   }
+}
+
+/**
+ * Creates the account, or refreshes the one already there.
+ *
+ * Keyed on email. See the note above about why these are never deleted: an account that has signed
+ * in is pinned by the append-only audit log, and its history is worth more than a clean insert.
+ */
+async function upsertUser(
+  db: Database,
+  values: {
+    email: string;
+    phone: string;
+    passwordHash: string;
+    role:
+      'partner' | 'customer' | 'support_agent' | 'finance_officer' | 'operations_manager';
+    status?: 'active' | 'suspended';
+  },
+): Promise<{ id: string }> {
+  const existing = await db.execute<{ id: string }>(
+    sql`SELECT id FROM users WHERE lower(email) = ${values.email.toLowerCase()} LIMIT 1`,
+  );
+
+  const found = existing.rows[0];
+
+  if (found) {
+    await db.execute(sql`
+      UPDATE users
+      SET password_hash = ${values.passwordHash},
+          role = ${values.role}::user_role,
+          status = ${values.status ?? 'active'}::user_status,
+          phone = ${values.phone},
+          email_verified_at = now(),
+          deleted_at = NULL,
+          updated_at = now()
+      WHERE id = ${found.id}
+    `);
+
+    return found;
+  }
+
+  const [row] = await db
+    .insert(schema.users)
+    .values({
+      email: values.email,
+      phone: values.phone,
+      passwordHash: values.passwordHash,
+      role: values.role,
+      status: values.status ?? 'active',
+      preferredLocale: 'ar',
+      emailVerifiedAt: new Date(),
+    })
+    .returning();
+
+  if (!row) throw new Error(`Could not create ${values.email}`);
+
+  return row;
 }
 
 async function build(db: Database): Promise<void> {
@@ -345,11 +424,28 @@ async function build(db: Database): Promise<void> {
   );
   await db.execute(sql`DELETE FROM customer_profiles WHERE id IN (${testbedProfiles})`);
   await db.execute(sql`DELETE FROM partners WHERE id IN (${testbedPartners})`);
-  await db.execute(sql`
-    DELETE FROM users
+  /*
+    Users are REUSED, not deleted.
+
+    Signing in writes an `audit_log` row, and `audit_log` is append-only — so the second run after
+    anybody has actually used the testbed hit `audit_log_actor_user_id_users_id_fk` and could not
+    proceed. That is `O-data-1` in `docs/FUTURE-WORK.md` meeting its own author.
+
+    Reusing the row is better than working around the constraint: the account keeps its identity,
+    its audit history stays true, and everything that hangs off it — partners, properties, bookings
+    — is rebuilt fresh above. Sessions still go, so a stale token cannot outlive the rebuild.
+  */
+  const testbedUsers = sql`
+    SELECT id FROM users
     WHERE lower(email) IN (${emailList})
        OR email LIKE 'guest%@safra.test'
-       OR email LIKE 'staff%@safra.test'`);
+       OR email LIKE 'staff%@safra.test'`;
+
+  await db.execute(sql`DELETE FROM refresh_tokens WHERE user_id IN (${testbedUsers})`);
+  await db.execute(sql`DELETE FROM auth_tokens WHERE user_id IN (${testbedUsers})`);
+  await db.execute(
+    sql`DELETE FROM staff_scope_cities WHERE user_id IN (${testbedUsers})`,
+  );
 
   // ── The three partners ────────────────────────────────────────────────────
   const madeProperties = new Map<
@@ -365,20 +461,12 @@ async function build(db: Database): Promise<void> {
     if (!city || !partnerType)
       throw new Error(`Missing reference data for ${spec.email}`);
 
-    const [user] = await db
-      .insert(schema.users)
-      .values({
-        email: spec.email,
-        phone: spec.phone,
-        passwordHash,
-        role: 'partner',
-        status: 'active',
-        preferredLocale: 'ar',
-        emailVerifiedAt: new Date(),
-      })
-      .returning();
-
-    if (!user) throw new Error(`Could not create ${spec.email}`);
+    const user = await upsertUser(db, {
+      email: spec.email,
+      phone: spec.phone,
+      passwordHash,
+      role: 'partner',
+    });
 
     /*
       Approved AND screened. `sanctions_screened_at` matters: the console refuses to approve a
@@ -433,6 +521,14 @@ async function build(db: Database): Promise<void> {
           status: 'published',
           verifiedAt: new Date(),
           cancellationPolicyId: policy.id,
+          attributes: [...property.attributes],
+          /*
+            A rating and a review count, so the §7.2 card's ★ is exercised. They are NOT derived
+            from a reviews table because there is not one yet — when reviews land these become the
+            aggregate of real rows rather than a seeded number.
+          */
+          rating: property.rating,
+          reviewsCount: property.reviewsCount,
         })
         .returning();
 
@@ -468,20 +564,12 @@ async function build(db: Database): Promise<void> {
   }
 
   // ── The customer ──────────────────────────────────────────────────────────
-  const [customerUser] = await db
-    .insert(schema.users)
-    .values({
-      email: CUSTOMER.email,
-      phone: CUSTOMER.phone,
-      passwordHash,
-      role: 'customer',
-      status: 'active',
-      preferredLocale: 'ar',
-      emailVerifiedAt: new Date(),
-    })
-    .returning();
-
-  if (!customerUser) throw new Error('Could not create the customer.');
+  const customerUser = await upsertUser(db, {
+    email: CUSTOMER.email,
+    phone: CUSTOMER.phone,
+    passwordHash,
+    role: 'customer',
+  });
 
   const [profile] = await db
     .insert(schema.customerProfiles)
@@ -640,14 +728,12 @@ async function bulk(
   ] as const;
 
   for (const [index, role] of ROLES.entries()) {
-    await db.insert(schema.users).values({
+    await upsertUser(db, {
       email: `staff${index + 1}@safra.test`,
       phone: `+96393300${String(index + 10).padStart(4, '0')}`,
       passwordHash: ctx.passwordHash,
       role,
       status: index === 5 ? 'suspended' : 'active',
-      preferredLocale: 'ar',
-      emailVerifiedAt: new Date(),
     });
   }
 

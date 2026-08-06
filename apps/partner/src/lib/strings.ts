@@ -21,3 +21,15 @@ export { fill };
 export function propertyStatus(status: string): string {
   return t.propertyStatus[status] ?? status.replace(/_/g, ' ');
 }
+
+/** A trip trait in Arabic, falling back to the raw key rather than blank. */
+export function tripAttribute(key: string): string {
+  return t.tripAttribute[key] ?? key;
+}
+
+/** A property type in Arabic, falling back to the raw code rather than blank. */
+export function propertyType(code: string | null): string {
+  if (!code) return '';
+
+  return t.propertyType[code] ?? code.replace(/_/g, ' ');
+}

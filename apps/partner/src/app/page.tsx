@@ -1,5 +1,4 @@
-import { getPartnerSession } from '@/lib/session-server';
-import { getMyProperties } from '@/lib/api';
+import { getMyProfile, getMyProperties } from '@/lib/api';
 import { Shell } from '@/components/shell';
 import { fill, t } from '@/lib/strings';
 
@@ -21,9 +20,9 @@ import { fill, t } from '@/lib/strings';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const session = await getPartnerSession();
-  const properties = await getMyProperties();
-  const name = session?.user.email ?? '';
+  const [profile, properties] = await Promise.all([getMyProfile(), getMyProperties()]);
+  const name =
+    profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
 
   return (
     <Shell title={t.dashboard.title} partnerName={name} active="dashboard">
