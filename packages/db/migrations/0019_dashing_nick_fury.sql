@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "table_page_sizes" jsonb DEFAULT '{}'::jsonb NOT NULL;

@@ -12,7 +12,7 @@ import {
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { t } from '@/lib/strings';
-import { listParams } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 
 /**
  * العملاء — the customer registry (design handoff §8).
@@ -37,7 +37,7 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, page, size } = await listParams(searchParams);
+  const { q, page, size } = await listParamsFor('customers', searchParams);
 
   const [result, counts] = await Promise.all([
     getCustomers({ q, page, limit: size }),
@@ -70,6 +70,7 @@ export default async function CustomersPage({
             />
             <TablePagination
               basePath="/customers"
+              section="customers"
               query={{ q }}
               page={result.page}
               pages={result.pages}

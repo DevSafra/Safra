@@ -15,7 +15,8 @@ import {
 } from '@/components/admin-table';
 import { OutlineAction, TableToolbar, ToolbarNote } from '@/components/table-toolbar';
 import { bookingStatus, fill, t } from '@/lib/strings';
-import { oneOf, pageNumber, pageSize, returnQuery } from '@/lib/search-params';
+import { oneOf, pageNumber, returnQuery } from '@/lib/search-params';
+import { resolvePageSize } from '@/lib/table-size';
 import { statusTone } from '@/lib/status-tone';
 
 /**
@@ -88,7 +89,8 @@ export default async function BookingsPage({
   // Dropped rather than forwarded if it is not a real status — see `oneOf`.
   const status = oneOf(params['status'], STATUSES);
   const page = pageNumber(first('page'));
-  const size = pageSize(first('size'));
+  // The URL wins, then this reader's saved size for bookings, then ten — see `resolvePageSize`.
+  const size = await resolvePageSize('bookings', first('size'));
 
   // Carried into every row link, so «رجوع» on the detail screen comes back here.
   const back = returnQuery({ page, size, q, status });
@@ -160,6 +162,7 @@ export default async function BookingsPage({
             />
             <TablePagination
               basePath="/bookings"
+              section="bookings"
               query={{ q, status }}
               page={result.page}
               pages={result.pages}

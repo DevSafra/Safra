@@ -14,7 +14,7 @@ import {
 import { TableToolbar } from '@/components/table-toolbar';
 import { fill, label, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
-import { listParams } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 
 /**
  * واتساب والبريد — the delivery log (design handoff §8).
@@ -44,7 +44,7 @@ export default async function CommsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, page, size } = await listParams(searchParams);
+  const { q, page, size } = await listParamsFor('comms', searchParams);
   const params = await searchParams;
   const rawStatus = params['status'];
   const status =
@@ -102,6 +102,7 @@ export default async function CommsPage({
             />
             <TablePagination
               basePath="/comms"
+              section="comms"
               query={{ q, status }}
               page={result.page}
               pages={result.pages}

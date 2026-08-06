@@ -18,7 +18,8 @@ import {
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
-import { listParams, returnQuery } from '@/lib/search-params';
+import { returnQuery } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 
 /**
  * الشركاء (design handoff §8, §8.1).
@@ -45,7 +46,7 @@ export default async function PartnersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, page, size } = await listParams(searchParams);
+  const { q, page, size } = await listParamsFor('partners', searchParams);
 
   // Carried into every row link, so «رجوع» on the detail screen comes back here.
   const back = returnQuery({ page, size, q });
@@ -83,6 +84,7 @@ export default async function PartnersPage({
               />
               <TablePagination
                 basePath="/partners"
+                section="partners"
                 query={{ q }}
                 page={registry.page}
                 pages={registry.pages}

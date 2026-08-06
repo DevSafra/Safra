@@ -8,7 +8,8 @@ import { FootNote, Ltr } from '@/components/admin-table';
 import { StaffAdmin } from '@/components/staff-admin';
 import { ScopePanel } from '@/components/scope-panel';
 import { auditAction, fill, roleName, t } from '@/lib/strings';
-import { listParams, pageNumber, pageSize } from '@/lib/search-params';
+import { pageNumber, pageSize } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 
 /**
  * الموظفون (M-5, SRS §4, design handoff §8.2).
@@ -27,7 +28,7 @@ export default async function StaffPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { page, size } = await listParams(searchParams);
+  const { page, size } = await listParamsFor('staff', searchParams);
   /*
     The scope map is the second paged table on this route, under its own parameters — see the note
     in `ScopePanel`. Read here rather than there so the accounts bar can carry them forward.
@@ -67,6 +68,7 @@ export default async function StaffPage({
               */}
               <TablePagination
                 basePath="/staff"
+                section="staff"
                 query={{
                   scopePage: String(scope.page),
                   scopeSize: String(scope.size),

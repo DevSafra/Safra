@@ -1,7 +1,11 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
+import { DEFAULT_TABLE_PAGE_SIZE } from '../packages/contracts/src/table-preferences.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
+
+/** A size that is not the default, so these survive the default changing again. */
+const NON_DEFAULT = DEFAULT_TABLE_PAGE_SIZE + 15;
 
 /**
  * A detail screen returns to the exact list view it was opened from.
@@ -58,7 +62,12 @@ test.describe('the back control', () => {
    * row assertion would also pass if both pages happened to show the same booking.
    */
   test('returns to the same page, size and filter', async ({ page }) => {
-    const view = '/bookings?size=10&page=4&status=cancelled';
+    /*
+      A NON-default size on purpose. The default became ten on 2026-08-06, and `returnQuery` drops
+      a size that equals the default — a URL stating the default is noise. So `size=10` would have
+      tested that the parameter is correctly absent, which is a different promise from this one.
+    */
+    const view = `/bookings?size=${NON_DEFAULT}&page=4&status=cancelled`;
 
     await page.goto(view);
 
@@ -69,7 +78,7 @@ test.describe('the back control', () => {
     const detail = new URL(page.url()).searchParams;
 
     expect(detail.get('page')).toBe('4');
-    expect(detail.get('size')).toBe('10');
+    expect(detail.get('size')).toBe(String(NON_DEFAULT));
     expect(detail.get('status')).toBe('cancelled');
 
     await backTo(page, t.nav.bookings).click();
@@ -79,7 +88,7 @@ test.describe('the back control', () => {
 
     expect(returned.pathname).toBe('/bookings');
     expect(returned.searchParams.get('page')).toBe('4');
-    expect(returned.searchParams.get('size')).toBe('10');
+    expect(returned.searchParams.get('size')).toBe(String(NON_DEFAULT));
     expect(returned.searchParams.get('status')).toBe('cancelled');
 
     // And the reader is actually looking at that page, not just at a URL that says so.
@@ -174,7 +183,11 @@ test.describe('the back control', () => {
    * whether or not anything works, so a test written against it passes on a broken build.
    */
   test('scrolls back to the row that was opened', async ({ page }) => {
-    await page.goto('/bookings?size=25');
+    /*
+      A size big enough that the last row is below the fold — ten fills less than one screen. It is
+      also NON-default, which is why the returned URL keeps `?size=` below.
+    */
+    await page.goto(`/bookings?size=${NON_DEFAULT}`);
 
     const rows = page.locator('tbody tr');
     const last = rows.last();
@@ -189,11 +202,12 @@ test.describe('the back control', () => {
     await page.waitForURL(/\/bookings\/BKG/);
 
     /*
-      No `?` to wait for: `size=25` IS the default, so `returnQuery` drops it rather than writing a
-      URL that states the default. The fragment is what identifies the destination here.
+      Either shape: `returnQuery` carries a size that DIFFERS from the default and drops one that
+      matches it, so whether there is a `?` depends on a number that has already changed once. The
+      fragment is what identifies the destination, and it is asserted exactly on the next line.
     */
     await backTo(page, t.nav.bookings).click();
-    await page.waitForURL(/\/bookings#/);
+    await page.waitForURL(/\/bookings(\?|#)/);
 
     expect(new URL(page.url()).hash).toBe(`#${anchor}`);
 

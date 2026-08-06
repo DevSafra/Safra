@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
+import { DEFAULT_TABLE_PAGE_SIZE } from '../packages/contracts/src/table-preferences.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -93,6 +94,20 @@ const previousArrow = (page: Page) =>
 /** The staff registry's own bar, by name, so the scope map's does not answer for it. */
 const staffBar = (page: Page) => bar(page, t.sections.staff.listLabel);
 
+/*
+  The size is saved against the ACCOUNT since 2026-08-06, so submitting the bar here MUTATES shared
+  state that later specs and later runs read. Left alone, a run of this file made
+  `navigation.spec.ts`'s "every table starts at ten rows" fail on the NEXT run, which is a failure
+  with no relationship to the code that caused it. So the sections these tests submit are put back.
+*/
+test.afterAll(async ({ request }) => {
+  for (const section of ['bookings', 'customers', 'partners']) {
+    await request
+      .post('/api/table-page-size', { form: { section, size: '10' } })
+      .catch(() => null);
+  }
+});
+
 test.describe('the pagination bar', () => {
   /**
    * Present on every paginated table, with every control.
@@ -119,13 +134,16 @@ test.describe('the pagination bar', () => {
 
       const value = await pageInput(page).inputValue();
 
-      // 1 and 25 are the defaults; the controls must show what is in force, not a placeholder.
+      // The controls must show what is IN FORCE, not a placeholder — page one and the default size.
       if (value !== '1') missing.push(`${path}: page input shows "${value}", expected 1`);
 
       const size = await sizeSelect(page).inputValue();
 
-      if (size !== '25')
-        missing.push(`${path}: size select shows "${size}", expected 25`);
+      if (size !== String(DEFAULT_TABLE_PAGE_SIZE)) {
+        missing.push(
+          `${path}: size select shows "${size}", expected ${DEFAULT_TABLE_PAGE_SIZE}`,
+        );
+      }
 
       // The total is what the bar exists to report, and "0 نتيجة" on a full table is the bug.
       if ((await bars.first().getByText(/نتيجة/).count()) === 0)
@@ -255,7 +273,7 @@ test.describe('the pagination bar', () => {
 
     await page.goto('/bookings?size=abc&page=abc');
 
-    await expect(sizeSelect(page)).toHaveValue('25');
+    await expect(sizeSelect(page)).toHaveValue(String(DEFAULT_TABLE_PAGE_SIZE));
     await expect(pageInput(page)).toHaveValue('1');
 
     // Page zero and negative pages both mean page one, not a 400 and not an empty screen.

@@ -9,6 +9,8 @@ import { DashboardService } from './dashboard.service.js';
 import { BookingDetailService } from './booking-detail.service.js';
 import { AdminOperationsController } from './operations.controller.js';
 import { ReviewService } from './review.service.js';
+import { MeController } from './me.controller.js';
+import { MeService } from './me.service.js';
 import { StaffController, StaffInvitationController } from './staff.controller.js';
 import { StaffService } from './staff.service.js';
 import { AuthModule } from '../auth/auth.module.js';
@@ -41,6 +43,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     CityImagesController,
     AdminGrantsController,
     AdminOperationsController,
+    MeController,
     StaffController,
     StaffInvitationController,
   ],
@@ -52,6 +55,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     BookingDetailService,
     SettingsAdminService,
     AuditService,
+    MeService,
     StaffService,
     // The §8 registry, finance and operations reads — see RegistriesController.
     BookingListService,

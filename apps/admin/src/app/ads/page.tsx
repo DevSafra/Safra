@@ -14,7 +14,7 @@ import { TableToolbar } from '@/components/table-toolbar';
 import { CampaignStatusButton } from '@/components/campaign-status-button';
 import { fill, label, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
-import { listParams } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 
 /**
  * الإعلانات — targeted advertising (design handoff §8).
@@ -42,7 +42,7 @@ export default async function AdsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, page, size } = await listParams(searchParams);
+  const { q, page, size } = await listParamsFor('ads', searchParams);
 
   const [result, counts] = await Promise.all([
     getCampaigns({ q, page, limit: size }),
@@ -81,6 +81,7 @@ export default async function AdsPage({
             />
             <TablePagination
               basePath="/ads"
+              section="ads"
               query={{ q }}
               page={result.page}
               pages={result.pages}

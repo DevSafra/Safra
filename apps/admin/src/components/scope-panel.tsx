@@ -67,6 +67,7 @@ export async function ScopePanel({
           />
           <TablePagination
             basePath="/staff"
+            section="staffScope"
             query={query}
             page={result.page}
             pages={result.pages}

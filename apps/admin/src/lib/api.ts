@@ -1085,3 +1085,26 @@ export async function getContracts(partner?: string) {
     z.object({ contracts: z.array(contractSchema) }),
   );
 }
+
+// ─── The signed-in staff member's own preferences ─────────────────────────────
+
+const preferencesSchema = z.object({
+  tablePageSizes: z.record(z.string(), z.number()),
+});
+
+/**
+ * The caller's saved page sizes.
+ *
+ * Read on every registry render, BEFORE the list itself, because the size is an input to the list
+ * query. That is a sequential round trip rather than a parallel one — a primary-key lookup on
+ * `users` against a local API, which is the cheapest read in the codebase, and the alternative
+ * (caching it in the session cookie) drifts the moment the same person changes it on a second
+ * device.
+ *
+ * A failure is not an error here: a console that refused to render a table because it could not
+ * read a display preference would be worse than one that shows ten rows. The caller falls back to
+ * the default.
+ */
+export async function getPreferences() {
+  return staffFetch('/admin/me/preferences', preferencesSchema);
+}

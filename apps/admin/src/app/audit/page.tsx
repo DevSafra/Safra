@@ -6,7 +6,8 @@ import { TablePagination } from '@/components/table-pagination';
 import { AdminTable, Ltr, type AdminColumn } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, auditAction, roleName } from '@/lib/strings';
-import { pageNumber, pageSize } from '@/lib/search-params';
+import { pageNumber } from '@/lib/search-params';
+import { resolvePageSize } from '@/lib/table-size';
 
 /**
  * سجل التدقيق (SRS §15, design handoff §8).
@@ -61,7 +62,8 @@ export default async function AuditPage({
     reader routinely wants a long page — reconstructing what happened means reading a sequence,
     not a screenful — so letting them ask for 100 matters more here than anywhere else.
   */
-  const size = pageSize(first('size'));
+  // The URL wins, then this reader's saved size for audit, then ten — see `resolvePageSize`.
+  const size = await resolvePageSize('audit', first('size'));
 
   const [entries, actionList, counts] = await Promise.all([
     getAuditLog({ action, actorEmail: q, page: String(page), limit: String(size) }),
@@ -120,6 +122,7 @@ export default async function AuditPage({
             />
             <TablePagination
               basePath="/audit"
+              section="audit"
               query={{ q, action }}
               page={entries.page}
               pages={entries.pages}

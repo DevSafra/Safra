@@ -92,6 +92,26 @@ export const users = pgTable(
     outsideScopeAccess: outsideScopeAccess('outside_scope_access')
       .notNull()
       .default('none'),
+    /**
+     * How many rows this person wants per page, per console registry — `{ bookings: 50 }`.
+     *
+     * Every table starts at ten rows (Bashar, 2026-08-06) and remembers a change against the
+     * ACCOUNT rather than the browser, so the choice survives a new laptop and a cleared cache.
+     * Per registry rather than one number: ten bookings is a queue you scan and a hundred audit
+     * rows is a log you search, and one setting cannot be right for both.
+     *
+     * A map rather than fourteen columns because the set of registries changes with the product
+     * and a column per table would mean a migration every time one is added. The keys ARE
+     * validated — `tablePageSizeSchema` in `@safra/contracts` — so this is not a place a client
+     * can write arbitrary JSON.
+     *
+     * Missing keys are the norm, not an error: an absent entry means "never changed it", which is
+     * exactly the default. Nothing writes a key equal to the default.
+     */
+    tablePageSizes: jsonb('table_page_sizes')
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
     /** Lockout state after repeated failed sign-ins (§1 rate limiting). */
     failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
     lockedUntil: timestamp('locked_until', { withTimezone: true }),

@@ -9,7 +9,16 @@ import {
   returnHref,
   returnQuery,
   rowAnchor,
+  DEFAULT_PAGE_SIZE,
 } from './search-params';
+
+/**
+ * A size that is not the default, derived so a change to the default cannot break these.
+ *
+ * Written as an offset rather than a comparison: `DEFAULT_PAGE_SIZE` is a literal type, so
+ * `=== 50` is a type ERROR rather than a false branch.
+ */
+const NON_DEFAULT = DEFAULT_PAGE_SIZE + 15;
 
 /**
  * The link a detail screen offers back to the list it was opened from.
@@ -20,11 +29,21 @@ import {
  */
 describe('returnQuery', () => {
   it('carries the page, size, search and filter', () => {
-    const query = returnQuery({ page: 4, size: 10, q: 'BKG', status: 'cancelled' });
+    /*
+      `NON_DEFAULT` rather than a literal: the default page size changed from 25 to 10 on
+      2026-08-06 and these assertions failed for a reason that had nothing to do with what they
+      test. A size is carried BECAUSE it differs from the default, so that is what they say.
+    */
+    const query = returnQuery({
+      page: 4,
+      size: NON_DEFAULT,
+      q: 'BKG',
+      status: 'cancelled',
+    });
     const params = new URLSearchParams(query.slice(1));
 
     expect(params.get('page')).toBe('4');
-    expect(params.get('size')).toBe('10');
+    expect(params.get('size')).toBe(String(NON_DEFAULT));
     expect(params.get('q')).toBe('BKG');
     expect(params.get('status')).toBe('cancelled');
   });
@@ -34,7 +53,7 @@ describe('returnQuery', () => {
    * step. Page one and the default size are the view you get by asking for nothing.
    */
   it('says nothing when there is nothing worth saying', () => {
-    expect(returnQuery({ page: 1, size: 25 })).toBe('');
+    expect(returnQuery({ page: 1, size: DEFAULT_PAGE_SIZE })).toBe('');
     expect(returnQuery({})).toBe('');
   });
 });
@@ -214,11 +233,18 @@ describe('backTarget', () => {
   it('carries the original list position through to the origin', () => {
     const target = backTarget(
       '/partners',
-      { from: 'bookings:BKG-000012', page: '4', size: '10', status: 'cancelled' },
+      {
+        from: 'bookings:BKG-000012',
+        page: '4',
+        size: String(NON_DEFAULT),
+        status: 'cancelled',
+      },
       'PAR-000002',
     );
 
-    expect(target.href).toBe('/bookings/BKG-000012?page=4&size=10&status=cancelled');
+    expect(target.href).toBe(
+      `/bookings/BKG-000012?page=4&size=${NON_DEFAULT}&status=cancelled`,
+    );
   });
 
   it('returns to a LIST origin, at the reader’s page', () => {

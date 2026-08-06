@@ -12,7 +12,7 @@ import {
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
-import { listParams } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 
 /**
  * المحفظة — the wallet ledger across all customers (design handoff §8).
@@ -32,7 +32,7 @@ export default async function WalletPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, page, size } = await listParams(searchParams);
+  const { q, page, size } = await listParamsFor('wallet', searchParams);
 
   const [result, counts] = await Promise.all([
     getWalletTransactions({ q, page, limit: size }),
@@ -65,6 +65,7 @@ export default async function WalletPage({
             />
             <TablePagination
               basePath="/wallet"
+              section="wallet"
               query={{ q }}
               page={result.page}
               pages={result.pages}

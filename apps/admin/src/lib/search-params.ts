@@ -9,13 +9,19 @@
  * its `.strict()` schema would reject with a 400 and turn a stray submit into an error page.
  */
 
+import { DEFAULT_TABLE_PAGE_SIZE } from '@safra/contracts';
+
 /**
- * Rows per page when nobody has chosen.
+ * Rows per page when nobody has chosen — ten, everywhere (Bashar, 2026-08-06).
  *
- * 25 was already the API client's default, so this changes nothing for a caller who does not pass
- * a size — it just gives the number a name and one home.
+ * Re-exported from `@safra/contracts` rather than declared here, because the API validates saved
+ * sizes against the same contract and two constants named "the default" in two packages is one
+ * more than can stay in step. It was 25.
+ *
+ * This is the floor of a three-step resolution, not the whole answer: `?size=` wins, then the
+ * reader's saved preference for that registry, then this. See `resolvePageSize`.
  */
-export const DEFAULT_PAGE_SIZE = 25;
+export const DEFAULT_PAGE_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 
 /**
  * The floor and ceiling, matching `pageQuerySchema` in `@safra/contracts`.
@@ -62,7 +68,7 @@ export async function listParams(
  * The same rule `listParams` applies, extracted because the return-link helpers below read raw
  * params too and two copies of "which value counts" would drift.
  */
-function first(
+export function first(
   params: Record<string, string | string[] | undefined>,
   key: string,
 ): string | undefined {

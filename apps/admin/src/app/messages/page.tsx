@@ -8,7 +8,8 @@ import { TablePagination } from '@/components/table-pagination';
 import { FootNote, Ltr, StatusPill } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { fill, t } from '@/lib/strings';
-import { listParams, returnQuery, rowAnchor } from '@/lib/search-params';
+import { returnQuery, rowAnchor } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 
 /**
  * الرسائل — the three-party inbox (design handoff §8).
@@ -27,7 +28,7 @@ export default async function MessagesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, page, size } = await listParams(searchParams);
+  const { q, page, size } = await listParamsFor('messages', searchParams);
 
   // Carried into every thread link, so «رجوع» on the thread screen comes back here.
   const back = returnQuery({ page, size, q });
@@ -73,6 +74,7 @@ export default async function MessagesPage({
             </ul>
             <TablePagination
               basePath="/messages"
+              section="messages"
               query={{ q }}
               page={result.page}
               pages={result.pages}

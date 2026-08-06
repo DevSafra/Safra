@@ -12,7 +12,7 @@ import {
 } from '@/components/admin-table';
 import { TableToolbar, ToolbarNote } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
-import { listParams } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 
 /**
  * الكوبونات (design handoff §8).
@@ -33,7 +33,7 @@ export default async function CouponsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, page, size } = await listParams(searchParams);
+  const { q, page, size } = await listParamsFor('coupons', searchParams);
 
   const [result, counts] = await Promise.all([
     getCoupons({ q, page, limit: size }),
@@ -78,6 +78,7 @@ export default async function CouponsPage({
             />
             <TablePagination
               basePath="/coupons"
+              section="coupons"
               query={{ q }}
               page={result.page}
               pages={result.pages}

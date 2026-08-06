@@ -10,7 +10,8 @@ import { TableToolbar } from '@/components/table-toolbar';
 import { CloseDisputeForm } from '@/components/close-dispute-form';
 import { fill, label, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
-import { listParams, oneOf } from '@/lib/search-params';
+import { oneOf } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 
 /**
  * النزاعات — disputes (design handoff §8).
@@ -37,7 +38,7 @@ export default async function DisputesPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, page, size } = await listParams(searchParams);
+  const { q, page, size } = await listParamsFor('disputes', searchParams);
   const params = await searchParams;
   /*
     Checked against THIS section's vocabulary, which is not the bookings one. It used to pass
@@ -100,6 +101,7 @@ export default async function DisputesPage({
 
             <TablePagination
               basePath="/disputes"
+              section="disputes"
               query={{ q, status }}
               page={result.page}
               pages={result.pages}

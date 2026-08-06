@@ -1,3 +1,5 @@
+import type { TableSection } from '@safra/contracts';
+
 import { count } from '@/lib/format';
 import { MAX_PAGE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from '@/lib/search-params';
 import { fill, t } from '@/lib/strings';
@@ -36,6 +38,7 @@ import { fill, t } from '@/lib/strings';
  */
 export function TablePagination({
   basePath,
+  section,
   query,
   page,
   pages,
@@ -47,6 +50,13 @@ export function TablePagination({
   label = t.table.paginationLabel,
 }: {
   readonly basePath: string;
+  /**
+   * Which registry this is, so the chosen size can be remembered against the ACCOUNT.
+   *
+   * One of the fourteen literals in `TABLE_SECTIONS`, which is also what the save endpoint builds
+   * its redirect from — so the section names a table, never a path.
+   */
+  readonly section: TableSection;
   /** Current filters, carried into every link and hidden in the form. */
   readonly query: Record<string, string | undefined>;
   readonly page: number;
@@ -98,11 +108,20 @@ export function TablePagination({
         controls wrap freely is no better — it breaks «من ٤٣٤» away from the page it belongs to and
         the bar stops reading as a sentence. So each group holds together and the groups stack.
       */}
+      {/*
+        POST, not GET, because submitting this bar REMEMBERS the size against the reader's account
+        (Bashar, 2026-08-06) — and a GET that writes would let a prefetch or a pasted link change
+        somebody's preference. The route saves, then redirects to the ordinary list URL, so what
+        the reader ends up looking at is still a plain shareable GET. The arrows either side of the
+        page number are still `<a href>`.
+      */}
       <form
-        action={basePath}
-        method="get"
+        action="/api/table-page-size"
+        method="post"
         className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2"
       >
+        <input type="hidden" name="section" value={section} />
+
         {Object.entries(query).map(([key, value]) =>
           value && key !== pageParam && key !== sizeParam ? (
             <input key={key} type="hidden" name={key} value={value} />

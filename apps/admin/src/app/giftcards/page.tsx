@@ -13,7 +13,7 @@ import {
 import { TableToolbar, ToolbarNote } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
-import { listParams } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 
 /**
  * بطاقات الهدايا (design handoff §8).
@@ -43,7 +43,7 @@ export default async function GiftCardsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, page, size } = await listParams(searchParams);
+  const { q, page, size } = await listParamsFor('giftcards', searchParams);
 
   const [result, counts] = await Promise.all([
     getGiftCards({ q, page, limit: size }),
@@ -88,6 +88,7 @@ export default async function GiftCardsPage({
             />
             <TablePagination
               basePath="/giftcards"
+              section="giftcards"
               query={{ q }}
               page={result.page}
               pages={result.pages}

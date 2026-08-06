@@ -15,7 +15,7 @@ import {
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
-import { listParams } from '@/lib/search-params';
+import { listParamsFor } from '@/lib/table-size';
 
 /**
  * الدفع والفواتير — money movement (design handoff §8).
@@ -41,7 +41,7 @@ export default async function PaymentsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { q, page, size } = await listParams(searchParams);
+  const { q, page, size } = await listParamsFor('payments', searchParams);
 
   const [result, counts] = await Promise.all([
     getFinance({ q, page, limit: size }),
@@ -107,6 +107,7 @@ export default async function PaymentsPage({
             />
             <TablePagination
               basePath="/payments"
+              section="payments"
               query={{ q }}
               page={result.page}
               pages={result.pages}

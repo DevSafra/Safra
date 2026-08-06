@@ -315,3 +315,91 @@ test.describe('console navigation', () => {
     await expect(current).toContainText(t.nav.bookings);
   });
 });
+
+/**
+ * Rows per page: ten by default, and a change is remembered against the ACCOUNT.
+ *
+ * Bashar's instruction (2026-08-06). The account part is the half a unit test cannot reach — it
+ * spans a form POST, an API write, a database column and a later render, and every one of those
+ * is a place the value can be dropped silently and leave a table that simply looks fine.
+ */
+test.describe('rows per page', () => {
+  /** Restored afterwards, so this test does not leave the seed account on a different size. */
+  const SECTIONS = ['/bookings', '/partners', '/properties', '/payments'] as const;
+
+  test('every table starts at ten rows', async ({ page }) => {
+    const wrong: string[] = [];
+
+    /*
+      Reset first, because the size is now saved against the ACCOUNT and this suite shares one —
+      `pagination.spec.ts` submits the bar, so a previous run can leave a section on fifty and this
+      test would fail for a reason that has nothing to do with the default. Resetting is not
+      cheating: a stored ten and a stored nothing render identically, which is the property being
+      checked. What ten IS, is pinned deterministically in `table-preferences.test.ts`.
+    */
+    for (const section of SECTIONS) {
+      await page.request.post('/api/table-page-size', {
+        form: { section: section.slice(1), size: '10' },
+      });
+    }
+
+    for (const section of SECTIONS) {
+      await page.goto(section);
+
+      const rows = await page.locator('tbody tr').count();
+      const chosen = await page.getByLabel(t.table.pageSizeLabel).first().inputValue();
+
+      if (chosen !== '10') wrong.push(`${section}: the size control reads ${chosen}`);
+      if (rows > 10) wrong.push(`${section}: rendered ${rows} rows`);
+    }
+
+    expect(wrong).toStrictEqual([]);
+  });
+
+  /**
+   * The whole round trip: change it, leave, come back, and it is still what was chosen.
+   *
+   * Navigating AWAY and back is the point — re-reading the same URL would pass on a value that
+   * only ever lived in the query string.
+   */
+  test('remembers a change on the account, per table', async ({ page }) => {
+    await page.goto('/bookings');
+    await page.getByLabel(t.table.pageSizeLabel).first().selectOption('50');
+    await page.getByRole('button', { name: t.table.apply }).first().click();
+    await page.waitForURL(/\/bookings/);
+
+    // Away, and back with no query string at all.
+    await page.goto('/partners');
+    await page.goto('/bookings');
+
+    await expect(page.getByLabel(t.table.pageSizeLabel).first()).toHaveValue('50');
+
+    // Per table: الشركاء was never changed, so it is still ten.
+    await page.goto('/partners');
+    await expect(page.getByLabel(t.table.pageSizeLabel).first()).toHaveValue('10');
+
+    // Put it back, so the run leaves the account as it found it.
+    await page.goto('/bookings');
+    await page.getByLabel(t.table.pageSizeLabel).first().selectOption('10');
+    await page.getByRole('button', { name: t.table.apply }).first().click();
+    await page.waitForURL(/\/bookings/);
+
+    await page.goto('/bookings');
+    await expect(page.getByLabel(t.table.pageSizeLabel).first()).toHaveValue('10');
+  });
+
+  /**
+   * A `?size=` in the URL still wins, so a shared link looks the same to both people.
+   *
+   * And it does NOT overwrite the preference: following somebody's link is not choosing anything.
+   */
+  test('a shared link wins without changing what was saved', async ({ page }) => {
+    await page.goto('/bookings?size=25');
+
+    await expect(page.getByLabel(t.table.pageSizeLabel).first()).toHaveValue('25');
+
+    await page.goto('/bookings');
+
+    await expect(page.getByLabel(t.table.pageSizeLabel).first()).toHaveValue('10');
+  });
+});
