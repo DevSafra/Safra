@@ -29,7 +29,8 @@
     "e2e:headed": "sh -c 'set -a; . ./.env; set +a; playwright test --headed'",
     "db:reset-dev": "pnpm --filter @safra/db db:reset-dev",
     "db:testbed": "pnpm --filter @safra/api db:testbed",
-    "partner:code": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api partner:code'"
+    "partner:code": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api partner:code'",
+    "media:bootstrap": "pnpm --filter @safra/api media:bootstrap"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
