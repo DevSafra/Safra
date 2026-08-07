@@ -1,7 +1,9 @@
 import { getMyProfile, getMyProperties, type PartnerProperty } from '@/lib/api';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
-import { statusTone, type Tone } from '@safra/ui';
+import { statusTone } from '@safra/ui';
+
+import { TONES } from '@/lib/tones';
 
 import { amount } from '@/lib/format';
 import { coverUrl } from '@/lib/media';
@@ -170,27 +172,3 @@ function StatusPill({ status }: { readonly status: string }) {
     </span>
   );
 }
-
-/**
- * Tone classes for this app.
- *
- * The COLOUR comes from `statusTone` in `@safra/ui`, shared with the console and the customer
- * site, so «منشور» is the same green everywhere in the project. Only the pill's shape is local:
- * this one sits over a photograph and needs a filled background to stay legible.
- */
-const TONES: Record<Tone, string> = {
-  ok: 'border-ok bg-ok/15 text-ok',
-  teal: 'border-teal bg-teal/15 text-teal',
-  lime: 'border-lime bg-lime/15 text-lime',
-  sky: 'border-sky bg-sky/15 text-sky',
-  indigo: 'border-indigo bg-indigo/15 text-indigo',
-  pend: 'border-pend bg-pend/15 text-pend',
-  gold: 'border-gold bg-gold/15 text-gold',
-  warn: 'border-warn bg-warn/15 text-warn',
-  orange: 'border-orange bg-orange/15 text-orange',
-  bad: 'border-bad bg-bad/15 text-bad',
-  crimson: 'border-crimson bg-crimson/15 text-crimson',
-  faint: 'border-line bg-field text-faint',
-  slate: 'border-slate bg-slate/15 text-slate',
-  stone: 'border-stone bg-stone/15 text-stone',
-};

@@ -18,6 +18,7 @@ export const ar = {
     dashboard: 'لوحة التحكم',
     properties: 'عقاراتي',
     reviews: 'التقييمات',
+    payouts: 'مستحقاتي',
     /** The handoff's sidebar footer, verbatim. */
     support: 'الدعم: partners@safra.com',
     showSidebar: 'إظهار قائمة التنقل',
@@ -169,7 +170,16 @@ export const ar = {
     /** المخالفات والتنبيهات. */
     alertsTitle: 'المخالفات والتنبيهات',
     alertsEmpty: 'لا مخالفات ولا تنبيهات.',
-    alertFine: 'غرامة {amount} خُصمت من المستحقات',
+    /*
+      «سُجّلت», not «خُصمت».
+
+      The handoff's line reads "غرامة 10$ خُصمت من المستحقات", and that is the intended behaviour —
+      but nothing deducts it yet: `partner_violations` records the fine and `partner_payouts.
+      fine_amount` is still zero on every payout. Saying "deducted" would tell a partner their
+      transfer is smaller than it is, and they would reconcile against a figure that never moved.
+      The wording goes back to the handoff's the moment the deduction is wired (see O-partner-2).
+    */
+    alertFine: 'غرامة {amount} مسجَّلة',
     alertOnBooking: 'على الحجز {reference}',
 
     /**
@@ -281,6 +291,52 @@ export const ar = {
     farm: 'مزرعة',
     camp: 'مخيم',
     rural_house: 'بيت ريفي',
+  } as Record<string, string>,
+
+  /**
+   * مستحقاتي — the partner's own view of their transfers.
+   *
+   * The copy distinguishes «مستحق» (what SAFRA owes) from «تحويل» (money that moved) throughout,
+   * because this is the screen where a partner decides whether to expect a payment. A word used
+   * loosely here becomes somebody planning around money that has not been sent.
+   */
+  payouts: {
+    title: 'مستحقاتي',
+    note: 'يُضاف الحجز إلى مستحقاتك بعد اكتمال الإقامة وتحصيل الدفع. أي حجز عليه نزاع مفتوح يبقى مجمّدًا حتى يُغلق النزاع.',
+    empty: 'لا مستحقات مسجّلة بعد.',
+    colReference: 'المرجع',
+    colPeriod: 'الفترة',
+    colBookings: 'الحجوزات',
+    colNet: 'الصافي',
+    colStatus: 'الحالة',
+    colDate: 'التاريخ',
+    gross: 'الإجمالي',
+    fine: 'الغرامات',
+    net: 'الصافي المستحق',
+    scheduledFor: 'موعد التحويل',
+    paidAt: 'تاريخ الدفع',
+    paidReference: 'مرجع الحوالة',
+    holdReason: 'سبب التعليق',
+    coveredBookings: 'الحجوزات المشمولة',
+    noBookings: 'لا حجوزات على هذه الفترة بعد.',
+    colBooking: 'الحجز',
+    colProperty: 'العقار',
+    colStay: 'الإقامة',
+    colAmount: 'المبلغ',
+    back: 'رجوع',
+    /* Read-only, and the screen says why rather than leaving a partner hunting for a button. */
+    readOnly:
+      'هذه الصفحة للاطّلاع فقط. جدولة التحويلات وتنفيذها يتمّان من سفرة؛ لأي استفسار راسل partners@safra.com.',
+  },
+
+  /** Payout state, in the partner's language. Same values and same colours as the console. */
+  payoutStatus: {
+    accruing: 'قيد التجميع',
+    pending_release: 'بانتظار الإفراج',
+    on_hold: 'معلَّق',
+    scheduled: 'مجدول',
+    paid: 'مدفوع',
+    cancelled: 'ملغى',
   } as Record<string, string>,
 
   reviews: {

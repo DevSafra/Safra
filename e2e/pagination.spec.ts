@@ -43,6 +43,8 @@ const TABLES = [
   '/messages',
   '/comms',
   '/audit',
+  /* تحويلات الشركاء — a registry under الدفع, not a twentieth sidebar section. */
+  '/payouts',
 ];
 
 /**

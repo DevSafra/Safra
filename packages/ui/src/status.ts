@@ -60,6 +60,8 @@ const STATUS_TONES: Record<string, Tone> = {
 
   // ── Underway ──────────────────────────────────────────────────────────────
   checked_in: 'sky',
+  /** A payout period still collecting bookings. Nothing is owed to anybody yet this month. */
+  accruing: 'sky',
   in_review: 'sky',
   sent: 'sky',
   initiated: 'sky',
@@ -74,6 +76,17 @@ const STATUS_TONES: Record<string, Tone> = {
   /** Also purple, in a vocabulary that has no `pending_confirmation` to clash with. */
   processing: 'pend',
 
+  /*
+    ── Payouts ───────────────────────────────────────────────────────────────
+
+    `scheduled` is GREEN and `paid` is teal, matching the handoff's own green dot on
+    «تحويل مستحقات ... مجدول يوم الخميس». A scheduled transfer is the good outcome a partner is
+    waiting for; a paid one is the finished one, and the two sit in the same column so they cannot
+    share a colour.
+  */
+  scheduled: 'ok',
+  paid: 'teal',
+
   // ── Waiting on somebody ───────────────────────────────────────────────────
   pending_payment: 'warn',
   pending_review: 'warn',
@@ -82,10 +95,14 @@ const STATUS_TONES: Record<string, Tone> = {
   paused: 'warn',
   queued: 'warn',
   awaiting_partner_signature: 'warn',
+  /** A closed payout period waiting for somebody to decide to send it. */
+  pending_release: 'warn',
   /** Gold: `pending` sits beside `requires_action` and `processing` in الدفع. */
   pending: 'gold',
   /** Orange: ran out. Not red — nothing went wrong — and not `failed`'s colour. */
   expired: 'orange',
+  /** Also orange: a payout stopped on purpose is not a failure, and must not read as one. */
+  on_hold: 'orange',
 
   // ── Wrong ─────────────────────────────────────────────────────────────────
   cancelled: 'bad',
@@ -162,6 +179,13 @@ export const VOCABULARIES: Readonly<Record<string, readonly string[]>> = {
   contract: ['awaiting_partner_signature', 'active', 'superseded', 'terminated'],
   user: ['active', 'suspended', 'archived'],
   notification: ['queued', 'sent', 'delivered', 'failed'],
+  /**
+   * The payout lifecycle.
+   *
+   * Six values on one registry, so six distinct tones. `cancelled` is shared with bookings and
+   * keeps its red there and here — the same status is the same colour everywhere, which is rule 1.
+   */
+  payout: ['accruing', 'pending_release', 'on_hold', 'scheduled', 'paid', 'cancelled'],
 };
 
 /**

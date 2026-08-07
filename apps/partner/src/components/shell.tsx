@@ -20,7 +20,7 @@ export function Shell({
 }: {
   readonly title: string;
   readonly partnerName: string;
-  readonly active: 'dashboard' | 'properties' | 'reviews';
+  readonly active: 'dashboard' | 'properties' | 'payouts' | 'reviews';
   readonly children: React.ReactNode;
 }) {
   return (
@@ -46,6 +46,7 @@ export function Shell({
             label={t.nav.properties}
             current={active === 'properties'}
           />
+          <Item href="/payouts" label={t.nav.payouts} current={active === 'payouts'} />
           <Item href="/reviews" label={t.nav.reviews} current={active === 'reviews'} />
         </nav>
 

@@ -201,3 +201,51 @@ export type PartnerDashboard = z.infer<typeof dashboardSchema>;
 export async function getDashboard() {
   return partnerFetch('/partner/dashboard', dashboardSchema);
 }
+
+/**
+ * The partner's own payouts, as `GET /partner/payouts` returns them.
+ *
+ * Scoped by the API to the `partnerId` in the verified token — this client sends no partner id,
+ * because there is no parameter to send one in.
+ */
+const partnerPayoutSchema = z.object({
+  reference: z.string(),
+  partnerName: z.string().nullable(),
+  currencyCode: z.string(),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  grossAmount: z.string(),
+  fineAmount: z.string(),
+  netAmount: z.string(),
+  status: z.string(),
+  scheduledFor: z.string().nullable(),
+  releasedAt: z.string().nullable(),
+  paidAt: z.string().nullable(),
+  paidReference: z.string().nullable(),
+  holdReason: z.string().nullable(),
+  bookingCount: z.number(),
+});
+
+export type PartnerPayout = z.infer<typeof partnerPayoutSchema>;
+
+export async function getMyPayouts() {
+  return partnerFetch('/partner/payouts', z.array(partnerPayoutSchema));
+}
+
+/** What one payout covers — the answer to "what is this $1,240 for". */
+const payoutBookingSchema = z.object({
+  bookingReference: z.string(),
+  amount: z.string(),
+  checkIn: z.string(),
+  checkOut: z.string(),
+  property: z.string().nullable(),
+});
+
+export type PayoutBooking = z.infer<typeof payoutBookingSchema>;
+
+export async function getMyPayoutBookings(reference: string) {
+  return partnerFetch(
+    `/partner/payouts/${encodeURIComponent(reference)}/bookings`,
+    z.array(payoutBookingSchema),
+  );
+}

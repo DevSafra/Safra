@@ -336,8 +336,86 @@ export const ar = {
       typeRefund: 'استرداد',
       typeFine: 'غرامة',
       note: 'كل حركة مالية سجل ثابت غير قابل للتعديل (immutable). منع الدفع المكرر عبر idempotency key (EC-003). لا تُخزَّن بيانات البطاقات إلا وفق PCI لدى مزود الدفع.',
-      payoutsMissing:
-        'تحويلات الشركاء (TRF) غير معروضة: لا يوجد جدول تحويلات بعد، ومسارات الدفع مؤجلة بقرار.',
+      /* Was «لا يوجد جدول تحويلات بعد» until the payout ledger shipped. It exists now. */
+      payoutsLink: 'تحويلات الشركاء',
+      payoutsNote:
+        'التحويلات إلى الشركاء لها سجلّها الخاص: كل تحويل حدث مسجَّل بدورة حياة وأثر تدقيق وحركة دفترية.',
+    },
+
+    /**
+     * تحويلات الشركاء — the payout registry and one payout's page (§9.3).
+     *
+     * The copy is careful about one distinction throughout: «مستحق» is what SAFRA owes and
+     * «تحويل» is money that moved. A screen that used them interchangeably would let an operator
+     * tell a partner a transfer happened when only an obligation was recorded.
+     */
+    payouts: {
+      title: 'تحويلات الشركاء',
+      searchPlaceholder: 'بحث بالمرجع أو الشريك أو مرجع الحوالة…',
+      allStatuses: 'كل الحالات',
+      colReference: 'المرجع',
+      colPartner: 'الشريك',
+      colPeriod: 'الفترة',
+      colBookings: 'الحجوزات',
+      colNet: 'الصافي',
+      colStatus: 'الحالة',
+      colScheduled: 'موعد التحويل',
+      note: 'الحساب التلقائي يضم الحجوزات المكتملة والمدفوعة فقط، ويستثني أي حجز عليه نزاع مفتوح أو قيد الفحص — تجميد المستحقات قاعدة مشتقة من النزاعات وليست علامة على الحجز.',
+
+      /* One payout's page. */
+      detailTitle: 'تحويل {reference}',
+      summary: 'الملخّص',
+      gross: 'الإجمالي',
+      fine: 'الغرامات',
+      net: 'الصافي',
+      period: 'الفترة',
+      status: 'الحالة',
+      scheduledFor: 'مجدول ليوم',
+      releasedAt: 'أُفرج عنه',
+      paidAt: 'دُفع',
+      paidReference: 'مرجع الحوالة',
+      holdReason: 'سبب التعليق',
+      coveredBookings: 'الحجوزات المشمولة',
+      noBookings: 'لا حجوزات على هذا التحويل.',
+      colBooking: 'الحجز',
+      colProperty: 'العقار',
+      colStay: 'الإقامة',
+      colAmount: 'المبلغ',
+
+      /* The audit trail and the ledger movement — the two halves of reconciliation. */
+      trail: 'أثر التدقيق',
+      noTrail: 'لا قرارات مسجَّلة بعد.',
+      ledger: 'الحركة الدفترية',
+      noLedger: 'لا حركة دفترية — تُسجَّل عند الدفع فقط.',
+      ledgerMissing:
+        'هذا التحويل مدفوع بلا حركة دفترية مقابلة. هذه حالة لا يُفترض أن تحدث — أبلغ عنها.',
+      debit: 'مدين',
+      credit: 'دائن',
+
+      /* The actions, and what each one commits to. */
+      actions: 'الإجراءات',
+      close: 'إغلاق الفترة',
+      closeHint: 'يوقف ضمّ حجوزات جديدة إلى هذه الفترة، ولا يحرّك أي مال.',
+      release: 'الإفراج للتحويل',
+      releaseHint: 'يحدّد موعد التحويل. يُعاد فحص تجميد النزاعات لحظة الإفراج.',
+      releaseDate: 'تاريخ التحويل',
+      releaseNotes: 'ملاحظات (اختياري)',
+      markPaid: 'تسجيل الدفع',
+      markPaidHint:
+        'يُسجّل أن المال غادر سفرة ويُنشئ الحركة الدفترية. لا يمكن التراجع — التحويل المدفوع سجل ثابت.',
+      paidReferenceLabel: 'مرجع الحوالة من البنك',
+      hold: 'تعليق',
+      holdHint: 'يوقف التحويل مؤقتًا مع تسجيل السبب.',
+      liftHold: 'رفع التعليق',
+      cancelPayout: 'إلغاء التحويل',
+      cancelHint: 'يفكّ ارتباط الحجوزات فتعود إلى فترة لاحقة.',
+      reason: 'السبب',
+      confirm: 'تأكيد',
+      cancel: 'إلغاء',
+      working: 'جارٍ التنفيذ…',
+      failed: 'تعذّر تنفيذ الإجراء.',
+      unreachable: 'تعذّر الوصول إلى الخادم.',
+      noActions: 'لا إجراءات متاحة على تحويل مدفوع.',
     },
 
     wallet: {
@@ -950,6 +1028,23 @@ export const ar = {
    * an empty cell reads as "no value" and is a lie.
    */
   enums: {
+    /**
+     * The payout lifecycle, in the reader's language.
+     *
+     * Six words, all distinct — `status-tone.test.ts` checks that per vocabulary, because once
+     * each status has its own colour, one word appearing in two colours reads as a rendering
+     * fault. «قيد التجميع» and «بانتظار الإفراج» are the pair most at risk of being collapsed
+     * into one «قيد المعالجة»; they are different things and an operator acts differently on each.
+     */
+    payoutStatus: {
+      accruing: 'قيد التجميع',
+      pending_release: 'بانتظار الإفراج',
+      on_hold: 'معلَّق',
+      scheduled: 'مجدول',
+      paid: 'مدفوع',
+      cancelled: 'ملغى',
+    } as Record<string, string>,
+
     propertyStatus: {
       draft: 'مسودة',
       pending_review: 'قيد المراجعة',

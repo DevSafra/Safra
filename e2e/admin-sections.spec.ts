@@ -390,17 +390,46 @@ test.describe('honesty rules the design and the register require', () => {
   });
 
   /**
-   * The payments screen must admit that partner payouts are not shown.
+   * The payments screen points at the payout registry rather than deriving transfers.
    *
-   * The design has a تحويل شريك row type; there is no payouts table. Deriving one from
-   * `partner_payable_amount` would present an obligation as a transfer that happened.
+   * This test used to assert the OPPOSITE — that the screen admitted no payouts table existed —
+   * and that was the honest thing to say until the ledger shipped. The rule it protects is
+   * unchanged and is now asserted on the registry itself: a transfer is a recorded EVENT, never
+   * `partner_payable_amount` summed up and presented as one.
    */
-  test('payments says partner transfers are absent rather than faking them', async ({
+  test('payments links to the payout registry rather than deriving transfers', async ({
     page,
   }) => {
     await page.goto('/payments');
 
-    await expect(page.getByText(t.sections.payments.payoutsMissing)).toBeVisible();
+    const link = page.getByRole('link', { name: t.sections.payments.payoutsLink });
+
+    await expect(link).toBeVisible();
+    await link.click();
+    await page.waitForURL(/\/payouts/);
+
+    await expect(
+      page.getByRole('heading', { name: t.sections.payouts.title }),
+    ).toBeVisible();
+  });
+
+  /**
+   * Every payout on the registry is a ROW, and the screen never invents one.
+   *
+   * The footnote states the accrual rule — completed and paid bookings only, with disputed ones
+   * excluded — because an operator reading a total needs to know what it is a total OF. The
+   * pagination bar is asserted because this registry is a table like every other, and the
+   * standing rule admits no exceptions that are not written down.
+   */
+  test('the payout registry states what it counts and pages like every other table', async ({
+    page,
+  }) => {
+    await page.goto('/payouts');
+
+    await expect(page.getByText(t.sections.payouts.note)).toBeVisible();
+    await expect(
+      page.getByRole('navigation', { name: /تنقّل بين/ }).first(),
+    ).toBeVisible();
   });
 
   /**

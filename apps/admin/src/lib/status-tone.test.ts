@@ -52,6 +52,7 @@ describe('no two statuses on one screen share a word', () => {
     ['propertyStatus', t.enums.propertyStatus],
     ['verification', t.enums.verification],
     ['disputeStatus', t.enums.disputeStatus],
+    ['payoutStatus', t.enums.payoutStatus],
   ])('%s', (_name, map) => {
     const byLabel = new Map<string, string[]>();
 

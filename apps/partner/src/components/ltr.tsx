@@ -6,9 +6,19 @@
  * console carries the same component; it is duplicated rather than shared because it is four lines
  * and moving it to `@safra/ui` would be the third place to look for it.
  */
-export function Ltr({ children }: { readonly children: React.ReactNode }) {
+export function Ltr({
+  children,
+  className,
+}: {
+  readonly children: React.ReactNode;
+  /** Appended, never replacing — `dir` and the alignment are the point of the component. */
+  readonly className?: string;
+}) {
   return (
-    <span dir="ltr" className="inline-block text-end">
+    <span
+      dir="ltr"
+      className={`inline-block text-end${className ? ` ${className}` : ''}`}
+    >
       {children}
     </span>
   );

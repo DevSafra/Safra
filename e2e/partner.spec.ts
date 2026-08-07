@@ -1,7 +1,12 @@
-import { authenticator } from 'otplib';
 import { expect, test } from '@playwright/test';
 
 import { partnerAr as t } from '../packages/i18n/src/partner.js';
+import {
+  PARTNER_BASE as BASE,
+  PARTNER_PASSWORD as PASSWORD,
+  PARTNER_STATE,
+  UNENROLLED_PARTNER_EMAIL as UNENROLLED_EMAIL,
+} from './partner-session.js';
 
 /**
  * لوحة الشريك — sign in, and see your own listings and nobody else's.
@@ -20,9 +25,6 @@ import { partnerAr as t } from '../packages/i18n/src/partner.js';
  * the verified token, so a partner seeing four would mean that scoping had broken — which is the
  * one bug in this app that would matter to somebody other than the person looking at it.
  */
-const BASE = process.env['PARTNER_URL'] ?? 'http://localhost:3002';
-const EMAIL = process.env['DEV_PARTNER_EMAIL'] ?? 'partner1@safra.test';
-const PASSWORD = process.env['TESTBED_PASSWORD'] ?? 'a-testbed-password-1';
 
 /**
  * The fixture partners' shared authenticator secret, and the one partner deliberately without it.
@@ -32,29 +34,17 @@ const PASSWORD = process.env['TESTBED_PASSWORD'] ?? 'a-testbed-password-1';
  * existed before 2FA was mandatory, which is the migration behaviour this suite has to keep
  * proving rather than assume.
  */
-const TOTP_SECRET =
-  process.env['TESTBED_PARTNER_TOTP_SECRET'] ?? 'KRSXG5CTMVRXEZLUMU2TAMBQGAYA';
-const UNENROLLED_EMAIL = 'partner3@safra.test';
-
-/**
- * A code with only a moment left will expire between generation and submission, so wait for the
- * next window rather than produce a flake that looks like a broken form.
- */
-async function freshCode(): Promise<string> {
-  if (authenticator.timeRemaining() < 5) {
-    await new Promise((resolve) => setTimeout(resolve, 6000));
-  }
-
-  return authenticator.generate(TOTP_SECRET);
-}
 
 /** Skipped rather than failed where the testbed has not been seeded — see `pnpm db:testbed`. */
 test.describe('the partner dashboard', () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
+  test.use({ storageState: PARTNER_STATE });
 
   test('refuses an anonymous visitor and keeps where they were going', async ({
     page,
   }) => {
+    /* This one test needs NO session — the point of it is what an anonymous visitor gets. */
+    await page.context().clearCookies();
+
     const response = await page.goto(`${BASE}/properties`);
 
     expect(response?.url()).toContain('/login');
@@ -62,43 +52,14 @@ test.describe('the partner dashboard', () => {
   });
 
   /**
-   * One sign-in for everything that needs one.
+   * Everything a signed-in partner sees, on the session `partner.setup.ts` captured.
    *
-   * `POST /auth/login` allows five calls a minute per IP and the staff specs already spend most of
-   * them — adding a second partner sign-in pushed the whole suite over the limit and failed two
-   * console tests for a reason that had nothing to do with the console. So this test signs in
-   * once, asserts what a signed-in partner sees, and signs out at the end.
-   *
-   * If this needs splitting later, add a `partner.setup.ts` project that saves a storage state,
-   * the way `auth.setup.ts` does for staff. Do not simply add another sign-in.
+   * Replaying a stored session rather than signing in again is the login-budget fix described in
+   * that file. The sign-in itself is still exercised — by the setup, which fails the whole run if
+   * the two-step form breaks, and by the forced-enrolment test below, which signs in for real.
    */
-  test('signs in, sees only their own listings, and signs out', async ({ page }) => {
-    await page.goto(`${BASE}/login`);
-    await page.getByLabel(t.login.email).fill(EMAIL);
-    await page.getByLabel(t.login.password, { exact: true }).fill(PASSWORD);
-    await page.getByRole('button', { name: t.login.submit }).click();
-
-    /*
-      Step two, since partner 2FA became mandatory — requirement 3 seen from outside the API.
-
-      That this field EXISTS is the assertion: an enrolled partner cannot get in on a password
-      alone. It appears only because the credentials were accepted, so reaching it also proves step
-      one succeeded.
-
-      A wrong code is deliberately NOT tried here. `AuthService` counts a bad TOTP as a failed
-      attempt, and five lock the account for fifteen minutes — so a browser test that mistypes on
-      purpose spends one of this fixture's five on every run, and three runs in an afternoon would
-      lock partner1 and fail the whole suite for a reason with no relationship to the change that
-      caused it. The rejection is proven in `partner-two-factor.integration.test.ts`, where it
-      costs nothing.
-    */
-    const code = page.getByLabel(t.login.codeLabel);
-
-    await expect(code).toBeVisible();
-    await code.fill(await freshCode());
-    await page.getByRole('button', { name: t.login.codeSubmit }).click();
-
-    await page.waitForURL(`${BASE}/`);
+  test('sees only their own listings, and signs out', async ({ page }) => {
+    await page.goto(`${BASE}/`);
 
     // The sidebar names the BUSINESS, not the email — handoff §7.
     await expect(page.locator('aside')).toContainText('قصر الشرق');
@@ -220,6 +181,31 @@ test.describe('the partner dashboard', () => {
 
     // No English enum reached the card.
     expect(await first.innerText()).not.toMatch(/\b(hotel|apartment|published)\b/);
+
+    /*
+      مستحقاتي — the partner's own transfers, and the rule that governs the whole screen.
+
+      Every row is a `partner_payouts` ROW. A partner with earnings and no payout sees an empty
+      list, which is the truth: SAFRA has recorded no transfer for them. The read-only note is
+      asserted because a partner must not go hunting for a button to release their own money —
+      the API has no such route, and the screen should not imply one.
+    */
+    await page.getByRole('link', { name: t.nav.payouts }).click();
+    await page.waitForURL(/\/payouts/);
+
+    await expect(page.getByText(t.payouts.readOnly)).toBeVisible();
+    await expect(page.getByText(t.payouts.note)).toBeVisible();
+
+    const firstPayout = page.locator('a[href^="/payouts/"]').first();
+
+    if ((await firstPayout.count()) > 0) {
+      await firstPayout.click();
+      await page.waitForURL(/\/payouts\/PYT-/);
+
+      // The detail answers "what is this amount FOR".
+      await expect(page.getByText(t.payouts.coveredBookings)).toBeVisible();
+      await expect(page.getByText(t.payouts.net)).toBeVisible();
+    }
 
     await page.getByRole('button', { name: t.nav.signOut }).click();
     await page.waitForURL(/\/login/);

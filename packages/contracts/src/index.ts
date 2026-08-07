@@ -5,6 +5,7 @@ export * from './error-codes.js';
 export * from './fx.js';
 export * from './pagination.js';
 export * from './payment.js';
+export * from './payout.js';
 export * from './permissions.js';
 export * from './property.js';
 export * from './scope.js';

@@ -37,6 +37,8 @@ export const TABLE_SECTIONS = [
   'messages',
   'comms',
   'audit',
+  /* Partner transfers — a registry under الدفع والفواتير rather than a 20th sidebar section. */
+  'payouts',
   /**
    * The staff SCOPE map, which is a second paged list on the same screen as the staff registry.
    *
@@ -71,6 +73,7 @@ export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   messages: '/messages',
   comms: '/comms',
   audit: '/audit',
+  payouts: '/payouts',
   staffScope: '/staff',
 };
 

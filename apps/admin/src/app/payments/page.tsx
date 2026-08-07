@@ -1,6 +1,8 @@
 import { getFinance, type FinanceItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { amount, money, shortDateTime } from '@/lib/format';
+import Link from 'next/link';
+
 import { ConsolePanel, ConsoleShell, Kpi, KpiRow } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import {
@@ -117,7 +119,21 @@ export default async function PaymentsPage({
             />
 
             <FootNote>{t.sections.payments.note}</FootNote>
-            <FootNote>{t.sections.payments.payoutsMissing}</FootNote>
+            {/*
+              Partner transfers now have a registry of their own — see `O-partner-2`. This screen
+              used to state that no such thing existed, which was true until the ledger shipped;
+              leaving that note in place would have been the more misleading of the two errors.
+            */}
+            <FootNote>
+              <Link
+                href="/payouts"
+                className="inline-flex min-h-10 items-center font-semibold text-gold underline-offset-2 hover:underline lg:min-h-0"
+              >
+                {t.sections.payments.payoutsLink}
+              </Link>
+              {' — '}
+              {t.sections.payments.payoutsNote}
+            </FootNote>
           </ConsolePanel>
         </div>
       )}

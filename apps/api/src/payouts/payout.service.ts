@@ -2,7 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { ERROR, PERMISSIONS as P } from '@safra/contracts';
+import {
+  COUNT_CAP,
+  ERROR,
+  PERMISSIONS as P,
+  type OffsetPage,
+  type PageQuery,
+  offsetPage,
+} from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
@@ -390,6 +397,193 @@ export class PayoutService {
     return rows.rows.map(toView);
   }
 
+  /**
+   * The staff registry of payouts (§9.3).
+   *
+   * Paginated with `OFFSET` and a capped count, like every other console registry — the standing
+   * "Tables and pagination" rule, including the part that matters most here: the count and the list
+   * share ONE `FROM … WHERE` fragment. A total that disagrees with the table it sits under is bad
+   * anywhere; over a list of transfers it is somebody reconciling against a figure that was never
+   * true.
+   *
+   * `PAYOUT_READ`, not `PAYOUT_EXECUTE`. Looking at what SAFRA owes and has sent is finance's daily
+   * work; moving the money is a separate decision with a separate permission.
+   */
+  async listForStaff(
+    query: PageQuery & { status?: string | undefined; q?: string | undefined },
+  ): Promise<OffsetPage<ReturnType<typeof toView>>> {
+    const conditions = [sql`p.deleted_at IS NULL`];
+
+    if (query.status) {
+      conditions.push(sql`p.status = ${query.status}::payout_status`);
+    }
+
+    if (query.q) {
+      const term = `%${query.q}%`;
+
+      conditions.push(
+        sql`(p.reference ILIKE ${query.q + '%'}
+             OR pa.display_name ILIKE ${term}
+             OR pa.legal_name ILIKE ${term}
+             OR p.paid_reference ILIKE ${term})`,
+      );
+    }
+
+    // One fragment, shared by the list and the count. See the note above.
+    const fromWhere = sql`
+      FROM partner_payouts p
+      JOIN currencies cur ON cur.id = p.currency_id
+      JOIN partners pa    ON pa.id = p.partner_id
+      WHERE ${sql.join(conditions, sql` AND `)}`;
+
+    const [rows, counted] = await Promise.all([
+      this.db.execute<PayoutRow>(sql`
+        ${PAYOUT_COLUMNS}
+        ${fromWhere}
+        ORDER BY p.created_at DESC, p.id DESC
+        LIMIT ${query.limit} OFFSET ${(query.page - 1) * query.limit}
+      `),
+      this.countOf(fromWhere),
+    ]);
+
+    return offsetPage(rows.rows.map(toView), counted, query);
+  }
+
+  /**
+   * One payout, everything a person needs to answer for it (§9.3).
+   *
+   * Four things travel together on purpose, because each is useless without the others when
+   * somebody asks "why was this partner sent this amount":
+   *
+   * - the payout itself;
+   * - the BOOKINGS it covers, which is what the amount is made of;
+   * - the AUDIT trail — who released it, who marked it paid, and when;
+   * - the LEDGER movement it discharged, which is what makes the books and this table reconcilable
+   *   in both directions rather than merely consistent-looking.
+   *
+   * The ledger entries are read through the payout's own `entry_group_id`, so a payout that claims
+   * to be paid and has no movement behind it shows an empty list rather than a plausible one. That
+   * is the reconciliation failure worth surfacing, and a check constraint already makes it
+   * impossible to create — this is what proves the constraint is still doing its job.
+   */
+  async detailForStaff(reference: string) {
+    const rows = await this.db.execute<PayoutRow & { entry_group_id: string | null }>(sql`
+      ${PAYOUT_COLUMNS}, p.entry_group_id
+      FROM partner_payouts p
+      JOIN currencies cur ON cur.id = p.currency_id
+      JOIN partners pa    ON pa.id = p.partner_id
+      WHERE p.reference = ${reference} AND p.deleted_at IS NULL
+    `);
+
+    const row = rows.rows[0];
+
+    if (!row) throw notFound(ERROR.PAYOUT_NOT_FOUND);
+
+    const items = await this.db.execute<{
+      booking_reference: string;
+      amount: string;
+      check_in: string;
+      check_out: string;
+      property: string;
+    }>(sql`
+      SELECT b.reference AS booking_reference, i.amount::text AS amount,
+             b.check_in::text, b.check_out::text,
+             coalesce(pr.name_ar, pr.name_en) AS property
+      FROM partner_payout_items i
+      JOIN bookings b    ON b.id = i.booking_id
+      JOIN properties pr ON pr.id = b.property_id
+      WHERE i.payout_id = ${row.id}
+      ORDER BY b.check_out DESC
+    `);
+
+    /*
+      The audit trail, filtered to this payout's own subject id.
+
+      `audit_log` is append-only by trigger, so this is the record of what happened rather than a
+      summary somebody maintained alongside it. Read here rather than left to the audit screen
+      because "who released this" is the first question asked about a transfer, and sending an
+      operator to a different section with a search box is how it goes unasked.
+    */
+    const trail = await this.db.execute<{
+      action: string;
+      actor_email: string | null;
+      actor_role: string | null;
+      after: unknown;
+      created_at: string;
+    }>(sql`
+      SELECT a.action, u.email AS actor_email, a.actor_role::text AS actor_role,
+             a.after, a.created_at::text
+      FROM audit_log a
+      LEFT JOIN users u ON u.id = a.actor_user_id
+      WHERE a.subject_type = 'partner_payout' AND a.subject_id = ${row.id}
+      ORDER BY a.created_at
+    `);
+
+    /* The movement the payment posted, or nothing — see the note on reconciliation above. */
+    const ledger = row.entry_group_id
+      ? await this.db.execute<{
+          account: string;
+          direction: string;
+          amount: string;
+          created_at: string;
+        }>(sql`
+          SELECT e.account::text, e.direction::text, e.amount::text, e.created_at::text
+          FROM ledger_entries e
+          WHERE e.entry_group_id = ${row.entry_group_id}
+          ORDER BY e.direction DESC
+        `)
+      : { rows: [] };
+
+    return {
+      ...toView(row),
+      /*
+        The id, on the DETAIL response only.
+
+        The action routes are keyed on it, so a screen that can only see the reference can display
+        a payout and not act on it. It is deliberately absent from the list: a registry is a read,
+        and handing every row an actionable identifier invites a client to build actions the
+        detail screen is responsible for gating.
+      */
+      id: row.id,
+      entryGroupId: row.entry_group_id,
+      bookings: items.rows.map((item) => ({
+        bookingReference: item.booking_reference,
+        amount: item.amount,
+        checkIn: item.check_in,
+        checkOut: item.check_out,
+        property: item.property,
+      })),
+      trail: trail.rows.map((entry) => ({
+        action: entry.action,
+        actorEmail: entry.actor_email,
+        actorRole: entry.actor_role,
+        after: entry.after,
+        createdAt: entry.created_at,
+      })),
+      ledger: ledger.rows.map((entry) => ({
+        account: entry.account,
+        direction: entry.direction,
+        amount: entry.amount,
+        createdAt: entry.created_at,
+      })),
+    };
+  }
+
+  /**
+   * The count for a page, over the SAME fragment the list uses.
+   *
+   * Capped at `COUNT_CAP` over a LIMIT-ed subquery so the database stops reading — an uncapped
+   * `count(*)` is unbounded work on every page view of a table that only grows, which rule 2
+   * forbids.
+   */
+  private async countOf(fromWhere: ReturnType<typeof sql>): Promise<number> {
+    const result = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (SELECT 1 ${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
+
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
   /** One payout's covered bookings, for the partner who owns it. */
   async itemsForPartner(reference: string, claims: AccessTokenClaims | undefined) {
     const partnerId = requirePartnerId(claims, P.PAYOUT_READ_OWN);
@@ -480,7 +674,7 @@ type PayoutRow = {
  * `fx_rate_to_syp` comes from the CURRENT rate rather than the payout, because a payout has no
  * rate of its own until it is paid — and the ledger needs one to post the movement in SYP.
  */
-const PAYOUT_SELECT = sql`
+const PAYOUT_COLUMNS = sql`
   SELECT p.id, p.reference, p.partner_id, p.currency_id, cur.code AS currency_code,
          -- The live rate for this currency against SYP. fx_rates is a PAIR table (base and
          -- quote), so the lookup names both; an earlier version read a currency_id column that
@@ -500,6 +694,17 @@ const PAYOUT_SELECT = sql`
          p.paid_reference, p.hold_reason,
          (SELECT count(*)::int FROM partner_payout_items i WHERE i.payout_id = p.id) AS item_count,
          pa.display_name AS partner_name
+`;
+
+/**
+ * The same projection with its `FROM` attached, for the reads that need no extra predicate.
+ *
+ * Split from the columns because a paginated read has to share ONE `FROM … WHERE` fragment between
+ * its list and its count — see `listForStaff`. Keeping both shapes here means the column list is
+ * still written once; a second copy is how a registry comes to disagree with its own detail screen.
+ */
+const PAYOUT_SELECT = sql`
+  ${PAYOUT_COLUMNS}
   FROM partner_payouts p
   JOIN currencies cur ON cur.id = p.currency_id
   JOIN partners pa    ON pa.id = p.partner_id

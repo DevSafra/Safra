@@ -1,7 +1,23 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { z } from 'zod';
 
-import { PERMISSIONS as P } from '@safra/contracts';
+import {
+  PAYOUT_STATUSES,
+  PERMISSIONS as P,
+  pageQuerySchema,
+  payoutPaidSchema,
+  payoutReasonSchema,
+  payoutReleaseSchema,
+} from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
@@ -43,22 +59,30 @@ export class PartnerPayoutController {
   }
 }
 
-const releaseSchema = z
-  .object({
-    /** The handoff's "مجدول يوم الخميس" — a date, not a timestamp. */
-    scheduledFor: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    notes: z.string().trim().max(500).optional(),
-  })
-  .strict();
+/*
+  The action schemas live in `@safra/contracts` so the console's forms validate against the same
+  definition the API enforces. They were declared here until the console grew screens that post to
+  these routes — at which point a second copy would have been a second set of rules.
+*/
+const releaseSchema = payoutReleaseSchema;
+const paidSchema = payoutPaidSchema;
+const reasonSchema = payoutReasonSchema;
 
-const paidSchema = z
-  .object({
-    /** The bank's own reference, so a partner's question can be answered against a statement. */
-    paidReference: z.string().trim().min(1).max(120),
-  })
-  .strict();
-
-const reasonSchema = z.object({ reason: z.string().trim().min(1).max(500) }).strict();
+/**
+ * The registry's filters.
+ *
+ * `.strict()` via `pageQuerySchema`, so an unknown parameter is a 400 rather than a filter that
+ * silently does nothing — a reader who mistypes `?statuss=paid` must not be shown everything while
+ * believing they narrowed it.
+ *
+ * `status` is an ENUM rather than a string reaching a cast. `${'$'}{query.status}::payout_status`
+ * with arbitrary text would be a parameterised cast and therefore not injectable, but it would
+ * still 500 on anything that is not a member; an allow-list answers 400 with a useful message.
+ */
+const payoutListQuerySchema = pageQuerySchema.extend({
+  status: z.enum(PAYOUT_STATUSES).optional(),
+  q: z.string().trim().min(1).max(80).optional(),
+});
 
 /**
  * Staff administration of payouts (§9.3, and the handoff's «صرف مستحقات الشركاء» permission row).
@@ -82,6 +106,38 @@ export class AdminPayoutController {
    * Idempotent, so a scheduler calling it every hour is safe. It is a POST rather than a GET
    * because it writes, even though it takes no body.
    */
+  /**
+   * The payout registry (§9.3).
+   *
+   * `PAYOUT_READ`, not `PAYOUT_EXECUTE`: reading what SAFRA owes and has sent is finance's daily
+   * work, and moving the money is a separate decision. Before this existed the console could act on
+   * a payout but never see one — every action route took an id an operator had no way to obtain
+   * except by querying the database.
+   */
+  @Get()
+  @RequirePermissions(P.PAYOUT_READ)
+  @AuditExempt('Reading the payout registry; changes nothing.')
+  async list(
+    @Query(new ZodValidationPipe(payoutListQuerySchema))
+    query: z.infer<typeof payoutListQuerySchema>,
+  ) {
+    return this.payouts.listForStaff(query);
+  }
+
+  /**
+   * One payout: what it covers, who decided it, and the ledger movement it discharged.
+   *
+   * Keyed on the human REFERENCE rather than the id, so the URL an operator shares is the one
+   * printed on the row. The action routes below still take the id, because they are posted by the
+   * screen this returns rather than typed by anybody.
+   */
+  @Get(':reference')
+  @RequirePermissions(P.PAYOUT_READ)
+  @AuditExempt('Reading one payout; changes nothing.')
+  async detail(@Param('reference') reference: string) {
+    return this.payouts.detailForStaff(reference);
+  }
+
   @Post('accrue')
   @RequirePermissions(P.PAYOUT_EXECUTE)
   @AuditExempt(

@@ -544,45 +544,56 @@ of the property aggregate on write.
 
 **Owner:** engineering. It is the largest remaining piece of the partner portal.
 
-### O-partner-2 — The payout ledger exists; nothing reads it yet
+### O-partner-2 — The payout ledger, read and operated
 
-**Decided 2026-08-06 (Bashar): SAFRA operates a payout ledger.** Option 1 below was chosen over the
-"say so on the dashboard" fallback, explicitly rejecting the temporary dashboard-only option. The
-backend shipped in `a84a67d`.
+**Decided 2026-08-06 (Bashar): SAFRA operates a payout ledger.** The backend shipped in `a84a67d`;
+the screens on both sides shipped 2026-08-07.
 
-**What is DONE.** `partner_payouts` and `partner_payout_items`; a `payoutStatus` lifecycle
-(`accruing` → `pending_release` → `scheduled` → `paid`, with `on_hold` and `cancelled`);
-`PayoutService` with `accrue` / `close` / `release` / `markPaid` / `hold` / `liftHold` / `cancel`;
-a partner read-only controller behind `PAYOUT_READ_OWN` and a staff controller behind
-`PAYOUT_EXECUTE`; nine error codes in ar/en/de; eight integration tests. `markPaid` is the only
-method that touches the ledger — it posts DEBIT `partner_payable` / CREDIT `partner_payout` and
-stores the `entry_group_id`, which is what makes the books and this table reconcilable in BOTH
-directions. Eight database-level guarantees in `post/0003_payout_constraints.sql`, each probed live:
-the `net = gross - fine` identity, non-negative amounts, an ordered period, evidence matching state
-(paid ⇔ `paid_at`, scheduled ⇒ a date, hold ⇒ a reason, paid ⇔ `entry_group_id`), and triggers
-making a **paid** payout and its items immutable.
+**What is DONE.** `partner_payouts` and `partner_payout_items`; the `accruing` → `pending_release`
+→ `scheduled` → `paid` lifecycle with `on_hold` and `cancelled`; `PayoutService` covering accrue /
+close / release / markPaid / hold / liftHold / cancel; eight database-level guarantees each probed
+live; nine error codes in ar/en/de. `markPaid` is the only method that touches the ledger — it
+posts DEBIT `partner_payable` / CREDIT `partner_payout` and stores the `entry_group_id`, which is
+what makes the books and this table reconcilable in BOTH directions.
 
-Two rules worth keeping in mind before anything is built on top:
+**And now the reads.** `GET /admin/payouts` is a paginated registry behind `PAYOUT_READ` — the
+console could previously ACT on a payout but never see one, so every action route took an id an
+operator had no way to obtain except by querying the database. `GET /admin/payouts/:reference`
+returns the payout, the bookings it covers, the audit trail and the ledger movement together,
+because "why was this partner sent this amount" is not answerable from any one of them.
 
-- **The dispute freeze is a DERIVED query, never a flag.** `accrue` excludes bookings with an `open`
-  or `investigating` dispute by joining, and `release` re-checks at release time. A boolean column
-  would be a second source of truth for "is this money frozen" and the two would disagree.
-- **A booking is paid out at most once**, enforced by a unique index on
-  `partner_payout_items.booking_id` rather than by service logic.
+**The screens.**
 
-**What is NOT done, and is the remaining work:**
+- **Console** — `/payouts` registry (status filter, search, `TablePagination`, reached from الدفع
+  والفواتير rather than a twentieth sidebar section) and `/payouts/[reference]` with the four
+  sections and the transition controls. The action route handler validates each action against ITS
+  own schema and takes the action from an ALLOW-LIST, so a crafted URL cannot reach an arbitrary
+  route under `/admin/payouts/:id/…`.
+- **Portal** — `/payouts` and `/payouts/[reference]`, read-only and saying so. A partner cannot
+  release their own transfer: `PAYOUT_EXECUTE` is a staff permission and the partner controller
+  exposes no write at all.
 
-1. **The partner-facing screen.** A partner cannot see their own payouts; the endpoint answers, but
-   لوحة الشريك has no page for it.
-2. **The staff administration screens.** Accrual, release, scheduling, hold and payment are API-only
-   — an operator would need `curl` to release a transfer, which is not an operable finance feature.
-3. **The dashboard line.** §7.1's _"تحويل مستحقات 1,240$ مجدول يوم الخميس"_ can now be rendered from
-   a real `scheduled` payout. It must read a payout row and stay ABSENT when there is none — the
-   original prohibition on summing `partner_payable_amount` into a sentence about a transfer stands.
-4. **Accrual scheduling.** `accrue` is invoked by hand. It needs the same advisory-lock cron
-   treatment as `RankingScheduler`, or it will double-run across replicas.
+**Two rules held throughout.** The dashboard line reads a ROW or renders nothing — proven by a test
+that gives a partner a completed booking with money owed and asserts the line is still absent. And
+the payout statuses joined `statusTone` with six distinct tones and six distinct Arabic labels,
+both enforced by the existing per-vocabulary tests, so a status is one colour and one word here as
+everywhere else.
 
-**Owner:** engineering.
+**Verified end to end against the running API**: an accrual over real bookings, then close →
+release → paid, producing a balanced movement (credit `partner_payout` 558.00, debit
+`partner_payable` 558.00), a three-entry audit trail naming the actor, and three covered bookings.
+
+**What remains:**
+
+1. **Accrual is invoked by hand.** It needs the advisory-lock cron treatment `RankingScheduler`
+   already has, or it will double-run across replicas.
+2. **No CSV export**, unlike the other finance registries.
+3. **Fines are never attached.** `fine_amount` is on the table and every payout so far carries
+   zero: `partner_violations` records a fine and nothing deducts it from the payout that covers the
+   offending booking. Until that is wired, a partner with a violation is paid as though they had
+   none, and the alerts panel says a fine «خُصمت من المستحقات» that in fact was not.
+
+**Owner:** engineering. Item 3 is the one with money attached.
 
 ### O-partner-3 — The dashboard is built; the calendar shows one unit
 

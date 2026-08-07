@@ -51,7 +51,7 @@ export default defineConfig({
      * worker after a failing test and re-runs file hooks, so a hook-based sign-in gets
      * throttled on the retry and turns one real failure into a whole-suite cascade.
      */
-    { name: 'setup', testMatch: /.*\.setup\.ts/ },
+    { name: 'setup', testMatch: /auth\.setup\.ts/ },
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
@@ -73,10 +73,30 @@ export default defineConfig({
      * `dependencies` is what expresses that, rather than relying on filenames sorting the way we
      * happen to want today.
      */
+    /**
+     * The partner sign-in, captured after everything else has finished signing in.
+     *
+     * Its own project rather than part of `setup` because of a hard budget: `POST /auth/login`
+     * allows ten calls a minute per IP, and this suite makes THIRTEEN — two for the staff session,
+     * eight in `staff-login.spec.ts` which tests the form itself, and three on the partner side
+     * since 2FA made that sign-in two steps. Thirteen in a seventy-second run does not fit however
+     * they are ordered, so the partner ones are moved out of the crowded window rather than
+     * squeezed alongside it.
+     *
+     * See the wait inside `partner.setup.ts` for the part that makes this deterministic. Raising
+     * the limiter to make a test suite pass was considered and rejected: it is a live control
+     * against credential stuffing, and the suite is the thing that should bend.
+     */
+    {
+      name: 'partner-setup',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['chromium'],
+      testMatch: /partner\.setup\.ts/,
+    },
     {
       name: 'partner',
       use: { ...devices['Desktop Chrome'] },
-      dependencies: ['chromium'],
+      dependencies: ['partner-setup'],
       testMatch: /partner\.spec\.ts/,
     },
   ],

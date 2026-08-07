@@ -38,3 +38,8 @@ export function propertyType(code: string | null): string {
 export function violationKind(kind: string): string {
   return t.violationKind[kind] ?? kind.replace(/_/g, ' ');
 }
+
+/** A payout state in Arabic, falling back to the raw value rather than blank. */
+export function payoutStatus(status: string): string {
+  return t.payoutStatus[status] ?? status.replace(/_/g, ' ');
+}

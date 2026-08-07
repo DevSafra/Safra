@@ -1116,3 +1116,85 @@ const preferencesSchema = z.object({
 export async function getPreferences() {
   return staffFetch('/admin/me/preferences', preferencesSchema);
 }
+
+/**
+ * A payout row as the staff registry returns it (§9.3).
+ *
+ * Amounts are strings, as everywhere else in this client: they are `numeric` in PostgreSQL and
+ * parsing them into a JS number here would round money for display purposes, which is the one
+ * place rounding must not happen silently.
+ */
+const payoutSchema = z.object({
+  reference: z.string(),
+  partnerName: z.string().nullable(),
+  currencyCode: z.string(),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  grossAmount: z.string(),
+  fineAmount: z.string(),
+  netAmount: z.string(),
+  status: z.string(),
+  scheduledFor: z.string().nullable(),
+  releasedAt: z.string().nullable(),
+  paidAt: z.string().nullable(),
+  paidReference: z.string().nullable(),
+  holdReason: z.string().nullable(),
+  bookingCount: z.number(),
+});
+
+export type PayoutItem = z.infer<typeof payoutSchema>;
+
+export async function getPayoutRegistry(
+  params: ListParams & { status?: string | undefined },
+) {
+  /* `listQuery` already carries `status` — it is one of the filters every registry shares. */
+  return staffFetch(`/admin/payouts${listQuery(params)}`, offsetPage(payoutSchema));
+}
+
+/**
+ * One payout with everything needed to answer for it.
+ *
+ * Four collections travel together because each is useless alone when somebody asks why a partner
+ * was sent an amount: what it covers, who decided it, and the ledger movement it discharged.
+ * `ledger` being empty on a paid payout is a reconciliation failure the screen must be able to
+ * show — so it is parsed as a possibly-empty array rather than assumed present.
+ */
+const payoutDetailSchema = payoutSchema.extend({
+  id: z.string(),
+  entryGroupId: z.string().nullable(),
+  bookings: z.array(
+    z.object({
+      bookingReference: z.string(),
+      amount: z.string(),
+      checkIn: z.string(),
+      checkOut: z.string(),
+      property: z.string().nullable(),
+    }),
+  ),
+  trail: z.array(
+    z.object({
+      action: z.string(),
+      actorEmail: z.string().nullable(),
+      actorRole: z.string().nullable(),
+      after: z.unknown(),
+      createdAt: z.string(),
+    }),
+  ),
+  ledger: z.array(
+    z.object({
+      account: z.string(),
+      direction: z.string(),
+      amount: z.string(),
+      createdAt: z.string(),
+    }),
+  ),
+});
+
+export type PayoutDetail = z.infer<typeof payoutDetailSchema>;
+
+export async function getPayout(reference: string) {
+  return staffFetch(
+    `/admin/payouts/${encodeURIComponent(reference)}`,
+    payoutDetailSchema,
+  );
+}
