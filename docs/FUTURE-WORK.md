@@ -544,29 +544,45 @@ of the property aggregate on write.
 
 **Owner:** engineering. It is the largest remaining piece of the partner portal.
 
-### O-partner-2 — The payout line has no payout model, and must not invent one
+### O-partner-2 — The payout ledger exists; nothing reads it yet
 
-**What:** §7.1 draws a payout line on the partner dashboard —
-_"تحويل مستحقات 1,240$ مجدول يوم الخميس"_. There is no payouts table. `bookings.partner_payable_amount`
-exists, but it is an OBLIGATION per booking, not a transfer that happened or is scheduled.
+**Decided 2026-08-06 (Bashar): SAFRA operates a payout ledger.** Option 1 below was chosen over the
+"say so on the dashboard" fallback, explicitly rejecting the temporary dashboard-only option. The
+backend shipped in `a84a67d`.
 
-**Why it is not simply a sum.** The console's الدفع screen already faced this and refused: it
-renders `payoutsMissing` — an explicit statement that partner transfers are absent — rather than
-deriving a figure. Summing payables on the partner dashboard would present the same obligation as a
-scheduled transfer, to the person it is owed to, which is worse than saying nothing. Two surfaces
-must not disagree about whether SAFRA has a payout ledger.
+**What is DONE.** `partner_payouts` and `partner_payout_items`; a `payoutStatus` lifecycle
+(`accruing` → `pending_release` → `scheduled` → `paid`, with `on_hold` and `cancelled`);
+`PayoutService` with `accrue` / `close` / `release` / `markPaid` / `hold` / `liftHold` / `cancel`;
+a partner read-only controller behind `PAYOUT_READ_OWN` and a staff controller behind
+`PAYOUT_EXECUTE`; nine error codes in ar/en/de; eight integration tests. `markPaid` is the only
+method that touches the ledger — it posts DEBIT `partner_payable` / CREDIT `partner_payout` and
+stores the `entry_group_id`, which is what makes the books and this table reconcilable in BOTH
+directions. Eight database-level guarantees in `post/0003_payout_constraints.sql`, each probed live:
+the `net = gross - fine` identity, non-negative amounts, an ordered period, evidence matching state
+(paid ⇔ `paid_at`, scheduled ⇒ a date, hold ⇒ a reason, paid ⇔ `entry_group_id`), and triggers
+making a **paid** payout and its items immutable.
 
-**The two honest options, in order:**
+Two rules worth keeping in mind before anything is built on top:
 
-1. **Build the model.** A `partner_payouts` table (period, amount, currency, status, scheduled
-   date, paid date, the bookings it covers), a job that accrues it, and a staff screen to release
-   one. This is a finance feature with an audit trail, not a widget.
-2. **Say so on the dashboard.** An explicit "payouts are not yet scheduled through SAFRA" line, the
-   same shape as the console's, until (1) exists.
+- **The dispute freeze is a DERIVED query, never a flag.** `accrue` excludes bookings with an `open`
+  or `investigating` dispute by joining, and `release` re-checks at release time. A boolean column
+  would be a second source of truth for "is this money frozen" and the two would disagree.
+- **A booking is paid out at most once**, enforced by a unique index on
+  `partner_payout_items.booking_id` rather than by service logic.
 
-Until (1) is decided, (2) is what ships — chosen deliberately, not by omission.
+**What is NOT done, and is the remaining work:**
 
-**Owner:** Bashar (product decision on whether SAFRA operates a payout ledger), then engineering.
+1. **The partner-facing screen.** A partner cannot see their own payouts; the endpoint answers, but
+   لوحة الشريك has no page for it.
+2. **The staff administration screens.** Accrual, release, scheduling, hold and payment are API-only
+   — an operator would need `curl` to release a transfer, which is not an operable finance feature.
+3. **The dashboard line.** §7.1's _"تحويل مستحقات 1,240$ مجدول يوم الخميس"_ can now be rendered from
+   a real `scheduled` payout. It must read a payout row and stay ABSENT when there is none — the
+   original prohibition on summing `partner_payable_amount` into a sentence about a transfer stands.
+4. **Accrual scheduling.** `accrue` is invoked by hand. It needs the same advisory-lock cron
+   treatment as `RankingScheduler`, or it will double-run across replicas.
+
+**Owner:** engineering.
 
 ### O-partner-3 — No per-unit calendar read for the dashboard
 
@@ -579,6 +595,31 @@ their units in a date range, in one query.
 one month, which is the N+1 rule 2 forbids on a screen loaded daily.
 
 **Owner:** engineering, alongside the dashboard.
+
+### O-partner-4 — Partners have no two-factor authentication
+
+**What:** Staff cannot reach the console without TOTP — `StaffTwoFactorGuard` enforces it
+server-side, and enrolling is not optional (see the 2026-08-02 entry in §11 for why that guard
+exists). لوحة الشريك has no equivalent: `apps/partner/middleware.ts` gates on the partner role and
+a valid session, and that is all.
+
+**Why it matters:** a partner account controls listings, prices, availability and — now that
+O-partner-2 has shipped — visibility of money owed to a business. It is a lower-value target than a
+super admin and a considerably higher-value one than a customer.
+
+**What it needs**, and each is its own decision rather than a step:
+
+1. A design that says whether partner 2FA is **mandatory** (as staff 2FA is) or opt-in, and what
+   happens to the partner accounts that already exist.
+2. API support. The staff enrolment and verification paths already exist and are the model to
+   follow; the question is how much is shared versus duplicated for a different audience.
+3. An enrolment flow inside the portal, and a recovery/replacement flow — the part that decides
+   whether a locked-out partner phones support or is stuck.
+4. Server-side enforcement, so it cannot be skipped by calling the API directly. A UI-only check
+   would repeat the exact defect the staff guard was written to close.
+5. Tests and documentation.
+
+**Owner:** Bashar (mandatory or opt-in, and the recovery policy), then engineering.
 
 ### O-page-1 — What numbered pages cost, and when it stops being affordable
 
