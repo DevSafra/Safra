@@ -39,7 +39,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
      * them out of an account they have never used.
      */
     if (password !== confirm) {
-      setError('The two passwords do not match.');
+      setError(t.sections.panels.invitationMismatch);
       return;
     }
 
@@ -55,14 +55,14 @@ export function AcceptInvitationForm({ token }: { token: string }) {
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? 'Could not set your password.');
+        setError(messageOf(body) ?? t.sections.panels.invitationFailed);
         setSubmitting(false);
         return;
       }
 
       setDone(true);
     } catch {
-      setError('Could not reach the server. Please try again.');
+      setError(t.sections.panels.unreachable);
       setSubmitting(false);
     }
   }
@@ -120,7 +120,9 @@ export function AcceptInvitationForm({ token }: { token: string }) {
         disabled={submitting}
         className="cursor-pointer rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {submitting ? 'Setting your password…' : 'Set password'}
+        {submitting
+          ? t.sections.panels.invitationSubmitting
+          : t.sections.panels.invitationSubmit}
       </button>
     </form>
   );

@@ -60,7 +60,7 @@ export function ScreeningPanel({
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? 'Could not run the screening.');
+        setError(messageOf(body) ?? t.sections.panels.screeningFailed);
         setBusy(false);
         return;
       }
@@ -69,7 +69,7 @@ export function ScreeningPanel({
       router.refresh();
       setBusy(false);
     } catch {
-      setError('Could not reach the server.');
+      setError(t.sections.panels.unreachable);
       setBusy(false);
     }
   }
@@ -168,7 +168,11 @@ export function ScreeningPanel({
           disabled={busy}
           className="cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {busy ? 'Searching…' : screenedAt ? 'Screen again' : 'Run screening'}
+          {busy
+            ? t.sections.panels.screeningSearching
+            : screenedAt
+              ? t.sections.panels.screeningAgain
+              : t.sections.panels.screeningRun}
         </button>
 
         {/*
@@ -183,7 +187,9 @@ export function ScreeningPanel({
               disabled={busy}
               className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-gold/50 hover:text-gold disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {previous.matched ? 'Record as not a match' : 'Flag as a match anyway'}
+              {previous.matched
+                ? t.sections.panels.screeningMarkNoMatch
+                : t.sections.panels.screeningMarkMatch}
             </button>
           </>
         ) : null}
@@ -193,8 +199,8 @@ export function ScreeningPanel({
         <div className="mt-3 rounded border border-gold/30 bg-gold/5 p-3">
           <p className="text-xs text-gold">
             {override
-              ? 'This will record a match against the automated result, blocking approval.'
-              : 'This will clear the match against the automated result. Only do this if you have confirmed a different party.'}
+              ? t.sections.panels.screeningMatchWarning
+              : t.sections.panels.screeningClearWarning}
           </p>
           <div className="mt-2 flex gap-2">
             <button

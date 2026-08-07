@@ -41,13 +41,13 @@ export function TwoFactorEnrolment() {
         if (cancelled) return;
 
         if (!response.ok || !isSetup(body)) {
-          setError('Could not start enrolment. Reload to try again.');
+          setError(t.sections.panels.twoFactorStartFailed);
           return;
         }
 
         setSetup(body);
       } catch {
-        if (!cancelled) setError('Could not reach the server.');
+        if (!cancelled) setError(t.sections.panels.unreachable);
       }
     })();
 
@@ -80,8 +80,8 @@ export function TwoFactorEnrolment() {
       if (!response.ok) {
         setError(
           response.status === 400 || response.status === 401
-            ? 'That code was not accepted. Check your authenticator and try again.'
-            : 'Something went wrong. Please try again.',
+            ? t.sections.panels.twoFactorCodeRejected
+            : t.sections.panels.twoFactorFailed,
         );
         setBusy(false);
         return;
@@ -90,7 +90,7 @@ export function TwoFactorEnrolment() {
       setRecoveryCodes(readRecoveryCodes(body));
       setBusy(false);
     } catch {
-      setError('Could not reach the server.');
+      setError(t.sections.panels.unreachable);
       setBusy(false);
     }
   }
@@ -157,7 +157,7 @@ export function TwoFactorEnrolment() {
       <div>
         <p className="text-xs text-faint">{t.sections.twoFactor.setupKey}</p>
         <p className="mt-1 break-all rounded-lg border border-line bg-field px-3 py-2.5 font-mono text-sm text-text">
-          {setup?.secret ?? 'Loading…'}
+          {setup?.secret ?? t.sections.panels.twoFactorLoading}
         </p>
       </div>
 
@@ -180,7 +180,7 @@ export function TwoFactorEnrolment() {
           disabled={busy || !setup}
           className="cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {busy ? 'Checking…' : 'Turn on two-factor'}
+          {busy ? t.sections.panels.twoFactorChecking : t.sections.panels.twoFactorSubmit}
         </button>
       </form>
     </div>

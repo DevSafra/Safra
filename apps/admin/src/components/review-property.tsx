@@ -51,7 +51,7 @@ export function ReviewProperty({
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? 'Could not record that decision.');
+        setError(messageOf(body) ?? t.sections.reviewProperty.failed);
         setBusy(false);
         return;
       }
@@ -59,7 +59,7 @@ export function ReviewProperty({
       router.refresh();
       setBusy(false);
     } catch {
-      setError('Could not reach the server.');
+      setError(t.sections.panels.unreachable);
       setBusy(false);
     }
   }
@@ -69,8 +69,8 @@ export function ReviewProperty({
       {!canApprove ? (
         <p className="mb-3 rounded border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-gold">
           {!partnerVerified
-            ? 'The partner must be verified before this listing can be published.'
-            : 'This listing has no units, so nothing could be booked.'}
+            ? t.sections.reviewProperty.partnerNotVerified
+            : t.sections.reviewProperty.noUnits}
         </p>
       ) : null}
 
@@ -109,8 +109,8 @@ export function ReviewProperty({
         >
           <label htmlFor="property-notes" className="text-xs text-muted">
             {mode === 'approve'
-              ? 'Notes (optional). Publishing makes this listing searchable immediately.'
-              : 'What must the partner change? Required, and they see it.'}
+              ? t.sections.reviewProperty.notesOptional
+              : t.sections.reviewProperty.rejectionReason}
           </label>
           <textarea
             id="property-notes"
@@ -128,10 +128,10 @@ export function ReviewProperty({
               }`}
             >
               {busy
-                ? 'Saving…'
+                ? t.sections.panels.saving
                 : mode === 'approve'
-                  ? 'Publish now'
-                  : 'Confirm rejection'}
+                  ? t.sections.reviewProperty.publishNow
+                  : t.sections.reviewProperty.confirmRejection}
             </button>
             <button
               type="button"

@@ -46,7 +46,7 @@ export function VerifyPartner({
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? 'Could not record that decision.');
+        setError(messageOf(body) ?? t.sections.panels.failed);
         setBusy(false);
         return;
       }
@@ -54,7 +54,7 @@ export function VerifyPartner({
       router.refresh();
       setBusy(false);
     } catch {
-      setError('Could not reach the server.');
+      setError(t.sections.panels.unreachable);
       setBusy(false);
     }
   }
@@ -79,7 +79,7 @@ export function VerifyPartner({
             type="button"
             disabled={!screened}
             onClick={() => setMode('approve')}
-            title={screened ? undefined : 'Sanctions screening is required first.'}
+            title={screened ? undefined : t.sections.verifyPartner.screeningRequiredTitle}
             className="cursor-pointer rounded-lg bg-ok px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40"
           >
             {t.sections.verifyPartner.approve}
@@ -103,8 +103,8 @@ export function VerifyPartner({
         >
           <label htmlFor="decision-notes" className="text-xs text-muted">
             {mode === 'approve'
-              ? 'Notes (optional). Approving lets this partner’s submitted listings be published.'
-              : 'Why is this being rejected? Required, and the partner sees it.'}
+              ? t.sections.verifyPartner.notesOptional
+              : t.sections.verifyPartner.rejectionReason}
           </label>
           <textarea
             id="decision-notes"
@@ -122,10 +122,10 @@ export function VerifyPartner({
               }`}
             >
               {busy
-                ? 'Saving…'
+                ? t.sections.panels.saving
                 : mode === 'approve'
-                  ? 'Confirm approval'
-                  : 'Confirm rejection'}
+                  ? t.sections.verifyPartner.confirmApproval
+                  : t.sections.verifyPartner.confirmRejection}
             </button>
             <button
               type="button"

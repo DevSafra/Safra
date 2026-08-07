@@ -37,7 +37,7 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? 'Could not record that decision.');
+        setError(messageOf(body) ?? t.sections.panels.failed);
         setBusy(false);
         return;
       }
@@ -47,7 +47,7 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
       router.refresh();
       setBusy(false);
     } catch {
-      setError('Could not reach the server.');
+      setError(t.sections.panels.unreachable);
       setBusy(false);
     }
   }
@@ -127,7 +127,7 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
               disabled={busy}
               className="cursor-pointer rounded-lg bg-bad px-3 py-1.5 text-xs font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {busy ? 'Saving…' : 'Reject document'}
+              {busy ? t.sections.panels.saving : t.sections.panels.documentReject}
             </button>
             <button
               type="button"

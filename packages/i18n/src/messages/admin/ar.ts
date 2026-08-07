@@ -903,6 +903,12 @@ export const ar = {
         'سجّل نتيجة فحص العقوبات قبل الموافقة. التحقق من طرف لم يُفحص مخاطرة قانونية على الكيان الألماني، لا إجراء شكلي.',
       approve: 'الموافقة على الشريك',
       reject: 'رفض الطلب',
+      /* Moved out of `verify-partner.tsx` (O-i18n-4). */
+      confirmApproval: 'تأكيد الموافقة',
+      confirmRejection: 'تأكيد الرفض',
+      notesOptional: 'ملاحظات (اختياري). الموافقة تتيح نشر عقارات هذا الشريك المُقدَّمة.',
+      rejectionReason: 'لماذا يُرفض الطلب؟ مطلوب، ويطّلع عليه الشريك.',
+      screeningRequiredTitle: 'فحص العقوبات مطلوب أولاً.',
     },
 
     /**
@@ -959,6 +965,59 @@ export const ar = {
     reviewProperty: {
       approveAndPublish: 'الموافقة والنشر',
       reject: 'رفض العقار',
+      /* The decision panel's own copy, moved out of the component (O-i18n-4). */
+      publishNow: 'النشر الآن',
+      confirmRejection: 'تأكيد الرفض',
+      saving: 'جارٍ الحفظ…',
+      notesOptional: 'ملاحظات (اختياري). النشر يجعل العقار قابلاً للبحث فوراً.',
+      rejectionReason: 'ما الذي يجب على الشريك تغييره؟ مطلوب، ويطّلع عليه.',
+      partnerNotVerified: 'يجب التحقق من الشريك قبل نشر هذا العقار.',
+      noUnits: 'لا وحدات في هذا العقار، فلا شيء يمكن حجزه.',
+      failed: 'تعذّر تسجيل القرار.',
+    },
+
+    /**
+     * Copy that used to live inside the console's client components (O-i18n-4).
+     *
+     * Roughly forty strings across ten files — button labels, client-side error messages and a few
+     * value lookups — none of which the `safra/no-hardcoded-text` rule can see, because each is a
+     * string literal in an EXPRESSION rather than JSX text: a ternary inside `{…}`, a
+     * `Record<string, string>` lookup, a `setError(…)` argument. The rule's own header explains why
+     * widening it would mean flagging every literal in the repo.
+     *
+     * They were being found one screenshot at a time. Grouped here rather than scattered per
+     * component so the next language is one file, which is the whole point of the copy rule.
+     */
+    panels: {
+      /* Shared by every client panel — one wording for "the request never arrived". */
+      unreachable: 'تعذّر الوصول إلى الخادم.',
+      saving: 'جارٍ الحفظ…',
+      failed: 'تعذّر تسجيل القرار.',
+      notSet: 'غير محدَّد',
+
+      screeningRun: 'تشغيل الفحص',
+      screeningAgain: 'إعادة الفحص',
+      screeningSearching: 'جارٍ البحث…',
+      screeningFailed: 'تعذّر تشغيل الفحص.',
+      screeningMarkNoMatch: 'تسجيل عدم التطابق',
+      screeningMarkMatch: 'تسجيل تطابق رغم النتيجة',
+      screeningMatchWarning: 'سيُسجَّل تطابق يخالف النتيجة الآلية، ويمنع ذلك الموافقة.',
+      screeningClearWarning:
+        'سيُلغى التطابق المسجَّل خلافاً للنتيجة الآلية. لا تفعل هذا إلا بعد التأكد من أن الطرف مختلف.',
+
+      documentReject: 'رفض الوثيقة',
+
+      twoFactorStartFailed: 'تعذّر بدء التفعيل. أعد تحميل الصفحة للمحاولة مرة أخرى.',
+      twoFactorCodeRejected: 'الرمز غير مقبول. تحقّق من تطبيق المُصادِق وحاول مرة أخرى.',
+      twoFactorFailed: 'حدث خطأ. حاول مرة أخرى.',
+      twoFactorLoading: 'جارٍ التحميل…',
+      twoFactorChecking: 'جارٍ التحقق…',
+      twoFactorSubmit: 'تفعيل المصادقة الثنائية',
+
+      invitationMismatch: 'كلمتا المرور غير متطابقتين.',
+      invitationFailed: 'تعذّر ضبط كلمة المرور.',
+      invitationSubmitting: 'جارٍ ضبط كلمة المرور…',
+      invitationSubmit: 'ضبط كلمة المرور',
     },
 
     invitation: {

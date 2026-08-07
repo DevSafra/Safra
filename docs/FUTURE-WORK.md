@@ -414,42 +414,27 @@ plurals once, there.
 
 **Owner:** engineering, alongside `O-i18n-1`. Not blocking.
 
-### O-i18n-4 — About 40 English strings are still written into the console's components
+### O-i18n-4 — Closed: the console's English copy is in the catalogue, and a test keeps it there
 
-**What:** A sweep of `apps/admin/src` for English prose in code — comments stripped, HTTP header
-names excluded — found roughly 40 user-facing strings that never reach a catalogue, across ten
-components. Found while fixing the four Bashar reported on the booking detail (2026-08-05), which
-is the point: they are being discovered one screenshot at a time.
+**Closed 2026-08-07.** All ~40 strings moved to `packages/i18n/src/messages/admin/ar.ts` across
+seven files — `screening-panel`, `review-property`, `verify-partner`, `document-review`,
+`two-factor-enrolment`, `accept-invitation-form` and the property detail. Button labels,
+client-side error messages and the «غير محدَّد» value label.
 
-They fall into three groups:
+**And the sweep is now a test.** `apps/admin/src/lib/no-english-copy.test.ts` fails the build on
+sentence-shaped English in any `.tsx` under `apps/admin/src`, comments excluded. It was verified to
+fail — naming the file and the string — when one is reintroduced.
 
-| Group                     | Examples                                                                                            | Where                                                                                               |
-| ------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Button labels             | `Run screening`, `Publish now`, `Confirm rejection`, `Reject document`, `Set password`              | `screening-panel`, `review-property`, `verify-partner`, `document-review`, `accept-invitation-form` |
-| Client-side error strings | `Could not reach the server.`, `Could not record that decision.`, `The two passwords do not match.` | the same five, plus `two-factor-enrolment`                                                          |
-| Value labels              | `Identity document`, `Commercial register`, `Proof of ownership`, `Not set`                         | `document-review`'s `kindLabel`, the property detail's coordinates row                              |
+**Why a test rather than widening the lint rule.** `safra/no-hardcoded-text` visits JSX text,
+user-facing attributes and exception messages. Every string this catches was a literal in an
+EXPRESSION instead: a ternary inside `{…}`, a `Record<string, string>` lookup, a `setError(…)`
+argument. The rule's own header explains why widening it to every literal would mean flagging
+imports, class names and HTTP headers. A test can afford a heuristic and an explicit allow-list;
+a lint rule that cries wolf gets switched off.
 
-**Why the lint rule did not catch any of them.** `no-hardcoded-text` visits `JSXText`,
-user-facing `JSXAttribute`s and exception messages. Every one of these is a string literal in an
-expression — a ternary inside `{…}`, a `Record<string, string>` lookup table, a `setError(…)`
-argument. The rule's own header says it cannot see those and explains why widening it would mean
-flagging every literal in the repo. That reasoning still holds; the gap is real either way.
-
-**What would close it, in order of value:**
-
-1. Move the ~40 strings into `packages/i18n/src/messages/admin/ar.ts`. Mechanical, and the only
-   part that changes what a person sees.
-2. Add the sweep as a CI check rather than a `docs/i18n.md` suggestion — the inverse of the
-   documented Arabic-literal grep, scoped to `apps/admin/src` and comment-aware. Without it, group
-   two comes straight back: an error string is added at the moment somebody is thinking about the
-   failure, not about translation.
-
-**Why it is not blocking:** the buttons sit on partner-verification and document-review screens
-that operations staff use daily and have learned, and the error strings appear only when a request
-fails. It is embarrassing rather than harmful — but it is a standing rule being broken in about
-forty places, and the register is where that belongs until it is fixed.
-
-**Owner:** engineering. Small and independent; can be done in one pass whenever there is room.
+**The remaining exception**, and it is small: the allow-list holds four entries — `Content-Type`,
+`application/json`, `Not signed in.` (a proxy's own 401 body, never rendered) and `Desktop Chrome`.
+Each is exempt for a stated reason.
 
 ### O-data-1 — The append-only guarantee does not survive TRUNCATE
 

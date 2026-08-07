@@ -121,7 +121,7 @@ export default async function PropertyPage({
             value={
               property.latitude && property.longitude
                 ? `${property.latitude}, ${property.longitude}`
-                : 'Not set'
+                : t.sections.panels.notSet
             }
           />
         </dl>
