@@ -51,6 +51,15 @@ const COMMISSION_RATE = 0.07;
 /** The default SYP rate the handoff names. Snapshotted onto every booking, as production does. */
 const FX_RATE_TO_SYP = 12500;
 
+/**
+ * The §7.1 two-hour window a partner has to answer a request.
+ *
+ * A constant here rather than a settings read, because this script writes fixtures rather than
+ * pricing anything — but the VALUE has to match `settings`, or the dashboard's countdown and the
+ * sweep that levies the fine would disagree about when the clock runs out.
+ */
+const CONFIRMATION_WINDOW_MINUTES = 120;
+
 const PASSWORD = process.env['TESTBED_PASSWORD'] ?? 'a-testbed-password-1';
 
 /**
@@ -749,6 +758,22 @@ async function build(db: Seeder): Promise<void> {
       totalSyp: money(total * FX_RATE_TO_SYP),
       cancellationPolicySnapshot: { code: policy.code, tiers: [] },
       ...(paid ? { paidAt: new Date() } : {}),
+      /*
+        The SLA clock, set the way `BookingCreationService` sets it.
+
+        A `pending_confirmation` booking with no `confirmation_deadline_at` is a booking the SLA
+        sweep can never expire and never fine — so a testbed full of them could not exercise the
+        two-hour rule at all, and the partner dashboard's countdown had nothing to count. Ahead of
+        now rather than behind it, so the queue is a live queue rather than a pile the next sweep
+        deletes.
+      */
+      ...(spec.status === 'pending_confirmation'
+        ? {
+            confirmationDeadlineAt: new Date(
+              Date.now() + CONFIRMATION_WINDOW_MINUTES * 60_000,
+            ),
+          }
+        : {}),
       ...(spec.status === 'confirmed' || spec.status === 'completed'
         ? { confirmedAt: new Date() }
         : {}),
@@ -928,6 +953,14 @@ async function bulk(
         totalSyp: money(total * FX_RATE_TO_SYP),
         cancellationPolicySnapshot: { code: ctx.policy.code, tiers: [] },
         ...(paid ? { paidAt: new Date(), confirmedAt: new Date() } : {}),
+        /* The SLA clock — see the note on the hand-built bookings above. */
+        ...(status === 'pending_confirmation'
+          ? {
+              confirmationDeadlineAt: new Date(
+                Date.now() + CONFIRMATION_WINDOW_MINUTES * 60_000,
+              ),
+            }
+          : {}),
         ...(status === 'cancelled'
           ? { cancelledAt: new Date(), cancellationReason: 'system.payment_expired' }
           : {}),

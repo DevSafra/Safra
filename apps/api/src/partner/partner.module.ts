@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { AuditService } from '../common/audit/audit.service.js';
 import { PasswordService } from '../common/crypto/password.service.js';
 import { CalendarService } from './calendar.service.js';
+import { PartnerDashboardService } from './dashboard.service.js';
 import {
   AdminPartnerDocumentsController,
   PartnerDocumentsController,
@@ -22,6 +23,7 @@ import { PropertiesService } from './properties.service.js';
   ],
   providers: [
     PropertiesService,
+    PartnerDashboardService,
     CalendarService,
     PartnerRegistrationService,
     PartnerDocumentsService,

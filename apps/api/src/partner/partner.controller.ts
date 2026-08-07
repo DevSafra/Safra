@@ -36,6 +36,7 @@ import { CurrentUser, Public, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { CalendarService } from './calendar.service.js';
 import { PartnerRegistrationService } from './partner-registration.service.js';
+import { PartnerDashboardService } from './dashboard.service.js';
 import { PropertiesService } from './properties.service.js';
 
 /**
@@ -52,6 +53,7 @@ export class PartnerController {
     private readonly properties: PropertiesService,
     private readonly calendar: CalendarService,
     private readonly registration: PartnerRegistrationService,
+    private readonly dashboardService: PartnerDashboardService,
   ) {}
 
   /**
@@ -103,6 +105,23 @@ export class PartnerController {
   @Get('me')
   async me(@CurrentUser() user: AccessTokenClaims | undefined) {
     return this.properties.profile(user);
+  }
+
+  /**
+   * لوحة التحكم (§7.1) — the KPIs, the pending-request queue, a month calendar and the alerts,
+   * in one round trip.
+   *
+   * `BOOKING_READ_OWN` because that is what almost everything on it is: the partner's own
+   * bookings, counted four ways. The payout line is the exception and is read under the same
+   * permission the payout endpoints use — a partner who may see their payouts may see that one of
+   * them is scheduled.
+   *
+   * Takes no partner id. `PartnerDashboardService` reads it from the verified token.
+   */
+  @Get('dashboard')
+  @RequirePermissions(P.BOOKING_READ_OWN)
+  async dashboard(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return this.dashboardService.overview(user);
   }
 
   @Get('properties')

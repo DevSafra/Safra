@@ -33,3 +33,8 @@ export function propertyType(code: string | null): string {
 
   return t.propertyType[code] ?? code.replace(/_/g, ' ');
 }
+
+/** A violation kind in Arabic, falling back to the raw enum rather than blank. */
+export function violationKind(kind: string): string {
+  return t.violationKind[kind] ?? kind.replace(/_/g, ' ');
+}

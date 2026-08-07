@@ -110,7 +110,113 @@ export const ar = {
     title: 'لوحة التحكم',
     loadFailed: 'تعذّر تحميل البيانات.',
     sessionExpired: 'انتهت الجلسة. سجّل الدخول مرة أخرى.',
+
+    /**
+     * The four §7.1 KPI cards.
+     *
+     * `noData` is «—» and not «٠». A partner with no units has not achieved zero occupancy, they
+     * have no occupancy — and a confident zero on a card about somebody's business reads as a
+     * verdict. The API returns null for exactly these cases; this is what null looks like.
+     */
+    kpiEarnings: 'أرباح هذا الشهر (بعد العمولة)',
+    kpiEarningsUp: '↑ {percent}٪ عن الشهر الماضي',
+    kpiEarningsDown: '↓ {percent}٪ عن الشهر الماضي',
+    kpiEarningsFlat: 'كالشهر الماضي',
+    kpiEarningsNoCompare: 'لا مقارنة — لا حجوزات الشهر الماضي',
+    kpiBookings: 'حجوزات مؤكدة نشطة',
+    kpiBookingsArriving: '{n} وصول هذا الأسبوع',
+    kpiBookingsNoneArriving: 'لا وصول هذا الأسبوع',
+    kpiOccupancy: 'نسبة الإشغال',
+    kpiOccupancyDetail: '{booked} من {available} ليلة',
+    kpiResponse: 'متوسط سرعة الرد',
+    kpiResponseMinutes: '{n} دقيقة',
+    kpiResponseSample: 'عن {n} حجزًا خلال ٩٠ يومًا',
+    noData: '—',
+    noDataYet: 'لا بيانات بعد',
+
+    /** طلبات حجز بانتظار ردك — the queue with the clock and the fine attached. */
+    requestsTitle: 'طلبات حجز بانتظار ردك',
+    requestsRule: 'مهلة ساعتين — الغرامة ١٠$ عند عدم الرد',
+    requestsEmpty: 'لا طلبات بانتظار ردك.',
+    requestsNights: '{n} ليلة',
+    requestsGuests: '{n} ضيف',
+    requestsLeft: 'متبقٍ {time}',
+    requestsOverdue: 'انتهت المهلة',
+    requestsNoDeadline: 'بلا مهلة مسجّلة',
+    accept: 'قبول',
+    reject: 'رفض',
+    rejectReason: 'سبب الرفض — يُرسل إلى سفرة ويُبلَّغ به الضيف.',
+    rejectConfirm: 'تأكيد الرفض',
+    cancel: 'إلغاء',
+    working: 'جارٍ التنفيذ…',
+    decisionFailed: 'تعذّر تسجيل القرار.',
+    unreachable: 'تعذّر الوصول إلى الخادم.',
+    /** The handoff's footnote, verbatim. */
+    requestsNote: 'لا تظهر لك أي بيانات دفع للعميل. التواصل مع الضيف يتم عبر سفرة فقط.',
+
+    /** التقويم — one unit, this month. */
+    calendarTitle: 'تقويم {month} — {unit}',
+    calendarDefaultPrice: 'سعر افتراضي: {price}',
+    calendarNoUnits: 'لا وحدات بعد، فلا تقويم لعرضه.',
+    legendAvailable: 'متاح',
+    legendBooked: 'محجوز',
+    legendBlocked: 'مغلق',
+    legendMaintenance: 'صيانة',
+    /** The handoff's reminder, verbatim. */
+    calendarReminder:
+      'تذكير: أجّرت الوحدة خارج سفرة؟ أغلق التاريخ فوراً. عدم تحديث التقويم يخفّض تقييمك الداخلي.',
+
+    /** المخالفات والتنبيهات. */
+    alertsTitle: 'المخالفات والتنبيهات',
+    alertsEmpty: 'لا مخالفات ولا تنبيهات.',
+    alertFine: 'غرامة {amount} خُصمت من المستحقات',
+    alertOnBooking: 'على الحجز {reference}',
+
+    /**
+     * The payout line — and the reason there are two of them.
+     *
+     * «مجدول» is a transfer with a date. «قيد التجميع» is an open accrual period. Both are real
+     * rows in `partner_payouts`; neither is a sum of what bookings owe. Two separate strings
+     * because one string with a variable status is exactly how an accrual comes to be described
+     * as a scheduled transfer.
+     */
+    payoutScheduled: 'تحويل مستحقات {amount} مجدول يوم {date}',
+    payoutAccruing: 'مستحقات قيد التجميع: {amount} — لم يُجدوَل تحويلها بعد',
+    payoutNone: 'لا تحويلات مجدولة حاليًا.',
   },
+
+  /** Violation kinds, keyed on the `violation_kind` enum. */
+  violationKind: {
+    no_response: 'تأخر الرد على طلب حجز',
+    rejected_after_payment: 'رفض الحجز بعد الدفع',
+    stale_calendar: 'تقويم غير محدَّث',
+    inaccurate_listing: 'بيانات إعلان غير دقيقة',
+    no_show: 'عدم استقبال الضيف',
+  } as Record<string, string>,
+
+  /**
+   * Month names for the calendar heading.
+   *
+   * Written out rather than taken from `Intl`, and this is a deliberate exception to the project
+   * rule that says use `Intl` for months: `Intl` with an `ar` locale returns the Gregorian months
+   * under their Levantine OR their Egyptian names depending on the runtime's data, and the handoff
+   * uses the Levantine set («آب», not «أغسطس»). A partner reading «أغسطس» on one machine and
+   * «آب» on another would reasonably think they were different products.
+   */
+  months: [
+    'كانون الثاني',
+    'شباط',
+    'آذار',
+    'نيسان',
+    'أيار',
+    'حزيران',
+    'تموز',
+    'آب',
+    'أيلول',
+    'تشرين الأول',
+    'تشرين الثاني',
+    'كانون الأول',
+  ],
 
   properties: {
     /** The handoff's §7.2 header, verbatim. */

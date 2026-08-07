@@ -584,17 +584,40 @@ Two rules worth keeping in mind before anything is built on top:
 
 **Owner:** engineering.
 
-### O-partner-3 — No per-unit calendar read for the dashboard
+### O-partner-3 — The dashboard is built; the calendar shows one unit
 
-**What:** §7.1 draws a booking calendar on the partner dashboard. `availability_days` holds per-day
-state per unit and `GET /partner/units/:id/calendar` reads ONE unit, which is the editing view. A
-month grid across a partner's whole portfolio needs a different read — bookings and blocks for all
-their units in a date range, in one query.
+**Shipped 2026-08-07.** `GET /partner/dashboard` answers the whole §7.1 screen in one round trip:
+four KPI cards, the pending-request queue with its SLA clock, a month calendar and the alerts panel
+carrying the payout line. Every section is one indexed query, scoped by the partner id in the
+VERIFIED token — the service accepts no partner id, so "show me another partner's dashboard" is a
+question it cannot be asked.
 
-**Why it is not the existing endpoint:** a partner with six units would make six calls to render
-one month, which is the N+1 rule 2 forbids on a screen loaded daily.
+**Two rules the implementation keeps, and both are load-bearing:**
 
-**Owner:** engineering, alongside the dashboard.
+- **Null is not zero.** Earnings, occupancy and response speed return `null` where the platform has
+  no data, and the card renders «—». A partner with no units has not achieved 0% occupancy; a
+  partner never asked to confirm a booking does not have a 0-minute response time. Both would be
+  read as a verdict. Occupancy DOES report a real zero for a partner who has units and no stays,
+  because that is a fact rather than an absence — asserted separately in the tests.
+- **The payout line describes a ROW or nothing.** It reads `partner_payouts` and never sums
+  `partner_payable_amount` into a sentence about a transfer. «مجدول» and «قيد التجميع» are two
+  separate catalogue strings so an open accrual cannot be rendered as a dated transfer. Proven by a
+  test that gives a partner a completed booking with money owed and asserts the line is still
+  absent.
+
+**What the calendar does and does not do.** It shows THIS month for ONE unit — the partner's first
+by creation — because §7.1 draws a single grid of squares and a partner with six units has no room
+for six. A booking overlays the availability table where the two disagree, since a booking means
+somebody is arriving. A portfolio-wide month view across all units is still not built; the per-unit
+editing calendar (`GET /partner/units/:id/calendar`) remains its own screen and has no UI yet.
+
+**Two fixture defects this found.** `db:testbed` created `pending_confirmation` bookings with no
+`confirmation_deadline_at`, so the SLA sweep could never expire or fine them and the dashboard's
+countdown had nothing to count — the seed now sets it the way `BookingCreationService` does. And
+`e2e/responsive.spec.ts` has never covered لوحة الشريك at all; the four widths are now asserted
+inside the partner sign-in test, where they cost no extra login.
+
+**Owner:** engineering.
 
 ### O-partner-4 — Partner 2FA is mandatory and enforced; what remains is operational
 

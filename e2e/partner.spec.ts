@@ -104,6 +104,98 @@ test.describe('the partner dashboard', () => {
     await expect(page.locator('aside')).toContainText('قصر الشرق');
     await expect(page.locator('aside')).not.toContainText('@safra.test');
 
+    /*
+      لوحة التحكم §7.1 — all four panels, on the screen a partner opens most often.
+
+      Asserted here rather than in a test of their own because a second test means a second
+      sign-in, and the login budget is the constraint this file already works around. The KPI
+      values themselves are proven in `dashboard.integration.test.ts`; what a browser adds is that
+      the panels RENDER — a server component that throws produces an error page, and every
+      HTTP-level check in the project would still see a 200.
+    */
+    await expect(page.getByText(t.dashboard.kpiEarnings)).toBeVisible();
+    await expect(page.getByText(t.dashboard.kpiOccupancy)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: t.dashboard.requestsTitle }),
+    ).toBeVisible();
+    await expect(page.getByText(t.dashboard.requestsRule)).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: t.dashboard.alertsTitle }),
+    ).toBeVisible();
+
+    /*
+      The payout line says one of exactly three things, and never invents a fourth.
+
+      This is the assertion the whole payout ledger exists to make possible: the line describes a
+      `partner_payouts` ROW or it says there is none. It must never be a sum of what bookings owe
+      rendered as a transfer, so the test pins it to the catalogue's own strings rather than to a
+      number — a number would pass whatever the sentence around it claimed.
+    */
+    const payoutLine = page.locator('[data-payout-line]');
+
+    await expect(payoutLine).toBeVisible();
+    await expect(payoutLine).toHaveText(
+      new RegExp(
+        [
+          t.dashboard.payoutNone,
+          t.dashboard.payoutScheduled.split('{')[0],
+          t.dashboard.payoutAccruing.split('{')[0],
+        ]
+          .map((part) => part?.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+          .join('|'),
+      ),
+    );
+
+    // The calendar drew a real month, not an empty box.
+    await expect(page.locator('ol li').first()).toBeVisible();
+
+    /*
+      «كل واجهة يجب أن تعمل على كل جهاز» — the standing rule, applied to the third app.
+
+      `responsive.spec.ts` sweeps the console and the customer site and has never touched لوحة
+      الشريك, so the dashboard's two-column split and its seven-column calendar grid had nothing
+      checking them at 390px. Folded in here rather than added to that file because a separate
+      spec would need its own sign-in, and the login budget is the constraint this file works
+      around.
+
+      1024 is the width that regresses silently: wide enough to look fine in a screenshot, narrow
+      enough that a `lg:` breakpoint has just fired.
+    */
+    for (const width of [390, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.waitForTimeout(60);
+
+      const spill = await page.evaluate(() => {
+        const doc = document.documentElement;
+        const by = doc.scrollWidth - doc.clientWidth;
+
+        if (by <= 1) return null;
+
+        let worst = '';
+        let worstBy = 0;
+
+        for (const element of Array.from(document.querySelectorAll<HTMLElement>('*'))) {
+          const box = element.getBoundingClientRect();
+          // RTL overflows to the LEFT, so a negative `left` counts as much as an excessive right.
+          const amount = Math.max(-box.left, box.right - doc.clientWidth);
+
+          if (amount > worstBy) {
+            worstBy = amount;
+            worst = `${element.tagName.toLowerCase()}[${(element.className || '').toString().slice(0, 40)}]`;
+          }
+        }
+
+        return `+${by}px, widest offender ${worst}`;
+      });
+
+      expect(
+        spill,
+        `dashboard scrolls sideways at ${width}px: ${spill ?? ''}`,
+      ).toBeNull();
+    }
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+
     await page.getByRole('link', { name: t.nav.properties }).click();
     await page.waitForURL(/\/properties/);
 

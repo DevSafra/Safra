@@ -112,3 +112,92 @@ export type PartnerProfile = z.infer<typeof profileSchema>;
 export async function getMyProfile() {
   return partnerFetch('/partner/me', profileSchema);
 }
+
+/**
+ * لوحة التحكم, as `GET /partner/dashboard` returns it (design handoff §7.1).
+ *
+ * Every KPI is `.nullable()` because the API distinguishes "no data" from zero and the screen has
+ * to as well — see the note on `PartnerDashboardService`. Parsing them as nullable rather than
+ * defaulting to 0 here is what keeps that distinction alive across the wire; a `.default(0)` would
+ * quietly turn "this partner has no units" into "this partner sold nothing".
+ */
+const dashboardSchema = z.object({
+  kpis: z.object({
+    earnings: z
+      .object({
+        amount: z.string(),
+        currencyCode: z.string().nullable(),
+        previousAmount: z.string(),
+        changePercent: z.number().nullable(),
+      })
+      .nullable(),
+    bookings: z.object({ active: z.number(), arrivingThisWeek: z.number() }),
+    occupancy: z
+      .object({
+        percent: z.number(),
+        bookedNights: z.number(),
+        availableNights: z.number(),
+      })
+      .nullable(),
+    response: z.object({ medianMinutes: z.number(), sampleSize: z.number() }).nullable(),
+  }),
+  pendingRequests: z.array(
+    z.object({
+      reference: z.string(),
+      unitName: z.string(),
+      propertyName: z.string(),
+      checkIn: z.string(),
+      checkOut: z.string(),
+      nights: z.number(),
+      guests: z.number(),
+      amount: z.string(),
+      currencyCode: z.string(),
+      deadlineAt: z.string().nullable(),
+    }),
+  ),
+  calendar: z
+    .object({
+      unitName: z.string(),
+      defaultPrice: z.string(),
+      currencyCode: z.string(),
+      days: z.array(
+        z.object({
+          date: z.string(),
+          status: z.string(),
+          price: z.string().nullable(),
+        }),
+      ),
+    })
+    .nullable(),
+  alerts: z.array(
+    z.object({
+      kind: z.string(),
+      fineAmount: z.string().nullable(),
+      currencyCode: z.string().nullable(),
+      bookingReference: z.string().nullable(),
+      createdAt: z.string(),
+    }),
+  ),
+  /**
+   * A real `partner_payouts` row, or null.
+   *
+   * Null means the line is ABSENT from the screen — not «$0 مجدول», which would describe a
+   * transfer that is not happening. `status` travels with the amount so the page cannot render an
+   * accruing balance as a scheduled transfer.
+   */
+  payout: z
+    .object({
+      reference: z.string(),
+      netAmount: z.string(),
+      currencyCode: z.string(),
+      status: z.string(),
+      scheduledFor: z.string().nullable(),
+    })
+    .nullable(),
+});
+
+export type PartnerDashboard = z.infer<typeof dashboardSchema>;
+
+export async function getDashboard() {
+  return partnerFetch('/partner/dashboard', dashboardSchema);
+}
