@@ -5,6 +5,8 @@ import { createDatabase, type Database } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { PropertyDetailService } from '../catalog/property-detail.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { ReviewService } from './review.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -45,6 +47,12 @@ async function refusal(promise: Promise<unknown>): Promise<string> {
 describeIfDb('ReviewService', () => {
   const db: Database = createDatabase(DATABASE_URL ?? '', 2);
   const service = new ReviewService(db, new AuditService(db));
+  /*
+    A real settings service. `PropertyDetailService` reads the customer fee through it, and the fee
+    is not what these tests are about — but stubbing it would mean the public read here diverged
+    from the one the endpoint performs, which is the only reason to go through this service at all.
+  */
+  const publicPage = new PropertyDetailService(db, new SettingsService(db));
 
   let partnerId = '';
   let propertyId = '';
@@ -580,6 +588,108 @@ describeIfDb('ReviewService', () => {
       );
 
       expect(row.rows[0]?.n).toBe(1);
+    });
+  });
+
+  /**
+   * What a VISITOR sees on the public property page (§5.6).
+   *
+   * The rule that matters is a negative one: a review staff have hidden must never appear here.
+   * It is enforced by a `status = 'published'` predicate in the WHERE clause rather than by a
+   * filter afterwards, so an unauthorised row is never read out of the database — and these assert
+   * that from the outside, through the same service the public endpoint calls.
+   */
+  describe('the public property page', () => {
+    /** The fixture property has to be published for the public read to find it at all. */
+    async function publish() {
+      const row = await db.execute<{ slug: string }>(sql`
+        UPDATE properties SET status = 'published'
+        WHERE id = ${propertyId} RETURNING slug
+      `);
+
+      return row.rows[0]?.slug ?? '';
+    }
+
+    it('shows a published review', async () => {
+      const slug = await publish();
+      await write(5, 'إقامة ممتازة وضيافة راقية.');
+
+      const page = await publicPage.bySlug(slug);
+
+      expect(page.reviews).toHaveLength(1);
+      expect(page.reviews[0]?.rating).toBe(5);
+      expect(page.reviews[0]?.body).toContain('ممتازة');
+    });
+
+    /*
+      THE assertion. A review SAFRA removed from the page after reading a partner's report must not
+      come back through this endpoint — and the moderation decision must also have taken it out of
+      the average, which is the trigger's job and is asserted alongside so the two cannot drift.
+    */
+    it('never shows a hidden review, and drops it from the average', async () => {
+      const slug = await publish();
+      const { reference } = await write(1, 'المكان لم يكن كما وُصف.');
+
+      await service.report(partner(), reference, 'Describes a different property.');
+      await service.moderate(staff(), reference, {
+        decision: 'uphold',
+        note: 'Upheld after review.',
+      });
+
+      const page = await publicPage.bySlug(slug);
+
+      expect(page.reviews).toHaveLength(0);
+      expect(page.reviewsCount).toBe(0);
+      expect(page.rating).toBeNull();
+    });
+
+    /* A report on its own changes nothing publicly — only a staff decision does. */
+    it('still shows a review that has merely been reported', async () => {
+      const slug = await publish();
+      const { reference } = await write(2, 'لم تعجبني الإقامة.');
+
+      await service.report(partner(), reference, 'Describes a different property.');
+
+      const page = await publicPage.bySlug(slug);
+
+      expect(page.reviews).toHaveLength(1);
+    });
+
+    it('shows the partner’s reply under the review', async () => {
+      const slug = await publish();
+      const { reference } = await write();
+
+      await service.reply(partner(), reference, 'شكراً لك على إقامتك معنا.');
+
+      const page = await publicPage.bySlug(slug);
+
+      expect(page.reviews[0]?.partnerReply).toContain('شكراً');
+    });
+
+    /**
+     * §7.2 forbids showing a partner customer contact details; a public page has an even shorter
+     * list of what it may publish about the author. A first name is enough to make a review read
+     * as a person's; a surname makes an ordinary opinion searchable against its author for ever.
+     */
+    it('publishes a first name and nothing else about the guest', async () => {
+      const slug = await publish();
+      await write();
+
+      const page = await publicPage.bySlug(slug);
+      const blob = JSON.stringify(page.reviews);
+
+      expect(page.reviews[0]?.author).toBe('Review');
+      expect(blob).not.toContain('Guest');
+      expect(blob).not.toMatch(/@safra\.test/);
+      expect(blob).not.toMatch(/\+9639/);
+    });
+
+    it('shows nothing when the property has no reviews', async () => {
+      const slug = await publish();
+
+      const page = await publicPage.bySlug(slug);
+
+      expect(page.reviews).toStrictEqual([]);
     });
   });
 

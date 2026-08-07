@@ -219,6 +219,70 @@ export default async function PropertyPage({
               <p className="mt-2 text-xs text-faint">{t('exactLocationAfterBooking')}</p>
             </div>
           </section>
+
+          {/* ── What guests said (§5.6, §7.3) ──────────────────────────────── */}
+          <section>
+            <h2 className="font-display text-xl text-text">{t('reviewsTitle')}</h2>
+
+            {property.reviews.length === 0 ? (
+              <p className="mt-3 text-sm text-faint">{t('reviewsEmpty')}</p>
+            ) : (
+              <>
+                {/*
+                  The sample is named as a sample. `reviewsCount` is the trigger-maintained total
+                  over published reviews, so "the 10 most recent of 132" cannot drift from the ★
+                  beside the title — both come from the same aggregate.
+                */}
+                <p className="mt-1 text-xs text-faint">
+                  {t('reviewsShowing', {
+                    shown: property.reviews.length,
+                    total: property.reviewsCount,
+                  })}
+                </p>
+
+                <ul className="mt-3 space-y-3">
+                  {property.reviews.map((review) => (
+                    <li
+                      key={review.reference}
+                      className="rounded-card border border-line bg-card p-5"
+                    >
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <span className="text-sm font-semibold text-text">
+                          {review.author ?? ''}
+                        </span>
+                        {/*
+                          `dir="ltr"`: a ★ followed by a digit is a Latin run, and the star is
+                          bidi-neutral — without this it lands on the wrong side of the number.
+                        */}
+                        <span dir="ltr" className="text-sm font-bold text-gold">
+                          <span aria-hidden>★</span> {review.rating}
+                        </span>
+                        <span className="text-xs text-faint">{t('reviewsVerified')}</span>
+                        <span className="ms-auto text-xs text-faint">
+                          {review.createdAt.slice(0, 10)}
+                        </span>
+                      </div>
+
+                      <p className="mt-2 text-sm leading-relaxed text-muted">
+                        {review.body}
+                      </p>
+
+                      {review.partnerReply ? (
+                        <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3">
+                          <p className="text-xs font-semibold text-gold">
+                            {t('reviewsPartnerReply')}
+                          </p>
+                          <p className="mt-1 text-sm leading-relaxed text-muted">
+                            {review.partnerReply}
+                          </p>
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
         </div>
 
         {/* ── Booking panel ─────────────────────────────────────────────────── */}

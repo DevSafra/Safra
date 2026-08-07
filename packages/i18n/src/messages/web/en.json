@@ -123,7 +123,12 @@
     "bookNow": "Book now",
     "askSafra": "Ask SAFRA about this property",
     "notInstantNotice": "You will not contact the partner directly — SAFRA confirms your booking within two hours of payment.",
-    "noUnits": "No units are currently available."
+    "noUnits": "No units are currently available.",
+    "reviewsTitle": "Guest reviews",
+    "reviewsEmpty": "No reviews for this property yet.",
+    "reviewsShowing": "The {shown} most recent of {total} reviews",
+    "reviewsPartnerReply": "The host replied",
+    "reviewsVerified": "From a completed stay"
   },
   "city": {
     "availableStays": "Available stays in {city}",

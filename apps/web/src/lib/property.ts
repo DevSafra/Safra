@@ -82,6 +82,32 @@ const propertyDetailSchema = z.object({
     customerFeeMode: z.string(),
     customerFeeValue: z.number(),
   }),
+  /**
+   * The ten most recent PUBLISHED reviews.
+   *
+   * A sample, not the whole set — `reviewsCount` above says how many there are, so the list is
+   * never mistaken for the total. Hidden reviews are excluded by the API's WHERE clause, not by
+   * anything here: a client-side filter would be one reorder away from publishing something staff
+   * decided to remove.
+   *
+   * `.default([])` so a property page built against an older API still renders. The listing is the
+   * point of the screen; its reviews are not worth failing the whole parse over.
+   */
+  reviews: z
+    .array(
+      z.object({
+        reference: z.string(),
+        /** A first name, or null. Never a surname — see the note on the API's `reviews()`. */
+        author: z.string().nullable(),
+        rating: z.number(),
+        body: z.string(),
+        unitName: z.object({ ar: z.string().nullable(), en: z.string().nullable() }),
+        partnerReply: z.string().nullable(),
+        partnerRepliedAt: z.string().nullable(),
+        createdAt: z.string(),
+      }),
+    )
+    .default([]),
 });
 
 export type PropertyDetail = z.infer<typeof propertyDetailSchema>;

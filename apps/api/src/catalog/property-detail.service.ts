@@ -68,11 +68,12 @@ export class PropertyDetailService {
     const row = rows.rows[0];
     if (!row) throw notFound(ERROR.PROPERTY_NOT_FOUND);
 
-    const [units, images, calendar, fees] = await Promise.all([
+    const [units, images, calendar, fees, reviews] = await Promise.all([
       this.units(slug),
       this.images(slug),
       this.calendar(slug),
       this.publicFees(),
+      this.reviews(slug),
     ]);
 
     return {
@@ -126,7 +127,78 @@ export class PropertyDetailService {
       images,
       calendar,
       fees,
+      reviews,
     };
+  }
+
+  /**
+   * What guests said, for the public page (§5.6, §7.3).
+   *
+   * ## `status = 'published'` is in the WHERE clause, not a filter afterwards
+   *
+   * A hidden review is one staff decided should not be shown, after a partner reported it and
+   * somebody read both sides. It must never reach this endpoint — so the predicate is part of the
+   * query and an unauthorised row is never read out of the database, rather than being fetched and
+   * then dropped by code somebody could later reorder.
+   *
+   * `properties.rating` and `reviews_count` are already maintained by a trigger over published
+   * rows only, so the header figures and this list cannot disagree about which reviews count.
+   *
+   * ## What a visitor is shown about the author
+   *
+   * The guest's FIRST NAME and nothing else. Not the surname, not the email, not the city, not the
+   * booking. A review is a signal about a property, and the amount of identity needed to make it
+   * credible is "a person stayed here" — which the platform guarantees structurally by tying every
+   * review to a completed booking. Publishing full names would make an ordinary review searchable
+   * against its author for ever, which is a cost the reader does not benefit from.
+   *
+   * ## Ten, newest first, and no pagination
+   *
+   * A property page is a decision aid, not an archive. Ten recent reviews plus the average over
+   * ALL published ones is what a person reads before booking; a paginated wall is a different
+   * screen that nobody asked for. The count beside the average says how many there are in total,
+   * so the sample is never mistaken for the whole.
+   */
+  private async reviews(slug: string) {
+    const rows = await this.db.execute<{
+      reference: string;
+      author: string;
+      rating: number;
+      body: string;
+      unit_name_ar: string | null;
+      unit_name_en: string | null;
+      partner_reply: string | null;
+      partner_replied_at: string | null;
+      created_at: string;
+    }>(sql`
+      SELECT r.reference,
+             -- The first word of the name, so «ليلى الحمصي» publishes as «ليلى».
+             split_part(btrim(cp.full_name), ' ', 1) AS author,
+             r.rating, r.body,
+             un.name_ar AS unit_name_ar, un.name_en AS unit_name_en,
+             r.partner_reply, r.partner_replied_at::text,
+             r.created_at::text
+      FROM reviews r
+      JOIN properties p          ON p.id = r.property_id
+      JOIN customer_profiles cp  ON cp.id = r.customer_profile_id
+      JOIN units un              ON un.id = r.unit_id
+      WHERE p.slug = ${slug}
+        AND r.status = 'published'
+      ORDER BY r.created_at DESC
+      LIMIT 10
+    `);
+
+    return rows.rows.map((row) => ({
+      reference: row.reference,
+      /* Never blank: a profile with no name would otherwise publish an empty byline. */
+      author: row.author.length > 0 ? row.author : null,
+      rating: row.rating,
+      body: row.body,
+      unitName: { ar: row.unit_name_ar, en: row.unit_name_en },
+      partnerReply: row.partner_reply,
+      partnerRepliedAt: row.partner_replied_at,
+      createdAt: row.created_at,
+    }));
   }
 
   private async units(slug: string) {

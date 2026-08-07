@@ -643,9 +643,26 @@ that contradicts it. `e2e/admin-sections.spec.ts` does the same for the staff qu
    4.0 → author still sees their own hidden review → row survives.
 2. ~~**The sidebar badge.**~~ **Shipped 2026-08-07**, both of them.
 3. **No notification** to a partner that a review arrived, or to a guest that a partner replied.
-4. **No public display.** A property page does not show its reviews to visitors — only the ★ and
-   the count, which come from the aggregate. The reviews exist and nothing renders them on
-   `/property/[slug]`.
+4. ~~**No public display.**~~ **Shipped 2026-08-08.** `/property/[slug]` shows the ten most recent
+   PUBLISHED reviews, the partner's reply under each, and names the sample against the total so it
+   is never mistaken for the whole. `status = 'published'` is in the API's WHERE clause rather than
+   a filter afterwards, so a hidden review is never read out of the database. A visitor sees the
+   guest's FIRST NAME and nothing else — a surname would make an ordinary opinion searchable
+   against its author for ever, which the reader gains nothing from.
+
+   **Two things this uncovered.** The seed declared `rating: '4.9', reviewsCount: 118` as literals,
+   so `beit-al-yasmine` published «★ ٤٫٩ من ١١٨ تقييماً» with not one review behind it — a trigger
+   has owned both columns since reviews shipped, and the fixture was overwriting it with a number
+   nothing could explain. Removed; a property's rating is now whatever its reviews say, and one
+   with none has none. And the seed cycled six review bodies across twenty-four reviews, so a probe
+   searching the page for a review's words matched a DIFFERENT review — which read as "moderation
+   does not remove it publicly" and cost an hour to disprove. Bodies are unique now, because a test
+   that searches for a review has to mean what it says.
+
+   **One accepted latency:** `/property/[slug]` caches for 60 seconds (`revalidate: 60`), so a
+   review staff hide stays on the public page for up to a minute. The API is immediate. Bounded and
+   defensible for a shop window; if an immediate takedown is ever needed the remedy is to unpublish
+   the listing, which is not cached.
 
 **Owner:** engineering.
 

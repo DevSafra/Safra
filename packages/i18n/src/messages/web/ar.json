@@ -123,7 +123,12 @@
     "bookNow": "احجز الآن",
     "askSafra": "اسأل سفرة عن هذا العقار",
     "notInstantNotice": "لن تتواصل مع الشريك مباشرة — سفرة تؤكد حجزك خلال مهلة أقصاها ساعتان بعد الدفع.",
-    "noUnits": "لا توجد وحدات متاحة حالياً."
+    "noUnits": "لا توجد وحدات متاحة حالياً.",
+    "reviewsTitle": "تقييمات الضيوف",
+    "reviewsEmpty": "لا تقييمات بعد لهذا العقار.",
+    "reviewsShowing": "أحدث {shown} من {total} تقييماً",
+    "reviewsPartnerReply": "رد المضيف",
+    "reviewsVerified": "من إقامة مؤكدة"
   },
   "city": {
     "availableStays": "الإقامات المتاحة في {city}",

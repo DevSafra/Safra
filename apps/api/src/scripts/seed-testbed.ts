@@ -93,8 +93,6 @@ interface PropertySpec {
   readonly descriptionAr: string;
   /** From `TRIP_ATTRIBUTES` — the ONE shared vocabulary (§5.6). Never a list forked here. */
   readonly attributes: readonly string[];
-  readonly rating: string;
-  readonly reviewsCount: number;
   readonly units: readonly UnitSpec[];
 }
 
@@ -137,8 +135,6 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'فندق قصر الشرق — المالكي',
         nameEn: 'Qasr Al-Sharq Hotel — Malki',
         slug: 'qasr-al-sharq-malki',
-        rating: '4.7',
-        reviewsCount: 132,
         attributes: ['history', 'business', 'internet', 'parking'],
         citySlug: 'damascus',
         type: 'hotel',
@@ -153,8 +149,6 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'فندق قصر الشرق — أبو رمانة',
         nameEn: 'Qasr Al-Sharq Hotel — Abu Rummaneh',
         slug: 'qasr-al-sharq-abu-rummaneh',
-        rating: '4.4',
-        reviewsCount: 58,
         attributes: ['history', 'business', 'internet'],
         citySlug: 'damascus',
         type: 'hotel',
@@ -166,8 +160,6 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'شقق قصر الشرق المخدومة',
         nameEn: 'Qasr Al-Sharq Serviced Apartments',
         slug: 'qasr-al-sharq-apartments',
-        rating: '4.6',
-        reviewsCount: 41,
         attributes: ['families', 'internet', 'parking'],
         citySlug: 'damascus',
         type: 'apartment',
@@ -200,8 +192,6 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'شاليهات الساحل — بلوران',
         nameEn: 'Coastal Chalets — Blouran',
         slug: 'coastal-chalets-blouran',
-        rating: '4.8',
-        reviewsCount: 96,
         attributes: ['sea', 'pool', 'families'],
         citySlug: 'latakia',
         type: 'chalet',
@@ -216,8 +206,6 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'منتجع الساحل',
         nameEn: 'Coastal Resort',
         slug: 'coastal-resort',
-        rating: '4.5',
-        reviewsCount: 73,
         attributes: ['sea', 'pool', 'honeymoon'],
         citySlug: 'latakia',
         type: 'hotel',
@@ -245,8 +233,6 @@ const PARTNERS: readonly PartnerSpec[] = [
         nameAr: 'بيت الياسمين الدمشقي',
         nameEn: 'Beit Al-Yasmine Damascene House',
         slug: 'beit-al-yasmine',
-        rating: '4.9',
-        reviewsCount: 118,
         attributes: ['history', 'honeymoon', 'nature'],
         citySlug: 'damascus',
         type: 'rural_house',
@@ -656,6 +642,15 @@ async function build(db: Seeder): Promise<void> {
     `);
 
     /*
+      No `rating` and no `reviews_count`.
+
+      They used to be literals in each fixture — `rating: '4.9', reviewsCount: 118` — and the
+      result was a published listing showing «★ ٤٫٩ من ١١٨ تقييماً» with not one review behind it.
+      A trigger has owned both columns since reviews shipped; letting the fixture declare them
+      produced a number no review could explain, on the screen a customer uses to decide.
+
+      Now a property's rating is whatever its reviews say, and a property with none has none.
+
       Approved AND screened. `sanctions_screened_at` matters: the console refuses to approve a
       partner that has not been screened, so a fixture that skipped it would create a partner the
       console would treat as half-finished.
@@ -709,13 +704,7 @@ async function build(db: Seeder): Promise<void> {
           verifiedAt: new Date(),
           cancellationPolicyId: policy.id,
           attributes: [...property.attributes],
-          /*
-            A rating and a review count, so the §7.2 card's ★ is exercised. They are NOT derived
-            from a reviews table because there is not one yet — when reviews land these become the
-            aggregate of real rows rather than a seeded number.
-          */
-          rating: property.rating,
-          reviewsCount: property.reviewsCount,
+          /* No rating or count — a trigger owns both. See the note above the partner insert. */
         })
         .returning();
 
@@ -1092,14 +1081,30 @@ async function reviews(db: Seeder): Promise<void> {
     WHERE b.status = 'completed'
       AND lower(u.email) IN ('partner1@safra.test', 'partner2@safra.test', 'partner3@safra.test')
       AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.booking_id = b.id)
-    ORDER BY b.partner_id, b.check_out DESC
-    LIMIT 18
+    -- Spread across PROPERTIES rather than taking the newest eighteen bookings overall.
+    --
+    -- Ordering by partner alone gave one partner's busiest listing seven reviews and left two
+    -- properties with none — which is realistic enough, except that those two then showed no ★ at
+    -- all on a screen the §7.2 card exists to exercise. Round-robin by property fixes the
+    -- distribution without inventing anything: every review is still a real completed stay.
+    ORDER BY row_number() OVER (PARTITION BY b.property_id ORDER BY b.check_out DESC),
+             b.property_id
+    LIMIT 24
   `);
 
   let written = 0;
 
   for (const [index, booking] of candidates.rows.entries()) {
-    const body = BODIES[index % BODIES.length] ?? BODIES[0];
+    /*
+      A distinguishing tail, so no two seeded reviews share a body.
+
+      Six bodies cycled across twenty-four reviews meant identical text on several, and a probe
+      searching the rendered page for a review's words matched a DIFFERENT review — which read as
+      "moderation does not remove it from the public page" and cost an hour to disprove. Unique
+      text is not realism for its own sake; it is what makes a test that searches for a review
+      mean what it says.
+    */
+    const body = `${BODIES[index % BODIES.length] ?? BODIES[0]} (${index + 1})`;
     const rating = RATINGS[index % RATINGS.length] ?? 5;
 
     await db.execute(sql`
