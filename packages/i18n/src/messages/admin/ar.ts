@@ -360,6 +360,15 @@ export const ar = {
       colNet: 'الصافي',
       colStatus: 'الحالة',
       colScheduled: 'موعد التحويل',
+      /*
+        When accrual last ran, stated on the screen an operator opens to answer a partner's
+        question. A job that stopped firing is invisible otherwise — the failure that matters is
+        silence, not an error.
+      */
+      lastAccrual: 'آخر تجميع تلقائي: {when} — ضُمّ {n} حجزاً',
+      lastAccrualFailed:
+        'آخر تجميع تلقائي فشل ({when}). راجع docs/runbook-scheduled-jobs.md',
+      lastAccrualNever: 'لم يُسجَّل تجميع تلقائي بعد.',
       note: 'الحساب التلقائي يضم الحجوزات المكتملة والمدفوعة فقط، ويستثني أي حجز عليه نزاع مفتوح أو قيد الفحص — تجميد المستحقات قاعدة مشتقة من النزاعات وليست علامة على الحجز.',
 
       /* One payout's page. */

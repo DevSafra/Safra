@@ -398,6 +398,28 @@ export class PayoutService {
   }
 
   /**
+   * What the last accrual reported, so the endpoint can answer with it.
+   *
+   * Read back from `scheduled_job_runs` rather than returned by `accrue`, because the caller may
+   * have SKIPPED — another replica or a concurrent manual run held the lock — and in that case the
+   * honest answer is what the run that did happen achieved, not a zero from the one that did not.
+   */
+  async latestAccrual(): Promise<{ attached: number; payouts: number }> {
+    const row = await this.db.execute<{
+      detail: { attached?: number; payouts?: number } | null;
+    }>(sql`
+      SELECT detail FROM scheduled_job_runs
+      WHERE job = 'payout-accrual' AND status = 'completed'
+      ORDER BY started_at DESC LIMIT 1
+    `);
+
+    return {
+      attached: row.rows[0]?.detail?.attached ?? 0,
+      payouts: row.rows[0]?.detail?.payouts ?? 0,
+    };
+  }
+
+  /**
    * The staff registry of payouts (§9.3).
    *
    * Paginated with `OFFSET` and a capped count, like every other console registry — the standing

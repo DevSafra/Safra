@@ -6,6 +6,7 @@ import { PERMISSIONS as P, pageQuerySchema } from '@safra/contracts';
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
+import { JobRunService } from '../common/jobs/job-run.service.js';
 import { SettingsAdminService } from '../settings/settings-admin.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { AuditLogService } from './audit-log.service.js';
@@ -48,6 +49,7 @@ export class AdminOperationsController {
     private readonly audit: AuditLogService,
     private readonly bookings: BookingDetailService,
     private readonly settings: SettingsAdminService,
+    private readonly jobRuns: JobRunService,
   ) {}
 
   /**
@@ -82,6 +84,28 @@ export class AdminOperationsController {
     @CurrentUser() user: AccessTokenClaims | undefined,
   ) {
     return this.bookings.detail(reference, user);
+  }
+
+  /**
+   * When each scheduled job last ran, and whether it worked.
+   *
+   * ## Not on `/health`
+   *
+   * That endpoint is `@Public()` — a probe cannot hold a credential — and "the payout accrual last
+   * ran at 03:00 and attached 47 bookings" is an operational detail about SAFRA's finances. It is
+   * behind `AUDIT_LOG_READ` because "what has the system been doing" is the same question that
+   * permission already answers.
+   *
+   * ## What it is FOR
+   *
+   * The failure nobody notices is not a job that threw — that lands in the log and in the row's
+   * `error`. It is a job that stopped firing. This makes the last run's TIMESTAMP readable, so an
+   * absence is visible to a person and, later, to an alert.
+   */
+  @Get('jobs')
+  @RequirePermissions(P.AUDIT_LOG_READ)
+  async jobs() {
+    return this.jobRuns.latest();
   }
 
   /** The Rules Engine (§9.3, P-005). `SETTINGS_READ` for operations and above. */

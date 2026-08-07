@@ -4,6 +4,7 @@ import { PERMISSIONS as P } from '@safra/contracts';
 
 import { RequirePermissions } from '../rbac/decorators.js';
 import { RecommendationService } from './recommendation.service.js';
+import { JobRunService } from '../common/jobs/job-run.service.js';
 import { RankingScheduler } from './ranking.scheduler.js';
 
 /**
@@ -28,7 +29,7 @@ class RankingController {
 
 @Module({
   controllers: [RankingController],
-  providers: [RecommendationService, RankingScheduler],
+  providers: [JobRunService, RecommendationService, RankingScheduler],
   exports: [RecommendationService],
 })
 export class RankingModule {}

@@ -313,3 +313,17 @@ export const reviewReportStatus = pgEnum('review_report_status', [
   'upheld',
   'dismissed',
 ]);
+
+/**
+ * How a scheduled job's run ended.
+ *
+ * `skipped` is a real outcome and not a failure: on a horizontally scaled API every replica fires
+ * the same cron, and the ones that do not win the advisory lock skip. Recording it separately is
+ * what stops "most runs skipped" reading as "most runs broken".
+ */
+export const jobRunStatus = pgEnum('job_run_status', [
+  'running',
+  'completed',
+  'skipped',
+  'failed',
+]);

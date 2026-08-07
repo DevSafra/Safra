@@ -1230,3 +1230,26 @@ export async function getReportedReviews(params: ListParams) {
     offsetPage(reportedReviewSchema),
   );
 }
+
+/**
+ * When each scheduled job last ran (§14's background work, until a queue lands).
+ *
+ * `detail` is `unknown` because each job reports its own counts; the payout screen reads
+ * `attached` and anything else is somebody else's business. Parsed permissively for the same
+ * reason — a new job reporting a new shape must not break a screen that only cares about one.
+ */
+const jobRunSchema = z.object({
+  job: z.string(),
+  status: z.string(),
+  startedAt: z.string(),
+  finishedAt: z.string().nullable(),
+  durationMs: z.string().nullable(),
+  detail: z.unknown(),
+  error: z.string().nullable(),
+});
+
+export type JobRun = z.infer<typeof jobRunSchema>;
+
+export async function getJobRuns() {
+  return staffFetch('/admin/jobs', z.array(jobRunSchema));
+}

@@ -619,8 +619,9 @@ release → paid, producing a balanced movement (credit `partner_payout` 558.00,
 
 **What remains:**
 
-1. **Accrual is invoked by hand.** It needs the advisory-lock cron treatment `RankingScheduler`
-   already has, or it will double-run across replicas.
+1. ~~**Accrual is invoked by hand.**~~ **Shipped 2026-08-07.** Hourly, behind a PostgreSQL
+   advisory lock so exactly one replica runs it. The manual endpoint calls the same path, so a
+   hand-run is recorded like any other — see `docs/runbook-scheduled-jobs.md`.
 2. **No CSV export**, unlike the other finance registries.
 3. **Fines are never attached.** `fine_amount` is on the table and every payout so far carries
    zero: `partner_violations` records a fine and nothing deducts it from the payout that covers the
@@ -665,6 +666,44 @@ deduction that never happened, which is the exact failure the payout ledger was 
 The wording returns to the handoff's the moment a deduction is real.
 
 **Owner:** Bashar for the five questions above, then engineering. Not blocking anything else.
+
+### O-ops-1 — Scheduled jobs are visible; alerting is not
+
+**Shipped 2026-08-07.** `payout-accrual` runs hourly and `ranking-recompute` nightly, both through
+`JobRunService.runExclusively` — one advisory lock, one recorded run, released in a `finally`.
+
+**Why a table and not just a log.** The failure that matters is not a job that threw; that lands in
+the log and in the row's `error`. It is a job that STOPPED FIRING, and silence lands nowhere — six
+weeks later somebody asks why no partner has been paid since March. `scheduled_job_runs` makes the
+absence of runs queryable, which is the thing worth alerting on.
+
+**Three decisions worth keeping:**
+
+- **A skip is its own outcome**, not a failure. On a four-replica deployment three of every four
+  ticks skip; a table showing only completions would make an operator believe the job runs a
+  quarter as often as it does. Skips are also excluded from "latest", so a health check never reads
+  the replicas that did nothing.
+- **The manual endpoint shares the path.** `POST /admin/payouts/accrue` calls the scheduler, so a
+  hand-run is recorded and takes the same lock — otherwise the console's footnote and the runbook's
+  "run it again" step would disagree about whether anything happened.
+- **Accrual accrues and stops.** It does not close, release or pay: those move money and §4.1
+  requires a person holding `PAYOUT_EXECUTE` to decide each one.
+
+**Visible where somebody looks**: the console's payout registry states when accrual last ran and
+what it attached, and `GET /admin/jobs` (behind `audit_log.read`, not the public `/health`) answers
+the same for every job. `docs/runbook-scheduled-jobs.md` is the on-call procedure.
+
+**What remains:**
+
+1. **No alert.** The data supports one — "last completed run older than two hours" — and there is
+   no alerting anywhere in the project (see **S-1**). This is the prerequisite, not the thing.
+2. **Still in-process.** §14 calls for a background queue; these are `@Cron` decorators inside the
+   API with an advisory lock standing in for a scheduler. Retries, backoff and per-job concurrency
+   arrive with BullMQ.
+3. **No retention on `scheduled_job_runs`.** ~8,760 rows a year at one accrual an hour, so it can
+   wait for the general retention work (**S-4**) rather than inventing a policy here.
+
+**Owner:** engineering, after S-1 lands.
 
 ### O-media-1 — Property images are managed; a defect and two guarantees came with it
 

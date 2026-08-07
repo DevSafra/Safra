@@ -23,6 +23,7 @@ import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { PayoutScheduler } from './payout.scheduler.js';
 import { PayoutService } from './payout.service.js';
 
 /**
@@ -98,7 +99,10 @@ const payoutListQuerySchema = pageQuerySchema.extend({
  */
 @Controller('admin/payouts')
 export class AdminPayoutController {
-  constructor(private readonly payouts: PayoutService) {}
+  constructor(
+    private readonly payouts: PayoutService,
+    private readonly scheduler: PayoutScheduler,
+  ) {}
 
   /**
    * Sweeps newly-payable bookings into their partners' open periods.
@@ -144,7 +148,17 @@ export class AdminPayoutController {
     'Bulk accrual; each payout carries its own audit trail on release and payment.',
   )
   async accrue() {
-    return this.payouts.accrue();
+    /*
+      Through the SCHEDULER, not straight to the service.
+
+      A hand-run has to land in `scheduled_job_runs` like any other, or the console's "last
+      accrual" footnote and the runbook's "run it again" step disagree about whether anything
+      happened. It also shares the advisory lock, so a manual run during a scheduled one skips
+      instead of racing it.
+    */
+    await this.scheduler.run();
+
+    return this.payouts.latestAccrual();
   }
 
   @Post(':id/close')

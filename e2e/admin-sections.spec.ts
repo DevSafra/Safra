@@ -451,6 +451,27 @@ test.describe('honesty rules the design and the register require', () => {
     await expect(
       page.getByRole('navigation', { name: /تنقّل بين/ }).first(),
     ).toBeVisible();
+
+    /*
+      When accrual last ran, on the screen somebody opens to answer "where is my money".
+
+      A scheduled job that STOPPED firing is invisible otherwise: a throw lands in the log and in
+      the run's `error`, but silence lands nowhere. One of these three sentences is always shown,
+      so the absence of any of them means the footnote itself has broken.
+    */
+    await expect(
+      page.getByText(
+        new RegExp(
+          [
+            t.sections.payouts.lastAccrualNever,
+            t.sections.payouts.lastAccrual.split('{')[0],
+            t.sections.payouts.lastAccrualFailed.split('{')[0],
+          ]
+            .map((part) => part?.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            .join('|'),
+        ),
+      ),
+    ).toBeVisible();
   });
 
   /**
