@@ -50,3 +50,26 @@ export interface TotpEnableResponse {
   /** Shown ONCE. They are hashed server-side and cannot be retrieved again. */
   recoveryCodes: string[];
 }
+
+/**
+ * A staff member clearing a partner's second factor — the lost-phone path.
+ *
+ * The reason is REQUIRED and has a floor, because this is the one partner action that removes an
+ * authentication factor. An audit row reading "operations manager reset partner 2FA" with no
+ * reason answers who and when and not the only question anybody asks afterwards, which is why.
+ *
+ * Note what is absent: no code, no secret, nothing the caller supplies about the new enrolment.
+ * The reset only CLEARS. The partner enrols again themselves, from their own session, which is
+ * what keeps a staff member from ever holding a partner's second factor.
+ */
+export const partnerTwoFactorResetSchema = z
+  .object({ reason: z.string().trim().min(3).max(500) })
+  .strict();
+export type PartnerTwoFactorResetInput = z.infer<typeof partnerTwoFactorResetSchema>;
+
+export interface PartnerTwoFactorResetResponse {
+  /** Always false afterwards — the partner must enrol again before they can act. */
+  twoFactorEnabled: false;
+  /** Sessions ended by the reset, so the caller can tell the partner what just happened. */
+  sessionsRevoked: number;
+}

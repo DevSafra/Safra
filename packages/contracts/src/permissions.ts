@@ -70,6 +70,18 @@ export const PERMISSIONS = {
    */
   PARTNER_CONTRACT_READ: 'partner_contract.read',
   PARTNER_CONTRACT_MANAGE: 'partner_contract.manage',
+  /**
+   * Clearing a partner's second factor so they can enrol again — the lost-phone path.
+   *
+   * Its own permission rather than folded into `PARTNER_SUSPEND`, because it is the one partner
+   * action that REMOVES an authentication factor. Anyone holding it can turn a 2FA-protected
+   * account back into a password-only one for the length of a sign-in, so who holds it is a
+   * decision worth making explicitly rather than inheriting from "can manage partners".
+   *
+   * The endpoint additionally refuses any target that is not a partner, so this can never be
+   * turned on a staff or super-admin account. See `PartnerTwoFactorService`.
+   */
+  PARTNER_TWO_FACTOR_RESET: 'partner.two_factor_reset',
   PROPERTY_READ: 'property.read',
   PROPERTY_MANAGE_OWN: 'property.manage_own',
   PROPERTY_APPROVE: 'property.approve',
@@ -209,6 +221,13 @@ const OPERATIONS_MANAGER: Permission[] = [
   P.PARTNER_APPROVE,
   P.PARTNER_SUSPEND,
   P.PARTNER_DOCUMENT_REVIEW,
+  /*
+    Operations, not support. A partner who has lost their authenticator phones the people who
+    already verify partner identity for a living; routing every lost phone through a super admin
+    would make the queue depend on one person, which is the same reasoning as the contract
+    permission below.
+  */
+  P.PARTNER_TWO_FACTOR_RESET,
   P.PROPERTY_READ,
   P.PROPERTY_APPROVE,
   P.VIOLATION_READ,
@@ -252,7 +271,7 @@ export type Role = keyof typeof ROLE_PERMISSIONS;
 
 export const ROLES = Object.keys(ROLE_PERMISSIONS) as Role[];
 
-/** Staff roles get 2FA enforced and are the only ones allowed into apps/admin. */
+/** The only roles allowed into `apps/admin`. Admission to the console, nothing else. */
 export const STAFF_ROLES: Role[] = [
   'support_agent',
   'finance_officer',
@@ -262,6 +281,26 @@ export const STAFF_ROLES: Role[] = [
 
 export function isStaffRole(role: Role): boolean {
   return STAFF_ROLES.includes(role);
+}
+
+/**
+ * Roles that must hold a second factor — staff AND partners (Bashar, 2026-08-07: mandatory,
+ * not optional).
+ *
+ * Separate from `STAFF_ROLES` on purpose, and the separation is the point. The two lists answered
+ * the same question until partner 2FA existed, and collapsing them would have meant one of two
+ * wrong outcomes: either partners become staff for admission purposes and can open the console, or
+ * 2FA stays keyed to console admission and partners never get it. They are different questions —
+ * "may this person see the staff tooling" and "must this person prove a second factor" — so they
+ * are different lists.
+ *
+ * Customers are deliberately absent. §4 specifies guest checkout, and a second factor on a
+ * customer account would contradict it.
+ */
+export const TWO_FACTOR_ROLES: Role[] = [...STAFF_ROLES, 'partner'];
+
+export function requiresTwoFactor(role: Role): boolean {
+  return TWO_FACTOR_ROLES.includes(role);
 }
 
 /**

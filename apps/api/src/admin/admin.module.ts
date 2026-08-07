@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { PartnerTwoFactorService } from '../auth/partner-two-factor.service.js';
 import { AdminGrantsController, AdminGrantsService } from './grants.controller.js';
 import { AdminController } from './admin.controller.js';
 import { CityImagesController } from './city-images.controller.js';
@@ -55,6 +56,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     BookingDetailService,
     SettingsAdminService,
     AuditService,
+    PartnerTwoFactorService,
     MeService,
     StaffService,
     // The §8 registry, finance and operations reads — see RegistriesController.

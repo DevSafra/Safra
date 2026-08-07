@@ -143,6 +143,14 @@ const partnerDetailSchema = z.object({
   suspendedAt: timestamp,
   suspendedReason: z.string().nullable(),
   createdAt: timestamp,
+  /*
+    Whether the partner has enrolled a second factor — a boolean, deliberately. Mandatory for
+    partners since 2026-08-07, so this is what tells a reviewer whether the reset control has
+    anything to reset. Defaulted rather than required so a console built against an older API
+    still renders the screen instead of failing the whole parse, which is the failure mode that
+    kept the listing review queue permanently empty (see §8 of the gap report).
+  */
+  twoFactorEnabled: z.boolean().default(false),
   city: z.object({
     slug: z.string(),
     nameAr: z.string(),

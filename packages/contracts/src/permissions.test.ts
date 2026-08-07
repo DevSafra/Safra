@@ -5,6 +5,7 @@ import {
   ROLES,
   ROLE_PERMISSIONS,
   isStaffRole,
+  requiresTwoFactor,
   resolvePermissions,
 } from './permissions.js';
 
@@ -92,6 +93,38 @@ describe('role permission separation (SRS §4)', () => {
       'super_admin',
       'support_agent',
     ]);
+  });
+
+  /*
+    Two-factor is a wider set than staff, and the gap between them is the whole reason both exist.
+    Asserted as an exact list rather than "contains partner", so adding a role forces a decision
+    here about whether it needs a second factor instead of inheriting one by omission.
+  */
+  it('requires a second factor from staff and partners, and from nobody else', () => {
+    expect(ROLES.filter(requiresTwoFactor).sort()).toEqual([
+      'finance_officer',
+      'operations_manager',
+      'partner',
+      'super_admin',
+      'support_agent',
+    ]);
+  });
+
+  /* §4 specifies guest checkout; a second factor on a customer account would contradict it. */
+  it('never requires a second factor from a customer', () => {
+    expect(requiresTwoFactor('customer')).toBe(false);
+  });
+
+  /* Every staff role keeps its second factor — widening the set must not narrow it. */
+  it('keeps every staff role inside the two-factor set', () => {
+    for (const role of ROLES.filter(isStaffRole)) {
+      expect(requiresTwoFactor(role)).toBe(true);
+    }
+  });
+
+  /* A partner is NOT staff: 2FA must not have become a back door into the console. */
+  it('does not make a partner staff', () => {
+    expect(isStaffRole('partner')).toBe(false);
   });
 });
 

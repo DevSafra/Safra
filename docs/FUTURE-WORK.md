@@ -596,30 +596,53 @@ one month, which is the N+1 rule 2 forbids on a screen loaded daily.
 
 **Owner:** engineering, alongside the dashboard.
 
-### O-partner-4 — Partners have no two-factor authentication
+### O-partner-4 — Partner 2FA is mandatory and enforced; what remains is operational
 
-**What:** Staff cannot reach the console without TOTP — `StaffTwoFactorGuard` enforces it
-server-side, and enrolling is not optional (see the 2026-08-02 entry in §11 for why that guard
-exists). لوحة الشريك has no equivalent: `apps/partner/middleware.ts` gates on the partner role and
-a valid session, and that is all.
+**Decided and shipped 2026-08-07.** Bashar's decision was **mandatory, not optional**. Partner
+accounts now require a second factor exactly as staff accounts do.
 
-**Why it matters:** a partner account controls listings, prices, availability and — now that
-O-partner-2 has shipped — visibility of money owed to a business. It is a lower-value target than a
-super admin and a considerably higher-value one than a customer.
+**What is DONE.** `TWO_FACTOR_ROLES` and `requiresTwoFactor()` in `@safra/contracts`, kept
+deliberately separate from `STAFF_ROLES` so widening one did not widen console admission;
+`StaffTwoFactorGuard` generalised to `TwoFactorGuard`, which refuses every request from an
+unenrolled staff member OR partner and admits only `@AllowsUnenrolled` routes; `AuthService.login`
+demanding the code from partners; enrolment, recovery-code issue and consumption reusing the staff
+`TwoFactorService`; a two-step partner sign-in that accepts a TOTP code or a recovery code in one
+field; a `/enrol-2fa` screen the portal middleware routes every unenrolled partner to; and a
+staff-driven reset behind its own `partner.two_factor_reset` permission.
 
-**What it needs**, and each is its own decision rather than a step:
+Three properties worth not losing:
 
-1. A design that says whether partner 2FA is **mandatory** (as staff 2FA is) or opt-in, and what
-   happens to the partner accounts that already exist.
-2. API support. The staff enrolment and verification paths already exist and are the model to
-   follow; the question is how much is shared versus duplicated for a different audience.
-3. An enrolment flow inside the portal, and a recovery/replacement flow — the part that decides
-   whether a locked-out partner phones support or is stuck.
-4. Server-side enforcement, so it cannot be skipped by calling the API directly. A UI-only check
-   would repeat the exact defect the staff guard was written to close.
-5. Tests and documentation.
+- **The migration needed no outage.** Login still asks for a code only from accounts that HAVE
+  enrolled, so every partner that existed on 2026-08-06 could still sign in — into a session
+  `TwoFactorGuard` allows to do exactly one thing. Refusing the login instead would have locked out
+  every partner with no way back, because enrolling needs a session.
+- **The reset only CLEARS.** It never sets, returns or accepts a secret, so a staff member never
+  holds a credential that authenticates as a partner. It refuses any target that is not a partner —
+  without that check the permission would be a way to strip a factor from a super admin and then
+  need only a password.
+- **Enforcement is server-side.** Verified against the running API: an unenrolled partner's token
+  is refused 403 on `/partner/properties`, `/partner/me` and `/partner/payouts`, and accepted only
+  on `/auth/2fa/setup`.
 
-**Owner:** Bashar (mandatory or opt-in, and the recovery policy), then engineering.
+**Tests.** `partner-two-factor.integration.test.ts` (23 against a real database: enrolment, secret
+encryption, recovery codes stored only as hashes, single-use consumption, the reset clearing the
+secret rather than only the flag, session revocation, the audit row and what it must not contain,
+and the escalation guard); `two-factor.guard.test.ts` and `second-factor-required.test.ts` for the
+role logic; `e2e/partner.spec.ts` for the forced-enrolment journey in a browser. `db:testbed` seeds
+partner1 and partner2 enrolled and partner3 **unenrolled on purpose** — the permanent fixture for
+the migration case.
+
+**What remains, and it is operational rather than structural:**
+
+1. **Staff 2FA has no reset path.** Partners now have one; staff do not, so a locked-out staff
+   member is still a database edit. The same service is the obvious model, with a stricter rule
+   about who may reset whom — a support agent must not be able to reset a super admin.
+2. **Recovery codes cannot be regenerated.** A partner who uses seven of eight has no way to get a
+   fresh set short of disabling and re-enrolling, which the portal offers no screen for.
+3. **No "you have N recovery codes left" anywhere.** The count exists in the database and nothing
+   surfaces it, so the first sign a partner gets is running out.
+
+**Owner:** engineering.
 
 ### O-page-1 — What numbered pages cost, and when it stops being affordable
 

@@ -31,7 +31,7 @@ import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH } from '../config/constants.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
-import { AllowsUnenrolledStaff, CurrentUser, Public } from '../rbac/decorators.js';
+import { AllowsUnenrolled, CurrentUser, Public } from '../rbac/decorators.js';
 import { AccountRecoveryService } from './account-recovery.service.js';
 import {
   AuthService,
@@ -293,7 +293,7 @@ export class AuthController {
    * already carry, and a client that cannot read its own state cannot tell that
    * enrolment is what it is missing.
    */
-  @AllowsUnenrolledStaff()
+  @AllowsUnenrolled()
   @Get('me')
   me(@CurrentUser() user: AccessTokenClaims | undefined): AccessTokenClaims {
     if (!user) {

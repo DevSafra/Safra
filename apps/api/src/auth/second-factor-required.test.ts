@@ -115,4 +115,39 @@ describe('AuthService.login — second factor outstanding', () => {
       ).rejects.not.toBeInstanceOf(SecondFactorRequiredException);
     });
   });
+
+  /**
+   * Partners, mandatory since 2026-08-07.
+   *
+   * The login path asks `requiresTwoFactor`, not `isStaffRole`. Before that change an enrolled
+   * partner was never asked for their code — the account would have carried a second factor that
+   * sign-in ignored, which is worse than having none, because the partner believes they are
+   * protected.
+   */
+  describe('partners', () => {
+    it('demands the code from an enrolled partner', async () => {
+      await expect(
+        service({ role: 'partner' }).login(credentials, {}),
+      ).rejects.toBeInstanceOf(SecondFactorRequiredException);
+    });
+
+    /*
+      Requirement 1, the migration case. An existing partner has no enrolment, so sign-in must
+      still succeed — otherwise making 2FA mandatory locks out every partner who has one on the day
+      it ships, and none of them can enrol, because enrolling needs a session. `TwoFactorGuard` is
+      what makes that session useless for anything but enrolment.
+    */
+    it('lets an unenrolled partner sign in, so they can reach enrolment', async () => {
+      await expect(
+        service({ role: 'partner', totpEnabledAt: null }).login(credentials, {}),
+      ).rejects.not.toBeInstanceOf(SecondFactorRequiredException);
+    });
+
+    /* §4 specifies guest checkout: a customer is never asked, enrolled or not. */
+    it('never demands a code from a customer', async () => {
+      await expect(
+        service({ role: 'customer' }).login(credentials, {}),
+      ).rejects.not.toBeInstanceOf(SecondFactorRequiredException);
+    });
+  });
 });

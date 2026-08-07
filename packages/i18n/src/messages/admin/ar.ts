@@ -818,6 +818,29 @@ export const ar = {
       reject: 'رفض الطلب',
     },
 
+    /**
+     * إعادة تعيين المصادقة الثنائية للشريك — the lost-phone path.
+     *
+     * The copy states what the action DOES rather than naming the control after the feature,
+     * because the operator reading it is on the phone to somebody who cannot sign in and needs to
+     * know what will happen next: the partner is signed out everywhere and must enrol again.
+     */
+    partnerTwoFactor: {
+      title: 'المصادقة الثنائية',
+      enrolled: 'مُفعَّلة',
+      notEnrolled: 'غير مُفعَّلة',
+      explain:
+        'المصادقة الثنائية إلزامية لكل الشركاء. إعادة التعيين تُنهي جميع جلسات الشريك وتُلزمه بتسجيل مُصادِق جديد عند الدخول التالي — لا تمنحك رمزًا ولا تفتح الحساب نيابةً عنه.',
+      reset: 'إعادة تعيين المصادقة الثنائية',
+      reasonLabel:
+        'سبب إعادة التعيين. يُسجَّل في سجل التدقيق ويُطلب منه ثلاثة أحرف على الأقل.',
+      confirm: 'تأكيد إعادة التعيين',
+      working: 'جارٍ التنفيذ…',
+      done: 'أُعيد التعيين. أُنهيت {n} جلسة، وعلى الشريك تسجيل مُصادِق جديد عند الدخول التالي.',
+      failed: 'تعذّرت إعادة التعيين.',
+      unreachable: 'تعذّر الوصول إلى الخادم.',
+    },
+
     reviewProperty: {
       approveAndPublish: 'الموافقة والنشر',
       reject: 'رفض العقار',

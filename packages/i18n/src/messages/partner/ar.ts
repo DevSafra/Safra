@@ -45,6 +45,65 @@ export const ar = {
     failed: 'بيانات الدخول غير صحيحة.',
     notAPartner: 'هذا الحساب ليس حساب شريك.',
     unreachable: 'تعذّر الوصول إلى الخادم. حاول مرة أخرى.',
+
+    /**
+     * The second step, for a partner who has already enrolled.
+     *
+     * `codeLabel` covers both kinds of secret on purpose. Six digits is an authenticator code and
+     * anything else is a recovery code; asking somebody which one they are holding is a question
+     * they should not have to answer while locked out.
+     */
+    codeTitle: 'رمز التحقق',
+    codeLabel: 'رمز المُصادِق المكوَّن من ٦ أرقام، أو أحد رموز الاسترداد.',
+    codeSubmit: 'تأكيد',
+    codeChecking: 'جارٍ التحقق…',
+    codeBack: 'رجوع',
+    codeFailed: 'الرمز غير مقبول. تحقّق من تطبيق المُصادِق وحاول مرة أخرى.',
+
+    /**
+     * A locked account and a throttled one are NOT «بيانات الدخول غير صحيحة».
+     *
+     * Telling somebody their password is wrong when the real answer is "too many attempts" sends
+     * them to try again, which spends another attempt and locks the account faster. Both messages
+     * name the wait, because a person who knows to come back in a quarter of an hour stops
+     * hammering the form.
+     */
+    locked: 'أُقفل الحساب مؤقتًا بعد عدة محاولات فاشلة. حاول بعد ١٥ دقيقة.',
+    tooMany: 'محاولات كثيرة خلال وقت قصير. انتظر دقيقة ثم حاول مرة أخرى.',
+    codeFormat:
+      'صيغة الرمز غير صحيحة. أدخل ٦ أرقام أو رمز استرداد بالشكل XXXX-XXXX-XXXX.',
+  },
+
+  /**
+   * المصادقة الثنائية — mandatory for every partner (Bashar, 2026-08-07).
+   *
+   * The copy leads with WHY rather than with the instruction, because a partner meeting this
+   * screen did not ask for it: they tried to open their dashboard and were sent here instead.
+   * A screen that only says "enter a code" reads as a fault in the product.
+   */
+  twoFactor: {
+    title: 'تفعيل المصادقة الثنائية',
+    why: 'حسابك يتحكّم بإعلاناتك وأسعارك وتقويم إشغالك، ويعرض مستحقاتك المالية. لذلك المصادقة الثنائية إلزامية لكل الشركاء — ولا يمكن استخدام لوحة الشريك قبل تفعيلها.',
+    step1:
+      'افتح تطبيق مُصادِق (Google Authenticator أو Microsoft Authenticator أو ما شابه).',
+    step2: 'أضف حسابًا جديدًا يدويًا وألصق المفتاح أدناه.',
+    step3: 'أدخل الرمز المكوَّن من ٦ أرقام الذي يعرضه التطبيق.',
+    setupKey: 'مفتاح الإعداد',
+    loading: 'جارٍ التحميل…',
+    sixDigitCode: 'الرمز المكوَّن من ٦ أرقام',
+    submit: 'تفعيل المصادقة الثنائية',
+    checking: 'جارٍ التحقق…',
+    enabled: 'تم تفعيل المصادقة الثنائية على حسابك.',
+    saveRecoveryCodes: 'احفظ رموز الاسترداد هذه الآن.',
+    /* Stated plainly because it is true and irreversible: the API stores only Argon2id hashes. */
+    recoveryCodesNote:
+      'تُعرض مرة واحدة فقط ولا يمكن استرجاعها. كل رمز يصلح لمرة واحدة، ويُغنيك عن تطبيق المُصادِق إذا فقدت هاتفك. إذا فقدتها جميعًا فطريق العودة الوحيد هو مراسلة سفرة لإعادة التعيين.',
+    savedContinue: 'حفظتها — متابعة',
+    startFailed: 'تعذّر بدء التفعيل. أعد تحميل الصفحة للمحاولة مرة أخرى.',
+    codeRejected: 'الرمز غير مقبول. تحقّق من تطبيق المُصادِق وحاول مرة أخرى.',
+    failed: 'حدث خطأ. حاول مرة أخرى.',
+    unreachable: 'تعذّر الوصول إلى الخادم.',
+    signOut: 'تسجيل الخروج',
   },
 
   dashboard: {

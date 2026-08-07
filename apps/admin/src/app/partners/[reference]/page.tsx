@@ -7,6 +7,7 @@ import { statusTone } from '@/lib/status-tone';
 import { DocumentReview } from '@/components/document-review';
 import { ScreeningPanel } from '@/components/screening-panel';
 import { VerifyPartner } from '@/components/verify-partner';
+import { PartnerTwoFactor } from '@/components/partner-two-factor';
 import { BackLink, type BackTarget } from '@/components/back-link';
 import { backTarget } from '@/lib/search-params';
 import { fill, label, t } from '@/lib/strings';
@@ -178,6 +179,14 @@ export default async function PartnerPage({
         ) : (
           <VerifyPartner reference={partner.reference} screened={screened} />
         )}
+      </Section>
+
+      {/* ── Their sign-in security (O-partner-4) ──────────────────────────── */}
+      <Section title={t.sections.partnerTwoFactor.title}>
+        <PartnerTwoFactor
+          reference={partner.reference}
+          enrolled={partner.twoFactorEnabled}
+        />
       </Section>
     </Shell>
   );

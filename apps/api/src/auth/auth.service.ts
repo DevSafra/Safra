@@ -16,7 +16,7 @@ import {
   type AuthUser,
   type LoginInput,
   type RegisterInput,
-  isStaffRole,
+  requiresTwoFactor,
 } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
@@ -185,9 +185,17 @@ export class AuthService {
       throw genericFailure;
     }
 
-    // Staff 2FA (rule 1). Checked AFTER the password so a valid TOTP alone is
-    // never sufficient, and so TOTP state does not leak for a wrong password.
-    if (isStaffRole(user.role) && user.totpEnabledAt && user.totpSecretEncrypted) {
+    /*
+      Second factor (rule 1), for staff and — since 2026-08-07 — partners. Checked AFTER the
+      password so a valid TOTP alone is never sufficient, and so TOTP state does not leak for a
+      wrong password.
+
+      Still conditional on the account HAVING enrolled, which is what lets an existing partner sign
+      in at all on the day the requirement lands. The session they receive is gated by
+      `TwoFactorGuard` down to enrolment and nothing else, so "may sign in" and "may act" are two
+      different questions with two different answers.
+    */
+    if (requiresTwoFactor(user.role) && user.totpEnabledAt && user.totpSecretEncrypted) {
       if (!input.totpCode && !input.recoveryCode) {
         throw new SecondFactorRequiredException();
       }

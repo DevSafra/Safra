@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 import type { Role } from '@safra/contracts';
 
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { ALLOWS_UNENROLLED_STAFF_KEY, PUBLIC_KEY } from './decorators.js';
-import { StaffTwoFactorGuard } from './staff-two-factor.guard.js';
+import { ALLOWS_UNENROLLED_KEY, PUBLIC_KEY } from './decorators.js';
+import { TwoFactorGuard } from './two-factor.guard.js';
 
 /**
  * Regression guard for a shipped auth bypass.
@@ -21,8 +21,8 @@ import { StaffTwoFactorGuard } from './staff-two-factor.guard.js';
  * but the console is not the security boundary. Declining to enrol was a way to opt
  * out of two-factor authentication entirely.
  */
-describe('StaffTwoFactorGuard', () => {
-  const guard = new StaffTwoFactorGuard(new Reflector());
+describe('TwoFactorGuard', () => {
+  const guard = new TwoFactorGuard(new Reflector());
 
   it('refuses a staff account that has not enrolled', () => {
     expect(() => guard.canActivate(contextFor(claims('support_agent', false)))).toThrow(
@@ -40,9 +40,44 @@ describe('StaffTwoFactorGuard', () => {
     expect(guard.canActivate(contextFor(claims('super_admin', true)))).toBe(true);
   });
 
-  /** 2FA is a staff requirement (§4); a customer must not be caught by it. */
+  /** §4 specifies guest checkout; a customer must not be caught by this. */
   it('ignores customers, enrolled or not', () => {
     expect(guard.canActivate(contextFor(claims('customer', false)))).toBe(true);
+  });
+
+  /*
+    Partners, mandatory since 2026-08-07.
+
+    This is requirement 3 — "no partner should be able to use sensitive partner functionality
+    without completed 2FA" — asserted at the only layer where it counts. The portal's middleware
+    gate is a convenience; a partner calling the API directly with a valid session must be refused
+    here, and this test is what proves the refusal is not merely a redirect in a browser.
+  */
+  it('refuses a partner that has not enrolled', () => {
+    expect(() => guard.canActivate(contextFor(claims('partner', false)))).toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('admits a partner that has enrolled', () => {
+    expect(guard.canActivate(contextFor(claims('partner', true)))).toBe(true);
+  });
+
+  /*
+    An EXISTING partner account — one created before 2FA was mandatory — is exactly the unenrolled
+    case above, which is requirement 1: it holds a session and can reach only enrolment. Asserted
+    separately because the migration behaviour is a requirement in its own right and would
+    otherwise be covered only by implication.
+  */
+  it('lets an unenrolled partner reach enrolment and nothing else', () => {
+    const enrolment = contextFor(claims('partner', false), {
+      [ALLOWS_UNENROLLED_KEY]: true,
+    });
+
+    expect(guard.canActivate(enrolment)).toBe(true);
+    expect(() => guard.canActivate(contextFor(claims('partner', false)))).toThrow(
+      ForbiddenException,
+    );
   });
 
   it('ignores anonymous requests, leaving JwtAuthGuard to decide', () => {
@@ -53,9 +88,9 @@ describe('StaffTwoFactorGuard', () => {
    * Without this the enrolment endpoints are unreachable by exactly the accounts that
    * need them, and a new staff member can never make their account usable.
    */
-  it('admits an unenrolled staff account to a route marked AllowsUnenrolledStaff', () => {
+  it('admits an unenrolled staff account to a route marked AllowsUnenrolled', () => {
     const context = contextFor(claims('support_agent', false), {
-      [ALLOWS_UNENROLLED_STAFF_KEY]: true,
+      [ALLOWS_UNENROLLED_KEY]: true,
     });
 
     expect(guard.canActivate(context)).toBe(true);
@@ -104,5 +139,5 @@ function contextFor(
     switchToHttp: () => ({ getRequest: () => ({ user }) }),
     getHandler: () => handler,
     getClass: () => class Controller {},
-  } as unknown as Parameters<StaffTwoFactorGuard['canActivate']>[0];
+  } as unknown as Parameters<TwoFactorGuard['canActivate']>[0];
 }

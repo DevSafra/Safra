@@ -34,7 +34,7 @@ import { PasswordService } from '../common/crypto/password.service.js';
  *   DATABASE_URL=... BOOTSTRAP_ADMIN_EMAIL=ops@safra.example pnpm bootstrap:admin
  *
  * The account is created WITHOUT two-factor authentication enrolled. That is correct:
- * `StaffTwoFactorGuard` refuses every staff request until TOTP is enabled, so the
+ * `TwoFactorGuard` refuses every staff request until TOTP is enabled, so the
  * first sign-in is forced through enrolment before the account can do anything.
  */
 async function main(): Promise<void> {

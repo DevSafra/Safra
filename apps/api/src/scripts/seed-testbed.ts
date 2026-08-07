@@ -2,7 +2,9 @@ import { eq, sql } from 'drizzle-orm';
 
 import { createDatabase, schema, type Database, type Transaction } from '@safra/db';
 
+import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import { PasswordService } from '../common/crypto/password.service.js';
+import type { Env } from '../config/env.js';
 
 /**
  * A small, hand-built dataset you can actually test against — three شركاء, one customer, and
@@ -51,6 +53,20 @@ const FX_RATE_TO_SYP = 12500;
 
 const PASSWORD = process.env['TESTBED_PASSWORD'] ?? 'a-testbed-password-1';
 
+/**
+ * The TOTP secret the enrolled fixture partners share.
+ *
+ * Partner 2FA is mandatory (Bashar, 2026-08-07), so a testbed whose partners were all unenrolled
+ * would leave every screen behind the enrolment gate untestable — and a suite that enrolled them
+ * itself would need somewhere to keep the secret anyway.
+ *
+ * A fixed dev constant, overridable, exactly like `TESTBED_PASSWORD` above. It authenticates
+ * nothing outside a local `safra` database: `db:reset-dev` refuses a non-local connection string,
+ * and this script only ever runs beside it.
+ */
+const PARTNER_TOTP_SECRET =
+  process.env['TESTBED_PARTNER_TOTP_SECRET'] ?? 'KRSXG5CTMVRXEZLUMU2TAMBQGAYA';
+
 interface UnitSpec {
   readonly nameAr: string;
   readonly nameEn: string;
@@ -83,6 +99,15 @@ interface PartnerSpec {
   readonly address: string;
   readonly score: number;
   readonly tier: 'new' | 'needs_improvement' | 'silver' | 'gold';
+  /**
+   * Whether this fixture partner arrives with a second factor already enrolled.
+   *
+   * Both states are needed and neither is incidental. The enrolled ones let the suite reach every
+   * screen behind the gate; the unenrolled one is the FORCED-ENROLMENT fixture — the existing
+   * partner meeting a requirement that did not exist when their account was made, which is the
+   * migration behaviour the 2FA work has to keep proving.
+   */
+  readonly twoFactorEnrolled: boolean;
   readonly properties: readonly PropertySpec[];
 }
 
@@ -97,6 +122,7 @@ const PARTNERS: readonly PartnerSpec[] = [
     address: 'شارع بغداد، دمشق',
     score: 92,
     tier: 'gold',
+    twoFactorEnrolled: true,
     properties: [
       {
         nameAr: 'فندق قصر الشرق — المالكي',
@@ -159,6 +185,7 @@ const PARTNERS: readonly PartnerSpec[] = [
     address: 'الكورنيش الجنوبي، اللاذقية',
     score: 78,
     tier: 'silver',
+    twoFactorEnrolled: true,
     properties: [
       {
         nameAr: 'شاليهات الساحل — بلوران',
@@ -203,6 +230,7 @@ const PARTNERS: readonly PartnerSpec[] = [
     address: 'باب توما، دمشق القديمة',
     score: 85,
     tier: 'gold',
+    twoFactorEnrolled: false,
     properties: [
       {
         nameAr: 'بيت الياسمين الدمشقي',
@@ -299,6 +327,28 @@ async function main(): Promise<void> {
   } finally {
     await db.$client.end();
   }
+}
+
+/**
+ * The fixture TOTP secret, encrypted the way the API encrypts it.
+ *
+ * Built per call rather than held in a module constant so the script fails loudly at the point of
+ * use if `FIELD_ENCRYPTION_KEY` is absent, rather than at import time with a stack trace that says
+ * nothing about seeding.
+ */
+function encryptedPartnerSecret(): string {
+  const key = process.env['FIELD_ENCRYPTION_KEY'];
+
+  if (!key) {
+    throw new Error(
+      'FIELD_ENCRYPTION_KEY is required: the fixture partners enrol a second factor, and it is ' +
+        'stored encrypted exactly as a real enrolment stores it.',
+    );
+  }
+
+  return new FieldEncryptionService({ FIELD_ENCRYPTION_KEY: key } as Env).encrypt(
+    PARTNER_TOTP_SECRET,
+  );
 }
 
 /**
@@ -520,9 +570,29 @@ async function build(db: Seeder): Promise<void> {
     });
 
     /*
+      The second factor, set here rather than by the suite.
+
+      Written with the platform's own `FieldEncryptionService`, so the stored column is encrypted
+      exactly as a real enrolment leaves it — a fixture that wrote the secret in the clear would
+      pass every test and prove nothing about the code path that reads it back.
+
+      Recovery codes are deliberately left empty. They are Argon2id hashes of values shown once,
+      and a fixture cannot produce a code somebody could actually use without also storing it
+      somewhere; the recovery path is covered by `partner-two-factor.integration.test.ts`, which
+      generates and consumes real ones.
+    */
+    await db.execute(sql`
+      UPDATE users
+      SET totp_secret_encrypted = ${spec.twoFactorEnrolled ? encryptedPartnerSecret() : null},
+          totp_enabled_at = ${spec.twoFactorEnrolled ? sql`now()` : sql`NULL`},
+          totp_recovery_code_hashes = '{}'
+      WHERE id = ${user.id}
+    `);
+
+    /*
       Approved AND screened. `sanctions_screened_at` matters: the console refuses to approve a
       partner that has not been screened, so a fixture that skipped it would create a partner the
-      console считает half-finished.
+      console would treat as half-finished.
     */
     const [partner] = await db
       .insert(schema.partners)
@@ -968,11 +1038,21 @@ async function report(db: Seeder): Promise<void> {
     console.log(`  ${String(row.n).padStart(4)}  ${row.label}`);
 
   console.log('\n  Sign in with:');
-  for (const partner of PARTNERS)
-    console.log(`    ${partner.email.padEnd(24)} ${partner.displayName}`);
+  for (const partner of PARTNERS) {
+    const second = partner.twoFactorEnrolled
+      ? '2FA enrolled'
+      : '2FA NOT enrolled — lands on /enrol-2fa';
+
+    console.log(
+      `    ${partner.email.padEnd(24)} ${partner.displayName.padEnd(18)} ${second}`,
+    );
+  }
   console.log(`    ${CUSTOMER.email.padEnd(24)} ${CUSTOMER.fullName}`);
   console.log(`\n  Password for all of them: ${PASSWORD}`);
-  console.log('  (override with TESTBED_PASSWORD)\n');
+  console.log('  (override with TESTBED_PASSWORD)');
+  console.log(`\n  Partner authenticator secret: ${PARTNER_TOTP_SECRET}`);
+  console.log('  Current code:  pnpm partner:code');
+  console.log('  (override with TESTBED_PARTNER_TOTP_SECRET)\n');
 }
 
 main().catch((error: unknown) => {

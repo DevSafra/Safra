@@ -154,8 +154,12 @@ export const de = {
     'Bitte die Einrichtung starten, bevor die Zwei-Faktor-Authentifizierung aktiviert wird.',
   'auth.two_factor_already_enabled_reenrol':
     'Die Zwei-Faktor-Authentifizierung ist bereits aktiviert. Bitte zuerst deaktivieren, um sie neu einzurichten.',
-  'auth.two_factor_staff_only':
-    'Die Zwei-Faktor-Authentifizierung steht nur Mitarbeiterkonten zur Verfügung.',
+  'auth.two_factor_role_ineligible':
+    'Die Zwei-Faktor-Authentifizierung steht für diese Kontoart nicht zur Verfügung.',
+  'partner.two_factor_target_not_partner':
+    'Dieses Konto ist kein Partnerkonto. Zurücksetzungen an dieser Stelle gelten nur für Partnerkonten.',
+  'partner.two_factor_no_account':
+    'Dieser Partner hat kein Anmeldekonto, daher gibt es keinen zweiten Faktor zum Zurücksetzen.',
   'staff.role_invalid_console':
     'Das ist keine Mitarbeiterrolle. Dieser Endpunkt erstellt ausschließlich Konsolenkonten.',
   'staff.email_taken':

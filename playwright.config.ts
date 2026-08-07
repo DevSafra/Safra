@@ -56,6 +56,28 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['setup'],
+      /* The partner specs are their own project, LAST — see below. */
+      testIgnore: /partner\.spec\.ts/,
+    },
+    /**
+     * The partner portal, run after everything else.
+     *
+     * Not a style preference — a budget one. `POST /auth/login` allows ten calls a minute per IP,
+     * and partner 2FA (mandatory since 2026-08-07) turned one partner sign-in into three: a
+     * two-step sign-in for an enrolled partner, and one for the unenrolled fixture that proves
+     * forced enrolment. Running mid-suite, those three sat inside the same sixty-second window as
+     * the staff sign-in tests and pushed the last of them over the limit — which fails as
+     * «محاولات كثيرة», a message with no relationship to the code being tested.
+     *
+     * Ordering them last means partner sign-ins can starve nothing: there is nothing after them.
+     * `dependencies` is what expresses that, rather than relying on filenames sorting the way we
+     * happen to want today.
+     */
+    {
+      name: 'partner',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['chromium'],
+      testMatch: /partner\.spec\.ts/,
     },
   ],
 });

@@ -130,8 +130,12 @@ export const en = {
     'Start setup before enabling two-factor authentication.',
   'auth.two_factor_already_enabled_reenrol':
     'Two-factor authentication is already enabled. Disable it first to re-enrol.',
-  'auth.two_factor_staff_only':
-    'Two-factor authentication is available to staff accounts only.',
+  'auth.two_factor_role_ineligible':
+    'Two-factor authentication is not available for this account type.',
+  'partner.two_factor_target_not_partner':
+    'This account is not a partner. Two-factor resets here apply to partner accounts only.',
+  'partner.two_factor_no_account':
+    'This partner has no sign-in account, so there is no second factor to reset.',
   'staff.role_invalid_console':
     'That is not a staff role. This endpoint creates console accounts only.',
   'staff.email_taken':

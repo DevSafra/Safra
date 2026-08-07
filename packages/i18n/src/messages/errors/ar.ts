@@ -127,7 +127,12 @@ export const ar = {
   'auth.two_factor_setup_required': 'ابدأ التهيئة قبل تمكين المصادقة الثنائية.',
   'auth.two_factor_already_enabled_reenrol':
     'المصادقة الثنائية مُمكَّنة بالفعل. عطّلها أولاً لإعادة التهيئة.',
-  'auth.two_factor_staff_only': 'المصادقة الثنائية متاحة لحسابات الموظفين فقط.',
+  'auth.two_factor_role_ineligible':
+    'المصادقة الثنائية غير متاحة لهذا النوع من الحسابات.',
+  'partner.two_factor_target_not_partner':
+    'هذا الحساب ليس حساب شريك. إعادة التعيين هنا تخص حسابات الشركاء فقط.',
+  'partner.two_factor_no_account':
+    'لا يملك هذا الشريك حساب دخول، فلا يوجد عامل ثانٍ لإعادة تعيينه.',
   'staff.role_invalid_console':
     'هذا ليس دوراً وظيفياً. هذه الواجهة تُنشئ حسابات مركز القيادة فقط.',
   'staff.email_taken': 'يوجد حساب بهذا البريد بالفعل. غيّر دوره بدلاً من دعوته.',

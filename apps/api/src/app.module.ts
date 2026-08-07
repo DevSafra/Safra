@@ -26,7 +26,7 @@ import { RedisModule } from './redis/redis.module.js';
 import { RedisThrottlerStorage } from './redis/redis-throttler.storage.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
 import { PermissionsGuard } from './rbac/permissions.guard.js';
-import { StaffTwoFactorGuard } from './rbac/staff-two-factor.guard.js';
+import { TwoFactorGuard } from './rbac/two-factor.guard.js';
 
 @Module({
   imports: [
@@ -78,7 +78,7 @@ import { StaffTwoFactorGuard } from './rbac/staff-two-factor.guard.js';
     // After JwtAuthGuard (it needs request.user) and before PermissionsGuard: an
     // unenrolled staff account is refused on enrolment grounds, not on a permission
     // it may well hold.
-    { provide: APP_GUARD, useClass: StaffTwoFactorGuard },
+    { provide: APP_GUARD, useClass: TwoFactorGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     // Runs after the guards, so an unauthorised request is never audited as an
     // action. Also warns about mutating routes with no audit declaration (§15).

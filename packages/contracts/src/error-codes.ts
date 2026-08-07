@@ -145,7 +145,17 @@ export const ERROR = {
   AUTH_CODE_INVALID_CHECK_APP: 'auth.code_invalid_check_app',
   AUTH_TWO_FACTOR_SETUP_REQUIRED: 'auth.two_factor_setup_required',
   AUTH_TWO_FACTOR_ALREADY_ENABLED_REENROL: 'auth.two_factor_already_enabled_reenrol',
-  AUTH_TWO_FACTOR_STAFF_ONLY: 'auth.two_factor_staff_only',
+  AUTH_TWO_FACTOR_ROLE_INELIGIBLE: 'auth.two_factor_role_ineligible',
+  /**
+   * The reset endpoint was pointed at an account that is not a partner.
+   *
+   * This is the escalation guard, so it has its own code rather than a generic 404: a staff
+   * member who can reset a partner's second factor must never be able to reset a colleague's or a
+   * super admin's, and the refusal should be legible in the logs when someone tries.
+   */
+  PARTNER_TWO_FACTOR_TARGET_NOT_PARTNER: 'partner.two_factor_target_not_partner',
+  /** The partner record exists but has no user account behind it, so there is nothing to reset. */
+  PARTNER_TWO_FACTOR_NO_ACCOUNT: 'partner.two_factor_no_account',
   STAFF_ROLE_INVALID_CONSOLE: 'staff.role_invalid_console',
   STAFF_EMAIL_TAKEN: 'staff.email_taken',
   STAFF_ALREADY_ACTIVATED: 'staff.already_activated',

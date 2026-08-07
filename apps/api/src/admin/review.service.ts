@@ -307,8 +307,28 @@ export class ReviewService {
       LIMIT 50
     `);
 
+    /**
+     * Whether this partner holds a second factor.
+     *
+     * A boolean and nothing else. The reviewer needs it to answer "have they enrolled yet" before
+     * offering a reset; the secret, the recovery codes and their count are none of the console's
+     * business, and selecting them here would put them in a response that has no use for them.
+     *
+     * A separate query because `users` is not a relation on `partners` in this graph, and the
+     * alternative — widening `partnerDetail`'s relation set — would attach a user row to every
+     * other caller that wants a partner.
+     */
+    const account = await this.db.execute<{ two_factor_enabled: boolean }>(sql`
+      SELECT (u.totp_enabled_at IS NOT NULL) AS two_factor_enabled
+      FROM users u
+      JOIN partners p ON p.user_id = u.id
+      WHERE p.reference = ${reference}
+    `);
+
     return {
       ...partner,
+      /* No user account behind the partner reads as "not enrolled", which it is. */
+      twoFactorEnabled: account.rows[0]?.two_factor_enabled ?? false,
       properties: properties.rows.map((row) => ({
         reference: row.reference,
         nameAr: row.name_ar,

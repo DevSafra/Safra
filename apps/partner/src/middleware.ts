@@ -8,6 +8,7 @@ import {
   createNonce,
   decodeSession,
   encodeSession,
+  hasTwoFactor,
   needsRefresh,
   sessionCookieOptions,
   type Session,
@@ -15,6 +16,9 @@ import {
 
 /** The only path reachable without a partner session. */
 const PUBLIC_PATHS = ['/login'];
+
+/** Reachable with a session that has not yet enrolled in 2FA — and nothing else. */
+const ENROLMENT_PATHS = ['/enrol-2fa'];
 
 /**
  * Everything that guards لوحة الشريك, in one place.
@@ -24,13 +28,16 @@ const PUBLIC_PATHS = ['/login'];
  *  1. **Session** — rotated if the access token is spent, exactly as in the other two apps.
  *  2. **Partner role** — a staff or customer cookie on this origin counts as no session at all.
  *
- * ## Why there is no 2FA gate here, unlike the console
+ * ## The 2FA gate, mandatory since 2026-08-07
  *
- * The console refuses to be useful until a staff member has enrolled in TOTP, because it approves
- * partners and moves wallet balances. A partner sees their own listings and their own guests, and
- * the API asks a partner for no second factor — so a gate here would block every partner out of an
- * app they cannot get into, rather than raising anybody's security. When partner 2FA exists on the
- * API this is where the gate goes, and `hasTwoFactor` is already in `@safra/session` for it.
+ * Bashar decided partner 2FA is mandatory rather than optional, so an unenrolled partner reaches
+ * `/enrol-2fa` and nothing else. Unlike the console's gate, this one is not a posture the app
+ * adopts on its own: `TwoFactorGuard` on the API already refuses every partner call except
+ * enrolment, so this redirect is the honest face of a refusal the server is making anyway. A
+ * partner who skips the portal and calls the API directly gets the same answer.
+ *
+ * A partner who existed before the requirement signs in with their password exactly as before and
+ * lands here. That is the migration: no account is locked out, and none is useful until enrolled.
  *
  * ## None of this is the security boundary
  *
@@ -77,6 +84,7 @@ export default async function middleware(request: NextRequest) {
 function route(request: NextRequest, session: Session | null): NextResponse {
   const { pathname } = request.nextUrl;
   const onPublic = matches(pathname, PUBLIC_PATHS);
+  const onEnrolment = matches(pathname, ENROLMENT_PATHS);
 
   if (!session) {
     if (onPublic) return NextResponse.next();
@@ -93,8 +101,17 @@ function route(request: NextRequest, session: Session | null): NextResponse {
     return NextResponse.redirect(target);
   }
 
-  // Signed in: the sign-in page has nothing left to offer.
-  if (onPublic) return NextResponse.redirect(new URL('/', request.url));
+  if (!hasTwoFactor(session)) {
+    // Enrolment is the ONLY thing an unenrolled partner may reach.
+    return onEnrolment
+      ? NextResponse.next()
+      : NextResponse.redirect(new URL('/enrol-2fa', request.url));
+  }
+
+  // Fully authenticated: the sign-in and enrolment pages have nothing left to offer.
+  if (onPublic || onEnrolment) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
 
   return NextResponse.next();
 }

@@ -8,7 +8,7 @@ import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 import {
   ERROR,
-  isStaffRole,
+  requiresTwoFactor,
   type TotpEnableResponse,
   type TotpSetupResponse,
 } from '@safra/contracts';
@@ -50,7 +50,7 @@ export class TwoFactorService {
    * correct behaviour for "I closed the page and want to start over".
    */
   async beginSetup(claims: AccessTokenClaims | undefined): Promise<TotpSetupResponse> {
-    const user = await this.requireStaff(claims);
+    const user = await this.requireEnrollable(claims);
 
     if (user.totpEnabledAt !== null) {
       throw conflict(ERROR.AUTH_TWO_FACTOR_ALREADY_ENABLED_REENROL);
@@ -79,7 +79,7 @@ export class TwoFactorService {
     claims: AccessTokenClaims | undefined,
     code: string,
   ): Promise<TotpEnableResponse> {
-    const user = await this.requireStaff(claims);
+    const user = await this.requireEnrollable(claims);
 
     if (user.totpEnabledAt !== null) {
       throw conflict(ERROR.AUTH_TWO_FACTOR_ALREADY_ENABLED);
@@ -136,7 +136,7 @@ export class TwoFactorService {
     password: string,
     code: string,
   ): Promise<{ enabled: false }> {
-    const user = await this.requireStaff(claims);
+    const user = await this.requireEnrollable(claims);
 
     if (user.totpEnabledAt === null) {
       throw conflict(ERROR.AUTH_TWO_FACTOR_NOT_ENABLED);
@@ -226,10 +226,17 @@ export class TwoFactorService {
   }
 
   /**
-   * Only staff enrol in 2FA. Customers are out of scope for the MVP — rule 1 requires
-   * it for staff, and forcing it on guests would conflict with §4's guest checkout.
+   * Staff and partners enrol in 2FA; customers do not.
+   *
+   * Keyed on `requiresTwoFactor` rather than a role check written here, so this method and
+   * `TwoFactorGuard` cannot disagree about who is expected to hold a second factor. A disagreement
+   * would be silent and would take one of two shapes, both bad: an account the guard blocks but
+   * this refuses to enrol — locked out permanently — or an account that can enrol and is never
+   * asked for the code.
+   *
+   * Customers stay out because §4 specifies guest checkout.
    */
-  private async requireStaff(claims: AccessTokenClaims | undefined) {
+  private async requireEnrollable(claims: AccessTokenClaims | undefined) {
     if (!claims) throw unauthorized(ERROR.AUTH_REQUIRED);
 
     const user = await this.db.query.users.findFirst({
@@ -238,8 +245,8 @@ export class TwoFactorService {
 
     if (!user) throw unauthorized(ERROR.AUTH_REQUIRED);
 
-    if (!isStaffRole(user.role)) {
-      throw forbidden(ERROR.AUTH_TWO_FACTOR_STAFF_ONLY);
+    if (!requiresTwoFactor(user.role)) {
+      throw forbidden(ERROR.AUTH_TWO_FACTOR_ROLE_INELIGIBLE);
     }
 
     return user;

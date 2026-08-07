@@ -166,7 +166,7 @@ export class StaffService {
    * Invites a new staff member.
    *
    * The account exists immediately but cannot be used: no password, and
-   * `StaffTwoFactorGuard` will hold it at enrolment even once one is set.
+   * `TwoFactorGuard` will hold it at enrolment even once one is set.
    */
   async invite(
     actor: AccessTokenClaims | undefined,

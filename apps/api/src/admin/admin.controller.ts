@@ -3,9 +3,11 @@ import { Throttle } from '@nestjs/throttler';
 
 import {
   PERMISSIONS as P,
+  type PartnerTwoFactorResetInput,
   type PartnerVerifyInput,
   type PropertyReviewInput,
   type SanctionsScreeningInput,
+  partnerTwoFactorResetSchema,
   partnerVerifySchema,
   propertyReviewSchema,
   sanctionsScreeningSchema,
@@ -16,6 +18,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { DashboardService } from './dashboard.service.js';
+import { PartnerTwoFactorService } from '../auth/partner-two-factor.service.js';
 import { ReviewService } from './review.service.js';
 import { EU_SOURCE, SanctionsService } from '../sanctions/sanctions.service.js';
 import { parseEuSanctionsXml } from '../sanctions/eu-list.parser.js';
@@ -34,6 +37,7 @@ export class AdminController {
     private readonly review: ReviewService,
     private readonly dashboard: DashboardService,
     private readonly sanctions: SanctionsService,
+    private readonly partnerTwoFactor: PartnerTwoFactorService,
   ) {}
 
   /** The §9.2 dashboard counters. */
@@ -97,6 +101,32 @@ export class AdminController {
   @RequirePermissions(P.PARTNER_READ)
   async partnerDetail(@Param('reference') reference: string) {
     return this.review.partnerDetail(reference);
+  }
+
+  /**
+   * Clear a partner's second factor so they can enrol a new authenticator (§4.1 sensitive
+   * operation).
+   *
+   * Its own permission rather than `PARTNER_SUSPEND`, because this is the only partner action that
+   * REMOVES an authentication factor — see `PARTNER_TWO_FACTOR_RESET`. The service additionally
+   * refuses any target that is not a partner, so the route cannot be turned on a staff account.
+   *
+   * Throttled hard. There is no legitimate reason to reset several partners a minute, and a
+   * compromised operations session working down a list is exactly the shape this limits.
+   */
+  @Post('partners/:reference/two-factor/reset')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @AuditExempt(
+    'PartnerTwoFactorService records partner.two_factor_reset transactionally.',
+  )
+  @RequirePermissions(P.PARTNER_TWO_FACTOR_RESET)
+  async resetPartnerTwoFactor(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(partnerTwoFactorResetSchema))
+    body: PartnerTwoFactorResetInput,
+  ) {
+    return this.partnerTwoFactor.reset(user, reference, body.reason);
   }
 
   @Post('partners/:reference/verify')
