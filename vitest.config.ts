@@ -1,7 +1,48 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { defineConfig } from 'vitest/config';
+import { transform } from '@swc/core';
+import { defineConfig, type Plugin } from 'vitest/config';
+
+/** The API's own source — not its tests, which need no decorator metadata of their own. */
+const API_SOURCE = /[/\\]apps[/\\]api[/\\]src[/\\].*(?<!\.(?:test|spec))\.ts$/;
+
+/**
+ * Compiles the API's source the way the API itself is compiled.
+ *
+ * Vitest transforms with esbuild, which implements `experimentalDecorators` but NOT
+ * `emitDecoratorMetadata` — it has no type information to emit. NestJS reads exactly that metadata
+ * (`design:paramtypes`) to know what a constructor asks for, so under plain esbuild every
+ * dependency without an explicit `@Inject()` resolves to `undefined` and no test can assemble the
+ * container. That is why `PayoutModule` could ship missing a provider with `pnpm verify` green.
+ *
+ * SWC does emit it, and `apps/api/tsconfig.json` already turns both flags on, so this makes the
+ * test build agree with the production build rather than introducing a new one. Scoped to the API
+ * because it is the only decorator-driven code here; everything else stays on esbuild.
+ */
+function nestDecoratorMetadata(): Plugin {
+  return {
+    name: 'safra:nest-decorator-metadata',
+    enforce: 'pre',
+    async transform(code: string, id: string) {
+      if (!API_SOURCE.test(id)) return null;
+
+      const output = await transform(code, {
+        filename: id,
+        sourceMaps: true,
+        jsc: {
+          parser: { syntax: 'typescript', decorators: true },
+          transform: { legacyDecorator: true, decoratorMetadata: true },
+          target: 'es2022',
+        },
+        // Left as ESM for Vite to handle; SWC only performs the TypeScript transform.
+        module: { type: 'es6' },
+      });
+
+      return { code: output.code, map: output.map ?? null };
+    },
+  };
+}
 
 /**
  * Resolves the Next apps' `@/…` alias the way each app's own `tsconfig.json` does.
@@ -40,6 +81,7 @@ function resolveAppAlias(source: string, importer: string | undefined): string {
  * anywhere runs every suite, and so CI has a single entry point.
  */
 export default defineConfig({
+  plugins: [nestDecoratorMetadata()],
   resolve: {
     alias: [
       /**

@@ -41,6 +41,7 @@
     "zod": "^4.1.0"
   },
   "devDependencies": {
+    "@nestjs/testing": "^11.1.28",
     "@swc-node/register": "^1.12.1",
     "@swc/core": "^1.15.47",
     "@types/cookie-parser": "^1.4.8",
