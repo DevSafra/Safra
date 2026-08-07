@@ -91,6 +91,8 @@ const CLEAR_TABLES = [
   'partner_contracts',
   'partner_documents',
   'partner_payout_accounts',
+  'partner_payout_items',
+  'partner_payouts',
   'partner_violations',
   'partners',
   'payment_provider_events',
@@ -144,6 +146,8 @@ async function main(): Promise<void> {
   const client = await pool.connect();
 
   try {
+    await assertEveryTableIsAccountedFor(client);
+
     const before = await counts(client);
 
     await client.query('BEGIN');
@@ -188,6 +192,38 @@ async function main(): Promise<void> {
   } finally {
     client.release();
     await pool.end();
+  }
+}
+
+/**
+ * Every table must be a deliberate choice: cleared, kept, or `users`.
+ *
+ * A new table that nobody adds to either list is not caught by the TRUNCATE — it simply survives,
+ * and a reset that leaves data behind is worse than one that fails, because the next seed builds on
+ * rows the developer believes are gone. `partner_payouts` and `partner_payout_items` did exactly
+ * that: they were added with the payout ledger, missed here, and the leftovers then blocked the
+ * testbed from deleting the bookings they referenced.
+ *
+ * Checked BEFORE the transaction, so an unlisted table stops the run rather than aborting it
+ * halfway. The message names the table, which is the whole fix.
+ */
+async function assertEveryTableIsAccountedFor(client: {
+  query: (sql: string) => Promise<{ rows: { table_name: string }[] }>;
+}): Promise<void> {
+  const { rows } = await client.query(`
+    SELECT table_name FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+  `);
+
+  const known = new Set([...CLEAR_TABLES, ...KEEP_TABLES, 'users']);
+  const unlisted = rows.map((r) => r.table_name).filter((name) => !known.has(name));
+
+  if (unlisted.length > 0) {
+    throw new Error(
+      `Refusing to run: ${unlisted.join(', ')} ${unlisted.length === 1 ? 'is' : 'are'} in the ` +
+        'database but in neither CLEAR_TABLES nor KEEP_TABLES. Decide which, then re-run — a ' +
+        'reset that quietly leaves a table populated is a worse outcome than this error.',
+    );
   }
 }
 

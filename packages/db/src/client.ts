@@ -6,6 +6,16 @@ import * as schema from './schema/index.js';
 export type Database = ReturnType<typeof createDatabase>;
 
 /**
+ * The handle inside `db.transaction(...)`.
+ *
+ * Derived from `Database` rather than imported from drizzle's internals so it cannot drift from
+ * whatever `drizzle()` actually returns here. It exists so a function can declare that it works
+ * against either — which is what makes a multi-step routine wrappable in a transaction without a
+ * cast, and a cast is exactly what would hide the day the two stop being interchangeable.
+ */
+export type Transaction = Parameters<Parameters<Database['transaction']>[0]>[0];
+
+/**
  * Connection pooling is not optional at this scale: PostgreSQL forks a backend per
  * connection, so uncapped clients exhaust the server long before CPU or IO do.
  * In production this pool sits behind pgBouncer in transaction mode.

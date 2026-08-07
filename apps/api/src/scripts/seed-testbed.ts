@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 
-import { createDatabase, schema, type Database } from '@safra/db';
+import { createDatabase, schema, type Database, type Transaction } from '@safra/db';
 
 import { PasswordService } from '../common/crypto/password.service.js';
 
@@ -268,6 +268,14 @@ function isoDate(offsetDays: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Everything here runs against either the pool or a transaction on it.
+ *
+ * Stated as a type rather than left to inference so the transaction wrapper below cannot be
+ * undone by someone adding a call that only the pool supports.
+ */
+type Seeder = Database | Transaction;
+
 async function main(): Promise<void> {
   const databaseUrl = process.env['DATABASE_URL'];
 
@@ -276,7 +284,18 @@ async function main(): Promise<void> {
   const db = createDatabase(databaseUrl, 2);
 
   try {
-    await build(db);
+    /*
+      One transaction over the clear AND the seed.
+
+      This script deletes the previous fixtures before writing the new ones, so a failure in the
+      middle used to leave a database with neither: a run that stopped on a foreign key left the
+      console with no disputes and no message threads, and the e2e suite then reported that as a
+      product regression. Rolled back, a failed seed leaves exactly what was there before, and the
+      only thing lost is the time.
+    */
+    await db.transaction(async (tx) => {
+      await build(tx);
+    });
   } finally {
     await db.$client.end();
   }
@@ -289,7 +308,7 @@ async function main(): Promise<void> {
  * in is pinned by the append-only audit log, and its history is worth more than a clean insert.
  */
 async function upsertUser(
-  db: Database,
+  db: Seeder,
   values: {
     email: string;
     phone: string;
@@ -339,7 +358,7 @@ async function upsertUser(
   return row;
 }
 
-async function build(db: Database): Promise<void> {
+async function build(db: Seeder): Promise<void> {
   /* The platform's own hasher, so a fixture account is hashed exactly like a real one. */
   const passwordHash = await new PasswordService().hash(PASSWORD);
 
@@ -405,6 +424,38 @@ async function build(db: Database): Promise<void> {
   await db.execute(sql`DELETE FROM dispute_evidence WHERE dispute_id IN (
     SELECT id FROM disputes WHERE booking_id IN (${testbedBookings}))`);
   await db.execute(sql`DELETE FROM disputes WHERE booking_id IN (${testbedBookings})`);
+
+  /*
+    Payouts pin the bookings they cover, so they go before the bookings do.
+
+    A PAID payout is money that left the company, and `deny_paid_payout_mutation` refuses to delete
+    one — correctly, and including here. So this stops with an instruction rather than an
+    `insufficient_privilege` from a trigger nobody was expecting: clearing a database that has paid
+    transfers on it is `db:reset-dev`'s job, because only TRUNCATE gets past an append-only rule and
+    only that script is guarded well enough to be allowed to.
+  */
+  const paid = await db.execute<{ reference: string }>(sql`
+    SELECT p.reference FROM partner_payouts p
+    WHERE p.status = 'paid'
+      AND p.id IN (SELECT payout_id FROM partner_payout_items
+                   WHERE booking_id IN (${testbedBookings}))`);
+
+  if (paid.rows.length > 0) {
+    throw new Error(
+      `Refusing to run: ${paid.rows.length} PAID payout(s) cover bookings this script would ` +
+        `delete (${paid.rows.map((r) => r.reference).join(', ')}). A paid payout is a completed ` +
+        'transfer and is immutable by design. Run `pnpm db:reset-dev --yes` first, which clears ' +
+        'the payout tables wholesale, then re-run this seed.',
+    );
+  }
+
+  await db.execute(sql`DELETE FROM partner_payout_items
+    WHERE booking_id IN (${testbedBookings})`);
+  await db.execute(sql`DELETE FROM partner_payouts
+    WHERE partner_id IN (
+      SELECT pa.id FROM partners pa JOIN users u ON u.id = pa.user_id
+      WHERE lower(u.email) IN (${emailList}))`);
+
   await db.execute(sql`DELETE FROM bookings WHERE id IN (${testbedBookings})`);
 
   const testbedPartners = sql`
@@ -660,7 +711,7 @@ async function build(db: Database): Promise<void> {
  * booking is one of theirs, and nothing arrives from a test run nobody remembers.
  */
 async function bulk(
-  db: Database,
+  db: Seeder,
   ctx: {
     profileId: string;
     usd: { id: string };
@@ -842,7 +893,7 @@ async function bulk(
  * about a screen. This is also the pair the console cares most about: النزاعات carries the payout
  * freeze, and الرسائل is the one place customer, partner and SAFRA meet.
  */
-async function conversation(db: Database, customerProfileId: string): Promise<void> {
+async function conversation(db: Seeder, customerProfileId: string): Promise<void> {
   const [booking] = await db
     .select({
       id: schema.bookings.id,
@@ -903,7 +954,7 @@ async function conversation(db: Database, customerProfileId: string): Promise<vo
   console.log('  1 dispute and a three-party thread');
 }
 
-async function report(db: Database): Promise<void> {
+async function report(db: Seeder): Promise<void> {
   const rows = await db.execute<{ label: string; n: number }>(sql`
     SELECT 'partners' AS label, count(*)::int AS n FROM partners
     UNION ALL SELECT 'properties', count(*)::int FROM properties
