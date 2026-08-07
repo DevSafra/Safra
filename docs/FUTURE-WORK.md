@@ -469,6 +469,18 @@ captures; an address is personal data and the counter has no use for a readable 
 ten while account B on the same address is still served, and a 45-request stuffing run across 45
 different accounts from one address stopped at forty.
 
+**And it uncovered an enumeration oracle, now closed.** `auth.locked` was returned BEFORE the
+password was checked, so five wrong guesses locked a real account and a sixth confirmed it existed
+— while an unregistered address answered the generic message forever. Six requests to confirm
+anybody's registration. Raising the IP ceiling would have made that roughly four times faster from
+one host, so rather than narrow the ceiling back and reintroduce the NAT problem, the password is
+now verified FIRST: `auth.locked` requires knowing it, which is exactly the legitimate user who
+needs to hear it. Verified live — a locked real account and an address that never existed both
+answer `401 auth.credentials_invalid`. Net enumeration risk is LOWER than before the change.
+
+**The full design and its rationale are in `docs/auth-rate-limiting.md`**, including what these
+controls deliberately do not protect against.
+
 **A side effect worth recording:** `e2e/partner.setup.ts` no longer needs its sixty-second wait —
 `ops`, `partner1`, `partner3` and `customer` each have their own budget now. The suite is half a
 minute faster and no longer competes with itself, for the same reason a NAT'd office no longer

@@ -104,11 +104,13 @@ describeIfDb('the account lockout', () => {
   });
 
   /*
-    A locked account answers `auth.locked`, not the generic credentials message. That is a
-    deliberate disclosure: the person has to be told to wait rather than left retrying, and by
-    then an attacker has already learned the address exists from having locked it.
+    A locked account answers `auth.locked` — to somebody who knows the password.
+
+    The disclosure is deliberate: a person who cannot get in has to be told to wait rather than
+    left retyping. Requiring the password first is what stops it being an enumeration oracle; see
+    the pair of tests below.
   */
-  it('says the account is locked rather than blaming the password', async () => {
+  it('tells somebody with the right password that the account is locked', async () => {
     for (let i = 0; i < 5; i += 1) await wrong().catch(() => undefined);
 
     const code = await service
@@ -116,6 +118,32 @@ describeIfDb('the account lockout', () => {
       .catch((error: { response?: { code?: string } }) => error.response?.code);
 
     expect(code).toBe('auth.locked');
+  });
+
+  /**
+   * The enumeration oracle, closed 2026-08-07.
+   *
+   * Before the password was checked first, five wrong guesses locked a real account and a sixth
+   * returned `auth.locked` — while an address that does not exist answered the generic message
+   * forever. Six requests confirmed anybody's registration, at the cost of denying them service.
+   *
+   * Now a caller who does not know the password cannot tell a locked real account from an address
+   * that was never registered. Asserted as an EQUALITY between the two, because that is the
+   * property: not "it returns X" but "it returns the same thing either way".
+   */
+  it('does not reveal a locked account to somebody guessing passwords', async () => {
+    for (let i = 0; i < 5; i += 1) await wrong().catch(() => undefined);
+
+    const lockedReal = await wrong().catch(
+      (error: { response?: { code?: string } }) => error.response?.code,
+    );
+
+    const neverRegistered = await service
+      .login({ email: `ghost-${crypto.randomUUID()}@safra.test`, password: 'not-it' }, {})
+      .catch((error: { response?: { code?: string } }) => error.response?.code);
+
+    expect(lockedReal).toBe(neverRegistered);
+    expect(lockedReal).toBe('auth.credentials_invalid');
   });
 
   it('does not lock after four', async () => {

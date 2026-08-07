@@ -169,19 +169,37 @@ export class AuthService {
       throw genericFailure;
     }
 
+    /*
+      The password is checked BEFORE the lock, and the order is a security decision (2026-08-07).
+
+      `auth.locked` is a deliberate disclosure — somebody who cannot get in has to be told to wait
+      rather than left retyping. But answering it to a caller who has NOT proved the password made
+      it an account-enumeration oracle: five wrong guesses lock a real account and a sixth returns
+      `auth.locked`, while an address that does not exist answers the generic message forever. Six
+      requests to confirm anybody's registration, at the cost of denying them service.
+
+      That oracle predates the throttling change and was made roughly four times faster by it — the
+      per-IP ceiling on auth routes went from ten a minute to forty so a NAT'd office would stop
+      starving itself, which also widened this. Rather than narrow the ceiling back and reintroduce
+      the NAT problem, the oracle is closed: `auth.locked` now requires knowing the password, which
+      is exactly the legitimate user who needs to hear it.
+
+      The lockout itself is unchanged. A locked account still cannot sign in with the correct
+      password, and a wrong guess against one still counts and extends it.
+    */
+    const passwordValid = await this.passwords.verify(user.passwordHash, input.password);
+
+    if (!passwordValid) {
+      await this.registerFailedAttempt(user.id);
+      throw genericFailure;
+    }
+
     if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
       throw unauthorized(ERROR.AUTH_LOCKED);
     }
 
     if (user.status !== 'active') {
       // Deliberately generic: a suspended account should not be confirmable.
-      throw genericFailure;
-    }
-
-    const passwordValid = await this.passwords.verify(user.passwordHash, input.password);
-
-    if (!passwordValid) {
-      await this.registerFailedAttempt(user.id);
       throw genericFailure;
     }
 
