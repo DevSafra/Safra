@@ -185,6 +185,39 @@ describeIfDb('PropertyImageService', () => {
     it('refuses an empty upload', async () => {
       await expect(service.upload(partner(), reference, undefined)).rejects.toThrow();
     });
+
+    /**
+     * The regression: a new photograph goes at the END, after an archive has left a gap.
+     *
+     * The position used to be the live COUNT, and archiving does not renumber. Three images minus
+     * the first two leaves one sitting at position 2 with a count of 1 — so the next upload took
+     * position 1 and appeared BEFORE the image already there. A partner adding a photograph
+     * watched it land in the middle of their gallery, and nothing on the screen explained why.
+     */
+    it('appends after an archive, rather than filling the gap it left', async () => {
+      const first = await add();
+      const second = await add();
+
+      await add();
+
+      /* Archive from the front, so the survivor keeps a position above the remaining count. */
+      await service.archive(partner(), reference, first.id);
+      await service.archive(partner(), reference, second.id);
+
+      const survivor = await service.list(partner(), reference);
+
+      expect(survivor).toHaveLength(1);
+      expect(survivor[0]?.sortOrder).toBe(2);
+
+      const added = await add();
+      const list = await service.list(partner(), reference);
+
+      expect(list).toHaveLength(2);
+      /* Last in the list, and holding a position of its own rather than tying with the survivor. */
+      expect(list[1]?.id).toBe(added.id);
+      expect(list[1]?.sortOrder).toBe(3);
+      expect(new Set(list.map((image) => image.sortOrder)).size).toBe(2);
+    });
   });
 
   /**

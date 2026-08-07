@@ -87,6 +87,21 @@ export class PropertyImageService {
       throw badRequest(ERROR.PROPERTY_IMAGE_LIMIT, { max: MAX_IMAGES_PER_PROPERTY });
     }
 
+    /*
+      Where the new photograph goes: AFTER the last one, which is not the same as "at position
+      `existing`".
+
+      `sortOrder: existing` was the obvious version and it was wrong, because archiving does not
+      renumber the rows it leaves behind. A gallery of three whose first two are archived still
+      holds one image at position 2, and the count is 1 — so the next upload claimed position 1 and
+      appeared BEFORE the photograph already there. The partner uploads a new picture and it lands
+      in the middle of their gallery, which reads as the order being random.
+
+      Positions can also COLLIDE this way, and a tie is broken by `created_at`, so two uploads into
+      the same gap come back in an order nothing on the screen explains.
+    */
+    const nextPosition = await this.nextSortOrder(property.id);
+
     const processed = await this.images.process(file.buffer, {
       kind: 'properties',
       owner: property.reference,
@@ -104,7 +119,7 @@ export class PropertyImageService {
           variantWidths: [...new Set(processed.variants.map((v) => v.width))],
           /* The first image becomes the cover, so a listing is never coverless. */
           isCover: existing === 0,
-          sortOrder: existing,
+          sortOrder: nextPosition,
         })
         .returning({ id: schema.propertyImages.id });
 
@@ -373,6 +388,21 @@ export class PropertyImageService {
     if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);
 
     return property;
+  }
+
+  /**
+   * One past the last live position.
+   *
+   * `max + 1` over the live rows, not the count of them — see the note in `upload`. Zero for an
+   * empty gallery, which keeps the first image at position 0 as before.
+   */
+  private async nextSortOrder(propertyId: string): Promise<number> {
+    const result = await this.db.execute<{ next: string }>(
+      sql`SELECT coalesce(max(sort_order) + 1, 0)::text AS next FROM property_images
+          WHERE property_id = ${propertyId} AND deleted_at IS NULL`,
+    );
+
+    return Number(result.rows[0]?.next ?? 0);
   }
 
   private async countLive(propertyId: string): Promise<number> {
