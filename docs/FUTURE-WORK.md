@@ -122,6 +122,7 @@ Bashar, not an implementation detail.
 | Staff scope is ENFORCED server-side, two modes                    | **2026-08-04** | `none` \| `read_only` outside scope; writes refused in both. See gap report §4a                                                                                                                                                                                                                                                                                             |
 | **The audit log is never scoped**                                 | **2026-08-04** | Bashar: "a scoped audit log is not a trustworthy audit log"                                                                                                                                                                                                                                                                                                                 |
 | **Violation fines are RECORDED, never deducted — pending a rule** | **2026-08-07** | Bashar, explicit. `partner_violations` records the fine; `partner_payouts.fine_amount` stays zero and nothing subtracts it. The subtraction already exists in the accrual (`net = gross − fine`) and is deliberately left unwired until the business rule is defined. The partner dashboard says «غرامة ١٠$ مسجَّلة», NOT the handoff's «خُصمت من المستحقات» — see D-fine-1 |
+| **Auth throttling is keyed on IP + account, not IP alone**        | **2026-08-07** | Bashar, approved. One person behind carrier-grade NAT could lock out everyone sharing their egress address — a real problem for Syrian partners. Two limits now: ten a minute per (IP, account) and forty per IP on auth routes. The five-attempt account lockout is unchanged and is what bounds a distributed attack. See `account-tracker.ts`                            |
 | Every booking export writes an audit row                          | **2026-08-04** | who · when · filters · row count; immutable                                                                                                                                                                                                                                                                                                                                 |
 
 ---
@@ -435,6 +436,43 @@ a lint rule that cries wolf gets switched off.
 **The remaining exception**, and it is small: the allow-list holds four entries — `Content-Type`,
 `application/json`, `Not signed in.` (a proxy's own 401 body, never rendered) and `Desktop Chrome`.
 Each is exempt for a stated reason.
+
+### O-sec-1 — Closed: auth throttling no longer punishes a shared address
+
+**Closed 2026-08-07**, on Bashar's approval.
+
+**The problem.** `POST /auth/login` was throttled at ten a minute per IP. Carrier-grade NAT puts
+thousands of Syrian subscribers behind one address, so one hotel's front desk retrying a typo
+consumed the budget for every other partner on that carrier — and the symptom on somebody else's
+FIRST attempt was «محاولات كثيرة», which reads as the product being broken. This project's own test
+suite hit it repeatedly and worked around it with a sixty-second wait.
+
+**The fix, and why the obvious version was wrong.** Keying on the email ALONE would have solved the
+NAT problem and introduced a worse one: anybody who knows an address could spend that account's
+budget from anywhere and keep the owner locked out — a targeted denial of service available to a
+stranger. The key is IP **and** a hash of the email, so each (person, network) pair has its own
+budget. Neither can starve the other.
+
+**What still stops credential stuffing**, because the rate limit is now more permissive:
+
+1. **A per-IP ceiling stays on every auth route**, at forty a minute — loose enough for a NAT'd
+   office signing in at the start of a shift, tight enough to bound an attacker cycling addresses
+   from one host, which is the shape of a stuffing run.
+2. **The five-attempt account lockout is untouched.** It is enforced against the USER ROW in
+   `AuthService`, not against a counter in Redis, so it does not care where attempts came from —
+   which is what bounds a distributed attack. It had no dedicated test; it has seven now.
+
+**The email is hashed into the key.** Redis keys turn up in `MONITOR` output and in whatever a host
+captures; an address is personal data and the counter has no use for a readable one.
+
+**Verified against the running API**, and both properties are now e2e tests: account A throttled at
+ten while account B on the same address is still served, and a 45-request stuffing run across 45
+different accounts from one address stopped at forty.
+
+**A side effect worth recording:** `e2e/partner.setup.ts` no longer needs its sixty-second wait —
+`ops`, `partner1`, `partner3` and `customer` each have their own budget now. The suite is half a
+minute faster and no longer competes with itself, for the same reason a NAT'd office no longer
+competes with itself.
 
 ### O-data-1 — Closed: the append-only guarantee now survives TRUNCATE
 

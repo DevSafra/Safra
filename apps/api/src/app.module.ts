@@ -25,6 +25,10 @@ import { WalletModule } from './wallet/wallet.module.js';
 import { HealthModule } from './health/health.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { RedisThrottlerStorage } from './redis/redis-throttler.storage.js';
+import {
+  accountTracker,
+  skipUnlessAccountNamed,
+} from './common/throttle/account-tracker.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
 import { PermissionsGuard } from './rbac/permissions.guard.js';
 import { TwoFactorGuard } from './rbac/two-factor.guard.js';
@@ -49,7 +53,29 @@ import { TwoFactorGuard } from './rbac/two-factor.guard.js';
       imports: [RedisModule],
       inject: [RedisThrottlerStorage],
       useFactory: (storage: RedisThrottlerStorage) => ({
-        throttlers: [{ name: 'default', ttl: 60_000, limit: 120 }],
+        throttlers: [
+          { name: 'default', ttl: 60_000, limit: 120 },
+          /**
+           * The per-ACCOUNT limit, added 2026-08-07 (Bashar).
+           *
+           * Applies wherever a request body names an email — login, registration, password reset,
+           * email verification — and is keyed on IP + a hash of that address rather than on IP
+           * alone. See `account-tracker.ts` for why both, and for what still stops credential
+           * stuffing once one NAT user can no longer starve another.
+           *
+           * Ten a minute per (person, network). The per-IP ceiling on those same routes is what
+           * bounds an attacker cycling addresses, and the five-attempt account lockout in
+           * `AuthService` is what bounds a distributed one.
+           */
+          {
+            name: 'account',
+            ttl: 60_000,
+            limit: 10,
+            skipIf: skipUnlessAccountNamed,
+            getTracker: (req: Record<string, unknown>) =>
+              Promise.resolve(accountTracker(req)),
+          },
+        ],
         storage,
       }),
     }),

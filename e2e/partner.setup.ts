@@ -29,20 +29,20 @@ import {
 } from './partner-session.js';
 
 /*
-  Long enough for a full throttle window, because this project runs immediately after
-  `staff-login.spec.ts` has spent eight of the ten sign-ins the limiter allows per minute.
+  The sixty-second wait that used to be here is GONE, and that is the point of the change on
+  2026-08-07.
 
-  A wait in a test suite is normally a smell. This one is load-bearing and cheap to justify: the
-  alternative is a suite that fails intermittently with «محاولات كثيرة» — a message about the
-  limiter doing its job, attached to whichever test happened to run when the budget ran out. That
-  failure has already cost this project two debugging sessions.
+  Auth throttling was keyed on IP alone, so this suite's fourteen sign-ins — eight of them in
+  `staff-login.spec.ts`, which tests the form itself — shared one ten-a-minute budget and the last
+  ones failed as «محاولات كثيرة». The fix was not a bigger budget: it was keying the limit on IP +
+  ACCOUNT, so `ops@safra.test`, `partner1`, `partner3` and `customer@safra.test` each have their
+  own. The suite stopped competing with itself for the same reason a NAT'd office of partners
+  stopped competing with each other.
+
+  The projects still run in order — see `playwright.config.ts` — because staff and partner specs
+  share a database, not a rate limit.
 */
-const THROTTLE_WINDOW_MS = 61_000;
-
 setup('capture a partner session', async ({ page, context }) => {
-  setup.setTimeout(THROTTLE_WINDOW_MS + 30_000);
-  await new Promise((resolve) => setTimeout(resolve, THROTTLE_WINDOW_MS));
-
   await page.goto(`${BASE}/login`);
   await page.getByLabel(t.login.email).fill(EMAIL);
   await page.getByLabel(t.login.password, { exact: true }).fill(PASSWORD);

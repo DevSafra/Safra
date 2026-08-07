@@ -93,16 +93,25 @@ export class AuthController {
 
   @Public()
   /**
-   * Ten per minute, not five, because a staff sign-in now costs TWO requests:
-   * credentials, then the second factor. At five, a staff member who mistyped a code
-   * once was locked out mid-sign-in — measured on 2026-08-03.
+   * ## Two limits, and they answer different questions
    *
-   * This restores the previous number of user-visible ATTEMPTS rather than loosening
-   * the control. The primary defence against targeted brute force is unchanged: five
-   * failed attempts locks the account for fifteen minutes, and a missing second factor
-   * does not count toward that.
+   * The `account` throttler — ten a minute, keyed on IP + a hash of the email — is the one a real
+   * person meets. Ten, not five, because a staff sign-in costs TWO requests: credentials, then the
+   * second factor. At five, somebody who mistyped a code once was locked out mid-sign-in
+   * (measured 2026-08-03). It is registered globally in `app.module.ts` and applies here because
+   * this body names an account.
+   *
+   * The `default` throttler is the per-IP ceiling and is what an attacker meets. Forty a minute:
+   * loose enough that a NAT'd office of partners signing in at the start of a shift is unaffected,
+   * tight enough that cycling a thousand addresses from one host is bounded — which is the shape
+   * of a credential-stuffing run. Before 2026-08-07 this was TEN per IP and there was no account
+   * dimension, so one person's typo consumed the budget for everyone behind their carrier.
+   *
+   * Neither is the primary defence against targeted brute force. That is unchanged and lives in
+   * `AuthService`: five failed attempts locks the ACCOUNT for fifteen minutes, wherever they came
+   * from, and a missing second factor does not count toward it.
    */
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: 40, ttl: 60_000 } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   /**
