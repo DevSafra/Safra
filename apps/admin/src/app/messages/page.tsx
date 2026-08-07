@@ -52,8 +52,6 @@ export default async function MessagesPage({
           <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
           <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
-        ) : result.items.length === 0 ? (
-          <p className="text-[12.5px] text-faint">{t.table.empty}</p>
         ) : (
           <>
             {/*
@@ -61,17 +59,27 @@ export default async function MessagesPage({
               element: this is a `<ul>` of cards and it pages, returns and scrolls back like every
               other registry. See `rowAnchor`.
             */}
-            <ul className="grid gap-2.5">
-              {result.items.map((thread) => (
-                <li
-                  key={thread.reference}
-                  id={rowAnchor(thread.reference)}
-                  className="scroll-mt-24 target:rounded-[11px] target:bg-[rgba(var(--goldA),0.14)]"
-                >
-                  <Thread thread={thread} back={back} />
-                </li>
-              ))}
-            </ul>
+            {result.items.length === 0 ? (
+              <p className="text-[12.5px] text-faint">{t.table.empty}</p>
+            ) : (
+              <ul className="grid gap-2.5">
+                {result.items.map((thread) => (
+                  <li
+                    key={thread.reference}
+                    id={rowAnchor(thread.reference)}
+                    className="scroll-mt-24 target:rounded-[11px] target:bg-[rgba(var(--goldA),0.14)]"
+                  >
+                    <Thread thread={thread} back={back} />
+                  </li>
+                ))}
+              </ul>
+            )}
+            {/*
+              The bar stays when the list is empty, as it does on every other registry — an empty
+              result is usually a filter that matched nothing or a page past the end, and hiding
+              the pager there strands the reader with no total, no way back to page one and no
+              size control. `AdminTable` behaves the same way for the ten `<table>` registries.
+            */}
             <TablePagination
               basePath="/messages"
               section="messages"
