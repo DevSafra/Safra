@@ -159,6 +159,10 @@ export const de = {
   'partner.two_factor_target_not_partner':
     'Dieses Konto ist kein Partnerkonto. Zurücksetzungen an dieser Stelle gelten nur für Partnerkonten.',
   'validation.review_rating_range': 'Eine Bewertung muss zwischen 1 und 5 liegen.',
+  'image.order_mismatch':
+    'Die Bildreihenfolge muss genau die aktuellen Bilder dieser Unterkunft enthalten.',
+  'image.last_one':
+    'Ein veröffentlichtes Inserat braucht mindestens ein Bild. Bitte zuerst ein Ersatzbild hochladen.',
   'review.not_found': 'Bewertung nicht gefunden.',
   'review.stay_not_completed':
     'Eine Bewertung ist erst nach abgeschlossenem Aufenthalt möglich.',

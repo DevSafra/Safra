@@ -272,7 +272,39 @@ export const ar = {
       dead boxes: an image is uploaded against a property that already exists.
     */
     imagesLater:
-      'تُضاف الصور بعد إنشاء العقار، من شاشة التعديل. لا يمكن رفع صورة لعقار لم يُنشأ بعد.',
+      'تُضاف الصور بعد إنشاء العقار، من شاشة الصور. لا يمكن رفع صورة لعقار لم يُنشأ بعد.',
+    manageImages: 'الصور',
+  },
+
+  /**
+   * صور العقار — the media manager (§5.6 gallery, §7.2).
+   *
+   * The copy is explicit that nothing is ever deleted: an image is ARCHIVED, and the reason is
+   * that a photograph is evidence of what a listing claimed on the day somebody booked it. A
+   * dispute about "the room looked nothing like the photo" is unanswerable if the photo is gone.
+   */
+  images: {
+    title: 'صور العقار',
+    note: 'أول صورة بالترتيب هي صورة الغلاف التي تظهر في نتائج البحث. تُعالَج كل صورة وتُزال منها بيانات الموقع قبل النشر.',
+    empty: 'لا صور بعد. ارفع أول صورة لهذا العقار.',
+    count: '{n} من {max} صورة',
+    upload: 'رفع صورة',
+    uploading: 'جارٍ الرفع…',
+    cover: 'صورة الغلاف',
+    makeCover: 'اجعلها صورة الغلاف',
+    moveUp: 'تقديم',
+    moveDown: 'تأخير',
+    archive: 'أرشفة',
+    archiveConfirm: 'تُؤرشَف الصورة ولا تُحذف — تبقى سجلاً لما عرضه الإعلان. متابعة؟',
+    altLabel: 'وصف الصورة لقارئ الشاشة (اختياري)',
+    altSave: 'حفظ الوصف',
+    altSaved: 'حُفظ',
+    backToProperties: 'رجوع إلى عقاراتي',
+    /* Each failure says which one it was: a partner who cannot tell them apart retries the wrong thing. */
+    uploadFailed: 'تعذّر رفع الصورة. تأكد أنها صورة صالحة وأصغر من ١٠ ميغابايت.',
+    lastImage: 'لا يمكن أرشفة الصورة الأخيرة لعقار منشور. ارفع صورة بديلة أولاً.',
+    failed: 'تعذّر تنفيذ الطلب.',
+    unreachable: 'تعذّر الوصول إلى الخادم.',
   },
 
   /** Property state, as the handoff's §7.2 pills name it. */

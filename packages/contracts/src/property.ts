@@ -272,3 +272,38 @@ export const sanctionsScreeningSchema = z
   .strict();
 
 export type SanctionsScreeningInput = z.infer<typeof sanctionsScreeningSchema>;
+
+/**
+ * Reordering a property's images (§7.2 gallery).
+ *
+ * The FULL set of ids, in the order they should appear — not a pair of positions. A "move item 3
+ * to position 1" API has to be applied against the client's idea of the current order, and two
+ * tabs open on the same listing then produce an order neither person chose. Sending the whole
+ * array makes the request self-describing: whatever it says, that is the order afterwards.
+ *
+ * The server checks the set matches the property's live images exactly, so a partial array cannot
+ * quietly archive the images it omits.
+ */
+export const propertyImageOrderSchema = z
+  .object({ imageIds: z.array(z.string().uuid()).min(1).max(30) })
+  .strict();
+
+export type PropertyImageOrderInput = z.infer<typeof propertyImageOrderSchema>;
+
+/**
+ * Alternative text for one image.
+ *
+ * Per locale, all optional, because a partner writing Arabic alt text should not be blocked on
+ * also writing German. An image with no alt text renders `alt=""` — correct for decoration and
+ * honest for a gallery, where the surrounding copy already names the property; a filename in the
+ * alt attribute is worse than nothing for a screen-reader user.
+ */
+export const propertyImageAltSchema = z
+  .object({
+    ar: z.string().trim().max(300).optional(),
+    en: z.string().trim().max(300).optional(),
+    de: z.string().trim().max(300).optional(),
+  })
+  .strict();
+
+export type PropertyImageAltInput = z.infer<typeof propertyImageAltSchema>;

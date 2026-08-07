@@ -135,6 +135,10 @@ export const en = {
   'partner.two_factor_target_not_partner':
     'This account is not a partner. Two-factor resets here apply to partner accounts only.',
   'validation.review_rating_range': 'A review score must be between 1 and 5.',
+  'image.order_mismatch':
+    'The image order must list exactly this property\u2019s current images.',
+  'image.last_one':
+    'A published listing needs at least one image. Upload a replacement first.',
   'review.not_found': 'Review not found.',
   'review.stay_not_completed': 'A review can only be written after the stay is complete.',
   'review.already_written': 'This booking already has a review.',

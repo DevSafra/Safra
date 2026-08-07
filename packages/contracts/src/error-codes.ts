@@ -96,6 +96,10 @@ export const ERROR = {
   UPLOAD_IMAGE_UNREADABLE: 'upload.image_unreadable',
   UPLOAD_IMAGE_TOO_LARGE: 'upload.image_too_large',
   IMAGE_NOT_FOUND: 'image.not_found',
+  /** A reorder that does not name exactly the property's live images. */
+  IMAGE_ORDER_MISMATCH: 'image.order_mismatch',
+  /** Archiving the only image would leave a listing with no cover at all. */
+  IMAGE_LAST_ONE: 'image.last_one',
   CONTRACT_NOT_FOUND: 'contract.not_found',
   CONTRACT_PDF_REQUIRED: 'contract.pdf_required',
   CONTRACT_NOT_AWAITING_SIGNATURE: 'contract.not_awaiting_signature',

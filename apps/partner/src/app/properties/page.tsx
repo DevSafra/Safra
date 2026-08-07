@@ -5,6 +5,8 @@ import {
   sidebarBadges,
   type PartnerProperty,
 } from '@/lib/api';
+import Link from 'next/link';
+
 import { AddProperty } from '@/components/add-property';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
@@ -166,6 +168,13 @@ function Card({ property }: { readonly property: PartnerProperty }) {
           ) : null}
 
           <div className="mt-2.5 flex gap-2">
+            {/* الصور is built; تعديل and التقويم are not, and say so rather than navigating nowhere. */}
+            <Link
+              href={`/properties/${encodeURIComponent(property.reference)}/images`}
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-gold/50 px-3 text-[11.5px] font-semibold text-gold lg:min-h-0 lg:py-1.5"
+            >
+              {t.properties.manageImages}
+            </Link>
             <Action label={t.properties.edit} />
             <Action label={t.properties.calendar} />
           </div>

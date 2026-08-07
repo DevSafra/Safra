@@ -1,50 +1,58 @@
 import {
+  Body,
   Controller,
   Delete,
-  Inject,
+  Get,
   Param,
+  Patch,
   Post,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
-import { and, eq, isNull, sql } from 'drizzle-orm';
 
-import type { Database } from '@safra/db';
-import { schema } from '@safra/db';
-import { ERROR, PERMISSIONS as P } from '@safra/contracts';
+import {
+  PERMISSIONS as P,
+  type PropertyImageAltInput,
+  type PropertyImageOrderInput,
+  propertyImageAltSchema,
+  propertyImageOrderSchema,
+} from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
-import { AuditService } from '../common/audit/audit.service.js';
-import { DATABASE } from '../database/database.module.js';
-import { ImageService } from '../storage/image.service.js';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { requirePartnerId } from '../rbac/ownership.js';
-import { badRequest, notFound } from '../common/errors/app-error.js';
-
-/** §5.5 rewards photo count in the ranking, so a cap keeps that from being gamed. */
-const MAX_IMAGES_PER_PROPERTY = 30;
+import { PropertyImageService } from './property-images.service.js';
 
 /**
- * Property image upload (roadmap item 81, feeding §5.6's gallery).
+ * Property image management (roadmap item 81, feeding §5.6's gallery and §7.2's manager).
  *
- * Multipart upload rather than a presigned URL. A presigned PUT would let the
- * browser write straight to the bucket and save us the bandwidth, but it also means
- * the object lands **unvalidated** — we could not decode it, strip its EXIF, or
- * confirm it is even an image before it is publicly readable. Routing bytes through
- * the API keeps that guarantee; if bandwidth becomes the constraint, the fix is a
- * presigned upload into a quarantine bucket plus a processing worker, not skipping
- * validation.
+ * Multipart upload rather than a presigned URL. A presigned PUT would let the browser write
+ * straight to the bucket and save us the bandwidth, but it also means the object lands
+ * **unvalidated** — we could not decode it, strip its EXIF, or confirm it is even an image before
+ * it is publicly readable. Routing bytes through the API keeps that guarantee; if bandwidth
+ * becomes the constraint, the fix is a presigned upload into a quarantine bucket plus a processing
+ * worker, not skipping validation.
+ *
+ * Every route is scoped by the service to the `partnerId` in the VERIFIED token, and answers 404
+ * for another partner's reference so it cannot be probed. The logic lives in
+ * `PropertyImageService`; this file is the HTTP surface.
  */
 @Controller('partner/properties/:reference/images')
 export class PartnerImagesController {
-  constructor(
-    @Inject(DATABASE) private readonly db: Database,
-    private readonly images: ImageService,
-    private readonly audit: AuditService,
-  ) {}
+  constructor(private readonly images: PropertyImageService) {}
+
+  @Get()
+  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @AuditExempt('A partner reading their own gallery; changes nothing.')
+  async list(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.images.list(user, reference);
+  }
 
   @Post()
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
@@ -64,94 +72,54 @@ export class PartnerImagesController {
     @UploadedFile()
     file: { buffer: Buffer; mimetype: string; originalname: string } | undefined,
   ) {
-    const partnerId = requirePartnerId(user, P.PROPERTY_MANAGE_OWN);
+    return this.images.upload(user, reference, file);
+  }
 
-    if (!file?.buffer) {
-      throw badRequest(ERROR.UPLOAD_FILE_MISSING);
-    }
+  /**
+   * The display order, as the FULL list of ids.
+   *
+   * A PATCH on the collection rather than on each image: the order is a property of the set, and
+   * applying it one row at a time leaves a window where two images share a position.
+   */
+  @Patch('order')
+  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @AuditExempt('Audited transactionally inside PropertyImageService.reorder.')
+  async reorder(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(propertyImageOrderSchema)) body: PropertyImageOrderInput,
+  ) {
+    return this.images.reorder(user, reference, body);
+  }
 
-    const property = await this.db.query.properties.findFirst({
-      where: and(
-        eq(schema.properties.reference, reference),
-        eq(schema.properties.partnerId, partnerId),
-        isNull(schema.properties.deletedAt),
-      ),
-      columns: { id: true, reference: true },
-    });
+  /**
+   * Makes one image the cover.
+   *
+   * Declared AFTER `order` so `:imageId` does not swallow it — Nest matches routes in declaration
+   * order, and a literal segment placed second is a route that never fires.
+   */
+  @Post(':imageId/cover')
+  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @AuditExempt('Audited transactionally inside PropertyImageService.setCover.')
+  async setCover(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Param('imageId') imageId: string,
+  ) {
+    return this.images.setCover(user, reference, imageId);
+  }
 
-    // 404 rather than 403 — another partner's reference must not be confirmable.
-    if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);
-
-    const existing = await this.db.execute<{ count: string }>(
-      sql`SELECT COUNT(*)::text AS count FROM property_images
-          WHERE property_id = ${property.id} AND deleted_at IS NULL`,
-    );
-
-    if (Number(existing.rows[0]?.count ?? 0) >= MAX_IMAGES_PER_PROPERTY) {
-      throw badRequest(ERROR.PROPERTY_IMAGE_LIMIT, { max: MAX_IMAGES_PER_PROPERTY });
-    }
-
-    /**
-     * file.mimetype and file.originalname are BOTH ignored. Either can be set to
-     * anything by the client; only the decoded file header is evidence.
-     */
-    const processed = await this.images.process(file.buffer, {
-      kind: 'properties',
-      owner: property.reference,
-    });
-
-    const inserted = await this.db.transaction(async (tx) => {
-      const isFirst = Number(existing.rows[0]?.count ?? 0) === 0;
-
-      const [row] = await tx
-        .insert(schema.propertyImages)
-        .values({
-          propertyId: property.id,
-          fileKey: processed.fileKey,
-          width: processed.width,
-          height: processed.height,
-          // Distinct widths only — each appears twice, once per format.
-          variantWidths: [...new Set(processed.variants.map((v) => v.width))],
-          // The first image becomes the cover, so a listing is never coverless.
-          isCover: isFirst,
-          sortOrder: Number(existing.rows[0]?.count ?? 0),
-        })
-        .returning({ id: schema.propertyImages.id });
-
-      if (!row) throw new Error('Image insert returned no row.');
-
-      await this.audit.record(
-        {
-          actorUserId: user?.sub,
-          actorRole: user?.role,
-          action: 'property_image.uploaded',
-          subjectType: 'property',
-          subjectId: property.id,
-          after: {
-            fileKey: processed.fileKey,
-            width: processed.width,
-            height: processed.height,
-            // The original filename is recorded for support, never used as a key.
-            uploadedAs: file.originalname,
-          },
-        },
-        tx as unknown as Database,
-      );
-
-      return row;
-    });
-
-    return {
-      id: inserted.id,
-      fileKey: processed.fileKey,
-      width: processed.width,
-      height: processed.height,
-      urls: {
-        thumbnail: this.images.publicUrl(processed.fileKey, 400),
-        medium: this.images.publicUrl(processed.fileKey, 800),
-        large: this.images.publicUrl(processed.fileKey, 1600),
-      },
-    };
+  /** Alternative text, per locale — the accessibility half of a gallery. */
+  @Patch(':imageId/alt')
+  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @AuditExempt('Copy, not a decision about money, access or visibility.')
+  async setAlt(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Param('imageId') imageId: string,
+    @Body(new ZodValidationPipe(propertyImageAltSchema)) body: PropertyImageAltInput,
+  ) {
+    return this.images.setAlt(user, reference, imageId, body);
   }
 
   /** Soft delete only (P-003). The stored objects are intentionally left in place. */
@@ -163,46 +131,6 @@ export class PartnerImagesController {
     @Param('reference') reference: string,
     @Param('imageId') imageId: string,
   ) {
-    const partnerId = requirePartnerId(user, P.PROPERTY_MANAGE_OWN);
-
-    const rows = await this.db
-      .select({ id: schema.propertyImages.id, isCover: schema.propertyImages.isCover })
-      .from(schema.propertyImages)
-      .innerJoin(
-        schema.properties,
-        eq(schema.properties.id, schema.propertyImages.propertyId),
-      )
-      .where(
-        and(
-          eq(schema.propertyImages.id, imageId),
-          eq(schema.properties.reference, reference),
-          eq(schema.properties.partnerId, partnerId),
-          isNull(schema.propertyImages.deletedAt),
-        ),
-      )
-      .limit(1);
-
-    const image = rows[0];
-    if (!image) throw notFound(ERROR.IMAGE_NOT_FOUND);
-
-    await this.db.transaction(async (tx) => {
-      await tx
-        .update(schema.propertyImages)
-        .set({ deletedAt: new Date() })
-        .where(eq(schema.propertyImages.id, imageId));
-
-      await this.audit.record(
-        {
-          actorUserId: user?.sub,
-          actorRole: user?.role,
-          action: 'property_image.archived',
-          subjectType: 'property_image',
-          subjectId: imageId,
-        },
-        tx as unknown as Database,
-      );
-    });
-
-    return { id: imageId, archived: true };
+    return this.images.archive(user, reference, imageId);
   }
 }

@@ -372,3 +372,29 @@ export async function getPropertyFormReference(): Promise<
     return 'failed';
   }
 }
+
+/** One photograph, as `GET /partner/properties/:reference/images` returns it. */
+const propertyImageSchema = z.object({
+  id: z.string(),
+  fileKey: z.string(),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+  variantWidths: z.array(z.number()),
+  isCover: z.boolean(),
+  sortOrder: z.number(),
+  alt: z.object({
+    ar: z.string().nullable(),
+    en: z.string().nullable(),
+    de: z.string().nullable(),
+  }),
+  urls: z.object({ thumbnail: z.string(), medium: z.string(), large: z.string() }),
+});
+
+export type PropertyImage = z.infer<typeof propertyImageSchema>;
+
+export async function getPropertyImages(reference: string) {
+  return partnerFetch(
+    `/partner/properties/${encodeURIComponent(reference)}/images`,
+    z.array(propertyImageSchema),
+  );
+}

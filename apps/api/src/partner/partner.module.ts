@@ -13,6 +13,7 @@ import { PartnerImagesController } from './images.controller.js';
 import { PartnerController } from './partner.controller.js';
 import { PartnerRegistrationService } from './partner-registration.service.js';
 import { PropertiesService } from './properties.service.js';
+import { PropertyImageService } from './property-images.service.js';
 
 @Module({
   controllers: [
@@ -23,6 +24,7 @@ import { PropertiesService } from './properties.service.js';
   ],
   providers: [
     PropertiesService,
+    PropertyImageService,
     PartnerDashboardService,
     CalendarService,
     PartnerRegistrationService,

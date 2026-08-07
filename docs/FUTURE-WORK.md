@@ -666,6 +666,42 @@ The wording returns to the handoff's the moment a deduction is real.
 
 **Owner:** Bashar for the five questions above, then engineering. Not blocking anything else.
 
+### O-media-1 — Property images are managed; a defect and two guarantees came with it
+
+**Shipped 2026-08-07.** Upload existed and nothing else did — no list, no reorder, no cover change,
+no alt text — so a partner could add photographs and never arrange them.
+
+**The defect this uncovered.** Archiving the COVER did not promote another. `is_cover` was read in
+the delete handler and never used, so a property kept its photographs while its card rendered «لا
+صورة بعد» and every search result showed a placeholder. Fixed by promoting the next image by sort
+order, in the same transaction, with a regression test.
+
+**Two guarantees added at the database.** A partial unique index — one cover per property, over
+LIVE rows only, so an archived image keeps its flag as a record of what the listing looked like at
+the time. And `sort_order >= 0` plus positive dimensions, because the frontend divides by height to
+hold the aspect ratio and a zero would be a division by zero in somebody's browser.
+
+**Two rules the service enforces that the old handler did not.** A published listing keeps at least
+one image — archiving the last one left a live listing rendering a placeholder to customers, and it
+is now refused with the remedy named. And a reorder must name EXACTLY the property's live images: a
+partial array is ambiguous about whether an omitted image goes last or was meant to be archived,
+and guessing either way silently changes what a customer sees.
+
+**Verified end to end** against the running API with a real JPEG carrying EXIF: upload, list,
+reorder, set cover, alt text, archive-the-cover-and-promote, and a 404 for another partner. EXIF —
+including GPS — is stripped as a side effect of re-encoding, confirmed directly rather than assumed.
+
+**What remains:**
+
+1. **No browser test for the upload itself.** The manager's buttons are covered by the service
+   tests; a Playwright `setInputFiles` against the real pipeline would also cover the multipart
+   proxy, and does not exist.
+2. **Alt text is Arabic-only in the UI.** The API stores all three locales and the manager edits
+   one. The customer site is trilingual, so the other two are reachable only by API.
+3. **No bulk upload.** One file at a time; §7.2's form draws three slots.
+
+**Owner:** engineering.
+
 ### O-partner-3 — The dashboard is built; the calendar shows one unit
 
 **Shipped 2026-08-07.** `GET /partner/dashboard` answers the whole §7.1 screen in one round trip:

@@ -132,6 +132,8 @@ export const ar = {
   'partner.two_factor_target_not_partner':
     'هذا الحساب ليس حساب شريك. إعادة التعيين هنا تخص حسابات الشركاء فقط.',
   'validation.review_rating_range': 'يجب أن يكون التقييم بين ١ و٥.',
+  'image.order_mismatch': 'يجب أن يتضمّن ترتيب الصور صور هذا العقار الحالية بالضبط.',
+  'image.last_one': 'لا يمكن حذف الصورة الأخيرة لعقار منشور. ارفع صورة بديلة أولاً.',
   'review.not_found': 'التقييم غير موجود.',
   'review.stay_not_completed': 'لا يمكن كتابة تقييم إلا بعد اكتمال الإقامة.',
   'review.already_written': 'لهذا الحجز تقييم بالفعل.',
