@@ -57,7 +57,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['setup'],
       /* The specs that SIGN IN are their own project, LAST — see below. */
-      testIgnore: /(partner|customer-review|auth-throttle)\.spec\.ts/,
+      testIgnore: /(partner|partner-images|customer-review|auth-throttle)\.spec\.ts/,
     },
     /**
      * Everything that SIGNS IN, run after everything else.
@@ -98,7 +98,7 @@ export default defineConfig({
       name: 'signed-in',
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['signed-in-setup'],
-      testMatch: /(partner|customer-review|auth-throttle)\.spec\.ts/,
+      testMatch: /(partner|partner-images|customer-review|auth-throttle)\.spec\.ts/,
     },
   ],
 });
