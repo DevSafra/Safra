@@ -108,3 +108,55 @@ const walletTransactionsSchema = z.object({
 export async function getMyWalletTransactions() {
   return authedFetch('/wallet/transactions?limit=10', walletTransactionsSchema);
 }
+
+// ─── Reviews (§7.3, P-006) ───────────────────────────────────────────────────
+
+const pendingReviewSchema = z.object({
+  bookingReference: z.string(),
+  propertyName: z.string().nullable(),
+  unitName: z.string().nullable(),
+  checkIn: z.string(),
+  checkOut: z.string(),
+});
+
+export type PendingReview = z.infer<typeof pendingReviewSchema>;
+
+/** The stays this customer may still write about — the account page's prompt. */
+export async function getPendingReviews() {
+  return authedFetch('/reviews/pending', z.array(pendingReviewSchema));
+}
+
+/**
+ * Whether this customer may review one booking, and what they wrote if they did.
+ *
+ * The API answers 404 for a booking that is not theirs, indistinguishably from one that does not
+ * exist — so this returns 'failed' in both cases and the page renders not-found. That is
+ * deliberate: a different answer would let a reference be probed for existence, and references are
+ * sequential (§13.2).
+ */
+const reviewEligibilitySchema = z.object({
+  propertyName: z.string().nullable(),
+  unitName: z.string().nullable(),
+  stayCompleted: z.boolean(),
+  alreadyReviewed: z.boolean(),
+  eligible: z.boolean(),
+  review: z
+    .object({
+      reference: z.string(),
+      rating: z.number(),
+      body: z.string(),
+      status: z.string(),
+      partnerReply: z.string().nullable(),
+      createdAt: z.string(),
+    })
+    .nullable(),
+});
+
+export type ReviewEligibility = z.infer<typeof reviewEligibilitySchema>;
+
+export async function getReviewForBooking(reference: string) {
+  return authedFetch(
+    `/reviews/booking/${encodeURIComponent(reference)}`,
+    reviewEligibilitySchema,
+  );
+}

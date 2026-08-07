@@ -296,5 +296,26 @@
       "completed": "Abgeschlossen",
       "disputed": "Strittig"
     }
+  },
+  "reviews": {
+    "title": "Bewerten Sie Ihren Aufenthalt",
+    "prompt": "Sie waren in {property}. Berichten Sie anderen Reisenden davon.",
+    "pendingTitle": "Aufenthalte, die auf Ihre Bewertung warten",
+    "writeReview": "Bewertung schreiben",
+    "ratingLabel": "Ihre Bewertung von 5",
+    "bodyLabel": "Wie war Ihr Aufenthalt?",
+    "bodyHint": "Mindestens drei Zeichen. Wird unter Ihrem Namen für Reisende und den Partner angezeigt.",
+    "submit": "Bewertung senden",
+    "submitting": "Wird gesendet…",
+    "rule": "Eine Bewertung kann nach dem Senden weder bearbeitet noch gelöscht werden (P-006). Der Partner kann darauf antworten.",
+    "yourReview": "Ihre Bewertung",
+    "partnerReply": "Antwort des Partners",
+    "notCompleted": "Sie können bewerten, sobald Ihr Aufenthalt beendet ist.",
+    "alreadyReviewed": "Sie haben diesen Aufenthalt bereits bewertet.",
+    "hidden": "SAFRA hat diese Bewertung nach Prüfung einer Partnermeldung ausgeblendet. Sie bleibt in Ihrem Verlauf und ist für Besucher nicht sichtbar.",
+    "failed": "Die Bewertung konnte nicht gesendet werden. Bitte erneut versuchen.",
+    "unreachable": "Der Server ist nicht erreichbar.",
+    "backToAccount": "Zurück zu meinem Konto",
+    "none": "Keine Aufenthalte warten auf Ihre Bewertung."
   }
 }

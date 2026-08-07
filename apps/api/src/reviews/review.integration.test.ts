@@ -256,6 +256,104 @@ describeIfDb('ReviewService', () => {
   });
 
   /**
+   * What the customer app asks before it draws a form.
+   *
+   * The prompt and the write endpoint have to agree about eligibility, or a customer is offered a
+   * form that then refuses them — so these assert the two answer the same question.
+   */
+  describe('customer eligibility', () => {
+    it('offers a completed, unreviewed stay', async () => {
+      const pending = await service.pendingForCustomer(guest());
+
+      expect(pending.map((row) => row.bookingReference)).toContain(bookingReference);
+    });
+
+    it('stops offering it once it has been reviewed', async () => {
+      await write();
+
+      const pending = await service.pendingForCustomer(guest());
+
+      expect(pending.map((row) => row.bookingReference)).not.toContain(bookingReference);
+    });
+
+    it('never offers a stay that has not finished', async () => {
+      const pending = await service.pendingForCustomer(guest());
+
+      expect(pending.map((row) => row.bookingReference)).not.toContain(pendingReference);
+    });
+
+    it('offers a different customer nothing of this one’s', async () => {
+      const stranger: AccessTokenClaims = {
+        ...guest(),
+        sub: staffUserId,
+      };
+
+      const pending = await service.pendingForCustomer(stranger);
+
+      expect(pending.map((row) => row.bookingReference)).not.toContain(bookingReference);
+    });
+
+    it('reports a completed stay as eligible, with the property named', async () => {
+      const view = await service.forBooking(guest(), bookingReference);
+
+      expect(view.eligible).toBe(true);
+      expect(view.stayCompleted).toBe(true);
+      expect(view.alreadyReviewed).toBe(false);
+      expect(view.propertyName).toBe('اختبار');
+    });
+
+    it('reports an unfinished stay as not yet eligible', async () => {
+      const view = await service.forBooking(guest(), pendingReference);
+
+      expect(view.eligible).toBe(false);
+      expect(view.stayCompleted).toBe(false);
+    });
+
+    it('returns the review once written, so the page shows it instead of a form', async () => {
+      await write(4, 'كانت إقامة هادئة ومريحة.');
+
+      const view = await service.forBooking(guest(), bookingReference);
+
+      expect(view.eligible).toBe(false);
+      expect(view.alreadyReviewed).toBe(true);
+      expect(view.review?.rating).toBe(4);
+    });
+
+    /*
+      Hiding a review from its own author would leave them unable to tell "SAFRA removed this"
+      from "it never saved" — and the second reading produces a duplicate attempt that the unique
+      index then refuses, which reads as the site being broken.
+    */
+    it('still shows the author their own review after staff hide it', async () => {
+      const { reference } = await write();
+      await service.report(partner(), reference, 'Describes a different property.');
+      await service.moderate(staff(), reference, {
+        decision: 'uphold',
+        note: 'Upheld after review.',
+      });
+
+      const view = await service.forBooking(guest(), bookingReference);
+
+      expect(view.review?.status).toBe('hidden');
+      expect(view.review?.body).toBeTruthy();
+    });
+
+    /*
+      A booking that is not yours is a 404, indistinguishable from one that does not exist. A
+      different answer would let a reference be probed, and references are sequential (§13.2).
+    */
+    it('answers not-found for a booking belonging to somebody else', async () => {
+      const stranger: AccessTokenClaims = { ...guest(), sub: staffUserId };
+
+      await expect(service.forBooking(stranger, bookingReference)).rejects.toThrow();
+    });
+
+    it('answers not-found for a reference that does not exist', async () => {
+      await expect(service.forBooking(guest(), 'BKG-2026-999999')).rejects.toThrow();
+    });
+  });
+
+  /**
    * P-006, asserted where it actually lives.
    *
    * *"لا يمكن حذف تقييم — يمكنك الرد عليه أو الإبلاغ عنه"*. The service has no delete method, but

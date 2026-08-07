@@ -562,12 +562,19 @@ that contradicts it. `e2e/admin-sections.spec.ts` does the same for the staff qu
 
 **What remains:**
 
-1. **No customer-facing form.** `POST /reviews` works and is tested, but `apps/web` has no screen
-   for a guest to write one — so in the product today reviews arrive only via the API or the seed.
-   That is the largest remaining piece and it belongs to the customer app rather than the portal.
-2. **The sidebar badge.** §7 draws `التقييمات 4.7` next to the nav item. The number now exists;
-   the badge is not rendered, and `عقاراتي 3` should land with it.
+1. ~~**No customer-facing form.**~~ **Shipped 2026-08-07.** `/[locale]/review/[reference]` behind
+   the account, with the prompt on `/account` listing exactly the stays `POST /reviews` would
+   accept — so the invitation and the endpoint cannot disagree. `/review` joined `/account` in the
+   middleware's `PROTECTED` list; a booking that is not yours answers 404, indistinguishably from
+   one that does not exist, because references are sequential (§13.2). The whole lifecycle was
+   verified against real data end to end: prompt → write → property rating 4.0 → 3.0 → partner
+   sees it → partner reports (still published) → staff queue → uphold → hidden → rating back to
+   4.0 → author still sees their own hidden review → row survives.
+2. ~~**The sidebar badge.**~~ **Shipped 2026-08-07**, both of them.
 3. **No notification** to a partner that a review arrived, or to a guest that a partner replied.
+4. **No public display.** A property page does not show its reviews to visitors — only the ★ and
+   the count, which come from the aggregate. The reviews exist and nothing renders them on
+   `/property/[slug]`.
 
 **Owner:** engineering.
 

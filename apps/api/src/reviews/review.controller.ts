@@ -33,6 +33,35 @@ const listQuerySchema = pageQuerySchema;
 export class ReviewController {
   constructor(private readonly reviews: ReviewService) {}
 
+  /**
+   * The stays this customer may still write about — the account page's prompt.
+   *
+   * `REVIEW_CREATE`, the same permission the write needs: a list of things you may do is only
+   * meaningful to somebody who may do them.
+   */
+  @Get('pending')
+  @RequirePermissions(P.REVIEW_CREATE)
+  @AuditExempt('Reading which of your own stays are reviewable; changes nothing.')
+  async pending(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return this.reviews.pendingForCustomer(user);
+  }
+
+  /**
+   * Whether this customer may review one booking, and what they wrote if they already did.
+   *
+   * Declared AFTER `pending` on purpose: Nest matches routes in declaration order, and
+   * `:bookingReference` would otherwise swallow `/pending`.
+   */
+  @Get('booking/:bookingReference')
+  @RequirePermissions(P.REVIEW_CREATE)
+  @AuditExempt('Reading your own eligibility; changes nothing.')
+  async forBooking(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('bookingReference') bookingReference: string,
+  ) {
+    return this.reviews.forBooking(user, bookingReference);
+  }
+
   @Post()
   @RequirePermissions(P.REVIEW_CREATE)
   @AuditExempt('Audited transactionally inside ReviewService.create.')

@@ -296,5 +296,26 @@
       "completed": "Completed",
       "disputed": "Disputed"
     }
+  },
+  "reviews": {
+    "title": "Review your stay",
+    "prompt": "You stayed at {property}. Tell other travellers how it went.",
+    "pendingTitle": "Stays waiting for your review",
+    "writeReview": "Write a review",
+    "ratingLabel": "Your score out of 5",
+    "bodyLabel": "How was your stay?",
+    "bodyHint": "At least three characters. Shown under your name to travellers and to the partner.",
+    "submit": "Submit review",
+    "submitting": "Sending…",
+    "rule": "A review cannot be edited or deleted once sent (P-006). The partner can reply to it.",
+    "yourReview": "Your review",
+    "partnerReply": "The partner replied",
+    "notCompleted": "You can review this once your stay has finished.",
+    "alreadyReviewed": "You have already reviewed this stay.",
+    "hidden": "SAFRA hid this review after reviewing a report from the partner. It stays in your record and is not shown to visitors.",
+    "failed": "Could not send your review. Please try again.",
+    "unreachable": "Could not reach the server.",
+    "backToAccount": "Back to my account",
+    "none": "No stays are waiting for your review."
   }
 }

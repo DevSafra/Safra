@@ -148,6 +148,131 @@ export class ReviewService {
   }
 
   /**
+   * The stays this customer may still write about.
+   *
+   * Drives the account page's prompt. Exactly the bookings `create` would accept — completed,
+   * theirs, not yet reviewed — so the list and the endpoint cannot disagree about eligibility and
+   * offer a form that then refuses.
+   *
+   * Bounded rather than paginated: it is a prompt, not a registry, and a customer with more than a
+   * handful of unreviewed stays is better served by being asked about the most recent ones.
+   */
+  async pendingForCustomer(claims: AccessTokenClaims | undefined) {
+    if (!claims) throw unauthorized(ERROR.AUTH_REQUIRED);
+
+    const rows = await this.db.execute<{
+      booking_reference: string;
+      property_name: string | null;
+      unit_name: string | null;
+      check_in: string;
+      check_out: string;
+    }>(sql`
+      SELECT b.reference AS booking_reference,
+             coalesce(pr.name_ar, pr.name_en) AS property_name,
+             coalesce(un.name_ar, un.name_en) AS unit_name,
+             b.check_in::text, b.check_out::text
+      FROM bookings b
+      JOIN customer_profiles cp ON cp.id = b.customer_profile_id
+      JOIN properties pr ON pr.id = b.property_id
+      JOIN units un      ON un.id = b.unit_id
+      WHERE cp.user_id = ${claims.sub}
+        AND b.status = 'completed'
+        AND b.deleted_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.booking_id = b.id)
+      ORDER BY b.check_out DESC
+      LIMIT 10
+    `);
+
+    return rows.rows.map((row) => ({
+      bookingReference: row.booking_reference,
+      propertyName: row.property_name,
+      unitName: row.unit_name,
+      checkIn: row.check_in,
+      checkOut: row.check_out,
+    }));
+  }
+
+  /**
+   * Whether this customer may review THIS booking, and what they already wrote if they did.
+   *
+   * ## Why a booking that is not theirs is a 404
+   *
+   * Not a 403. A different answer for "somebody else's booking" and "no such booking" would let a
+   * reference be probed for existence, and a booking reference is a short, guessable-ish string
+   * printed on a voucher. The two cases are indistinguishable from outside, deliberately.
+   *
+   * The REASON is returned rather than a bare boolean, because the screen says something different
+   * for each: a stay that has not finished gets "after your stay", and one already reviewed shows
+   * the review.
+   */
+  async forBooking(claims: AccessTokenClaims | undefined, bookingReference: string) {
+    if (!claims) throw unauthorized(ERROR.AUTH_REQUIRED);
+
+    const found = await this.db.execute<{
+      status: string;
+      owner_user_id: string | null;
+      property_name: string | null;
+      unit_name: string | null;
+      review_reference: string | null;
+      rating: number | null;
+      body: string | null;
+      review_status: string | null;
+      partner_reply: string | null;
+      created_at: string | null;
+    }>(sql`
+      SELECT b.status::text AS status,
+             cp.user_id AS owner_user_id,
+             coalesce(pr.name_ar, pr.name_en) AS property_name,
+             coalesce(un.name_ar, un.name_en) AS unit_name,
+             r.reference AS review_reference,
+             r.rating, r.body,
+             r.status::text AS review_status,
+             r.partner_reply,
+             r.created_at::text
+      FROM bookings b
+      JOIN customer_profiles cp ON cp.id = b.customer_profile_id
+      JOIN properties pr ON pr.id = b.property_id
+      JOIN units un      ON un.id = b.unit_id
+      LEFT JOIN reviews r ON r.booking_id = b.id
+      WHERE b.reference = ${bookingReference} AND b.deleted_at IS NULL
+    `);
+
+    const row = found.rows[0];
+
+    /* Unknown, or somebody else's — the same answer either way. See the note above. */
+    if (!row || !row.owner_user_id || row.owner_user_id !== claims.sub) {
+      throw notFound(ERROR.BOOKING_NOT_FOUND);
+    }
+
+    const stayCompleted = row.status === 'completed';
+    const alreadyReviewed = row.review_reference !== null;
+
+    return {
+      propertyName: row.property_name,
+      unitName: row.unit_name,
+      stayCompleted,
+      alreadyReviewed,
+      eligible: stayCompleted && !alreadyReviewed,
+      review: alreadyReviewed
+        ? {
+            reference: row.review_reference ?? '',
+            rating: row.rating ?? 0,
+            body: row.body ?? '',
+            /*
+              The customer sees their own review even when staff have hidden it, and the status
+              travels so the screen can say so. Hiding it from its author would leave them unable
+              to tell "SAFRA removed this" from "it never saved", and the second reading produces a
+              duplicate attempt that the unique index then refuses.
+            */
+            status: row.review_status ?? 'published',
+            partnerReply: row.partner_reply,
+            createdAt: row.created_at ?? '',
+          }
+        : null,
+    };
+  }
+
+  /**
    * تقييمات ضيوفي — this partner's reviews, and the header figures §7.3 prints.
    *
    * Includes HIDDEN ones. A partner who reported a review and had it upheld should be able to see

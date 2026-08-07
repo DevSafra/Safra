@@ -7,7 +7,12 @@ import { statusTone, type Tone } from '@safra/ui';
 
 import { SignOutButton } from '@/components/sign-out-button';
 import { isLocale } from '@/i18n/routing';
-import { getMyBookings, getMyWallet, getMyWalletTransactions } from '@/lib/account';
+import {
+  getMyBookings,
+  getMyWallet,
+  getMyWalletTransactions,
+  getPendingReviews,
+} from '@/lib/account';
 import { formatMoney } from '@/lib/localise';
 import { getSession } from '@/lib/session-server';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -45,15 +50,17 @@ export default async function AccountPage({
     redirect(`/${locale}/login?next=${encodeURIComponent(`/${locale}/account`)}`);
 
   const t = await getTranslations('account');
+  const reviews = await getTranslations('reviews');
 
   /**
-   * Three independent reads, issued together. Sequentially they would add two round
+   * Four independent reads, issued together. Sequentially they would add three round
    * trips to a page that already has to be dynamic (§3).
    */
-  const [bookings, wallet, transactions] = await Promise.all([
+  const [bookings, wallet, transactions, pendingReviews] = await Promise.all([
     getMyBookings(),
     getMyWallet(),
     getMyWalletTransactions(),
+    getPendingReviews(),
   ]);
 
   return (
@@ -140,6 +147,42 @@ export default async function AccountPage({
       </section>
 
       {/* ── Bookings ───────────────────────────────────────────────────────── */}
+      {/*
+        قيّم إقامتك — the prompt, above the booking list.
+
+        Only stays that are genuinely reviewable appear: the API returns exactly what
+        `POST /reviews` would accept, so the prompt and the endpoint cannot disagree and offer a
+        form that then refuses. Absent entirely when there is nothing to review, rather than an
+        empty box — this is an invitation, and an empty invitation is clutter.
+      */}
+      {pendingReviews !== 'failed' &&
+      pendingReviews !== 'unauthenticated' &&
+      pendingReviews.length > 0 ? (
+        <section>
+          <h2 className="font-display text-xl text-text">{reviews('pendingTitle')}</h2>
+          <ul className="mt-3 space-y-3">
+            {pendingReviews.map((stay) => (
+              <li key={stay.bookingReference}>
+                <Link
+                  href={`/${locale}/review/${stay.bookingReference}`}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-gold/40 bg-card p-4 transition-colors hover:border-gold"
+                >
+                  <span>
+                    <span className="block text-sm text-text">{stay.propertyName}</span>
+                    <span className="block text-xs text-faint">
+                      {stay.unitName} · {stay.checkIn} → {stay.checkOut}
+                    </span>
+                  </span>
+                  <span className="text-sm font-semibold text-gold">
+                    {reviews('writeReview')}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <section className="mt-10">
         <h2 className="font-display text-xl text-text">{t('bookingsTitle')}</h2>
 

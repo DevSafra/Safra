@@ -56,20 +56,21 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['setup'],
-      /* The partner specs are their own project, LAST — see below. */
-      testIgnore: /partner\.spec\.ts/,
+      /* The specs that SIGN IN are their own project, LAST — see below. */
+      testIgnore: /(partner|customer-review)\.spec\.ts/,
     },
     /**
-     * The partner portal, run after everything else.
+     * Everything that SIGNS IN, run after everything else.
      *
      * Not a style preference — a budget one. `POST /auth/login` allows ten calls a minute per IP,
-     * and partner 2FA (mandatory since 2026-08-07) turned one partner sign-in into three: a
-     * two-step sign-in for an enrolled partner, and one for the unenrolled fixture that proves
-     * forced enrolment. Running mid-suite, those three sat inside the same sixty-second window as
-     * the staff sign-in tests and pushed the last of them over the limit — which fails as
-     * «محاولات كثيرة», a message with no relationship to the code being tested.
+     * and this suite makes FOURTEEN: two for the staff session, eight in `staff-login.spec.ts`
+     * which tests the form itself, three on the partner side since 2FA made that sign-in two
+     * steps, and one for the customer review flow. Fourteen does not fit in a two-minute run
+     * however they are ordered, so everything that signs in is moved out of the crowded window
+     * rather than squeezed alongside it — mid-suite they pushed the last staff test over the
+     * limit, which fails as «محاولات كثيرة», a message with no relationship to the code tested.
      *
-     * Ordering them last means partner sign-ins can starve nothing: there is nothing after them.
+     * Ordering them last means these sign-ins can starve nothing: there is nothing after them.
      * `dependencies` is what expresses that, rather than relying on filenames sorting the way we
      * happen to want today.
      */
@@ -88,16 +89,16 @@ export default defineConfig({
      * against credential stuffing, and the suite is the thing that should bend.
      */
     {
-      name: 'partner-setup',
+      name: 'signed-in-setup',
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['chromium'],
       testMatch: /partner\.setup\.ts/,
     },
     {
-      name: 'partner',
+      name: 'signed-in',
       use: { ...devices['Desktop Chrome'] },
-      dependencies: ['partner-setup'],
-      testMatch: /partner\.spec\.ts/,
+      dependencies: ['signed-in-setup'],
+      testMatch: /(partner|customer-review)\.spec\.ts/,
     },
   ],
 });
