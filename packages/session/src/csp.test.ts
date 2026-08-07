@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildCsp, cspHeaders, createNonce } from './csp.js';
+import { buildCsp, cspHeaders, createNonce, mediaOrigins } from './csp.js';
 
 /**
  * Content-Security-Policy construction.
@@ -112,5 +112,56 @@ describe('cspHeaders', () => {
 
     expect(request['content-security-policy']).toBe('default-src ‘self’');
     expect(response['content-security-policy']).toBe('default-src ‘self’');
+  });
+});
+
+/**
+ * The regression: a policy that forgot where the photographs come from.
+ *
+ * The partner portal shipped `img-src 'self' data: blob:` and could not display a single listing
+ * photograph. Every layer reported success — the upload, the store, the URL — and the browser
+ * silently refused to fetch it, which appears in no server log.
+ */
+describe('mediaOrigins', () => {
+  it('reduces a media base to the origin a CSP can name', () => {
+    expect(mediaOrigins(['https://media.safra.com/properties'])).toEqual([
+      'https://media.safra.com',
+    ]);
+  });
+
+  it('keeps the port, because an origin with a different port is a different origin', () => {
+    expect(mediaOrigins(['http://localhost:9000/safra-media'])).toEqual([
+      'http://localhost:9000',
+    ]);
+  });
+
+  it('collapses two bases that share an origin', () => {
+    expect(
+      mediaOrigins(['https://media.safra.com/a', 'https://media.safra.com/b']),
+    ).toEqual(['https://media.safra.com']);
+  });
+
+  it('ignores what is not configured', () => {
+    expect(mediaOrigins([undefined, ''])).toEqual([]);
+  });
+
+  /* A relative base is same-origin and already covered by `'self'`; throwing would 500 the app. */
+  it('skips a base that is not absolute rather than throwing', () => {
+    expect(() => mediaOrigins(['/api/v1/media'])).not.toThrow();
+    expect(mediaOrigins(['/api/v1/media'])).toEqual([]);
+  });
+
+  it('produces a policy that actually names the media host', () => {
+    const csp = buildCsp({
+      nonce: 'n',
+      imgSrc: ["'self'", 'data:', ...mediaOrigins(['https://media.safra.com/x'])].join(
+        ' ',
+      ),
+      upgradeInsecure: false,
+    });
+
+    expect(csp).toContain("img-src 'self' data: https://media.safra.com");
+    /* And does NOT fall back to permitting the whole internet. */
+    expect(csp).not.toContain('img-src https:');
   });
 });

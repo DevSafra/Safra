@@ -108,4 +108,39 @@ test.describe('reviews on a property page', () => {
       expect(property.rating).not.toBeNull();
     }
   });
+
+  /**
+   * The regression: a policy that forbade the photographs it was serving.
+   *
+   * The customer app allowed `img-src … https:`, which worked in production by permitting every
+   * HTTPS host on the internet, and blocked the media host over plain HTTP everywhere else. The
+   * partner portal named no remote host at all and could not display a single photograph. Both are
+   * invisible to anything that checks a status code: the page returns 200, the HTML carries the
+   * right `src`, and the browser silently declines to fetch it.
+   *
+   * Asserted on the HEADER rather than by loading a picture, because whether a fixture listing has
+   * a photograph today depends on what the last test run left behind — and a test that quietly
+   * passes when there is nothing to look at is not a test.
+   */
+  test('the page permits the media host it serves images from', async ({ request }) => {
+    const response = await request.get(
+      'http://localhost:3000/ar/property/coastal-resort',
+    );
+    const csp = response.headers()['content-security-policy'] ?? '';
+    const imgSrc = csp
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith('img-src'));
+
+    expect(imgSrc).toBeDefined();
+
+    const media = new URL(
+      process.env['NEXT_PUBLIC_MEDIA_URL'] ?? 'http://localhost:4000/api/v1/media',
+    ).origin;
+
+    expect(imgSrc).toContain(media);
+
+    /* And not by readmitting the whole internet. */
+    expect(imgSrc?.split(/\s+/)).not.toContain('https:');
+  });
 });

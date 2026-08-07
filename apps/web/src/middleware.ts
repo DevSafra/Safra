@@ -8,6 +8,7 @@ import {
   buildCsp,
   callAuth,
   createNonce,
+  mediaOrigins,
   decodeSession,
   encodeSession,
   needsRefresh,
@@ -44,7 +45,20 @@ export default async function middleware(request: NextRequest) {
     nonce: createNonce(),
     // https: because property photography comes from object storage or a CDN whose
     // hostname is deployment configuration, not known at build time.
-    imgSrc: "'self' data: blob: https:",
+    imgSrc: [
+      "'self'",
+      'data:',
+      'blob:',
+      /*
+        Named origins, replacing a blanket `https:`. That allowed every HTTPS host on the internet
+        to be an image source, which is an exfiltration channel rather than a convenience — see
+        `mediaOrigins`.
+      */
+      ...mediaOrigins([
+        process.env['NEXT_PUBLIC_MEDIA_URL'],
+        process.env['API_URL'] ?? 'http://localhost:4000',
+      ]),
+    ].join(' '),
     upgradeInsecure: process.env.NODE_ENV === 'production',
   });
 

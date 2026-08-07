@@ -6,6 +6,7 @@ import {
   buildCsp,
   callAuth,
   createNonce,
+  mediaOrigins,
   decodeSession,
   encodeSession,
   hasTwoFactor,
@@ -55,7 +56,19 @@ export default async function middleware(request: NextRequest) {
   const csp = buildCsp({
     nonce: createNonce(),
     /* Listing photos come from the API and from data URIs; nothing remote is loaded. */
-    imgSrc: "'self' data: blob:",
+    imgSrc: [
+      "'self'",
+      'data:',
+      'blob:',
+      /*
+        The object store, or the API's development media route — whichever this deployment points
+        the URL builders at. Without it the gallery is blank: see `mediaOrigins`.
+      */
+      ...mediaOrigins([
+        process.env['NEXT_PUBLIC_MEDIA_URL'],
+        process.env['API_URL'] ?? 'http://localhost:4000',
+      ]),
+    ].join(' '),
     upgradeInsecure: process.env.NODE_ENV === 'production',
   });
 
