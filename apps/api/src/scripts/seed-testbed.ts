@@ -475,11 +475,14 @@ async function build(db: Seeder): Promise<void> {
     `reset-dev` names — so a row-wise delete raises `insufficient_privilege`, a conversation cannot
     be removed while its messages point at it, and that in turn pins the booking.
 
-    TRUNCATE does not fire row triggers, which is the gap this codebase now carries as an open
-    item. It clears every thread rather than only this script's, and that is acceptable here for
-    the reason it would not be in the seed: nothing but a testbed has threads on this database.
+    Since 2026-08-07 `messages` also refuses TRUNCATE — a `BEFORE TRUNCATE` statement trigger
+    closed the hole this used to rely on — so the suspension is explicit and scoped to this
+    transaction. It clears every thread rather than only this script's, which is acceptable for the
+    reason it would not be in the seed: nothing but a testbed has threads on this database.
   */
+  await db.execute(sql`ALTER TABLE messages DISABLE TRIGGER USER`);
   await db.execute(sql`TRUNCATE TABLE messages, conversations RESTART IDENTITY`);
+  await db.execute(sql`ALTER TABLE messages ENABLE TRIGGER USER`);
   await db.execute(sql`DELETE FROM dispute_evidence WHERE dispute_id IN (
     SELECT id FROM disputes WHERE booking_id IN (${testbedBookings}))`);
   await db.execute(sql`DELETE FROM disputes WHERE booking_id IN (${testbedBookings})`);
@@ -488,9 +491,9 @@ async function build(db: Seeder): Promise<void> {
     Reviews pin the bookings they are about, so they go first.
 
     P-006 forbids DELETE and a trigger enforces it — so this is the one cleanup step that cannot
-    simply delete. TRUNCATE does not fire row triggers, which is the documented gap O-data-1 and
-    the same escape `messages` already relies on here. Acceptable for the same reason: nothing but
-    a testbed has reviews on this database, and the alternative is a seed that can never re-run.
+    simply delete. `reviews` is NOT one of the seven append-only tables, so TRUNCATE still works on
+    it without a suspension. Acceptable for the same reason as the threads above: nothing but a
+    testbed has reviews on this database, and the alternative is a seed that can never re-run.
   */
   await db.execute(sql`TRUNCATE TABLE reviews`);
 

@@ -181,6 +181,29 @@ BEGIN
          FOR EACH ROW EXECUTE FUNCTION deny_mutation()',
       t || '_immutable', t
     );
+
+    -- And the hole the row trigger cannot cover.
+    --
+    -- PostgreSQL does NOT fire row-level triggers on TRUNCATE, so every one of
+    -- these tables could be emptied by anyone with table privileges, with no
+    -- error and no trace. `reset-dev.ts` cleared 17,067 audit rows and 8,681
+    -- timeline events that way without touching a trigger (2026-08-06) — which
+    -- was convenient for a dev reset and is the wrong outcome everywhere else.
+    --
+    -- A STATEMENT-level trigger closes it. `deny_mutation()` already raises with
+    -- TG_OP, so the message reads "TRUNCATE is not permitted on audit_log" and
+    -- needs no change.
+    --
+    -- The cost, accepted deliberately: `db:reset-dev` and the testbed now have to
+    -- suspend these explicitly with ALTER TABLE ... DISABLE TRIGGER. That is the
+    -- point — clearing history becomes a thing somebody wrote down rather than an
+    -- accident of which statement they happened to use.
+    EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', t || '_no_truncate', t);
+    EXECUTE format(
+      'CREATE TRIGGER %I BEFORE TRUNCATE ON %I
+         EXECUTE FUNCTION deny_mutation()',
+      t || '_no_truncate', t
+    );
   END LOOP;
 END $$;
 
@@ -405,6 +428,16 @@ SELECT add_constraint_if_missing('conversations', 'conversations_unread_non_nega
 DROP TRIGGER IF EXISTS messages_immutable ON messages;
 CREATE TRIGGER messages_immutable BEFORE UPDATE OR DELETE ON messages
   FOR EACH ROW EXECUTE FUNCTION deny_mutation();
+
+-- The TRUNCATE half, matching the six tables in the loop above.
+--
+-- `messages` gets its trigger here rather than from that loop because it arrived
+-- with the messaging tables in a later pass — which is exactly why the first
+-- version of this fix left it as the ONE table still truncatable. Probed live
+-- afterwards, which is how that was caught rather than shipped.
+DROP TRIGGER IF EXISTS messages_no_truncate ON messages;
+CREATE TRIGGER messages_no_truncate BEFORE TRUNCATE ON messages
+  EXECUTE FUNCTION deny_mutation();
 
 SELECT add_constraint_if_missing('messages', 'messages_redacted_count_non_negative',
   'CHECK (redacted_count >= 0)');

@@ -436,34 +436,29 @@ a lint rule that cries wolf gets switched off.
 `application/json`, `Not signed in.` (a proxy's own 401 body, never rendered) and `Desktop Chrome`.
 Each is exempt for a stated reason.
 
-### O-data-1 — The append-only guarantee does not survive TRUNCATE
+### O-data-1 — Closed: the append-only guarantee now survives TRUNCATE
 
-**What:** Seven tables are append-only — `audit_log`, `ledger_entries`, `timeline_events`,
-`wallet_transactions`, `gift_card_transactions`, `settings_history` and `messages` — enforced by
-`BEFORE UPDATE OR DELETE ... FOR EACH ROW` triggers in `post/0001_constraints.sql`. PostgreSQL does
-**not** fire row-level triggers on `TRUNCATE`, so every one of them can be emptied by anyone with
-table privileges, with no error and no trace.
+**Closed 2026-08-07.** All seven tables — `audit_log`, `ledger_entries`, `timeline_events`,
+`wallet_transactions`, `gift_card_transactions`, `settings_history` and `messages` — carry a
+`BEFORE TRUNCATE` statement trigger alongside the row-level one. PostgreSQL does not fire row
+triggers on TRUNCATE, so until now every one of them could be emptied by anyone with table
+privileges, with no error and no trace.
 
-**How it was found:** `reset-dev.ts` cleared 17,067 audit rows and 8,681 timeline events without
-touching a trigger (2026-08-06). That was convenient for a dev reset and is the wrong outcome
-everywhere else — the whole point of the trigger is that "a bug that tries to rewrite history
-should fail loudly in CI, not succeed quietly in production".
+**Probed live, and the probe found a miss.** The first version added the trigger inside the
+`FOREACH` loop, which covers six tables — `messages` gets its trigger from a separate statement
+because it arrived with the messaging tables in a later pass, and was left as the ONE table still
+truncatable. Caught by running the probe rather than by reading the loop.
 
-**The fix:** a statement-level trigger on the same seven tables:
+**The cost, accepted deliberately.** `db:reset-dev` and `db:testbed` legitimately clear these on a
+development machine, and both now suspend the triggers explicitly with `ALTER TABLE … DISABLE
+TRIGGER USER` inside their transaction, then restore them. That is the improvement, not the price:
+clearing history is a thing somebody wrote down rather than an accident of which statement they
+happened to use. `assertTriggersIntact` at the end of the reset proves they came back, and the full
+reset → seed cycle was run to confirm it.
 
-```sql
-CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
-  EXECUTE FUNCTION deny_mutation();
-```
-
-`deny_mutation()` already raises with `TG_OP`, so it needs no change. Add it to the same `FOREACH`
-loop that installs the row triggers.
-
-**What it costs:** `reset-dev.ts` and the testbed's `TRUNCATE messages, conversations` would then
-have to drop and restore the triggers explicitly — which is the correct trade, because it makes the
-suspension deliberate and visible rather than an accident of which statement you happened to use.
-
-**Owner:** engineering. Small, and it closes a P-003 hole.
+**A second thing this shook out.** The reset's unlisted-table check — added on 2026-08-06 after
+`partner_payouts` was missed — caught `scheduled_job_runs`, which had been added hours earlier and
+not registered. The guard doing its job on the person who wrote it.
 
 ### O-data-2 — The integration suite repopulates the database it runs against
 

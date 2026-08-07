@@ -22,13 +22,17 @@ import { Pool } from 'pg';
  *   cancellation policies, settings, FX rates, sanctions lists. These are the platform's
  *   vocabulary, not test data, and re-seeding them is slow and pointless.
  *
- * ## TRUNCATE, and a gap it revealed
+ * ## Clearing the append-only tables is now DELIBERATE
  *
- * Six tables are append-only, enforced by `BEFORE UPDATE OR DELETE ... FOR EACH ROW` triggers
- * (`post/0001_constraints.sql`). PostgreSQL does NOT fire row-level triggers on TRUNCATE, so this
- * script clears them without touching the triggers at all — which is convenient here and is a real
- * hole in the guarantee everywhere else. `docs/FUTURE-WORK.md` carries it as an open item; the fix
- * is a `BEFORE TRUNCATE` statement trigger on the same six tables.
+ * Seven tables are append-only (`post/0001_constraints.sql`), and since 2026-08-07 they carry a
+ * `BEFORE TRUNCATE` statement trigger as well as the row-level one — PostgreSQL does not fire row
+ * triggers on TRUNCATE, so without it every one of them could be emptied with no error and no
+ * trace. This script used to rely on exactly that hole.
+ *
+ * So it now suspends them explicitly, inside the transaction, and puts them back. That is the
+ * point of the change: clearing history is a thing somebody wrote down rather than an accident of
+ * which statement they happened to use, and `assertTriggersIntact` at the end proves they came
+ * back.
  *
  * ## Safety
  *
@@ -102,6 +106,8 @@ const CLEAR_TABLES = [
   'refresh_tokens',
   'refunds',
   'reviews',
+  /* Job telemetry, not evidence — a reset starts the history over with everything else. */
+  'scheduled_job_runs',
   'settings_history',
   'staff_scope_cities',
   'timeline_events',
@@ -109,6 +115,25 @@ const CLEAR_TABLES = [
   'units',
   'wallet_transactions',
   'wallets',
+];
+
+/**
+ * The tables whose triggers this script has to suspend.
+ *
+ * The same seven `assertTriggersIntact` checks afterwards, and the same seven
+ * `post/0001_constraints.sql` protects. Listed here rather than derived so that adding an
+ * append-only table is a decision somebody makes in both places — a reset that silently skipped a
+ * protected table would leave data behind, which is the failure the unlisted-table check exists to
+ * prevent.
+ */
+const APPEND_ONLY = [
+  'audit_log',
+  'ledger_entries',
+  'timeline_events',
+  'wallet_transactions',
+  'gift_card_transactions',
+  'settings_history',
+  'messages',
 ];
 
 function assertSafe(connectionString: string): void {
@@ -162,7 +187,20 @@ async function main(): Promise<void> {
       handled below. If that stops being true the statement FAILS, which is the right outcome —
       silently truncating a table nobody listed is how a reset script becomes a data-loss story.
     */
+    /*
+      The append-only tables refuse TRUNCATE by trigger. Suspending them is explicit and scoped to
+      this transaction — `DISABLE TRIGGER USER` is transactional, so a failure anywhere rolls the
+      suspension back along with everything else.
+    */
+    for (const table of APPEND_ONLY) {
+      await client.query(`ALTER TABLE ${table} DISABLE TRIGGER USER`);
+    }
+
     await client.query(`TRUNCATE TABLE ${CLEAR_TABLES.join(', ')} RESTART IDENTITY`);
+
+    for (const table of APPEND_ONLY) {
+      await client.query(`ALTER TABLE ${table} ENABLE TRIGGER USER`);
+    }
 
     const kept = await client.query<{ email: string }>(
       'DELETE FROM users WHERE lower(email) <> ALL($1::text[]) RETURNING email',
