@@ -101,6 +101,7 @@ const CLEAR_TABLES = [
   'property_images',
   'refresh_tokens',
   'refunds',
+  'reviews',
   'settings_history',
   'staff_scope_cities',
   'timeline_events',

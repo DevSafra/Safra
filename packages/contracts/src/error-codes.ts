@@ -156,6 +156,19 @@ export const ERROR = {
   PARTNER_TWO_FACTOR_TARGET_NOT_PARTNER: 'partner.two_factor_target_not_partner',
   /** The partner record exists but has no user account behind it, so there is nothing to reset. */
   PARTNER_TWO_FACTOR_NO_ACCOUNT: 'partner.two_factor_no_account',
+  REVIEW_NOT_FOUND: 'review.not_found',
+  /** A review may only be written about a stay that actually finished. */
+  REVIEW_STAY_NOT_COMPLETED: 'review.stay_not_completed',
+  /** One review per booking — the rule that makes a rating mean anything. */
+  REVIEW_ALREADY_WRITTEN: 'review.already_written',
+  /** The booking belongs to somebody else. */
+  REVIEW_NOT_YOUR_BOOKING: 'review.not_your_booking',
+  /** A partner may reply once; changing a published answer is a different feature. */
+  REVIEW_ALREADY_REPLIED: 'review.already_replied',
+  /** Reporting a review that is already reported, or already decided. */
+  REVIEW_ALREADY_REPORTED: 'review.already_reported',
+  /** Moderating a review nobody reported. */
+  REVIEW_NOT_REPORTED: 'review.not_reported',
   STAFF_ROLE_INVALID_CONSOLE: 'staff.role_invalid_console',
   STAFF_EMAIL_TAKEN: 'staff.email_taken',
   STAFF_ALREADY_ACTIVATED: 'staff.already_activated',
@@ -192,6 +205,7 @@ export const ERROR = {
   VALIDATION_PASSWORD_TOO_LONG: 'validation.password_too_long',
   VALIDATION_PHONE_FORMAT: 'validation.phone_format',
   VALIDATION_RECOVERY_CODE_FORMAT: 'validation.recovery_code_format',
+  VALIDATION_REVIEW_RATING_RANGE: 'validation.review_rating_range',
   VALIDATION_DECIMAL_STRING: 'validation.decimal_string',
   VALIDATION_CURRENCY_CODE: 'validation.currency_code',
   VALIDATION_RATE_POSITIVE: 'validation.rate_positive',

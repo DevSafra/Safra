@@ -249,3 +249,56 @@ export async function getMyPayoutBookings(reference: string) {
     z.array(payoutBookingSchema),
   );
 }
+
+/**
+ * تقييمات ضيوفي, as `GET /partner/reviews` returns it (design handoff §7.3).
+ *
+ * The guest's NAME and nothing else about them. §7.2 forbids showing a partner any customer
+ * contact detail, and a review screen is exactly where "so they can follow up" would creep in —
+ * so the absence is asserted in `review.integration.test.ts` rather than left to this schema.
+ */
+const reviewSchema = z.object({
+  reference: z.string(),
+  guestName: z.string(),
+  propertyName: z.string().nullable(),
+  unitName: z.string().nullable(),
+  rating: z.number(),
+  body: z.string(),
+  status: z.string(),
+  partnerReply: z.string().nullable(),
+  partnerRepliedAt: z.string().nullable(),
+  reportStatus: z.string(),
+  reportReason: z.string().nullable(),
+  moderationNote: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type PartnerReview = z.infer<typeof reviewSchema>;
+
+const reviewPageSchema = z.object({
+  items: z.array(reviewSchema),
+  total: z.number(),
+  capped: z.boolean(),
+  page: z.number(),
+  pages: z.number(),
+  /*
+    No `limit`. `offsetPage` does not return it — written against the real response rather than
+    against the fields one would expect, which is the trap that kept the console's listing queue
+    permanently empty: `safeParse` fails, `partnerFetch` returns 'failed', and the page says
+    "could not load" with nothing in any log.
+  */
+  summary: z.object({
+    /** Null when the partner has no published reviews — the header then says so. */
+    average: z.string().nullable(),
+    published: z.number(),
+  }),
+});
+
+export async function getMyReviews(params: { page: number; limit: number }) {
+  const search = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.limit),
+  });
+
+  return partnerFetch(`/partner/reviews?${search.toString()}`, reviewPageSchema);
+}

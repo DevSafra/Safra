@@ -158,6 +158,16 @@ export const de = {
     'Die Zwei-Faktor-Authentifizierung steht für diese Kontoart nicht zur Verfügung.',
   'partner.two_factor_target_not_partner':
     'Dieses Konto ist kein Partnerkonto. Zurücksetzungen an dieser Stelle gelten nur für Partnerkonten.',
+  'validation.review_rating_range': 'Eine Bewertung muss zwischen 1 und 5 liegen.',
+  'review.not_found': 'Bewertung nicht gefunden.',
+  'review.stay_not_completed':
+    'Eine Bewertung ist erst nach abgeschlossenem Aufenthalt möglich.',
+  'review.already_written': 'Für diese Buchung liegt bereits eine Bewertung vor.',
+  'review.not_your_booking': 'Diese Buchung können Sie nicht bewerten.',
+  'review.already_replied': 'Sie haben auf diese Bewertung bereits geantwortet.',
+  'review.already_reported': 'Diese Bewertung wurde bereits gemeldet.',
+  'review.not_reported':
+    'Diese Bewertung wurde nicht gemeldet, es ist nichts zu entscheiden.',
   'partner.two_factor_no_account':
     'Dieser Partner hat kein Anmeldekonto, daher gibt es keinen zweiten Faktor zum Zurücksetzen.',
   'staff.role_invalid_console':

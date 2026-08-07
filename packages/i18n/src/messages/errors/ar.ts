@@ -131,6 +131,14 @@ export const ar = {
     'المصادقة الثنائية غير متاحة لهذا النوع من الحسابات.',
   'partner.two_factor_target_not_partner':
     'هذا الحساب ليس حساب شريك. إعادة التعيين هنا تخص حسابات الشركاء فقط.',
+  'validation.review_rating_range': 'يجب أن يكون التقييم بين ١ و٥.',
+  'review.not_found': 'التقييم غير موجود.',
+  'review.stay_not_completed': 'لا يمكن كتابة تقييم إلا بعد اكتمال الإقامة.',
+  'review.already_written': 'لهذا الحجز تقييم بالفعل.',
+  'review.not_your_booking': 'هذا الحجز ليس لك حتى تقيّمه.',
+  'review.already_replied': 'سبق أن رددت على هذا التقييم.',
+  'review.already_reported': 'سبق الإبلاغ عن هذا التقييم.',
+  'review.not_reported': 'لم يُبلَّغ عن هذا التقييم، فلا قرار مطلوب.',
   'partner.two_factor_no_account':
     'لا يملك هذا الشريك حساب دخول، فلا يوجد عامل ثانٍ لإعادة تعيينه.',
   'staff.role_invalid_console':

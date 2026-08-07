@@ -341,8 +341,32 @@ export const ar = {
 
   reviews: {
     title: 'تقييمات ضيوفي',
-    /** P-006, quoted by the handoff. */
+    /** P-006, quoted by the handoff verbatim. */
     rule: 'لا يمكن حذف تقييم — يمكنك الرد عليه أو الإبلاغ عنه (P-006)',
-    notBuilt: 'التقييمات لم تُبنَ بعد — لا يوجد جدول تقييمات في قاعدة البيانات.',
+    /** The §7.3 header figure. Shown only when there is an average to show. */
+    summary: 'المعدل العام ★ {average} من {n} تقييماً',
+    summaryEmpty: 'لا تقييمات بعد.',
+    empty: 'لا تقييمات بعد. تظهر هنا بعد أن يقيّم ضيوفك إقاماتهم المكتملة.',
+
+    reply: 'الرد',
+    report: 'إبلاغ',
+    replyLabel: 'ردّك — يظهر للجميع تحت التقييم، ولا يمكن تعديله بعد النشر.',
+    replySubmit: 'نشر الرد',
+    replied: 'ردّك',
+    alreadyReplied: 'سبق أن رددت على هذا التقييم.',
+    reportLabel:
+      'لماذا تُبلغ عن هذا التقييم؟ يصل النص إلى سفرة ولا يظهر للضيف. عشرة أحرف على الأقل.',
+    reportSubmit: 'إرسال البلاغ',
+    /* Stated plainly: reporting is not removal, and a partner should not expect it to be. */
+    reportPending: 'بلاغك قيد المراجعة لدى سفرة. التقييم يبقى ظاهراً حتى يصدر القرار.',
+    reportUpheld: 'قبلت سفرة بلاغك وأُخفي التقييم.',
+    reportDismissed: 'راجعت سفرة بلاغك وأبقت التقييم ظاهراً.',
+    hidden: 'مُخفى',
+    hiddenNote: 'أخفت سفرة هذا التقييم. يبقى في سجلّك ولا يُحتسب في معدّلك.',
+
+    cancel: 'إلغاء',
+    working: 'جارٍ الإرسال…',
+    failed: 'تعذّر تنفيذ الطلب.',
+    unreachable: 'تعذّر الوصول إلى الخادم.',
   },
 } as const;

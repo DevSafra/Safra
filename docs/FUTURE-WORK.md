@@ -103,25 +103,26 @@ treat "engineering complete" as a statement about planned scope, not about corre
 These are not open questions. They are settled, and changing one is a decision for
 Bashar, not an implementation detail.
 
-| Decision                                                      | Date           | Detail                                                                                                                                                                                                                                                                                                                                                    |
-| ------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Work directly on `main`; never branch                         | 2026-07-29     | No feature branches, no PR flow, never force-push                                                                                                                                                                                                                                                                                                         |
-| Commit messages are exactly one line, typed prefix            | 2026-07-29     | No body, no `Co-Authored-By`, no tool footers                                                                                                                                                                                                                                                                                                             |
-| Ask before every commit and every push                        | standing       | No batching of approval                                                                                                                                                                                                                                                                                                                                   |
-| Merchant of record: Safra Technologies GmbH (Germany)         | 2026-07-29     | ADR 0002                                                                                                                                                                                                                                                                                                                                                  |
-| Payment rails and payouts deferred to end of project          | 2026-08-01     | Items 84, 135                                                                                                                                                                                                                                                                                                                                             |
-| Money settings carry a currency, plus `money.always_usd`      | 2026-08-01     | Toggle ON by default; ADR 0006                                                                                                                                                                                                                                                                                                                            |
-| ID documents: store, restrict access, defer retention policy  | 2026-08-01     | Retention is now item **S-4** below                                                                                                                                                                                                                                                                                                                       |
-| FX management: `super_admin` only, with a toggle for finance  | 2026-08-01     | `rbac.finance_can_manage_fx`                                                                                                                                                                                                                                                                                                                              |
-| **No new product scope until must-haves M-1…M-6 have a plan** | **2026-08-02** | Bashar, explicit                                                                                                                                                                                                                                                                                                                                          |
-| **No user-facing text is hardcoded**                          | **2026-08-04** | Every word a person reads comes from `@safra/i18n`; enforced by `safra/no-hardcoded-text` in `pnpm lint`. See `docs/i18n.md`                                                                                                                                                                                                                              |
-| **Every UI is responsive on every device**                    | **2026-08-05** | No page scrolls sideways at 390 / 768 / 1024 / 1440 px. Enforced by `e2e/responsive.spec.ts` and a zero-specificity `min-width: 0` rule in both apps' `globals.css`                                                                                                                                                                                       |
-| **The console sidebar collapses at every size**               | **2026-08-05** | Hamburger always available, choice persisted, content reclaims the space, nav still reachable. `e2e/sidebar.spec.ts`                                                                                                                                                                                                                                      |
-| **Every table carries a numbered pagination bar**             | **2026-08-05** | `TablePagination`: prev/next, a page-number input, the page count, a rows-per-page select, the total found — under the table. Console registries use `OFFSET` with a count capped at 10,000; everything customer-facing keeps keyset. Exception: geography's bounded reference tables, held by `geo-bounds.integration.test.ts`. `e2e/pagination.spec.ts` |
-| The API answers with an error CODE, not a sentence            | **2026-08-04** | 154 codes in `@safra/contracts`. `message` is English for logs only and must never be displayed                                                                                                                                                                                                                                                           |
-| Staff scope is ENFORCED server-side, two modes                | **2026-08-04** | `none` \| `read_only` outside scope; writes refused in both. See gap report §4a                                                                                                                                                                                                                                                                           |
-| **The audit log is never scoped**                             | **2026-08-04** | Bashar: "a scoped audit log is not a trustworthy audit log"                                                                                                                                                                                                                                                                                               |
-| Every booking export writes an audit row                      | **2026-08-04** | who · when · filters · row count; immutable                                                                                                                                                                                                                                                                                                               |
+| Decision                                                          | Date           | Detail                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Work directly on `main`; never branch                             | 2026-07-29     | No feature branches, no PR flow, never force-push                                                                                                                                                                                                                                                                                                                           |
+| Commit messages are exactly one line, typed prefix                | 2026-07-29     | No body, no `Co-Authored-By`, no tool footers                                                                                                                                                                                                                                                                                                                               |
+| Ask before every commit and every push                            | standing       | No batching of approval                                                                                                                                                                                                                                                                                                                                                     |
+| Merchant of record: Safra Technologies GmbH (Germany)             | 2026-07-29     | ADR 0002                                                                                                                                                                                                                                                                                                                                                                    |
+| Payment rails and payouts deferred to end of project              | 2026-08-01     | Items 84, 135                                                                                                                                                                                                                                                                                                                                                               |
+| Money settings carry a currency, plus `money.always_usd`          | 2026-08-01     | Toggle ON by default; ADR 0006                                                                                                                                                                                                                                                                                                                                              |
+| ID documents: store, restrict access, defer retention policy      | 2026-08-01     | Retention is now item **S-4** below                                                                                                                                                                                                                                                                                                                                         |
+| FX management: `super_admin` only, with a toggle for finance      | 2026-08-01     | `rbac.finance_can_manage_fx`                                                                                                                                                                                                                                                                                                                                                |
+| **No new product scope until must-haves M-1…M-6 have a plan**     | **2026-08-02** | Bashar, explicit                                                                                                                                                                                                                                                                                                                                                            |
+| **No user-facing text is hardcoded**                              | **2026-08-04** | Every word a person reads comes from `@safra/i18n`; enforced by `safra/no-hardcoded-text` in `pnpm lint`. See `docs/i18n.md`                                                                                                                                                                                                                                                |
+| **Every UI is responsive on every device**                        | **2026-08-05** | No page scrolls sideways at 390 / 768 / 1024 / 1440 px. Enforced by `e2e/responsive.spec.ts` and a zero-specificity `min-width: 0` rule in both apps' `globals.css`                                                                                                                                                                                                         |
+| **The console sidebar collapses at every size**                   | **2026-08-05** | Hamburger always available, choice persisted, content reclaims the space, nav still reachable. `e2e/sidebar.spec.ts`                                                                                                                                                                                                                                                        |
+| **Every table carries a numbered pagination bar**                 | **2026-08-05** | `TablePagination`: prev/next, a page-number input, the page count, a rows-per-page select, the total found — under the table. Console registries use `OFFSET` with a count capped at 10,000; everything customer-facing keeps keyset. Exception: geography's bounded reference tables, held by `geo-bounds.integration.test.ts`. `e2e/pagination.spec.ts`                   |
+| The API answers with an error CODE, not a sentence                | **2026-08-04** | 154 codes in `@safra/contracts`. `message` is English for logs only and must never be displayed                                                                                                                                                                                                                                                                             |
+| Staff scope is ENFORCED server-side, two modes                    | **2026-08-04** | `none` \| `read_only` outside scope; writes refused in both. See gap report §4a                                                                                                                                                                                                                                                                                             |
+| **The audit log is never scoped**                                 | **2026-08-04** | Bashar: "a scoped audit log is not a trustworthy audit log"                                                                                                                                                                                                                                                                                                                 |
+| **Violation fines are RECORDED, never deducted — pending a rule** | **2026-08-07** | Bashar, explicit. `partner_violations` records the fine; `partner_payouts.fine_amount` stays zero and nothing subtracts it. The subtraction already exists in the accrual (`net = gross − fine`) and is deliberately left unwired until the business rule is defined. The partner dashboard says «غرامة ١٠$ مسجَّلة», NOT the handoff's «خُصمت من المستحقات» — see D-fine-1 |
+| Every booking export writes an audit row                          | **2026-08-04** | who · when · filters · row count; immutable                                                                                                                                                                                                                                                                                                                                 |
 
 ---
 
@@ -522,27 +523,53 @@ failing on a foreign key.
 **Owner:** engineering. Not blocking, and it will keep costing an afternoon every few weeks until
 it is done.
 
-### O-partner-1 — التقييمات has no schema, and the sidebar badge depends on it
+### O-partner-1 — Reviews, shipped; the sidebar badge and the customer form remain
 
-**What:** The handoff's §7.3 specifies a full reviews page — guest name, property as listed, unit,
-★ score, date, body, and **رد** / **إبلاغ** buttons — plus the rule quoted verbatim in the design:
-_"لا يمكن حذف تقييم — يمكنك الرد عليه أو الإبلاغ عنه (P-006)"_. There is no `reviews` table, no API
-and no aggregate.
+**Shipped 2026-08-07.** §7.3 exists end to end: schema, API, partner UI, staff moderation, and
+P-006 enforced by the database rather than by a code path.
 
-**What depends on it beyond the page itself:**
+**P-006 is a property of the TABLE.** _"لا يمكن حذف تقييم — يمكنك الرد عليه أو الإبلاغ عنه"_. A
+trigger refuses `DELETE` outright and a second freezes `rating` and `body` after insert, so the
+rule survives a service somebody writes later, a migration, and a console with database access.
+There is no `review.delete` permission and there never will be — a permission naming it would be a
+promise the system cannot keep. Staff hold `review.moderate`, which HIDES, with an actor, a
+timestamp and a required note.
 
-- The sidebar's `التقييمات 4.7` badge (§7).
-- `properties.rating` and `reviews_count`, which are columns the testbed currently SEEDS. Once
-  reviews exist they must become an aggregate of real rows, or the card's ★ is a number nobody
-  wrote.
-- §7.3's header line _"المعدل العام ★ 4.7 من 132 تقييماً"_.
+**Why a review needs a completed booking.** `properties.rating` is the heaviest input to the
+search ranking (`WEIGHTS.rating = 3.5`, "the strongest signal"), so an unearned review is a ranking
+exploit rather than a rudeness. Three checks stand between a request and a rating change: the
+booking must belong to the caller, it must be `completed`, and one review per booking is enforced
+by a unique INDEX rather than by a service check that races with itself.
 
-**What it needs:** a `reviews` table keyed on the booking (one review per stay, which is also what
-stops a review from a guest who never came), a partner reply and a report flag on the same row,
-`no DELETE` enforced by the same append-only trigger pattern the audit tables use, and a recompute
-of the property aggregate on write.
+**The aggregate cannot drift.** `properties.rating` and `reviews_count` were documented as
+"worker-maintained" while no worker existed. They are now recomputed by an `AFTER INSERT OR UPDATE`
+trigger over PUBLISHED rows only — so a hidden review leaves the average and the ranking the
+instant staff hide it, rather than carrying on working on a listing's position after it has been
+taken off the page.
 
-**Owner:** engineering. It is the largest remaining piece of the partner portal.
+**Reporting is not removing**, and both screens say so. A partner who reports sees «بلاغك قيد
+المراجعة … التقييم يبقى ظاهراً حتى يصدر القرار». Without that, a partner reports every review below
+four stars and is angry twice.
+
+**Ten constraints probed live** against the running database, all refusing: rating outside 1–5, an
+empty body, two reviews on one booking, hidden with no moderator, a report with no reason, a reply
+with no timestamp, DELETE, and edits to the body or the score. The aggregate was checked in both
+directions in the same session.
+
+**Tests.** 25 integration tests. `e2e/partner.spec.ts` asserts the rule is printed and that no
+delete control exists — by ABSENCE, because a screen can state a policy and still ship the button
+that contradicts it. `e2e/admin-sections.spec.ts` does the same for the staff queue.
+
+**What remains:**
+
+1. **No customer-facing form.** `POST /reviews` works and is tested, but `apps/web` has no screen
+   for a guest to write one — so in the product today reviews arrive only via the API or the seed.
+   That is the largest remaining piece and it belongs to the customer app rather than the portal.
+2. **The sidebar badge.** §7 draws `التقييمات 4.7` next to the nav item. The number now exists;
+   the badge is not rendered, and `عقاراتي 3` should land with it.
+3. **No notification** to a partner that a review arrived, or to a guest that a partner replied.
+
+**Owner:** engineering.
 
 ### O-partner-2 — The payout ledger, read and operated
 
@@ -594,6 +621,43 @@ release → paid, producing a balanced movement (credit `partner_payout` 558.00,
    none, and the alerts panel says a fine «خُصمت من المستحقات» that in fact was not.
 
 **Owner:** engineering. Item 3 is the one with money attached.
+
+### D-fine-1 — What a fine actually does to a payout is undecided
+
+**Status: a DECISION waiting on Bashar, not an engineering gap.** Held open deliberately on
+2026-08-07: _"keep them recorded only for now, do not deduct them from payouts until we define the
+exact business rule."_
+
+**Where it stands.** `partner_violations` records the offence, the occurrence number, the fine
+amount and the split between what compensates the customer and what SAFRA retains (§6.4).
+`partner_payouts.fine_amount` exists and the accrual already computes `net_amount = gross_amount −
+fine_amount`, enforced by a CHECK constraint. Nothing populates `fine_amount`, so every payout so
+far nets to its gross.
+
+**Why it was not simply wired.** The plumbing is one query; the rule is not. At least five
+questions have to be answered before any deduction is correct, and each has a defensible answer
+that contradicts the others:
+
+1. **Which payout does a fine land on** — the one covering the offending booking, or the next open
+   period? The offending booking may already be paid, and a paid payout is immutable.
+2. **What if the fine exceeds the period's gross?** `net_amount >= 0` is a CHECK constraint, so a
+   large fine against a quiet month cannot simply be subtracted; it has to carry forward, be
+   capped, or become a debt outside the payout model.
+3. **Does a waived fine reverse a deduction that already happened?** `waived_at` exists and a paid
+   payout cannot be restated — so a waiver after payment needs a compensating movement, not an
+   edit.
+4. **Does the customer's compensation come out of the same amount?** §6.4 splits the fine; the
+   ledger has to show both halves going to different places.
+5. **When is the partner told?** A transfer that arrives smaller than the dashboard said is the
+   complaint this whole feature exists to avoid.
+
+**What was done instead, and it matters.** The dashboard's alert line said «غرامة ١٠$ خُصمت من
+المستحقات» — the handoff's own wording, and a statement that the money had already been taken. It
+now says «مسجَّلة» (recorded). Leaving the original would have had partners reconciling against a
+deduction that never happened, which is the exact failure the payout ledger was built to prevent.
+The wording returns to the handoff's the moment a deduction is real.
+
+**Owner:** Bashar for the five questions above, then engineering. Not blocking anything else.
 
 ### O-partner-3 — The dashboard is built; the calendar shows one unit
 

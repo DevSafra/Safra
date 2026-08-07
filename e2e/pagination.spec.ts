@@ -45,6 +45,8 @@ const TABLES = [
   '/audit',
   /* تحويلات الشركاء — a registry under الدفع, not a twentieth sidebar section. */
   '/payouts',
+  /* التقييمات المُبلَّغ عنها — a card list, paged like every other registry. */
+  '/reviews',
 ];
 
 /**

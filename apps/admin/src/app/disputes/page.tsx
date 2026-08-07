@@ -109,6 +109,18 @@ export default async function DisputesPage({
               capped={result.capped}
               size={size}
             />
+            {/*
+              The reported-review queue lives beside this one: both are complaints about what
+              somebody said, and both are answered by the same people.
+            */}
+            <FootNote>
+              <Link
+                href="/reviews"
+                className="inline-flex min-h-10 items-center font-semibold text-gold underline-offset-2 hover:underline lg:min-h-0"
+              >
+                {t.sections.reviewModeration.title}
+              </Link>
+            </FootNote>
             <FootNote>{t.sections.disputes.note}</FootNote>
           </ConsolePanel>
         </div>

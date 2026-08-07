@@ -134,6 +134,15 @@ export const en = {
     'Two-factor authentication is not available for this account type.',
   'partner.two_factor_target_not_partner':
     'This account is not a partner. Two-factor resets here apply to partner accounts only.',
+  'validation.review_rating_range': 'A review score must be between 1 and 5.',
+  'review.not_found': 'Review not found.',
+  'review.stay_not_completed': 'A review can only be written after the stay is complete.',
+  'review.already_written': 'This booking already has a review.',
+  'review.not_your_booking': 'That booking is not yours to review.',
+  'review.already_replied': 'You have already replied to this review.',
+  'review.already_reported': 'This review has already been reported.',
+  'review.not_reported':
+    'This review has not been reported, so there is nothing to decide.',
   'partner.two_factor_no_account':
     'This partner has no sign-in account, so there is no second factor to reset.',
   'staff.role_invalid_console':

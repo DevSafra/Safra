@@ -82,6 +82,18 @@ export const PERMISSIONS = {
    * turned on a staff or super-admin account. See `PartnerTwoFactorService`.
    */
   PARTNER_TWO_FACTOR_RESET: 'partner.two_factor_reset',
+  /**
+   * Guest reviews (§7.3, P-006).
+   *
+   * Four permissions rather than one, because they are four different powers with four different
+   * blast radii. Notably there is no `review.delete` and there never will be: P-006 forbids it,
+   * and the database refuses it, so a permission naming it would be a promise the system cannot
+   * keep. `review.moderate` is what staff hold instead — it HIDES, with an actor and a reason.
+   */
+  REVIEW_CREATE: 'review.create',
+  REVIEW_READ_OWN: 'review.read_own',
+  REVIEW_RESPOND_OWN: 'review.respond_own',
+  REVIEW_MODERATE: 'review.moderate',
   PROPERTY_READ: 'property.read',
   PROPERTY_MANAGE_OWN: 'property.manage_own',
   PROPERTY_APPROVE: 'property.approve',
@@ -129,6 +141,7 @@ const P = PERMISSIONS;
 
 /** A registered or guest customer, acting only on their own records. */
 const CUSTOMER: Permission[] = [
+  P.REVIEW_CREATE,
   P.BOOKING_READ_OWN,
   P.BOOKING_CREATE,
   P.WALLET_READ,
@@ -154,6 +167,9 @@ const PARTNER: Permission[] = [
   P.MESSAGE_READ,
   P.MESSAGE_SEND,
   P.PAYOUT_READ_OWN,
+  P.REVIEW_READ_OWN,
+  /* الرد and إبلاغ — the two remedies P-006 allows. Hiding is not among them. */
+  P.REVIEW_RESPOND_OWN,
 ];
 
 /**
@@ -174,6 +190,12 @@ const SUPPORT_AGENT: Permission[] = [
   P.MESSAGE_SEND,
   P.DISPUTE_READ,
   P.DISPUTE_MANAGE,
+  /*
+    A reported review is a support ticket in everything but name — a partner saying "this is
+    unfair" about something a guest wrote. It lands with the people who already answer for the
+    relationship between the two.
+  */
+  P.REVIEW_MODERATE,
   P.NOTIFICATION_READ,
   P.WALLET_READ,
   P.GIFT_CARD_READ,
@@ -236,6 +258,8 @@ const OPERATIONS_MANAGER: Permission[] = [
   P.MESSAGE_SEND,
   P.DISPUTE_READ,
   P.DISPUTE_MANAGE,
+  /* Reports from partners land in the same queue operations already works. */
+  P.REVIEW_MODERATE,
   P.NOTIFICATION_READ,
   P.PARTNER_CONTRACT_READ,
   /**

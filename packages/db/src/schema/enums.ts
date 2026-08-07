@@ -286,3 +286,30 @@ export const cityCategory = pgEnum('city_category', [
   'desert',
   'historic',
 ]);
+
+/**
+ * A guest review's visibility (§7.3, P-006).
+ *
+ * There is no `deleted`. P-006 is explicit — *"لا يمكن حذف تقييم"* — so a review that should not
+ * be shown becomes `hidden`, which is a moderation decision with an actor and a reason, and the
+ * row survives. That is the whole difference between moderation and deletion, and it is the
+ * difference the rule is about.
+ *
+ * `published` is the DEFAULT: a guest who writes a review expects it to appear, and holding every
+ * review for approval would make the partner's ability to report one meaningless.
+ */
+export const reviewStatus = pgEnum('review_status', ['published', 'hidden']);
+
+/**
+ * Where a partner's report about a review has got to.
+ *
+ * `none` is the ordinary state. The pair `open`/`upheld`/`dismissed` is deliberately NOT a
+ * separate table: a review carries at most one live report, and a second table would invite two
+ * open reports disagreeing about the same review.
+ */
+export const reviewReportStatus = pgEnum('review_report_status', [
+  'none',
+  'open',
+  'upheld',
+  'dismissed',
+]);

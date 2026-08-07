@@ -1198,3 +1198,35 @@ export async function getPayout(reference: string) {
     payoutDetailSchema,
   );
 }
+
+/**
+ * A reported review awaiting a staff decision (§7.3, P-006).
+ *
+ * Carries the guest's name and the review body because a moderator has to read what was actually
+ * written to decide — but nothing else about the guest, for the same reason the partner's own
+ * screen shows nothing else.
+ */
+const reportedReviewSchema = z.object({
+  reference: z.string(),
+  guestName: z.string(),
+  propertyName: z.string().nullable(),
+  unitName: z.string().nullable(),
+  rating: z.number(),
+  body: z.string(),
+  status: z.string(),
+  partnerReply: z.string().nullable(),
+  partnerRepliedAt: z.string().nullable(),
+  reportStatus: z.string(),
+  reportReason: z.string().nullable(),
+  moderationNote: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type ReportedReview = z.infer<typeof reportedReviewSchema>;
+
+export async function getReportedReviews(params: ListParams) {
+  return staffFetch(
+    `/admin/reviews/reported${listQuery(params)}`,
+    offsetPage(reportedReviewSchema),
+  );
+}

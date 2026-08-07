@@ -13,3 +13,4 @@ export * from './search.js';
 export * from './table-preferences.js';
 export * from './two-factor.js';
 export * from './wallet.js';
+export * from './review.js';

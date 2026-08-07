@@ -16,6 +16,7 @@ import { PartnerModule } from './partner/partner.module.js';
 import { PayoutModule } from './payouts/payout.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { RankingModule } from './ranking/ranking.module.js';
+import { ReviewModule } from './reviews/review.module.js';
 import { SanctionsModule } from './sanctions/sanctions.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SettingsModule } from './settings/settings.module.js';
@@ -64,6 +65,7 @@ import { TwoFactorGuard } from './rbac/two-factor.guard.js';
     PayoutModule,
     PaymentsModule,
     RankingModule,
+    ReviewModule,
     SanctionsModule,
     AdminModule,
     CatalogModule,

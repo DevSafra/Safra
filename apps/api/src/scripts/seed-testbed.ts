@@ -485,6 +485,16 @@ async function build(db: Seeder): Promise<void> {
   await db.execute(sql`DELETE FROM disputes WHERE booking_id IN (${testbedBookings})`);
 
   /*
+    Reviews pin the bookings they are about, so they go first.
+
+    P-006 forbids DELETE and a trigger enforces it — so this is the one cleanup step that cannot
+    simply delete. TRUNCATE does not fire row triggers, which is the documented gap O-data-1 and
+    the same escape `messages` already relies on here. Acceptable for the same reason: nothing but
+    a testbed has reviews on this database, and the alternative is a seed that can never re-run.
+  */
+  await db.execute(sql`TRUNCATE TABLE reviews`);
+
+  /*
     Payouts pin the bookings they cover, so they go before the bookings do.
 
     A PAID payout is money that left the company, and `deny_paid_payout_mutation` refuses to delete
@@ -515,6 +525,33 @@ async function build(db: Seeder): Promise<void> {
       SELECT pa.id FROM partners pa JOIN users u ON u.id = pa.user_id
       WHERE lower(u.email) IN (${emailList}))`);
 
+  /*
+    Ledger entries and wallet movements pin the bookings they belong to, and both tables are
+    append-only by trigger.
+
+    The rows are debris: integration suites post real movements against whatever bookings exist,
+    and `docs/FUTURE-WORK.md` carries that as O-data-2. The seed has to clear them or it can never
+    re-run on a machine where the tests have been run — which is every machine.
+
+    The trigger is disabled for the length of this ONE statement rather than the table being
+    truncated, so only the entries belonging to bookings this script is already deleting go. That
+    matters: `partner_payouts.entry_group_id` points into this table, and a wholesale TRUNCATE
+    would leave paid payouts claiming a movement that no longer exists — the exact reconciliation
+    failure the payout detail screen was built to surface.
+
+    Inside the seed's transaction, so a failure anywhere puts the trigger back.
+  */
+  await db.execute(sql`ALTER TABLE ledger_entries DISABLE TRIGGER USER`);
+  await db.execute(sql`ALTER TABLE wallet_transactions DISABLE TRIGGER USER`);
+  await db.execute(
+    sql`DELETE FROM ledger_entries WHERE booking_id IN (${testbedBookings})`,
+  );
+  await db.execute(
+    sql`DELETE FROM wallet_transactions WHERE booking_id IN (${testbedBookings})`,
+  );
+  await db.execute(sql`ALTER TABLE wallet_transactions ENABLE TRIGGER USER`);
+  await db.execute(sql`ALTER TABLE ledger_entries ENABLE TRIGGER USER`);
+
   await db.execute(sql`DELETE FROM bookings WHERE id IN (${testbedBookings})`);
 
   const testbedPartners = sql`
@@ -529,6 +566,23 @@ async function build(db: Seeder): Promise<void> {
   await db.execute(sql`DELETE FROM property_images WHERE property_id IN (
     SELECT id FROM properties WHERE partner_id IN (${testbedPartners}))`);
   await db.execute(sql`DELETE FROM properties WHERE partner_id IN (${testbedPartners})`);
+
+  /*
+    The last things holding a partner row down.
+
+    `partner_violations` is written by the SLA sweep whenever a seeded booking expires unanswered,
+    so it accumulates on its own rather than being something this script created. `ledger_entries`
+    keeps a second reference — by PARTNER rather than by booking — on the movements a payout posts,
+    which have no booking at all; the scoped delete above catches only the booking-shaped ones.
+  */
+  await db.execute(
+    sql`DELETE FROM partner_violations WHERE partner_id IN (${testbedPartners})`,
+  );
+  await db.execute(sql`ALTER TABLE ledger_entries DISABLE TRIGGER USER`);
+  await db.execute(
+    sql`DELETE FROM ledger_entries WHERE partner_id IN (${testbedPartners})`,
+  );
+  await db.execute(sql`ALTER TABLE ledger_entries ENABLE TRIGGER USER`);
   await db.execute(
     sql`DELETE FROM wallets WHERE customer_profile_id IN (${testbedProfiles})`,
   );
@@ -987,6 +1041,91 @@ async function bulk(
   console.log(`  ${n} additional bookings`);
 
   await conversation(db, ctx.profileId);
+  await reviews(db);
+}
+
+/**
+ * Guest reviews on completed stays (§7.3).
+ *
+ * ## Why the seed writes these directly rather than through the service
+ *
+ * `ReviewService.create` requires an authenticated guest whose user id matches the booking's
+ * customer profile, and most seeded bookings belong to GUEST profiles with no user row at all —
+ * which is realistic and is exactly the case the service is right to refuse. Writing the rows
+ * here keeps the fixture honest about which bookings are reviewable without weakening the rule.
+ *
+ * One review is left REPORTED and undecided, so the staff moderation queue has something in it
+ * and the partner's «إبلاغ» state is visible on a screen rather than only in a test. Nothing is
+ * pre-hidden: a hidden review needs a moderator to have decided, and inventing that decision would
+ * put a name against a judgement nobody made.
+ */
+async function reviews(db: Seeder): Promise<void> {
+  const BODIES = [
+    'إقامة ممتازة، والاستقبال كان راقياً منذ اللحظة الأولى. الغرفة نظيفة والموقع قريب من كل شيء.',
+    'المكان جميل والخدمة جيدة، لكن الإفطار كان محدوداً بعض الشيء.',
+    'تجربة رائعة مع العائلة. الأطفال أحبوا المسبح وسنعود بإذن الله.',
+    'الصور لا تُنصف المكان — أفضل مما توقعت بكثير.',
+    'الموقع ممتاز لكن الضجيج من الشارع كان مزعجاً في الليل.',
+    'كل شيء كما وُصف تماماً. شكراً على الاهتمام بالتفاصيل.',
+  ];
+  const RATINGS = [5, 4, 5, 5, 3, 4];
+
+  /*
+    Completed bookings that have no review yet, spread across partners so every fixture partner has
+    something on their §7.3 screen. `ON CONFLICT DO NOTHING` on the booking unique index makes a
+    re-run a no-op rather than a duplicate-key failure.
+  */
+  const candidates = await db.execute<{
+    id: string;
+    property_id: string;
+    unit_id: string;
+    partner_id: string;
+    customer_profile_id: string;
+  }>(sql`
+    SELECT b.id, b.property_id, b.unit_id, b.partner_id, b.customer_profile_id
+    FROM bookings b
+    JOIN partners pa ON pa.id = b.partner_id
+    JOIN users u     ON u.id = pa.user_id
+    WHERE b.status = 'completed'
+      AND lower(u.email) IN ('partner1@safra.test', 'partner2@safra.test', 'partner3@safra.test')
+      AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.booking_id = b.id)
+    ORDER BY b.partner_id, b.check_out DESC
+    LIMIT 18
+  `);
+
+  let written = 0;
+
+  for (const [index, booking] of candidates.rows.entries()) {
+    const body = BODIES[index % BODIES.length] ?? BODIES[0];
+    const rating = RATINGS[index % RATINGS.length] ?? 5;
+
+    await db.execute(sql`
+      INSERT INTO reviews (booking_id, property_id, unit_id, partner_id,
+                           customer_profile_id, rating, body)
+      VALUES (${booking.id}, ${booking.property_id}, ${booking.unit_id},
+              ${booking.partner_id}, ${booking.customer_profile_id}, ${rating}, ${body})
+      ON CONFLICT (booking_id) DO NOTHING
+    `);
+
+    written += 1;
+  }
+
+  // One partner has already answered a guest, and one review is awaiting a staff decision.
+  await db.execute(sql`
+    UPDATE reviews SET partner_reply = 'شكراً لك على إقامتك معنا، ونتطلع لاستضافتك مجدداً.',
+                       partner_replied_at = now()
+    WHERE id = (SELECT id FROM reviews WHERE partner_reply IS NULL ORDER BY created_at LIMIT 1)
+  `);
+
+  await db.execute(sql`
+    UPDATE reviews SET report_status = 'open',
+                       report_reason = 'الضيف يصف عقاراً آخر — لم يقم لدينا في هذا التاريخ.',
+                       reported_at = now()
+    WHERE id = (SELECT id FROM reviews WHERE report_status = 'none' AND rating <= 3
+                ORDER BY created_at LIMIT 1)
+  `);
+
+  console.log(`  ${written} guest reviews, 1 replied to and 1 reported`);
 }
 
 /**

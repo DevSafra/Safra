@@ -207,6 +207,32 @@ test.describe('the partner dashboard', () => {
       await expect(page.getByText(t.payouts.net)).toBeVisible();
     }
 
+    /*
+      تقييمات ضيوفي §7.3 — and P-006, which is the assertion that matters.
+
+      *"لا يمكن حذف تقييم — يمكنك الرد عليه أو الإبلاغ عنه"*. The rule is printed on the page and
+      there is no delete control anywhere on it. Asserted by ABSENCE, deliberately: a screen can
+      state a policy and still offer the button that contradicts it, and the button is the thing a
+      partner would use.
+    */
+    await page.getByRole('link', { name: t.nav.reviews }).click();
+    await page.waitForURL(/\/reviews/);
+
+    await expect(page.getByText(t.reviews.rule)).toBeVisible();
+    await expect(page.getByText(/المعدل العام/)).toBeVisible();
+
+    // The two remedies the rule promises are both here.
+    await expect(
+      page.getByRole('button', { name: t.reviews.reply }).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: t.reviews.report }).first(),
+    ).toBeVisible();
+
+    // And nothing that deletes. No button, no link, no menu item.
+    await expect(page.getByRole('button', { name: /حذف/ })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /حذف/ })).toHaveCount(0);
+
     await page.getByRole('button', { name: t.nav.signOut }).click();
     await page.waitForURL(/\/login/);
 

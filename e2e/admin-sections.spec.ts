@@ -414,6 +414,27 @@ test.describe('honesty rules the design and the register require', () => {
   });
 
   /**
+   * The moderation queue exists, states P-006, and offers no way to delete anything.
+   *
+   * A reported review is the one place staff could plausibly be given a delete button — they are
+   * the ones being asked to make something go away. The queue offers «إخفاء» and «إبقاء» instead,
+   * and the footnote says why. Asserted by absence for the same reason the partner side is: a page
+   * can state a policy and still ship the control that breaks it.
+   */
+  test('the review moderation queue offers hide and keep, never delete', async ({
+    page,
+  }) => {
+    await page.goto('/reviews');
+
+    await expect(
+      page.getByRole('heading', { name: t.sections.reviewModeration.title }),
+    ).toBeVisible();
+    await expect(page.getByText(t.sections.reviewModeration.note)).toBeVisible();
+
+    await expect(page.getByRole('button', { name: /حذف/ })).toHaveCount(0);
+  });
+
+  /**
    * Every payout on the registry is a ROW, and the screen never invents one.
    *
    * The footnote states the accrual rule — completed and paid bookings only, with disputed ones

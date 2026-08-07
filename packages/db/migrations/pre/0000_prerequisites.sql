@@ -28,6 +28,7 @@ CREATE SEQUENCE IF NOT EXISTS advertiser_reference_seq   START 1;
 -- when they ask where a transfer went, so it carries a reference like everything
 -- else that moves money.
 CREATE SEQUENCE IF NOT EXISTS payout_reference_seq       START 1;
+CREATE SEQUENCE IF NOT EXISTS review_reference_seq       START 1;
 
 -- Booking references are BKG-<year>-NNNNNN, so the counter restarts each January.
 CREATE OR REPLACE FUNCTION reset_booking_sequence_yearly() RETURNS void AS $$

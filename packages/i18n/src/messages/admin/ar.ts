@@ -919,6 +919,34 @@ export const ar = {
       unreachable: 'تعذّر الوصول إلى الخادم.',
     },
 
+    /**
+     * التقييمات المُبلَّغ عنها — the staff moderation queue (§7.3, P-006).
+     *
+     * The two decisions are «إخفاء» and «إبقاء», not «حذف» and «إبقاء». The vocabulary matters:
+     * the database refuses to delete a review, so a control named «حذف» would be a promise the
+     * system cannot keep, and an operator would go looking for why it failed.
+     */
+    reviewModeration: {
+      title: 'التقييمات المُبلَّغ عنها',
+      note: 'لا يُحذف أي تقييم (P-006). القرار هنا بين إخفائه عن الزوار أو إبقائه ظاهراً؛ في الحالتين يبقى السجل ويُسجَّل من قرّر ولماذا.',
+      empty: 'لا بلاغات بانتظار القرار.',
+      colGuest: 'الضيف',
+      colProperty: 'العقار',
+      colRating: 'التقييم',
+      reportedBy: 'بلاغ الشريك',
+      body: 'نص التقييم',
+      uphold: 'قبول البلاغ وإخفاء التقييم',
+      dismiss: 'رفض البلاغ وإبقاء التقييم',
+      noteLabel: 'سبب القرار. يُسجَّل في سجل التدقيق ويُطلب في الحالتين.',
+      confirm: 'تأكيد القرار',
+      cancel: 'إلغاء',
+      working: 'جارٍ التنفيذ…',
+      failed: 'تعذّر تسجيل القرار.',
+      unreachable: 'تعذّر الوصول إلى الخادم.',
+      hiddenEffect:
+        'الإخفاء يُخرج التقييم من صفحة العقار ومن معدّله فوراً، ويبقى ظاهراً للشريك في سجلّه.',
+    },
+
     reviewProperty: {
       approveAndPublish: 'الموافقة والنشر',
       reject: 'رفض العقار',
