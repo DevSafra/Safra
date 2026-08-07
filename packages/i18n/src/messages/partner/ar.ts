@@ -285,7 +285,15 @@ export const ar = {
    */
   images: {
     title: 'صور العقار',
-    note: 'أول صورة بالترتيب هي صورة الغلاف التي تظهر في نتائج البحث. تُعالَج كل صورة وتُزال منها بيانات الموقع قبل النشر.',
+    /*
+      The cover is the FLAGGED image, not the first one.
+
+      This sentence used to say the first image in the order was the cover. It never was: the
+      order and the cover are separate columns, and «اجعلها صورة الغلاف» is what sets the cover.
+      A partner who reordered their gallery to change what search results show would have watched
+      nothing happen and had no way to find out why — the screen had told them the wrong mechanism.
+    */
+    note: 'صورة الغلاف هي التي تظهر في نتائج البحث، وتُختار بزر «اجعلها صورة الغلاف» لا بالترتيب. تُعالَج كل صورة وتُزال منها بيانات الموقع قبل النشر.',
     empty: 'لا صور بعد. ارفع أول صورة لهذا العقار.',
     count: '{n} من {max} صورة',
     upload: 'رفع صورة',
@@ -296,7 +304,21 @@ export const ar = {
     moveDown: 'تأخير',
     archive: 'أرشفة',
     archiveConfirm: 'تُؤرشَف الصورة ولا تُحذف — تبقى سجلاً لما عرضه الإعلان. متابعة؟',
+    /**
+     * Alt text, per language.
+     *
+     * All three, not just Arabic. The customer site serves ar/en/de and the alt attribute is
+     * chosen by the READER's locale — an English visitor to a listing described only in Arabic
+     * gets `alt=""`, which is the same as no description at all. Editing one language and storing
+     * three was a UI that quietly discarded two thirds of the field.
+     *
+     * Every one is optional. A partner writing Arabic should not be blocked on also writing
+     * German, and an empty alt is honest for a photograph the surrounding copy already names.
+     */
     altLabel: 'وصف الصورة لقارئ الشاشة (اختياري)',
+    altAr: 'بالعربية',
+    altEn: 'بالإنجليزية',
+    altDe: 'بالألمانية',
     altSave: 'حفظ الوصف',
     altSaved: 'حُفظ',
     backToProperties: 'رجوع إلى عقاراتي',

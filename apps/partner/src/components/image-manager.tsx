@@ -242,12 +242,11 @@ export function ImageManager({
                 </div>
 
                 <AltEditor
-                  reference={reference}
                   image={image}
-                  onSave={(value) =>
+                  onSave={(alt) =>
                     act(`/api/properties/${reference}/images/${image.id}`, {
                       method: 'PATCH',
-                      body: { ar: value },
+                      body: alt,
                     })
                   }
                 />
@@ -260,41 +259,85 @@ export function ImageManager({
   );
 }
 
+/**
+ * Alt text in every language the customer site serves.
+ *
+ * ## Why three fields and not one
+ *
+ * The alt attribute a visitor gets is chosen by THEIR locale. Storing three and editing one meant
+ * an English or German visitor to a listing described only in Arabic saw `alt=""` — the same as no
+ * description, on the field that exists for people who cannot see the photograph.
+ *
+ * ## All optional, saved together
+ *
+ * One submit for all three, because they describe one image and a partner filling in two of them
+ * should not have to decide which to save first. Sending them together also means the API's
+ * `PATCH` receives the complete state, so clearing a language is expressible — which it would not
+ * be if each field posted only itself.
+ */
 function AltEditor({
   image,
   onSave,
 }: {
-  readonly reference: string;
   readonly image: PropertyImage;
-  readonly onSave: (value: string) => Promise<boolean>;
+  readonly onSave: (alt: { ar?: string; en?: string; de?: string }) => Promise<boolean>;
 }) {
-  const [value, setValue] = useState(image.alt.ar ?? '');
+  const [alt, setAlt] = useState({
+    ar: image.alt.ar ?? '',
+    en: image.alt.en ?? '',
+    de: image.alt.de ?? '',
+  });
   const [saved, setSaved] = useState(false);
+
+  const set = (locale: 'ar' | 'en' | 'de') => (value: string) => {
+    setAlt((current) => ({ ...current, [locale]: value }));
+    setSaved(false);
+  };
 
   return (
     <form
       className="grid gap-1.5"
       onSubmit={(event) => {
         event.preventDefault();
-        void onSave(value.trim()).then((ok) => setSaved(ok));
+
+        /*
+          Empty strings are sent as ABSENT rather than as `''`. The API stores `null` for a missing
+          language, and a stored empty string would be indistinguishable from a description
+          somebody deliberately wrote as blank — while rendering the same `alt=""` either way.
+        */
+        const trimmed = {
+          ...(alt.ar.trim() ? { ar: alt.ar.trim() } : {}),
+          ...(alt.en.trim() ? { en: alt.en.trim() } : {}),
+          ...(alt.de.trim() ? { de: alt.de.trim() } : {}),
+        };
+
+        void onSave(trimmed).then((ok) => setSaved(ok));
       }}
     >
-      <label
-        htmlFor={`alt-${image.id}`}
-        className="text-[11px] leading-relaxed text-faint"
-      >
-        {t.images.altLabel}
-      </label>
-      <input
-        id={`alt-${image.id}`}
-        value={value}
-        maxLength={300}
-        onChange={(event) => {
-          setValue(event.target.value);
-          setSaved(false);
-        }}
-        className="min-h-10 rounded-lg border border-line bg-field px-2.5 py-1.5 text-[12px] text-text lg:min-h-0"
+      <p className="text-[11px] leading-relaxed text-faint">{t.images.altLabel}</p>
+
+      <AltField
+        id={`alt-ar-${image.id}`}
+        label={t.images.altAr}
+        value={alt.ar}
+        onChange={set('ar')}
+        dir="rtl"
       />
+      <AltField
+        id={`alt-en-${image.id}`}
+        label={t.images.altEn}
+        value={alt.en}
+        onChange={set('en')}
+        dir="ltr"
+      />
+      <AltField
+        id={`alt-de-${image.id}`}
+        label={t.images.altDe}
+        value={alt.de}
+        onChange={set('de')}
+        dir="ltr"
+      />
+
       <button
         type="submit"
         className="min-h-10 w-fit cursor-pointer rounded-lg border border-line px-3 py-1 text-[11.5px] text-muted lg:min-h-0"
@@ -302,6 +345,40 @@ function AltEditor({
         {saved ? t.images.altSaved : t.images.altSave}
       </button>
     </form>
+  );
+}
+
+/**
+ * One language's field.
+ *
+ * `dir` is per FIELD, not inherited from the page: an English description typed into an RTL input
+ * has its punctuation reordered as you type, which looks like the app corrupting the text.
+ */
+function AltField({
+  id,
+  label,
+  value,
+  onChange,
+  dir,
+}: {
+  readonly id: string;
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly dir: 'rtl' | 'ltr';
+}) {
+  return (
+    <label className="grid gap-0.5">
+      <span className="text-[10.5px] text-faint2">{label}</span>
+      <input
+        id={id}
+        dir={dir}
+        value={value}
+        maxLength={300}
+        onChange={(event) => onChange(event.target.value)}
+        className="min-h-10 rounded-lg border border-line bg-field px-2.5 py-1.5 text-[12px] text-text lg:min-h-0"
+      />
+    </label>
   );
 }
 
