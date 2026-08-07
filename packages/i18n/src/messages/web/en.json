@@ -253,7 +253,7 @@
     "resetLinkInvalidTitle": "This link no longer works",
     "resetLinkInvalid": "Reset links expire after an hour and can be used once. Request a new one.",
     "requestNewLink": "Request a new link",
-    "backToSignIn": "Back to sign in",
+    "backToSignIn": "Go to sign in",
     "resetDone": "Your password has been changed. Sign in with it below.",
     "verifiedTitle": "Email confirmed",
     "verified": "Thank you — your address is confirmed.",
@@ -264,7 +264,9 @@
     "verifyResend": "Send the link again",
     "verifyResent": "Sent. Check your inbox.",
     "showPassword": "Show password",
-    "hidePassword": "Hide password"
+    "hidePassword": "Hide password",
+    "checkEmail": "Check your email",
+    "checkEmailBody": "If you did not have an account with this address, we have sent you a confirmation link. If you did, we have sent you a message explaining how to sign in or reset your password."
   },
   "account": {
     "title": "My account",

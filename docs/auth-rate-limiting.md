@@ -82,6 +82,50 @@ both answer `401 auth.credentials_invalid`, indistinguishably.
 
 **Net position:** enumeration risk is **lower** than before the change, not merely unchanged.
 
+### And the registration oracle, closed 2026-08-08
+
+`POST /auth/register` answered `409 auth.email_taken` for an address that was already registered.
+That was the cheaper of the two oracles: one request, no side effects, a definitive answer — where
+the lockout one cost five requests and denied somebody service.
+
+It now answers `202 { ok: true }` for every address. The difference moves into the inbox, which is
+reachable only by the owner: a new address gets a verification link, a taken one gets "you already
+have an account, here is how to sign in or reset". Nothing about the existing account changes, so a
+stranger triggering it is harmless.
+
+**The cost, accepted deliberately:** registration no longer signs the customer in. It could not —
+an identical response for a taken address would mean issuing a session for an account the caller
+may not own. Both paths end at "check your email".
+
+**Verified over real HTTP**, three samples of each, interleaved:
+
+| Channel      | Taken address | New address   |
+| ------------ | ------------- | ------------- |
+| Status       | `202`         | `202`         |
+| Body         | `{"ok":true}` | `{"ok":true}` |
+| `Set-Cookie` | none          | none          |
+| Median time  | 35 ms         | 52 ms         |
+
+**The residual: timing, at a ratio of ~1.5.** The new path does four inserts the taken path does
+not. This is a far weaker signal than the old status code — extracting it needs many samples and
+a stable network path, where the old one needed a single request — but it is not zero, and it is
+worth naming rather than claiming perfection.
+
+What bounds it: the rate limits (ten a minute per IP+account, forty per IP) make sample collection
+expensive, and every attempt against a taken address writes an `auth.register_existing_email` audit
+row, so a campaign is visible to whoever reads the log even though it was invisible to whoever ran
+it. Real-world network jitter is comparable to the 17 ms difference.
+
+What would close it fully: constant-time responses — performing equivalent writes on both paths, or
+deferring account creation to a queued job so the endpoint's work is identical either way. Both add
+latency and complexity to a path that is otherwise simple, and neither is worth it until there is
+evidence anybody is measuring. Recorded here so the trade is visible rather than forgotten.
+
+The password is hashed on BOTH paths, always — Argon2id dominates the endpoint, and hashing only
+when creating would have made the ratio roughly ten rather than 1.5. That is asserted directly by a
+spy as well as by the clock, because a stopwatch test alone would pass on a fast machine if
+somebody later moved the hash back inside the create branch.
+
 ---
 
 ## Confirmations

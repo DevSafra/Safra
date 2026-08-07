@@ -8,6 +8,10 @@ export const de = {
     subject: 'Bestätigen Sie Ihre E-Mail-Adresse — SAFRA',
     body: 'Willkommen bei SAFRA.\n\nBestätigen Sie Ihre E-Mail-Adresse über diesen Link:\n{url}\n\nDer Link läuft in {expiresInHours} Stunden ab.\n\nNach der Bestätigung können wir Buchungen, die Sie bereits als Gast mit dieser Adresse getätigt haben, Ihrem Konto zuordnen.\n\nIhr SAFRA-Team',
   },
+  accountExists: {
+    subject: 'Registrierungsversuch — SAFRA',
+    body: 'Jemand hat versucht, mit dieser E-Mail-Adresse ein SAFRA-Konto zu erstellen — Sie haben bereits eines.\n\nWaren Sie das, melden Sie sich hier an:\n{signInUrl}\n\nPasswort vergessen? Hier zurücksetzen:\n{resetUrl}\n\nWaren Sie es nicht, ist nichts zu tun — an Ihrem Konto hat sich nichts geändert und niemand hat Ihre Daten gesehen.\n\nIhr SAFRA-Team',
+  },
   staffInvitation: {
     subject: 'Einladung zur SAFRA-Administrationskonsole',
     body: 'Sie wurden zur SAFRA-Administrationskonsole eingeladen als: {roleLabel}.\n\nÖffnen Sie diesen Link, um Ihr Passwort festzulegen:\n{url}\n\nDer Link läuft in {expiresInHours} Stunden ab und ist einmal verwendbar.\n\nNach dem Festlegen des Passworts müssen Sie die Zwei-Faktor-Authentifizierung aktivieren, bevor das Konto genutzt werden kann.\n\nFalls Sie diese Einladung nicht erwartet haben, öffnen Sie den Link nicht und informieren Sie das SAFRA-Team.\n\nIhr SAFRA-Team',

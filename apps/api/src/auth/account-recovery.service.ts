@@ -7,7 +7,11 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
 import { MailService } from '../mail/mail.service.js';
-import { emailVerificationMail, passwordResetMail } from '../mail/mail.templates.js';
+import {
+  accountExistsMail,
+  emailVerificationMail,
+  passwordResetMail,
+} from '../mail/mail.templates.js';
 import { PasswordService } from '../common/crypto/password.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { AuthTokenService } from './auth-token.service.js';
@@ -417,6 +421,39 @@ export class AccountRecoveryService {
    * SAFRA with a link pointing at the attacker's domain, and the victim's token is
    * handed over by their own click.
    */
+  /**
+   * Tells the owner of an already-registered address that somebody tried to sign up with it.
+   *
+   * ## Why this is a mail and not a response
+   *
+   * `POST /auth/register` answers the same generic body for every address (Bashar, 2026-08-07), so
+   * the only channel that can carry "you already have an account" is one that reaches the OWNER of
+   * the address and nobody else. The caller learns nothing either way.
+   *
+   * ## No token, and nothing changes
+   *
+   * This mail carries plain links to sign in and to reset — no token of any kind. A stranger
+   * triggering it therefore achieves nothing except sending somebody an email, and the recipient
+   * has nothing to act on urgently, which is what the copy says.
+   *
+   * ## Not rate-limited HERE
+   *
+   * The register endpoint's own limits do that work: forty a minute per address and ten per
+   * (address, account). Adding a second budget in this method would make the taken path measurably
+   * different from the new one under load, which is the timing oracle the whole change exists to
+   * close.
+   */
+  async notifyAccountExists(email: string, locale: string): Promise<void> {
+    await this.mail.send(
+      accountExistsMail({
+        to: email,
+        signInUrl: new URL(`/${locale}/login`, this.env.APP_URL).toString(),
+        resetUrl: new URL(`/${locale}/forgot-password`, this.env.APP_URL).toString(),
+        locale,
+      }),
+    );
+  }
+
   private link(path: string, token: string, locale: string): string {
     const url = new URL(`/${locale}/${path}`, this.env.APP_URL);
     url.searchParams.set('token', token);

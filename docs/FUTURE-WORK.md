@@ -437,6 +437,47 @@ a lint rule that cries wolf gets switched off.
 `application/json`, `Not signed in.` (a proxy's own 401 body, never rendered) and `Desktop Chrome`.
 Each is exempt for a stated reason.
 
+### O-sec-2 — Closed: registration no longer reveals whether an address is registered
+
+**Closed 2026-08-08**, on Bashar's instruction, after it was flagged as the remaining oracle when
+`O-sec-1` closed the lockout one.
+
+**What it was.** `POST /auth/register` answered `409 auth.email_taken`. One request, no side
+effects, a definitive answer — cheaper than the lockout oracle, which at least cost five requests
+and denied somebody service. It was a documented, deliberate trade: "a signup form reveals this by
+design, so hiding it buys no privacy". The first half is only true if the form must REFUSE, and it
+does not have to.
+
+**What it is now.** `202 { ok: true }` for every address. The difference moves into the inbox: a
+new address gets a verification link, a taken one gets "you already have an account, here is how to
+sign in or reset" — plain links, no token, nothing changed on the account, so a stranger triggering
+it achieves nothing but sending somebody an email.
+
+**The cost, accepted:** registration no longer signs the customer straight in, because an identical
+response for a taken address cannot carry a session — that would sign the caller in as somebody
+else. Both paths end at «تحقّق من بريدك الإلكتروني». One extra step, in exchange for the endpoint no
+longer answering "does this person have an account".
+
+**Audited either way, with different actions.** `auth.registered` and
+`auth.register_existing_email`. The caller learns nothing; §15 still records what happened, and a
+burst of the second against many addresses from one source is a defeated enumeration attempt that
+is visible to whoever reads the log.
+
+**Verified over real HTTP**: identical status, identical body, no `Set-Cookie` on either. Five
+integration tests cover the four leak channels, including a spy proving the password is hashed on
+BOTH paths — Argon2id dominates the endpoint, and hashing only when creating would have made the
+timing difference roughly tenfold.
+
+**Residual, named rather than papered over:** timing differs by ~1.5× (35 ms vs 52 ms) because the
+create path does four inserts. Far weaker than a status code — it needs many samples and a stable
+path — and bounded by the rate limits and the audit trail. `docs/auth-rate-limiting.md` records
+what would close it fully and why that is not worth doing yet.
+
+**A test this shook out.** The i18n completeness suite asserted every email body contains `{url}`
+literally. `accountExists` carries TWO links, `{signInUrl}` and `{resetUrl}`, because "I already
+have an account" and "I cannot remember my password" arrive together. The assertion now matches the
+SHAPE of a URL placeholder, which is what it always meant.
+
 ### O-sec-1 — Closed: auth throttling no longer punishes a shared address
 
 **Closed 2026-08-07**, on Bashar's approval.

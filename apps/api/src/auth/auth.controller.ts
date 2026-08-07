@@ -59,36 +59,54 @@ export class AuthController {
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
+  @HttpCode(HttpStatus.ACCEPTED)
   @UsePipes(new ZodValidationPipe(registerSchema))
   async register(
     @Body() body: RegisterInput,
     @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
-  ): Promise<LoginResponse> {
-    const result = await this.auth.register(body, contextOf(request));
+  ): Promise<{ ok: true }> {
+    const outcome = await this.auth.register(body);
 
+    /*
+      Audited either way, with DIFFERENT actions — the caller learns nothing, and §15 still records
+      what happened. `auth.register_existing_email` is the more interesting of the two: a burst of
+      them against many addresses from one source is an enumeration attempt that has been defeated,
+      and it should be visible to whoever reads the log even though it was invisible to whoever
+      made the requests.
+    */
     this.audit.recordDetached({
-      actorUserId: result.user.id,
-      actorRole: result.user.role,
-      action: 'auth.registered',
+      actorUserId: outcome.created ? outcome.userId : null,
+      actorRole: outcome.created ? 'customer' : undefined,
+      action: outcome.created ? 'auth.registered' : 'auth.register_existing_email',
       subjectType: 'user',
-      subjectId: result.user.id,
+      subjectId: outcome.userId,
       ...contextOf(request),
     });
 
-    /**
-     * The verification email goes out here rather than inside `register`, so a mail
-     * failure can never roll back an account the customer has already been told was
-     * created. Awaited, not detached: `MailService.send` swallows delivery errors, so
-     * the only thing being waited on is a token insert.
-     *
-     * Verification is NOT a precondition for signing in — §4 keeps the barrier to
-     * booking low — but it IS the precondition for claiming guest bookings, which is
-     * a transfer of access to somebody else's data.
-     */
-    await this.recovery.requestEmailVerification(result.user.id, contextOf(request));
+    /*
+      The email is where the two paths differ, because an inbox is reachable only by the person who
+      owns the address.
 
-    return this.respond(result, response);
+      Awaited rather than detached, and awaited in BOTH branches: `MailService.send` swallows
+      delivery errors, so what is being waited on is a token insert for one and nothing for the
+      other — and a branch that skipped the await would be measurably faster, which is the timing
+      oracle this endpoint just closed.
+    */
+    if (outcome.created) {
+      await this.recovery.requestEmailVerification(outcome.userId, contextOf(request));
+    } else {
+      await this.recovery.notifyAccountExists(body.email, outcome.locale);
+    }
+
+    /*
+      The same body for both, and no session for either.
+
+      Registration used to return tokens and sign the customer straight in. It cannot now: an
+      identical response for a taken address would mean issuing a session for an account the caller
+      may not own. The new customer verifies their email and signs in — one extra step, in exchange
+      for this endpoint no longer answering "does this person have an account".
+    */
+    return { ok: true };
   }
 
   @Public()

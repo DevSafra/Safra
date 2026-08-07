@@ -253,7 +253,7 @@
     "resetLinkInvalidTitle": "Dieser Link ist nicht mehr gültig",
     "resetLinkInvalid": "Links laufen nach einer Stunde ab und sind einmal verwendbar. Fordern Sie einen neuen an.",
     "requestNewLink": "Neuen Link anfordern",
-    "backToSignIn": "Zurück zur Anmeldung",
+    "backToSignIn": "Zur Anmeldung",
     "resetDone": "Ihr Passwort wurde geändert. Melden Sie sich damit an.",
     "verifiedTitle": "E-Mail bestätigt",
     "verified": "Vielen Dank — Ihre Adresse ist bestätigt.",
@@ -264,7 +264,9 @@
     "verifyResend": "Link erneut senden",
     "verifyResent": "Gesendet. Prüfen Sie Ihren Posteingang.",
     "showPassword": "Passwort anzeigen",
-    "hidePassword": "Passwort verbergen"
+    "hidePassword": "Passwort verbergen",
+    "checkEmail": "Prüfen Sie Ihre E-Mails",
+    "checkEmailBody": "Falls Sie mit dieser Adresse noch kein Konto hatten, haben wir Ihnen einen Bestätigungslink gesendet. Falls doch, haben wir Ihnen erklärt, wie Sie sich anmelden oder Ihr Passwort zurücksetzen."
   },
   "account": {
     "title": "Mein Konto",

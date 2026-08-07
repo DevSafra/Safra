@@ -487,13 +487,36 @@ describeIfDb('ReviewService', () => {
   });
 
   describe('staff moderation', () => {
-    it('lists what partners have reported', async () => {
+    /*
+      The queue is GLOBAL — it is every partner's reports, oldest first, because staff work a
+      backlog from the front. So a newly reported review lands at the END, and on a database with
+      a backlog it is not on page one.
+
+      Asserted on the TOTAL rather than by hunting for the reference on an arbitrary page. That is
+      also the honest assertion: what matters is that reporting puts something in the queue, and
+      which page it lands on is a property of how much work is already waiting.
+    */
+    it('puts a reported review into the staff queue', async () => {
+      const before = (await service.listReported({ page: 1, limit: 1 })).total;
+
       const { reference } = await write();
       await service.report(partner(), reference, 'Describes a different property.');
 
-      const page = await service.listReported({ page: 1, limit: 25 });
+      const after = await service.listReported({ page: 1, limit: 1 });
 
-      expect(page.items.some((item) => item.reference === reference)).toBe(true);
+      expect(after.total).toBe(before + 1);
+    });
+
+    /* And it is reachable — on whichever page the backlog puts it. */
+    it('is findable in the queue by walking it', async () => {
+      const { reference } = await write();
+      await service.report(partner(), reference, 'Describes a different property.');
+
+      const { total } = await service.listReported({ page: 1, limit: 1 });
+      const all = await service.listReported({ page: 1, limit: Math.min(total, 100) });
+
+      /* Newest is last: oldest-first ordering, so the one just added is at the back. */
+      expect(all.items.at(-1)?.reference).toBe(reference);
     });
 
     it('hides a review when a report is upheld, with an actor and a note', async () => {

@@ -24,7 +24,7 @@ import { FieldEncryptionService } from '../common/crypto/field-encryption.servic
 import { PasswordService } from '../common/crypto/password.service.js';
 import { TokenService, type IssuedTokens } from './token.service.js';
 import { TwoFactorService } from './two-factor.service.js';
-import { conflict, unauthorized, unavailable } from '../common/errors/app-error.js';
+import { unauthorized, unavailable } from '../common/errors/app-error.js';
 
 /**
  * Thrown when credentials were ACCEPTED and only the second factor is outstanding.
@@ -63,6 +63,19 @@ export interface AuthResult {
   user: AuthUser;
 }
 
+/**
+ * What registration did, for the CONTROLLER's eyes only.
+ *
+ * Never serialised. The controller uses it to decide which email to send and which audit row to
+ * write, and answers the caller with the same generic body either way — see the note on
+ * `register` about why.
+ */
+export interface RegistrationOutcome {
+  created: boolean;
+  userId: string;
+  locale: string;
+}
+
 export interface RequestContext {
   ipAddress?: string | undefined;
   userAgent?: string | undefined;
@@ -87,21 +100,42 @@ export class AuthService {
    * Two independent barriers, because privilege escalation via mass assignment is
    * the single most common way registration endpoints are broken.
    */
-  async register(input: RegisterInput, context: RequestContext): Promise<AuthResult> {
+  async register(input: RegisterInput): Promise<RegistrationOutcome> {
+    /*
+      The password is hashed BEFORE the existence check, always, and the result is discarded when
+      the address is taken.
+
+      Argon2id dominates the cost of this endpoint — tens of milliseconds against a sub-millisecond
+      indexed lookup — so hashing only on the create path would make "taken" measurably faster than
+      "new". That is the same oracle the status code used to be, expressed as a stopwatch, and it
+      would survive any amount of care taken over the response body.
+    */
+    const passwordHash = await this.passwords.hash(input.password);
+
     const existing = await this.db.query.users.findFirst({
       where: and(eq(schema.users.email, input.email), isNull(schema.users.deletedAt)),
-      columns: { id: true },
+      columns: { id: true, preferredLocale: true },
     });
 
-    if (existing) {
-      // An honest 409 here is a deliberate trade-off: the registration form
-      // already reveals whether an email is taken by design, so pretending
-      // otherwise adds no privacy while making the UX incoherent. The LOGIN path
-      // stays strictly non-committal — that is where enumeration actually matters.
-      throw conflict(ERROR.AUTH_EMAIL_TAKEN);
-    }
+    /*
+      An address that is already registered gets the SAME answer as a new one (Bashar, 2026-08-07).
 
-    const passwordHash = await this.passwords.hash(input.password);
+      This used to be `409 auth.email_taken`, justified on the grounds that a registration form
+      reveals this by design. It does not have to: one request, no side effects and a definitive
+      answer is the cheapest enumeration oracle a system can offer — cheaper than the lockout one
+      closed the same day, which at least cost five requests and a denial of service.
+
+      The difference moves into the inbox, where only the owner of the address can see it. The
+      caller learns nothing; the owner learns they already have an account and gets links to sign
+      in or reset. Nothing about their account changes, so a stranger triggering it is harmless.
+    */
+    if (existing) {
+      return {
+        created: false,
+        userId: existing.id,
+        locale: existing.preferredLocale ?? input.preferredLocale,
+      };
+    }
 
     const result = await this.db.transaction(async (tx) => {
       const [user] = await tx
@@ -146,7 +180,16 @@ export class AuthService {
       return user;
     });
 
-    return this.completeLogin(result, context);
+    /*
+      No tokens, and this is the price of the change.
+
+      Registration used to sign the customer straight in. It cannot any more: the response has to
+      be identical for a taken address, and returning a session for THAT address would sign the
+      caller in as somebody else. So both paths answer "check your email", and the new customer
+      signs in after verifying — one extra step, in exchange for the endpoint no longer answering
+      "does this person have an account".
+    */
+    return { created: true, userId: result.id, locale: result.preferredLocale };
   }
 
   /**

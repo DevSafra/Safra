@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -44,6 +45,8 @@ export function AuthForm({
   const router = useRouter();
 
   const [submitting, setSubmitting] = useState(false);
+  /** Registration succeeded — the same screen whether or not the address was already taken. */
+  const [sent, setSent] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
@@ -94,12 +97,39 @@ export function AuthForm({
        * that render the header and the account page are served from the router cache
        * and still believe the customer is signed out.
        */
+      /*
+        Registration no longer signs anybody in — it answers the same generic body for every
+        address, so it cannot carry a session (see the route handler). Both paths end here, at
+        "check your email", which is what makes a taken address indistinguishable from a new one
+        to whoever is looking at the screen.
+      */
+      if (mode === 'register') {
+        setSent(true);
+        setSubmitting(false);
+        return;
+      }
+
       router.refresh();
       router.push(redirectTo);
     } catch {
       setFormError(t('networkError'));
       setSubmitting(false);
     }
+  }
+
+  if (sent) {
+    return (
+      <div className="rounded-card border border-ok/40 bg-ok/10 p-4">
+        <p className="font-display text-lg text-ok">{t('checkEmail')}</p>
+        <p className="mt-2 text-sm leading-relaxed text-muted">{t('checkEmailBody')}</p>
+        <Link
+          href={`/${locale}/login`}
+          className="mt-4 inline-flex min-h-10 items-center text-sm text-gold underline-offset-4 hover:underline"
+        >
+          {t('backToSignIn')}
+        </Link>
+      </div>
+    );
   }
 
   return (
