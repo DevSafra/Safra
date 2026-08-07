@@ -109,6 +109,31 @@ export class CatalogService {
   }
 
   /** Property types with a live count, for the "types of stay" grid. */
+  /**
+   * SAFRA's cancellation policies, for the §7.2 add-property form.
+   *
+   * Code and the Arabic name only. The tier structure is what the booking flow prices against and
+   * is not something a partner chooses between on a dropdown — showing it here would invite the
+   * belief that it can be varied per listing, which §7.4 is explicit it cannot.
+   */
+  async cancellationPolicies() {
+    const rows = await this.db.execute<{
+      code: string;
+      name_ar: string;
+      name_en: string | null;
+    }>(sql`
+      SELECT code, name_ar, name_en
+      FROM cancellation_policies
+      ORDER BY code
+    `);
+
+    return rows.rows.map((row) => ({
+      code: row.code,
+      nameAr: row.name_ar,
+      nameEn: row.name_en,
+    }));
+  }
+
   async propertyTypes() {
     const rows = await this.db.execute<{
       code: string;

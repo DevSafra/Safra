@@ -243,6 +243,36 @@ export const ar = {
     edit: 'تعديل',
     calendar: 'التقويم',
     notBuilt: 'لم يُبنَ هذا القسم بعد',
+
+    /** The §7.2 add-property form, with the handoff's own labels and note. */
+    addOpen: '+ إضافة عقار',
+    addClose: '× إغلاق النموذج',
+    fName: 'اسم العقار',
+    fType: 'النوع',
+    fCity: 'المدينة',
+    fPrice: 'السعر لليلة ($)',
+    fUnits: 'عدد الوحدات',
+    fGuests: 'عدد الضيوف لكل وحدة',
+    fPolicy: 'سياسة الإلغاء',
+    fAddress: 'العنوان',
+    fDescription: 'الوصف',
+    attributesLabel:
+      'صفات الرحلة — نفس صفات صفحة الإقامات؛ اختر حتى 4 لتظهر للزوار وتُستخدم في الفلترة',
+    attributesTooMany: 'اخترت أكثر من ٤ صفات. أزل واحدة قبل الإرسال.',
+    submit: 'إرسال للمراجعة',
+    submitting: 'جارٍ الإرسال…',
+    cancelForm: 'إلغاء',
+    /** P-002, quoted by the handoff. */
+    reviewNote: 'تراجعه سفرة خلال 48 ساعة (P-002) قبل ظهوره للزوار.',
+    created: 'أُرسل العقار للمراجعة. يظهر أدناه كمسودة حتى تعتمده سفرة.',
+    createFailed: 'تعذّر إنشاء العقار. راجع الحقول وحاول مرة أخرى.',
+    unreachable: 'تعذّر الوصول إلى الخادم.',
+    /*
+      The three image slots §7.2 draws are absent, and the note says why rather than showing
+      dead boxes: an image is uploaded against a property that already exists.
+    */
+    imagesLater:
+      'تُضاف الصور بعد إنشاء العقار، من شاشة التعديل. لا يمكن رفع صورة لعقار لم يُنشأ بعد.',
   },
 
   /** Property state, as the handoff's §7.2 pills name it. */

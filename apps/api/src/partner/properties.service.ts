@@ -52,10 +52,21 @@ export class PropertiesService {
       score: number;
       tier: string;
       city_name_ar: string | null;
+      property_count: number;
+      review_average: string | null;
     }>(sql`
       SELECT pa.reference, pa.display_name, pa.legal_name,
              pa.verification::text AS verification, pa.score, pa.tier::text AS tier,
-             ci.name_ar AS city_name_ar
+             ci.name_ar AS city_name_ar,
+             -- The §7 sidebar badges. Two correlated subqueries rather than two more round
+             -- trips: every page in the portal reads this profile, so the badges ride along
+             -- with it instead of each screen fetching its own counts.
+             (SELECT count(*)::int FROM properties pr
+              WHERE pr.partner_id = pa.id AND pr.deleted_at IS NULL) AS property_count,
+             -- Over PUBLISHED reviews only, matching the number the public sees and the one
+             -- the ranking uses. A badge disagreeing with the reviews screen is worse than none.
+             (SELECT round(avg(rv.rating)::numeric, 1)::text FROM reviews rv
+              WHERE rv.partner_id = pa.id AND rv.status = 'published') AS review_average
       FROM partners pa
       LEFT JOIN cities ci ON ci.id = pa.city_id
       WHERE pa.id = ${partnerId} AND pa.deleted_at IS NULL
@@ -72,6 +83,9 @@ export class PropertiesService {
       verification: row.verification,
       score: row.score,
       tier: row.tier,
+      propertyCount: row.property_count,
+      /** Null when the partner has no published reviews — the badge is then absent, not «0». */
+      reviewAverage: row.review_average,
       city: row.city_name_ar,
     };
   }
@@ -232,6 +246,39 @@ export class PropertiesService {
         .returning({ reference: schema.properties.reference, id: schema.properties.id });
 
       if (!row) throw new Error('Property insert returned no row.');
+
+      /*
+        The units the partner asked for, in the SAME transaction.
+
+        A listing with no unit cannot be booked and cannot be priced, so creating one and leaving
+        it empty would produce a listing that looks finished and is not. In one transaction because
+        a property that exists without its units is exactly that half-state.
+
+        The currency is the city's country default rather than anything in the request: a partner
+        does not choose what currency SAFRA prices in.
+      */
+      if (input.initialUnits) {
+        const currency = await tx.execute<{ id: string }>(
+          sql`SELECT id FROM currencies WHERE code = 'USD' LIMIT 1`,
+        );
+        const currencyId = currency.rows[0]?.id;
+
+        if (!currencyId) throw new Error('No USD currency row to price units in.');
+
+        for (let index = 1; index <= input.initialUnits.count; index += 1) {
+          const suffix = input.initialUnits.count > 1 ? ` ${index}` : '';
+
+          await tx.insert(schema.units).values({
+            propertyId: row.id,
+            nameAr: `${input.name.ar}${suffix}`,
+            nameEn: `${input.name.en ?? input.name.ar}${suffix}`,
+            nameDe: `${input.name.de ?? input.name.ar}${suffix}`,
+            maxGuests: input.initialUnits.maxGuests,
+            basePrice: input.initialUnits.basePrice.toFixed(2),
+            currencyId,
+          });
+        }
+      }
 
       await this.audit.record(
         {

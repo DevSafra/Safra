@@ -105,6 +105,9 @@ const profileSchema = z.object({
   score: z.number(),
   tier: z.string(),
   city: z.string().nullable(),
+  /* The §7 sidebar badges. Defaulted so an older API still renders the shell. */
+  propertyCount: z.number().default(0),
+  reviewAverage: z.string().nullable().default(null),
 });
 
 export type PartnerProfile = z.infer<typeof profileSchema>;
@@ -301,4 +304,71 @@ export async function getMyReviews(params: { page: number; limit: number }) {
   });
 
   return partnerFetch(`/partner/reviews?${search.toString()}`, reviewPageSchema);
+}
+
+/**
+ * The §7 sidebar badges, from the profile every page already fetches.
+ *
+ * Both are absent rather than zero when there is nothing to say: a partner with no published
+ * reviews gets no ★ badge, because «★ 0» reads as a verdict rather than as an absence.
+ */
+export function sidebarBadges(profile: PartnerProfile | 'failed' | 'unauthenticated'): {
+  properties?: string;
+  reviews?: string;
+} {
+  if (profile === 'failed' || profile === 'unauthenticated') return {};
+
+  return {
+    ...(profile.propertyCount > 0 ? { properties: String(profile.propertyCount) } : {}),
+    ...(profile.reviewAverage ? { reviews: `\u2605 ${profile.reviewAverage}` } : {}),
+  };
+}
+
+/** The reference data the §7.2 add form's selects need. All public catalogue reads. */
+const referenceSchema = z.object({
+  cities: z.array(z.object({ slug: z.string(), nameAr: z.string() })),
+  propertyTypes: z.array(z.object({ code: z.string(), nameAr: z.string() })),
+  policies: z.array(z.object({ code: z.string(), nameAr: z.string() })),
+});
+
+export type PropertyFormReference = z.infer<typeof referenceSchema>;
+
+/**
+ * Cities, property types and cancellation policies, for the add form.
+ *
+ * Three PUBLIC endpoints, so this deliberately does not go through `partnerFetch` — attaching a
+ * partner's access token to a catalogue read would be the only place in this app where a token
+ * leaves for a request that does not need one.
+ */
+export async function getPropertyFormReference(): Promise<
+  PropertyFormReference | 'failed'
+> {
+  try {
+    const read = async (path: string): Promise<unknown> => {
+      const response = await fetch(`${API_URL}/api/v1${path}`, { cache: 'no-store' });
+
+      return response.json();
+    };
+
+    const [cities, types, policies] = await Promise.all([
+      read('/cities'),
+      read('/property-types'),
+      read('/cancellation-policies'),
+    ]);
+
+    /*
+      `.safeParse` over each list rather than a cast. These are three separate endpoints and the
+      form's selects are only as good as their contents — a shape change in any of them should
+      empty the form loudly rather than render options with undefined values.
+    */
+    const parsed = referenceSchema.safeParse({
+      cities: Array.isArray(cities) ? cities : [],
+      propertyTypes: Array.isArray(types) ? types : [],
+      policies: Array.isArray(policies) ? policies : [],
+    });
+
+    return parsed.success ? parsed.data : 'failed';
+  } catch {
+    return 'failed';
+  }
 }

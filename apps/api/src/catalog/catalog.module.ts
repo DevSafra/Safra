@@ -40,6 +40,19 @@ class CatalogController {
     return this.catalog.propertyTypes();
   }
 
+  /**
+   * The cancellation policies a partner may choose from (§7.4).
+   *
+   * Public because the customer site already prints a listing's policy terms — these are SAFRA's
+   * published terms, not internal configuration. A partner picks from this list and cannot invent
+   * terms, which is what `PROPERTY_CANCELLATION_POLICY_UNKNOWN` enforces on the way in.
+   */
+  @Public()
+  @Get('cancellation-policies')
+  async cancellationPolicies() {
+    return this.catalog.cancellationPolicies();
+  }
+
   @Public()
   @Get('amenities')
   async amenities() {

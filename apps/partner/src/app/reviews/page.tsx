@@ -1,4 +1,4 @@
-import { getMyProfile, getMyReviews, type PartnerReview } from '@/lib/api';
+import { getMyProfile, getMyReviews, type PartnerReview, sidebarBadges } from '@/lib/api';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { ReviewActions } from '@/components/review-actions';
@@ -46,7 +46,12 @@ export default async function ReviewsPage({
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
 
   return (
-    <Shell title={t.reviews.title} partnerName={name} active="reviews">
+    <Shell
+      title={t.reviews.title}
+      partnerName={name}
+      active="reviews"
+      badges={sidebarBadges(profile)}
+    >
       {result === 'unauthenticated' ? (
         <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
       ) : result === 'failed' ? (

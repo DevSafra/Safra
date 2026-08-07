@@ -1,4 +1,9 @@
-import { getDashboard, getMyProfile, type PartnerDashboard } from '@/lib/api';
+import {
+  getDashboard,
+  getMyProfile,
+  type PartnerDashboard,
+  sidebarBadges,
+} from '@/lib/api';
 import { BookingDecision } from '@/components/booking-decision';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
@@ -33,7 +38,12 @@ export default async function DashboardPage() {
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
 
   return (
-    <Shell title={t.dashboard.title} partnerName={name} active="dashboard">
+    <Shell
+      title={t.dashboard.title}
+      partnerName={name}
+      active="dashboard"
+      badges={sidebarBadges(profile)}
+    >
       {dashboard === 'unauthenticated' ? (
         <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
       ) : dashboard === 'failed' ? (

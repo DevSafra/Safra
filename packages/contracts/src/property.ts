@@ -53,6 +53,26 @@ export const propertyCreateSchema = z
      * never be tagged with something no customer can search for.
      */
     attributes: z.array(tripAttributeSchema).max(10).default([]),
+    /**
+     * The units to open the listing with — §7.2's «عدد الوحدات» and «السعر لليلة».
+     *
+     * Optional, so the endpoint's existing callers are unaffected. Present because the handoff's
+     * add-property form asks for both on the same screen, and a listing with no unit is not
+     * bookable: a partner who filled in that form and got an empty listing would reasonably think
+     * the form had failed.
+     *
+     * Identical units, named by index. A partner with genuinely different rooms edits them
+     * afterwards; asking for six unit descriptions inside a create form is how the form stops
+     * being filled in at all.
+     */
+    initialUnits: z
+      .object({
+        count: z.number().int().min(1).max(50),
+        basePrice: z.number().min(0).max(1_000_000),
+        maxGuests: z.number().int().min(1).max(50).default(2),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

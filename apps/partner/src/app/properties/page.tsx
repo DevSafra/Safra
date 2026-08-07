@@ -1,4 +1,11 @@
-import { getMyProfile, getMyProperties, type PartnerProperty } from '@/lib/api';
+import {
+  getMyProfile,
+  getMyProperties,
+  getPropertyFormReference,
+  sidebarBadges,
+  type PartnerProperty,
+} from '@/lib/api';
+import { AddProperty } from '@/components/add-property';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { statusTone } from '@safra/ui';
@@ -23,31 +30,56 @@ import { fill, propertyStatus, propertyType, t, tripAttribute } from '@/lib/stri
 export const dynamic = 'force-dynamic';
 
 export default async function PropertiesPage() {
-  const [profile, properties] = await Promise.all([getMyProfile(), getMyProperties()]);
+  const [profile, properties, reference] = await Promise.all([
+    getMyProfile(),
+    getMyProperties(),
+    getPropertyFormReference(),
+  ]);
   const name =
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
 
   return (
-    <Shell title={t.properties.title} partnerName={name} active="properties">
+    <Shell
+      title={t.properties.title}
+      partnerName={name}
+      active="properties"
+      badges={sidebarBadges(profile)}
+    >
       {properties === 'unauthenticated' ? (
         <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
       ) : properties === 'failed' ? (
         <p className="text-sm text-bad">{t.dashboard.loadFailed}</p>
-      ) : properties.length === 0 ? (
-        <p className="text-sm text-faint">{t.properties.empty}</p>
       ) : (
         <>
-          <p className="mb-3 text-[12.5px] text-faint">
-            {fill(t.properties.count, { n: properties.length })} · {t.properties.note}
-          </p>
+          {/*
+            §7.2's header row, ABOVE the empty check.
 
-          <ul className="grid gap-3.5 sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-            {properties.map((property) => (
-              <li key={property.reference}>
-                <Card property={property} />
-              </li>
-            ))}
-          </ul>
+            A partner with no listings is the one who most needs this button — putting it inside
+            the non-empty branch would show it to everybody except the person adding their first.
+          */}
+          {reference === 'failed' ? null : (
+            <div className="mb-3.5">
+              <AddProperty reference={reference} />
+            </div>
+          )}
+
+          {properties.length === 0 ? (
+            <p className="text-sm text-faint">{t.properties.empty}</p>
+          ) : (
+            <>
+              <p className="mb-3 text-[12.5px] text-faint">
+                {fill(t.properties.count, { n: properties.length })} · {t.properties.note}
+              </p>
+
+              <ul className="grid gap-3.5 sm:grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+                {properties.map((property) => (
+                  <li key={property.reference}>
+                    <Card property={property} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </>
       )}
     </Shell>

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { getMyPayouts, getMyProfile, type PartnerPayout } from '@/lib/api';
+import { getMyPayouts, getMyProfile, type PartnerPayout, sidebarBadges } from '@/lib/api';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
@@ -31,7 +31,12 @@ export default async function PayoutsPage() {
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
 
   return (
-    <Shell title={t.payouts.title} partnerName={name} active="payouts">
+    <Shell
+      title={t.payouts.title}
+      partnerName={name}
+      active="payouts"
+      badges={sidebarBadges(profile)}
+    >
       {payouts === 'unauthenticated' ? (
         <p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>
       ) : payouts === 'failed' ? (
