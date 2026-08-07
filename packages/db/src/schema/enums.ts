@@ -125,6 +125,30 @@ export const paymentStatus = pgEnum('payment_status', [
   'partially_refunded',
 ]);
 
+/**
+ * A partner payout's lifecycle (design handoff §7.1).
+ *
+ * These are states of a real money EVENT, not of an inferred obligation. What a partner is owed
+ * already lives in the ledger as `partner_payable`; a payout is the transfer that discharges some
+ * of it, and it exists as a row only once SAFRA has decided to make it.
+ *
+ * - `accruing`         the open period for this partner. Bookings join it as they become payable.
+ * - `pending_release`  the period is closed and the total is fixed, awaiting a human.
+ * - `on_hold`          frozen. An open dispute freezes the partner's entitlement (§8, the console
+ *                      states this on every unresolved dispute), and so does a manual hold.
+ * - `scheduled`        released by staff, with a date — the handoff's "مجدول يوم الخميس".
+ * - `paid`             the transfer happened. Terminal, and the only state that writes the ledger.
+ * - `cancelled`        abandoned before payment; its bookings return to accrual. Terminal.
+ */
+export const payoutStatus = pgEnum('payout_status', [
+  'accruing',
+  'pending_release',
+  'on_hold',
+  'scheduled',
+  'paid',
+  'cancelled',
+]);
+
 export const refundStatus = pgEnum('refund_status', [
   'pending',
   'processing',

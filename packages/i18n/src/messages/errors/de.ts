@@ -57,6 +57,22 @@ export const de = {
   'payment.unavailable':
     'Die Zahlung ist vorübergehend nicht verfügbar. Bitte erneut versuchen.',
   'partner.not_found': 'Partner nicht gefunden.',
+
+  // ── Partnerauszahlungen (§7.1) ────────────────────────────────────────────
+  'payout.not_found': 'Diese Auszahlung wurde nicht gefunden.',
+  'payout.not_accruing':
+    'Dieser Zeitraum ist nicht offen und kann nicht geschlossen werden.',
+  'payout.not_releasable':
+    'Diese Auszahlung kann im aktuellen Zustand nicht freigegeben werden.',
+  'payout.not_scheduled': 'Diese Auszahlung ist noch nicht terminiert.',
+  'payout.not_held': 'Diese Auszahlung ist nicht gesperrt.',
+  'payout.already_paid':
+    'Diese Auszahlung wurde bezahlt und kann nicht geändert werden. Buchen Sie stattdessen eine Gegenbuchung.',
+  'payout.already_final':
+    'Diese Auszahlung ist abgeschlossen und kann nicht geändert werden.',
+  'payout.nothing_to_pay': 'In diesem Zeitraum ist nichts auszuzahlen.',
+  'payout.frozen_by_dispute':
+    'Ein offener Fall sperrt die Auszahlung für diese Buchungen.',
   'partner.already_verified': 'Der Partner ist bereits verifiziert.',
   'partner.profile_missing': 'Dieses Konto ist keinem Partnerprofil zugeordnet.',
   'partner.type_unknown': 'Unbekannter Partnertyp.',

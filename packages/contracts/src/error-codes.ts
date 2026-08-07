@@ -66,6 +66,18 @@ export const ERROR = {
   BOOKING_DRAFT_NOT_REFUNDABLE: 'booking.draft_not_refundable',
   PAYMENT_UNAVAILABLE: 'payment.unavailable',
   PARTNER_NOT_FOUND: 'partner.not_found',
+
+  // ── Partner payouts (design handoff §7.1) ──────────────────────────────────
+  PAYOUT_NOT_FOUND: 'payout.not_found',
+  PAYOUT_NOT_ACCRUING: 'payout.not_accruing',
+  PAYOUT_NOT_RELEASABLE: 'payout.not_releasable',
+  PAYOUT_NOT_SCHEDULED: 'payout.not_scheduled',
+  PAYOUT_NOT_HELD: 'payout.not_held',
+  PAYOUT_ALREADY_PAID: 'payout.already_paid',
+  PAYOUT_ALREADY_FINAL: 'payout.already_final',
+  PAYOUT_NOTHING_TO_PAY: 'payout.nothing_to_pay',
+  /** A dispute that is open or investigating freezes the partner's entitlement. */
+  PAYOUT_FROZEN_BY_DISPUTE: 'payout.frozen_by_dispute',
   PARTNER_ALREADY_VERIFIED: 'partner.already_verified',
   PARTNER_PROFILE_MISSING: 'partner.profile_missing',
   PARTNER_TYPE_UNKNOWN: 'partner.type_unknown',

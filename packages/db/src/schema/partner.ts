@@ -1,6 +1,7 @@
 import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -12,9 +13,11 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { foreignId, money, notDeleted, primaryId, timestamps } from './_shared.js';
-import { partnerTier, verificationStatus, violationKind } from './enums.js';
+import { partnerTier, payoutStatus, verificationStatus, violationKind } from './enums.js';
 import { cities, currencies } from './geo.js';
 import { users } from './identity.js';
+// `partner_payout_items` links a payout to the bookings it covers.
+import { bookings } from './booking.js';
 
 /**
  * SRS §12: Van and car rental must be addable "without rebuilding the system".
@@ -301,3 +304,141 @@ export const partnerViolationsRelations = relations(partnerViolations, ({ one })
     references: [partners.id],
   }),
 }));
+
+/**
+ * A partner payout — a real transfer, or SAFRA's committed intent to make one.
+ *
+ * ## Why this exists rather than a sum over bookings
+ *
+ * `bookings.partner_payable_amount` is an OBLIGATION per booking. Summing it answers "what does
+ * SAFRA owe this partner", which is a ledger question the ledger already answers through the
+ * `partner_payable` account. It does NOT answer "what has SAFRA sent them, and when" — and the
+ * design handoff's §7.1 line, *"تحويل مستحقات 1,240$ مجدول يوم الخميس"*, is the second question.
+ *
+ * Presenting the first as if it were the second, on the dashboard of the person owed the money, is
+ * the failure mode this table exists to prevent. The console's الدفع screen already refused to do
+ * it (it renders `payoutsMissing` rather than deriving a figure); this is the other half of that
+ * decision, and the two must not disagree about whether a payout ledger exists.
+ *
+ * ## The money identity
+ *
+ * `net_amount = gross_amount - fine_amount`, enforced by a CHECK. `gross_amount` is the sum of the
+ * items' payables at the moment they were attached, NOT a live recomputation — a payout is
+ * evidence of what was decided, and a booking amended afterwards must not silently restate a
+ * transfer that already happened.
+ *
+ * ## Where it meets the ledger
+ *
+ * Only on payment. Reaching `paid` posts one balanced movement — DEBIT `partner_payable`, CREDIT
+ * `partner_payout` — and stores its `entry_group_id` here, so a payout row and the books can be
+ * reconciled in either direction. Nothing is posted at accrual or release: intending to pay
+ * somebody is not a movement of money.
+ */
+export const partnerPayouts = pgTable(
+  'partner_payouts',
+  {
+    id: primaryId(),
+    reference: text('reference')
+      .notNull()
+      .unique()
+      .default(sql`'PYT-' || lpad(nextval('payout_reference_seq')::text, 6, '0')`),
+    partnerId: foreignId('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    currencyId: foreignId('currency_id')
+      .notNull()
+      .references(() => currencies.id),
+
+    /** The accrual window this payout covers. Inclusive start, inclusive end. */
+    periodStart: date('period_start').notNull(),
+    periodEnd: date('period_end').notNull(),
+
+    /** Sum of the attached items, frozen at attachment. See the note above. */
+    grossAmount: money('gross_amount').notNull().default('0'),
+    /** §6.4 fines and other deductions withheld from this transfer. */
+    fineAmount: money('fine_amount').notNull().default('0'),
+    netAmount: money('net_amount').notNull().default('0'),
+
+    status: payoutStatus('status').notNull().default('accruing'),
+
+    /**
+     * Which account the money goes to, captured when the payout is RELEASED.
+     *
+     * Pinned rather than read live: a partner who changes their bank details after a transfer was
+     * sent must not make the record say it went somewhere it did not.
+     */
+    payoutAccountId: foreignId('payout_account_id').references(
+      () => partnerPayoutAccounts.id,
+    ),
+
+    /** The handoff's "مجدول يوم الخميس". Set on release, never before. */
+    scheduledFor: date('scheduled_for'),
+
+    releasedAt: timestamp('released_at', { withTimezone: true }),
+    releasedByUserId: foreignId('released_by_user_id').references(() => users.id),
+
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    paidByUserId: foreignId('paid_by_user_id').references(() => users.id),
+    /** The bank's own reference, so a partner's question can be answered against their statement. */
+    paidReference: text('paid_reference'),
+
+    /** Why it is frozen. Required whenever status is `on_hold` — see the CHECK. */
+    holdReason: text('hold_reason'),
+
+    /** The balanced movement posted when this was paid. Null until then. */
+    entryGroupId: foreignId('entry_group_id'),
+
+    notes: text('notes'),
+    ...timestamps,
+  },
+  (t) => [
+    /**
+     * One open period per partner per currency.
+     *
+     * Two `accruing` payouts would race for the same bookings and each would report a total that
+     * was true of neither. Partial, so the closed history is unconstrained.
+     */
+    uniqueIndex('partner_payouts_one_accruing')
+      .on(t.partnerId, t.currencyId)
+      .where(sql`status = 'accruing' AND deleted_at IS NULL`),
+    index('partner_payouts_partner_idx').on(t.partnerId, t.createdAt),
+    index('partner_payouts_status_idx').on(t.status, t.scheduledFor),
+  ],
+);
+
+/**
+ * Which bookings a payout covers — the reconciliation record.
+ *
+ * A partner asking "what is this $1,240 for" is answered from here, and a booking asking "have I
+ * been paid out" is answered by whether a row exists. Both are questions somebody eventually asks
+ * about money, so the link is stored rather than recomputed from dates.
+ *
+ * `amount` is the payable as it stood when the booking was attached, for the same reason the
+ * payout's total is frozen: a later amendment must not restate a completed transfer.
+ */
+export const partnerPayoutItems = pgTable(
+  'partner_payout_items',
+  {
+    id: primaryId(),
+    payoutId: foreignId('payout_id')
+      .notNull()
+      .references(() => partnerPayouts.id),
+    bookingId: foreignId('booking_id')
+      .notNull()
+      .references(() => bookings.id),
+    amount: money('amount').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /**
+     * A booking is paid out at most ONCE.
+     *
+     * This is the constraint that makes double-payment impossible rather than merely unlikely, and
+     * it is a database guarantee because the alternative is trusting every future code path that
+     * touches accrual. Cancelling a payout deletes its items, which returns those bookings to
+     * accrual — the payout row itself survives with its amounts, so the event stays on record.
+     */
+    uniqueIndex('partner_payout_items_booking_unique').on(t.bookingId),
+    index('partner_payout_items_payout_idx').on(t.payoutId),
+  ],
+);

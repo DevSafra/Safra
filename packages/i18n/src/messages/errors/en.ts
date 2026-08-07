@@ -49,6 +49,18 @@ export const en = {
   'booking.draft_not_refundable': 'A draft booking has no payment to refund.',
   'payment.unavailable': 'Payment is temporarily unavailable. Please retry.',
   'partner.not_found': 'Partner not found.',
+
+  // ── Partner payouts (§7.1) ────────────────────────────────────────────────
+  'payout.not_found': 'That payout could not be found.',
+  'payout.not_accruing': 'That period is not open, so it cannot be closed.',
+  'payout.not_releasable': 'This payout cannot be released in its current state.',
+  'payout.not_scheduled': 'This payout has not been scheduled yet.',
+  'payout.not_held': 'This payout is not on hold.',
+  'payout.already_paid':
+    'This payout has been paid and cannot be changed. Post a reversing entry instead.',
+  'payout.already_final': 'This payout is final and cannot be changed.',
+  'payout.nothing_to_pay': 'There is nothing payable in this period.',
+  'payout.frozen_by_dispute': 'An open dispute freezes the payout for these bookings.',
   'partner.already_verified': 'Partner is already verified.',
   'partner.profile_missing': 'This account is not linked to a partner profile.',
   'partner.type_unknown': 'Unknown partner type.',

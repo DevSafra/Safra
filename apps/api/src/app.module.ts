@@ -13,6 +13,7 @@ import { CatalogModule } from './catalog/catalog.module.js';
 import { FxModule } from './fx/fx.module.js';
 import { LedgerModule } from './ledger/ledger.module.js';
 import { PartnerModule } from './partner/partner.module.js';
+import { PayoutModule } from './payouts/payout.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { RankingModule } from './ranking/ranking.module.js';
 import { SanctionsModule } from './sanctions/sanctions.module.js';
@@ -60,6 +61,7 @@ import { StaffTwoFactorGuard } from './rbac/staff-two-factor.guard.js';
     BookingsModule,
     SearchModule,
     PartnerModule,
+    PayoutModule,
     PaymentsModule,
     RankingModule,
     SanctionsModule,

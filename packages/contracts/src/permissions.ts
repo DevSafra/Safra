@@ -35,6 +35,15 @@ export const PERMISSIONS = {
   REFUND_CREATE: 'refund.create',
   LEDGER_READ: 'ledger.read',
   PAYOUT_READ: 'payout.read',
+  /**
+   * A partner reading their OWN payouts (design handoff §7.1).
+   *
+   * Separate from `PAYOUT_READ`, which is the finance view across every partner. Sharing one
+   * permission would mean granting a partner the staff-wide read, and the difference between
+   * "my transfers" and "everybody's transfers" is exactly the kind of thing a permission name
+   * should make impossible to confuse.
+   */
+  PAYOUT_READ_OWN: 'payout.read_own',
   PAYOUT_EXECUTE: 'payout.execute',
   /** Reading a partner's bank details — finance only. */
   PAYOUT_ACCOUNT_READ: 'payout_account.read',
@@ -132,6 +141,7 @@ const PARTNER: Permission[] = [
   P.VIOLATION_READ,
   P.MESSAGE_READ,
   P.MESSAGE_SEND,
+  P.PAYOUT_READ_OWN,
 ];
 
 /**
