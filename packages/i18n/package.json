@@ -22,5 +22,8 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
-  ]
+  ],
+  "devDependencies": {
+    "intl-messageformat": "^11.2.13"
+  }
 }

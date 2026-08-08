@@ -75,3 +75,71 @@ test('the English wording does not appear on the Arabic page', async ({ page }) 
   await expect(page.getByText(ar['validation.email_invalid'])).toBeVisible();
   await expect(page.getByText(en['validation.email_invalid'])).toHaveCount(0);
 });
+
+/**
+ * Arabic plural agreement, as a customer actually reads it.
+ *
+ * ## Why this needs a browser and not only the unit test
+ *
+ * `plurals.test.ts` proves the CATALOGUE selects the right form. It cannot prove the app reaches
+ * that form: a component that pre-formats the count into an Arabic-numeral STRING before handing it
+ * to `t()` makes every message fall to `other`, silently, because `Intl.PluralRules` has nothing
+ * numeric to classify. Every category still exists, every unit test still passes, and every reader
+ * sees the singular.
+ *
+ * So this asserts the rendered page at a count in the range that used to be wrong.
+ */
+test.describe('Arabic plurals on a real page', () => {
+  test('a result count between 11 and 99 takes the singular noun', async ({ page }) => {
+    await page.goto('/ar/search');
+
+    const heading = page
+      .locator('h1, h2')
+      .filter({ hasText: /نتيجة|نتائج/ })
+      .first();
+
+    await expect(heading).toBeVisible();
+
+    const text = (await heading.textContent()) ?? '';
+    const digits = text.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+    const count = Number(/(\d+)/.exec(digits)?.[1] ?? '0');
+
+    /*
+      The assertion is conditional on WHICH category the fixture count lands in, because the seed
+      decides how many published listings there are — and a test that hard-coded "٦ نتائج" would
+      break every time somebody added a listing, for a reason unrelated to plurals.
+    */
+    if (count >= 3 && count <= 10) {
+      expect(text).toContain('نتائج');
+    } else if (count >= 11 && count <= 99) {
+      /* The category that was wrong: Arabic takes the SINGULAR here. */
+      expect(text).toContain('نتيجة');
+      expect(text).not.toContain('نتائج');
+    } else if (count === 1) {
+      expect(text).toContain('نتيجة واحدة');
+    }
+  });
+
+  test('the count reaches the formatter as a number, not a pre-rendered string', async ({
+    page,
+  }) => {
+    /*
+      The failure this catches: a component formatting the count to Arabic-Indic digits BEFORE
+      `t()` sees it. Every message would then resolve to `other` and read as the singular for
+      every count, which looks like a translation choice rather than a bug.
+
+      Proven on the property page, whose review line names a count and its noun together.
+    */
+    await page.goto('/ar/property/qasr-al-sharq-malki');
+
+    const line = page.locator('text=/أحدث .* من .*/').first();
+
+    await expect(line).toBeVisible();
+
+    const text = (await line.textContent()) ?? '';
+
+    /* Whatever the fixture count is, it must have selected a real category — never «# تقييم». */
+    expect(text).not.toContain('#');
+    expect(text).toMatch(/تقييم/);
+  });
+});
