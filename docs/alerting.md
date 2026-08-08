@@ -3,9 +3,16 @@
 What must page somebody, what must merely be visible, and exactly what has to be wired once a
 hosting target exists.
 
-**Status: designed, not implemented.** Every signal below is already produced by the application —
-this document is the specification for consuming them, and the work is blocked only on `M-1`, the
-deployment decision. Nothing here requires further discovery.
+> **This document is the implementation contract for infrastructure.** The metric names, labels,
+> thresholds, severities, access model and integration points below are settled and may be adopted
+> as-is. Nothing in it requires further design work, and a change to any metric name or label is a
+> breaking change to be made here first.
+
+**Status: the application side is BUILT. The consumer is not.**
+
+`GET /internal/metrics` exposes every table-derived signal below as a Prometheus gauge (added
+2026-08-08). What remains is entirely outside this repository: a scraper, a rule file, log shipping
+and a pager. The exact rules are given below, so that work is configuration rather than design.
 
 ---
 
@@ -69,13 +76,28 @@ creates the belief that somebody is watching.
 - **`/health/ready`** — reports `database`, `redis`, `media`.
 - **Structured JSON logs** with correlation ids, plus an access log.
 
-### Needs a small amount of code (≤ ½ day, unblocked)
+### Built — `GET /internal/metrics`
 
-- **A metrics endpoint.** `GET /internal/metrics` in Prometheus text format, exposing the counts
-  above as gauges so a scraper does not need database credentials. **This is the one piece of
-  application work alerting requires**, and it is deliberately not built yet because the exposition
-  format should match whatever the host provides — Prometheus, OTLP, or a vendor agent.
-- **`sanctions_list_versions.fetched_at`** is written today; nothing reads it for freshness.
+Prometheus text exposition, version 0.0.4. **The scraper never needs database credentials**, and
+the schema stays an implementation detail rather than being encoded in somebody else's rule file.
+
+| Series                                                             | Alerts | Notes                                                                                                                           |
+| ------------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| `safra_job_last_success_age_seconds{job}`                          | 1, 2   | **-1 means never completed** — reported rather than omitted, because an absent series is indistinguishable from a failed scrape |
+| `safra_job_failures_6h{job}`                                       | 3      | A `skipped` run is another replica doing nothing, and never counts as a success                                                 |
+| `safra_notifications_1h{status}`                                   | 4, 5   | `sent`, `failed`, and `queued` — the last is its own failure: written, never sent, never retried                                |
+| `safra_sanctions_snapshot_age_seconds{source}`                     | 6      | `{source="none"} -1` while `M-2` is unresolved                                                                                  |
+| `safra_payment_events_unprocessed` + `_oldest_unprocessed_seconds` | 14     | Count and age: fifty events thirty seconds old is a busy minute; one stuck an hour is a paid booking that did not advance       |
+| `safra_bookings_sla_overdue`                                       | 15     | Counts the CONSEQUENCE, because a sweep that stops running produces no signal of its own                                        |
+| `safra_media_reachable`                                            | 8      | 1 or 0                                                                                                                          |
+| `safra_metrics_collection_seconds`                                 | —      | Self-monitoring: this endpoint must stay cheap. **20 ms measured**                                                              |
+
+**Access.** Bearer token in `METRICS_TOKEN`. No token configured, wrong token, missing token and
+missing scheme all answer **404** — fail closed, and quietly, so the route is indistinguishable
+from a build that never had it. Comparison is timing-safe.
+
+**Cost.** Cached for 10 s, so several replicas under a scrape storm cost one set of queries each.
+Every query is bounded by time or by a partial index; none is an unbounded `count(*)`.
 
 ### Needs the hosting decision
 
@@ -83,6 +105,97 @@ creates the belief that somebody is watching.
 - The scraper or agent.
 - Paging (PagerDuty, Opsgenie, or a phone).
 - Uptime checks from outside the network — the one class of failure no internal signal can see.
+
+---
+
+## The rules, ready to paste
+
+```yaml
+groups:
+  - name: safra
+    rules:
+      # 1 — accrual stopped. -1 (never) fires this too, which is intended.
+      - alert: PayoutAccrualStopped
+        expr: safra_job_last_success_age_seconds{job="payout-accrual"} > 7200
+          or safra_job_last_success_age_seconds{job="payout-accrual"} == -1
+        for: 5m
+        labels: { severity: page }
+
+      # 2 — ranking stopped.
+      - alert: RankingRecomputeStopped
+        expr: safra_job_last_success_age_seconds{job="ranking-recompute"} > 93600
+        for: 15m
+        labels: { severity: ticket }
+
+      # 3 — a job failing repeatedly.
+      - alert: ScheduledJobFailing
+        expr: safra_job_failures_6h >= 3
+        for: 5m
+        labels: { severity: page }
+
+      # 4 — notifications failing as a PROPORTION; a full mailbox is not an outage.
+      - alert: NotificationsFailing
+        expr: >
+          safra_notifications_1h{status="failed"} /
+          clamp_min(sum without (status) (safra_notifications_1h), 1) > 0.2
+          and safra_notifications_1h{status="failed"} >= 5
+        for: 10m
+        labels: { severity: page }
+
+      # 5 — none at all, which produces no failures either.
+      - alert: NoNotificationsSent
+        expr: sum without (status) (safra_notifications_1h) == 0
+        for: 6h
+        labels: { severity: ticket }
+
+      # 6 — sanctions data stale, or never fetched.
+      - alert: SanctionsFeedStale
+        expr: safra_sanctions_snapshot_age_seconds > 172800
+          or safra_sanctions_snapshot_age_seconds == -1
+        for: 15m
+        labels: { severity: page }
+
+      # 8 — every photograph on the platform is broken.
+      - alert: MediaUnreachable
+        expr: safra_media_reachable == 0
+        for: 5m
+        labels: { severity: page }
+
+      # 14 — money captured, booking not advanced.
+      - alert: PaymentEventsBacklogged
+        expr: safra_payment_events_oldest_unprocessed_seconds > 900
+        for: 5m
+        labels: { severity: page }
+
+      # 15 — the sweep is not running; customers owed compensation are not getting it.
+      - alert: SlaSweepNotRunning
+        expr: safra_bookings_sla_overdue > 0
+        for: 15m
+        labels: { severity: page }
+
+      # Self-monitoring: the endpoint must not become the load.
+      - alert: MetricsCollectionSlow
+        expr: safra_metrics_collection_seconds > 1
+        for: 15m
+        labels: { severity: ticket }
+```
+
+Scrape config:
+
+```yaml
+scrape_configs:
+  - job_name: safra-api
+    metrics_path: /api/v1/internal/metrics
+    scrape_interval: 30s
+    authorization: { type: Bearer, credentials_file: /etc/secrets/safra-metrics-token }
+    static_configs: [{ targets: ['api:4000'] }]
+```
+
+**Scrape every 30 s, not every 5.** The gauges are cached for 10 s and every threshold above is
+measured in minutes; a faster scrape buys nothing and multiplies the queries by the replica count.
+
+**`absent()` on the whole job matters too.** If the scrape itself fails, none of these fire — that
+is what an `up == 0` alert is for, and it belongs in the same rule file.
 
 ---
 

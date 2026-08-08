@@ -98,6 +98,28 @@ treat "engineering complete" as a statement about planned scope, not about corre
 
 ---
 
+## 1a. Launch blockers — the authoritative list
+
+**Agreed with Bashar, 2026-08-08.** SAFRA is engineering-complete; these ten are what stand between
+that and a launch. **Engineering-complete does not mean launch-ready**, and this list is the
+difference.
+
+| #   | Blocker                                            | Owner               | Gated by 1 |
+| --- | -------------------------------------------------- | ------------------- | ---------- |
+| 1   | Deployment target selection                        | Bashar              | —          |
+| 2   | Backup implementation and a verified restore drill | Infrastructure      | yes        |
+| 3   | Sanctions feed activation                          | Compliance + vendor | no         |
+| 4   | Malware scanning for uploaded identity documents   | Bashar              | yes        |
+| 5   | External penetration test                          | Bashar              | yes        |
+| 6   | Retention / erasure policy reconciliation          | Legal               | no         |
+| 7   | WhatsApp provider selection                        | Bashar              | no         |
+| 8   | Fine-deduction policy decision                     | Bashar              | no         |
+| 9   | Monitoring deployment and on-call ownership        | Infrastructure      | yes        |
+| 10  | Load-testing execution and validation              | Engineering         | yes        |
+
+Full detail, ownership and specification pointers in **`docs/launch-readiness.md` §4**. Items 3, 6,
+7 and 8 need no infrastructure and can start today.
+
 ## 1b. Where the remaining work is written down
 
 **Engineering is complete. Everything below this line is operational, and every item now has a
@@ -1268,7 +1290,18 @@ sections matter. Bookings and disputes triage are the plausible ones; the Rules 
 **Effort when unblocked:** medium per section. The floor — no horizontal scroll, content first —
 is already in place and tested at four widths.
 
-### S-1 — No error tracking, no metrics, no alerts
+### S-1 — Partly closed: the metrics endpoint exists; the consumer does not
+
+**2026-08-08.** `GET /internal/metrics` exposes every table-derived signal as a Prometheus gauge —
+job success ages, notification outcomes, sanctions freshness, the payment-event backlog, the SLA
+consequence count and media reachability — behind a bearer token that answers **404** when absent,
+wrong, or missing its scheme. Timing-safe, cached 10 s, 20 ms to collect.
+
+A job that has never completed reports `-1` rather than being omitted: an absent series is
+indistinguishable from a failed scrape, and "never ran" is precisely the case alerting exists for.
+
+`docs/alerting.md` now carries the Prometheus rule file verbatim. **What remains is a scraper, a
+pager and an on-call rota** — none of it in this repository, all of it after `M-1`.
 
 **Status:** blocked on M-1 · **Owner:** Platform engineering
 

@@ -65,23 +65,34 @@ discovery. Where something is undecided, it says who decides it.
 
 ## 4. Launch blockers
 
-**Hard blockers — launching without these is negligent:**
+**The authoritative list, agreed with Bashar on 2026-08-08.** Ten items. Nothing is added to this
+list without his agreement, and nothing leaves it without evidence.
 
-1. **Backups with a restore that somebody has actually performed.** Not a backup job; a drill.
-2. **Alerting on the six `page` signals**, with a person receiving them.
-3. **A load test executed against production-shaped infrastructure**, meeting the stated budgets.
-4. **Sanctions feed activated.** A legal obligation, not a feature.
-5. **Payment gateway live** with a reconciled test transaction.
-6. **HTTPS, HSTS, and the CSP verified in production.**
+| #   | Blocker                                                | Owner               | Depends on | Where it is specified             |
+| --- | ------------------------------------------------------ | ------------------- | ---------- | --------------------------------- |
+| 1   | **Deployment target selection**                        | Bashar              | —          | `M-1`                             |
+| 2   | **Backup implementation and a verified restore drill** | Infrastructure      | 1          | §6 below, `M-3`                   |
+| 3   | **Sanctions feed activation**                          | Compliance + vendor | —          | `M-2`                             |
+| 4   | **Malware scanning for identity documents**            | Bashar (decision)   | 1          | `docs/malware-scanning.md`        |
+| 5   | **External penetration test**                          | Bashar (vendor)     | 1          | `S-9`                             |
+| 6   | **Retention / erasure policy reconciliation**          | Legal               | —          | §10 below, `S-4`                  |
+| 7   | **WhatsApp provider selection**                        | Bashar (vendor)     | —          | roadmap 192                       |
+| 8   | **Fine-deduction policy decision**                     | Bashar              | —          | `D-fine-1`                        |
+| 9   | **Monitoring deployment and on-call ownership**        | Infrastructure      | 1          | `docs/alerting.md` — **contract** |
+| 10  | **Load-testing execution and validation**              | Engineering         | 1          | `docs/load-testing.md`            |
 
-**Should-have — launch is defensible without them, with the risk stated:**
+**Item 1 gates five others** (2, 4, 5, 9, 10). It is the single highest-leverage decision available
+and everything downstream of it is already specified.
 
-7. Malware scanning on identity documents.
-8. Penetration test.
-9. Retention policy.
-10. Notification queue.
+**Items 3, 6, 7 and 8 do not depend on hosting** and can proceed in parallel today.
 
----
+### What is NOT on this list, and why
+
+- **The notification queue (BullMQ).** Designed and ready (`docs/background-jobs-design.md`), and
+  deferred deliberately. The platform launches without it; the accepted cost is that an unreachable
+  mail server adds its timeout to the request that triggered it.
+- **Console plural coverage beyond what shipped**, bulk unit creation, and the remaining
+  test-suite debris. All cosmetic or internal.
 
 ## 5. Security posture
 
@@ -144,8 +155,11 @@ does not exist yet.
 endpoints reporting database, Redis and media; job telemetry in `scheduled_job_runs`; notification
 delivery in `notifications`.
 
-**Missing:** log shipping and search; a metrics endpoint (~½ day, unblocked); a scraper; dashboards;
-paging; external uptime checks.
+**Built 2026-08-08:** `GET /internal/metrics` — every table-derived signal as a Prometheus gauge,
+behind a bearer token that 404s when absent or wrong. 20 ms to collect, cached 10 s.
+
+**Missing, and all of it outside this repository:** log shipping and search; a scraper; dashboards;
+paging; external uptime checks. The rule file is written and ready to paste.
 
 Full specification with thresholds in `docs/alerting.md`. **Sixteen signals, six of them paging.**
 
@@ -202,7 +216,7 @@ Full specification with thresholds in `docs/alerting.md`. **Sixteen signals, six
 1. **Choose the deployment target.** Unblocks risks 1, 2, 3 and 6.
 2. Provision, deploy, verify TLS/HSTS/CSP.
 3. Backups **and a restore drill**.
-4. Metrics endpoint, then alerting, then an on-call rota.
+4. Point a scraper at `/internal/metrics`, load the rule file, arm an on-call rota.
 5. Write the data generator; run the load test; fix what it finds.
 6. Activate the sanctions feed.
 7. Payment gateway with a reconciled test transaction.
