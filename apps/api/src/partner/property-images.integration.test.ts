@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
@@ -49,7 +49,12 @@ async function refusal(promise: Promise<unknown>): Promise<string> {
 }
 
 describeIfDb('PropertyImageService', () => {
-  const db: Database = createDatabase(DATABASE_URL ?? '', 2);
+  /*
+    A rollback handle: every row this suite writes is discarded when the test that wrote it ends.
+    See `createRollbackDatabase` for why the wrapper sits on the connection rather than on drizzle.
+  */
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  const db: Database = harness.db;
 
   /*
     A stub that records what it was asked to do and hands back a plausible key. The real service
@@ -96,6 +101,8 @@ describeIfDb('PropertyImageService', () => {
 
   /** A partner with two properties: one draft to work on, one published to protect. */
   beforeEach(async () => {
+    await harness.begin();
+
     const made = await db.execute<{
       partner_id: string;
       partner_user_id: string;
@@ -142,8 +149,12 @@ describeIfDb('PropertyImageService', () => {
     uploads = 0;
   });
 
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await db.$client.end();
+    await harness.close();
   });
 
   const add = async (target = reference) =>

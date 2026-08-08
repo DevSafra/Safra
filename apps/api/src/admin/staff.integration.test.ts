@@ -1,8 +1,8 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { AuthTokenService } from '../auth/auth-token.service.js';
@@ -27,7 +27,9 @@ const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('StaffService', () => {
-  const db: Database = createDatabase(DATABASE_URL ?? '', 2);
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
+  const db: Database = harness.db;
 
   /** Captures what would have been emailed, so the invitation link is inspectable. */
   const sent: OutgoingMail[] = [];
@@ -67,7 +69,9 @@ describeIfDb('StaffService', () => {
     return `m5-${process.pid}-${run}-${label}@safra.test`;
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await harness.begin();
+
     run += 1;
     sent.length = 0;
     revoked.length = 0;
@@ -83,13 +87,12 @@ describeIfDb('StaffService', () => {
    * path the application would take. Addresses are namespaced by pid and run counter,
    * so leaving the rows behind cannot collide with a later run.
    */
-  afterAll(async () => {
-    await db.execute(sql`
-      UPDATE users SET deleted_at = now(), status = 'archived'
-      WHERE email LIKE ${`m5-${process.pid}-%@safra.test`} AND deleted_at IS NULL
-    `);
+  afterEach(async () => {
+    await harness.rollback();
+  });
 
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+  afterAll(async () => {
+    await harness.close();
   });
 
   async function invite(label: string, role = 'support_agent' as const) {

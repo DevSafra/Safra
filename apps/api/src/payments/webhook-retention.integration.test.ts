@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { WebhookRetentionService } from './webhook-retention.service.js';
 
@@ -23,7 +23,9 @@ const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('WebhookRetentionService', () => {
-  const db: Database = createDatabase(DATABASE_URL ?? '', 2);
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
+  const db: Database = harness.db;
   const service = new WebhookRetentionService(db);
 
   /** Namespaced so a run cannot touch rows belonging to any other suite. */
@@ -86,12 +88,17 @@ describeIfDb('WebhookRetentionService', () => {
     `);
   }
 
-  beforeEach(cleanup);
+  beforeEach(async () => {
+    await harness.begin();
+    await cleanup();
+  });
+
+  afterEach(async () => {
+    await harness.rollback();
+  });
 
   afterAll(async () => {
-    await cleanup();
-
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+    await harness.close();
   });
 
   /** The trigger must refuse a direct delete of evidence, not merely the service. */

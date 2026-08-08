@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 
 /**
  * The geography screen's three tables are the one documented exception to "every table is
@@ -39,14 +39,22 @@ const BOUNDS = {
 } as const;
 
 describeIfDb('the geography screen stays a reference list', () => {
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
   let db: Database;
 
-  beforeAll(() => {
-    db = createDatabase(DATABASE_URL as string, 2);
+  beforeEach(async () => {
+    await harness.begin();
+
+    db = harness.db;
+  });
+
+  afterEach(async () => {
+    await harness.rollback();
   });
 
   afterAll(async () => {
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+    await harness.close();
   });
 
   for (const [table, bound] of Object.entries(BOUNDS)) {

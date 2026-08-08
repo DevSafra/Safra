@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { ReviewService } from './review.service.js';
@@ -27,12 +27,16 @@ const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('verification queues', () => {
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
   let db: Database;
   let review: ReviewService;
   let reference: string;
 
-  beforeAll(async () => {
-    db = createDatabase(DATABASE_URL as string, 3);
+  beforeEach(async () => {
+    await harness.begin();
+
+    db = harness.db;
 
     /**
      * A real SanctionsService. These tests only exercise the QUEUES, which never
@@ -44,8 +48,12 @@ describeIfDb('verification queues', () => {
     reference = await createPendingPartnerWithDocument(db);
   });
 
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+    await harness.close();
   });
 
   /**

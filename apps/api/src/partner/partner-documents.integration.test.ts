@@ -2,9 +2,9 @@ import { randomUUID } from 'node:crypto';
 
 import { sql } from 'drizzle-orm';
 import sharp from 'sharp';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import {
@@ -54,6 +54,8 @@ const STAFF = {
 } as unknown as AccessTokenClaims;
 
 describeIfDb('partner verification documents', () => {
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
   let db: Database;
   let storage: MemoryStorage;
   let documents: PartnerDocumentsService;
@@ -63,8 +65,10 @@ describeIfDb('partner verification documents', () => {
   let pdf: Buffer;
   let png: Buffer;
 
-  beforeAll(async () => {
-    db = createDatabase(DATABASE_URL as string, 3);
+  beforeEach(async () => {
+    await harness.begin();
+
+    db = harness.db;
     storage = new MemoryStorage();
     documents = new PartnerDocumentsService(db, storage, new AuditService(db));
 
@@ -90,8 +94,12 @@ describeIfDb('partner verification documents', () => {
       ON CONFLICT DO NOTHING`);
   });
 
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+    await harness.close();
   });
 
   beforeEach(async () => {

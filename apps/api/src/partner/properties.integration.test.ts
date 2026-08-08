@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
@@ -30,7 +30,9 @@ const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('PropertiesService.readOwn', () => {
-  const db: Database = createDatabase(DATABASE_URL ?? '', 2);
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
+  const db: Database = harness.db;
   const service = new PropertiesService(db, new AuditService(db));
 
   let partnerId = '';
@@ -55,6 +57,8 @@ describeIfDb('PropertiesService.readOwn', () => {
    * that the first must never be able to read.
    */
   beforeEach(async () => {
+    await harness.begin();
+
     const made = await db.execute<{
       partner_id: string;
       partner_user_id: string;
@@ -140,8 +144,12 @@ describeIfDb('PropertiesService.readOwn', () => {
     otherReference = row?.other_reference ?? '';
   });
 
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await db.$client.end();
+    await harness.close();
   });
 
   describe('what the form prefills from', () => {

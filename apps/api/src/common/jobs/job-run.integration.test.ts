@@ -28,6 +28,13 @@ const describeIfDb = DATABASE_URL ? describe : describe.skip;
 const TEST_LOCK = 991_100_7;
 
 describeIfDb('JobRunService', () => {
+  /*
+    TWO real connections, and the documented exception to the rollback harness.
+    This suite is ABOUT two sessions contending for a PostgreSQL advisory lock — the second must be
+    refused while the first holds it. A single pooled connection cannot express that, and a
+    transaction cannot either: a session-scoped advisory lock is held by the SESSION. So these tests
+    commit, and clean up after themselves by deleting their own `test-job-%` rows.
+  */
   const one: Database = createDatabase(DATABASE_URL ?? '', 1);
   const two: Database = createDatabase(DATABASE_URL ?? '', 1);
 
@@ -41,6 +48,7 @@ describeIfDb('JobRunService', () => {
   });
 
   afterAll(async () => {
+    /* These tests commit, so they remove their own rows — see the note on the two connections. */
     await one.execute(sql`DELETE FROM scheduled_job_runs WHERE job LIKE 'test-job-%'`);
     await one.$client.end();
     await two.$client.end();

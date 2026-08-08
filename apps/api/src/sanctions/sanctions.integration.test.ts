@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { parseEuSanctionsXml } from './eu-list.parser.js';
 import { EU_SOURCE, SanctionsService } from './sanctions.service.js';
@@ -45,20 +45,27 @@ const SAMPLE_XML = `<?xml version="1.0" encoding="UTF-8"?>
 </export>`;
 
 describeIfDb('sanctions screening', () => {
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
   let db: Database;
   let sanctions: SanctionsService;
 
   beforeAll(() => {
-    db = createDatabase(DATABASE_URL as string, 3);
+    db = harness.db;
     sanctions = new SanctionsService(db);
   });
 
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await clearSnapshots(db);
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+    await harness.close();
   });
 
   beforeEach(async () => {
+    await harness.begin();
+
     await clearSnapshots(db);
   });
 

@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
 import { PartnerDashboardService } from './dashboard.service.js';
@@ -27,7 +27,9 @@ const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('PartnerDashboardService', () => {
-  const db: Database = createDatabase(DATABASE_URL ?? '', 2);
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
+  const db: Database = harness.db;
   const service = new PartnerDashboardService(db);
 
   /** The partner under test, and a NEIGHBOUR whose data must never appear. */
@@ -138,6 +140,8 @@ describeIfDb('PartnerDashboardService', () => {
   }
 
   beforeEach(async () => {
+    await harness.begin();
+
     const mine = await makePartner();
     const theirs = await makePartner();
 
@@ -168,8 +172,12 @@ describeIfDb('PartnerDashboardService', () => {
     });
   });
 
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await db.$client.end();
+    await harness.close();
   });
 
   describe('isolation', () => {

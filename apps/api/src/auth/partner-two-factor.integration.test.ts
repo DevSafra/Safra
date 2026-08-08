@@ -1,8 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { authenticator } from 'otplib';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
@@ -33,7 +33,9 @@ const TEST_ENV = {
 } as unknown as Env;
 
 describeIfDb('partner two-factor authentication', () => {
-  const db: Database = createDatabase(DATABASE_URL ?? '', 2);
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
+  const db: Database = harness.db;
   const encryption = new FieldEncryptionService(TEST_ENV);
   const passwords = new PasswordService();
   const audit = new AuditService(db);
@@ -63,6 +65,8 @@ describeIfDb('partner two-factor authentication', () => {
 
   /** Each test owns its partner, so an enrolment in one never decides the outcome of another. */
   beforeEach(async () => {
+    await harness.begin();
+
     const staff = await db.execute<{ id: string }>(sql`
       SELECT id FROM users
       WHERE role IN ('operations_manager', 'super_admin') AND deleted_at IS NULL
@@ -99,8 +103,12 @@ describeIfDb('partner two-factor authentication', () => {
     partnerReference = made.rows[0]?.reference ?? '';
   });
 
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await db.$client.end();
+    await harness.close();
   });
 
   function partnerClaims(): AccessTokenClaims {

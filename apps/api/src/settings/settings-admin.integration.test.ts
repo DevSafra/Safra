@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { SettingsAdminService } from './settings-admin.service.js';
@@ -21,6 +21,8 @@ const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('SettingsAdminService', () => {
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
   let db: Database;
   let admin: SettingsAdminService;
   let settings: SettingsService;
@@ -47,8 +49,10 @@ describeIfDb('SettingsAdminService', () => {
   const ORIGINAL_VALUE = 120;
   let original: unknown;
 
-  beforeAll(async () => {
-    db = createDatabase(DATABASE_URL as string, 2);
+  beforeEach(async () => {
+    await harness.begin();
+
+    db = harness.db;
     settings = new SettingsService(db);
     admin = new SettingsAdminService(db, settings, new AuditService(db));
 
@@ -79,8 +83,12 @@ describeIfDb('SettingsAdminService', () => {
    * Nothing to remove. The fixture row is permanent by design — see the note on `KEY` —
    * and `afterEach` has already restored its value, so the next run starts clean.
    */
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+    await harness.close();
   });
 
   beforeEach(() => {

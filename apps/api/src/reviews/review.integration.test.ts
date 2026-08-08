@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
@@ -48,7 +48,9 @@ async function refusal(promise: Promise<unknown>): Promise<string> {
 }
 
 describeIfDb('ReviewService', () => {
-  const db: Database = createDatabase(DATABASE_URL ?? '', 2);
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
+  const db: Database = harness.db;
   /*
     A REAL `NotificationService` over a stub transport.
 
@@ -130,6 +132,8 @@ describeIfDb('ReviewService', () => {
 
   /** Each test owns its partner, property, guest and bookings. */
   beforeEach(async () => {
+    await harness.begin();
+
     const made = await db.execute<{
       partner_id: string;
       property_id: string;
@@ -218,8 +222,12 @@ describeIfDb('ReviewService', () => {
     staffUserId = s.rows[0]?.id ?? '';
   });
 
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await db.$client.end();
+    await harness.close();
   });
 
   async function write(rating = 5, body = 'إقامة ممتازة وضيافة راقية.') {

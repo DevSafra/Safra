@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
@@ -49,7 +49,9 @@ async function refusal(promise: Promise<unknown>): Promise<string> {
 }
 
 describeIfDb('PayoutService', () => {
-  const db: Database = createDatabase(DATABASE_URL ?? '', 2);
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
+  const db: Database = harness.db;
   const service = new PayoutService(db, new AuditService(db), new LedgerService(db));
 
   /*
@@ -71,6 +73,8 @@ describeIfDb('PayoutService', () => {
   let bookingIds: string[] = [];
 
   beforeEach(async () => {
+    await harness.begin();
+
     const staff = await db.execute<{ id: string }>(sql`
       SELECT id FROM users
       WHERE role IN ('finance_officer', 'super_admin') AND deleted_at IS NULL
@@ -142,8 +146,12 @@ describeIfDb('PayoutService', () => {
     bookingIds = made.rows.map((row) => row.booking_id);
   });
 
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await db.$client.end();
+    await harness.close();
   });
 
   it('accrues completed, paid bookings into one open period per partner', async () => {
