@@ -174,6 +174,10 @@ perfection — §10 records the residual security risk honestly.
 | Browser suite grown to 130 tests, including 21 for the pagination bar and 3 that assert a customer reads errors in their own language                                                                                                                                                                                                                                                       | 2026-08-05    |
 | **Property media, driven in a real browser** — `setInputFiles` through the multipart proxy and the whole pipeline. Found that `img-src` named no media host, so NO app could display a photograph; that the customer app allowed every HTTPS host as an image source; that a new image sorted into the middle of the gallery; and that the screen described the wrong way to choose a cover | 2026-08-08    |
 | **Alt text in ar/en/de** — the API stored three and the manager edited one, so a non-Arabic visitor got `alt=""` on the field that exists for people who cannot see the picture                                                                                                                                                                                                             | 2026-08-08    |
+| **تعديل and التقويم built** — the last two disabled partner screens; a published listing explains why structural edits are closed rather than showing a form whose submit is refused, and the calendar never offers «محجوز»                                                                                                                                                                 | 2026-08-08    |
+| **Dashboard calendar covers the whole portfolio** — it drew one unit chosen by creation date, on the screen a partner opens every morning; now booked/closed/open per day, in thirty-one rows whatever the portfolio size                                                                                                                                                                   | 2026-08-08    |
+| **Notifications for three events** (`S-2` closed) — partner told a booking is waiting with its deadline; partner told a review arrived; guest told the host replied. Every send recorded in `notifications`, which nothing had ever written to                                                                                                                                              | 2026-08-08    |
+| **Seed fixture falsehoods removed** — a draft listing was carrying 5.0 stars from eight stays it could never have had, because bulk bookings and reviews were generated against listings that were never bookable                                                                                                                                                                           | 2026-08-08    |
 
 ### 🏗 Hosting-dependent — waiting on roadmap item 193
 
@@ -873,6 +877,86 @@ engineering, alongside `S-1`.
 
 **Owner:** engineering.
 
+### O-partner-5 — Closed: the two disabled partner screens are built
+
+**Closed 2026-08-08.** عقاراتي offered تعديل and التقويم as greyed-out `<span aria-disabled>` labels
+saying «لم يُبنَ هذا القسم بعد». Both backends already existed — `PATCH /partner/properties/:reference`
+and `GET`/`PUT /partner/units/:id/calendar` — so what was missing was only the screen.
+
+**تعديل, and the honest refusal.** A published listing CANNOT be structurally edited: §8.1 verified
+the address, the photographs and the documents against each other, and letting the address change
+afterwards would leave «موثّق» standing over a claim nobody checked. The screen does not show a
+disabled form — it says why, and names what IS still editable (the calendar, the photographs), with
+links. `isStructurallyEditable` is computed by the API next to the `update` that enforces the same
+rule, so the screen and the endpoint cannot disagree about whether to offer a form; a UI that decided
+for itself would eventually take somebody's work and then refuse the submit.
+
+A REJECTED listing shows the reason it was rejected above a form that can fix it. Reopening the form
+without the reason is asking somebody to guess.
+
+**The form sends only what CHANGED.** A PATCH built from every input re-sends the whole record, which
+turns "I fixed a typo in the address" into a write that also overwrites the English description with
+whatever the form happened to hold — including an empty string, if that language was never filled in.
+
+**التقويم.** One unit's month with a range editor: status, nightly price, minimum nights and a private
+note over a span, written in one transaction. The status select offers متاح, مغلق and صيانة and
+**never محجوز** — that is derived from real bookings, and a partner able to write it by hand could
+hold inventory back from سفرة while appearing available (§8.4). The unit and the month live in the
+URL so a view is shareable, and both are clamped: an unknown unit falls back to the property's own
+first rather than erroring.
+
+**A new endpoint, `GET /partner/properties/:reference`.** The card list returns what a card draws; a
+form has to PREFILL, which needs the address, the coordinates and the descriptions in three languages
+plus the city and policy CODES rather than their Arabic names. A form prefilled from a response that
+omitted a field silently blanks it, and the partner who saves has erased their own copy without ever
+seeing it — so the integration test is mostly a completeness assertion.
+
+**11 browser tests** cover both screens, each asserting after a RELOAD and undoing its own writes.
+
+**What remains:** the add-property form's three image slots stay absent by design (an image uploads
+against a property that already exists, and the form says so), and there is no bulk unit editor —
+units are edited one at a time through `PATCH /partner/units/:id`, which has no UI yet.
+
+**Owner:** engineering.
+
+### O-notify-1 — Notifications exist for three events, and are sent in the request
+
+**Shipped 2026-08-08.** Three notices, in the recipient's own language, each recorded:
+`booking.needs_action` to the partner, `review.received` to the partner, `review.replied` to the
+guest. Full design in **`docs/notifications.md`**.
+
+**The delivery log was the point.** `notifications` had existed since the first migration and nothing
+had ever written to it, so «سجل المراسلات» showed a catalogue of templates over an empty table. Every
+send now writes a row — sent OR failed, with the provider's reason — because "was the partner
+actually told?" is the first question asked when somebody disputes a §6.4 fine.
+
+**A security fix the test found.** The failure reason was stored verbatim, and an SMTP rejection
+routinely quotes the address it refused (`550 5.1.1 <someone@example.com> …`). That would have put
+email addresses into the one table designed to hold none. Reasons now pass through
+`redactContactDetails`. Found by writing the assertion, not by inspection.
+
+**Visibility is derived, never requested.** A guest writing a review causes mail to reach the host of
+the booking they stayed at, taken from the booking row; a partner replying reaches the guest who
+wrote that review, taken from the review. Neither party names the recipient.
+
+**ACCEPTED DEVIATION — sends happen in the request.** There is no queue: `notify` calls the transport
+inline after the transaction commits. That is honest for three low-volume notices and wrong for a
+platform — a slow mail server becomes a slow API, and rule 3's p95 budget does not survive an SMTP
+timeout on the booking path. The fix is item 9 (BullMQ), deferred by Bashar until the hosting
+decision is made. This service is the seam that move happens behind: every send already goes through
+one method with a recorded outcome. **The consequence, stated plainly: an unreachable mail server
+adds its connection timeout to the request that triggered it.** Nothing is lost — sends are after the
+commit and failures are recorded — but the caller waits.
+
+**What remains:**
+
+1. **WhatsApp is unwired** (roadmap item 192, provider undecided). Email is the only channel.
+2. **No digest or preference.** A partner receiving twenty bookings gets twenty emails, and there is
+   no way to opt out of anything. Acceptable at launch volume; not at scale.
+3. **No retry.** A failed send is recorded and abandoned. Retrying belongs with the queue.
+
+**Owner:** engineering (1 and 3 follow the hosting decision; 2 is product).
+
 ### O-partner-3 — The dashboard is built; the calendar shows one unit
 
 **Shipped 2026-08-07.** `GET /partner/dashboard` answers the whole §7.1 screen in one round trip:
@@ -894,11 +978,20 @@ question it cannot be asked.
   test that gives a partner a completed booking with money owed and asserts the line is still
   absent.
 
-**What the calendar does and does not do.** It shows THIS month for ONE unit — the partner's first
-by creation — because §7.1 draws a single grid of squares and a partner with six units has no room
-for six. A booking overlays the availability table where the two disagree, since a booking means
-somebody is arriving. A portfolio-wide month view across all units is still not built; the per-unit
-editing calendar (`GET /partner/units/:id/calendar`) remains its own screen and has no UI yet.
+**The calendar, replaced 2026-08-08 — it now covers the WHOLE portfolio.** It used to draw one unit
+chosen by creation date, which is a defensible sample of one and a misleading picture of a business:
+a partner with six units saw one room's month on the screen they open every morning. Each square now
+carries how many units are booked, how many are closed, and how many are still open, with the
+breakdown in a `title`. A booking still overrides the availability table where they disagree, since a
+booking means somebody is arriving; and a unit that is both booked and closed is counted ONCE, as
+booked, or the three numbers would exceed the portfolio and «متاح» would go negative.
+
+**It does not get slower as a portfolio grows.** The obvious query is units × days then `GROUP BY`,
+which is 15,500 rows for a 500-unit partner before it aggregates anything. This one expands the
+BOOKINGS and availability rows that exist — bounded by what the partner did rather than by what they
+own, both indexed by `unit_id` — and answers thirty-one rows whatever the portfolio looks like.
+Inactive units are excluded: a unit taken off sale is not inventory, and counting it as available
+would overstate what a customer can book.
 
 **Two fixture defects this found.** `db:testbed` created `pending_confirmation` bookings with no
 `confirmation_deadline_at`, so the SLA sweep could never expire or fine them and the dashboard's
@@ -1108,17 +1201,23 @@ currently unmeasurable.
 **Also alert on `sanctions ageDays > 3`,** not 7. By 7 onboarding has already stopped;
 3 leaves two missed nightly runs of margin.
 
-### S-2 — Partners are not notified that a booking is waiting
+### S-2 — Closed: partners are told, by email, and it is recorded
 
-**Status:** blocked on a decision · **Owner:** Product + Bashar
+**Closed 2026-08-08.** A paid booking entering `pending_confirmation` sends the partner
+`booking.needs_action` in their own language, carrying the reference, the stay and the DEADLINE.
 
-A partner is not told a booking awaits confirmation; they find out by looking. Against a
-two-hour SLA with fines attached, that is a fairness problem, not only a product gap.
+The reason this was a fairness problem and not only a product gap: §6.4 fines a partner and cuts
+their score for not answering inside the window, and until now the only way to learn a request
+existed was to be looking at the dashboard. **Fining somebody for missing a message nobody sent them
+is not a rule, it is a trap.**
 
-**Blocked by:** roadmap item 192, WhatsApp BSP selection. No notification table exists
-either.
+**And it is provable.** Every send writes a row to `notifications` — sent OR failed, with the
+provider's reason — so "was I ever told?" has an answer months later. That table had existed since
+the first migration with nothing ever writing to it. See `docs/notifications.md`.
 
-**Workaround at launch volume:** staff phone the partner. Does not survive growth.
+**What is still open, and it is not this.** WhatsApp remains unwired pending roadmap item 192; email
+is the channel today and the console shows that per channel rather than claiming the template works
+everywhere. And sends happen IN THE REQUEST — see the accepted deviation under `O-notify-1`.
 
 ### S-3 — Load testing has never been run
 
@@ -1249,6 +1348,26 @@ been reviewed. Required for a German merchant entity handling EU personal data.
 ---
 
 ## 8. Known risks and traps
+
+### Fixtures can assert things the product never could
+
+Three times now a seeded fixture has published something impossible, and each time it was found by a
+test failing for an unrelated reason rather than by anyone looking:
+
+- A property declared `rating: '4.9', reviewsCount: 118` as literals while a trigger owned both
+  columns, so a listing advertised a score with zero reviews behind it (2026-08-07).
+- A DRAFT listing accumulated ninety days of completed stays and eight reviews, and the trigger gave
+  it 5.0 stars — a listing no customer had ever been able to book (2026-08-08).
+- The customer-review browser test depended on an un-reviewed stay that existed only by arithmetic;
+  adding two listings closed the gap and broke a test with no relationship to the change (2026-08-08).
+
+**The rule this suggests: a fixture a test depends on must be arranged on purpose and named, not left
+to fall out of a loop.** The seed now reserves the customer's most recent completed stay explicitly,
+by email, and restricts bulk bookings and reviews to PUBLISHED listings.
+
+Not yet enforced by anything. A `db:testbed` self-check — no unpublished listing has a rating, every
+fixture a spec names exists — would catch the next one at seed time rather than three specs later.
+Owner: engineering.
 
 Things that are not blockers but will cost someone a day if forgotten.
 
