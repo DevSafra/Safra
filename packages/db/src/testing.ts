@@ -65,7 +65,17 @@ import type { Database } from './client.js';
  */
 
 /** Statements the wrapper rewrites, matched on the leading keyword only. */
-const TRANSACTION_CONTROL = /^\s*(begin|start transaction|commit|rollback)\b/i;
+const TRANSACTION_CONTROL = /^\s*(begin|start transaction|commit|rollback)\b(?!\s+to\b)/i;
+
+/**
+ * Drizzle's OWN savepoints, which pass through untouched.
+ *
+ * A nested `tx.transaction()` issues `savepoint sp1` / `release savepoint sp1` directly. Wrapping
+ * those in a statement savepoint of our own destroys them: releasing the outer point discards
+ * `sp1`, and drizzle's later `release savepoint sp1` then fails against a point that no longer
+ * exists — which aborts the transaction and surfaces as a lost write several assertions later.
+ */
+const OWN_SAVEPOINT = /^\s*(savepoint|release\s+savepoint|rollback\s+to)\b/i;
 
 export interface RollbackDatabase {
   /** The drizzle handle to hand to services and to query directly. */
@@ -90,7 +100,6 @@ export function createRollbackDatabase(connectionString: string): RollbackDataba
 
   let connected = false;
   let inTransaction = false;
-  let depth = 0;
   let counter = 0;
 
   const textOf = (first: QueryArgs[0]): string =>
@@ -120,48 +129,70 @@ export function createRollbackDatabase(connectionString: string): RollbackDataba
     return next;
   };
 
-  const wrapped = async (...args: QueryArgs): Promise<unknown> => {
+  /**
+   * The savepoint STACK, not a counter.
+   *
+   * A counter gets this wrong the first time a service's transaction fails: the names it generates
+   * drift from the savepoints that actually exist, and `RELEASE SAVEPOINT nested_2` on a point that
+   * was never created is an error — which aborts the transaction and turns every later statement in
+   * the test into "current transaction is aborted", reported against whichever assertion happened
+   * to come next.
+   */
+  const stack: string[] = [];
+
+  const wrapped = (...args: QueryArgs): Promise<unknown> => {
     /* Outside a test's transaction, behave exactly like the real client. */
     if (!inTransaction) return raw(...args);
 
-    const text = textOf(args[0]);
-    const control = TRANSACTION_CONTROL.exec(text);
+    /*
+      EVERYTHING goes through the queue, transaction control included. A savepoint-wrapped statement
+      is three round trips, and `pg` interleaves concurrent callers on one connection — so a service
+      issuing BEGIN while another statement's trio is mid-flight would nest the wrong way round.
+    */
+    return serialise(async () => {
+      const text = textOf(args[0]);
 
-    if (control) {
-      const keyword = (control[1] ?? '').toLowerCase();
+      /* Drizzle managing its own savepoints — ours must not enclose them. */
+      if (OWN_SAVEPOINT.test(text)) return raw(...args);
 
-      if (keyword === 'begin' || keyword === 'start transaction') {
-        depth += 1;
+      const control = TRANSACTION_CONTROL.exec(text);
 
-        return raw(`SAVEPOINT nested_${depth}`);
-      }
+      if (control) {
+        const keyword = (control[1] ?? '').toLowerCase();
 
-      if (keyword === 'commit') {
-        const name = `nested_${depth}`;
+        if (keyword === 'begin' || keyword === 'start transaction') {
+          counter += 1;
+          const name = `nested_${counter}`;
 
-        depth = Math.max(0, depth - 1);
+          stack.push(name);
 
-        return raw(`RELEASE SAVEPOINT ${name}`);
+          return raw(`SAVEPOINT ${name}`);
+        }
+
+        const name = stack.pop();
+
+        /*
+          A COMMIT or ROLLBACK with nothing on the stack is a service closing a transaction this
+          wrapper never saw opened. Doing nothing is right: the alternative is releasing a savepoint
+          that does not exist, which aborts the whole transaction.
+        */
+        if (!name) return { rows: [] };
+
+        if (keyword === 'commit') return raw(`RELEASE SAVEPOINT ${name}`);
+
+        /*
+          A service rolling ITS transaction back must undo its own work and leave the test's
+          transaction usable — `ROLLBACK TO` does that, where a bare `ROLLBACK` would discard the
+          enclosing transaction and take the test's fixtures with it.
+        */
+        return raw(`ROLLBACK TO SAVEPOINT ${name}`);
       }
 
       /*
-        A service rolling ITS transaction back must undo its own work and leave the test's
-        transaction usable — `ROLLBACK TO` does exactly that, where a bare `ROLLBACK` would discard
-        the enclosing transaction and take the test's fixtures with it.
+        An ordinary statement, in its own savepoint so a refusal stays local. These suites provoke
+        constraint violations on purpose and keep asserting afterwards; without this the first one
+        would abort the transaction and every later query would fail for an unrelated reason.
       */
-      const name = `nested_${depth}`;
-
-      depth = Math.max(0, depth - 1);
-
-      return raw(`ROLLBACK TO SAVEPOINT ${name}`);
-    }
-
-    /*
-      An ordinary statement, in its own savepoint so a refusal stays local. Tests here provoke
-      constraint violations on purpose and keep asserting afterwards; without this the first one
-      would abort the transaction and every later query would fail for an unrelated reason.
-    */
-    return serialise(async () => {
       counter += 1;
       const point = `stmt_${counter}`;
 
@@ -193,17 +224,27 @@ export function createRollbackDatabase(connectionString: string): RollbackDataba
         connected = true;
       }
 
-      await raw('BEGIN');
+      /*
+        Through the QUEUE, not straight to the connection.
+
+        `begin` and `rollback` used to call `raw` directly, so the ROLLBACK ending one test could
+        overtake a statement still in flight from it — leaving the next test's BEGIN issued against
+        a connection whose transaction was already aborted. The symptom was a failure reported
+        against whichever assertion ran first in the NEXT test, which is the hardest possible place
+        to look for it.
+      */
+      await serialise(() => raw('BEGIN'));
       inTransaction = true;
-      depth = 0;
+      stack.length = 0;
     },
     async rollback() {
       if (!inTransaction) return;
 
-      inTransaction = false;
-      depth = 0;
+      /* Drains anything still queued from the test before discarding its work. */
+      await serialise(() => raw('ROLLBACK'));
 
-      await raw('ROLLBACK');
+      inTransaction = false;
+      stack.length = 0;
     },
     async close() {
       if (connected) await client.end();
