@@ -130,6 +130,17 @@ export class PartnerController {
     return this.properties.listOwn(user);
   }
 
+  /** One listing, with the fields a form prefills from and the units a calendar is chosen by. */
+  @Get('properties/:reference')
+  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @AuditExempt('A partner reading their own listing; changes nothing.')
+  async readProperty(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.properties.readOwn(user, reference);
+  }
+
   @Post('properties')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   async createProperty(

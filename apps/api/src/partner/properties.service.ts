@@ -109,6 +109,148 @@ export class PropertiesService {
    * Scoped to `partnerId` from the VERIFIED token, so this cannot return another partner's
    * listing regardless of what the caller asks for.
    */
+  /**
+   * ONE listing, with everything the تعديل form and the التقويم screen need.
+   *
+   * ## Why this exists rather than reusing `listOwn`
+   *
+   * The card list returns what a card draws — a name, a status, a price, a cover. An edit form has
+   * to PREFILL, which means it needs the fields nobody looks at on a card: the address, the
+   * coordinates, the descriptions in three languages, the city and policy CODES rather than their
+   * Arabic names. A form prefilled from a list that does not carry them silently blanks whatever
+   * it could not read, and a partner who saves it has just erased their own description.
+   *
+   * ## `isStructurallyEditable` is computed HERE
+   *
+   * The rule — draft, pending_review and rejected only — lives next to the `update` that enforces
+   * it, so the screen and the endpoint cannot disagree about whether a form should be shown. A UI
+   * that decided this for itself would eventually offer a form whose submit is refused, which is
+   * the worst of both: the work is done and then discarded.
+   *
+   * The reason is §8.1: SAFRA verified the address, the photographs and the documents against each
+   * other. Letting a published listing change its address would invalidate that verification while
+   * leaving the «موثّق» badge in place, which is exactly the claim P-002 exists to protect.
+   *
+   * Prices, calendar and photographs stay editable at every status — those are the partner's
+   * ongoing responsibility (P-006), and the screen says so rather than leaving the reader to
+   * wonder what they are allowed to touch.
+   */
+  async readOwn(claims: AccessTokenClaims | undefined, reference: string) {
+    const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
+
+    const rows = await this.db.execute<{
+      id: string;
+      reference: string;
+      slug: string;
+      status: string;
+      name_ar: string;
+      name_en: string | null;
+      name_de: string | null;
+      description_ar: string | null;
+      description_en: string | null;
+      description_de: string | null;
+      address: string;
+      latitude: string | null;
+      longitude: string | null;
+      attributes: string[] | null;
+      city_slug: string;
+      city_name_ar: string;
+      property_type_code: string;
+      cancellation_policy_code: string;
+      review_notes: string | null;
+    }>(sql`
+      SELECT pr.id, pr.reference, pr.slug, pr.status::text AS status,
+             pr.name_ar, pr.name_en, pr.name_de,
+             pr.description_ar, pr.description_en, pr.description_de,
+             pr.address, pr.latitude, pr.longitude, pr.attributes,
+             ci.slug AS city_slug, ci.name_ar AS city_name_ar,
+             pt.code AS property_type_code,
+             cp.code AS cancellation_policy_code,
+             pr.review_notes
+      FROM properties pr
+      JOIN cities ci               ON ci.id = pr.city_id
+      JOIN property_types pt       ON pt.id = pr.property_type_id
+      JOIN cancellation_policies cp ON cp.id = pr.cancellation_policy_id
+      WHERE pr.partner_id = ${partnerId}
+        AND pr.reference = ${reference}
+        AND pr.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const row = rows.rows[0];
+
+    /* 404 rather than 403 for another partner's reference, so it cannot be probed for existence. */
+    if (!row) throw notFound(ERROR.PROPERTY_NOT_FOUND);
+
+    const units = await this.db.execute<{
+      id: string;
+      name_ar: string;
+      unit_label: string | null;
+      max_guests: number;
+      bedrooms: number;
+      beds: number;
+      bathrooms: number;
+      base_price: string;
+      currency_code: string;
+      min_nights: number;
+      max_nights: number | null;
+      is_active: boolean;
+    }>(sql`
+      SELECT un.id, un.name_ar, un.unit_label, un.max_guests, un.bedrooms, un.beds,
+             un.bathrooms, un.base_price::text, cur.code AS currency_code,
+             un.min_nights, un.max_nights, un.is_active
+      FROM units un
+      JOIN currencies cur ON cur.id = un.currency_id
+      /*
+        The id VERIFIED above, not a second lookup by reference. The reference is unique so both
+        resolve alike today; reusing the checked id means the ownership test and the rows returned
+        cannot come apart if that ever stops being true.
+      */
+      WHERE un.property_id = ${row.id}
+        AND un.deleted_at IS NULL
+      ORDER BY un.created_at
+    `);
+
+    return {
+      reference: row.reference,
+      slug: row.slug,
+      status: row.status,
+      name: { ar: row.name_ar, en: row.name_en, de: row.name_de },
+      description: {
+        ar: row.description_ar,
+        en: row.description_en,
+        de: row.description_de,
+      },
+      address: row.address,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      attributes: row.attributes ?? [],
+      citySlug: row.city_slug,
+      cityNameAr: row.city_name_ar,
+      propertyTypeCode: row.property_type_code,
+      cancellationPolicyCode: row.cancellation_policy_code,
+      /* Why a rejected listing was rejected — the one thing that makes the form worth reopening. */
+      reviewNotes: row.status === 'rejected' ? row.review_notes : null,
+      isStructurallyEditable: STRUCTURALLY_EDITABLE.includes(
+        row.status as (typeof STRUCTURALLY_EDITABLE)[number],
+      ),
+      units: units.rows.map((unit) => ({
+        id: unit.id,
+        nameAr: unit.name_ar,
+        unitLabel: unit.unit_label,
+        maxGuests: unit.max_guests,
+        bedrooms: unit.bedrooms,
+        beds: unit.beds,
+        bathrooms: unit.bathrooms,
+        basePrice: unit.base_price,
+        currencyCode: unit.currency_code,
+        minNights: unit.min_nights,
+        maxNights: unit.max_nights,
+        isActive: unit.is_active,
+      })),
+    };
+  }
+
   async listOwn(claims: AccessTokenClaims | undefined) {
     const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
 
