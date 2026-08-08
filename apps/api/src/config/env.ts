@@ -44,6 +44,14 @@ export const envSchema = z.object({
     infrastructure — at that point a failing probe means somebody changed the policy, and a failed
     deploy is the right outcome. See `MediaReachabilityService`.
   */
+  /*
+    The bearer token a scraper presents to `GET /internal/metrics`.
+
+    Absent means the route answers 404 — fail closed, and quietly. 32 bytes of random, from the
+    secret manager. See `MetricsController` for why a wrong token gets the same 404 as no token.
+  */
+  METRICS_TOKEN: z.string().min(32).optional(),
+
   MEDIA_REQUIRE_PUBLIC: z
     .enum(['true', 'false'])
     .default('false')

@@ -22,6 +22,7 @@ import { SearchModule } from './search/search.module.js';
 import { SettingsModule } from './settings/settings.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { WalletModule } from './wallet/wallet.module.js';
+import { MetricsModule } from './metrics/metrics.module.js';
 import { HealthModule } from './health/health.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { RedisThrottlerStorage } from './redis/redis-throttler.storage.js';
@@ -96,6 +97,7 @@ import { TwoFactorGuard } from './rbac/two-factor.guard.js';
     AdminModule,
     CatalogModule,
     HealthModule,
+    MetricsModule,
   ],
   providers: [
     // Order matters: throttling runs first (cheapest rejection), then
