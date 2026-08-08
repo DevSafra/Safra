@@ -1,0 +1,213 @@
+# Launch readiness
+
+The state of the platform on 2026-08-08, and everything that stands between it and a launch.
+
+Written so that infrastructure, compliance and launch execution can begin without further
+discovery. Where something is undecided, it says who decides it.
+
+---
+
+## 1. Completed components
+
+| Component                                                                                     | State                             | Evidence                                                         |
+| --------------------------------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------- |
+| **Customer app** — search, property, checkout, payment, account, wallet, reviews              | Complete                          | `e2e/`, 191 browser tests                                        |
+| **Staff console** — 19 sections, registries, finance, disputes, emergency mode, audit         | Complete                          | `e2e/navigation.spec.ts` sweeps all 19                           |
+| **Partner portal** — dashboard, listings, media, calendar, edit, units, payouts, reviews, 2FA | Complete                          | `e2e/partner*.spec.ts`                                           |
+| **Booking lifecycle**                                                                         | Complete                          | Exclusion constraint proven under contention                     |
+| **Payments and ledger**                                                                       | Complete                          | Four-leg balanced groups; balance enforced by trigger            |
+| **Payouts**                                                                                   | Complete                          | Accrual → close → release → paid, immutable once paid            |
+| **Reviews (P-006)**                                                                           | Complete                          | Enforced by database trigger, not convention                     |
+| **Media pipeline**                                                                            | Complete                          | EXIF stripped, variants, cover invariant by partial unique index |
+| **Notifications**                                                                             | Complete for 3 events, email only | `docs/notifications.md`                                          |
+| **Auth** — 2FA, lockout, rotation, throttling                                                 | Complete                          | `docs/auth-rate-limiting.md`                                     |
+| **i18n** — ar/en/de, ICU plurals, error codes                                                 | Complete                          | 1,088 tests incl. plural boundaries                              |
+| **RBAC and staff scope**                                                                      | Complete                          | Server-enforced, matrix derived from the guard                   |
+| **Audit log**                                                                                 | Complete                          | Append-only by trigger, survives TRUNCATE                        |
+| **Scheduled jobs**                                                                            | Complete                          | Advisory-locked, telemetry in `scheduled_job_runs`               |
+
+**No unblocked engineering item remains.**
+
+---
+
+## 2. Remaining operational risks
+
+| #   | Risk                                                 | Severity | Status                                                                    |
+| --- | ---------------------------------------------------- | -------- | ------------------------------------------------------------------------- |
+| 1   | **No alerting.** A job that stops firing is silent   | **High** | Designed — `docs/alerting.md`. Needs `M-1` + ½ day for a metrics endpoint |
+| 2   | **No backups, no tested restore**                    | **High** | `M-3`. Needs `M-1`                                                        |
+| 3   | **Never load-tested.** No capacity number is claimed | **High** | Planned — `docs/load-testing.md`. Needs `M-1`                             |
+| 4   | **No malware scanning** on identity documents        | Medium   | Recommended — `docs/malware-scanning.md`. ClamAV sidecar, 1–2 days        |
+| 5   | **Media config drift** between API and apps          | Medium   | Reduced — `docs/media-integrity.md`. One deployment assertion closes it   |
+| 6   | **Notifications send in-request**                    | Medium   | Designed away — `docs/background-jobs-design.md` phase 2                  |
+| 7   | **No on-call rota**                                  | Medium   | Organisational. Alerting without a recipient is worse than none           |
+| 8   | **Rate limiting fails open** when Redis is down      | Low      | Deliberate. Alert 11 covers it                                            |
+| 9   | **`availability_days` unpartitioned**                | Low      | ~70M rows at target scale. Load test decides                              |
+
+---
+
+## 3. Remaining external dependencies
+
+| Dependency                        | Owner               | Blocks                                                      |
+| --------------------------------- | ------------------- | ----------------------------------------------------------- |
+| **Deployment target and region**  | Bashar              | Risks 1, 2, 3, 6 — **the single highest-leverage decision** |
+| Object storage + CDN provisioning | Infrastructure      | Media in production                                         |
+| SMTP provider                     | Vendor              | All email                                                   |
+| Payment gateway contract          | Vendor + legal      | Real money                                                  |
+| WhatsApp BSP                      | Vendor              | Second notification channel                                 |
+| Sanctions data feed               | Vendor + compliance | Screening against current lists                             |
+| Malware scanning decision         | Bashar              | Risk 4                                                      |
+| Penetration test                  | External            | Security sign-off                                           |
+| Retention and erasure policy      | Legal               | GDPR posture                                                |
+| Fine-deduction business rule      | Bashar              | Payout arithmetic (`D-fine-1`)                              |
+
+---
+
+## 4. Launch blockers
+
+**Hard blockers — launching without these is negligent:**
+
+1. **Backups with a restore that somebody has actually performed.** Not a backup job; a drill.
+2. **Alerting on the six `page` signals**, with a person receiving them.
+3. **A load test executed against production-shaped infrastructure**, meeting the stated budgets.
+4. **Sanctions feed activated.** A legal obligation, not a feature.
+5. **Payment gateway live** with a reconciled test transaction.
+6. **HTTPS, HSTS, and the CSP verified in production.**
+
+**Should-have — launch is defensible without them, with the risk stated:**
+
+7. Malware scanning on identity documents.
+8. Penetration test.
+9. Retention policy.
+10. Notification queue.
+
+---
+
+## 5. Security posture
+
+**Implemented and verified:**
+
+- Argon2id passwords; short-lived access tokens with rotating, revocable refresh; `HttpOnly`
+  `Secure` `SameSite=Strict` cookies.
+- Mandatory 2FA for staff **and** partners, enforced server-side, with a staff-operated recovery path.
+- Per-request, per-resource authorization. Deny by default. Staff scope enforced in the API.
+- Rate limiting on IP **and** account, with lockout — and **no account-enumeration oracle** in login
+  or registration (a residual timing difference is documented honestly in
+  `docs/auth-rate-limiting.md`, not claimed away).
+- Every external input validated by schema at the boundary; unknown fields rejected.
+- Parameterised queries throughout.
+- CSP with a per-request nonce; `img-src` names its origins rather than allowing `https:`.
+- Field-level encryption for TOTP secrets, with tested key rotation.
+- Append-only audit log, enforced by trigger, surviving `TRUNCATE`.
+- Errors to clients are codes; detail stays in server logs. **No PII in logs**, including
+  notification failure reasons.
+- Dependencies pinned and audited in `pnpm verify`. Currently zero known vulnerabilities.
+
+**Known gaps:** no penetration test; no malware scanning; no WAF or DDoS protection (hosting-level);
+no automated dependency-update pipeline.
+
+**Honest statement, unchanged from rule 1:** no system can be proven unbreachable. What is claimed
+is defence in depth, least privilege, no known vulnerability class shipped, and a blast radius that
+is contained and detectable — with the caveat that _detectable_ currently depends on alerting that
+does not exist yet.
+
+---
+
+## 6. Disaster recovery posture
+
+**Currently: none.** This is the most serious gap in the document.
+
+- No backups configured. No restore ever attempted. **RPO and RTO are both undefined**, which means
+  unbounded.
+- The database is the system of record for money. There is no second copy.
+
+**Required, and specified:**
+
+| Item                   | Target                                                     |
+| ---------------------- | ---------------------------------------------------------- |
+| Automated backups      | Every 6 h, 30-day retention                                |
+| Point-in-time recovery | 7 days minimum                                             |
+| **Restore drill**      | Quarterly, timed, into a scratch environment               |
+| RPO                    | ≤ 15 min                                                   |
+| RTO                    | ≤ 4 h                                                      |
+| Off-region copy        | Required                                                   |
+| Object storage         | Versioning + lifecycle rules                               |
+| Redis                  | Only becomes a DR concern after BullMQ — see that document |
+
+**A backup nobody has restored is a hypothesis, not a backup.** The drill is the deliverable.
+
+---
+
+## 7. Monitoring posture
+
+**Produced today:** structured JSON logs with correlation ids; an access log; liveness and readiness
+endpoints reporting database, Redis and media; job telemetry in `scheduled_job_runs`; notification
+delivery in `notifications`.
+
+**Missing:** log shipping and search; a metrics endpoint (~½ day, unblocked); a scraper; dashboards;
+paging; external uptime checks.
+
+Full specification with thresholds in `docs/alerting.md`. **Sixteen signals, six of them paging.**
+
+---
+
+## 8. Infrastructure requirements
+
+| Component          | Requirement                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------ |
+| App servers        | ≥2 replicas per app behind a load balancer; **stateless already**                                |
+| PostgreSQL         | 16+, connection pooling (pgBouncer, transaction mode), read replica planned                      |
+| Redis              | Persistence off is acceptable _today_; **AOF + `noeviction` required before BullMQ**             |
+| Object storage     | S3-compatible, `properties/` public-read, `identity/` private, versioned                         |
+| CDN                | In front of media; `NEXT_PUBLIC_MEDIA_URL` must name it, and must equal `S3_PUBLIC_URL`'s origin |
+| TLS                | Managed certificates, HSTS with preload                                                          |
+| Secrets            | A secret manager. **No `.env` in any deployed image**                                            |
+| Container registry | Images exist for all three apps                                                                  |
+| Migrations         | Forward-only, run as a deploy step (`docs`, `S-7`)                                               |
+| Env vars           | `.env.example` is the complete list. `MEDIA_REQUIRE_PUBLIC=true` in production                   |
+
+---
+
+## 9. Vendor requirements
+
+| Vendor                                | Needed for      | Decision owner |
+| ------------------------------------- | --------------- | -------------- |
+| Cloud host                            | Everything      | Bashar         |
+| SMTP (Postmark/SES/Resend)            | All email       | Bashar         |
+| Payment gateway                       | Real payments   | Bashar + legal |
+| Sanctions data                        | Legal screening | Compliance     |
+| WhatsApp BSP                          | Second channel  | Bashar         |
+| Error tracking (Sentry or equivalent) | Alerting        | Bashar         |
+| Paging (PagerDuty/Opsgenie)           | On-call         | Bashar         |
+| Penetration testing firm              | Sign-off        | Bashar         |
+
+---
+
+## 10. Legal and compliance dependencies
+
+| Item                                            | Status                                                                                                                                           |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Sanctions screening against a live feed         | **Blocked** — vendor + compliance                                                                                                                |
+| Data retention policy                           | **Missing.** Nothing is ever deleted; the audit log is append-only by design, which conflicts with erasure and needs a documented reconciliation |
+| GDPR erasure procedure                          | **Missing**, and depends on the above                                                                                                            |
+| Privacy policy, terms, cancellation policy copy | Legal                                                                                                                                            |
+| PCI scope                                       | Depends on the gateway. Card data never touches our servers today, which should keep scope to SAQ-A — **confirm with the gateway**               |
+| Syrian regulatory requirements                  | Unassessed                                                                                                                                       |
+| Cross-border data transfer                      | Depends on region — a decision that follows `M-1`                                                                                                |
+
+---
+
+## 11. The shortest path to launch
+
+1. **Choose the deployment target.** Unblocks risks 1, 2, 3 and 6.
+2. Provision, deploy, verify TLS/HSTS/CSP.
+3. Backups **and a restore drill**.
+4. Metrics endpoint, then alerting, then an on-call rota.
+5. Write the data generator; run the load test; fix what it finds.
+6. Activate the sanctions feed.
+7. Payment gateway with a reconciled test transaction.
+8. Penetration test.
+9. Retention policy and erasure procedure.
+10. Malware scanning; BullMQ phases 1–2.
+
+Steps 1–8 are the launch. 9 and 10 can follow, with the risk stated in writing.

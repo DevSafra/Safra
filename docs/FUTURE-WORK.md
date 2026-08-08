@@ -98,6 +98,23 @@ treat "engineering complete" as a statement about planned scope, not about corre
 
 ---
 
+## 1b. Where the remaining work is written down
+
+**Engineering is complete. Everything below this line is operational, and every item now has a
+document that makes it executable without further discovery.**
+
+| Document                         | What it settles                                                                                                            |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `docs/launch-readiness.md`       | The whole picture: components, risks, blockers, security, DR, monitoring, infrastructure, vendors, legal. **Start here.**  |
+| `docs/alerting.md`               | 16 signals with thresholds and severities; the 4 integration points; the one endpoint still to build                       |
+| `docs/load-testing.md`           | 6 scenarios, success criteria, production-shaped data volumes, k6, what to do when it fails                                |
+| `docs/malware-scanning.md`       | Four options weighed; ClamAV sidecar recommended for identity documents only, with the reasoning for excluding photographs |
+| `docs/media-integrity.md`        | What is closed, and the one invariant only a deployment can enforce                                                        |
+| `docs/background-jobs-design.md` | BullMQ: 5 queues, retries, dead letters, scheduler migration, backup implications, 6-phase rollout, ~14 days               |
+| `docs/notifications.md`          | What is sent, to whom, and how to prove it                                                                                 |
+| `docs/runbook-scheduled-jobs.md` | On-call procedure for the two cron jobs                                                                                    |
+| `docs/auth-rate-limiting.md`     | The throttling design and its honest residual                                                                              |
+
 ## 2. Standing decisions that constrain all future work
 
 These are not open questions. They are settled, and changing one is a decision for
@@ -1428,6 +1445,28 @@ been reviewed. Required for a German merchant entity handling EU personal data.
 | —   | Retention period for identity documents | S-4                              | Compliance input needed                              |
 
 ---
+
+## 7b. Accepted deviations, re-evaluated 2026-08-08
+
+Every deviation on the record, re-examined against one question: **would a person be harmed by this,
+and would we find out?** Three changed status.
+
+| #   | Deviation                                                             | Verdict                                                           | Reasoning                                                                                                                                                                                                               |
+| --- | --------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Notifications send in the request**                                 | **Promoted to a task** — `docs/background-jobs-design.md` phase 2 | Acceptable at three low-volume notices; NOT acceptable once an SMTP timeout can sit on the booking path under load. Phase 2 removes it in ~2 days and is worth doing on its own                                         |
+| 2   | **Four integration suites commit**                                    | **Genuinely acceptable**                                          | 30 bookings and 23 audit rows per run, in a development database. Each has a reason a transaction cannot solve — the sharpest being that `now()` is transaction-start time. Not worth contorting the tests              |
+| 3   | **Console uses `OFFSET`**                                             | **Genuinely acceptable, with a measurement owed**                 | Bashar asked for numbered pages; there is no third mechanism. Bounded by a page ceiling and capped counts. The load test measures the real cost and may lower the ceiling (`docs/load-testing.md` scenario 3)           |
+| 4   | **`/property/[slug]` caches for 60 s**                                | **Genuinely acceptable**                                          | A hidden review can persist one minute publicly. Bounded, and the remedy for a true emergency — unpublishing the listing — is not cached                                                                                |
+| 5   | **Geography screens unpaginated**                                     | **Genuinely acceptable**                                          | Held to account by `geo-bounds.integration.test.ts`, which fails and names the work if they outgrow the screen                                                                                                          |
+| 6   | **Media check warns rather than refusing to boot**                    | **Genuinely acceptable, now with an enforced path**               | `MEDIA_REQUIRE_PUBLIC=true` is set in `.env.example`, so a deployment that copies it gets the strict behaviour. Warning is the right default locally                                                                    |
+| 7   | **Rate limiting fails open when Redis is down**                       | **Promoted to a monitored risk**                                  | A security control silently off. Not worth failing closed — that would take the whole API down for a cache outage — but it MUST be alerted (`docs/alerting.md`, signal 11) rather than merely documented                |
+| 8   | **Photographs are not malware-scanned**                               | **Genuinely acceptable**                                          | sharp re-encodes every image, so the realistic payload does not survive. The residual is a decoder exploit, which fires before any scanner would run. See `docs/malware-scanning.md`                                    |
+| 9   | **Identity documents are not malware-scanned**                        | **LAUNCH BLOCKER (should-have)**                                  | Was recorded as an accepted gap. It is not: the files are stored as uploaded, come from unverified partners, and are downloaded onto STAFF machines. That is the platform acting as a courier. ClamAV sidecar, 1–2 days |
+| 10  | **`NEXT_PUBLIC_MEDIA_URL` and `S3_PUBLIC_URL` must agree, unchecked** | **Promoted to a deployment requirement**                          | Cannot be closed in code — different processes, different environments. A deployment-time assertion closes it, and it is now written down as such (`docs/media-integrity.md`)                                           |
+| 11  | **No retention policy; audit log is append-only**                     | **LAUNCH BLOCKER (legal)**                                        | Previously "compliance dependency". It is a direct conflict between a design decision we made and an obligation we have, and it needs a written reconciliation, not a note                                              |
+
+**Summary of changes:** two deviations became launch blockers (9, 11), three became tasks or
+requirements (1, 7, 10), and six stand as accepted.
 
 ## 8. Known risks and traps
 

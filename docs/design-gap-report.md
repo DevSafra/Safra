@@ -13,6 +13,21 @@ The handoff defines **19 admin sections**. Its §8 table lists 18 navigation row
 
 ---
 
+## Engineering-complete, 2026-08-08
+
+Every gap this report was opened to track is closed. **No unblocked engineering item remains**, and
+the design handoff has no section without a working screen behind it.
+
+What is left is operational, and it is written down rather than discovered: see
+`docs/launch-readiness.md` for the consolidated picture and the shortest path to launch. The two
+things standing between this state and a defensible launch are **a tested restore** and **alerting
+with somebody receiving it** — both of which follow the deployment decision (`M-1`).
+
+A deliberate note on what "complete" claims: no known gap between the specification and the code,
+verified by 1,094 unit and integration tests plus 191 browser tests. It does not claim _proven at
+scale_ — the load test has never run, and `docs/load-testing.md` exists so that it can the day
+infrastructure does.
+
 ## Testing posture, 2026-08-08
 
 **191 browser tests and 1,088 unit/integration tests.** What each layer can and cannot see:
