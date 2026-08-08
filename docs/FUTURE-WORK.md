@@ -180,6 +180,11 @@ perfection — §10 records the residual security risk honestly.
 | **Seed fixture falsehoods removed** — a draft listing was carrying 5.0 stars from eight stays it could never have had, because bulk bookings and reviews were generated against listings that were never bookable                                                                                                                                                                           | 2026-08-08    |
 | **16 of 22 integration suites roll back** — one connection, `BEGIN`/`ROLLBACK` per test, savepoints for nested transactions. Payout debris that no `afterAll` could ever remove is now zero                                                                                                                                                                                                 | 2026-08-08    |
 | **Arabic plurals on CLDR categories** in the customer app — `=1`/`=2`/`other` put 11–99 in the plural where Arabic takes the singular, on the range a result count most often lands in                                                                                                                                                                                                      | 2026-08-08    |
+| **18 of 22 integration suites roll back** — users, partners, properties and payouts added per run all fall to zero; four suites commit for reasons a transaction cannot solve, `now()` being the sharpest                                                                                                                                                                                   | 2026-08-08    |
+| **Console pluralises through ICU** — the booking detail read «٤ ليلة»; both apps now share one mechanism and `Intl.PluralRules`                                                                                                                                                                                                                                                             | 2026-08-08    |
+| **Media address checked at boot** — probes a key that cannot exist; 404 passes, 403 fails, reported on readiness and fatal under `MEDIA_REQUIRE_PUBLIC`                                                                                                                                                                                                                                     | 2026-08-08    |
+| **Batch image upload and a units editor** — a gallery is filled in one go, sequentially so cover and order stay deterministic; every unit editable on one screen even after publication                                                                                                                                                                                                     | 2026-08-08    |
+| **The seed refuses to describe something impossible** — five assertions at seed time, proven against the exact regression that cost an hour                                                                                                                                                                                                                                                 | 2026-08-08    |
 
 ### 🏗 Hosting-dependent — waiting on roadmap item 193
 
@@ -438,6 +443,62 @@ onto the same message loader as the customer app, which is `O-i18n-1`'s work and
 console to gain a second language. It reads as clumsy rather than as wrong information, and the
 console is staff-only. **Owner:** engineering, alongside `O-i18n-1`.
 
+### O-i18n-5 — Closed: the last four unblocked engineering items
+
+**Closed 2026-08-08**, all four verified against a running system.
+
+**The console pluralises.** `plural()` in `apps/admin/src/lib/strings.ts` renders an ICU message
+through `IntlMessageFormat` — the same formatter the customer app uses — so the console and the
+customer site now share one mechanism and one set of rules. Nine messages converted, including the
+booking detail's «{nights} ليلة», which read «٤ ليلة» on a screen an operator uses all day.
+
+`fill()` is untouched and still substitutes placeholders; teaching IT plural rules would have made a
+small translation library out of a string helper, which is why `O-i18n-3` deferred this. Counts are
+typed as NUMBERS at every call site: passing `count(n)` would leave `Intl.PluralRules` nothing to
+classify, every message would resolve to `other`, and every test would stay green.
+
+Two browser tests had to change, and both were asserting the bug: the pagination bar's total was
+pinned to «نتيجة» whichever count it showed, and its empty state expected "0 نتيجة" where Arabic has
+a `zero` category and now says «لا نتائج».
+
+**The media address is checked at boot.** `MediaReachabilityService` fetches a key that cannot exist
+and reads the status — 404 means the store answered and the bucket is readable, 403 means it is not,
+anything else means the host is wrong. Probing a MISSING key means this works on an empty bucket and
+on a fresh deployment, which is when a misconfiguration is cheapest to fix. Verified both ways
+against a live bucket: removing the policy produced `media: unreadable` on `/health/ready` plus a
+startup error naming the remedy.
+
+It warns by default and reports on readiness rather than refusing to boot, because media is not on
+the booking or payment path and a slow CDN should not become an outage. `MEDIA_REQUIRE_PUBLIC=true`
+makes it fatal, and `.env.example` sets it — that is the right setting once infrastructure owns the
+bucket, where a failing probe means somebody changed the policy.
+
+**Images upload in a batch.** The manager takes a multi-file selection and sends them ONE AT A TIME:
+each upload is six sharp variants, the endpoint's throttle is twenty a minute because the work is
+heavy, and — decisively — the first-image-becomes-cover and append-after-the-last rules are computed
+from the rows that exist when the request arrives. Parallel uploads race and the resulting order is
+whatever the event loop decided. A partial failure reports how many landed rather than rolling back
+seven photographs the partner would have to pick again.
+
+**Units are edited on one screen.** Every unit of a listing, each saved separately — one price change
+must not re-send five other units' fields, and a single validation failure must not reject work that
+was already correct. Deliberately NOT gated behind `isStructurallyEditable`: a published listing's
+address is frozen because §8.1 verified it, and its prices are not, because P-006 makes them the
+partner's ongoing responsibility. Taking a unit off sale carries a warning that it is not a way to
+close dates — a partner who blocks a fortnight that way has removed the unit from every future month.
+
+**The seed refuses to describe something impossible.** `selfCheck` runs at the end of `db:testbed`
+and throws on: an unpublished listing carrying a rating, an unpublished listing with bookings, a
+published listing with no unit, a missing fixture that a browser spec names by slug, and a fixture
+customer with no stay awaiting review. Proven by reintroducing the exact regression that took an hour
+to find last week — it now fails the seed, by name, in one line.
+
+Scoped to the seed's own listings: integration-test debris shares the database and follows a
+`*-test-*` slug, and refusing to finish over rows the seed did not write is how a useful check gets
+disabled.
+
+**Owner:** engineering. Nothing remains in this group.
+
 ### O-i18n-4 — Closed: the console's English copy is in the catalogue, and a test keeps it there
 
 **Closed 2026-08-07.** All ~40 strings moved to `packages/i18n/src/messages/admin/ar.ts` across
@@ -574,62 +635,52 @@ reset → seed cycle was run to confirm it.
 `partner_payouts` was missed — caught `scheduled_job_runs`, which had been added hours earlier and
 not registered. The guard doing its job on the person who wrote it.
 
-### O-data-2 — Mostly closed: 16 of 22 integration suites now roll back
+### O-data-2 — Closed for every suite that can roll back: 18 of 22
 
 **2026-08-08.** `createRollbackDatabase` in `@safra/db` gives a suite one dedicated connection, a
-real `BEGIN` before each test and a real `ROLLBACK` after it. Sixteen of the twenty-two integration
-suites use it and leave **nothing** behind.
+real `BEGIN` before each test and a real `ROLLBACK` after it. Eighteen of the twenty-two database
+integration suites use it and leave **nothing** behind.
 
 **Measured on the same database, one full `pnpm vitest run`:**
 
 | Rows added per run  | Before | After |
 | ------------------- | ------ | ----- |
-| users               | ~100   | 31    |
-| partners            | ~37    | 7     |
-| properties          | dozens | 0     |
+| users               | ~100   | **0** |
+| partners            | ~37    | **0** |
+| properties          | dozens | **0** |
 | **partner_payouts** | 66     | **0** |
+| bookings            | ~40    | 30    |
+| audit_log           | ~60    | 23    |
 
-The payout number is the one that mattered most. `deny_paid_payout_mutation` refuses to delete a
-paid payout — correctly, it records money that left the company — so that debris was PERMANENT, no
-`afterAll` could ever have removed it, and it then blocked `db:testbed` outright. It is now gone.
+The payout number mattered most: `deny_paid_payout_mutation` refuses to delete a paid payout —
+correctly, it records money that left the company — so that debris was PERMANENT, no `afterAll`
+could ever have removed it, and it had already blocked `db:testbed`.
 
-**Why the wrapper is on the CONNECTION and not on drizzle.** Every drizzle path — `execute`, the
-query builders, `db.query.*`, its own `transaction()` — bottoms out in one `client.query`. Wrapping
-there covers the SERVICES too, which hold a `Database` and open their own transactions internally
-where no test-side discipline reaches. A nested `BEGIN` is rewritten to `SAVEPOINT`, `COMMIT` to
-`RELEASE`, `ROLLBACK` to `ROLLBACK TO`, so a service's transaction still behaves like one while the
-outer transaction stays discardable.
+**Why the wrapper is on the CONNECTION.** Every drizzle path — `execute`, the query builders,
+`db.query.*`, its own `transaction()` — bottoms out in one `client.query`. Wrapping there covers the
+SERVICES, which hold a `Database` and open transactions internally where no test-side discipline
+reaches. A nested `BEGIN` becomes `SAVEPOINT`, `COMMIT` becomes `RELEASE`, `ROLLBACK` becomes
+`ROLLBACK TO`; drizzle's OWN savepoints pass through untouched, and every ordinary statement gets a
+savepoint of its own so a deliberately provoked constraint violation stays local instead of poisoning
+the transaction.
 
-**Every statement also gets its own savepoint.** Not tidiness: in PostgreSQL one failed statement
-poisons the whole transaction, and these suites provoke failures on purpose — a unique index, an
-append-only trigger — and keep asserting afterwards. Without per-statement savepoints the first
-`rejects.toThrow()` would leave every later query answering "current transaction is aborted".
+**Append-only guarantees are untouched.** Real triggers, real constraints, real indexes; a test that
+violates an append-only rule is still refused by the rule. Only durability is removed.
 
-**Append-only guarantees are untouched.** This is a real database doing real work: every trigger,
-constraint and index still runs, and a test that violates an append-only rule is still refused by
-the rule rather than by a mock. Only durability is removed.
+**FOUR suites still commit, and each for a reason a transaction cannot solve:**
 
-**SIX suites deliberately still commit,** and the reason is the same in every case — their subject
-is something a single transaction cannot express:
+| Suite      | Why                                                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `job-run`  | Two SESSIONS contending for an advisory lock — a lock is held by a session, not a txn                                                             |
+| `wallet`   | Concurrent movements racing; the harness serialises statements, removing the at-once                                                              |
+| `payments` | Webhook redelivery and idempotency under concurrency, same reason                                                                                 |
+| `fx-rate`  | **`now()` is transaction START time** — a rate inserted after `BEGIN` is invisible to its own transaction, so the suite cannot see what it writes |
 
-| Suite                  | Why it cannot roll back                                                   |
-| ---------------------- | ------------------------------------------------------------------------- |
-| `job-run`              | Two SESSIONS contending for an advisory lock; a lock is held by a session |
-| `wallet`               | Concurrent movements racing — the harness serialises statements           |
-| `payments`             | Webhook redelivery and idempotency under concurrency                      |
-| `fx-rate`              | Rates seeded in one test and read in the next                             |
-| `calendar`             | Same — cross-test fixture persistence                                     |
-| `account-recovery`     | Same                                                                      |
-| `partner-registration` | Same                                                                      |
+The `fx-rate` reason is the one worth remembering when writing a new suite: anything comparing a
+database `now()` against a timestamp generated in JS during the test cannot run inside one
+transaction. They account for the 30 bookings and 23 audit rows a run still adds.
 
-The first three are genuine and permanent: **serialising statements is exactly what a concurrency
-test must not have.** The last four are test-design debt rather than a limit of the mechanism — each
-relies on data outliving the test that made it, which the harness deliberately forbids. Converting
-them means rewriting their fixtures into `beforeEach`, which is mechanical but not free.
-
-**What remains:** those four suites, and they account for most of the 31 users and 36 bookings a run
-still adds. `db:reset-dev` remains the way to clear a database. **Owner:** engineering. No longer
-costing an afternoon every few weeks.
+**Owner:** engineering, and no longer costing an afternoon every few weeks.
 
 ### O-partner-1 — Reviews, shipped; the sidebar badge and the customer form remain
 

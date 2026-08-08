@@ -15,11 +15,11 @@ The handoff defines **19 admin sections**. Its §8 table lists 18 navigation row
 
 ## Testing posture, 2026-08-08
 
-**186 browser tests and 1,082 unit/integration tests.** What each layer can and cannot see:
+**191 browser tests and 1,088 unit/integration tests.** What each layer can and cannot see:
 
 - The **unit/integration** suite runs against a real PostgreSQL, so every trigger, constraint and
-  index is exercised. Sixteen of its twenty-two integration suites now roll back and leave nothing
-  behind; six commit deliberately, because their subject — session-scoped advisory locks, concurrent
+  index is exercised. Eighteen of its twenty-two integration suites now roll back and leave nothing
+  behind; four commit deliberately, because their subject — session-scoped advisory locks, concurrent
   wallet movements, webhook redelivery — cannot be expressed inside one transaction. See `O-data-2`.
 - The **browser** suite is the only layer that can see a hydration failure, a CSP refusal, or a
   count formatted before it reaches a plural rule. Every one of those has actually happened here and
