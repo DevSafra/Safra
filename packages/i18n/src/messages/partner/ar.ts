@@ -156,8 +156,17 @@ export const ar = {
     requestsNote: 'لا تظهر لك أي بيانات دفع للعميل. التواصل مع الضيف يتم عبر سفرة فقط.',
 
     /** التقويم — one unit, this month. */
-    calendarTitle: 'تقويم {month} — {unit}',
-    calendarDefaultPrice: 'سعر افتراضي: {price}',
+    calendarTitle: 'تقويم {month} — كل وحداتك',
+    calendarDefaultPrice: '{count} وحدة · تبدأ من {price}',
+    /* One square per day, describing the portfolio rather than a single room. */
+    calendarDayFull: 'لا وحدة متاحة',
+    calendarDaySome: '{available} من {total} متاحة',
+    calendarDayFree: 'كل الوحدات متاحة',
+    calendarDayDetail: '{date} · محجوز {booked} · مغلق {blocked} · متاح {available}',
+    legendPortfolioFree: 'كل الوحدات متاحة',
+    legendPortfolioSome: 'متاح جزئيًا',
+    legendPortfolioFull: 'لا شيء متاح',
+    calendarPerUnit: 'لتعديل الأسعار والإتاحة، افتح تقويم الوحدة من عقاراتي.',
     calendarNoUnits: 'لا وحدات بعد، فلا تقويم لعرضه.',
     legendAvailable: 'متاح',
     legendBooked: 'محجوز',
@@ -228,6 +237,98 @@ export const ar = {
     'كانون الأول',
   ],
 
+  /**
+   * تعديل العقار — the edit form, and the honest screen when there is nothing to edit.
+   *
+   * A published listing CANNOT be structurally edited: SAFRA verified the address, the
+   * photographs and the documents against each other (§8.1), and letting the address change
+   * afterwards would leave the «موثّق» badge standing over a claim nobody checked. The screen says
+   * that, and names what IS editable, rather than showing a form whose submit is refused.
+   */
+  editProperty: {
+    title: 'تعديل العقار',
+    back: 'رجوع إلى العقارات',
+    section: 'بيانات العقار',
+    /* Why the form is not shown, and what to do instead. */
+    lockedTitle: 'هذا العقار منشور، ولا يمكن تعديل بياناته الأساسية',
+    lockedWhy:
+      'راجعت سفرة العنوان والوثائق والصور معًا قبل النشر. تغيير العنوان أو المدينة بعد ذلك يُبطل تلك المراجعة بينما تبقى علامة التوثيق ظاهرة.',
+    lockedWhatYouCan:
+      'ما زال بإمكانك تعديل الأسعار والإتاحة من التقويم، وإدارة الصور، في أي وقت.',
+    lockedContact: 'لتغيير العنوان أو المدينة، راسل سفرة من صفحة الرسائل.',
+    goCalendar: 'فتح التقويم',
+    goImages: 'إدارة الصور',
+    rejectedTitle: 'سبب رفض العقار',
+    /* Fields. Arabic is required; the other two are optional and labelled as such. */
+    nameAr: 'اسم العقار بالعربية',
+    nameEn: 'الاسم بالإنجليزية (اختياري)',
+    nameDe: 'الاسم بالألمانية (اختياري)',
+    descriptionAr: 'الوصف بالعربية',
+    descriptionEn: 'الوصف بالإنجليزية (اختياري)',
+    descriptionDe: 'الوصف بالألمانية (اختياري)',
+    address: 'العنوان',
+    city: 'المدينة',
+    type: 'النوع',
+    policy: 'سياسة الإلغاء',
+    latitude: 'خط العرض (اختياري)',
+    longitude: 'خط الطول (اختياري)',
+    coordinatesHint: 'بالدرجات العشرية، مثل 33.5138',
+    save: 'حفظ التعديلات',
+    saving: 'جارٍ الحفظ…',
+    saved: 'حُفظت التعديلات.',
+    failed: 'تعذّر حفظ التعديلات. راجع الحقول وحاول مرة أخرى.',
+    unreachable: 'تعذّر الوصول إلى الخادم.',
+    units: 'الوحدات',
+    unitsEmpty: 'لا وحدات بعد.',
+    unitGuests: '{n} ضيف',
+    unitNights: 'أقل مدة {n} ليلة',
+    unitInactive: 'موقوفة',
+    openUnitCalendar: 'تقويم هذه الوحدة',
+  },
+
+  /**
+   * تقويم الإتاحة — one unit's month, and the range editor that changes it.
+   *
+   * ## «محجوز» is not in the editor
+   *
+   * A partner may set «متاح», «مغلق» or «صيانة». `booked` is DERIVED from real bookings, and a
+   * partner able to write it by hand could mark a unit booked with no booking behind it — hiding
+   * inventory from سفرة while appearing compliant (§8.4). To take dates off sale they close them,
+   * which is what the endpoint accepts and what this form offers.
+   */
+  unitCalendar: {
+    title: 'تقويم الإتاحة',
+    back: 'رجوع إلى العقارات',
+    unit: 'الوحدة',
+    noUnits: 'لا وحدات في هذا العقار بعد، فلا تقويم لعرضه.',
+    month: 'الشهر',
+    previousMonth: 'الشهر السابق',
+    nextMonth: 'الشهر التالي',
+    legend: 'الدليل',
+    perNight: '/ ليلة',
+    basePrice: 'السعر الأساسي',
+    minNightsShort: 'أقل مدة',
+    /* The range editor. */
+    editorTitle: 'تعديل مدة',
+    from: 'من تاريخ',
+    to: 'إلى تاريخ',
+    status: 'الحالة',
+    statusUnchanged: 'دون تغيير',
+    price: 'سعر الليلة',
+    priceUnchanged: 'دون تغيير',
+    priceClear: 'العودة إلى السعر الأساسي',
+    minNights: 'أقل عدد ليالٍ',
+    note: 'ملاحظة (لك وحدك)',
+    apply: 'تطبيق على المدة',
+    applying: 'جارٍ التطبيق…',
+    applied: 'طُبِّق التغيير على المدة المحددة.',
+    failed: 'تعذّر تطبيق التغيير. راجع التواريخ وحاول مرة أخرى.',
+    unreachable: 'تعذّر الوصول إلى الخادم.',
+    bookedWarning:
+      'الليالي المحجوزة لا تتغير. الحجز واقعٌ قائم، والتقويم لا يلغيه — ألغِ الحجز نفسه إن لزم.',
+    noteHint: 'لا تظهر الملاحظة للضيوف.',
+  },
+
   properties: {
     /** The handoff's §7.2 header, verbatim. */
     title: 'عروضي المنشورة على سفرة',
@@ -242,7 +343,6 @@ export const ar = {
     from: 'من',
     edit: 'تعديل',
     calendar: 'التقويم',
-    notBuilt: 'لم يُبنَ هذا القسم بعد',
 
     /** The §7.2 add-property form, with the handoff's own labels and note. */
     addOpen: '+ إضافة عقار',
@@ -330,6 +430,20 @@ export const ar = {
   },
 
   /** Property state, as the handoff's §7.2 pills name it. */
+  /**
+   * Availability day states, keyed on `availability_days.status`.
+   *
+   * «محجوز» is present because a day can BE booked, and absent from the editor's select because a
+   * partner may not SET it — the two are different questions and the catalogue answers only the
+   * first. See the note on `unitCalendar`.
+   */
+  dayStatus: {
+    available: 'متاح',
+    booked: 'محجوز',
+    closed: 'مغلق',
+    maintenance: 'صيانة',
+  } as Record<string, string>,
+
   propertyStatus: {
     published: 'منشور',
     pending_review: 'قيد المراجعة',

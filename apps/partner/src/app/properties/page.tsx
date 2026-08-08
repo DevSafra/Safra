@@ -175,31 +175,22 @@ function Card({ property }: { readonly property: PartnerProperty }) {
             >
               {t.properties.manageImages}
             </Link>
-            <Action label={t.properties.edit} />
-            <Action label={t.properties.calendar} />
+            <Link
+              href={`/properties/${property.reference}/edit`}
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-line px-3 text-[11.5px] text-muted lg:min-h-0 lg:py-1.5"
+            >
+              {t.properties.edit}
+            </Link>
+            <Link
+              href={`/properties/${property.reference}/calendar`}
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-line px-3 text-[11.5px] text-muted lg:min-h-0 lg:py-1.5"
+            >
+              {t.properties.calendar}
+            </Link>
           </div>
         </div>
       </div>
     </article>
-  );
-}
-
-/**
- * تعديل and التقويم, disabled and saying so.
- *
- * Neither screen exists yet. A button that navigates nowhere is worse than one that admits it —
- * the console makes the same call for its unbuilt sections, and `aria-disabled` with a title is
- * what tells a screen-reader user the same thing the cursor tells everybody else.
- */
-function Action({ label }: { readonly label: string }) {
-  return (
-    <span
-      aria-disabled="true"
-      title={t.properties.notBuilt}
-      className="inline-flex min-h-10 flex-1 cursor-not-allowed items-center justify-center rounded-lg border border-line px-3 text-[11.5px] text-faint2 lg:min-h-0 lg:py-1.5"
-    >
-      {label}
-    </span>
   );
 }
 

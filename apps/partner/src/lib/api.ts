@@ -158,16 +158,19 @@ const dashboardSchema = z.object({
       deadlineAt: z.string().nullable(),
     }),
   ),
+  /* The whole portfolio's month, aggregated per day — not one unit's. */
   calendar: z
     .object({
-      unitName: z.string(),
-      defaultPrice: z.string(),
+      unitCount: z.number(),
+      propertyCount: z.number(),
+      fromPrice: z.string(),
       currencyCode: z.string(),
       days: z.array(
         z.object({
           date: z.string(),
-          status: z.string(),
-          price: z.string().nullable(),
+          booked: z.number(),
+          blocked: z.number(),
+          available: z.number(),
         }),
       ),
     })
@@ -391,6 +394,95 @@ const propertyImageSchema = z.object({
 });
 
 export type PropertyImage = z.infer<typeof propertyImageSchema>;
+
+/**
+ * ONE listing, with everything تعديل prefills from and التقويم chooses a unit by.
+ *
+ * Every field the form writes is `.nullable()` rather than optional where the column is nullable:
+ * a schema that made an absent description optional would parse a response that lost it, and the
+ * form would render an empty textarea over copy that still exists. Nullable says "the API sent
+ * nothing here" and optional says "the API may not have sent this at all" — only the first is true.
+ */
+const partnerPropertySchema = z.object({
+  reference: z.string(),
+  slug: z.string(),
+  status: z.string(),
+  name: z.object({
+    ar: z.string(),
+    en: z.string().nullable(),
+    de: z.string().nullable(),
+  }),
+  description: z.object({
+    ar: z.string().nullable(),
+    en: z.string().nullable(),
+    de: z.string().nullable(),
+  }),
+  address: z.string(),
+  latitude: z.string().nullable(),
+  longitude: z.string().nullable(),
+  attributes: z.array(z.string()),
+  citySlug: z.string(),
+  cityNameAr: z.string(),
+  propertyTypeCode: z.string(),
+  cancellationPolicyCode: z.string(),
+  reviewNotes: z.string().nullable(),
+  isStructurallyEditable: z.boolean(),
+  units: z.array(
+    z.object({
+      id: z.string(),
+      nameAr: z.string(),
+      unitLabel: z.string().nullable(),
+      maxGuests: z.number(),
+      bedrooms: z.number(),
+      beds: z.number(),
+      bathrooms: z.number(),
+      basePrice: z.string(),
+      currencyCode: z.string(),
+      minNights: z.number(),
+      maxNights: z.number().nullable(),
+      isActive: z.boolean(),
+    }),
+  ),
+});
+
+export type PartnerPropertyDetail = z.infer<typeof partnerPropertySchema>;
+
+export async function getProperty(reference: string) {
+  return partnerFetch(
+    `/partner/properties/${encodeURIComponent(reference)}`,
+    partnerPropertySchema,
+  );
+}
+
+/** One unit's month. The API derives every day, so a quiet month still returns its squares. */
+const calendarDaySchema = z.object({
+  date: z.string(),
+  status: z.string(),
+  price: z.string(),
+  isPriceOverridden: z.boolean(),
+  minNights: z.number(),
+  note: z.string().nullable(),
+});
+
+export type UnitCalendarDay = z.infer<typeof calendarDaySchema>;
+
+/*
+  The API answers `{ unitId, days }`, not a bare array — the envelope is what a mismatched schema
+  costs: `safeParse` fails, `partnerFetch` returns 'failed', and the screen says it could not reach
+  the server while the request sat in the log as a 200. Parsing the real shape is the only way that
+  discrepancy is ever visible.
+*/
+const unitCalendarSchema = z.object({
+  unitId: z.string(),
+  days: z.array(calendarDaySchema),
+});
+
+export async function getUnitCalendar(unitId: string, from: string, to: string) {
+  return partnerFetch(
+    `/partner/units/${encodeURIComponent(unitId)}/calendar?from=${from}&to=${to}`,
+    unitCalendarSchema,
+  );
+}
 
 export async function getPropertyImages(reference: string) {
   return partnerFetch(

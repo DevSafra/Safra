@@ -43,3 +43,8 @@ export function violationKind(kind: string): string {
 export function payoutStatus(status: string): string {
   return t.payoutStatus[status] ?? status.replace(/_/g, ' ');
 }
+
+/** An availability day's state, in Arabic. Unknown values fall back to the raw value. */
+export function dayStatus(status: string): string {
+  return partnerAr.dayStatus[status] ?? status;
+}
