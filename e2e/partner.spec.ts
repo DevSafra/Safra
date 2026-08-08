@@ -107,8 +107,24 @@ test.describe('the partner dashboard', () => {
       ),
     );
 
-    // The calendar drew a real month, not an empty box.
-    await expect(page.locator('ol li').first()).toBeVisible();
+    /*
+      The calendar drew a real month of the WHOLE portfolio, not an empty box and not one unit.
+
+      `data-day-available` is the assertion that matters: it is a COUNT of units still bookable
+      that day, so its presence proves the grid is describing the portfolio. The old grid painted
+      one unit's day status and would satisfy any test that only counted squares.
+    */
+    const days = page.locator('[data-day][data-day-available]');
+
+    await expect(days.first()).toBeVisible();
+    expect(await days.count()).toBeGreaterThanOrEqual(28);
+
+    /* Every square's count is within the portfolio — a negative or excessive one is nonsense. */
+    const counts = await days.evaluateAll((nodes) =>
+      nodes.map((node) => Number(node.getAttribute('data-day-available'))),
+    );
+
+    expect(counts.every((value) => Number.isInteger(value) && value >= 0)).toBe(true);
 
     /*
       «كل واجهة يجب أن تعمل على كل جهاز» — the standing rule, applied to the third app.

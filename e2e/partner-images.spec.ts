@@ -1,7 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { partnerAr as t } from '../packages/i18n/src/partner.js';
-import { PARTNER_BASE as BASE, PARTNER_STATE } from './partner-session.js';
+import { findReference } from './partner-fixtures.js';
+import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
 
 /**
  * معرض صور العقار — the upload pipeline, driven the way a partner drives it.
@@ -41,13 +42,14 @@ test.use({ storageState: PARTNER_STATE });
 /**
  * A listing owned by `partner1`, seeded with no images.
  *
- * The third of the three on purpose: the other partner specs read the first, and a spec that
- * uploads into a listing another spec counts rows on is a spec that fails for reasons in a
- * different file.
+ * Named by SLUG, resolved to a reference at run time. References are database-generated and change
+ * on every reseed — a hard-coded one passed until the seed gained a fixture, then failed as a 404
+ * that looked like a broken screen.
+ *
+ * Deliberately not the listing the other partner specs read: a spec that uploads into a listing
+ * another spec counts rows on is a spec that fails for reasons in a different file.
  */
-const REFERENCE = 'PRO-003297';
-
-const GALLERY = `${BASE}/properties/${REFERENCE}/images`;
+const SLUG = 'qasr-al-sharq-apartments';
 
 /** Every card currently rendered. The manager draws one `<li>` per live image. */
 function cards(page: Page): Locator {
@@ -133,7 +135,9 @@ test.describe('معرض صور العقار', () => {
     /* Registered once for the whole test: accepting an already-handled dialog throws. */
     page.on('dialog', (dialog) => void dialog.accept());
 
-    await page.goto(GALLERY);
+    const reference = await findReference(page, SLUG);
+
+    await page.goto(`${PARTNER_BASE}/properties/${reference}/images`);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await normalise(page);
   });
