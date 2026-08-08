@@ -1322,6 +1322,138 @@ async function report(db: Seeder): Promise<void> {
   console.log(`\n  Partner authenticator secret: ${PARTNER_TOTP_SECRET}`);
   console.log('  Current code:  pnpm partner:code');
   console.log('  (override with TESTBED_PARTNER_TOTP_SECRET)\n');
+
+  await selfCheck(db);
+}
+
+/**
+ * What the seed CLAIMS, checked against what it wrote.
+ *
+ * ## Why this exists
+ *
+ * Three times a fixture has published something the product could never produce, and every one was
+ * found by an unrelated test failing rather than by anybody looking:
+ *
+ * - A listing declared `rating: 4.9, reviewsCount: 118` as literals while a trigger owned both
+ *   columns, so it advertised a score with no reviews behind it.
+ * - A DRAFT listing accumulated ninety days of completed stays and eight reviews, and the trigger
+ *   gave it five stars — on a listing no customer had ever been able to book.
+ * - A browser test depended on an un-reviewed stay that existed only by arithmetic; adding two
+ *   listings closed the gap and broke a spec with no relationship to the change.
+ *
+ * Each was cheap to fix and expensive to find. These assertions run at SEED time, where the cause
+ * and the symptom are still in the same place.
+ *
+ * ## Why it throws rather than warns
+ *
+ * A warning printed after two hundred lines of seed output is a warning nobody reads. A seed that
+ * refuses to finish is one somebody fixes, and the only thing lost is a testbed that was already
+ * lying.
+ */
+async function selfCheck(db: Seeder): Promise<void> {
+  const problems: string[] = [];
+
+  /*
+    Scoped to the seed's OWN listings.
+
+    Integration-test debris lives in the same database and follows a `*-test-*` slug; flagging it
+    here would make the seed refuse to finish over rows it did not write and cannot fix, which
+    turns a useful check into one somebody disables. `O-data-2` is where that debris is dealt with.
+  */
+  const unpublishedWithRating = await db.execute<{ slug: string; rating: string }>(sql`
+    SELECT slug, rating::text AS rating
+    FROM properties
+    WHERE status <> 'published' AND deleted_at IS NULL
+      AND slug NOT LIKE '%-test-%'
+      AND (rating IS NOT NULL OR reviews_count > 0)
+  `);
+
+  for (const row of unpublishedWithRating.rows) {
+    problems.push(
+      `${row.slug} is not published but carries a rating of ${row.rating} — a listing no customer could book cannot have been reviewed`,
+    );
+  }
+
+  const unpublishedWithBookings = await db.execute<{ slug: string; n: string }>(sql`
+    SELECT p.slug, count(*)::text AS n
+    FROM bookings b
+    JOIN properties p ON p.id = b.property_id
+    WHERE p.status <> 'published' AND p.deleted_at IS NULL
+      AND p.slug NOT LIKE '%-test-%'
+    GROUP BY p.slug
+  `);
+
+  for (const row of unpublishedWithBookings.rows) {
+    problems.push(`${row.slug} is not published but has ${row.n} bookings against it`);
+  }
+
+  /* The fixture `e2e/customer-review.spec.ts` needs: exactly one stay waiting to be reviewed. */
+  const pending = await db.execute<{ n: string }>(sql`
+    SELECT count(*)::text AS n
+    FROM bookings b
+    JOIN customer_profiles cp ON cp.id = b.customer_profile_id
+    JOIN users u              ON u.id = cp.user_id
+    WHERE b.status = 'completed'
+      AND lower(u.email) = ${CUSTOMER.email.toLowerCase()}
+      AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.booking_id = b.id)
+  `);
+
+  if (Number(pending.rows[0]?.n ?? 0) < 1) {
+    problems.push(
+      'the fixture customer has no un-reviewed completed stay, so «إقامات بانتظار تقييمك» is empty and the customer review flow is unreachable',
+    );
+  }
+
+  /* Every slug a browser spec names by hand. A rename here breaks a spec three files away. */
+  const NAMED_BY_SPECS = [
+    'qasr-al-sharq-malki',
+    'qasr-al-sharq-apartments',
+    'qasr-al-sharq-lodge',
+    'qasr-al-sharq-rest-house',
+    'coastal-resort',
+  ];
+
+  /*
+    Read the slugs and compare in TypeScript rather than passing an array to `ANY`: drizzle expands
+    a JS array into a positional TUPLE, which is a syntax error against `ANY`. Five string
+    comparisons in memory is not worth a cast that hides that.
+  */
+  const found = await db.execute<{ slug: string }>(sql`
+    SELECT slug FROM properties WHERE deleted_at IS NULL
+  `);
+
+  const present = new Set(found.rows.map((row) => row.slug));
+
+  for (const slug of NAMED_BY_SPECS) {
+    if (!present.has(slug))
+      problems.push(`${slug} is named by a browser spec and was not seeded`);
+  }
+
+  /* A published listing with no unit cannot be booked, so it is not a usable fixture either. */
+  const unbookable = await db.execute<{ slug: string }>(sql`
+    SELECT p.slug FROM properties p
+    WHERE p.status = 'published' AND p.deleted_at IS NULL
+      AND p.slug NOT LIKE '%-test-%'
+      AND NOT EXISTS (
+        SELECT 1 FROM units un WHERE un.property_id = p.id AND un.deleted_at IS NULL
+      )
+  `);
+
+  for (const row of unbookable.rows) {
+    problems.push(
+      `${row.slug} is published with no unit, so nothing on it can be booked`,
+    );
+  }
+
+  if (problems.length > 0) {
+    throw new Error(
+      `The testbed finished but describes something impossible:\n  - ${problems.join('\n  - ')}`,
+    );
+  }
+
+  console.log(
+    `  self-check passed: ${NAMED_BY_SPECS.length} named fixtures present, no listing claims what it cannot have`,
+  );
 }
 
 main().catch((error: unknown) => {
