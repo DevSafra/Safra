@@ -1,3 +1,5 @@
+import { mediaBase, mediaUrl } from '@safra/session';
+
 /**
  * The URL of a listing photo.
  *
@@ -16,9 +18,10 @@
  * 404 and a broken card. The same rule the customer site's `imageUrl()` follows — picking from
  * what was actually rendered.
  */
-const MEDIA_BASE =
-  process.env['NEXT_PUBLIC_MEDIA_URL'] ??
-  `${process.env['API_URL'] ?? 'http://localhost:4000'}/api/v1/media`;
+const MEDIA_BASE = mediaBase({
+  NEXT_PUBLIC_MEDIA_URL: process.env['NEXT_PUBLIC_MEDIA_URL'],
+  API_URL: process.env['API_URL'],
+});
 
 export function coverUrl(
   key: string,
@@ -26,11 +29,5 @@ export function coverUrl(
   desiredWidth = 800,
   format: 'avif' | 'webp' = 'avif',
 ): string {
-  const available = [...variantWidths].sort((a, b) => a - b);
-  const chosen =
-    available.filter((width) => width <= desiredWidth).pop() ??
-    available[0] ??
-    desiredWidth;
-
-  return `${MEDIA_BASE}/${key}-${chosen}.${format}`;
+  return mediaUrl(MEDIA_BASE, { fileKey: key, variantWidths }, desiredWidth, format);
 }

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { mediaBase, mediaUrl } from '@safra/session';
+
 import { CUSTOMER_FACING_METHODS, type CustomerFacingMethod } from '@safra/contracts';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
@@ -147,13 +149,15 @@ export function imageUrl(
   desiredWidth: number,
   format: 'avif' | 'webp' = 'avif',
 ): string {
-  const base = process.env['NEXT_PUBLIC_MEDIA_URL'] ?? `${API_URL}/api/v1/media`;
-
-  const available = [...image.variantWidths].sort((a, b) => a - b);
-  const chosen =
-    available.filter((w) => w <= desiredWidth).pop() ?? available[0] ?? desiredWidth;
-
-  return `${base}/${image.fileKey}-${chosen}.${format}`;
+  return mediaUrl(
+    mediaBase({
+      NEXT_PUBLIC_MEDIA_URL: process.env['NEXT_PUBLIC_MEDIA_URL'],
+      API_URL: process.env['API_URL'],
+    }),
+    image,
+    desiredWidth,
+    format,
+  );
 }
 
 const quoteSchema = z.object({
