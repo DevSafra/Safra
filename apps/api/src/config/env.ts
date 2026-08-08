@@ -28,6 +28,14 @@ export const envSchema = z.object({
 
   APP_URL: z.string().url(),
   ADMIN_URL: z.string().url(),
+  /*
+    Where the partner portal lives, for links inside notices sent to partners.
+
+    Defaulted rather than required so an existing deployment does not fail to boot on an added
+    variable — but a wrong default here is a link a partner cannot follow, so it is in
+    `.env.example` and the deployment checklist rather than left to be discovered.
+  */
+  PARTNER_URL: z.string().url().default('http://localhost:3002'),
 
   DATABASE_URL: z.string().url(),
   DATABASE_POOL_MAX: z.coerce.number().int().positive().max(200).default(20),

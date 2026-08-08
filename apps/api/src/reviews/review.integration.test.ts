@@ -5,6 +5,9 @@ import { createDatabase, type Database } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import type { Env } from '../config/env.js';
+import type { MailService } from '../mail/mail.service.js';
+import { NotificationService } from '../notifications/notification.service.js';
 import { PropertyDetailService } from '../catalog/property-detail.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { ReviewService } from './review.service.js';
@@ -46,7 +49,38 @@ async function refusal(promise: Promise<unknown>): Promise<string> {
 
 describeIfDb('ReviewService', () => {
   const db: Database = createDatabase(DATABASE_URL ?? '', 2);
-  const service = new ReviewService(db, new AuditService(db));
+  /*
+    A REAL `NotificationService` over a stub transport.
+
+    Not a mocked notifier: what these tests need to see is the `notifications` ROW — the delivery
+    log is the auditability half of this feature, and a stub that only counted calls would leave
+    it unwritten and unasserted. The mail transport is stubbed because SMTP is not the subject; a
+    send that throws is exercised separately to prove a failed notice still gets recorded.
+  */
+  const sentMail: { to: string; subject: string; text: string }[] = [];
+  /* Set by the test that proves a failed send is still recorded; cleared after each one. */
+  let failNextSend = false;
+  const mail = {
+    send: (message: { to: string; subject: string; text: string }) => {
+      if (failNextSend) {
+        failNextSend = false;
+
+        return Promise.reject(
+          new Error('SMTP refused the message for host@example.test'),
+        );
+      }
+
+      sentMail.push(message);
+
+      return Promise.resolve();
+    },
+  } as unknown as MailService;
+
+  const notifications = new NotificationService(db, mail);
+  const service = new ReviewService(db, new AuditService(db), notifications, {
+    APP_URL: 'http://localhost:3000',
+    PARTNER_URL: 'http://localhost:3002',
+  } as unknown as Env);
   /*
     A real settings service. `PropertyDetailService` reads the customer fee through it, and the fee
     is not what these tests are about — but stubbing it would mean the public read here diverged
@@ -732,6 +766,134 @@ describeIfDb('ReviewService', () => {
       await service.report(partner(), reference, 'Describes a different property.');
 
       expect(await propertyRating()).toMatchObject({ rating: '4.0', n: 1 });
+    });
+  });
+  /**
+   * Telling people, and being able to prove we told them.
+   *
+   * ## Why the LOG is the assertion, not the send
+   *
+   * A partner is fined and loses score for not answering a booking request in time (§6.4). The
+   * first question when they dispute that is "was I ever told?", and until `notifications` had
+   * rows written to it there was no way to answer. So what these assert is the row: the template,
+   * the locale, the subject, and the outcome — including when the outcome is failure.
+   *
+   * ## And the visibility rule
+   *
+   * A notice reaches exactly one person, derived from the record being acted on. A guest writing a
+   * review cannot cause mail to reach anybody but their host; a partner replying cannot address
+   * anybody but the guest who wrote the review. Both are asserted by counting rows against the
+   * subject ids rather than by trusting the code path.
+   */
+  describe('notifications', () => {
+    const logFor = async (templateKey: string) =>
+      (
+        await db.execute<{
+          template_key: string;
+          locale: string;
+          status: string;
+          partner_id: string | null;
+          customer_profile_id: string | null;
+          booking_id: string | null;
+        }>(sql`
+          SELECT template_key, locale, status::text AS status,
+                 partner_id, customer_profile_id, booking_id
+          FROM notifications
+          WHERE template_key = ${templateKey}
+          ORDER BY queued_at DESC
+          LIMIT 1
+        `)
+      ).rows[0];
+
+    it('tells the host a review arrived, and records that it did', async () => {
+      sentMail.length = 0;
+
+      await write(4);
+
+      const row = await logFor('review.received');
+
+      expect(row?.status).toBe('sent');
+      /* Addressed to the host of the booking, not to anybody the caller named. */
+      expect(row?.partner_id).toBe(partnerId);
+      expect(sentMail).toHaveLength(1);
+    });
+
+    /*
+      The email says P-006 out loud. A host who learns of a review by email and then finds no
+      delete button reads that as the product failing them; told in the same message that nobody
+      can remove a review and that a reply is the answer, they know what to do with it.
+    */
+    it('tells the host what they can and cannot do about it', async () => {
+      sentMail.length = 0;
+
+      await write(2, 'لم تكن الإقامة كما توقعت.');
+
+      expect(sentMail[0]?.text).toContain('P-006');
+      expect(sentMail[0]?.text).toContain('/reviews');
+    });
+
+    it('tells the guest when the host replies, and never the other way round', async () => {
+      const created = await write(5);
+
+      sentMail.length = 0;
+
+      await service.reply(partner(), created.reference, 'شكرًا لإقامتك معنا.');
+
+      const row = await logFor('review.replied');
+
+      expect(row?.status).toBe('sent');
+      /* The guest's profile, taken from the review — the partner supplied only the text. */
+      expect(row?.customer_profile_id).not.toBeNull();
+      expect(sentMail).toHaveLength(1);
+    });
+
+    it("writes the notice in the recipient's own language", async () => {
+      await db.execute(sql`
+        UPDATE users SET preferred_locale = 'de'
+        WHERE id = (SELECT user_id FROM partners WHERE id = ${partnerId})
+      `);
+
+      sentMail.length = 0;
+
+      await write(5);
+
+      const row = await logFor('review.received');
+
+      expect(row?.locale).toBe('de');
+      expect(sentMail[0]?.subject).toContain('Neue Bewertung');
+
+      await db.execute(sql`
+        UPDATE users SET preferred_locale = 'ar'
+        WHERE id = (SELECT user_id FROM partners WHERE id = ${partnerId})
+      `);
+    });
+
+    /**
+     * The review is the fact; the notice is a consequence.
+     *
+     * A mail server that is down must not stop a guest writing a review — and the failure must be
+     * VISIBLE, because "we tried and could not reach them" is a different answer from "we never
+     * tried" when a partner disputes a fine.
+     */
+    it('saves the review even when the notice cannot be sent, and records the failure', async () => {
+      failNextSend = true;
+
+      const created = await write(5);
+
+      expect(created.reference).toMatch(/^REV-\d{6}$/);
+
+      const row = await logFor('review.received');
+
+      expect(row?.status).toBe('failed');
+
+      const failure = await db.execute<{ failure_reason: string | null }>(sql`
+        SELECT failure_reason FROM notifications
+        WHERE template_key = 'review.received' ORDER BY queued_at DESC LIMIT 1
+      `);
+
+      expect(failure.rows[0]?.failure_reason).toBeTruthy();
+      /* Never the recipient: this table is read by more people than the database. */
+      expect(failure.rows[0]?.failure_reason).not.toContain('@');
     });
   });
 });

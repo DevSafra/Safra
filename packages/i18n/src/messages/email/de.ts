@@ -16,4 +16,17 @@ export const de = {
     subject: 'Einladung zur SAFRA-Administrationskonsole',
     body: 'Sie wurden zur SAFRA-Administrationskonsole eingeladen als: {roleLabel}.\n\nÖffnen Sie diesen Link, um Ihr Passwort festzulegen:\n{url}\n\nDer Link läuft in {expiresInHours} Stunden ab und ist einmal verwendbar.\n\nNach dem Festlegen des Passworts müssen Sie die Zwei-Faktor-Authentifizierung aktivieren, bevor das Konto genutzt werden kann.\n\nFalls Sie diese Einladung nicht erwartet haben, öffnen Sie den Link nicht und informieren Sie das SAFRA-Team.\n\nIhr SAFRA-Team',
   },
+
+  reviewReceived: {
+    subject: 'Neue Bewertung für {property} — SAFRA',
+    body: 'Ein Gast, der in {property} übernachtet hat, hat eine Bewertung hinterlassen.\n\nBewertung: {rating} von 5\n\nSie können sie in Ihrem Partner-Dashboard lesen und beantworten:\n{url}\n\nIhre Antwort erscheint öffentlich unter der Bewertung. Eine Bewertung kann weder gelöscht noch geändert werden — weder vom Gast noch von SAFRA (Grundsatz P-006) — eine Antwort ist daher die einzige Möglichkeit, Ihre Sicht darzustellen.\n\nIhr SAFRA-Team',
+  },
+  reviewReplied: {
+    subject: 'Der Gastgeber hat auf Ihre Bewertung von {property} geantwortet — SAFRA',
+    body: 'Der Gastgeber hat auf Ihre Bewertung von {property} geantwortet.\n\nSie können die Antwort auf der Unterkunftsseite lesen:\n{url}\n\nIhr SAFRA-Team',
+  },
+  bookingNeedsAction: {
+    subject: 'Eine Buchung wartet auf Sie — {reference}',
+    body: 'Eine neue Buchungsanfrage wartet auf Ihre Entscheidung.\n\nReferenz: {reference}\nUnterkunft: {property}\nAnreise: {checkIn}\nAbreise: {checkOut}\n\nSie haben bis {deadline} Zeit zu antworten. Eine Anfrage, die bis dahin unbeantwortet bleibt, wird automatisch storniert und ein Verstoß wegen "keine Antwort" wird Ihrem Konto zugeordnet.\n\nAnfrage hier öffnen:\n{url}\n\nIhr SAFRA-Team',
+  },
 } as const;

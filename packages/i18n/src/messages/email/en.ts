@@ -16,4 +16,17 @@ export const en = {
     subject: 'You have been invited to the SAFRA admin console',
     body: 'You have been invited to the SAFRA admin console as: {roleLabel}.\n\nOpen this link to set your password:\n{url}\n\nThe link expires in {expiresInHours} hours and can be used once.\n\nAfter setting a password you will be required to enable two-factor authentication before the account can be used.\n\nIf you were not expecting this invitation, do not open the link and tell the SAFRA team.\n\nThe SAFRA team',
   },
+
+  reviewReceived: {
+    subject: 'New review for {property} — SAFRA',
+    body: 'A guest who stayed at {property} has left a review.\n\nRating: {rating} out of 5\n\nYou can read it and reply from your partner dashboard:\n{url}\n\nYour reply appears publicly beneath the review. A review cannot be deleted or edited — not by the guest and not by SAFRA (principle P-006) — so replying is the only way to put your side.\n\nThe SAFRA team',
+  },
+  reviewReplied: {
+    subject: 'The host replied to your review of {property} — SAFRA',
+    body: 'The host has replied to the review you wrote about {property}.\n\nYou can read the reply on the property page:\n{url}\n\nThe SAFRA team',
+  },
+  bookingNeedsAction: {
+    subject: 'A booking is waiting for you — {reference}',
+    body: 'You have a new booking request waiting for your decision.\n\nReference: {reference}\nProperty: {property}\nCheck-in: {checkIn}\nCheck-out: {checkOut}\n\nYou have until {deadline} to respond. A request left unanswered past that time is cancelled automatically and a "no response" violation is recorded against your account.\n\nOpen the request here:\n{url}\n\nThe SAFRA team',
+  },
 } as const;

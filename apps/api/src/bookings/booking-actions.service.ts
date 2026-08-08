@@ -4,6 +4,9 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { ENV, type Env } from '../config/env.js';
+import { bookingNeedsActionMail } from '../mail/mail.templates.js';
+import { NotificationService } from '../notifications/notification.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { MONEY_SCALE, toMinor } from '../common/money.js';
 import { DATABASE } from '../database/database.module.js';
@@ -31,6 +34,8 @@ export class BookingActionsService {
     private readonly audit: AuditService,
     private readonly ledger: LedgerService,
     private readonly wallet: WalletService,
+    private readonly notifications: NotificationService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   /**
@@ -80,7 +85,7 @@ export class BookingActionsService {
       120,
     );
 
-    return this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx) => {
       await tx.execute(sql`
         UPDATE bookings
         SET status = 'pending_confirmation',
@@ -173,6 +178,74 @@ export class BookingActionsService {
         ledgerEntryGroup: entryGroupId,
       };
     });
+
+    /*
+      The partner is told AFTER the money has moved and the transaction has committed.
+
+      This is the notice `S-2` was about: a partner is fined and loses score for not answering
+      within the window (§6.4), and until now the only way to learn a request existed was to be
+      looking at the dashboard. Fining somebody for missing a message nobody sent them is not a
+      rule, it is a trap.
+
+      Sent outside the transaction on purpose — a mail server that hung would otherwise hold open a
+      transaction that has just written ledger entries.
+    */
+    await this.notifyPartnerOfPendingBooking(booking.id);
+
+    return result;
+  }
+
+  /**
+   * Tells the partner a paid booking is waiting for their decision.
+   *
+   * The recipient is derived from the BOOKING's own partner, and the deadline from the row that
+   * was just written — not from anything a caller passed in. A webhook cannot address this notice.
+   *
+   * Failure is contained by `NotificationService`: a booking that is paid and pending must not be
+   * undone because an email bounced, and the failed attempt is recorded rather than thrown.
+   */
+  private async notifyPartnerOfPendingBooking(bookingId: string): Promise<void> {
+    const found = await this.db.execute<{
+      email: string | null;
+      locale: string | null;
+      partner_id: string;
+      reference: string;
+      property_name: string | null;
+      check_in: string;
+      check_out: string;
+      deadline: string | null;
+    }>(sql`
+      SELECT u.email, u.preferred_locale AS locale, pa.id AS partner_id,
+             b.reference, pr.name_ar AS property_name,
+             b.check_in::text AS check_in, b.check_out::text AS check_out,
+             to_char(b.confirmation_deadline_at AT TIME ZONE 'UTC',
+                     'YYYY-MM-DD HH24:MI') AS deadline
+      FROM bookings b
+      JOIN partners pa   ON pa.id = b.partner_id
+      JOIN users u       ON u.id = pa.user_id
+      JOIN properties pr ON pr.id = b.property_id
+      WHERE b.id = ${bookingId} AND u.status = 'active'
+    `);
+
+    const row = found.rows[0];
+
+    if (!row?.email) return;
+
+    await this.notifications.notify(
+      'booking.needs_action',
+      bookingNeedsActionMail({
+        to: row.email,
+        locale: row.locale ?? 'ar',
+        reference: row.reference,
+        property: row.property_name ?? '',
+        checkIn: row.check_in,
+        checkOut: row.check_out,
+        deadline: row.deadline ?? '',
+        url: `${this.env.PARTNER_URL}/`,
+      }),
+      row.locale ?? 'ar',
+      { bookingId, partnerId: row.partner_id },
+    );
   }
 
   /**

@@ -7,6 +7,9 @@ import { createDatabase, type Database } from '@safra/db';
 
 import { BookingAccessService } from '../bookings/booking-access.service.js';
 import { BookingActionsService } from '../bookings/booking-actions.service.js';
+
+/* Set by the test proving a failed notice still records, and consumed by the stub transport. */
+let failNextNotification = false;
 import { SlaService } from '../bookings/sla.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { PaymentIntentService } from './payment-intent.service.js';
@@ -19,6 +22,9 @@ import { ManualTransferProvider } from './providers/manual-transfer.provider.js'
 // PAYMENT_SIMULATOR_ENABLED is set, which is exactly the behaviour under test.
 import { signSimulatorPayload } from './providers/simulator.provider.js';
 import { MoneySettingsService } from '../settings/money-settings.service.js';
+import type { Env } from '../config/env.js';
+import type { MailService } from '../mail/mail.service.js';
+import { NotificationService } from '../notifications/notification.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { AuditService } from '../common/audit/audit.service.js';
@@ -118,7 +124,32 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
     wallet = new WalletService(db, fx);
 
-    actions = new BookingActionsService(db, settings, audit, ledger, wallet);
+    /*
+      A real `NotificationService` over a stub transport: `markPaid` now tells the partner their
+      booking is waiting, and the delivery LOG is part of what these tests describe. A mocked
+      notifier would leave the `notifications` row unwritten and the assertion below meaningless.
+    */
+    const mail = {
+      send: () => {
+        if (failNextNotification) {
+          failNextNotification = false;
+
+          return Promise.reject(new Error('SMTP unavailable'));
+        }
+
+        return Promise.resolve();
+      },
+    } as unknown as MailService;
+
+    actions = new BookingActionsService(
+      db,
+      settings,
+      audit,
+      ledger,
+      wallet,
+      new NotificationService(db, mail),
+      { PARTNER_URL: 'http://localhost:3002' } as unknown as Env,
+    );
 
     /**
      * A REAL MoneySettingsService over the stubbed settings and the throwing FX.
@@ -241,6 +272,62 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       const legs = await ledgerLegs(db, booking.id);
       expect(legs.count).toBe(4);
       expect(legs.balanced).toBe(true);
+    });
+
+    /**
+     * `S-2`: the partner is TOLD their booking is waiting.
+     *
+     * §6.4 fines a partner and cuts their score for not answering inside the confirmation window.
+     * Until this row existed, the only way to learn a request had arrived was to be looking at the
+     * dashboard — so the penalty applied to people who were never told, and there was no record
+     * either way when they disputed it.
+     *
+     * Asserted on the `notifications` ROW rather than on the send, because the row is the thing
+     * that answers the dispute months later.
+     */
+    it('tells the partner the booking is waiting, and records that it did', async () => {
+      const ref = `sim_${booking.id}`;
+      await openPayment(db, booking.id, ref);
+
+      expect(await deliver(webhooks, eventId(), ref)).toBe('accepted');
+
+      const notice = await db.execute<{
+        template_key: string;
+        status: string;
+        partner_id: string | null;
+        booking_id: string | null;
+      }>(sql`
+        SELECT template_key, status::text AS status, partner_id, booking_id
+        FROM notifications
+        WHERE booking_id = ${booking.id} AND template_key = 'booking.needs_action'
+      `);
+
+      expect(notice.rows).toHaveLength(1);
+      expect(notice.rows[0]?.status).toBe('sent');
+      /* Addressed to the booking's own partner — a webhook cannot redirect it. */
+      expect(notice.rows[0]?.partner_id).toBeTruthy();
+    });
+
+    /*
+      A booking that is paid must stay paid even if nobody could be told about it. The money has
+      moved and the ledger is written; an unreachable mail server is not a reason to unwind that.
+    */
+    it('captures the payment even when the notice cannot be sent', async () => {
+      const ref = `sim_${booking.id}`;
+      await openPayment(db, booking.id, ref);
+
+      failNextNotification = true;
+
+      expect(await deliver(webhooks, eventId(), ref)).toBe('accepted');
+      expect(await bookingStatus(db, booking.id)).toBe('pending_confirmation');
+
+      const notice = await db.execute<{ status: string }>(sql`
+        SELECT status::text AS status FROM notifications
+        WHERE booking_id = ${booking.id} AND template_key = 'booking.needs_action'
+        ORDER BY queued_at DESC LIMIT 1
+      `);
+
+      expect(notice.rows[0]?.status).toBe('failed');
     });
 
     /**

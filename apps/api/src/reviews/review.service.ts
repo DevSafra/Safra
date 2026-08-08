@@ -14,6 +14,9 @@ import {
 } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { ENV, type Env } from '../config/env.js';
+import { reviewReceivedMail, reviewRepliedMail } from '../mail/mail.templates.js';
+import { NotificationService } from '../notifications/notification.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -60,7 +63,17 @@ export class ReviewService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
+
+  private get partnerUrl(): string {
+    return this.env.PARTNER_URL;
+  }
+
+  private get appUrl(): string {
+    return this.env.APP_URL;
+  }
 
   /**
    * A guest writing about a stay.
@@ -120,7 +133,7 @@ export class ReviewService {
     */
     if (row.already) throw conflict(ERROR.REVIEW_ALREADY_WRITTEN);
 
-    return this.db.transaction(async (tx) => {
+    const created = await this.db.transaction(async (tx) => {
       const inserted = await tx.execute<{ id: string; reference: string }>(sql`
         INSERT INTO reviews (booking_id, property_id, unit_id, partner_id,
                              customer_profile_id, rating, body)
@@ -143,8 +156,64 @@ export class ReviewService {
         tx as unknown as Database,
       );
 
-      return { reference: review?.reference ?? '', rating: input.rating };
+      return { reference: review?.reference ?? '' };
     });
+
+    /*
+      AFTER the commit, and outside the transaction.
+
+      Inside it, a mail server that hung would hold a database transaction open for the duration,
+      and a send that succeeded before a later rollback would have told the partner about a review
+      that does not exist. The review is the fact; the notice is a consequence of it.
+    */
+    await this.notifyPartnerOfReview(row.partner_id, row.property_id, input.rating);
+
+    return { reference: created.reference, rating: input.rating };
+  }
+
+  /**
+   * Tells the partner a review arrived.
+   *
+   * The recipient is derived from the review's OWN partner id — the one just written, taken from
+   * the booking — never from anything the caller supplied. That is the visibility rule: a customer
+   * writing a review cannot cause an email to reach anybody except the host they stayed with.
+   *
+   * A partner with no email, or one whose account is closed, is skipped silently. There is nothing
+   * the guest should be told about the host's mailbox.
+   */
+  private async notifyPartnerOfReview(
+    partnerId: string,
+    propertyId: string,
+    rating: number,
+  ): Promise<void> {
+    const found = await this.db.execute<{
+      email: string | null;
+      locale: string | null;
+      property_name: string | null;
+    }>(sql`
+      SELECT u.email, u.preferred_locale AS locale, pr.name_ar AS property_name
+      FROM partners pa
+      JOIN users u      ON u.id = pa.user_id
+      JOIN properties pr ON pr.id = ${propertyId}
+      WHERE pa.id = ${partnerId} AND u.status = 'active'
+    `);
+
+    const row = found.rows[0];
+
+    if (!row?.email) return;
+
+    await this.notifications.notify(
+      'review.received',
+      reviewReceivedMail({
+        to: row.email,
+        locale: row.locale ?? 'ar',
+        property: row.property_name ?? '',
+        rating,
+        url: `${this.partnerUrl}/reviews`,
+      }),
+      row.locale ?? 'ar',
+      { partnerId },
+    );
   }
 
   /**
@@ -344,7 +413,7 @@ export class ReviewService {
 
     if (review.partner_reply) throw conflict(ERROR.REVIEW_ALREADY_REPLIED);
 
-    return this.db.transaction(async (tx) => {
+    const replied = await this.db.transaction(async (tx) => {
       await tx.execute(sql`
         UPDATE reviews
         SET partner_reply = ${replyText}, partner_replied_at = now(), updated_at = now()
@@ -364,6 +433,72 @@ export class ReviewService {
 
       return { replied: true as const };
     });
+
+    /*
+      The guest is told AFTER the reply is committed, for the same reason the partner is told after
+      the review is: the reply is the fact, and an email about a reply that then rolled back is
+      worse than a late email.
+    */
+    await this.notifyCustomerOfReply(reference, partnerId);
+
+    return replied;
+  }
+
+  /**
+   * Tells the guest their host replied.
+   *
+   * The recipient comes from the REVIEW's own `customer_profile_id`, which came from the booking.
+   * A partner replying cannot address the notice to anybody else — they supply the text and
+   * nothing about who reads it.
+   *
+   * The link points at the public property page rather than at the review: the reply is published
+   * there, which is where the guest can see it in the context every other reader sees it in.
+   */
+  private async notifyCustomerOfReply(
+    reference: string,
+    partnerId: string,
+  ): Promise<void> {
+    const found = await this.db.execute<{
+      email: string | null;
+      locale: string | null;
+      slug: string | null;
+      property_name: string | null;
+      customer_profile_id: string | null;
+      booking_id: string | null;
+    }>(sql`
+      SELECT u.email, u.preferred_locale AS locale,
+             pr.slug, pr.name_ar AS property_name,
+             r.customer_profile_id, r.booking_id
+      FROM reviews r
+      JOIN customer_profiles cp ON cp.id = r.customer_profile_id
+      JOIN users u              ON u.id = cp.user_id
+      JOIN properties pr        ON pr.id = r.property_id
+      WHERE r.reference = ${reference}
+        AND r.partner_id = ${partnerId}
+        AND u.status = 'active'
+    `);
+
+    const row = found.rows[0];
+
+    if (!row?.email) return;
+
+    await this.notifications.notify(
+      'review.replied',
+      reviewRepliedMail({
+        to: row.email,
+        locale: row.locale ?? 'ar',
+        property: row.property_name ?? '',
+        url: `${this.appUrl}/${row.locale ?? 'ar'}/property/${row.slug ?? ''}`,
+      }),
+      row.locale ?? 'ar',
+      {
+        partnerId,
+        ...(row.customer_profile_id
+          ? { customerProfileId: row.customer_profile_id }
+          : {}),
+        ...(row.booking_id ? { bookingId: row.booking_id } : {}),
+      },
+    );
   }
 
   /**

@@ -132,3 +132,80 @@ export function staffInvitationMail(input: {
     }),
   };
 }
+
+/**
+ * A guest has reviewed one of the partner's listings.
+ *
+ * The email says P-006 out loud. A partner learning about a review by email and finding no delete
+ * button reads that as the product failing them; told in the same message that nobody can remove a
+ * review — not the guest, not SAFRA — and that a reply is the answer, they know what to do with it.
+ */
+export function reviewReceivedMail(input: {
+  to: string;
+  locale: string;
+  property: string;
+  rating: number;
+  url: string;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).reviewReceived;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { property: input.property }),
+    text: fill(copy.body, {
+      property: input.property,
+      rating: input.rating,
+      url: input.url,
+    }),
+  };
+}
+
+/** The host has replied to a review the customer wrote. */
+export function reviewRepliedMail(input: {
+  to: string;
+  locale: string;
+  property: string;
+  url: string;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).reviewReplied;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { property: input.property }),
+    text: fill(copy.body, { property: input.property, url: input.url }),
+  };
+}
+
+/**
+ * A booking is waiting for the partner's decision.
+ *
+ * Carries the DEADLINE, because the consequence of missing it is a fine and a score penalty
+ * (§6.4). A notice that said only "you have a booking" would leave the partner to discover the
+ * clock from the dashboard, and the whole point of the email is reaching somebody who is not
+ * looking at the dashboard.
+ */
+export function bookingNeedsActionMail(input: {
+  to: string;
+  locale: string;
+  reference: string;
+  property: string;
+  checkIn: string;
+  checkOut: string;
+  deadline: string;
+  url: string;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).bookingNeedsAction;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { reference: input.reference }),
+    text: fill(copy.body, {
+      reference: input.reference,
+      property: input.property,
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+      deadline: input.deadline,
+      url: input.url,
+    }),
+  };
+}

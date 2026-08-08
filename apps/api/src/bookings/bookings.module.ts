@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { MailService } from '../mail/mail.service.js';
+import { NotificationService } from '../notifications/notification.service.js';
 import { FxModule } from '../fx/fx.module.js';
 import { IdempotencyService } from '../common/idempotency/idempotency.service.js';
 import { BookingAccessService } from './booking-access.service.js';
@@ -26,6 +28,9 @@ import { WalletModule } from '../wallet/wallet.module.js';
     SlaService,
     IdempotencyService,
     AuditService,
+    /* markPaid tells the partner their booking is waiting — see `S-2`. */
+    NotificationService,
+    MailService,
   ],
   exports: [
     BookingsService,
