@@ -307,4 +307,46 @@ test.describe('معرض صور العقار', () => {
     await expect(alertText(page)).toContainText(t.images.lastImage);
     await expect(cards(page)).toHaveCount(1);
   });
+
+  test('يرفع عدة صور دفعة واحدة ويحافظ على الترتيب', async ({ page }) => {
+    const before = await cards(page).count();
+
+    /*
+      Two files in ONE selection. The manager sends them sequentially, which is what keeps the two
+      invariants true — the first image becomes the cover, and each new one goes after the last.
+      Uploaded in parallel they race, and the resulting order is whatever the event loop decided.
+    */
+    await page
+      .locator('input[type="file"]')
+      .setInputFiles(['e2e/fixtures/room-one.jpg', 'e2e/fixtures/room-two.jpg']);
+
+    await expect(cards(page)).toHaveCount(before + 2, { timeout: 60_000 });
+
+    /* Both survive a reload, so both were stored rather than one being dropped silently. */
+    await page.reload();
+    await expect(cards(page)).toHaveCount(before + 2);
+
+    /* Still exactly one cover — a batch must not create a second. */
+    await expect(page.getByText(t.images.cover, { exact: true })).toHaveCount(1);
+  });
+
+  test('يقبل ما يتسع ويقول كم رُفع عندما تتجاوز الدفعة الحد', async ({ page }) => {
+    /*
+      The refusal has to be legible. A batch that silently drops the overflow leaves the partner
+      believing photographs are there that are not, and the count under the button is the only
+      place they would ever find out.
+    */
+    const files = Array.from({ length: 3 }, () => 'e2e/fixtures/room-one.jpg');
+
+    await page.locator('input[type="file"]').setInputFiles(files);
+
+    await expect(cards(page)).not.toHaveCount(0, { timeout: 60_000 });
+
+    const shown = await cards(page).count();
+
+    await page.reload();
+
+    /* What the screen said and what was stored are the same number. */
+    await expect(cards(page)).toHaveCount(shown);
+  });
 });

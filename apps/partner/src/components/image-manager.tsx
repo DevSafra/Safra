@@ -87,33 +87,73 @@ export function ImageManager({
     }
   }
 
-  async function upload(file: File) {
-    if (busy) return;
+  /**
+   * Uploads a selection, ONE REQUEST AT A TIME.
+   *
+   * ## Why sequential and not parallel
+   *
+   * Each upload decodes, resizes and re-encodes six variants with sharp, so ten at once is ten
+   * concurrent libvips jobs on the API — and the endpoint's own throttle is twenty a minute
+   * precisely because the work is heavy. Sequential also makes the two invariants hold: the FIRST
+   * image becomes the cover, and each new one goes after the last. Both are computed from the rows
+   * that exist when the request arrives, so parallel uploads race and the resulting order is
+   * whatever the event loop decided.
+   *
+   * ## Why a partial failure is reported rather than rolled back
+   *
+   * Seven of ten succeeding is seven photographs the partner does not have to pick again. The
+   * message names how many landed, so the screen and the gallery agree; silently stopping would
+   * leave them re-uploading files that are already there.
+   */
+  async function upload(files: readonly File[]) {
+    if (busy || files.length === 0) return;
 
     setBusy(true);
     setError(null);
 
-    const body = new FormData();
-    body.append('file', file);
+    const room = MAX - images.length;
+    const accepted = files.slice(0, Math.max(0, room));
 
-    try {
-      const response = await fetch(`/api/properties/${reference}/images`, {
-        method: 'POST',
-        body,
-      });
+    if (accepted.length === 0) {
+      setError(fill(t.images.limitReached, { max: count(MAX) }));
+      setBusy(false);
+      return;
+    }
 
-      if (!response.ok) {
-        setError(t.images.uploadFailed);
+    let done = 0;
+
+    for (const file of accepted) {
+      const body = new FormData();
+      body.append('file', file);
+
+      try {
+        const response = await fetch(`/api/properties/${reference}/images`, {
+          method: 'POST',
+          body,
+        });
+
+        if (!response.ok) break;
+
+        done += 1;
+      } catch {
+        setError(t.images.unreachable);
         setBusy(false);
+        router.refresh();
         return;
       }
-
-      router.refresh();
-      setBusy(false);
-    } catch {
-      setError(t.images.unreachable);
-      setBusy(false);
     }
+
+    if (done < files.length) {
+      setError(
+        fill(t.images.uploadedSome, {
+          done: count(done),
+          total: count(files.length),
+        }),
+      );
+    }
+
+    router.refresh();
+    setBusy(false);
   }
 
   /** Swap with the neighbour and send the WHOLE order — see `propertyImageOrderSchema`. */
@@ -155,13 +195,15 @@ export function ImageManager({
           {busy ? t.images.uploading : t.images.upload}
           <input
             type="file"
+            /* A gallery is filled in one go, not one file at a time. */
+            multiple
             accept="image/jpeg,image/png,image/webp,image/avif"
             className="sr-only"
             disabled={busy || images.length >= MAX}
             onChange={(event) => {
-              const file = event.target.files?.[0];
+              const chosen = [...(event.target.files ?? [])];
 
-              if (file) void upload(file);
+              if (chosen.length > 0) void upload(chosen);
               /* Cleared so re-picking the same file fires `change` again. */
               event.target.value = '';
             }}
