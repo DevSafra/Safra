@@ -178,6 +178,8 @@ perfection — §10 records the residual security risk honestly.
 | **Dashboard calendar covers the whole portfolio** — it drew one unit chosen by creation date, on the screen a partner opens every morning; now booked/closed/open per day, in thirty-one rows whatever the portfolio size                                                                                                                                                                   | 2026-08-08    |
 | **Notifications for three events** (`S-2` closed) — partner told a booking is waiting with its deadline; partner told a review arrived; guest told the host replied. Every send recorded in `notifications`, which nothing had ever written to                                                                                                                                              | 2026-08-08    |
 | **Seed fixture falsehoods removed** — a draft listing was carrying 5.0 stars from eight stays it could never have had, because bulk bookings and reviews were generated against listings that were never bookable                                                                                                                                                                           | 2026-08-08    |
+| **16 of 22 integration suites roll back** — one connection, `BEGIN`/`ROLLBACK` per test, savepoints for nested transactions. Payout debris that no `afterAll` could ever remove is now zero                                                                                                                                                                                                 | 2026-08-08    |
+| **Arabic plurals on CLDR categories** in the customer app — `=1`/`=2`/`other` put 11–99 in the plural where Arabic takes the singular, on the range a result count most often lands in                                                                                                                                                                                                      | 2026-08-08    |
 
 ### 🏗 Hosting-dependent — waiting on roadmap item 193
 
@@ -401,25 +403,40 @@ should be hidden.
 
 **Owner:** engineering, next time it appears.
 
-### O-i18n-3 — «4 ليلة» is not Arabic, and the fix is ICU
+### O-i18n-3 — Closed for the customer app: Arabic plurals use CLDR categories
 
-**What:** The booking detail's stay line reads `{nights} ليلة`, which is correct for one night and
-wrong for four — Arabic has six plural categories and `ليلة` is the singular. The catalogue already
-notes why it is not built with a conditional (`{n} night{n === 1 ? '' : 's'}` is English grammar
-written into a component), but "read the count as a value" only avoids the bug for phrasings that
-do not need agreement, and this one does.
+**Closed 2026-08-08 for `apps/web`.** Every count-bearing message in the customer catalogue now
+selects on the CLDR plural category rather than on an exact value.
 
-**Why it can wait:** it reads as slightly clumsy, not as wrong information, and the console is
-staff-only and Arabic-only. Nothing operational turns on it.
+**What was actually wrong.** Several messages already used ICU, with `=1`, `=2` and `other`. That
+looks complete and is not: Arabic has six categories and the boundaries are not where an English
+speaker puts them.
 
-**What fixes it:** ICU plural selection (`{nights, plural, one {ليلة} two {ليلتان} few {ليالٍ}
-many {ليلة} other {ليلة}}`), which the customer app's `next-intl` already supports and the console's
-`fill()` deliberately does not — `fill()` is a placeholder substituter, and teaching it plural rules
-would make it a small translation library. The likely shape is to move the console onto the same
-message loader as the customer app when it gains a second language (see `O-i18n-1`), and to do
-plurals once, there.
+- 3–10 is `few`, and takes the broken plural — «٥ ضيوف».
+- **11–99 is `many`, and takes the SINGULAR** — «١٥ ضيفًا», never «١٥ ضيوف».
+- 100 and above is `other`, singular again.
 
-**Owner:** engineering, alongside `O-i18n-1`. Not blocking.
+With only `=1`/`=2`/`other`, everything from three upward fell into one case, so either 3–10 or
+11–99 had to be wrong. It was 11–99 — the range a real result count lands in most often. Four more
+messages had no plural at all and simply carried one hard-coded form.
+
+**Pinned by two tests that can see the difference.** `plurals.test.ts` renders each message through
+`IntlMessageFormat` — the same formatter `next-intl` uses — at 1, 2, 3, 15 and 100, and asserts five
+DISTINCT strings; a collapsed category shows up as a duplicate. A second test fails any Arabic plural
+that omits `few` or `many`, which is exactly the shape produced by translating the English string
+instead of the meaning.
+
+**And one in a browser,** because the unit test cannot see the failure that matters most: a component
+that formats the count to Arabic-Indic digits BEFORE handing it to `t()` makes every message fall to
+`other` silently, since `Intl.PluralRules` has nothing numeric to classify. Every category still
+exists, every unit test still passes, and every reader sees the singular.
+
+**Still open — the STAFF CONSOLE.** `apps/admin` builds copy with `fill()`, a placeholder substituter
+that deliberately does not know plural rules; teaching it would make it a small translation library.
+The booking detail's «{nights} ليلة» is still wrong for four nights. The fix is to move the console
+onto the same message loader as the customer app, which is `O-i18n-1`'s work and waits for the
+console to gain a second language. It reads as clumsy rather than as wrong information, and the
+console is staff-only. **Owner:** engineering, alongside `O-i18n-1`.
 
 ### O-i18n-4 — Closed: the console's English copy is in the catalogue, and a test keeps it there
 
@@ -557,48 +574,62 @@ reset → seed cycle was run to confirm it.
 `partner_payouts` was missed — caught `scheduled_job_runs`, which had been added hours earlier and
 not registered. The guard doing its job on the person who wrote it.
 
-### O-data-2 — The integration suite repopulates the database it runs against
+### O-data-2 — Mostly closed: 16 of 22 integration suites now roll back
 
-**What:** `pnpm vitest run` with `DATABASE_URL` set creates real rows and does not remove them.
-A single full run adds roughly 100 users and 37 partners. Left alone this accumulates: the
-database on 2026-08-06 held **12,297 users** (2,262 of them super admins), 5,250 bookings and
-17,067 audit rows, none of it authored by a person.
+**2026-08-08.** `createRollbackDatabase` in `@safra/db` gives a suite one dedicated connection, a
+real `BEGIN` before each test and a real `ROLLBACK` after it. Sixteen of the twenty-two integration
+suites use it and leave **nothing** behind.
 
-**Why it matters beyond tidiness:**
+**Measured on the same database, one full `pnpm vitest run`:**
 
-- A console with 4,967 partners in الشركاء cannot be judged by eye, which is what a staff console
-  is for.
-- It masks defects. `responsive.spec.ts` passed for months because the customer search page had no
-  results to render; the moment the testbed gave it six published properties, a 21px touch target
-  appeared that had always been there.
-- It makes `db:reset-dev` a point-in-time clean rather than a stable state.
+| Rows added per run  | Before | After |
+| ------------------- | ------ | ----- |
+| users               | ~100   | 31    |
+| partners            | ~37    | 7     |
+| properties          | dozens | 0     |
+| **partner_payouts** | 66     | **0** |
 
-**Since the payout ledger, some of the debris is PERMANENT.** `payout.integration.test.ts` marks
-payouts paid, and `deny_paid_payout_mutation` refuses to delete a paid payout — correctly, since it
-records money that left the company. So on 2026-08-06 a dev database held 66 payouts and 201 payout
-items over 54 throwaway partners, and no `afterAll` could have removed them. They then blocked
-`db:testbed` outright: a payout item pins the booking it covers, and the seed deletes bookings.
+The payout number is the one that mattered most. `deny_paid_payout_mutation` refuses to delete a
+paid payout — correctly, it records money that left the company — so that debris was PERMANENT, no
+`afterAll` could ever have removed it, and it then blocked `db:testbed` outright. It is now gone.
 
-That promotes option 1 below from a tidiness improvement to the only workable fix, because option 2
-**cannot** work for any suite that touches an append-only or immutable-once-final table.
+**Why the wrapper is on the CONNECTION and not on drizzle.** Every drizzle path — `execute`, the
+query builders, `db.query.*`, its own `transaction()` — bottoms out in one `client.query`. Wrapping
+there covers the SERVICES too, which hold a `Database` and open their own transactions internally
+where no test-side discipline reaches. A nested `BEGIN` is rewritten to `SAVEPOINT`, `COMMIT` to
+`RELEASE`, `ROLLBACK` to `ROLLBACK TO`, so a service's transaction still behaves like one while the
+outer transaction stays discardable.
 
-**What would fix it,** roughly in order of value:
+**Every statement also gets its own savepoint.** Not tidiness: in PostgreSQL one failed statement
+poisons the whole transaction, and these suites provoke failures on purpose — a unique index, an
+append-only trigger — and keep asserting afterwards. Without per-statement savepoints the first
+`rejects.toThrow()` would leave every later query answering "current transaction is aborted".
 
-1. A transactional fixture per integration test — begin, run, roll back — so nothing is left.
-   Most of these tests do not need committed data, and it is the only option that can clean up
-   after a suite whose rows a trigger refuses to delete.
-2. Failing that, a per-run marker column or email prefix plus an `afterAll` cleanup. Works only for
-   ordinary tables — not payouts, not the seven append-only ones.
-3. A separate database for the integration suite, so a developer's testbed is never its dumping
-   ground.
+**Append-only guarantees are untouched.** This is a real database doing real work: every trigger,
+constraint and index still runs, and a test that violates an append-only rule is still refused by
+the rule rather than by a mock. Only durability is removed.
 
-**Until then**, clearing a database that has paid payouts on it is `db:reset-dev`'s job — TRUNCATE
-is the only thing that gets past an append-only rule (see O-data-1), and that script is the one
-guarded well enough to be allowed to. `db:testbed` now detects the case and says so rather than
-failing on a foreign key.
+**SIX suites deliberately still commit,** and the reason is the same in every case — their subject
+is something a single transaction cannot express:
 
-**Owner:** engineering. Not blocking, and it will keep costing an afternoon every few weeks until
-it is done.
+| Suite                  | Why it cannot roll back                                                   |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `job-run`              | Two SESSIONS contending for an advisory lock; a lock is held by a session |
+| `wallet`               | Concurrent movements racing — the harness serialises statements           |
+| `payments`             | Webhook redelivery and idempotency under concurrency                      |
+| `fx-rate`              | Rates seeded in one test and read in the next                             |
+| `calendar`             | Same — cross-test fixture persistence                                     |
+| `account-recovery`     | Same                                                                      |
+| `partner-registration` | Same                                                                      |
+
+The first three are genuine and permanent: **serialising statements is exactly what a concurrency
+test must not have.** The last four are test-design debt rather than a limit of the mechanism — each
+relies on data outliving the test that made it, which the harness deliberately forbids. Converting
+them means rewriting their fixtures into `beforeEach`, which is mechanical but not free.
+
+**What remains:** those four suites, and they account for most of the 31 users and 36 bookings a run
+still adds. `db:reset-dev` remains the way to clear a database. **Owner:** engineering. No longer
+costing an afternoon every few weeks.
 
 ### O-partner-1 — Reviews, shipped; the sidebar badge and the customer form remain
 

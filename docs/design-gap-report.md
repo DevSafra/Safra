@@ -13,6 +13,20 @@ The handoff defines **19 admin sections**. Its §8 table lists 18 navigation row
 
 ---
 
+## Testing posture, 2026-08-08
+
+**186 browser tests and 1,082 unit/integration tests.** What each layer can and cannot see:
+
+- The **unit/integration** suite runs against a real PostgreSQL, so every trigger, constraint and
+  index is exercised. Sixteen of its twenty-two integration suites now roll back and leave nothing
+  behind; six commit deliberately, because their subject — session-scoped advisory locks, concurrent
+  wallet movements, webhook redelivery — cannot be expressed inside one transaction. See `O-data-2`.
+- The **browser** suite is the only layer that can see a hydration failure, a CSP refusal, or a
+  count formatted before it reaches a plural rule. Every one of those has actually happened here and
+  every one was invisible to a green `pnpm verify`.
+
+The rule this keeps proving: **a check that reads a status code cannot see what a person reads.**
+
 ## How each section was assessed
 
 Three sources, in this order of authority:
