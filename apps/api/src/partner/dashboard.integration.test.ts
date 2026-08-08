@@ -314,12 +314,46 @@ describeIfDb('PartnerDashboardService', () => {
     });
   });
 
+  /**
+   * The calendar covers the WHOLE portfolio, not the partner's first unit.
+   *
+   * It used to draw one unit chosen by creation date, which is a defensible sample of one and a
+   * misleading picture of a business. What is asserted here is that the three counts describe
+   * every sellable unit and always add up — a day whose numbers do not sum to the portfolio is a
+   * day the partner cannot reason about.
+   */
   describe('the calendar', () => {
     it('returns a full month of days even when nothing has touched availability', async () => {
       const view = await service.overview(claims(partnerId));
 
       expect(view.calendar?.days.length).toBeGreaterThanOrEqual(28);
-      expect(view.calendar?.days.every((d) => d.status === 'available')).toBe(true);
+      expect(view.calendar?.days.every((d) => d.booked === 0 && d.blocked === 0)).toBe(
+        true,
+      );
+      expect(
+        view.calendar?.days.every((d) => d.available === view.calendar?.unitCount),
+      ).toBe(true);
+    });
+
+    it('counts every sellable unit in the portfolio, not just the first', async () => {
+      const before = await service.overview(claims(partnerId));
+      const had = before.calendar?.unitCount ?? 0;
+
+      /* A second unit on the same property must raise the denominator. */
+      await db.execute(sql`
+        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
+                           currency_id, min_nights)
+        SELECT p.id, 'وحدة ثانية', 'Second', 'Zweite', 2, 50000,
+               (SELECT id FROM currencies LIMIT 1), 1
+        FROM properties p
+        WHERE p.partner_id = ${partnerId} AND p.deleted_at IS NULL
+        LIMIT 1
+      `);
+
+      const after = await service.overview(claims(partnerId));
+
+      expect(after.calendar?.unitCount).toBe(had + 1);
+      expect(after.calendar?.days[0]?.available).toBe(had + 1);
     });
 
     /*
@@ -327,7 +361,7 @@ describeIfDb('PartnerDashboardService', () => {
       flow and the other by the partner — and when they do, somebody is arriving, which is the
       fact that matters.
     */
-    it('paints a booked day as booked even where availability says available', async () => {
+    it('counts a booked day as booked even where availability says available', async () => {
       await makeBooking({
         unit: unitId,
         partner: partnerId,
@@ -338,8 +372,91 @@ describeIfDb('PartnerDashboardService', () => {
 
       const view = await service.overview(claims(partnerId));
       const today = new Date().toISOString().slice(0, 10);
+      const day = view.calendar?.days.find((d) => d.date === today);
 
-      expect(view.calendar?.days.find((d) => d.date === today)?.status).toBe('booked');
+      expect(day?.booked).toBe(1);
+      expect(day?.available).toBe((view.calendar?.unitCount ?? 0) - 1);
+    });
+
+    /**
+     * The invariant that makes the grid readable: the three numbers describe the same portfolio.
+     *
+     * A unit that is BOTH booked and closed is the case that breaks naive counting — counted in
+     * both, the sum exceeds the portfolio and «متاح» goes negative. It is counted once, as booked.
+     */
+    it('never lets a unit be counted twice when it is both booked and closed', async () => {
+      await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'confirmed',
+        fromDay: 0,
+        nights: 2,
+      });
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      await db.execute(sql`
+        INSERT INTO availability_days (unit_id, date, status)
+        VALUES (${unitId}, ${today}::date, 'closed')
+        ON CONFLICT (unit_id, date) DO UPDATE SET status = 'closed'
+      `);
+
+      const view = await service.overview(claims(partnerId));
+      const day = view.calendar?.days.find((d) => d.date === today);
+      const total = view.calendar?.unitCount ?? 0;
+
+      expect(day?.booked).toBe(1);
+      expect(day?.blocked).toBe(0);
+      expect((day?.booked ?? 0) + (day?.blocked ?? 0) + (day?.available ?? 0)).toBe(
+        total,
+      );
+    });
+
+    it('counts a closed day as blocked, and it still adds up', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+
+      await db.execute(sql`
+        INSERT INTO availability_days (unit_id, date, status)
+        VALUES (${unitId}, ${today}::date, 'maintenance')
+        ON CONFLICT (unit_id, date) DO UPDATE SET status = 'maintenance'
+      `);
+
+      const view = await service.overview(claims(partnerId));
+      const day = view.calendar?.days.find((d) => d.date === today);
+      const total = view.calendar?.unitCount ?? 0;
+
+      expect(day?.blocked).toBe(1);
+      expect((day?.booked ?? 0) + (day?.blocked ?? 0) + (day?.available ?? 0)).toBe(
+        total,
+      );
+    });
+
+    it('excludes a unit taken off sale entirely, because it is not inventory', async () => {
+      /*
+        A second unit first, so what is measured is EXCLUSION rather than the empty portfolio —
+        deactivating the only unit returns no calendar at all, which is a different rule and has
+        its own test below.
+      */
+      await db.execute(sql`
+        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
+                           currency_id, min_nights)
+        SELECT p.id, 'وحدة إضافية', 'Extra', 'Extra', 2, 50000,
+               (SELECT id FROM currencies LIMIT 1), 1
+        FROM properties p
+        WHERE p.partner_id = ${partnerId} AND p.deleted_at IS NULL
+        LIMIT 1
+      `);
+
+      const before = await service.overview(claims(partnerId));
+      const had = before.calendar?.unitCount ?? 0;
+
+      expect(had).toBeGreaterThan(1);
+
+      await db.execute(sql`UPDATE units SET is_active = false WHERE id = ${unitId}`);
+
+      const after = await service.overview(claims(partnerId));
+
+      expect(after.calendar?.unitCount).toBe(had - 1);
     });
 
     it('returns no calendar for a partner with no units', async () => {

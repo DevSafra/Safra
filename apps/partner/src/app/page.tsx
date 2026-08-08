@@ -278,14 +278,12 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
     <section className="rounded-2xl border border-gold/15 bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[15px] font-extrabold text-gold">
-          {fill(t.dashboard.calendarTitle, {
-            month: monthName,
-            unit: calendar.unitName,
-          })}
+          {fill(t.dashboard.calendarTitle, { month: monthName })}
         </h2>
         <span className="text-[11px] text-faint">
           {fill(t.dashboard.calendarDefaultPrice, {
-            price: amount(calendar.defaultPrice, calendar.currencyCode),
+            count: count(calendar.unitCount),
+            price: amount(calendar.fromPrice, calendar.currencyCode),
           })}
         </span>
       </div>
@@ -299,19 +297,32 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
         {calendar.days.map((day) => (
           <li
             key={day.date}
-            title={`${day.date} · ${amount(day.price, calendar.currencyCode)}`}
-            className={`grid aspect-square place-items-center rounded-[7px] border text-[11px] font-semibold ${DAY_TONES[day.status] ?? DAY_TONES['available']}`}
+            data-day={day.date}
+            data-day-available={day.available}
+            /*
+              The breakdown in a `title`, because the square is too small to carry three numbers
+              and the reader who wants them is hovering one day, not scanning thirty.
+            */
+            title={fill(t.dashboard.calendarDayDetail, {
+              date: day.date,
+              booked: count(day.booked),
+              blocked: count(day.blocked),
+              available: count(day.available),
+            })}
+            className={`grid aspect-square place-items-center rounded-[7px] border text-[11px] font-semibold ${portfolioTone(
+              day.available,
+              calendar.unitCount,
+            )}`}
           >
-            {new Date(day.date).getUTCDate()}
+            {count(new Date(day.date).getUTCDate())}
           </li>
         ))}
       </ol>
 
       <div className="mt-3 flex flex-wrap gap-3.5 text-[10.5px] text-faint">
-        <Legend tone="text-ok" label={t.dashboard.legendAvailable} />
-        <Legend tone="text-bad" label={t.dashboard.legendBooked} />
-        <Legend tone="text-faint2" label={t.dashboard.legendBlocked} />
-        <Legend tone="text-warn" label={t.dashboard.legendMaintenance} />
+        <Legend tone="text-ok" label={t.dashboard.legendPortfolioFree} />
+        <Legend tone="text-warn" label={t.dashboard.legendPortfolioSome} />
+        <Legend tone="text-bad" label={t.dashboard.legendPortfolioFull} />
       </div>
 
       <p className="mt-2.5 rounded-lg border border-dashed border-warn/40 bg-warn/8 px-3 py-2 text-[11px] text-warn">
@@ -322,17 +333,21 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
 }
 
 /**
- * Day tones, matching the §7.1 legend.
+ * How full the portfolio is on one day, as a colour.
  *
- * Keyed on the `day_status` enum. An unknown status falls back to `available`'s neutral rather
- * than to a colour that claims something — a day nobody can classify must not be painted red.
+ * Three states rather than four: the old map painted a DAY STATUS, which a portfolio does not
+ * have — six units can be booked, closed and free on the same date. What a partner reads off this
+ * grid is "can anybody still book me today", so that is what the colour answers.
+ *
+ * A portfolio with no units never reaches here (the section says so in words instead), so the
+ * zero-denominator case is not a colour decision.
  */
-const DAY_TONES: Record<string, string> = {
-  available: 'border-ok/30 bg-ok/10 text-ok',
-  booked: 'border-bad/40 bg-bad/15 text-bad',
-  blocked: 'border-line bg-field text-faint2',
-  maintenance: 'border-warn/40 bg-warn/15 text-warn',
-};
+function portfolioTone(available: number, total: number): string {
+  if (available === 0) return 'border-bad/40 bg-bad/12 text-bad';
+  if (available < total) return 'border-warn/40 bg-warn/12 text-warn';
+
+  return 'border-ok/30 bg-ok/10 text-ok';
+}
 
 function Legend({ tone, label }: { readonly tone: string; readonly label: string }) {
   return (

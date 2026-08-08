@@ -280,82 +280,119 @@ export class PartnerDashboardService {
   }
 
   /**
-   * تقويم — this month for ONE unit, the way §7.1 draws it.
+   * تقويم — this month across the partner's WHOLE portfolio.
    *
-   * One unit rather than all of them, because the design's grid is a single month of squares and a
-   * partner with six units has no room for six grids on a dashboard. The unit chosen is their
-   * first by creation, which is stable across reloads; the full per-unit calendar is its own
-   * screen (`GET /partner/units/:id/calendar`).
+   * ## Why not one unit
    *
-   * Days are derived from `generate_series` and LEFT JOINed onto `availability_days`, so a month
-   * with no rows still returns thirty squares. Building the grid from the table's rows instead
-   * would draw a half-empty month whenever nobody had touched the calendar — which looks like
-   * missing data rather than an available month.
+   * It used to draw the partner's first unit by creation date. That is a defensible sample of one
+   * and a misleading picture of a business: a partner with six units saw one unit's month on the
+   * screen they open every morning, with nothing saying so beyond a unit name in the heading. The
+   * dashboard's job is «كيف حال الشهر», and the answer to that is not one room.
+   *
+   * ## What a square means now
+   *
+   * Per day: how many units are booked, how many the partner has taken off sale, and how many are
+   * still open. The per-unit month, with the editor, is its own screen — reached from عقاراتي —
+   * so nothing is lost by aggregating here.
+   *
+   * ## Why it does not get slower with the portfolio
+   *
+   * The obvious query is units × days and then GROUP BY, which is 15,500 rows for a 500-unit
+   * partner before it aggregates anything. This one expands the BOOKINGS that exist and the
+   * availability rows that exist, which are bounded by what the partner actually did rather than
+   * by how much they own, and both are indexed by `unit_id`. The response is thirty-one rows
+   * whatever the portfolio looks like.
+   *
+   * Inactive units are excluded: a unit taken off sale entirely is not inventory, and counting it
+   * as "available" would overstate what a customer can book.
    */
   private async calendar(partnerId: string) {
-    const unit = await this.db.execute<{
-      id: string;
-      name_ar: string;
-      base_price: string;
-      currency_code: string;
+    const summary = await this.db.execute<{
+      unit_count: number;
+      property_count: number;
+      from_price: string | null;
+      currency_code: string | null;
     }>(sql`
-      SELECT un.id, un.name_ar, un.base_price::text, c.code AS currency_code
+      SELECT count(*)::int                AS unit_count,
+             count(DISTINCT pr.id)::int   AS property_count,
+             min(un.base_price)::text     AS from_price,
+             min(c.code)                  AS currency_code
       FROM units un
       JOIN properties pr ON pr.id = un.property_id
-      JOIN currencies c ON c.id = un.currency_id
+      JOIN currencies c  ON c.id = un.currency_id
       WHERE pr.partner_id = ${partnerId}
         AND un.deleted_at IS NULL
         AND pr.deleted_at IS NULL
-      ORDER BY un.created_at
-      LIMIT 1
+        AND un.is_active = true
     `);
 
-    const row = unit.rows[0];
+    const totals = summary.rows[0];
 
-    if (!row) return null;
+    /* No sellable unit means no portfolio to draw, which the screen says in words. */
+    if (!totals || totals.unit_count === 0) return null;
 
     const days = await this.db.execute<{
       date: string;
-      status: string;
-      price: string | null;
+      booked: number;
+      blocked: number;
     }>(sql`
-      SELECT d::date::text AS date,
-             coalesce(ad.status::text, 'available') AS status,
-             coalesce(ad.price, ${row.base_price})::text AS price
-      FROM generate_series(
-             date_trunc('month', now())::date,
-             (date_trunc('month', now()) + interval '1 month - 1 day')::date,
-             interval '1 day'
-           ) AS d
-      LEFT JOIN availability_days ad ON ad.unit_id = ${row.id} AND ad.date = d::date
-      ORDER BY d
+      WITH unit_list AS (
+        SELECT un.id
+        FROM units un
+        JOIN properties pr ON pr.id = un.property_id
+        WHERE pr.partner_id = ${partnerId}
+          AND un.deleted_at IS NULL
+          AND pr.deleted_at IS NULL
+          AND un.is_active = true
+      ), month AS (
+        SELECT date_trunc('month', now())::date                              AS first_day,
+               (date_trunc('month', now()) + interval '1 month - 1 day')::date AS last_day
+      ), day_list AS (
+        SELECT d::date AS date
+        FROM month, generate_series(month.first_day, month.last_day, interval '1 day') AS d
+      ), booked_days AS (
+        -- Expands the bookings that EXIST, not every unit against every day. A booking is the
+        -- fact: where the calendar and a booking disagree, somebody is arriving.
+        SELECT DISTINCT b.unit_id, d::date AS date
+        FROM bookings b
+        JOIN unit_list ul ON ul.id = b.unit_id
+        CROSS JOIN LATERAL generate_series(b.check_in, b.check_out - 1, interval '1 day') AS d
+        CROSS JOIN month
+        WHERE b.status IN ('confirmed', 'checked_in', 'completed')
+          AND d::date BETWEEN month.first_day AND month.last_day
+      ), blocked_days AS (
+        SELECT ad.unit_id, ad.date
+        FROM availability_days ad
+        JOIN unit_list ul ON ul.id = ad.unit_id
+        CROSS JOIN month
+        WHERE ad.status IN ('closed', 'maintenance')
+          AND ad.date BETWEEN month.first_day AND month.last_day
+      )
+      SELECT day_list.date::text AS date,
+             (SELECT count(*) FROM booked_days bd WHERE bd.date = day_list.date)::int AS booked,
+             -- A unit both booked and closed counts ONCE, as booked. Counting it twice would let
+             -- booked + blocked exceed the portfolio and make "available" negative.
+             (SELECT count(*) FROM blocked_days bl
+               WHERE bl.date = day_list.date
+                 AND NOT EXISTS (
+                   SELECT 1 FROM booked_days bd
+                   WHERE bd.unit_id = bl.unit_id AND bd.date = bl.date
+                 ))::int AS blocked
+      FROM day_list
+      ORDER BY day_list.date
     `);
-
-    /*
-      A day with a booking on it reads as booked even where `availability_days` says otherwise.
-      The two can disagree — a booking is written by the booking flow and the calendar by the
-      partner — and when they do, the BOOKING is the fact: somebody is arriving.
-    */
-    const booked = await this.db.execute<{ date: string }>(sql`
-      SELECT d::date::text AS date
-      FROM bookings b
-      CROSS JOIN LATERAL generate_series(b.check_in, b.check_out - 1, interval '1 day') AS d
-      WHERE b.unit_id = ${row.id}
-        AND b.status IN ('confirmed', 'checked_in', 'completed')
-        AND d >= date_trunc('month', now())::date
-        AND d <  date_trunc('month', now()) + interval '1 month'
-    `);
-
-    const bookedDates = new Set(booked.rows.map((r) => r.date));
 
     return {
-      unitName: row.name_ar,
-      defaultPrice: row.base_price,
-      currencyCode: row.currency_code,
+      unitCount: totals.unit_count,
+      propertyCount: totals.property_count,
+      fromPrice: totals.from_price ?? '0',
+      currencyCode: totals.currency_code ?? 'USD',
       days: days.rows.map((day) => ({
         date: day.date,
-        status: bookedDates.has(day.date) ? 'booked' : day.status,
-        price: day.price,
+        booked: day.booked,
+        blocked: day.blocked,
+        /* Derived rather than selected, so the three can never sum to something else. */
+        available: Math.max(0, totals.unit_count - day.booked - day.blocked),
       })),
     };
   }
