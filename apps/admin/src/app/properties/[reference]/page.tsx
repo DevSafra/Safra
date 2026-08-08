@@ -7,7 +7,7 @@ import { BackLink, type BackTarget } from '@/components/back-link';
 import { StatusPill } from '@/components/admin-table';
 import { backTarget, detailHref, origin } from '@/lib/search-params';
 import { statusTone } from '@/lib/status-tone';
-import { fill, label, t } from '@/lib/strings';
+import { fill, label, t, plural } from '@/lib/strings';
 
 /**
  * One listing, and the decision to publish it (SRS §8.1, P-002).
@@ -165,7 +165,7 @@ export default async function PropertyPage({
           </p>
         ) : (
           <p className="text-sm text-muted">
-            {fill(t.sections.propertyDetail.photoCount, {
+            {plural(t.sections.propertyDetail.photoCount, {
               count: property.images.length,
               cover: property.images.some((image) => image.isCover)
                 ? t.sections.propertyDetail.coverSet
@@ -190,7 +190,7 @@ export default async function PropertyPage({
               >
                 <span className="text-text">{unit.nameEn}</span>
                 <span className="text-xs text-faint">
-                  {fill(t.sections.propertyDetail.unitLine, {
+                  {plural(t.sections.propertyDetail.unitLine, {
                     guests: unit.maxGuests,
                     price: unit.basePrice,
                     minNights: unit.minNights,

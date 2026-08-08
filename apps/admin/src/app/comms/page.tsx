@@ -12,7 +12,7 @@ import {
   type AdminColumn,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { fill, label, t } from '@/lib/strings';
+import { fill, label, t, plural } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { listParamsFor } from '@/lib/table-size';
 
@@ -230,7 +230,7 @@ const COLUMNS: readonly AdminColumn<NotificationItem>[] = [
         */}
         {row.status === 'failed' ? (
           <span className="text-[10px] leading-tight text-faint">
-            {fill(t.sections.comms.attempts, { n: count(row.attempts) })}
+            {plural(t.sections.comms.attempts, { n: row.attempts })}
             {row.failureReason ? ` · ${row.failureReason}` : ''}
           </span>
         ) : null}

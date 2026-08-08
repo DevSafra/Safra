@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { cancellationReason, payloadEntries } from './strings';
+import { count } from './format';
+import { cancellationReason, payloadEntries, plural, t } from './strings';
 
 /**
  * A cancellation reason is either a `system.*` code or a person's own sentence, and the two are
@@ -81,5 +82,57 @@ describe('payloadEntries', () => {
     expect(payloadEntries({})).toStrictEqual([]);
     expect(payloadEntries(null)).toStrictEqual([]);
     expect(payloadEntries('not an object')).toStrictEqual([]);
+  });
+});
+
+/**
+ * Arabic agreement in the console, at the boundaries that break it.
+ *
+ * The console printed «٤ ليلة» on the booking detail — correct for one night, wrong for four — on
+ * a screen an operator reads all day. `fill` could not fix it: it substitutes placeholders, and
+ * agreement is not substitution.
+ */
+describe('plural', () => {
+  it('gives one, two, few, many and other their own wording', () => {
+    const rendered = [1, 2, 3, 15, 100].map((n) => plural(t.table.found, { n }));
+
+    expect(new Set(rendered).size).toBe(5);
+  });
+
+  /* The case `other` used to swallow: 11–99 takes the SINGULAR noun in Arabic. */
+  it('uses the singular for 11 to 99', () => {
+    expect(plural(t.table.found, { n: 15 })).toContain('نتيجة');
+    expect(plural(t.table.found, { n: 15 })).not.toContain('نتائج');
+    expect(plural(t.table.found, { n: 5 })).toContain('نتائج');
+  });
+
+  it('agrees on the booking stay line, which names two counts at once', () => {
+    const line = plural(t.sections.bookingDetail.stay, {
+      checkIn: '2026-08-01',
+      checkOut: '2026-08-05',
+      nights: 4,
+      adults: 2,
+    });
+
+    expect(line).toContain('ليالٍ');
+    expect(line).toContain('بالغان');
+    /* The defect, pinned: four nights is never «٤ ليلة». */
+    expect(line).not.toMatch(/٤ ليلة/);
+  });
+
+  /**
+   * The digits match the rest of the console, and the count arrives as a NUMBER.
+   *
+   * `count()` formats with `ARABIC_WESTERN_DIGITS` — the console shows Western numerals in Arabic
+   * copy deliberately — so ICU must agree, or one figure on a screen would be written differently
+   * from the one beside it.
+   *
+   * Passing `count(n)` instead of `n` would give `Intl.PluralRules` nothing numeric to classify,
+   * and every message would silently resolve to `other`. The five-distinct-forms test above is
+   * what would catch that; this one keeps the two number styles in step.
+   */
+  it('formats its digits the same way the rest of the console does', () => {
+    expect(plural(t.table.found, { n: 5 })).toContain(count(5));
+    expect(plural(t.table.found, { n: 1500 })).toContain(count(1500));
   });
 });

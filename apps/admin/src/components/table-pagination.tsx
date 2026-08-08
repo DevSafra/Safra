@@ -2,7 +2,7 @@ import type { TableSection } from '@safra/contracts';
 
 import { count } from '@/lib/format';
 import { MAX_PAGE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from '@/lib/search-params';
-import { fill, t } from '@/lib/strings';
+import { fill, t, plural } from '@/lib/strings';
 
 /**
  * The bar under every table: page number, page count, rows per page, total found.
@@ -187,7 +187,7 @@ export function TablePagination({
       </form>
 
       <span className="whitespace-nowrap text-faint">
-        {fill(capped ? t.table.foundCapped : t.table.found, { n: count(total) })}
+        {plural(capped ? t.table.foundCapped : t.table.found, { n: total })}
       </span>
     </nav>
   );

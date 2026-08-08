@@ -8,7 +8,7 @@ import { TablePagination } from '@/components/table-pagination';
 import { FootNote, Ltr, StatusPill } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { CloseDisputeForm } from '@/components/close-dispute-form';
-import { fill, label, t } from '@/lib/strings';
+import { label, t, plural } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { oneOf } from '@/lib/search-params';
 import { listParamsFor } from '@/lib/table-size';
@@ -209,7 +209,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
             {dispute.customer ? ` · ${dispute.customer}` : ''}
             {dispute.partner ? ` · ${dispute.partner}` : ''}
             {dispute.evidenceCount > 0
-              ? ` · ${fill(t.sections.disputes.evidence, { n: count(dispute.evidenceCount) })}`
+              ? ` · ${plural(t.sections.disputes.evidence, { n: dispute.evidenceCount })}`
               : ''}
           </p>
 

@@ -112,6 +112,15 @@ test.afterAll(async ({ request }) => {
   }
 });
 
+/**
+ * The total, in any of its Arabic forms.
+ *
+ * The bar used to read «{n} نتيجة» whatever the count was. It now agrees: 3–10 takes «نتائج», and
+ * 11–99 takes the singular «نتيجة» again. A test pinned to one form asserts a grammar bug rather
+ * than the presence of a total, and would fail the day the fixture count crossed a boundary.
+ */
+const RESULT_COUNT = /نتيجة|نتائج/;
+
 test.describe('the pagination bar', () => {
   /**
    * Present on every paginated table, with every control.
@@ -150,7 +159,7 @@ test.describe('the pagination bar', () => {
       }
 
       // The total is what the bar exists to report, and "0 نتيجة" on a full table is the bug.
-      if ((await bars.first().getByText(/نتيجة/).count()) === 0)
+      if ((await bars.first().getByText(RESULT_COUNT).count()) === 0)
         missing.push(`${path}: no total shown`);
     }
 
@@ -387,11 +396,11 @@ test.describe('pagination itself', () => {
   test('the total is the same on page one and page two', async ({ page }) => {
     await page.goto('/customers?size=5');
 
-    const onFirst = await bar(page).getByText(/نتيجة/).innerText();
+    const onFirst = await bar(page).getByText(RESULT_COUNT).innerText();
 
     await nextArrow(page).click();
 
-    expect(await bar(page).getByText(/نتيجة/).innerText()).toBe(onFirst);
+    expect(await bar(page).getByText(RESULT_COUNT).innerText()).toBe(onFirst);
   });
 
   /**
@@ -408,16 +417,21 @@ test.describe('pagination itself', () => {
   test('the total describes the filtered set, not the table', async ({ page }) => {
     await page.goto('/partners');
 
-    const unfiltered = await bar(page).getByText(/نتيجة/).innerText();
+    const unfiltered = await bar(page).getByText(RESULT_COUNT).innerText();
 
     await page.goto('/partners?q=zzzzzznomatchzzzzzz');
 
-    const filtered = await bar(page).getByText(/نتيجة/).innerText();
+    const filtered = await bar(page).getByText(RESULT_COUNT).innerText();
 
     expect(filtered).not.toBe(unfiltered);
     // Zero rows, and a total that says so.
     expect(await rowCount(page)).toBe(0);
-    expect(filtered).toMatch(/(^|\D)0 /);
+    /*
+      «لا نتائج», not «0 نتيجة». Arabic has a `zero` plural category and the catalogue uses it —
+      a bar reading "0 نتيجة" is the literal translation of an English sentence, which is what the
+      plural work replaced. Either shape is accepted so this asserts the TOTAL, not the wording.
+    */
+    expect(filtered).toMatch(/لا نتائج|(^|\D)0 /);
   });
 
   /**

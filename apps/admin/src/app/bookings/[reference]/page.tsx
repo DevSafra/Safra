@@ -15,6 +15,7 @@ import {
   label,
   payloadEntries,
   t,
+  plural,
 } from '@/lib/strings';
 
 /**
@@ -66,14 +67,14 @@ export default async function BookingPage({
         <h1 className="mt-1 text-2xl font-semibold text-text">{booking.property.name}</h1>
         <p className="mt-1 text-sm text-muted">
           {booking.stay.children > 0
-            ? fill(t.sections.bookingDetail.stayWithChildren, {
+            ? plural(t.sections.bookingDetail.stayWithChildren, {
                 checkIn: booking.stay.checkIn,
                 checkOut: booking.stay.checkOut,
                 nights: booking.stay.nights,
                 adults: booking.stay.adults,
                 children: booking.stay.children,
               })
-            : fill(t.sections.bookingDetail.stay, {
+            : plural(t.sections.bookingDetail.stay, {
                 checkIn: booking.stay.checkIn,
                 checkOut: booking.stay.checkOut,
                 nights: booking.stay.nights,

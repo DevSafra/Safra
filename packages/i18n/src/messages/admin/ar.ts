@@ -225,7 +225,8 @@ export const ar = {
     /** Follows it, naming what is being counted. */
     rows: 'صفًا',
     /** The total the query matched, printed at the end of the bar. */
-    found: '{n} نتيجة',
+    found:
+      '{n, plural, zero {لا نتائج} one {نتيجة واحدة} two {نتيجتان} few {# نتائج} many {# نتيجة} other {# نتيجة}}',
     /**
      * Shown instead of `found` when the count was capped.
      *
@@ -233,7 +234,8 @@ export const ar = {
      * the audit log is a full scan on every page view. "أكثر من ١٠٠٠٠" is honest about that;
      * a precise-looking number nobody paid for would not be.
      */
-    foundCapped: 'أكثر من {n} نتيجة',
+    foundCapped:
+      'أكثر من {n, plural, one {نتيجة واحدة} two {نتيجتين} few {# نتائج} many {# نتيجة} other {# نتيجة}}',
     previousPage: 'الصفحة السابقة',
     nextPageShort: 'الصفحة التالية',
     /** Names the whole bar for a screen reader, which lands on it as a landmark. */
@@ -475,7 +477,8 @@ export const ar = {
       colCountry: 'الدولة',
       colCategory: 'الفئة',
       colProperties: 'عقارات',
-      activeCities: '{n} مدينة نشطة',
+      activeCities:
+        '{n, plural, zero {لا مدن نشطة} one {مدينة نشطة واحدة} two {مدينتان نشطتان} few {# مدن نشطة} many {# مدينة نشطة} other {# مدينة نشطة}}',
       note: 'الأسعار تُعرض للعميل حسب البلد أو العملة المختارة. أسعار الصرف تُعدَّل من هنا لا من الكود (P-005).',
       citiesNote:
         'صفحة كل مدينة: أول ثلثها صور عالية الجودة، ثم وصف وتصنيفات وعروض — وتُستخدم لأهداف SEO لاحقاً.',
@@ -583,7 +586,8 @@ export const ar = {
       kpiFrozenSub: 'حجوزات لا تُحوَّل حتى الإغلاق',
       kpiResolved: 'أُغلقت هذا الشهر',
       hours: 'ساعة',
-      evidence: '{n} صورة مرفوعة',
+      evidence:
+        '{n, plural, zero {لا صور مرفوعة} one {صورة واحدة مرفوعة} two {صورتان مرفوعتان} few {# صور مرفوعة} many {# صورة مرفوعة} other {# صورة مرفوعة}}',
       open: 'فتح النزاع ←',
       frozen: 'المستحقات مجمّدة',
       note: 'فتح النزاع يجمّد استحقاق تحويل الشريك للحجز المعني حتى الإغلاق. الصور المرفوعة من العميل (EC-007) تظهر داخل ملف النزاع.',
@@ -635,7 +639,8 @@ export const ar = {
       channelWhatsapp: 'واتساب',
       channelEmail: 'بريد',
       channelInApp: 'داخل التطبيق',
-      attempts: '{n} محاولات',
+      attempts:
+        '{n, plural, zero {لا محاولات} one {محاولة واحدة} two {محاولتان} few {# محاولات} many {# محاولة} other {# محاولة}}',
       window: 'آخر {days} يوماً',
       note: 'واتساب للتنبيهات فقط (ليس بديلاً للدعم). تأكيد الحجز يُرسل خلال مهلة أقصاها ساعتان من الدفع. حالة كل رسالة تُسجَّل: مرسلة / فشلت / قيد الانتظار، وكل بريد يرتبط بالحجز في الخط الزمني. الإرسال عبر طابور خلفي.',
       whatsappBlocked:
@@ -768,9 +773,9 @@ export const ar = {
         check-in, saying the stay ran backwards. Neither arrow is bidi-mirrored, so the character
         written here is the character shown. Same correction as the الحجوزات table's stay column.
       */
-      stay: '{checkIn} ← {checkOut} · {nights} ليلة · {adults} بالغ',
+      stay: '{checkIn} ← {checkOut} · {nights, plural, one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}} · {adults, plural, one {بالغ واحد} two {بالغان} few {# بالغين} many {# بالغًا} other {# بالغ}}',
       stayWithChildren:
-        '{checkIn} ← {checkOut} · {nights} ليلة · {adults} بالغ، {children} طفل',
+        '{checkIn} ← {checkOut} · {nights, plural, one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}} · {adults, plural, one {بالغ واحد} two {بالغان} few {# بالغين} many {# بالغًا} other {# بالغ}}، {children, plural, one {طفل واحد} two {طفلان} few {# أطفال} many {# طفلًا} other {# طفل}}',
       fxSnapshot: '{amount} ل.س بسعر صرف {rate}، مثبَّت لحظة إنشاء الحجز.',
       attemptVia: '{method} عبر {provider} · {status}',
       refunded: 'استُرد {amount} {currency}',
@@ -827,10 +832,12 @@ export const ar = {
        * stops where the link begins, and the link's own label is the next key.
        */
       partnerNotVerified: 'حالة الشريك {status}. لا يمكن نشر هذا العقار قبل التحقق منه —',
-      photoCount: '{count} صورة مرفوعة، {cover}',
+      photoCount:
+        '{count, plural, zero {لا صور مرفوعة} one {صورة واحدة مرفوعة} two {صورتان مرفوعتان} few {# صور مرفوعة} many {# صورة مرفوعة} other {# صورة مرفوعة}}، {cover}',
       coverSet: 'وصورة الغلاف محددة',
       coverMissing: 'ولم تُحدَّد صورة غلاف',
-      unitLine: 'حتى {guests} ضيوف · {price} / الليلة · الحد الأدنى {minNights} ليلة',
+      unitLine:
+        'حتى {guests, plural, one {ضيف واحد} two {ضيفين} few {# ضيوف} many {# ضيفًا} other {# ضيف}} · {price} / الليلة · الحد الأدنى {minNights, plural, one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}}',
       notAwaitingReview: 'حالة هذا العقار {status} وهو ليس بانتظار المراجعة.',
       reviewThePartner: 'راجع الشريك',
       noDescription: 'لا يوجد وصف.',

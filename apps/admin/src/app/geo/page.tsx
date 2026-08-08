@@ -12,7 +12,7 @@ import {
   type AdminColumn,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { cityCategories, fill, t } from '@/lib/strings';
+import { cityCategories, t, plural } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 
 /**
@@ -119,7 +119,7 @@ function Countries({ rows }: { rows: Geography['countries'] }) {
             <span className="font-bold text-text">{row.nameAr}</span>
             <span className="text-[11px] text-faint">
               {row.currencyCode ?? t.admin.noData} ·{' '}
-              {fill(t.sections.geo.activeCities, { n: count(row.activeCities) })}
+              {plural(t.sections.geo.activeCities, { n: row.activeCities })}
             </span>
             <span
               className={`ms-auto text-[11px] font-bold ${row.isActive ? 'text-ok' : 'text-faint'}`}

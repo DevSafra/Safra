@@ -1,3 +1,5 @@
+import IntlMessageFormat from 'intl-messageformat';
+
 import { adminAr, errorMessage, fill, type Locale } from '@safra/i18n';
 
 /**
@@ -155,4 +157,33 @@ export function roleName(role: string | undefined): string {
  */
 export function apiError(code: string | null): string {
   return errorMessage(code, CONSOLE_LOCALE);
+}
+
+/**
+ * A message whose wording depends on a COUNT.
+ *
+ * ## Why `fill` cannot do this
+ *
+ * `fill` substitutes placeholders. That is the right tool for «{city} · {type}» and the wrong one
+ * for «{nights} ليلة», because Arabic agreement is not substitution: the noun changes with the
+ * number, and it changes at boundaries an English speaker does not expect.
+ *
+ * - 3–10 is `few` and takes the broken plural — «٥ ليالٍ».
+ * - **11–99 is `many` and takes the SINGULAR** — «١٥ ليلة», never «١٥ ليالٍ».
+ * - 100 and above is `other`, singular again.
+ *
+ * The console printed «٤ ليلة» — correct for one night, wrong for four — on the booking detail an
+ * operator reads all day. Teaching `fill` these rules would turn a placeholder substituter into a
+ * small translation library; using ICU, which the customer app already speaks, keeps one mechanism
+ * across both apps and puts the rules in `Intl.PluralRules` where they belong.
+ *
+ * ## Counts arrive as NUMBERS
+ *
+ * Not as `count(n)`. `IntlMessageFormat` formats the digits itself in `ar`, so the Arabic-Indic
+ * numerals still appear — and passing a pre-formatted string would give `Intl.PluralRules` nothing
+ * numeric to classify, so every message would silently resolve to `other` and read as the
+ * singular. That failure leaves every test green, which is why the counts are typed as numbers.
+ */
+export function plural(message: string, values: Record<string, number | string>): string {
+  return String(new IntlMessageFormat(message, CONSOLE_LOCALE).format(values));
 }
