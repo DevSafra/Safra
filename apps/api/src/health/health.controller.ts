@@ -5,6 +5,7 @@ import type { Redis } from 'ioredis';
 
 import type { Database } from '@safra/db';
 
+import { MediaReachabilityService } from '../storage/media-reachability.service.js';
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { DATABASE } from '../database/database.module.js';
 import { Public } from '../rbac/decorators.js';
@@ -52,6 +53,7 @@ export class HealthController {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     @Inject(REDIS) private readonly redis: Redis,
+    private readonly media: MediaReachabilityService,
   ) {}
 
   /**
@@ -82,6 +84,7 @@ export class HealthController {
     status: 'ready';
     database: 'up';
     redis: 'up' | 'degraded';
+    media: string;
   }> {
     const [database, redis] = await Promise.all([
       this.check(() => this.db.execute(sql`SELECT 1`)),
@@ -97,10 +100,23 @@ export class HealthController {
         status: 'not_ready',
         database: 'down',
         redis: redis ? 'up' : 'degraded',
+        media: this.media.status(),
       });
     }
 
-    return { status: 'ready', database: 'up', redis: redis ? 'up' : 'degraded' };
+    /*
+      Media is REPORTED, not decisive.
+
+      An unreadable bucket means every photograph is broken, which is serious and is not a reason to
+      take a replica out of rotation — bookings and payments do not touch it. A deployment that
+      wants to gate on it reads this field, or sets `MEDIA_REQUIRE_PUBLIC` and never gets here.
+    */
+    return {
+      status: 'ready',
+      database: 'up',
+      redis: redis ? 'up' : 'degraded',
+      media: this.media.status(),
+    };
   }
 
   /**

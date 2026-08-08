@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 
 import { ENV, type Env } from '../config/env.js';
 import { ImageService } from './image.service.js';
+import { MediaReachabilityService } from './media-reachability.service.js';
 import { MediaController } from './media.controller.js';
 import { S3Storage } from './s3.storage.js';
 import { LocalDiskStorage, StorageService } from './storage.service.js';
@@ -26,7 +27,8 @@ import { LocalDiskStorage, StorageService } from './storage.service.js';
           : new LocalDiskStorage(env),
     },
     ImageService,
+    MediaReachabilityService,
   ],
-  exports: [StorageService, ImageService],
+  exports: [StorageService, ImageService, MediaReachabilityService],
 })
 export class StorageModule {}

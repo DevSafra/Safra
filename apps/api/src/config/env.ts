@@ -36,6 +36,18 @@ export const envSchema = z.object({
     `.env.example` and the deployment checklist rather than left to be discovered.
   */
   PARTNER_URL: z.string().url().default('http://localhost:3002'),
+  /*
+    Whether an unreadable media bucket stops the API from starting.
+
+    Off by default: a CDN slow to propagate would otherwise turn blank images into an outage, and
+    media is not on the booking or payment path. On once a deployment provisions the bucket through
+    infrastructure — at that point a failing probe means somebody changed the policy, and a failed
+    deploy is the right outcome. See `MediaReachabilityService`.
+  */
+  MEDIA_REQUIRE_PUBLIC: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
 
   DATABASE_URL: z.string().url(),
   DATABASE_POOL_MAX: z.coerce.number().int().positive().max(200).default(20),

@@ -1,5 +1,7 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import type { Redis } from 'ioredis';
+
+import type { MediaReachabilityService } from '../storage/media-reachability.service.js';
 import { describe, expect, it } from 'vitest';
 
 import type { Database } from '@safra/db';
@@ -18,10 +20,15 @@ describe('HealthController', () => {
   const down = () => Promise.reject(new Error('connection refused'));
   const hang = () => new Promise(() => undefined);
 
-  function controller(database: () => Promise<unknown>, redis: () => Promise<unknown>) {
+  function controller(
+    database: () => Promise<unknown>,
+    redis: () => Promise<unknown>,
+    media: 'ok' | 'unreadable' | 'unreachable' | 'unknown' | 'skipped' = 'ok',
+  ) {
     return new HealthController(
       { execute: database } as unknown as Database,
       { ping: redis } as unknown as Redis,
+      { status: () => media } as unknown as MediaReachabilityService,
     );
   }
 
@@ -47,6 +54,7 @@ describe('HealthController', () => {
         status: 'ready',
         database: 'up',
         redis: 'up',
+        media: 'ok',
       });
     });
 
@@ -66,6 +74,7 @@ describe('HealthController', () => {
         status: 'ready',
         database: 'up',
         redis: 'degraded',
+        media: 'ok',
       });
     });
 
@@ -90,5 +99,26 @@ describe('HealthController', () => {
         ServiceUnavailableException,
       );
     }, 10_000);
+  });
+
+  /**
+   * Media is reported, never decisive.
+   *
+   * An unreadable bucket means every photograph on the platform is a broken image, which is
+   * serious — and is still not a reason to pull a replica out of rotation, because bookings and
+   * payments never touch it. A readiness check that failed on it would trade broken pictures for
+   * an outage.
+   */
+  describe('media reachability', () => {
+    it('reports an unreadable bucket without refusing to serve', async () => {
+      const result = await controller(up, up, 'unreadable').ready();
+
+      expect(result.status).toBe('ready');
+      expect(result.media).toBe('unreadable');
+    });
+
+    it('reports it as ok when the bucket answers for a missing object', async () => {
+      expect((await controller(up, up, 'ok').ready()).media).toBe('ok');
+    });
   });
 });
