@@ -300,3 +300,94 @@ test.describe('تقويم الإتاحة', () => {
     await expect(page.locator('[data-day]').first()).toBeVisible();
   });
 });
+
+test.describe('الوحدات', () => {
+  /**
+   * Prices and capacity stay editable AFTER publication, and the screen has to prove it.
+   *
+   * A published listing cannot change its address — SAFRA verified it (§8.1). It can change its
+   * prices at any time, because that is the partner's ongoing responsibility under P-006. The two
+   * rules are different and a screen that conflated them would leave a hotel unable to raise a
+   * price without asking staff.
+   */
+  test('a published listing can still edit its units, even though its address is frozen', async ({
+    page,
+  }) => {
+    const reference = await findReference(page, PUBLISHED);
+
+    await page.goto(`${BASE}/properties/${reference}/edit`);
+
+    /* The address form is absent — that half is genuinely closed. */
+    await expect(page.getByLabel(t.editProperty.address)).toHaveCount(0);
+
+    /* The unit form is not. */
+    const unit = page.locator('[data-unit]').first();
+
+    await expect(unit).toBeVisible();
+    await expect(
+      unit.getByRole('button', { name: t.editProperty.unitSave }),
+    ).toBeVisible();
+  });
+
+  test('a price change is saved and survives a reload', async ({ page }) => {
+    const reference = await findReference(page, DRAFT);
+
+    await page.goto(`${BASE}/properties/${reference}/edit`);
+
+    const unit = page.locator('[data-unit]').first();
+    const price = unit.getByLabel(new RegExp(t.editProperty.unitPrice));
+
+    const original = await price.inputValue();
+    const edited = String(Number(original) + 5);
+
+    await price.fill(edited);
+    await unit.getByRole('button', { name: t.editProperty.unitSave }).click();
+
+    await expect(banner(page)).toContainText(t.editProperty.unitSaved);
+
+    await page.reload();
+
+    /*
+      Compared as a NUMBER. The column is `numeric`, so it comes back as «65.00» where the form
+      sent «65» — a string comparison would fail on a value that is correct, which is the kind of
+      test failure that gets a real change reverted.
+    */
+    await expect
+      .poll(async () =>
+        Number(
+          await page
+            .locator('[data-unit]')
+            .first()
+            .getByLabel(new RegExp(t.editProperty.unitPrice))
+            .inputValue(),
+        ),
+      )
+      .toBe(Number(edited));
+
+    /* Put it back — the suite shares one testbed with every other spec. */
+    const again = page.locator('[data-unit]').first();
+
+    await again.getByLabel(new RegExp(t.editProperty.unitPrice)).fill(original);
+    await again.getByRole('button', { name: t.editProperty.unitSave }).click();
+    await expect(banner(page)).toContainText(t.editProperty.unitSaved);
+  });
+
+  /*
+    Taking a unit off sale is not the same as closing dates, and the screen must say so — a partner
+    who blocks a fortnight by deactivating a unit has removed it from every future month too.
+  */
+  test('says what taking a unit off sale actually does', async ({ page }) => {
+    const reference = await findReference(page, DRAFT);
+
+    await page.goto(`${BASE}/properties/${reference}/edit`);
+
+    const unit = page.locator('[data-unit]').first();
+
+    await unit.getByRole('checkbox').uncheck();
+
+    await expect(page.getByText(t.editProperty.unitInactiveNote)).toBeVisible();
+
+    /* Not saved — the warning appears on intent, before the decision is committed. */
+    await unit.getByRole('checkbox').check();
+  });
+});

@@ -8,6 +8,7 @@ import {
   sidebarBadges,
 } from '@/lib/api';
 import { PropertyEditor } from '@/components/property-editor';
+import { UnitEditor } from '@/components/unit-editor';
 import { Shell } from '@/components/shell';
 import { t } from '@/lib/strings';
 
@@ -83,7 +84,10 @@ export default async function EditPropertyPage({
           <Locked reference={property.reference} />
         )}
 
-        <Units property={property} />
+        <section className="grid gap-2">
+          <h3 className="text-[13px] font-bold text-text">{t.editProperty.units}</h3>
+          <UnitEditor reference={property.reference} units={property.units} />
+        </section>
       </div>
     </Shell>
   );
@@ -135,46 +139,6 @@ function Locked({ reference }: { readonly reference: string }) {
       <p className="text-[11.5px] leading-relaxed text-faint">
         {t.editProperty.lockedContact}
       </p>
-    </section>
-  );
-}
-
-/** The units, each linking to its own calendar — the thing that stays editable at every status. */
-function Units({
-  property,
-}: {
-  readonly property: Exclude<Awaited<ReturnType<typeof getProperty>>, string>;
-}) {
-  return (
-    <section className="grid gap-2">
-      <h3 className="text-[13px] font-bold text-text">{t.editProperty.units}</h3>
-
-      {property.units.length === 0 ? (
-        <p className="text-[12.5px] text-faint">{t.editProperty.unitsEmpty}</p>
-      ) : (
-        <ul className="grid gap-2">
-          {property.units.map((unit) => (
-            <li
-              key={unit.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-card p-3"
-            >
-              <div className="grid gap-0.5">
-                <span className="text-[12.5px] font-bold text-text">{unit.nameAr}</span>
-                <span className="text-[11px] text-faint">
-                  {unit.maxGuests} · {unit.basePrice} {unit.currencyCode}
-                  {unit.isActive ? '' : ` · ${t.editProperty.unitInactive}`}
-                </span>
-              </div>
-              <Link
-                href={`/properties/${property.reference}/calendar?unit=${unit.id}`}
-                className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[11.5px] text-muted lg:min-h-0 lg:py-1.5"
-              >
-                {t.editProperty.openUnitCalendar}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
     </section>
   );
 }

@@ -284,6 +284,24 @@ export const ar = {
     unitNights: 'أقل مدة {n} ليلة',
     unitInactive: 'موقوفة',
     openUnitCalendar: 'تقويم هذه الوحدة',
+    /* The unit editor. Every unit on one screen, each saved on its own. */
+    unitName: 'اسم الوحدة',
+    unitGuestsField: 'عدد الضيوف',
+    unitBedrooms: 'غرف النوم',
+    unitBeds: 'الأسرّة',
+    unitBathrooms: 'الحمّامات',
+    unitPrice: 'السعر الأساسي لليلة',
+    unitMinNights: 'أقل عدد ليالٍ',
+    unitMaxNights: 'أكثر عدد ليالٍ (اختياري)',
+    unitActive: 'معروضة للحجز',
+    unitInactiveNote:
+      'الوحدة الموقوفة تختفي من البحث ولا تُحجز، وتبقى حجوزاتها القائمة كما هي. لإغلاق تواريخ محددة استخدم التقويم بدل إيقاف الوحدة.',
+    unitSave: 'حفظ الوحدة',
+    unitSaving: 'جارٍ الحفظ…',
+    unitSaved: 'حُفظت الوحدة.',
+    unitFailed: 'تعذّر حفظ الوحدة. راجع الحقول وحاول مرة أخرى.',
+    unitsNote:
+      'الأسعار والإتاحة تبقى قابلة للتعديل في كل الحالات، حتى بعد نشر العقار — فهي مسؤوليتك المستمرة (P-006).',
   },
 
   /**
@@ -396,7 +414,7 @@ export const ar = {
     note: 'صورة الغلاف هي التي تظهر في نتائج البحث، وتُختار بزر «اجعلها صورة الغلاف» لا بالترتيب. تُعالَج كل صورة وتُزال منها بيانات الموقع قبل النشر.',
     empty: 'لا صور بعد. ارفع أول صورة لهذا العقار.',
     count: '{n} من {max} صورة',
-    upload: 'رفع صورة',
+    upload: 'رفع صور',
     uploading: 'جارٍ الرفع…',
     cover: 'صورة الغلاف',
     makeCover: 'اجعلها صورة الغلاف',
@@ -423,6 +441,9 @@ export const ar = {
     altSaved: 'حُفظ',
     backToProperties: 'رجوع إلى عقاراتي',
     /* Each failure says which one it was: a partner who cannot tell them apart retries the wrong thing. */
+    /* Several at once: what landed, and what the limit refused. */
+    uploadedSome: 'رُفعت {done} من {total} صور. تحقق من الصور المتبقية وأعد المحاولة.',
+    limitReached: 'بلغت الحد الأقصى وهو {max} صورة لهذا العقار.',
     uploadFailed: 'تعذّر رفع الصورة. تأكد أنها صورة صالحة وأصغر من ١٠ ميغابايت.',
     lastImage: 'لا يمكن أرشفة الصورة الأخيرة لعقار منشور. ارفع صورة بديلة أولاً.',
     failed: 'تعذّر تنفيذ الطلب.',
