@@ -94,6 +94,17 @@ interface PropertySpec {
   /** From `TRIP_ATTRIBUTES` — the ONE shared vocabulary (§5.6). Never a list forked here. */
   readonly attributes: readonly string[];
   readonly units: readonly UnitSpec[];
+  /**
+   * Where this listing sits in the §8.1 lifecycle. Defaults to published.
+   *
+   * Present because `STRUCTURALLY_EDITABLE` makes the EDIT form reachable only for a draft,
+   * pending_review or rejected listing — so a testbed of nothing but published ones can exercise
+   * the refusal and never the form. Both halves of that rule need a fixture or only one of them
+   * is ever tested.
+   */
+  readonly status?: 'draft' | 'pending_review' | 'rejected' | 'published';
+  /** Why staff rejected it. Only meaningful with `status: 'rejected'`, and shown on the form. */
+  readonly reviewNotes?: string;
 }
 
 interface PartnerSpec {
@@ -155,6 +166,37 @@ const PARTNERS: readonly PartnerSpec[] = [
         address: 'أبو رمانة، دمشق',
         descriptionAr: 'فرعنا الثاني، بإطلالة على جبل قاسيون.',
         units: [{ nameAr: 'غرفة مفردة', nameEn: 'Single Room', price: 45, maxGuests: 1 }],
+      },
+      {
+        /* The draft: what the تعديل form is actually tested against. */
+        nameAr: 'نزل قصر الشرق — قيد الإعداد',
+        nameEn: 'Qasr Al-Sharq Lodge — In Preparation',
+        slug: 'qasr-al-sharq-lodge',
+        attributes: ['history', 'internet'],
+        citySlug: 'damascus',
+        type: 'apartment',
+        address: 'باب توما، دمشق',
+        descriptionAr: 'نزل صغير في المدينة القديمة، لم يُرسَل للمراجعة بعد.',
+        status: 'draft',
+        units: [
+          { nameAr: 'غرفة بإطلالة', nameEn: 'Room with a View', price: 60, maxGuests: 2 },
+        ],
+      },
+      {
+        /* The rejected one, with the reason a partner reopens the form to fix. */
+        nameAr: 'استراحة قصر الشرق — مرفوضة',
+        nameEn: 'Qasr Al-Sharq Rest House — Rejected',
+        slug: 'qasr-al-sharq-rest-house',
+        attributes: ['families'],
+        citySlug: 'damascus',
+        type: 'apartment',
+        address: 'دمر، دمشق',
+        descriptionAr: 'استراحة عائلية.',
+        status: 'rejected',
+        reviewNotes: 'العنوان في الوثائق لا يطابق العنوان المُدخل. صحّحه وأعد الإرسال.',
+        units: [
+          { nameAr: 'جناح عائلي', nameEn: 'Family Suite', price: 80, maxGuests: 6 },
+        ],
       },
       {
         nameAr: 'شقق قصر الشرق المخدومة',
@@ -603,7 +645,7 @@ async function build(db: Seeder): Promise<void> {
   // ── The three partners ────────────────────────────────────────────────────
   const madeProperties = new Map<
     string,
-    { id: string; partnerId: string; cityId: string }
+    { id: string; partnerId: string; cityId: string; status: string }
   >();
   const madeUnits = new Map<string, { id: string; price: number }[]>();
 
@@ -700,8 +742,12 @@ async function build(db: Seeder): Promise<void> {
           descriptionEn: property.descriptionAr,
           descriptionDe: property.descriptionAr,
           address: property.address,
-          status: 'published',
-          verifiedAt: new Date(),
+          status: property.status ?? 'published',
+          ...(property.reviewNotes ? { reviewNotes: property.reviewNotes } : {}),
+          /* Only a published listing has been verified; a draft claiming a date would be a lie. */
+          ...((property.status ?? 'published') === 'published'
+            ? { verifiedAt: new Date() }
+            : {}),
           cancellationPolicyId: policy.id,
           attributes: [...property.attributes],
           /* No rating or count — a trigger owns both. See the note above the partner insert. */
@@ -714,6 +760,8 @@ async function build(db: Seeder): Promise<void> {
         id: row.id,
         partnerId: partner.id,
         cityId: propertyCity.id,
+        /* Carried so the bulk booking generator can skip what was never bookable. */
+        status: property.status ?? 'published',
       });
 
       const units: { id: string; price: number }[] = [];
@@ -857,7 +905,10 @@ async function bulk(
     profileId: string;
     usd: { id: string };
     policy: { id: string; code: string };
-    madeProperties: Map<string, { id: string; partnerId: string; cityId: string }>;
+    madeProperties: Map<
+      string,
+      { id: string; partnerId: string; cityId: string; status: string }
+    >;
     madeUnits: Map<string, { id: string; price: number }[]>;
     passwordHash: string;
   },
@@ -929,7 +980,20 @@ async function bulk(
     });
   }
 
-  const slugs = [...ctx.madeProperties.keys()];
+  /*
+    Bulk history is generated against PUBLISHED listings only.
+
+    A draft has never been visible to a customer, so it cannot have accumulated ninety days of
+    completed stays — and once it had them, the review seeder distributed reviews to it and a
+    trigger gave it a public-looking star rating. Two fixture falsehoods from one missing filter.
+
+    The consequence is also practical: with drafts in the rotation, the published listings the
+    customer-facing tests read got a third of the bookings they used to, and reviews bunched onto
+    whichever listing happened to keep enough of them.
+  */
+  const slugs = [...ctx.madeProperties.entries()]
+    .filter(([, property]) => property.status === 'published')
+    .map(([slug]) => slug);
   const STATUSES = [
     'confirmed',
     'confirmed',
@@ -1076,9 +1140,17 @@ async function reviews(db: Seeder): Promise<void> {
   }>(sql`
     SELECT b.id, b.property_id, b.unit_id, b.partner_id, b.customer_profile_id
     FROM bookings b
-    JOIN partners pa ON pa.id = b.partner_id
-    JOIN users u     ON u.id = pa.user_id
+    JOIN partners pa   ON pa.id = b.partner_id
+    JOIN users u       ON u.id = pa.user_id
+    JOIN properties pr ON pr.id = b.property_id
     WHERE b.status = 'completed'
+      -- PUBLISHED listings only.
+      --
+      -- Without this, the round-robin spread reviews evenly across every listing including the
+      -- draft and the rejected one — and a trigger owns the rating column, so a listing never
+      -- visible to a customer ended up advertising 5.0 stars from eight stays. Fiction on a
+      -- fixture is worse than sparse data: it is what a screenshot gets taken of.
+      AND pr.status = 'published'
       AND lower(u.email) IN ('partner1@safra.test', 'partner2@safra.test', 'partner3@safra.test')
       AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.booking_id = b.id)
     -- Spread across PROPERTIES rather than taking the newest eighteen bookings overall.
@@ -1087,6 +1159,23 @@ async function reviews(db: Seeder): Promise<void> {
     -- properties with none — which is realistic enough, except that those two then showed no ★ at
     -- all on a screen the §7.2 card exists to exercise. Round-robin by property fixes the
     -- distribution without inventing anything: every review is still a real completed stay.
+    --
+    -- The FIXTURE CUSTOMER's most recent completed stay is held back, so «إقامات بانتظار تقييمك»
+    -- always has exactly one entry. The customer review flow is reachable only from that prompt,
+    -- and the spec covering it used to rely on a gap that happened to exist — adding two listings
+    -- closed the gap and broke a test with no relationship to the change. A fixture a test needs
+    -- has to be arranged on purpose, not left to arithmetic. Named by EMAIL rather than by an
+    -- offset, so it stays the right booking however the counts move.
+      AND b.id <> coalesce((
+        SELECT b2.id
+        FROM bookings b2
+        JOIN customer_profiles cp2 ON cp2.id = b2.customer_profile_id
+        JOIN users cu              ON cu.id = cp2.user_id
+        WHERE b2.status = 'completed'
+          AND lower(cu.email) = 'customer@safra.test'
+        ORDER BY b2.check_out DESC
+        LIMIT 1
+      ), '00000000-0000-0000-0000-000000000000'::uuid)
     ORDER BY row_number() OVER (PARTITION BY b.property_id ORDER BY b.check_out DESC),
              b.property_id
     LIMIT 24
