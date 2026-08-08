@@ -1,6 +1,6 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { CalendarService } from './calendar.service.js';
 import type { AuditService } from '../common/audit/audit.service.js';
@@ -37,11 +37,15 @@ const claims: AccessTokenClaims = {
 };
 
 describeIfDb('CalendarService.updateRange — field-level upsert semantics', () => {
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
   let db: Database;
   let service: CalendarService;
 
-  beforeAll(async () => {
-    db = createDatabase(DATABASE_URL as string, 2);
+  beforeEach(async () => {
+    await harness.begin();
+
+    db = harness.db;
 
     // Audit writes are not what this test covers; a no-op keeps the fixture small.
     const audit = { record: () => Promise.resolve() } as unknown as AuditService;
@@ -50,9 +54,12 @@ describeIfDb('CalendarService.updateRange — field-level upsert semantics', () 
     await seed(db);
   });
 
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await teardown(db);
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+    await harness.close();
   });
 
   it('creates rows for a range and defaults new days to available', async () => {
@@ -124,6 +131,19 @@ describeIfDb('CalendarService.updateRange — field-level upsert semantics', () 
   });
 
   it('applies an explicit status change', async () => {
+    /*
+      Close the span FIRST, in this test.
+
+      It used to rely on the preceding test having closed it — which passed only because the suite
+      committed and ran in order. A test that depends on its predecessor is a test that reports the
+      wrong thing the day somebody reorders the file, and it is what stopped this suite rolling back.
+    */
+    await service.updateRange(claims, UNIT_ID, {
+      from: '2030-02-01',
+      to: '2030-02-03',
+      status: 'closed',
+    });
+
     await service.updateRange(claims, UNIT_ID, {
       from: '2030-02-02',
       to: '2030-02-02',
@@ -211,48 +231,4 @@ async function seed(db: Database): Promise<void> {
     FROM currencies cu WHERE cu.code = 'USD'
     LIMIT 1
     ON CONFLICT DO NOTHING`);
-}
-
-/**
- * Removes the fixture, by PARENT rather than by fixed child id.
- *
- * The previous version deleted `units WHERE id = UNIT_ID` and then the property. Any
- * other unit under that property — left behind by a run that errored before its own
- * teardown — blocked the property delete with a foreign key violation, and the suite
- * then failed on every subsequent run against that database. One bad run poisoned the
- * database permanently, and the resulting failure pointed at the calendar tests rather
- * than at whatever had actually crashed.
- *
- * Deleting everything under the parent makes cleanup self-healing: it removes its own
- * rows and any debris from an earlier failure.
- *
- * Hard deletes are acceptable ONLY here: these are synthetic rows, never production
- * data. P-003 governs application code paths, not test cleanup.
- */
-async function teardown(db: Database): Promise<void> {
-  const { sql } = await import('drizzle-orm');
-
-  const units = sql`SELECT id FROM units WHERE property_id = ${PROPERTY_ID}::uuid`;
-
-  await db.execute(sql`DELETE FROM availability_days WHERE unit_id IN (${units})`);
-  /**
-   * Bookings are cleared before units, because a booking holds a foreign key to one.
-   *
-   * Matched on `unit_id` as well as `property_id`, and that is not belt-and-braces: a booking
-   * carries BOTH columns, and clearing only by property leaves any row whose `property_id`
-   * says something else while its `unit_id` still points here. The next statement then trips
-   * `bookings_unit_id_units_id_fk` and the whole file fails in teardown with every test
-   * passing — which is exactly how this failed once, on a run where the id in the error no
-   * longer existed by the time it was investigated.
-   *
-   * Still scoped to this fixture's own units, so a booking belonging to any other suite is
-   * untouched.
-   */
-  await db.execute(sql`
-    DELETE FROM bookings
-    WHERE property_id = ${PROPERTY_ID}::uuid OR unit_id IN (${units})`);
-  await db.execute(sql`DELETE FROM units WHERE property_id = ${PROPERTY_ID}::uuid`);
-  await db.execute(sql`DELETE FROM properties WHERE id = ${PROPERTY_ID}::uuid`);
-  await db.execute(sql`DELETE FROM partners WHERE id = ${PARTNER_ID}::uuid`);
-  await db.execute(sql`DELETE FROM users WHERE id = ${claims.sub}::uuid`);
 }

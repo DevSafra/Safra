@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 import { partnerRegisterSchema } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
@@ -23,21 +23,26 @@ const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('partner self-registration', () => {
-  let db: Database;
-  let registration: PartnerRegistrationService;
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  const db: Database = harness.db;
 
-  beforeAll(() => {
-    db = createDatabase(DATABASE_URL as string, 3);
+  const registration = new PartnerRegistrationService(
+    db,
+    new PasswordService(),
+    new AuditService(db),
+  );
 
-    registration = new PartnerRegistrationService(
-      db,
-      new PasswordService(),
-      new AuditService(db),
-    );
+  beforeEach(async () => {
+    await harness.begin();
+  });
+
+  afterEach(async () => {
+    await harness.rollback();
   });
 
   afterAll(async () => {
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+    await harness.close();
   });
 
   function application(overrides: Record<string, unknown> = {}) {

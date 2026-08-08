@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { PasswordService } from '../common/crypto/password.service.js';
@@ -30,6 +30,8 @@ const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('account recovery', () => {
+  /* Every row this suite writes is discarded when the test that wrote it ends. */
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
   let db: Database;
   let recovery: AccountRecoveryService;
   let authTokens: AuthTokenService;
@@ -42,8 +44,10 @@ describeIfDb('account recovery', () => {
 
   let user: { id: string; email: string };
 
-  beforeAll(() => {
-    db = createDatabase(DATABASE_URL as string, 4);
+  beforeEach(async () => {
+    await harness.begin();
+
+    db = harness.db;
 
     authTokens = new AuthTokenService(db);
     passwords = new PasswordService();
@@ -93,8 +97,12 @@ describeIfDb('account recovery', () => {
     );
   });
 
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
   afterAll(async () => {
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+    await harness.close();
   });
 
   beforeEach(async () => {
