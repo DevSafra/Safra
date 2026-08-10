@@ -17,6 +17,7 @@ export const ar = {
     heading: 'لوحة الشريك',
     dashboard: 'لوحة التحكم',
     properties: 'عقاراتي',
+    calendars: 'التقويمات',
     reviews: 'التقييمات',
     payouts: 'مستحقاتي',
     /** The handoff's sidebar footer, verbatim. */
@@ -24,6 +25,16 @@ export const ar = {
     showSidebar: 'إظهار قائمة التنقل',
     hideSidebar: 'إخفاء قائمة التنقل',
     signOut: 'تسجيل الخروج',
+    /**
+     * The theme toggle names the DESTINATION, not the current state.
+     *
+     * «الوضع الداكن» while dark is active is ambiguous read aloud — it could be reporting a state
+     * or offering an action. These say which way the button goes. Worded identically to the
+     * console's, because a partner and a staff member pressing the same control should hear the
+     * same sentence.
+     */
+    themeToLight: 'التبديل إلى الوضع الفاتح',
+    themeToDark: 'التبديل إلى الوضع الداكن',
   },
 
   login: {
@@ -163,6 +174,12 @@ export const ar = {
     calendarDaySome: '{available} من {total} متاحة',
     calendarDayFree: 'كل الوحدات متاحة',
     calendarDayDetail: '{date} · محجوز {booked} · مغلق {blocked} · متاح {available}',
+    /*
+      A discoverability line, not decoration. The squares became LINKS so a partner can act on a day,
+      and a link that looks exactly like the read-only square it replaced is a feature nobody finds.
+      One sentence is cheaper than teaching it.
+    */
+    calendarClickHint: 'اضغط أي يوم لإدارة إتاحة الوحدات فيه.',
     legendPortfolioFree: 'كل الوحدات متاحة',
     legendPortfolioSome: 'متاح جزئيًا',
     legendPortfolioFull: 'لا شيء متاح',
@@ -345,6 +362,35 @@ export const ar = {
     bookedWarning:
       'الليالي المحجوزة لا تتغير. الحجز واقعٌ قائم، والتقويم لا يلغيه — ألغِ الحجز نفسه إن لزم.',
     noteHint: 'لا تظهر الملاحظة للضيوف.',
+  },
+
+  /**
+   * التقويمات — every unit's month on one screen, grouped by property (Bashar, 2026-08-10).
+   *
+   * The editor's own labels are NOT repeated here: this screen renders the same range editor as
+   * تقويم الإتاحة, so it reads `unitCalendar` for every field. Two copies of «تطبيق على المدة» would
+   * drift the first time somebody reworded one of them.
+   */
+  calendars: {
+    title: 'التقويمات',
+    intro: 'كل وحدة وتقويمها. أغلق التواريخ التي لم تعد متاحة، أو غيّر سعر ليلة.',
+    /** `{month}` is a month name and `{year}` a year — never joined in code, see docs/i18n.md. */
+    monthOf: '{month} {year}',
+    noProperties: 'لا عقارات بعد، فلا تقويم لعرضه.',
+    noUnits: 'لا وحدات في هذا العقار بعد.',
+    /* An off-sale unit is listed rather than hidden, so it needs to say why it is greyed. */
+    inactive: 'موقوفة عن البيع',
+    loadMore: 'عرض عقارات أخرى',
+    /*
+      A cursor only moves forward, so without this the reader who pressed «عرض عقارات أخرى» has no way
+      back except the browser's own button — and the month arrows carry the cursor with them, so they
+      do not escape it either.
+    */
+    firstPage: 'العودة إلى أول العقارات',
+    /** The `<caption>` every month grid needs — «تقويم {unit} لشهر {month}». */
+    gridCaption: 'تقويم {unit} لشهر {month}',
+    today: 'اليوم',
+    unitCount: 'وحدة',
   },
 
   properties: {

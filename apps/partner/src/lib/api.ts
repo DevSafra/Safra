@@ -484,6 +484,47 @@ export async function getUnitCalendar(unitId: string, from: string, to: string) 
   );
 }
 
+/**
+ * The whole portfolio's month, grouped by property — التقويمات.
+ *
+ * One request for every room rather than one per room: the API expands the month for a page of
+ * properties in two queries, so this screen costs the same whether the partner owns two units or
+ * twenty. Parsing the real envelope for the reason recorded above.
+ */
+const portfolioCalendarUnitSchema = z.object({
+  unitId: z.string(),
+  nameAr: z.string(),
+  basePrice: z.string(),
+  currencyCode: z.string(),
+  minNights: z.number(),
+  isActive: z.boolean(),
+  days: z.array(calendarDaySchema),
+});
+
+export type PortfolioCalendarUnit = z.infer<typeof portfolioCalendarUnitSchema>;
+
+const portfolioCalendarSchema = z.object({
+  month: z.string(),
+  properties: z.array(
+    z.object({
+      reference: z.string(),
+      nameAr: z.string(),
+      units: z.array(portfolioCalendarUnitSchema),
+    }),
+  ),
+  nextCursor: z.string().nullable(),
+});
+
+export type PortfolioCalendar = z.infer<typeof portfolioCalendarSchema>;
+
+export async function getPortfolioCalendar(month: string, cursor?: string) {
+  const query = new URLSearchParams({ month });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return partnerFetch(`/partner/calendars?${query.toString()}`, portfolioCalendarSchema);
+}
+
 export async function getPropertyImages(reference: string) {
   return partnerFetch(
     `/partner/properties/${encodeURIComponent(reference)}/images`,

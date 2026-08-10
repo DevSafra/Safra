@@ -17,12 +17,14 @@ import {
   type CalendarQuery,
   type CalendarRangeUpdate,
   type PartnerRegisterInput,
+  type PortfolioCalendarQuery,
   type PropertyCreateInput,
   type PropertyUpdateInput,
   type UnitCreateInput,
   type UnitUpdateInput,
   calendarQuerySchema,
   calendarRangeUpdateSchema,
+  portfolioCalendarQuerySchema,
   partnerRegisterSchema,
   propertyCreateSchema,
   propertyUpdateSchema,
@@ -191,6 +193,26 @@ export class PartnerController {
     @Body(new ZodValidationPipe(unitUpdateSchema)) body: UnitUpdateInput,
   ) {
     return this.properties.updateUnit(user, unitId, body);
+  }
+
+  /**
+   * The whole portfolio's month — every unit, grouped under its property.
+   *
+   * A separate endpoint rather than a flag on the per-unit read: it answers a different shape and,
+   * more to the point, it takes a MONTH where that one takes a free `from`/`to`. Bounding the range
+   * in the contract is what keeps "show me my rooms" from being able to ask for a century.
+   *
+   * Takes no partner id, like every handler here. The service derives it from the verified token,
+   * so "show me another partner's calendars" is a question this endpoint cannot be asked.
+   */
+  @Get('calendars')
+  @RequirePermissions(P.CALENDAR_MANAGE_OWN)
+  async readPortfolioCalendar(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Query(new ZodValidationPipe(portfolioCalendarQuerySchema))
+    query: PortfolioCalendarQuery,
+  ) {
+    return this.calendar.readPortfolio(user, query);
   }
 
   @Get('units/:unitId/calendar')

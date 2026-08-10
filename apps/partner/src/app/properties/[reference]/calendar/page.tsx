@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getMyProfile, getProperty, getUnitCalendar, sidebarBadges } from '@/lib/api';
 import { Shell } from '@/components/shell';
 import { UnitCalendar } from '@/components/unit-calendar';
+import { marketToday } from '@/lib/format';
 import { t } from '@/lib/strings';
 
 /**
@@ -104,9 +105,14 @@ export default async function UnitCalendarPage({
     property.units[0];
 
   const requestedMonth = typeof query['month'] === 'string' ? query['month'] : '';
+
+  /*
+    Falls back to the month the BUSINESS is in, not the one UTC is in. Damascus is UTC+3, so for the
+    last three hours of every month this opened on the month that had just ended.
+  */
   const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(requestedMonth)
     ? requestedMonth
-    : monthOf(new Date());
+    : marketToday().slice(0, 7);
 
   const { from, to } = span(month);
   const calendar = unit ? await getUnitCalendar(unit.id, from, to) : 'failed';

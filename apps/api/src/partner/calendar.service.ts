@@ -6,16 +6,36 @@ import { schema } from '@safra/db';
 import {
   ERROR,
   PERMISSIONS as P,
+  decodeCursor,
+  encodeCursor,
   type CalendarDay,
   type CalendarQuery,
   type CalendarRangeUpdate,
+  type PortfolioCalendar,
+  type PortfolioCalendarProperty,
+  type PortfolioCalendarQuery,
 } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
-import { notFound } from '../common/errors/app-error.js';
+import { badRequest, notFound } from '../common/errors/app-error.js';
+
+/** A uuid, checked before it reaches a `::uuid` cast so a forged cursor is a 400 and not a 500. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The booking states that OCCUPY a night.
+ *
+ * One fragment because TWO calendars read it now — a single unit's month and the whole portfolio's
+ * — and a night shown as booked on one screen and free on the other is worse than either answer on
+ * its own. Written once here, it cannot drift between them.
+ *
+ * `completed` and `cancelled` are deliberately absent: a finished stay no longer holds the night,
+ * and a cancelled one never did.
+ */
+const OCCUPYING_STATUSES = sql`('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')`;
 
 @Injectable()
 export class CalendarService {
@@ -69,7 +89,7 @@ export class CalendarService {
         ON ad.unit_id = u.id AND ad.date = d.day::date
       LEFT JOIN bookings b
         ON b.unit_id = u.id
-       AND b.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
+       AND b.status IN ${OCCUPYING_STATUSES}
        AND d.day::date >= b.check_in
        AND d.day::date <  b.check_out
       WHERE u.id = ${unitId}
@@ -87,6 +107,200 @@ export class CalendarService {
         note: r.note,
       })),
     };
+  }
+
+  /**
+   * Every unit's month, grouped under the property that owns it (Bashar, 2026-08-10).
+   *
+   * ## Why this is not the per-unit read in a loop
+   *
+   * The screen shows a whole portfolio, so calling `read` once per unit would be one round trip per
+   * room — the `N+1` rule 2 forbids, and it gets worse exactly as a partner grows. This is TWO
+   * queries whatever the portfolio: one indexed page of properties, then one expansion of the
+   * month for the units those properties own.
+   *
+   * ## Bounded on both axes
+   *
+   * A month, so days per unit is at most 31 by construction — see `calendarMonthSchema` for why a
+   * free `from`/`to` is not safe here. And a page of PROPERTIES, so units per answer is bounded by
+   * the handful of properties in the page rather than by the size of the portfolio. Paginating by
+   * property rather than by unit is what lets the screen group rooms under a heading without a page
+   * boundary ever splitting a property's rooms in half.
+   *
+   * ## Inactive units are included
+   *
+   * Unlike the dashboard's counters, which exclude them because an off-sale unit is not something a
+   * customer can book. This screen answers a different question — what do I own, and what is its
+   * month — and a page that silently dropped a room would read as having lost it. `isActive` travels
+   * so the UI can mark it.
+   */
+  async readPortfolio(
+    claims: AccessTokenClaims | undefined,
+    query: PortfolioCalendarQuery,
+  ): Promise<PortfolioCalendar> {
+    const partnerId = requirePartnerId(claims, P.CALENDAR_MANAGE_OWN);
+
+    /**
+     * A malformed cursor is a 400, not a silent restart from page one.
+     *
+     * The same call `bookings.service.ts` makes, for the same reason: starting over quietly sends a
+     * client that mishandles the cursor into an infinite loop, fetching page one for ever while
+     * believing it is advancing. The uuid check is part of it here — the id reaches a `::uuid`
+     * cast, and a forged cursor should not be able to turn that into a 500.
+     */
+    let after: { sortKey: string; id: string } | null = null;
+
+    if (query.cursor !== undefined) {
+      const decoded = decodeCursor(query.cursor);
+
+      if (!decoded || !UUID.test(decoded.id)) {
+        throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
+      }
+
+      after = { sortKey: decoded.sortKey, id: decoded.id };
+    }
+
+    /*
+      The sort key stays a STRING the whole way through, and that is load-bearing.
+      `properties.created_at` is a `timestamptz` holding MICROseconds while a JS Date holds
+      milliseconds, so round-tripping the key through a Date truncates it — and
+      `(created_at, id) > (truncated, id)` is then true of the cursor's own row, which reappears at
+      the top of every following page. `encodeCursor` documents the trap; this is a caller that has
+      to respect it.
+    */
+    const keyset = after
+      ? sql`AND (p.created_at, p.id) > (${after.sortKey}::timestamptz, ${after.id}::uuid)`
+      : sql``;
+
+    // One row beyond the page answers "is there another" without a second COUNT over the portfolio.
+    const properties = await this.db.execute<{
+      id: string;
+      reference: string;
+      name_ar: string;
+      created_at: string;
+    }>(sql`
+      SELECT p.id, p.reference, p.name_ar, p.created_at::text AS created_at
+      FROM properties p
+      WHERE p.partner_id = ${partnerId}
+        AND p.deleted_at IS NULL
+        ${keyset}
+      ORDER BY p.created_at, p.id
+      LIMIT ${query.limit + 1}
+    `);
+
+    const page = properties.rows.slice(0, query.limit);
+    const last = page[page.length - 1];
+
+    const nextCursor =
+      properties.rows.length > query.limit && last
+        ? encodeCursor(last.created_at, last.id)
+        : null;
+
+    // No properties at all, or a cursor past the end. Either way there is nothing to expand.
+    if (page.length === 0) {
+      return { month: query.month, properties: [], nextCursor: null };
+    }
+
+    const first = `${query.month}-01`;
+
+    const days = await this.db.execute<{
+      property_id: string;
+      unit_id: string;
+      unit_name: string;
+      is_active: boolean;
+      base_price: string;
+      currency_code: string;
+      unit_min_nights: number;
+      date: string;
+      status: CalendarDay['status'];
+      price: string;
+      is_price_overridden: boolean;
+      min_nights: number;
+      note: string | null;
+    }>(sql`
+      SELECT
+        u.property_id                                 AS property_id,
+        u.id                                          AS unit_id,
+        u.name_ar                                     AS unit_name,
+        u.is_active                                   AS is_active,
+        u.base_price::text                            AS base_price,
+        c.code                                        AS currency_code,
+        u.min_nights                                  AS unit_min_nights,
+        d.day::date::text                             AS date,
+        -- A live booking always wins over the partner's declared state, as the per-unit read does.
+        CASE WHEN b.id IS NOT NULL THEN 'booked'
+             ELSE COALESCE(ad.status, 'available')
+        END                                           AS status,
+        COALESCE(ad.price, u.base_price)::text        AS price,
+        (ad.price IS NOT NULL)                        AS is_price_overridden,
+        COALESCE(ad.min_nights, u.min_nights)         AS min_nights,
+        ad.note                                       AS note
+      FROM units u
+      JOIN currencies c ON c.id = u.currency_id
+      /*
+        The month derived in SQL rather than in TypeScript: plus one month minus one day is right
+        for February and for a leap year without either side knowing which month it was handed.
+      */
+      CROSS JOIN generate_series(
+        ${first}::date,
+        ${first}::date + INTERVAL '1 month' - INTERVAL '1 day',
+        INTERVAL '1 day'
+      ) AS d(day)
+      LEFT JOIN availability_days ad
+        ON ad.unit_id = u.id AND ad.date = d.day::date
+      LEFT JOIN bookings b
+        ON b.unit_id = u.id
+       AND b.status IN ${OCCUPYING_STATUSES}
+       AND d.day::date >= b.check_in
+       AND d.day::date <  b.check_out
+      WHERE u.property_id IN ${page.map((p) => p.id)}
+        AND u.deleted_at IS NULL
+      ORDER BY u.created_at, u.id, d.day
+    `);
+
+    /*
+      Seeded from the property PAGE, not from the day rows, so a property with no units yet still
+      appears — as itself, with an empty list. Building the map from the rows instead would make an
+      empty property vanish, which reads as the page having lost it rather than as a property having
+      no rooms.
+    */
+    const byProperty = new Map<string, PortfolioCalendarProperty>(
+      page.map((p) => [p.id, { reference: p.reference, nameAr: p.name_ar, units: [] }]),
+    );
+
+    for (const row of days.rows) {
+      const property = byProperty.get(row.property_id);
+
+      if (!property) continue;
+
+      let unit = property.units.find((candidate) => candidate.unitId === row.unit_id);
+
+      if (!unit) {
+        unit = {
+          unitId: row.unit_id,
+          nameAr: row.unit_name,
+          basePrice: row.base_price,
+          currencyCode: row.currency_code,
+          minNights: row.unit_min_nights,
+          isActive: row.is_active,
+          days: [],
+        };
+
+        property.units.push(unit);
+      }
+
+      unit.days.push({
+        date: row.date,
+        status: row.status,
+        price: row.price,
+        isPriceOverridden: row.is_price_overridden,
+        minNights: row.min_nights,
+        note: row.note,
+      });
+    }
+
+    // Insertion order is the page's order, which is `created_at, id` — the portfolio as it grew.
+    return { month: query.month, properties: [...byProperty.values()], nextCursor };
   }
 
   /**

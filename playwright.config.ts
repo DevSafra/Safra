@@ -56,9 +56,14 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['setup'],
-      /* The specs that SIGN IN are their own project, LAST — see below. */
+      /*
+        The specs that need a PARTNER SESSION are their own project, LAST — see below. They are
+        excluded here rather than left to sort themselves out: `partner.setup.ts` writes the session
+        in a project that depends on this one, so a partner spec collected here would read a state
+        file that does not exist yet.
+      */
       testIgnore:
-        /(partner|partner-images|partner-screens|customer-review|auth-throttle)\.spec\.ts/,
+        /(partner|partner-images|partner-screens|partner-sidebar|partner-calendars|customer-review|auth-throttle)\.spec\.ts/,
     },
     /**
      * Everything that SIGNS IN, run after everything else.
@@ -100,7 +105,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['signed-in-setup'],
       testMatch:
-        /(partner|partner-images|partner-screens|customer-review|auth-throttle)\.spec\.ts/,
+        /(partner|partner-images|partner-screens|partner-sidebar|partner-calendars|customer-review|auth-throttle)\.spec\.ts/,
     },
   ],
 });

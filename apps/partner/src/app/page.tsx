@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import {
   getDashboard,
   getMyProfile,
@@ -291,33 +293,60 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
       {/*
         Seven columns, and the grid is NOT offset to the weekday the month starts on. The handoff
         draws a plain run of squares, and an offset grid needs a weekday header to be readable —
-        which the design does not have. A month strip is what is specified.
+        which the design does not have. A month strip is what is specified. التقويمات, which is where
+        the work happens, draws a real weekday-aligned grid.
       */}
       <ol className="mt-3.5 grid grid-cols-7 gap-1.25">
-        {calendar.days.map((day) => (
-          <li
-            key={day.date}
-            data-day={day.date}
-            data-day-available={day.available}
-            /*
-              The breakdown in a `title`, because the square is too small to carry three numbers
-              and the reader who wants them is hovering one day, not scanning thirty.
-            */
-            title={fill(t.dashboard.calendarDayDetail, {
-              date: day.date,
-              booked: count(day.booked),
-              blocked: count(day.blocked),
-              available: count(day.available),
-            })}
-            className={`grid aspect-square place-items-center rounded-[7px] border text-[11px] font-semibold ${portfolioTone(
-              day.available,
-              calendar.unitCount,
-            )}`}
-          >
-            {count(new Date(day.date).getUTCDate())}
-          </li>
-        ))}
+        {calendar.days.map((day) => {
+          /*
+            The breakdown in a `title` AND an `aria-label`, because the square is too small to carry
+            three numbers. As the link's accessible name it also means a screen reader hears which
+            day it is about to open rather than a bare numeral repeated thirty-one times.
+          */
+          const detail = fill(t.dashboard.calendarDayDetail, {
+            date: day.date,
+            booked: count(day.booked),
+            blocked: count(day.blocked),
+            available: count(day.available),
+          });
+
+          return (
+            <li key={day.date} data-day={day.date} data-day-available={day.available}>
+              {/*
+                Each day OPENS that day (Bashar, 2026-08-10). The dashboard square is a portfolio
+                aggregate over every unit, so it cannot itself be edited — there is no single room to
+                open or close. It links to التقويمات at this date instead, which is the screen that
+                can act on it, with the day marked so the reader lands on it.
+
+                `min-h-10` on top of `aspect-square`: the cells are already past 40px at every width
+                the app supports, but the floor is a rule about controls under `lg` rather than an
+                observation about this grid, and an anchor needs it stated.
+              */}
+              <Link
+                href={`/calendars?date=${day.date}`}
+                /*
+                  `prefetch={false}` because there are THIRTY-ONE of these, all in the viewport at
+                  once, and each points at a dynamic page that costs a profile read plus a page of
+                  calendars to render. Left to the framework's default that is a month's worth of
+                  server renders for opening the dashboard. One deliberate navigation is cheap; the
+                  speculative version of it is not.
+                */
+                prefetch={false}
+                title={detail}
+                aria-label={detail}
+                className={`grid aspect-square min-h-10 cursor-pointer place-items-center rounded-[7px] border text-[11px] font-semibold transition-colors hover:border-gold ${portfolioTone(
+                  day.available,
+                  calendar.unitCount,
+                )}`}
+              >
+                {count(new Date(day.date).getUTCDate())}
+              </Link>
+            </li>
+          );
+        })}
       </ol>
+
+      <p className="mt-2.5 text-[10.5px] text-faint2">{t.dashboard.calendarClickHint}</p>
 
       <div className="mt-3 flex flex-wrap gap-3.5 text-[10.5px] text-faint">
         <Legend tone="text-ok" label={t.dashboard.legendPortfolioFree} />

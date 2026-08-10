@@ -14,6 +14,16 @@ export const PARTNER_LOCALE: Locale = 'ar';
 
 export const t = partnerAr;
 
+/**
+ * The sidebar's element id, shared by the hamburger's `aria-controls` and the aside itself.
+ *
+ * A constant rather than a literal in both files, for the reason the console records: `aria-controls`
+ * pointing at an id that does not exist is invisible to everyone except the screen-reader user it
+ * was added for. Named for this app rather than reusing `console-nav` — they are separate documents
+ * and a shared name would suggest a shared element.
+ */
+export const SIDEBAR_ID = 'partner-nav';
+
 /** Re-exported so components interpolate copy without also importing the package. */
 export { fill };
 

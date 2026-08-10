@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { calendarDateSchema } from './search.js';
+import { cursorQuerySchema } from './pagination.js';
 import { ERROR } from './error-codes.js';
 
 /**
@@ -88,4 +89,78 @@ export interface CalendarDay {
   isPriceOverridden: boolean;
   minNights: number;
   note: string | null;
+}
+
+/**
+ * `YYYY-MM` — exactly one calendar month.
+ *
+ * The portfolio calendar takes a MONTH rather than a `from`/`to` pair, and that is a BOUND rather
+ * than a convenience. `calendarQuerySchema` above accepts any range at all, and the read expands
+ * units × days, so `from=1900-01-01&to=2100-01-01` is a 73,000-row answer per unit to a request
+ * that costs nothing to make. Across a portfolio that is the shape of a denial-of-service. A month
+ * caps every unit at 31 rows by construction, and the screen shows one month anyway.
+ */
+export const calendarMonthSchema = z
+  .string()
+  .regex(/^\d{4}-(0[1-9]|1[0-2])$/, ERROR.VALIDATION_DATE_FORMAT)
+  /*
+    And bounded to years the platform could plausibly trade in, so a mistyped year is a 400 rather
+    than a generated series a century away.
+  */
+  .refine((v) => {
+    const year = Number(v.slice(0, 4));
+
+    return year >= 2000 && year <= 2100;
+  }, ERROR.VALIDATION_DATE_UNREAL);
+
+/**
+ * The whole portfolio's month, paginated by PROPERTY.
+ *
+ * Paginated by property rather than by unit because the screen groups units under the property they
+ * belong to: a cursor over units could split a hotel's rooms across a page boundary, and a group
+ * header with three of its five rooms under it is a worse answer than a second page.
+ *
+ * `limit` is overridden down to a default of 3 and a ceiling of 10, well below the shared
+ * `cursorQuerySchema` default of 20. A page here is not a row, it is a property and every unit it
+ * owns and every day of the month for each — so the unit of cost is much larger than a list item.
+ */
+export const portfolioCalendarQuerySchema = cursorQuerySchema
+  .extend({
+    month: calendarMonthSchema,
+    limit: z.coerce.number().int().min(1).max(10).default(3),
+  })
+  .strict();
+
+export type PortfolioCalendarQuery = z.infer<typeof portfolioCalendarQuerySchema>;
+
+export interface PortfolioCalendarUnit {
+  unitId: string;
+  nameAr: string;
+  /** The unit's own base price, for the editor's "unchanged" placeholder. */
+  basePrice: string;
+  currencyCode: string;
+  minNights: number;
+  /**
+   * Whether the unit is on sale at all.
+   *
+   * Inactive units are RETURNED, unlike the dashboard's portfolio counters which exclude them. The
+   * two answer different questions: the dashboard says what a customer can book, where an off-sale
+   * unit would overstate supply; this screen lists what the partner OWNS, and silently omitting a
+   * room would read as the page having lost it.
+   */
+  isActive: boolean;
+  days: CalendarDay[];
+}
+
+export interface PortfolioCalendarProperty {
+  reference: string;
+  nameAr: string;
+  units: PortfolioCalendarUnit[];
+}
+
+export interface PortfolioCalendar {
+  /** Echoed back so a client cannot render one month's grid under another month's heading. */
+  month: string;
+  properties: PortfolioCalendarProperty[];
+  nextCursor: string | null;
 }

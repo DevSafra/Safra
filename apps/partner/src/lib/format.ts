@@ -1,4 +1,26 @@
+import { cityLocalNow } from '@safra/contracts';
 import { ARABIC_WESTERN_DIGITS } from '@safra/i18n';
+
+/**
+ * The primary launch market's zone — the same fallback `SearchService.resolveTimezone` uses.
+ *
+ * A partner's properties can sit in different cities, but one calendar grid has one "today", so it
+ * is the platform's market rather than a per-property answer.
+ */
+const MARKET_TIME_ZONE = 'Asia/Damascus';
+
+/**
+ * Today's date where the business is, as `YYYY-MM-DD`.
+ *
+ * NOT `new Date().toISOString().slice(0, 10)`, which is what this replaced. That returns the date in
+ * UTC, and Damascus is UTC+3 — so for the three hours after 21:00 UTC every day, the calendar rang
+ * the wrong square as "today" and left the real yesterday undimmed. `cityLocalNow` reads the IANA
+ * database rather than assuming a constant offset, which matters the moment a second market is added:
+ * Beirut observes DST and Damascus has not since 2022.
+ */
+export function marketToday(): string {
+  return cityLocalNow(new Date(), MARKET_TIME_ZONE).date;
+}
 
 /**
  * An amount with its symbol, in the position that reads correctly.
