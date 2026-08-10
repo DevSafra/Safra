@@ -2,12 +2,43 @@
 
 import { useEffect, useState } from 'react';
 
-import { applySidebar, sidebarVisible } from '@safra/ui';
+import { applySidebar, sidebarVisible } from './sidebar.js';
 
-import { SIDEBAR_ID, t } from '@/lib/strings';
+/** The width from which the sidebar is a column rather than a drawer. Tailwind's `lg`. */
+const COLUMN_BREAKPOINT = '(min-width: 64rem)';
+
+/** The default toggle id. Both staff surfaces use it, and the browser tests select on it. */
+const DEFAULT_TOGGLE_ID = 'sidebar-toggle';
+
+export interface SidebarToggleProps {
+  /**
+   * The `aside`'s id — used for `aria-controls` and to move focus into the drawer.
+   *
+   * A prop rather than a constant here because the two apps name their own element:
+   * `console-nav` and `partner-nav`. Passing it keeps `aria-controls` pointing at an id that
+   * exists, which is invisible to everyone except the screen-reader user it was added for.
+   */
+  readonly sidebarId: string;
+  /** Names the ACTION, so the label says which way the button goes. Never the current state. */
+  readonly showLabel: string;
+  readonly hideLabel: string;
+  /** This document's own id for the button. Both apps take the default. */
+  readonly id?: string;
+}
 
 /**
  * The hamburger. Available at every width (Bashar, 2026-08-05).
+ *
+ * ## Why it lives in `@safra/ui`
+ *
+ * Both staff surfaces need it, and the requirement is that they AGREE — the sidebar collapses at
+ * every size, the hamburger is always available, the choice persists, Escape dismisses the drawer
+ * and returns focus. That is a project rule rather than a nicety, which is the bar this package
+ * sets for admission (see `PasswordField`). A copy in each app would have worked on the day and
+ * drifted after it, and the drift would be in the a11y behaviour, where nobody looks.
+ *
+ * Copy comes in as props for the same reason `PasswordField` requires its labels: no user-facing
+ * text is written inside a component, and a default would be wrong in some language.
  *
  * ## Why it is available on a desktop too
  *
@@ -17,16 +48,21 @@ import { SIDEBAR_ID, t } from '@/lib/strings';
  *
  * ## State lives on `<html>`, not here
  *
- * `PreferencesScript` has already applied the saved value before this mounts, and the CSS in
+ * The pre-paint script has already applied the saved value before this mounts, and each app's
  * `globals.css` draws the layout from it. This component reads that state so its label and
  * `aria-expanded` describe what is actually on screen, and writes it on click.
  *
  * The first render deliberately assumes visible. There is nothing to read during server
  * rendering — the choice lives in `localStorage` — and branching on anything client-only here is
- * a hydration mismatch, which this console has been broken by before. The effect corrects it
+ * a hydration mismatch, which the console has been broken by before. The effect corrects it
  * before a person can act on it.
  */
-export function SidebarToggle() {
+export function SidebarToggle({
+  sidebarId,
+  showLabel,
+  hideLabel,
+  id = DEFAULT_TOGGLE_ID,
+}: SidebarToggleProps) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
@@ -49,7 +85,7 @@ export function SidebarToggle() {
       Also re-read on resize. With no explicit choice the visible state IS the breakpoint, so
       dragging a window across 1024px changes what is on screen without touching the attribute.
     */
-    const media = window.matchMedia('(min-width: 64rem)');
+    const media = window.matchMedia(COLUMN_BREAKPOINT);
     const onChange = () => setVisible(sidebarVisible());
 
     media.addEventListener('change', onChange);
@@ -72,18 +108,18 @@ export function SidebarToggle() {
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
-      if (window.matchMedia('(min-width: 64rem)').matches) return;
+      if (window.matchMedia(COLUMN_BREAKPOINT).matches) return;
 
       applySidebar('hidden');
       setVisible(false);
       // Focus returns to the control that opened it, or it is lost to the top of the document.
-      document.getElementById(TOGGLE_ID)?.focus();
+      document.getElementById(id)?.focus();
     }
 
     window.addEventListener('keydown', onKeyDown);
 
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [visible]);
+  }, [visible, id]);
 
   function toggle() {
     const next = !visible;
@@ -98,24 +134,24 @@ export function SidebarToggle() {
       through nothing to reach it. On a desktop the sidebar is a column in the normal flow, so
       focus stays where it was and the tab order already leads there.
     */
-    if (next && !window.matchMedia('(min-width: 64rem)').matches) {
+    if (next && !window.matchMedia(COLUMN_BREAKPOINT).matches) {
       requestAnimationFrame(() => {
-        document.getElementById(SIDEBAR_ID)?.focus();
+        document.getElementById(sidebarId)?.focus();
       });
     }
   }
 
-  const label = visible ? t.nav.hideSidebar : t.nav.showSidebar;
+  const label = visible ? hideLabel : showLabel;
 
   return (
     <button
-      id={TOGGLE_ID}
+      id={id}
       type="button"
       onClick={toggle}
       aria-label={label}
       title={label}
       aria-expanded={visible}
-      aria-controls={SIDEBAR_ID}
+      aria-controls={sidebarId}
       className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-[9px] border border-line bg-field text-muted transition-colors hover:border-gold hover:text-gold"
     >
       {/*
@@ -131,6 +167,3 @@ export function SidebarToggle() {
     </button>
   );
 }
-
-/** Stable id so `aria-controls` and the focus calls agree. */
-const TOGGLE_ID = 'sidebar-toggle';

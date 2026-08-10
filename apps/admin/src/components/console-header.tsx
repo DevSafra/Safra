@@ -1,7 +1,8 @@
-import { SidebarToggle } from '@/components/sidebar-toggle';
+import { SidebarToggle } from '@safra/ui';
+
 import { todayLong } from '@/lib/format';
 import { getStaffSession } from '@/lib/session-server';
-import { roleName } from '@/lib/strings';
+import { SIDEBAR_ID, roleName, t } from '@/lib/strings';
 
 /**
  * The title row every console section shares: hamburger, title · date · role, section actions.
@@ -45,7 +46,11 @@ export async function ConsoleHeader({
         Available at every width — the operator chooses whether the sidebar is there, on a phone
         and on a desktop alike.
       */}
-      <SidebarToggle />
+      <SidebarToggle
+        sidebarId={SIDEBAR_ID}
+        showLabel={t.nav.showSidebar}
+        hideLabel={t.nav.hideSidebar}
+      />
 
       {/*
         Title and meta share an inner row; the subtitle sits UNDER both. That is what keeps the

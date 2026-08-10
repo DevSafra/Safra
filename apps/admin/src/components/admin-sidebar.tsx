@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { ThemeToggle } from '@safra/ui';
+
 import { ARABIC_WESTERN_DIGITS } from '@/lib/numerals';
 import { SignOutButton } from '@/components/sign-out-button';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { SIDEBAR_ID, t } from '@/lib/strings';
 
 /**
@@ -190,7 +191,15 @@ export function AdminSidebar({ counts }: { counts: SidebarCounts }) {
         both shapes, because the aside is a flex column.
       */}
       <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line2 pt-3">
-        <ThemeToggle />
+        {/*
+          `whenUnset='dark'` — the console is designed dark and its CSS has no
+          `prefers-color-scheme` rule, so dark is what is actually on screen before anyone chooses.
+        */}
+        <ThemeToggle
+          toLightLabel={t.dashboard.themeToLight}
+          toDarkLabel={t.dashboard.themeToDark}
+          whenUnset="dark"
+        />
         <SignOutButton />
       </div>
     </aside>

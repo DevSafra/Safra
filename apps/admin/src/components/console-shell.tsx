@@ -1,6 +1,7 @@
+import { SidebarBackdrop } from '@safra/ui';
+
 import { AdminSidebar, type SidebarCounts } from '@/components/admin-sidebar';
 import { ConsoleHeader } from '@/components/console-header';
-import { SidebarBackdrop } from '@/components/sidebar-backdrop';
 import { t } from '@/lib/strings';
 
 /**
@@ -35,7 +36,7 @@ export function ConsoleShell({
       </main>
 
       <AdminSidebar counts={counts} />
-      <SidebarBackdrop />
+      <SidebarBackdrop label={t.nav.hideSidebar} className="console-backdrop" />
     </div>
   );
 }

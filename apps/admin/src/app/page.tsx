@@ -10,11 +10,10 @@ import { amount, count } from '@/lib/format';
 import { AdminSidebar } from '@/components/admin-sidebar';
 import { RevenueChart } from '@/components/revenue-chart';
 import { ConsoleHeader } from '@/components/console-header';
-import { SidebarBackdrop } from '@/components/sidebar-backdrop';
 import { t, auditAction, bookingStatus } from '@/lib/strings';
 import { StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
-import { ORNAMENT_BRAND } from '@safra/ui';
+import { ORNAMENT_BRAND, SidebarBackdrop } from '@safra/ui';
 
 /**
  * The command center (§9.2), built to the approved design (SAFRA 29.07).
@@ -88,7 +87,7 @@ export default async function DashboardPage() {
             : {}
         }
       />
-      <SidebarBackdrop />
+      <SidebarBackdrop label={t.nav.hideSidebar} className="console-backdrop" />
     </div>
   );
 }

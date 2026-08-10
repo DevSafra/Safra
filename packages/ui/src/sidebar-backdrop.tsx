@@ -1,8 +1,20 @@
 'use client';
 
-import { applySidebar } from '@safra/ui';
+import { applySidebar } from './sidebar.js';
 
-import { t } from '@/lib/strings';
+export interface SidebarBackdropProps {
+  /** The dismiss label — the same "hide the navigation" string the hamburger uses. */
+  readonly label: string;
+  /**
+   * The app's backdrop class.
+   *
+   * A prop because each app's `globals.css` owns WHEN the backdrop is visible — below `lg`, and
+   * only while the sidebar is shown — and the class is that rule's hook. The styling cannot come
+   * from here: it depends on an attribute on `<html>` and must be right in the first painted
+   * frame, which a Tailwind arbitrary variant repeated per element cannot express legibly.
+   */
+  readonly className: string;
+}
 
 /**
  * The dimmed area behind the sidebar when it is a drawer.
@@ -21,12 +33,12 @@ import { t } from '@/lib/strings';
  * `<html>`, and re-rendering the server tree to close a drawer would refetch the page's data. The
  * hamburger keeps its label in step by observing the attribute.
  */
-export function SidebarBackdrop() {
+export function SidebarBackdrop({ label, className }: SidebarBackdropProps) {
   return (
     <button
       type="button"
-      aria-label={t.nav.hideSidebar}
-      className="console-backdrop cursor-pointer"
+      aria-label={label}
+      className={`${className} cursor-pointer`}
       onClick={() => applySidebar('hidden')}
     />
   );
