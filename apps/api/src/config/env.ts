@@ -60,6 +60,33 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   DATABASE_POOL_MAX: z.coerce.number().int().positive().max(200).default(20),
 
+  /**
+   * The per-IP ceiling for ordinary traffic, a minute at a time. 120 unless raised deliberately.
+   *
+   * ## What this is not
+   *
+   * It is **not** the credential-stuffing control, and it is deliberately the only one of the two
+   * throttlers that configuration can move. The `account` throttler — ten a minute per (person,
+   * network) on every route that names an email — is a literal in `app.module.ts` with no variable,
+   * because raising THAT to make a test suite pass was considered and rejected (see
+   * `e2e/partner.setup.ts`). Nor does this touch the five-attempt account lockout in `AuthService`.
+   *
+   * ## Why it needs to be movable
+   *
+   * `pnpm e2e` is one IP driving four apps through several hundred renders in ninety seconds — the
+   * traffic of dozens of separate people. A full run already produces ~500 `429`s, which the console
+   * absorbs by design; but لوحة الشريك renders its business name from `GET /partner/me`, so when that
+   * is the refused request the page renders nameless and a spec fails for a reason unrelated to the
+   * code under test. Restructuring the suite cannot fix it — retrying re-fills the same window.
+   *
+   * Raised only in the git-ignored local `.env`. Absent in production, where 120 stands. A load test
+   * is the other legitimate reason to move it.
+   *
+   * `positive()` and an upper bound rather than a bare number: a typo must fall foul of the schema at
+   * BOOT, not silently remove a denial-of-service guard at run time.
+   */
+  THROTTLE_DEFAULT_LIMIT: z.coerce.number().int().positive().max(100_000).default(120),
+
   REDIS_URL: z.string().url(),
 
   JWT_ACCESS_SECRET: secretSchema,

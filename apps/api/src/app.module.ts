@@ -30,6 +30,7 @@ import {
   accountTracker,
   skipUnlessAccountNamed,
 } from './common/throttle/account-tracker.js';
+import { ENV, type Env } from './config/env.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
 import { PermissionsGuard } from './rbac/permissions.guard.js';
 import { TwoFactorGuard } from './rbac/two-factor.guard.js';
@@ -52,10 +53,15 @@ import { TwoFactorGuard } from './rbac/two-factor.guard.js';
      */
     ThrottlerModule.forRootAsync({
       imports: [RedisModule],
-      inject: [RedisThrottlerStorage],
-      useFactory: (storage: RedisThrottlerStorage) => ({
+      inject: [RedisThrottlerStorage, ENV],
+      useFactory: (storage: RedisThrottlerStorage, env: Env) => ({
         throttlers: [
-          { name: 'default', ttl: 60_000, limit: 120 },
+          /*
+            The per-IP ceiling, from the schema-validated environment rather than a literal — see
+            `THROTTLE_DEFAULT_LIMIT` in `config/env.ts` for what it is for and, more importantly,
+            what it is NOT. The `account` throttler below stays a literal on purpose.
+          */
+          { name: 'default', ttl: 60_000, limit: env.THROTTLE_DEFAULT_LIMIT },
           /**
            * The per-ACCOUNT limit, added 2026-08-07 (Bashar).
            *
