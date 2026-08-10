@@ -447,6 +447,48 @@ should be hidden.
 
 **Owner:** engineering, next time it appears.
 
+### O-test-2 — The browser suite runs at the API's rate-limit ceiling
+
+**What was found (2026-08-10, adding `partner-sidebar.spec.ts`):** the API's `default` throttler
+allows **120 requests a minute per IP** (`app.module.ts`), and `pnpm e2e` is one IP driving every
+app. A full run already produces around **500 `429`s** — 343 on `GET /admin/attention` and 157 on
+`GET /admin/me/preferences` — and passes anyway, because both degrade gracefully by design: "a
+failed preference read is not an error".
+
+**Why that matters to the next person adding a spec.** Not every 429 is absorbed. `partner.spec.ts`
+sorts last among the partner specs and so inherits the emptiest budget in the run; when
+`GET /partner/me` is throttled, لوحة الشريك renders with an empty business name and that spec's
+first assertion fails. The first draft of `partner-sidebar.spec.ts` — twenty tests, thirty-odd
+navigations — did exactly that, and the failure appeared in the file the change had just touched,
+pointing at markup that was correct.
+
+**First the suite was bent, and it was not enough.** `partner-sidebar.spec.ts` and
+`partner-calendars.spec.ts` group their assertions by the page load they share and sweep viewport
+widths by resizing rather than reloading — both carry comments saying why. That halved their cost and
+still left `partner.spec.ts` red. Retrying makes it worse, not better: the window is sliding, so a
+reload-until-it-works loop keeps re-filling the thing it is waiting to drain. Four consecutive runs
+demonstrated it.
+
+**Resolved 2026-08-10 by making the per-IP ceiling configuration, not a literal.**
+`THROTTLE_DEFAULT_LIMIT` (`apps/api/src/config/env.ts`, schema-validated, default **120**) is set to
+1200 in the git-ignored local `.env` only. Production sets nothing and keeps 120. Result: the ~500
+spurious `429`s are gone and the suite is green at 198 tests.
+
+**What was deliberately NOT touched, and how that is proven.** The `account` throttler — ten a minute
+per (person, network) on every route that names an email — is still a literal in `app.module.ts` with
+no variable, as is the five-attempt lockout in `AuthService`. Those are the credential-stuffing
+controls, and O-sec-1 is why they are keyed the way they are. The evidence that they still fire is in
+the same run: `POST /auth/login` took **6 × 429** with the new ceiling in place, which is
+`auth-throttle.spec.ts` doing its job. If a future change makes that count zero, the guard has been
+weakened and that spec should fail.
+
+**Still worth doing on its own merits:** the console's `attention` and `me/preferences` reads are what
+generated most of those ~500 rejections — 343 and 157 respectively, one pair per section render.
+Caching them would remove that traffic for real rather than raising the ceiling over it, and at 1M
+users it is a production concern rather than a test one.
+
+**Owner:** engineering — the caching item. The limiter question is closed.
+
 ### O-i18n-3 — Closed for the customer app: Arabic plurals use CLDR categories
 
 **Closed 2026-08-08 for `apps/web`.** Every count-bearing message in the customer catalogue now
@@ -1119,6 +1161,61 @@ would overstate what a customer can book.
 countdown had nothing to count — the seed now sets it the way `BookingCreationService` does. And
 `e2e/responsive.spec.ts` has never covered لوحة الشريك at all; the four widths are now asserted
 inside the partner sign-in test, where they cost no extra login.
+
+**The calendar became a way IN, 2026-08-10 (Bashar).** Its numbers were correct — checked against the
+seeded bookings — but it was read-only, so a partner who spotted a problem had no way to act on it.
+Every square is now a link to **التقويمات** (`/calendars`) at that date. The aggregate square itself
+cannot be edited and never will be: it counts every unit, so there is no single room to open or close.
+`prefetch={false}` on those links is not incidental — thirty-one links to a dynamic page would
+otherwise let a framework default turn opening the dashboard into a month of server renders.
+
+**التقويمات, new 2026-08-10.** Every unit's month on one page, grouped under its property, each with
+its own weekday-aligned grid and its own range editor. `GET /partner/calendars` answers it in TWO
+queries whatever the portfolio — a page of properties by keyset, then one expansion of the month for
+their units — and takes a `month` rather than a `from`/`to` because `calendarQuerySchema` accepts any
+range and units × days over a century is a denial-of-service shaped like a calendar read.
+
+**Both grids are now real calendars.** They were seven-column strips: day one in column one whatever
+weekday it fell on, and no weekday header. `MonthGrid` offsets the first day into its true column,
+names the columns from `Intl` (Saturday first, the week as it is read in Syria), dims the past and
+rings today. The old shape withheld the one thing a lodging calendar is asked — which of these is a
+weekend. **The dashboard's own strip was left as the design specifies it**; the working screen is the
+one that got the real grid.
+
+**Four defects found and fixed on review, 2026-08-10.** Recorded because three of them are classes of
+bug rather than one-off slips:
+
+1. **Every day cell carried `id="day-<date>"`** — fine on the one-grid screen, invalid on التقويمات
+   where four units draw the same month, so each id existed four times. Removed rather than
+   namespaced: nothing links to them, because the dashboard hands over by `?date=` and cannot know a
+   unit id to build a fragment from.
+2. **The range editor kept the previous month's dates.** `useState` seeds once, and a client-side
+   month change re-renders `RangeEditor` without remounting it — so the dates stayed on آب while the
+   bounds moved to أيلول, and «تطبيق على المدة» wrote to **August** while the reader was looking at
+   September. Fixed by adjusting state during render when the month prop changes. The regression test
+   CLICKS the arrow; a `goto` remounts the component and passes against the bug.
+3. **"Today" was computed in UTC** (`toISOString().slice(0, 10)`) on three screens. Damascus is UTC+3,
+   so from 21:00 UTC the wrong square was ringed and the real yesterday was left undimmed — and at
+   21:30 on the 31st, the screens opened on **the month that had just ended**. Now `marketToday()`,
+   which goes through `cityLocalNow` and the IANA database rather than assuming a constant offset.
+4. **A cursor page was a dead end.** `عرض عقارات أخرى` moves forward only and the month arrows carry
+   the cursor, so page two had no way back except the browser button. There is now a
+   «العودة إلى أول العقارات» link.
+
+**Known limits, deliberately not built:**
+
+- **Paging is per PROPERTY, so one property with hundreds of units is one large response.** Chosen so
+  a page boundary can never split a hotel's rooms away from their heading. A 500-room hotel would
+  want unit-level paging inside a property; nothing in the fixtures approaches it.
+- **No composite index for the keyset.** `properties_partner_idx` serves the filter and Postgres sorts
+  one partner's properties, which `EXPLAIN` confirms is an index scan plus a small sort.
+  `(partner_id, created_at, id)` would make it a pure seek and is the right index if portfolios grow.
+- **Pressing a day does not scroll to it.** It opens the month and rings the date in every grid; on a
+  long page the ring can be below the fold. A fragment cannot be built without a unique target — see
+  defect 1.
+- **A nightly price of `0` cannot be submitted.** `if (price)` treats `"0"` as absent, so the contract
+  accepts a free night that the UI cannot send. Left alone: rejecting a zero price is the safer
+  behaviour of the two, and changing it is a pricing decision rather than a bug fix.
 
 **Owner:** engineering.
 
