@@ -151,6 +151,37 @@ test.describe('بطاقات الهدايا', () => {
     await page.setViewportSize({ width: 1280, height: 1000 });
 
     /*
+      ── An LTR value sits at the reader's START edge, in both directions ──
+
+      Bashar, 2026-08-11: on the Arabic profile the email and the phone number sat on the LEFT while
+      their labels sat on the right. The cause was `dir="ltr"`, which fixes the ORDER of a Latin run and
+      also moves the element's start edge to the left. Display text now uses a U+2066 isolate and fields
+      use the `field-ltr` class, which takes its alignment from the DOCUMENT rather than the element.
+    */
+    for (const [loc, want] of [
+      ['ar', 'right'],
+      ['en', 'left'],
+    ] as const) {
+      await page.goto(`/${loc}/account/gifts`, { waitUntil: 'domcontentloaded' });
+
+      const align = await page
+        .locator('input[name=code]')
+        .evaluate((el) => getComputedStyle(el).textAlign);
+
+      expect(
+        align === want || (want === 'left' && align === 'start'),
+        `the ${loc} gift-code field aligns ${align}, expected ${want}`,
+      ).toBe(true);
+
+      /* The ORDER is still left to right, or `+963…` would render as `963…+`. */
+      expect(
+        await page
+          .locator('input[name=code]')
+          .evaluate((el) => getComputedStyle(el).direction),
+      ).toBe('ltr');
+    }
+
+    /*
       ── Arabic, and no sideways scroll at any documented width ──
 
       In the same test rather than its own, because a second `test` under this describe would get a fresh

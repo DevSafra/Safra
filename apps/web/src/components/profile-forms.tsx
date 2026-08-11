@@ -132,14 +132,17 @@ export function ProfileForm({
 
       <label className="grid gap-1">
         <span className="text-sm text-muted">{labels.phone}</span>
-        {/* A number with a leading `+` is a Latin run; its own `dir` keeps the bidi algorithm off it. */}
+        {/*
+          `field-ltr`, not `dir="ltr"`: the number is laid out left to right, and it still sits at the
+          reader's start edge — the right, in Arabic. See the class in `globals.css`.
+        */}
         <input
+          name="phone"
           value={phone}
           onChange={(event) => setPhone(event.target.value)}
-          dir="ltr"
           inputMode="tel"
           required
-          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-text lg:min-h-0"
+          className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-text lg:min-h-0"
         />
       </label>
 

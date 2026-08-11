@@ -5,6 +5,7 @@ import { AccountShell } from '@/components/account-shell';
 import { PasswordForm, ProfileForm } from '@/components/profile-forms';
 import { getAccountSummary } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
+import { ltrIsolate } from '@/lib/bidi';
 
 /**
  * الملف الشخصي — handoff §6.
@@ -48,10 +49,15 @@ export default async function AccountProfilePage({
         <dl className="grid gap-4 rounded-card border border-line bg-card p-5">
           <div>
             <dt className="text-sm text-muted">{t('profileEmail')}</dt>
-            {/* An address is a Latin run on a line that may be Arabic. */}
-            <dd className="mt-1 text-text" dir="ltr">
-              {session.user.email}
-            </dd>
+            {/*
+              Isolated, not `dir="ltr"`.
+
+              The address is a Latin run on a line that may be Arabic, so its order has to be left to
+              right — but `dir="ltr"` also moves the element's start edge to the left, which put the
+              address flush left under a label sitting on the right. The isolate fixes the order and
+              leaves the placement to the paragraph.
+            */}
+            <dd className="mt-1 text-text">{ltrIsolate(session.user.email)}</dd>
             <dd className="mt-1 text-xs leading-relaxed text-faint">
               {t('emailNotEditable')}
             </dd>

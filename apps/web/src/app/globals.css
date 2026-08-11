@@ -235,6 +235,30 @@ body {
 }
 
 /**
+ * A field whose VALUE reads left-to-right on a page that may not.
+ *
+ * An email, a phone number, a gift-card code: the characters have to be laid out left to right, or
+ * `+963…` renders as `963…+` — the `+` is bidi-neutral, so at the start of an RTL run it takes the
+ * paragraph's direction and lands on the wrong side.
+ *
+ * `dir="ltr"` fixes the ORDER and breaks the PLACEMENT: it makes the element's own start edge the left
+ * one, so on an Arabic page the value sat flush left inside a full-width field while its label sat on
+ * the right. Reported by Bashar (2026-08-11) against البريد الإلكتروني and رقم الهاتف.
+ *
+ * Display text solves this with `ltrIsolate` from `lib/bidi.ts` — U+2066 around the value, which leaves
+ * alignment to the paragraph. A FIELD cannot: those are real characters, and they would be submitted
+ * with the form and stored. So the direction is set here and the alignment is taken from the DOCUMENT
+ * rather than from the element, which is the one thing a `dir` attribute cannot express.
+ */
+.field-ltr {
+  direction: ltr;
+}
+
+:root[dir='rtl'] .field-ltr {
+  text-align: right;
+}
+
+/**
  * حسابي's shell — the same arrangement as لوحة الشريك and the staff console.
  *
  * Bashar, 2026-08-11: the customer dashboard's sidebar should match the other two. So: a hamburger at

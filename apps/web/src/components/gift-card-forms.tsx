@@ -147,8 +147,10 @@ export function RedeemForm({ locale }: { readonly locale: Locale }) {
       <label className="grid gap-1">
         <span className="text-sm text-muted">{t('giftCodeLabel')}</span>
         {/*
-          `dir="ltr"` and a monospace face: a code is a Latin and numeric run on a line that may be
-          Arabic, and the grouping is only readable when every symbol has the same width.
+          `field-ltr` and a monospace face: a code is a Latin and numeric run on a line that may be
+          Arabic, and the grouping is only readable when every symbol has the same width. The class keeps
+          the order left to right while leaving the value at the reader's start edge — `dir="ltr"` moved
+          it to the left of an Arabic form, which is the bug Bashar reported on الملف الشخصي.
 
           `autoComplete="off"` with `spellCheck={false}`, because neither a password manager nor a spell
           checker should take an interest in a one-time bearer string.
@@ -157,12 +159,11 @@ export function RedeemForm({ locale }: { readonly locale: Locale }) {
           name="code"
           value={code}
           onChange={(event) => setCode(event.target.value)}
-          dir="ltr"
           autoComplete="off"
           spellCheck={false}
           maxLength={64}
           placeholder="XXXXX-XXXXX-XXXXX-XXXXX"
-          className={`${CONTROL} font-mono tracking-wider`}
+          className={`${CONTROL} field-ltr font-mono tracking-wider`}
           required
         />
         <span className="text-xs text-faint">{t('giftCodeHint')}</span>
@@ -348,9 +349,9 @@ export function BuyForm({
             value={recipientEmail}
             onChange={(event) => setRecipientEmail(event.target.value)}
             type="email"
-            dir="ltr"
             maxLength={254}
-            className={CONTROL}
+            /* An address is a Latin run; `field-ltr` orders it without moving it off the start edge. */
+            className={`${CONTROL} field-ltr`}
           />
           <span className="text-xs text-faint">{t('giftRecipientNote')}</span>
         </label>

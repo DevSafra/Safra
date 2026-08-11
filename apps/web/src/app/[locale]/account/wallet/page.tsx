@@ -7,6 +7,7 @@ import { getAccountSummary, getMyWallet, getMyWalletTransactions } from '@/lib/a
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { formatMoney } from '@/lib/localise';
+import { ltrIsolate } from '@/lib/bidi';
 
 /**
  * محفظتي — handoff §6.1, which is the most tightly specified panel in the whole document.
@@ -252,9 +253,15 @@ function BalanceCard({
       }}
     >
       <p className="text-sm text-muted">{title}</p>
-      {/* 36px/800, the handoff's figure size. `dir="ltr"` — an amount is a Latin run. */}
-      <p className={`mt-1 text-[36px] leading-tight font-extrabold ${tone}`} dir="ltr">
-        {amount}
+      {/*
+        36px/800, the handoff's figure size.
+
+        The amount is ISOLATED rather than carrying `dir="ltr"`: an amount is a Latin run and needs its
+        own order, but `dir` also flips the element's start edge, which left both figures hugging the
+        left of an Arabic card while their titles sat on the right.
+      */}
+      <p className={`mt-1 text-[36px] leading-tight font-extrabold ${tone}`}>
+        {ltrIsolate(amount)}
       </p>
       <p className="mt-2 text-[11.5px] leading-relaxed text-faint">{caption}</p>
     </div>
