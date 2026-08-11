@@ -1602,6 +1602,42 @@ of which exists:
 which markets, at which rate. The engineering work is meaningless until that is answered,
 and answering it may make `bookings` carry a tax column, which is the expensive part.
 
+### O-fin-2 — The receipt PDF is made by the reader's browser, not by us
+
+**Status:** shipped as print-to-PDF, deliberately · **Owner:** **Bashar** ·
+**Recorded:** 2026-08-11
+
+Bashar asked for a downloadable PDF (2026-08-11). What ships is a «تحميل PDF» button that calls
+`window.print()`, with a print stylesheet that turns the receipt into an A4 document — the colour
+tokens are redefined once inside `@media print`, so the whole page becomes paper rather than each
+element needing a `print:` class.
+
+**Why not generated in the API.** The receipt has to read correctly in Arabic, and Arabic is not a
+font substitution — it needs contextual glyph shaping and bidirectional layout. `pdfkit` and
+`pdf-lib`, the two libraries that would run in a Node service, do neither: the output would be
+disconnected left-to-right letterforms. It would look perfect to anyone testing in English and be
+unusable for the primary audience, which is the worst shape a bug can have.
+
+Correct Arabic in a PDF needs a real text engine. That means the reader's browser, or a headless one
+of ours.
+
+**What the server-side version would take**, if it is ever wanted — an emailable, byte-identical file:
+
+| Needed                         | Note                                                                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Headless Chromium in the image | Or a HarfBuzz-based shaper. Both are a container and deployment concern, which is **M-1**                               |
+| A background queue             | Rule 2 forbids slow work on a request path, and the API budget is p95 < 200 ms. Rendering a page per request is neither |
+| Object storage for the result  | The queue answers "later", so the file needs somewhere to live and a signed, expiring URL                               |
+| Arabic + Latin fonts embedded  | Amiri and Cairo, subset. A missing glyph in a PDF is a blank box rather than a fallback                                 |
+
+**The trade the current version makes:** the customer chooses the destination in the print dialog
+rather than getting a file straight into their downloads folder. That is the honest cost, and the
+button's helper text says «اختر «حفظ بصيغة PDF» في نافذة الطباعة» so nobody has to guess.
+
+**Recommended next action:** none until there is a reason a browser-made PDF is insufficient — the
+likely trigger is wanting to ATTACH the receipt to an email, which is a queue job and lands with M-1
+anyway.
+
 ---
 
 ## 6. Deferred until after launch
