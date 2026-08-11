@@ -1628,6 +1628,40 @@ button's helper text says «اختر «حفظ بصيغة PDF» في نافذة �
 likely trigger is wanting to ATTACH the receipt to an email, which is a queue job and lands with M-1
 anyway.
 
+### O-fin-3 — A gift card can only be bought with wallet balance
+
+**Status:** built, with the funding source constrained · **Owner:** **Bashar** ·
+**Recorded:** 2026-08-11
+
+بطاقات الهدايا is built (`/account/gifts`, `GET|POST /gift-cards`, `POST /gift-cards/redeem`). Redeeming
+a code credits the customer's WALLET, which is what Bashar asked for — the balance then composes with
+every payment method rather than only with a booking.
+
+**Buying is funded from the wallet, and that is a schema constraint rather than a preference.**
+`payments.booking_id` is `NOT NULL`, so the payments table cannot record a purchase that is not for a
+stay. A wallet debit is a complete and correct purchase today — it refuses rather than going negative,
+it is audited, it locks the row — but it means somebody with an empty wallet cannot buy a gift.
+
+**What buying with a card would take:**
+
+| Needed                              | Note                                                                                                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `payments.booking_id` made nullable | A money-path migration. Every reader of that column then has to handle a payment with no booking, including the ledger and the payouts view       |
+| A `gift_card_id` leg on `payments`  | So a purchase is attributable. `LedgerContext.bookingId` is already optional, so the ledger side is ready                                         |
+| A pending → active card state       | A card must not be spendable before its payment captures, which means a status the redeem path refuses. `gift_card_status` has no `pending` today |
+| Webhook handling for the capture    | The existing provider flow resolves a BOOKING from the payment; it would need to resolve a card instead                                           |
+
+**Also deliberately absent: nothing is emailed.** `recipient_name` and `recipient_email` are stored as
+LABELS, so a buyer can tell their cards apart, and the UI says so in as many words — «للتمييز بين
+بطاقاتك فقط — لا نرسل الرمز إلى هذا البريد». Delivering a code by email means a mail template and a
+queue job, and it also means deciding whether a code in an inbox is acceptable at all: it is a bearer
+instrument, so an email is a spendable secret sitting in somebody's mailbox.
+
+**The code is shown exactly once**, in the response to the purchase. It is stored only as
+`sha256(normalised)` plus the last four symbols, never logged, and never returned by a read. A buyer who
+loses it before passing it on needs staff to cancel and reissue — the same trade every gift card makes,
+and the reason the console has no endpoint that reveals a code either.
+
 ---
 
 ## 6. Deferred until after launch
