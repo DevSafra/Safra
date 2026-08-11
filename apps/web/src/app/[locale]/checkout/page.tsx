@@ -7,7 +7,7 @@ import { CheckoutForm } from '@/components/checkout-form';
 import { DateRange } from '@/components/date-range';
 import { isLocale } from '@/i18n/routing';
 import { getMyWallet } from '@/lib/account';
-import { formatMoney } from '@/lib/localise';
+import { formatMoney, localisedName, localisedText } from '@/lib/localise';
 import { availablePaymentMethods, getProperty, quote } from '@/lib/property';
 import { getSession } from '@/lib/session-server';
 
@@ -124,9 +124,8 @@ export default async function CheckoutPage({
   const applicable =
     balance && balance.currencyCode === priced.currencyCode ? balance.balance : null;
 
-  const name = locale === 'ar' ? property.name.ar : property.name.en || property.name.ar;
-  const cityName =
-    locale === 'ar' ? property.city.nameAr : property.city.nameEn || property.city.nameAr;
+  const name = localisedText(property.name, locale);
+  const cityName = localisedName(property.city, locale);
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">

@@ -4,7 +4,8 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { isLocale, routing, type Locale } from '@/i18n/routing';
-import { formatMoney } from '@/lib/localise';
+import { SaveButton } from '@/components/save-button';
+import { formatMoney, localisedName, localisedText } from '@/lib/localise';
 import { getProperty, imageUrl, type PropertyDetail } from '@/lib/property';
 import { dynamicMessage } from '@/lib/dynamic-message';
 
@@ -33,8 +34,8 @@ export async function generateMetadata({
   const property = await getProperty(slug);
   if (!property) return {};
 
-  const name = pick(property.name, locale);
-  const description = pick(property.description, locale);
+  const name = localisedText(property.name, locale);
+  const description = localisedText(property.description, locale);
 
   return {
     title: name,
@@ -75,9 +76,9 @@ export default async function PropertyPage({
   const tc = await getTranslations('city');
   const tcal = await getTranslations('calendar');
 
-  const name = pick(property.name, locale);
-  const description = pick(property.description, locale);
-  const cityName = cityLabel(property.city, locale);
+  const name = localisedText(property.name, locale);
+  const description = localisedText(property.description, locale);
+  const cityName = localisedName(property.city, locale);
   const cheapest = property.units[0];
   const defaultStay = firstAvailableWindow(property.calendar, cheapest?.minNights ?? 1);
 
@@ -118,6 +119,24 @@ export default async function PropertyPage({
               {' · '}
               <span className="text-faint">{property.reference}</span>
             </p>
+
+            {/*
+              Save to المفضلة.
+
+              No `initiallySaved`: this page is cached (`revalidate = 60`), so its HTML is shared
+              between readers and must carry nobody's shortlist. The button asks for its own state
+              after mounting, which keeps the page cacheable.
+            */}
+            <div className="mt-3">
+              <SaveButton
+                slug={property.slug}
+                labels={{
+                  save: t('save'),
+                  saved: t('saved'),
+                  failed: t('saveFailed'),
+                }}
+              />
+            </div>
           </div>
 
           {property.badges.length > 0 ? (
@@ -385,7 +404,7 @@ function Gallery({
           <source srcSet={imageUrl(cover, 1600, 'webp')} type="image/webp" />
           <img
             src={imageUrl(cover, 1600, 'webp')}
-            alt={pick(cover.alt, locale) ?? name}
+            alt={localisedText(cover.alt, locale) ?? name}
             width={cover.width ?? 1600}
             height={cover.height ?? 1000}
             className="h-64 w-full rounded-card border border-line object-cover sm:h-80"
@@ -403,7 +422,7 @@ function Gallery({
                 <source srcSet={imageUrl(image, 800, 'webp')} type="image/webp" />
                 <img
                   src={imageUrl(image, 800, 'webp')}
-                  alt={pick(image.alt, locale) ?? name}
+                  alt={localisedText(image.alt, locale) ?? name}
                   width={image.width ?? 800}
                   height={image.height ?? 600}
                   className="h-32 w-full rounded-card border border-line object-cover sm:h-[9.5rem]"
@@ -416,22 +435,6 @@ function Gallery({
       ) : null}
     </div>
   );
-}
-
-function pick(
-  value: { ar: string | null; en: string | null; de: string | null },
-  locale: Locale,
-) {
-  // Arabic is the authored language; fall back to it rather than showing nothing.
-  if (locale === 'en') return value.en?.trim() || value.ar || '';
-  if (locale === 'de') return value.de?.trim() || value.ar || '';
-  return value.ar || '';
-}
-
-function cityLabel(city: PropertyDetail['city'], locale: Locale): string {
-  if (locale === 'en') return city.nameEn || city.nameAr;
-  if (locale === 'de') return city.nameDe || city.nameAr;
-  return city.nameAr;
 }
 
 function policyName(

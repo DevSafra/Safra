@@ -13,8 +13,19 @@ export interface SearchResultItem {
   slug: string;
   nameAr: string;
   nameEn: string;
+  /*
+    All three names, and the city's in all three too.
+
+    The projection used to carry `nameAr`, `nameEn` and `cityNameAr` only, which left the customer app
+    unable to render a search result correctly in two of the three languages it serves: a German reader
+    got the ENGLISH property name (241 properties have a distinct German one), and an English or German
+    reader got the city SLUG — «damascus» — because no city name in their language was sent at all.
+  */
+  nameDe: string;
   citySlug: string;
   cityNameAr: string;
+  cityNameEn: string;
+  cityNameDe: string;
   propertyTypeCode: string;
   rating: string | null;
   reviewsCount: number;
@@ -198,8 +209,11 @@ export class SearchService {
           p.slug,
           p.name_ar            AS "nameAr",
           p.name_en            AS "nameEn",
+          p.name_de            AS "nameDe",
           ci.slug              AS "citySlug",
           ci.name_ar           AS "cityNameAr",
+          ci.name_en           AS "cityNameEn",
+          ci.name_de           AS "cityNameDe",
           pt.code              AS "propertyTypeCode",
           p.rating,
           p.reviews_count      AS "reviewsCount",

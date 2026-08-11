@@ -26,6 +26,24 @@ export function localisedName(value: Translated, locale: Locale): string {
   return value.nameAr;
 }
 
+/**
+ * The same choice for the `{ ar, en, de }` shape the property detail uses.
+ *
+ * Lifted out of `property/[slug]/page.tsx`, where it lived as a local `pick`. Being local is how the
+ * checkout page came to re-implement it as `locale === 'ar' ? name.ar : name.en || name.ar` — which
+ * answers ENGLISH to a German reader, and 241 properties have a German name that differs. One helper,
+ * so there is nowhere for a fifth variant to appear.
+ */
+export function localisedText(
+  value: { ar: string | null; en: string | null; de: string | null },
+  locale: Locale,
+): string {
+  if (locale === 'en') return value.en?.trim() || value.ar || '';
+  if (locale === 'de') return value.de?.trim() || value.ar || '';
+
+  return value.ar || '';
+}
+
 export function localisedDescription(value: Described, locale: Locale): string | null {
   if (locale === 'en') return value.descriptionEn?.trim() || value.descriptionAr || null;
   if (locale === 'de') return value.descriptionDe?.trim() || value.descriptionAr || null;
@@ -42,7 +60,15 @@ export function localisedDescription(value: Described, locale: Locale): string |
 export function formatMoney(amount: string, currency: string, locale: Locale): string {
   const value = Number(amount);
 
-  if (!Number.isFinite(value)) return `${amount} ${currency}`;
+  /*
+    A blank string is treated as UNPARSEABLE rather than as zero.
+
+    `Number('')` is `0` and finite, so a missing amount would have formatted as a real price of nothing.
+    Falling through to the raw-value path shows the currency without inventing a figure.
+  */
+  if (!Number.isFinite(value) || amount.trim() === '') {
+    return `${amount} ${currency}`.trim();
+  }
 
   return new Intl.NumberFormat(locale === 'ar' ? 'ar-SY' : locale, {
     style: 'currency',

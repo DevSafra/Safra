@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import type { Locale } from '@/i18n/routing';
 import type { SearchResultItem } from '@/lib/api';
-import { formatMoney } from '@/lib/localise';
+import { formatMoney, localisedName } from '@/lib/localise';
 import { dynamicMessage } from '@/lib/dynamic-message';
 
 /**
@@ -24,7 +24,19 @@ export async function PropertyCard({
   const t = await getTranslations('property');
   const tt = await getTranslations('propertyTypes');
 
-  const name = locale === 'ar' ? item.nameAr : item.nameEn || item.nameAr;
+  /*
+    `localisedName`, not a locale ternary. The old `locale === 'ar' ? nameAr : nameEn || nameAr`
+    answered ENGLISH to a German reader on the busiest screen in the app.
+  */
+  const name = localisedName(item, locale);
+  /*
+    And the city was worse: it printed `item.citySlug` — «damascus» — to anybody not reading Arabic,
+    because the search projection sent no city name in their language at all.
+  */
+  const city = localisedName(
+    { nameAr: item.cityNameAr, nameEn: item.cityNameEn, nameDe: item.cityNameDe },
+    locale,
+  );
 
   return (
     <article className="flex h-full flex-col rounded-card border border-line bg-card p-5 transition-colors hover:border-gold/60">
@@ -53,8 +65,7 @@ export async function PropertyCard({
       </div>
 
       <p className="mt-1 text-sm text-faint">
-        {dynamicMessage(tt, item.propertyTypeCode, item.propertyTypeCode)} ·{' '}
-        {locale === 'ar' ? item.cityNameAr : item.citySlug}
+        {dynamicMessage(tt, item.propertyTypeCode, item.propertyTypeCode)} · {city}
       </p>
 
       {/* Trust badges (§5.6). Awarded by SAFRA, never set by the partner. */}

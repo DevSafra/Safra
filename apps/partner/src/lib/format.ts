@@ -44,6 +44,16 @@ const SYMBOLS: Record<string, string> = {
 export function amount(value: string | null | undefined, currency: string): string {
   if (value === null || value === undefined) return '—';
 
+  /*
+    A BLANK is absent, not zero.
+
+    `Number('')` and `Number('  ')` are both `0`, which is finite — so without this a missing amount
+    rendered as «$0.00». That is the "null is not zero" rule failing in the one place it matters most:
+    a fabricated financial figure is more damaging than an absent one, and a partner reading a payout
+    of zero has been told something false rather than nothing.
+  */
+  if (value.trim() === '') return '—';
+
   const parsed = Number(value);
 
   if (!Number.isFinite(parsed)) return '—';
