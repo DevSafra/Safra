@@ -80,3 +80,32 @@ test('the eye is positioned inside the input', async ({ page }) => {
   );
   expect(e.x, 'eye is not on the right').toBeGreaterThan(i.x + i.width / 2);
 });
+
+/**
+ * Setting a new password asks for it TWICE (Bashar, 2026-08-11).
+ *
+ * Tested on the RESET form because it needs no session: the page renders in confirm mode from any
+ * `?token=`, so this costs nothing from the sign-in budget that shapes the rest of this suite. The
+ * profile form's copy of the same rule is covered by `password-match.test.ts`, which tests the shared
+ * function both forms call.
+ *
+ * The token is deliberately fake but SHAPE-VALID: the page checks it against `/^[A-Za-z0-9_-]{43}$/`
+ * and renders an invalid-link notice for anything else, so a short placeholder silently tests the wrong
+ * page. Its validity is never checked here — that belongs to the API, and nothing is submitted.
+ */
+test('a new password is asked for twice, and both fields have the toggle', async ({
+  page,
+}) => {
+  await page.goto('/en/reset-password?token=e2e-not-a-real-reset-token-0000000000000000');
+
+  await expect(field(page, 'New password')).toHaveAttribute('type', 'password');
+  await expect(field(page, 'Confirm new password')).toHaveAttribute('type', 'password');
+
+  /* Two independent toggles, not one shared between the fields — `PasswordField` uses `useId`. */
+  await expect(page.getByRole('button', { name: 'Show password' })).toHaveCount(2);
+
+  await page.getByRole('button', { name: 'Show password' }).first().click();
+  await expect(field(page, 'New password')).toHaveAttribute('type', 'text');
+  /* Revealing one must not reveal the other. */
+  await expect(field(page, 'Confirm new password')).toHaveAttribute('type', 'password');
+});

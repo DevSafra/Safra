@@ -87,6 +87,8 @@ export default async function AccountProfilePage({
             title: t('passwordTitle'),
             current: t('passwordCurrent'),
             next: t('passwordNew'),
+            confirm: t('passwordConfirm'),
+            mismatch: t('passwordMismatch'),
             show: t('passwordShow'),
             hide: t('passwordHide'),
             submit: t('passwordSubmit'),

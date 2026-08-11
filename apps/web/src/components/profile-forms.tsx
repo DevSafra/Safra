@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { PasswordField } from '@safra/ui';
+import { PasswordField, passwordMismatch, passwordsMatch } from '@safra/ui';
 
 /**
  * الملف الشخصي's two forms (handoff §6).
@@ -158,6 +158,8 @@ interface PasswordLabels {
   readonly title: string;
   readonly current: string;
   readonly next: string;
+  readonly confirm: string;
+  readonly mismatch: string;
   readonly show: string;
   readonly hide: string;
   readonly submit: string;
@@ -178,15 +180,32 @@ export function PasswordForm({
   const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: 'ok' | 'bad'; text: string } | null>(
     null,
   );
 
+  /* Shown on the confirmation FIELD, and only once there is something typed there to compare. */
+  const mismatch = passwordMismatch(newPassword, confirmPassword);
+
   async function submit(event: React.FormEvent) {
     event.preventDefault();
 
     if (busy) return;
+
+    /*
+      The guard is `passwordsMatch`, not `!mismatch`.
+
+      They differ while the confirmation is still empty — `mismatch` is deliberately false then, so
+      submitting with an untouched confirmation field would otherwise go straight through and change
+      the password to whatever is in the first field alone.
+    */
+    if (!passwordsMatch(newPassword, confirmPassword)) {
+      setMessage({ kind: 'bad', text: labels.mismatch });
+
+      return;
+    }
 
     setBusy(true);
     setMessage(null);
@@ -219,9 +238,10 @@ export function PasswordForm({
         return;
       }
 
-      /* Cleared immediately: nothing is served by leaving two passwords in a form's state. */
+      /* Cleared immediately: nothing is served by leaving three passwords in a form's state. */
       setCurrentPassword('');
       setNewPassword('');
+      setConfirmPassword('');
       setBusy(false);
       setMessage({ kind: 'ok', text: labels.changed });
 
@@ -279,9 +299,31 @@ export function PasswordForm({
         required
       />
 
+      {/*
+        The confirmation, and the mismatch is reported HERE rather than as a form-level banner.
+
+        `PasswordField`'s `error` sets `aria-invalid` and `aria-describedby` on the input itself, so a
+        screen reader announces the problem against the field that has it — a banner at the top of a
+        three-field form says something is wrong without saying which one.
+
+        The value is never sent. The API has no second password to compare it against, and
+        `passwordChangeSchema` is `.strict()`, so an extra field would be refused outright.
+      */}
+      <PasswordField
+        label={labels.confirm}
+        value={confirmPassword}
+        onChange={(event) => setConfirmPassword(event.target.value)}
+        showLabel={labels.show}
+        hideLabel={labels.hide}
+        error={mismatch ? labels.mismatch : undefined}
+        autoComplete="new-password"
+        minLength={12}
+        required
+      />
+
       <button
         type="submit"
-        disabled={busy}
+        disabled={busy || mismatch}
         className="min-h-10 w-fit cursor-pointer rounded-lg bg-gold px-5 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2.5"
       >
         {busy ? labels.submitting : labels.submit}

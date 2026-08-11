@@ -277,7 +277,9 @@
     "showPassword": "Passwort anzeigen",
     "hidePassword": "Passwort verbergen",
     "checkEmail": "Prüfen Sie Ihre E-Mails",
-    "checkEmailBody": "Falls Sie mit dieser Adresse noch kein Konto hatten, haben wir Ihnen einen Bestätigungslink gesendet. Falls doch, haben wir Ihnen erklärt, wie Sie sich anmelden oder Ihr Passwort zurücksetzen."
+    "checkEmailBody": "Falls Sie mit dieser Adresse noch kein Konto hatten, haben wir Ihnen einen Bestätigungslink gesendet. Falls doch, haben wir Ihnen erklärt, wie Sie sich anmelden oder Ihr Passwort zurücksetzen.",
+    "confirmNewPassword": "Neues Passwort bestätigen",
+    "passwordMismatch": "Die beiden Passwörter stimmen nicht überein."
   },
   "account": {
     "title": "Mein Konto",
@@ -392,7 +394,9 @@
       "expired": "Abgelaufen",
       "refunded": "Erstattet",
       "partially_refunded": "Teilweise erstattet"
-    }
+    },
+    "passwordConfirm": "Neues Passwort bestätigen",
+    "passwordMismatch": "Die beiden Passwörter stimmen nicht überein."
   },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",

@@ -15,6 +15,7 @@ export * from './ornaments.js';
 export * from './status.js';
 export * from './theme.js';
 export * from './password-field.js';
+export * from './password-match.js';
 export * from './sidebar.js';
 export * from './sidebar-toggle.js';
 export * from './sidebar-backdrop.js';

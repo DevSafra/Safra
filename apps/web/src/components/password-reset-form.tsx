@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
 
-import { PasswordField } from '@safra/ui';
+import { PasswordField, passwordsMatch } from '@safra/ui';
 
 /**
  * Both halves of a password reset (SRS §4).
@@ -41,6 +41,23 @@ export function PasswordResetForm({
     setError(null);
 
     const form = new FormData(event.currentTarget);
+
+    /*
+      A mistyped new password costs MORE here than on the profile form.
+
+      There is no current password to prove who this is, the token is single-use, and the customer is
+      locked out of the account they were in the middle of recovering — the way back is another email.
+      So the two fields are compared before anything is sent.
+    */
+    if (
+      mode === 'confirm' &&
+      !passwordsMatch(text(form, 'password'), text(form, 'confirm'))
+    ) {
+      setError(t('passwordMismatch'));
+      setSubmitting(false);
+
+      return;
+    }
 
     const body =
       mode === 'request'
@@ -116,15 +133,27 @@ export function PasswordResetForm({
           required
         />
       ) : (
-        <PasswordField
-          showLabel={t('showPassword')}
-          hideLabel={t('hidePassword')}
-          name="password"
-          label={t('newPassword')}
-          autoComplete="new-password"
-          hint={t('passwordHint')}
-          required
-        />
+        <>
+          <PasswordField
+            showLabel={t('showPassword')}
+            hideLabel={t('hidePassword')}
+            name="password"
+            label={t('newPassword')}
+            autoComplete="new-password"
+            hint={t('passwordHint')}
+            required
+          />
+
+          {/* Never sent: the API takes one password, and the confirmation is a typo guard. */}
+          <PasswordField
+            showLabel={t('showPassword')}
+            hideLabel={t('hidePassword')}
+            name="confirm"
+            label={t('confirmNewPassword')}
+            autoComplete="new-password"
+            required
+          />
+        </>
       )}
 
       <button
