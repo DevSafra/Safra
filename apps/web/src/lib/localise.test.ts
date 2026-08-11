@@ -150,6 +150,44 @@ describe('formatMoney', () => {
   it('uses Western digits even in Arabic', () => {
     expect(formatMoney('65.00', 'USD', 'ar')).toMatch(/65/);
   });
+
+  /**
+   * `exact` — the receipt's column, not a price tag.
+   *
+   * A price reads better as `$380` than `$380.00`, which is the default. A RECEIPT breakdown printed
+   * `$380`, `$1.99` and `$381.99` down one column, and the whole number read as a different kind of
+   * figure from the two beside it. `exact` pins two decimals so the column aligns.
+   */
+  it('drops trailing zeros on a whole price by default', () => {
+    expect(formatMoney('380.00', 'USD', 'en')).toBe('$380');
+  });
+
+  it('keeps two decimals on a whole amount when exact', () => {
+    expect(formatMoney('380.00', 'USD', 'en', { exact: true })).toBe('$380.00');
+  });
+
+  it('leaves a fractional amount unchanged either way', () => {
+    expect(formatMoney('1.99', 'USD', 'en')).toBe('$1.99');
+    expect(formatMoney('1.99', 'USD', 'en', { exact: true })).toBe('$1.99');
+  });
+
+  /* Every figure in a receipt column carries the same precision, whole or not. */
+  it('gives a column of receipt figures one precision', () => {
+    const column = ['380.00', '1.99', '381.99'].map((amount) =>
+      formatMoney(amount, 'USD', 'en', { exact: true }),
+    );
+
+    expect(column).toStrictEqual(['$380.00', '$1.99', '$381.99']);
+    expect(column.every((entry) => /\.\d{2}$/.test(entry))).toBe(true);
+  });
+
+  /* `exact` must not resurrect the blank-is-zero hole the guard below covers. */
+  it.each(['', '  ', 'not-a-number'])(
+    'still refuses to invent a figure for %j when exact',
+    (bad) => {
+      expect(formatMoney(bad, 'USD', 'en', { exact: true })).not.toMatch(/0\.00/);
+    },
+  );
 });
 
 /**

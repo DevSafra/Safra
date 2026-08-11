@@ -56,8 +56,20 @@ export function localisedDescription(value: Described, locale: Locale): string |
  * Amounts arrive from the API as decimal STRINGS and are parsed only here, at the
  * point of display. Nothing upstream does arithmetic on a float — a rounding error
  * in a price is not recoverable once it has been shown to a customer.
+ *
+ * ## `exact` — for a column of figures rather than a price
+ *
+ * A price reads better without trailing zeros, which is why `$380` is the default. On a RECEIPT it does
+ * not: the breakdown printed `$380`, `$1.99`, `$381.99` down one column, and the whole number looks
+ * like a different kind of number from the two beside it. `exact` pins two decimals so a column of
+ * amounts aligns and every figure carries the same precision as the stored value.
  */
-export function formatMoney(amount: string, currency: string, locale: Locale): string {
+export function formatMoney(
+  amount: string,
+  currency: string,
+  locale: Locale,
+  options: { readonly exact?: boolean } = {},
+): string {
   const value = Number(amount);
 
   /*
@@ -74,7 +86,7 @@ export function formatMoney(amount: string, currency: string, locale: Locale): s
     style: 'currency',
     currency,
     // Whole prices read better without trailing zeros; fractions still show them.
-    minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
+    minimumFractionDigits: options.exact || !Number.isInteger(value) ? 2 : 0,
     maximumFractionDigits: 2,
     // Western digits across all locales, matching the prototype.
     numberingSystem: 'latn',
