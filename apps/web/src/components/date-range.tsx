@@ -1,4 +1,5 @@
-import { LOCALE_DIRECTION, type Locale } from '@/i18n/routing';
+import { rangeArrow } from '@/lib/arrows';
+import type { Locale } from '@/i18n/routing';
 
 /**
  * A date range, with the arrow pointing the way the reader READS.
@@ -35,7 +36,7 @@ export function DateRange({
   readonly to: string;
   readonly locale: Locale;
 }) {
-  const arrow = LOCALE_DIRECTION[locale] === 'rtl' ? '←' : '→';
+  const arrow = rangeArrow(locale);
 
   return (
     <>

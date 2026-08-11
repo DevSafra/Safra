@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
-import { LOCALE_DIRECTION, type Locale } from '@/i18n/routing';
+import { backArrow } from '@/lib/arrows';
+import type { Locale } from '@/i18n/routing';
 
 /**
  * «رجوع» — the back control on a detail screen.
@@ -24,7 +25,7 @@ export async function BackLink({
   readonly locale: Locale;
 }) {
   const t = await getTranslations('common');
-  const arrow = LOCALE_DIRECTION[locale] === 'rtl' ? '→' : '←';
+  const arrow = backArrow(locale);
 
   return (
     <Link
