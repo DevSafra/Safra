@@ -5,6 +5,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { BackLink } from '@/components/back-link';
 import { isLocale } from '@/i18n/routing';
+import { isBookingReference } from '@/lib/booking-reference';
 import { returnTo } from '@/lib/return-to';
 
 /**
@@ -31,6 +32,16 @@ export default async function BookingPendingPage({
   const { locale, reference } = await params;
   if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
+
+  /*
+    The reference is echoed onto the page, so its SHAPE is checked even though nothing is looked up.
+
+    Anything that cannot name a booking gets the not-found page rather than a confirmation for something
+    that does not exist. `isBookingReference` carries the reasoning and the regression tests — the short
+    version is that this page renders the segment as an official «Booking reference» under real branding,
+    which made any URL a phishing page on our own domain.
+  */
+  if (!isBookingReference(reference)) notFound();
 
   /*
     Back to wherever the reader came from — their bookings list, the overview, or the home page.
