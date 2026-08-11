@@ -222,6 +222,20 @@ export const ERROR = {
     'validation.document_rejection_notes_required',
   BOOKING_TRANSITION_INVALID: 'booking.transition_invalid',
   REQUEST_IDEMPOTENCY_KEY_REUSED: 'request.idempotency_key_reused',
+  /*
+    بطاقات الهدايا. `GIFT_CARD_CODE_INVALID` deliberately covers both "no such code" and "malformed":
+    a code is a bearer instrument, so the answer to a guess must not confirm that a string is a real
+    code somebody else holds. `ALREADY_USED` and `EXPIRED` are distinct on purpose — the person asking
+    is holding a card they own, and "invalid" would send them to support over a card that simply ran
+    out.
+  */
+  GIFT_CARD_CODE_INVALID: 'gift_card.code_invalid',
+  GIFT_CARD_ALREADY_USED: 'gift_card.already_used',
+  GIFT_CARD_EXPIRED: 'gift_card.expired',
+  GIFT_CARD_CANCELLED: 'gift_card.cancelled',
+  GIFT_CARD_AMOUNT_INVALID: 'gift_card.amount_invalid',
+  WALLET_INSUFFICIENT_BALANCE: 'wallet.insufficient_balance',
+  VALIDATION_TOO_LONG: 'validation.too_long',
 } as const;
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR];

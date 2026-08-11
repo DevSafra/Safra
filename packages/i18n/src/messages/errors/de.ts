@@ -101,6 +101,16 @@ export const de = {
   'dispute.already_closed': 'Dieser Streitfall ist bereits geschlossen.',
   'conversation.not_found_or_closed': 'Unterhaltung nicht gefunden oder geschlossen.',
   'campaign.not_found': 'Kampagne nicht gefunden.',
+  'gift_card.code_invalid':
+    'Dieser Geschenkkarten-Code ist ungültig. Bitte prüfen und erneut versuchen.',
+  'gift_card.already_used': 'Diese Geschenkkarte wurde bereits eingelöst.',
+  'gift_card.expired': 'Diese Geschenkkarte ist abgelaufen.',
+  'gift_card.cancelled':
+    'Diese Geschenkkarte wurde storniert. Bitte wenden Sie sich an den Support.',
+  'gift_card.amount_invalid':
+    'Bitte einen der verfügbaren Geschenkkarten-Beträge wählen.',
+  'wallet.insufficient_balance': 'Ihr Guthaben reicht dafür nicht aus.',
+  'validation.too_long': 'Dieser Wert ist zu lang.',
   'wallet.not_found': 'Dieser Kunde hat kein Guthabenkonto.',
   'wallet.amount_not_positive': 'Eine Guthabenbuchung muss einen positiven Betrag haben.',
   'customer.profile_missing': 'Dieses Konto hat kein Kundenprofil.',

@@ -1,0 +1,177 @@
+import { z } from 'zod';
+
+import { ERROR } from './error-codes.js';
+import { cursorQuerySchema } from './pagination.js';
+
+/**
+ * بطاقات الهدايا — buying a card, and turning a code into wallet balance.
+ *
+ * Bashar, 2026-08-11: "the customer should be able to buy a card or input a card code to receive money
+ * in his wallet". Two flows, and the second is the one with teeth: a gift-card code is a BEARER
+ * instrument. Whoever holds the string can convert it to money, exactly like cash, which shapes almost
+ * every decision here.
+ */
+
+/**
+ * The alphabet a code is drawn from — Crockford base32.
+ *
+ * `I`, `L`, `O` and `U` are absent on purpose. The first three are unreadable next to `1` and `0` in
+ * most fonts, and a code is READ OFF a screen, an email or a printed card and typed by hand; `U` is
+ * dropped so a random draw cannot spell something unfortunate. 32 symbols is 5 bits each.
+ */
+export const GIFT_CODE_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+/** Four groups of five, hyphenated: `A1B2C-3D4E5-F6G7H-8J9KM`. */
+export const GIFT_CODE_GROUPS = 4;
+export const GIFT_CODE_GROUP_SIZE = 5;
+
+/**
+ * 20 symbols × 5 bits = 100 bits of entropy.
+ *
+ * That is the primary defence, and it has to be, because a rate limit only slows an attacker down.
+ * At 100 bits, guessing a live code is not a threat model. Shortening this to something "friendlier"
+ * would trade the only real protection for typing convenience.
+ */
+export const GIFT_CODE_ENTROPY_BITS = GIFT_CODE_GROUPS * GIFT_CODE_GROUP_SIZE * 5;
+
+/**
+ * Puts a typed code into the one form that is hashed.
+ *
+ * Called at BOTH ends — when a code is created and when one is redeemed — because a hash only matches
+ * if both sides normalise identically. That is the entire reason this is in `@safra/contracts` rather
+ * than in the service: a second, subtly different copy on the client would produce codes that are
+ * correct and refuse to work.
+ *
+ * What it does, and why each part:
+ * - **uppercases**, since the alphabet is uppercase and people type in lower case;
+ * - **drops every hyphen, space and non-alphanumeric**, so `a1b2c 3d4e5` and `A1B2C-3D4E5` are one
+ *   code — the grouping is a reading aid, not data;
+ * - **maps the confusable letters onto their digits** (`I`/`L` → `1`, `O` → `0`), because a person
+ *   reading `0` off a card will sometimes type `O`. The alphabet excludes those letters, so the
+ *   mapping can never collide with a legitimate symbol.
+ */
+export function normaliseGiftCode(input: string): string {
+  return input
+    .toUpperCase()
+    .replace(/[^0-9A-Z]/g, '')
+    .replace(/[IL]/g, '1')
+    .replace(/O/g, '0');
+}
+
+/** The length a normalised code must have. */
+export const GIFT_CODE_LENGTH = GIFT_CODE_GROUPS * GIFT_CODE_GROUP_SIZE;
+
+/**
+ * Redeeming: one field, and it is validated on SHAPE only.
+ *
+ * The upper bound on the raw string is what stops a megabyte of text becoming a hash computation. The
+ * normalised length is checked too, so a code that cannot possibly exist is refused at the boundary
+ * rather than turning into a database lookup — which also keeps the timing of a malformed attempt
+ * distinct from a real one, rather than the other way round.
+ */
+export const giftCardRedeemSchema = z
+  .object({
+    code: z
+      .string()
+      .min(1, ERROR.VALIDATION_REQUIRED)
+      .max(64, ERROR.VALIDATION_TOO_LONG)
+      .refine(
+        (value) => normaliseGiftCode(value).length === GIFT_CODE_LENGTH,
+        ERROR.GIFT_CARD_CODE_INVALID,
+      ),
+  })
+  .strict();
+
+export type GiftCardRedeemInput = z.infer<typeof giftCardRedeemSchema>;
+
+/**
+ * The amounts a card may be bought for.
+ *
+ * A fixed ladder rather than a free-text amount. Three reasons, in order of weight: an arbitrary
+ * amount is an arbitrary liability on the balance sheet; a free field invites `0.01` and `999999`,
+ * each of which needs its own rule; and a ladder is what the buyer actually wants to choose from.
+ */
+export const GIFT_CARD_AMOUNTS = ['25.00', '50.00', '100.00', '200.00'] as const;
+
+export type GiftCardAmount = (typeof GIFT_CARD_AMOUNTS)[number];
+
+/**
+ * Buying a card.
+ *
+ * The recipient's name and email are OPTIONAL and are only ever a label: nothing is emailed by this
+ * endpoint and the code is not delivered to that address. Writing them here would otherwise imply a
+ * delivery that does not happen — see `docs/FUTURE-WORK.md`.
+ *
+ * There is no `currency` field. The card is issued in the currency of the wallet that paid for it,
+ * because the purchase is a wallet DEBIT: letting the buyer name a different currency would mean
+ * converting at purchase and again at redemption, and charging somebody twice for a spread on their
+ * own money is not something to build by accident.
+ */
+export const giftCardPurchaseSchema = z
+  .object({
+    amount: z.enum(GIFT_CARD_AMOUNTS, { message: ERROR.GIFT_CARD_AMOUNT_INVALID }),
+    recipientName: z.string().trim().min(1).max(120).optional(),
+    recipientEmail: z
+      .string()
+      .trim()
+      .email(ERROR.VALIDATION_EMAIL_INVALID)
+      .max(254)
+      .optional(),
+  })
+  .strict();
+
+export type GiftCardPurchaseInput = z.infer<typeof giftCardPurchaseSchema>;
+
+/** The list query for the cards a customer bought. */
+export const giftCardQuerySchema = cursorQuerySchema;
+
+export type GiftCardQuery = z.infer<typeof giftCardQuerySchema>;
+
+/**
+ * A card as its PURCHASER sees it. The code is not here.
+ *
+ * `gift_cards` stores `code_hash` and `code_last4`, and no endpoint returns a usable code — the
+ * console's own note says a screen that displays redeemable codes turns a support tool into a way to
+ * spend other people's money. The same reasoning applies to the customer's own list: the code is
+ * shown ONCE, in the response to the purchase that created it, and is unrecoverable afterwards.
+ */
+export interface GiftCardSummary {
+  readonly reference: string;
+  /** The last four symbols, so a buyer can tell two cards apart without the code being present. */
+  readonly codeLast4: string;
+  readonly originalAmount: string;
+  readonly remainingAmount: string;
+  readonly currencyCode: string;
+  readonly status: string;
+  readonly expiresAt: string | null;
+  readonly recipientName: string | null;
+  readonly recipientEmail: string | null;
+  readonly createdAt: string;
+}
+
+/**
+ * The purchase response — the ONE time a plaintext code exists outside the buyer's screen.
+ *
+ * It is not stored in recoverable form, not logged, and not returned by any later read. If the buyer
+ * loses it before passing it on, the card has to be cancelled and reissued by staff; that is the cost
+ * of the card being a bearer instrument, and it is the same trade every gift card makes.
+ */
+export interface GiftCardPurchaseResult {
+  readonly card: GiftCardSummary;
+  /** Grouped for reading: `A1B2C-3D4E5-F6G7H-8J9KM`. Shown once. */
+  readonly code: string;
+  /** What the buyer's wallet holds now, after paying for the card. */
+  readonly walletBalance: string;
+  readonly walletCurrency: string;
+}
+
+/** The redemption response. */
+export interface GiftCardRedeemResult {
+  readonly reference: string;
+  /** What the card was worth, in the CARD's currency. */
+  readonly creditedAmount: string;
+  readonly creditedCurrency: string;
+  /** The wallet after the credit — converted, when the wallet is held in another currency. */
+  readonly walletBalance: string;
+  readonly walletCurrency: string;
+}

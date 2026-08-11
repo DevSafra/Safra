@@ -3,6 +3,7 @@ export * from './booking.js';
 export * from './calendar.js';
 export * from './error-codes.js';
 export * from './fx.js';
+export * from './gift-card.js';
 export * from './invoice.js';
 export * from './pagination.js';
 export * from './payment.js';

@@ -383,3 +383,40 @@ export async function getMyInvoices(cursor?: string) {
 export async function getInvoice(reference: string) {
   return authedFetch(`/invoices/${encodeURIComponent(reference)}`, invoiceDetailSchema);
 }
+
+// ─── بطاقات الهدايا (handoff §6) ──────────────────────────────────────────────
+
+/**
+ * A card as its purchaser sees it. There is no code field, and there must never be one.
+ *
+ * `gift_cards` stores only `code_hash` and `code_last4`, so a code is unrecoverable after the
+ * purchase response that carried it. If a schema here ever grows a `code`, something upstream has
+ * started returning a spendable secret on a read.
+ */
+const giftCardSchema = z.object({
+  reference: z.string(),
+  codeLast4: z.string(),
+  originalAmount: z.string(),
+  remainingAmount: z.string(),
+  currencyCode: z.string(),
+  status: z.string(),
+  expiresAt: z.string().nullable(),
+  recipientName: z.string().nullable(),
+  recipientEmail: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type GiftCardRow = z.infer<typeof giftCardSchema>;
+
+const giftCardsSchema = z.object({
+  items: z.array(giftCardSchema),
+  nextCursor: z.string().nullable(),
+});
+
+export async function getMyGiftCards(cursor?: string) {
+  const query = new URLSearchParams({ limit: '10' });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return authedFetch(`/gift-cards?${query.toString()}`, giftCardsSchema);
+}
