@@ -48,6 +48,18 @@ import type { Env } from '../config/env.js';
 /** The flat service fee (§1.4) and the partner commission, from the handoff. */
 const CUSTOMER_FEE = 1.99;
 const COMMISSION_RATE = 0.07;
+/**
+ * The customer fixture's opening wallet balance — ONE constant, used three times.
+ *
+ * The balance, the credit amount and its `balance_after` all have to say the same thing, because محفظتي
+ * derives how much of a balance came from a gift card by reading the statement: a balance with a smaller
+ * history behind it reports the difference as gift money on a wallet that has never seen a gift card.
+ *
+ * They were three literals until 2026-08-11, and editing the balance from 25 to 35 left the transaction
+ * at 25 — the drift this constant exists to make impossible.
+ */
+const WALLET_OPENING_BALANCE = '35.00';
+
 /** The default SYP rate the handoff names. Snapshotted onto every booking, as production does. */
 const FX_RATE_TO_SYP = 12500;
 
@@ -107,7 +119,30 @@ interface PropertySpec {
   readonly reviewNotes?: string;
 }
 
+/**
+ * Fixed ids for the two fixtures a SESSION can point at.
+ *
+ * An access token embeds `customerProfileId` for a customer and `partnerId` for a partner, so ownership
+ * filtering costs no query on the hot path. This script DELETES and recreates both rows on every run —
+ * it has to, because the cleanup walks foreign keys — and with generated ids that handed every recreated
+ * fixture a new identity.
+ *
+ * The consequence bit Bashar (2026-08-11): reseeding while signed in left his token pointing at a
+ * customer profile that no longer existed. Nothing errored. The greeting lost its name, the badges
+ * vanished, and حجوزاتي, الفواتير, المفضلة and محفظتي all came back empty — which reads as "my data is
+ * gone" rather than as "sign in again".
+ *
+ * Pinning the ids makes a reseed survivable: the rows are rebuilt with the same identity, so a token
+ * minted before it still resolves. Guest profiles are left generated — nobody signs in as one.
+ *
+ * Version nibble 4, so these cannot collide with the `uuidv7()` the columns default to, and a
+ * recognisable prefix so one of them in a log or a query is obviously a fixture rather than real data.
+ */
+const FIXTURE_CUSTOMER_PROFILE_ID = '5afe0000-0000-4000-8000-000000000001';
+
 interface PartnerSpec {
+  /** Fixed, so a partner session survives a reseed — see `FIXTURE_CUSTOMER_PROFILE_ID`. */
+  readonly id: string;
   readonly email: string;
   readonly legalName: string;
   readonly displayName: string;
@@ -131,6 +166,7 @@ interface PartnerSpec {
 
 const PARTNERS: readonly PartnerSpec[] = [
   {
+    id: '5afe0000-0000-4000-8000-000000000011',
     email: 'partner1@safra.test',
     legalName: 'شركة قصر الشرق للفنادق',
     displayName: 'فندق قصر الشرق',
@@ -219,6 +255,7 @@ const PARTNERS: readonly PartnerSpec[] = [
     ],
   },
   {
+    id: '5afe0000-0000-4000-8000-000000000012',
     email: 'partner2@safra.test',
     legalName: 'مؤسسة الساحل للسياحة',
     displayName: 'شاليهات الساحل',
@@ -260,6 +297,7 @@ const PARTNERS: readonly PartnerSpec[] = [
     ],
   },
   {
+    id: '5afe0000-0000-4000-8000-000000000013',
     email: 'partner3@safra.test',
     legalName: 'بيت الياسمين للضيافة التراثية',
     displayName: 'بيت دمشقي تراثي',
@@ -739,6 +777,7 @@ async function build(db: Seeder): Promise<void> {
     const [partner] = await db
       .insert(schema.partners)
       .values({
+        id: spec.id,
         userId: user.id,
         partnerTypeId: partnerType.id,
         legalName: spec.legalName,
@@ -837,6 +876,7 @@ async function build(db: Seeder): Promise<void> {
   const [profile] = await db
     .insert(schema.customerProfiles)
     .values({
+      id: FIXTURE_CUSTOMER_PROFILE_ID,
       userId: customerUser.id,
       fullName: CUSTOMER.fullName,
       email: CUSTOMER.email,
@@ -864,7 +904,7 @@ async function build(db: Seeder): Promise<void> {
     .values({
       customerProfileId: profile.id,
       currencyId: usd.id,
-      balance: '25.00',
+      balance: WALLET_OPENING_BALANCE,
     })
     .returning();
 
@@ -874,9 +914,9 @@ async function build(db: Seeder): Promise<void> {
     walletId: seededWallet.id,
     direction: 'credit',
     reason: 'sla_compensation',
-    amount: '25.00',
+    amount: WALLET_OPENING_BALANCE,
     currencyId: usd.id,
-    balanceAfter: '25.00',
+    balanceAfter: WALLET_OPENING_BALANCE,
   });
 
   // ── The bookings ──────────────────────────────────────────────────────────
