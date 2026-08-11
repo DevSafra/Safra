@@ -445,6 +445,35 @@ second one rather than investigated from scratch.
 the same reasoning applies here: an intermittent failure in the money path is the last thing that
 should be hidden.
 
+**Second occurrence, 2026-08-11.** One test failed — `returns the rate once one is set` — during a
+full `pnpm verify`, with the same "no rate configured" refusal immediately after a rate had been set.
+Recognised rather than investigated from scratch, which is what this entry was for.
+
+**What that run ruled OUT.** The entry's own hypothesis was a second actor on the database, suspected
+to be the app servers. It is not:
+
+- **Not another test suite.** `payments` and `wallet` are the only other suites that mention
+  `fx_rates`, and both only mention it in a COMMENT saying they deliberately stay off it. Nothing
+  else writes the table.
+- **Not a scheduled job.** No `@Cron` in the API touches `fx_rates`; the only app-side writer is
+  `FxRateService` on an explicit `POST /admin/fx-rates`, which nothing fires automatically.
+- **Not a shared cache.** `FxRateService`'s cache is a per-instance in-memory `Map`, and it caches
+  only successful lookups — a miss is never stored, so no stale "no rate" can be read back.
+- **Not simply "servers running".** The suite passed 17/17 in isolation with all four servers live,
+  and 90/90 three times alongside `payments` and `wallet`. It needs the timing of the full run.
+
+**What is now known about the suite itself, and is the leading hypothesis.** It is the only
+integration suite that does NOT use the rollback harness — `createDatabase(DATABASE_URL, 2)`, so every
+write COMMITS — and it clears the table with a wholesale `DELETE FROM fx_rates` in `beforeEach`. That
+makes it both vulnerable and dangerous, and it points at the suite racing ITSELF: an unawaited write in
+one test, or a `beforeEach` delete overlapping the previous test's read, would produce exactly this
+symptom and would explain why only this file fails and only under full-suite load.
+
+**Next step, now cheap enough to be worth doing:** move it onto `createRollbackDatabase` like the other
+21 suites, which removes the wholesale delete entirely because nothing escapes the transaction. If the
+pool of 2 exists for a reason the rollback harness cannot serve, scope the delete to the rows the suite
+wrote instead. Either is verifiable against this diagnosis in a way the previous one was not.
+
 **Owner:** engineering, next time it appears.
 
 ### O-test-2 — The browser suite runs at the API's rate-limit ceiling
