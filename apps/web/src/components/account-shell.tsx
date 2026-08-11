@@ -160,14 +160,23 @@ export async function AccountShell({
         })}
       </nav>
 
-      <main className="min-w-0 lg:col-start-2 lg:row-start-1">
+      {/*
+        A `div`, not a second `<main>`.
+
+        `app/[locale]/layout.tsx` already wraps every page in `<main id="main">` — the target its skip
+        link points at — so a `<main>` here produced two nested main landmarks on every account page.
+        That is invalid HTML and it makes a screen reader's landmark list ambiguous: "main" twice, with
+        no way to tell which one holds the section. Found by a browser probe that could not resolve
+        `locator('main')` to one element.
+      */}
+      <div className="min-w-0 lg:col-start-2 lg:row-start-1">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <h1 className="font-display text-3xl font-bold text-gold">{title}</h1>
           <SignOutButton locale={locale} />
         </div>
 
         <div className="mt-8">{children}</div>
-      </main>
+      </div>
     </div>
   );
 }
