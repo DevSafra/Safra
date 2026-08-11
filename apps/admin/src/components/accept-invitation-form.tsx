@@ -102,7 +102,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
         required
         minLength={12}
         autoComplete="new-password"
-        hint="At least 12 characters."
+        hint={t.sections.invitation.passwordHint}
       />
 
       <PasswordField

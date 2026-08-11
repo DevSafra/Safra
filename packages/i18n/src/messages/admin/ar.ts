@@ -1033,6 +1033,7 @@ export const ar = {
       unexpectedNote:
         'إذا لم تكن تتوقع هذه الدعوة، أغلق هذه الصفحة وأبلغ فريق سفرة. لا تعيّن كلمة مرور.',
       newPassword: 'كلمة المرور الجديدة',
+      passwordHint: '١٢ حرفًا على الأقل.',
       confirmPassword: 'تأكيد كلمة المرور',
       passwordSet: 'تم تعيين كلمة المرور.',
       signInNext:
