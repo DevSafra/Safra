@@ -1577,6 +1577,31 @@ rehearsal rather than treating it as separate work.
 Terms of service, privacy policy and the partner contract (roadmap item 196) have not
 been reviewed. Required for a German merchant entity handling EU personal data.
 
+### O-fin-1 — الفواتير is a receipt, and a tax invoice is a different document
+
+**Status:** built as a receipt, deliberately · **Owner:** **Bashar + Legal** ·
+**Recorded:** 2026-08-11
+
+Handoff §6's eighth section is built (`/account/invoices`, list + detail, `GET /invoices`).
+What it renders is a faithful RECORD of what a booking cost and what was paid: every figure
+is read verbatim off the `bookings` row, `total_amount` included, so the document cannot
+disagree with the charge. Both screens say so in a sentence, in all three languages
+(`account.invoicesNotTax`).
+
+It is **not** a tax invoice, and must not be described as one. What a real one needs, none
+of which exists:
+
+| Missing                                | Why it is not a small change                                                                                                                                                                  |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A gapless sequential number            | A register with its own sequence, separate from `booking_reference_seq` — a receipt is currently identified by the booking reference, and a gap in an invoice series is itself a finding      |
+| Seller legal identity and VAT id       | Belongs to the merchant entity, which is a Legal decision (see the item above), and differs per market                                                                                        |
+| A tax breakdown at the applicable rate | `bookings` stores no tax component at all. Adding one is a pricing change, not a display change, and it is retroactive: existing bookings have no rate to attribute                           |
+| Immutability after issue               | The property name and city are JOINED, not snapshotted, so renaming a property changes what an old document says it was for. A document that may not change has to carry its own descriptions |
+
+**Recommended next action:** treat this as a Legal question first — which entity issues, in
+which markets, at which rate. The engineering work is meaningless until that is answered,
+and answering it may make `bookings` carry a tax column, which is the expensive part.
+
 ---
 
 ## 6. Deferred until after launch
