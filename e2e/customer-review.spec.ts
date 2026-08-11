@@ -98,6 +98,51 @@ test.describe('writing a review', () => {
     const stranger = await page.goto('/en/review/BKG-2026-000001');
 
     expect(stranger?.status()).toBe(404);
+
+    /*
+      «رجوع» returns the reader where they CAME FROM (Bashar, 2026-08-11).
+
+      The booking confirmation used to say «العودة للرئيسية» and drop you on the home page even when
+      you had arrived from your own bookings list. The list now names its own origin in the row's href
+      and the detail screen resolves it through an allow-list.
+
+      Asserted on the SAME session rather than in tests of their own: a second test means a second
+      sign-in, and the login budget is the suite's binding constraint.
+    */
+    for (const [from, expected] of [
+      ['bookings', '/en/account/bookings'],
+      ['reviews', '/en/account/reviews'],
+      ['account', '/en/account'],
+    ] as const) {
+      await page.goto(`/en/account/bookings`);
+      await page.goto(`/en/booking/BKG-2026-009548?from=${from}`);
+
+      const back = page.getByRole('link', { name: /Back/i });
+
+      await expect(back).toHaveAttribute('href', expected);
+    }
+
+    /*
+      A forged origin is IGNORED, not followed.
+
+      The parameter carries a key from a fixed list, never a path, so the worst a crafted link can do
+      is fall back. Read as a path it would be an open redirect on our own page — the back control
+      would hop somewhere else and the reader would have no reason to distrust it.
+    */
+    for (const forged of [
+      'https://evil.example.com',
+      '//evil.example.com',
+      '../../etc/passwd',
+      '/en/account/wallet%00',
+    ]) {
+      await page.goto(`/en/booking/BKG-2026-009548?from=${encodeURIComponent(forged)}`);
+
+      /* The home page — this route is reachable by a guest, so that is the honest fallback. */
+      await expect(page.getByRole('link', { name: /Back/i })).toHaveAttribute(
+        'href',
+        '/en',
+      );
+    }
   });
 
   /** Anonymous visitors are bounced to sign-in, exactly as they are off `/account`. */

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { CheckoutForm } from '@/components/checkout-form';
+import { DateRange } from '@/components/date-range';
 import { isLocale } from '@/i18n/routing';
 import { getMyWallet } from '@/lib/account';
 import { formatMoney } from '@/lib/localise';
@@ -161,7 +162,8 @@ export default async function CheckoutPage({
               {name} · {cityName}
             </p>
             <p className="text-sm text-faint">
-              {checkIn} → {checkOut} · {tp('totalFor', { nights: priced.nights })}
+              <DateRange from={checkIn} to={checkOut} locale={locale} /> ·{' '}
+              {tp('totalFor', { nights: priced.nights })}
             </p>
 
             <div className="gold-rule my-4" />

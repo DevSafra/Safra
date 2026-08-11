@@ -8,8 +8,11 @@ import {
   PERMISSIONS as P,
   type OffsetPage,
   type PageQuery,
+  type CursorQuery,
   type ReviewCreateInput,
   type ReviewModerateInput,
+  decodeCursor,
+  encodeCursor,
   offsetPage,
 } from '@safra/contracts';
 
@@ -21,11 +24,15 @@ import { DATABASE } from '../database/database.module.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import {
+  badRequest,
   conflict,
   forbidden,
   notFound,
   unauthorized,
 } from '../common/errors/app-error.js';
+
+/** A uuid, checked before it reaches a `::uuid` cast so a forged cursor is a 400 and not a 500. */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Guest reviews (design handoff §7.3, P-006).
@@ -229,16 +236,37 @@ export class ReviewService {
   async pendingForCustomer(claims: AccessTokenClaims | undefined) {
     if (!claims) throw unauthorized(ERROR.AUTH_REQUIRED);
 
+    /*
+      All THREE names, not `coalesce(name_ar, name_en)`.
+
+      That coalesce answered Arabic to every reader, so the English and German account pages showed
+      «شقق قصر الشرق المخدومة» in the middle of an otherwise translated page. The customer app is the
+      one surface that serves three languages, and it is the caller — not this query — that knows
+      which one the reader has chosen: their URL locale, which may differ from the preference stored
+      on their account. So the projection carries all three and the client picks with
+      `localisedName`, exactly as the catalogue endpoints already do.
+
+      The console and the partner portal keep their `coalesce(name_ar, …)` reads: both are Arabic
+      only, so answering Arabic is correct there rather than a bug of the same shape.
+    */
     const rows = await this.db.execute<{
       booking_reference: string;
-      property_name: string | null;
-      unit_name: string | null;
+      property_name_ar: string | null;
+      property_name_en: string | null;
+      property_name_de: string | null;
+      unit_name_ar: string | null;
+      unit_name_en: string | null;
+      unit_name_de: string | null;
       check_in: string;
       check_out: string;
     }>(sql`
       SELECT b.reference AS booking_reference,
-             coalesce(pr.name_ar, pr.name_en) AS property_name,
-             coalesce(un.name_ar, un.name_en) AS unit_name,
+             pr.name_ar AS property_name_ar,
+             pr.name_en AS property_name_en,
+             pr.name_de AS property_name_de,
+             un.name_ar AS unit_name_ar,
+             un.name_en AS unit_name_en,
+             un.name_de AS unit_name_de,
              b.check_in::text, b.check_out::text
       FROM bookings b
       JOIN customer_profiles cp ON cp.id = b.customer_profile_id
@@ -254,11 +282,132 @@ export class ReviewService {
 
     return rows.rows.map((row) => ({
       bookingReference: row.booking_reference,
-      propertyName: row.property_name,
-      unitName: row.unit_name,
+      property: {
+        nameAr: row.property_name_ar,
+        nameEn: row.property_name_en,
+        nameDe: row.property_name_de,
+      },
+      unit: {
+        nameAr: row.unit_name_ar,
+        nameEn: row.unit_name_en,
+        nameDe: row.unit_name_de,
+      },
       checkIn: row.check_in,
       checkOut: row.check_out,
     }));
+  }
+
+  /**
+   * تقييماتي — the reviews this customer has WRITTEN.
+   *
+   * Distinct from `GET /reviews`, which is the partner's list of reviews about them. The account
+   * screen previously had no way to show a customer their own words: it said "you have not written
+   * one yet" to everybody, because nothing could tell it otherwise.
+   *
+   * ## Hidden reviews are still shown to their author
+   *
+   * The same call `forBooking` makes, and for the same reason: a customer who cannot see a review
+   * staff have hidden cannot tell "SAFRA removed this" from "it never saved", and the second reading
+   * produces a duplicate attempt the unique index then refuses. The status travels so the screen can
+   * say which it is.
+   *
+   * Keyset paginated on `(created_at, id)` through `reviews_customer_idx`. A customer's reviews are
+   * bounded by their own stays, but a list endpoint without a page is a list endpoint that grows
+   * without one.
+   */
+  async mineForCustomer(claims: AccessTokenClaims | undefined, query: CursorQuery) {
+    if (!claims) throw unauthorized(ERROR.AUTH_REQUIRED);
+
+    const profileId = claims.customerProfileId;
+
+    /* No customer profile, no reviews of one’s own — an empty page rather than an error. */
+    if (!profileId) return { items: [], nextCursor: null };
+
+    let after: { sortKey: string; id: string } | null = null;
+
+    if (query.cursor !== undefined) {
+      const decoded = decodeCursor(query.cursor);
+
+      if (!decoded || !UUID_PATTERN.test(decoded.id)) {
+        throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
+      }
+
+      after = { sortKey: decoded.sortKey, id: decoded.id };
+    }
+
+    /*
+      The sort key stays a STRING: `created_at` holds microseconds and a JS Date holds milliseconds,
+      so round-tripping it through a Date truncates the key and repeats the boundary row on the next
+      page. `encodeCursor` documents the trap.
+    */
+    const keyset = after
+      ? sql`AND (r.created_at, r.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`
+      : sql``;
+
+    const rows = await this.db.execute<{
+      reference: string;
+      rating: number;
+      body: string;
+      status: string;
+      partner_reply: string | null;
+      created_at: string;
+      id: string;
+      booking_reference: string;
+      property_name_ar: string | null;
+      property_name_en: string | null;
+      property_name_de: string | null;
+      unit_name_ar: string | null;
+      unit_name_en: string | null;
+      unit_name_de: string | null;
+    }>(sql`
+      SELECT r.reference, r.rating, r.body, r.status::text AS status, r.partner_reply,
+             r.created_at::text AS created_at, r.id,
+             b.reference AS booking_reference,
+             -- All three names: only the client knows the locale the reader chose.
+             pr.name_ar AS property_name_ar,
+             pr.name_en AS property_name_en,
+             pr.name_de AS property_name_de,
+             un.name_ar AS unit_name_ar,
+             un.name_en AS unit_name_en,
+             un.name_de AS unit_name_de
+      FROM reviews r
+      JOIN bookings b   ON b.id = r.booking_id
+      JOIN properties pr ON pr.id = r.property_id
+      JOIN units un      ON un.id = r.unit_id
+      WHERE r.customer_profile_id = ${profileId}
+        ${keyset}
+      ORDER BY r.created_at DESC, r.id DESC
+      LIMIT ${query.limit + 1}
+    `);
+
+    const page = rows.rows.slice(0, query.limit);
+    const last = page[page.length - 1];
+
+    return {
+      items: page.map((row) => ({
+        reference: row.reference,
+        bookingReference: row.booking_reference,
+        rating: row.rating,
+        body: row.body,
+        status: row.status,
+        partnerReply: row.partner_reply,
+        createdAt: row.created_at,
+        property: {
+          nameAr: row.property_name_ar,
+          nameEn: row.property_name_en,
+          nameDe: row.property_name_de,
+        },
+        unit: {
+          nameAr: row.unit_name_ar,
+          nameEn: row.unit_name_en,
+          nameDe: row.unit_name_de,
+        },
+      })),
+      nextCursor:
+        rows.rows.length > query.limit && last
+          ? encodeCursor(last.created_at, last.id)
+          : null,
+    };
   }
 
   /**
@@ -280,8 +429,12 @@ export class ReviewService {
     const found = await this.db.execute<{
       status: string;
       owner_user_id: string | null;
-      property_name: string | null;
-      unit_name: string | null;
+      property_name_ar: string | null;
+      property_name_en: string | null;
+      property_name_de: string | null;
+      unit_name_ar: string | null;
+      unit_name_en: string | null;
+      unit_name_de: string | null;
       review_reference: string | null;
       rating: number | null;
       body: string | null;
@@ -291,8 +444,13 @@ export class ReviewService {
     }>(sql`
       SELECT b.status::text AS status,
              cp.user_id AS owner_user_id,
-             coalesce(pr.name_ar, pr.name_en) AS property_name,
-             coalesce(un.name_ar, un.name_en) AS unit_name,
+             -- All three, for the reason recorded on pendingForCustomer above.
+             pr.name_ar AS property_name_ar,
+             pr.name_en AS property_name_en,
+             pr.name_de AS property_name_de,
+             un.name_ar AS unit_name_ar,
+             un.name_en AS unit_name_en,
+             un.name_de AS unit_name_de,
              r.reference AS review_reference,
              r.rating, r.body,
              r.status::text AS review_status,
@@ -317,8 +475,16 @@ export class ReviewService {
     const alreadyReviewed = row.review_reference !== null;
 
     return {
-      propertyName: row.property_name,
-      unitName: row.unit_name,
+      property: {
+        nameAr: row.property_name_ar,
+        nameEn: row.property_name_en,
+        nameDe: row.property_name_de,
+      },
+      unit: {
+        nameAr: row.unit_name_ar,
+        nameEn: row.unit_name_en,
+        nameDe: row.unit_name_de,
+      },
       stayCompleted,
       alreadyReviewed,
       eligible: stayCompleted && !alreadyReviewed,

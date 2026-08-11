@@ -103,6 +103,15 @@ export const reviews = pgTable(
     index('reviews_partner_idx').on(t.partnerId, t.createdAt),
     /* The customer site's per-property list, and the aggregate recompute. */
     index('reviews_property_idx').on(t.propertyId, t.status),
+    /*
+      تقييماتي — the reviews one customer WROTE, newest first.
+
+      Added with that screen: `mineForCustomer` filters on `customer_profile_id` and pages by keyset
+      on `(created_at, id)`, and without this the filter was a sequential scan of every review on the
+      platform on a request path — which is the thing rule 2 forbids rather than a slow query to
+      accept. Mirrors `reviews_partner_idx`, which exists for the same shape of read.
+    */
+    index('reviews_customer_idx').on(t.customerProfileId, t.createdAt),
     /* The staff moderation queue: everything a partner has reported. */
     index('reviews_reported_idx').on(t.reportStatus, t.reportedAt),
   ],

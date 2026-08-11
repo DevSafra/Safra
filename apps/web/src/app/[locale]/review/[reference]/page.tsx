@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { getReviewForBooking } from '@/lib/account';
 import { ReviewForm } from '@/components/review-form';
-import { isLocale } from '@/i18n/routing';
+import { BackLink } from '@/components/back-link';
+import { isLocale, type Locale } from '@/i18n/routing';
+import { localisedName } from '@/lib/localise';
+import { returnTo } from '@/lib/return-to';
 
 /**
  * Writing about a stay (§7.3, P-006).
@@ -35,12 +37,23 @@ export const metadata: Metadata = {
 
 export default async function ReviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; reference: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale, reference } = await params;
   if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
+
+  /*
+    Back to the list the reader came from — تقييماتي or the overview.
+
+    `reviews` is the fallback rather than the home page: this route IS behind the auth middleware, so
+    whoever is reading it has an account, and the section that owns this stay is the useful place to
+    land when there is no origin to honour.
+  */
+  const back = returnTo(locale, (await searchParams)['from'], 'reviews');
 
   const t = await getTranslations('reviews');
   const account = await getTranslations('account');
@@ -48,7 +61,7 @@ export default async function ReviewPage({
 
   if (eligibility === 'unauthenticated') {
     return (
-      <Shell title={t('title')} locale={locale} back={account('title')}>
+      <Shell title={t('title')} locale={locale} back={back}>
         <p className="text-muted">{account('sessionExpired')}</p>
       </Shell>
     );
@@ -58,11 +71,11 @@ export default async function ReviewPage({
   if (eligibility === 'failed') notFound();
 
   return (
-    <Shell title={t('title')} locale={locale} back={t('backToAccount')}>
+    <Shell title={t('title')} locale={locale} back={back}>
       <p className="text-muted">
-        {t('prompt', { property: eligibility.propertyName ?? '' })}
+        {t('prompt', { property: localisedName(eligibility.property, locale) })}
       </p>
-      <p className="mt-1 text-sm text-faint">{eligibility.unitName}</p>
+      <p className="mt-1 text-sm text-faint">{localisedName(eligibility.unit, locale)}</p>
 
       {eligibility.review ? (
         <section className="mt-5 rounded-card border border-line bg-card p-4">
@@ -105,7 +118,8 @@ function Shell({
   children,
 }: {
   readonly title: string;
-  readonly locale: string;
+  readonly locale: Locale;
+  /** An href from the `returnTo` allow-list, not a label — the control names itself. */
   readonly back: string;
   readonly children: React.ReactNode;
 }) {
@@ -113,12 +127,9 @@ function Shell({
     <div className="mx-auto max-w-2xl px-4 py-12">
       <h1 className="font-display text-2xl font-bold text-gold">{title}</h1>
       {children}
-      <Link
-        href={`/${locale}/account`}
-        className="mt-6 inline-flex min-h-10 items-center text-sm text-muted underline-offset-4 hover:text-gold hover:underline"
-      >
-        {back}
-      </Link>
+      <div className="mt-6">
+        <BackLink href={back} locale={locale} />
+      </div>
     </div>
   );
 }

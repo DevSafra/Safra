@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { setRequestLocale } from 'next-intl/server';
+import { getTranslations } from 'next-intl/server';
 
+import { BackLink } from '@/components/back-link';
 import { isLocale } from '@/i18n/routing';
+import { returnTo } from '@/lib/return-to';
 
 /**
  * Post-payment holding page (SRS §6.3 steps 5–8).
@@ -21,12 +23,23 @@ export const metadata: Metadata = {
 
 export default async function BookingPendingPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; reference: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale, reference } = await params;
   if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
+
+  /*
+    Back to wherever the reader came from — their bookings list, the overview, or the home page.
+
+    `home` is the fallback rather than the account, and deliberately: this page performs NO booking
+    lookup and is not behind the auth middleware, so a guest who has just paid can be standing on it.
+    Sending them to `/account` would bounce them into a sign-in they may not have.
+  */
+  const back = returnTo(locale, (await searchParams)['from'], 'home');
 
   const t = await getTranslations('bookingPending');
 
@@ -70,12 +83,9 @@ export default async function BookingPendingPage({
         {t('guarantee')}
       </p>
 
-      <Link
-        href={`/${locale}`}
-        className="mt-8 inline-block rounded-lg border border-line px-5 py-2.5 text-sm text-muted transition-colors hover:border-gold hover:text-gold"
-      >
-        {t('backHome')}
-      </Link>
+      <div className="mt-8 flex justify-center">
+        <BackLink href={back} locale={locale} />
+      </div>
     </div>
   );
 }

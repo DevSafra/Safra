@@ -2,10 +2,12 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 
 import {
   PERMISSIONS as P,
+  type CursorQuery,
   type ReviewCreateInput,
   type ReviewModerateInput,
   type ReviewReplyInput,
   type ReviewReportInput,
+  cursorQuerySchema,
   pageQuerySchema,
   reviewCreateSchema,
   reviewModerateSchema,
@@ -44,6 +46,22 @@ export class ReviewController {
   @AuditExempt('Reading which of your own stays are reviewable; changes nothing.')
   async pending(@CurrentUser() user: AccessTokenClaims | undefined) {
     return this.reviews.pendingForCustomer(user);
+  }
+
+  /**
+   * تقييماتي — the reviews this customer has WRITTEN.
+   *
+   * Not to be confused with `GET /reviews` on the partner controller, which is the list of reviews
+   * ABOUT a partner. Declared before any parameterised route for the reason recorded below.
+   */
+  @Get('mine')
+  @RequirePermissions(P.REVIEW_CREATE)
+  @AuditExempt('A customer reading their own reviews; changes nothing.')
+  async mine(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Query(new ZodValidationPipe(cursorQuerySchema)) query: CursorQuery,
+  ) {
+    return this.reviews.mineForCustomer(user, query);
   }
 
   /**

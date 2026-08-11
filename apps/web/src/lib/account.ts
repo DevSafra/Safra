@@ -71,8 +71,20 @@ const bookingsSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
-export async function getMyBookings() {
-  return authedFetch('/bookings?limit=20', bookingsSchema);
+/**
+ * The customer's bookings, one page at a time.
+ *
+ * `cursor` is why this takes an argument at all. It used to be a bare `?limit=20`, and the
+ * `nextCursor` the API returns was parsed and then thrown away — so a customer with twenty-one
+ * bookings could not reach the twenty-first by any means. `limit` stays a constant here rather than a
+ * parameter: the page size is this screen's decision, not the caller's.
+ */
+export async function getMyBookings(cursor?: string) {
+  const query = new URLSearchParams({ limit: '20' });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return authedFetch(`/bookings?${query.toString()}`, bookingsSchema);
 }
 
 // ─── Wallet ──────────────────────────────────────────────────────────────────
@@ -105,16 +117,46 @@ const walletTransactionsSchema = z.object({
   nextCursor: z.string().nullable(),
 });
 
-export async function getMyWalletTransactions() {
-  return authedFetch('/wallet/transactions?limit=10', walletTransactionsSchema);
+/**
+ * The wallet statement, one page at a time — and paged for the same reason as the bookings above.
+ *
+ * `limit` differs per caller here, unlike bookings: the overview shows a handful as a preview while
+ * محفظتي shows a full page of them, and those are genuinely different questions.
+ */
+export async function getMyWalletTransactions(limit = 10, cursor?: string) {
+  const query = new URLSearchParams({ limit: String(limit) });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return authedFetch(
+    `/wallet/transactions?${query.toString()}`,
+    walletTransactionsSchema,
+  );
 }
 
 // ─── Reviews (§7.3, P-006) ───────────────────────────────────────────────────
 
+/**
+ * A name in all three languages, for `localisedName` to pick from.
+ *
+ * The API used to pre-pick with `coalesce(name_ar, name_en)`, which answered Arabic to every reader —
+ * so «شقق قصر الشرق المخدومة» appeared in the middle of the English and German account pages. Only the
+ * client knows which language the reader actually chose, because that is their URL locale and it may
+ * differ from the preference stored on their account.
+ *
+ * `nameAr` is not nullable: it is `NOT NULL` in the database and reached through an inner join, and
+ * it is the fallback every other locale relies on.
+ */
+const translatedNameSchema = z.object({
+  nameAr: z.string(),
+  nameEn: z.string().nullable(),
+  nameDe: z.string().nullable(),
+});
+
 const pendingReviewSchema = z.object({
   bookingReference: z.string(),
-  propertyName: z.string().nullable(),
-  unitName: z.string().nullable(),
+  property: translatedNameSchema,
+  unit: translatedNameSchema,
   checkIn: z.string(),
   checkOut: z.string(),
 });
@@ -135,8 +177,8 @@ export async function getPendingReviews() {
  * sequential (§13.2).
  */
 const reviewEligibilitySchema = z.object({
-  propertyName: z.string().nullable(),
-  unitName: z.string().nullable(),
+  property: translatedNameSchema,
+  unit: translatedNameSchema,
   stayCompleted: z.boolean(),
   alreadyReviewed: z.boolean(),
   eligible: z.boolean(),
@@ -159,4 +201,67 @@ export async function getReviewForBooking(reference: string) {
     `/reviews/booking/${encodeURIComponent(reference)}`,
     reviewEligibilitySchema,
   );
+}
+
+// ─── Account summary (handoff §6: the greeting and the sidebar badges) ────────
+
+const accountSummarySchema = z.object({
+  reference: z.string(),
+  fullName: z.string(),
+  email: z.string(),
+  phone: z.string(),
+  preferredLocale: z.string(),
+  counters: z.object({
+    bookings: z.number(),
+    pendingReviews: z.number(),
+    walletBalance: z.string().nullable(),
+    walletCurrency: z.string().nullable(),
+  }),
+});
+
+export type AccountSummary = z.infer<typeof accountSummarySchema>;
+
+/**
+ * The reader's own profile and the three counters §6 puts on the sidebar.
+ *
+ * ONE read per account page, which is the point: the sidebar is on every section, and three separate
+ * counter reads per navigation is the cost the console refused. It also carries the name, which no
+ * session claim holds — the greeting «أهلاً رامي» and الملف الشخصي both had nothing to show without it.
+ */
+export async function getAccountSummary() {
+  return authedFetch('/auth/me/profile', accountSummarySchema);
+}
+
+/**
+ * تقييماتي — the reviews this customer has written.
+ *
+ * A hidden review is still returned to its author, carrying its status: somebody who cannot see the
+ * review staff hid cannot tell "SAFRA removed this" from "it never saved", and the second reading
+ * produces a duplicate attempt the unique index then refuses.
+ */
+const myReviewSchema = z.object({
+  reference: z.string(),
+  bookingReference: z.string(),
+  rating: z.number(),
+  body: z.string(),
+  status: z.string(),
+  partnerReply: z.string().nullable(),
+  createdAt: z.string(),
+  property: translatedNameSchema,
+  unit: translatedNameSchema,
+});
+
+export type MyReview = z.infer<typeof myReviewSchema>;
+
+const myReviewsSchema = z.object({
+  items: z.array(myReviewSchema),
+  nextCursor: z.string().nullable(),
+});
+
+export async function getMyReviews(cursor?: string) {
+  const query = new URLSearchParams({ limit: '10' });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return authedFetch(`/reviews/mine?${query.toString()}`, myReviewsSchema);
 }

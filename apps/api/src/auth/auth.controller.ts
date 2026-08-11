@@ -33,6 +33,7 @@ import { REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH } from '../config/constants.js
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { AllowsUnenrolled, CurrentUser, Public } from '../rbac/decorators.js';
 import { AccountRecoveryService } from './account-recovery.service.js';
+import { CustomerAccountService } from './customer-account.service.js';
 import {
   AuthService,
   SecondFactorRequiredException,
@@ -49,6 +50,7 @@ export class AuthController {
     private readonly tokens: TokenService,
     private readonly audit: AuditService,
     private readonly recovery: AccountRecoveryService,
+    private readonly customerAccount: CustomerAccountService,
   ) {}
 
   /**
@@ -327,6 +329,21 @@ export class AuthController {
       throw unauthorized(ERROR.AUTH_REQUIRED);
     }
     return user;
+  }
+
+  /**
+   * The signed-in customer's own profile, and the counters handoff §6 puts on the sidebar.
+   *
+   * `me` above answers the TOKEN — no name, no phone, because none of that is a claim. This reads
+   * `customer_profiles`, which is what §6's greeting and the three section badges need.
+   *
+   * Takes no id: the service derives the profile from the verified token, so it cannot be asked about
+   * anybody else. Read-only, so it changes nothing and is exempt from the audit log.
+   */
+  @Get('me/profile')
+  @AuditExempt('A customer reading their own profile and counters; changes nothing.')
+  async myProfile(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return this.customerAccount.summary(user);
   }
 
   private respond(result: AuthResult, response: Response): LoginResponse {

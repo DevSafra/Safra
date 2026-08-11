@@ -139,7 +139,8 @@
     "loading": "Wird geladen…",
     "error": "Etwas ist schiefgelaufen",
     "retry": "Erneut versuchen",
-    "skipToContent": "Zum Inhalt springen"
+    "skipToContent": "Zum Inhalt springen",
+    "back": "Zurück"
   },
   "notFound": {
     "title": "Seite nicht gefunden",
@@ -191,8 +192,7 @@
     "step1": "SAFRA kontaktiert den Partner zur Bestätigung innerhalb von zwei Stunden.",
     "step2": "Nach Zustimmung erhalten Sie WhatsApp und E-Mail mit Voucher und QR-Code.",
     "step3": "Bei der Ankunft nutzen Sie Ihre Buchungsnummer oder den QR-Code.",
-    "guarantee": "Antwortet der Partner nicht rechtzeitig: Die Buchung wird storniert, Sie erhalten den vollen Betrag zurück und eine Entschädigung in Ihrer Wallet.",
-    "backHome": "Zurück zur Startseite"
+    "guarantee": "Antwortet der Partner nicht rechtzeitig: Die Buchung wird storniert, Sie erhalten den vollen Betrag zurück und eine Entschädigung in Ihrer Wallet."
   },
   "paymentReturn": {
     "title": "Zahlung per Banküberweisung abschließen",
@@ -302,7 +302,41 @@
       "checked_in": "Eingecheckt",
       "completed": "Abgeschlossen",
       "disputed": "Strittig"
-    }
+    },
+    "navHeading": "Mein Konto",
+    "navOverview": "Übersicht",
+    "navBookings": "Meine Buchungen",
+    "navWallet": "Meine Wallet",
+    "navGifts": "Geschenkkarten",
+    "navFavourites": "Favoriten",
+    "navReviews": "Meine Bewertungen",
+    "navInvoices": "Rechnungen",
+    "navProfile": "Profil",
+    "greeting": "Hallo {name}",
+    "walletEyebrow": "SAFRA-Wallet",
+    "walletCurrentTitle": "Aktuelles Guthaben",
+    "walletCurrentCaption": "Entschädigungen und Rückerstattungen · sofort nutzbar",
+    "walletGiftTitle": "Geschenkkarten-Guthaben",
+    "walletGiftUnlinked": "Geschenkkarten sind noch nicht mit Konten verknüpft",
+    "walletTotalLabel": "Insgesamt verfügbar",
+    "walletCombineNote": "Beide Guthaben lassen sich in einem Vorgang mit jeder Zahlungsart kombinieren (P-007).",
+    "loadMore": "Mehr anzeigen",
+    "notBuiltHeading": "Dieser Bereich ist noch nicht gebaut",
+    "giftsNotBuilt": "Eine Geschenkkarte wird über ihren Code eingelöst, und nichts verknüpft eine Karte bislang mit Ihrem Konto — ein Guthaben ließe sich hier nur erfinden.",
+    "favouritesNotBuilt": "Favoriten sind noch nicht gebaut: Es gibt keine Tabelle, die Ihre Auswahl speichert, also gibt es nichts zu zeigen.",
+    "invoicesNotBuilt": "Rechnungen sind noch nicht gebaut. Eine aus einer Buchung abzuleiten hieße, ein Finanzdokument zu erzeugen, das niemand ausgestellt hat — schlimmer, als es nicht zu zeigen.",
+    "nothingWaiting": "Es wartet nichts auf Sie.",
+    "overviewNextStay": "Ihr nächster Aufenthalt",
+    "profileFullName": "Vollständiger Name",
+    "profileEmail": "E-Mail-Adresse",
+    "profilePhone": "Telefonnummer",
+    "profileNotSet": "Nicht angegeben",
+    "profileEditUnavailable": "Das Bearbeiten Ihres Profils ist noch nicht verfügbar.",
+    "reviewsSubmittedTitle": "Ihre veröffentlichten Bewertungen",
+    "reviewsNone": "Sie haben noch keine Bewertung geschrieben.",
+    "greetingGeneric": "Willkommen zurück",
+    "profileNameUnavailable": "Name und Telefonnummer sind noch nicht verfügbar — es gibt keinen Endpunkt, der das Kundenprofil liest.",
+    "firstPage": "Zur ersten Seite"
   },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",
@@ -322,7 +356,6 @@
     "hidden": "SAFRA hat diese Bewertung nach Prüfung einer Partnermeldung ausgeblendet. Sie bleibt in Ihrem Verlauf und ist für Besucher nicht sichtbar.",
     "failed": "Die Bewertung konnte nicht gesendet werden. Bitte erneut versuchen.",
     "unreachable": "Der Server ist nicht erreichbar.",
-    "backToAccount": "Zurück zu meinem Konto",
     "none": "Keine Aufenthalte warten auf Ihre Bewertung."
   }
 }

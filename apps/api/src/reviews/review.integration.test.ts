@@ -349,7 +349,16 @@ describeIfDb('ReviewService', () => {
       expect(view.eligible).toBe(true);
       expect(view.stayCompleted).toBe(true);
       expect(view.alreadyReviewed).toBe(false);
-      expect(view.propertyName).toBe('اختبار');
+      /*
+        The name arrives in ALL THREE languages rather than pre-picked.
+        `coalesce(name_ar, name_en)` answered Arabic to every reader, which put Arabic property names
+        in the middle of the English and German account pages. The client picks, because only it knows
+        the locale the reader chose — see the note on `pendingForCustomer`.
+      */
+      expect(view.property.nameAr).toBe('اختبار');
+      expect(view.property).toHaveProperty('nameEn');
+      expect(view.property).toHaveProperty('nameDe');
+      expect(view.unit).toHaveProperty('nameAr');
     });
 
     it('reports an unfinished stay as not yet eligible', async () => {
@@ -400,6 +409,108 @@ describeIfDb('ReviewService', () => {
 
     it('answers not-found for a reference that does not exist', async () => {
       await expect(service.forBooking(guest(), 'BKG-2026-999999')).rejects.toThrow();
+    });
+  });
+
+  /**
+   * تقييماتي — the reviews this customer WROTE.
+   *
+   * The account screen had no way to show these: `GET /reviews` is the partner's list of reviews
+   * ABOUT them, so the section told everybody "you have not written one yet" regardless.
+   */
+  describe('the customer’s own reviews', () => {
+    /** The profile id the token carries. Created inside a CTE by the fixture, so it is read back. */
+    async function ownProfileId(): Promise<string> {
+      const { sql } = await import('drizzle-orm');
+      const found = await db.execute<{ id: string }>(
+        sql`SELECT id FROM customer_profiles WHERE user_id = ${guestUserId} LIMIT 1`,
+      );
+
+      return found.rows[0]?.id ?? '';
+    }
+
+    const author = async (): Promise<AccessTokenClaims> => ({
+      ...guest(),
+      customerProfileId: await ownProfileId(),
+    });
+
+    it('returns what this customer wrote, with the property named in all three languages', async () => {
+      const { reference } = await write(4, 'مكان هادئ ونظيف.');
+
+      const page = await service.mineForCustomer(await author(), { limit: 20 });
+
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]?.reference).toBe(reference);
+      expect(page.items[0]?.rating).toBe(4);
+      expect(page.items[0]?.body).toBe('مكان هادئ ونظيف.');
+      /* Names unpicked, so the client can honour the locale the reader chose. */
+      expect(page.items[0]?.property.nameAr).toBe('اختبار');
+      expect(page.items[0]?.property).toHaveProperty('nameEn');
+      expect(page.items[0]?.unit).toHaveProperty('nameDe');
+      /* One review, so there is no further page to offer. */
+      expect(page.nextCursor).toBeNull();
+    });
+
+    /**
+     * A hidden review is still shown to its AUTHOR.
+     *
+     * The same call `forBooking` makes: somebody who cannot see the review staff hid cannot tell
+     * "SAFRA removed this" from "it never saved", and the second reading produces a duplicate attempt
+     * the unique index then refuses. The status travels so the screen can say which it is.
+     */
+    it('still returns a review staff have hidden, carrying its status', async () => {
+      await write();
+
+      /*
+        `reviews_hidden_is_moderated` refuses a hidden review with no moderator and no timestamp —
+        hiding is a decision, and the constraint will not record one nobody made. So both travel.
+      */
+      await db.execute(sql`
+        UPDATE reviews
+        SET status = 'hidden',
+            moderated_by_user_id = ${staffUserId},
+            moderated_at = now()`);
+
+      const page = await service.mineForCustomer(await author(), { limit: 20 });
+
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]?.status).toBe('hidden');
+    });
+
+    /** Scoped to the caller's own profile, and there is no id in the request to argue with. */
+    it('returns nothing for a different customer profile', async () => {
+      await write();
+
+      const someoneElse: AccessTokenClaims = {
+        ...guest(),
+        customerProfileId: '99990000-0000-0000-0000-0000000000ab',
+      };
+
+      const page = await service.mineForCustomer(someoneElse, { limit: 20 });
+
+      expect(page.items).toStrictEqual([]);
+    });
+
+    /**
+     * A principal with no customer profile gets an empty page, not an error.
+     *
+     * Staff carry no `customerProfileId`. "You have written no reviews" is true of them, and an
+     * exception would make an ordinary read look like a fault.
+     */
+    it('returns an empty page when the token carries no customer profile', async () => {
+      await write();
+
+      const page = await service.mineForCustomer(guest(), { limit: 20 });
+
+      expect(page.items).toStrictEqual([]);
+      expect(page.nextCursor).toBeNull();
+    });
+
+    /** A malformed cursor is a 400, not a silent restart that loops a client for ever. */
+    it('refuses a malformed cursor', async () => {
+      await expect(
+        service.mineForCustomer(await author(), { limit: 20, cursor: 'not-a-cursor' }),
+      ).rejects.toMatchObject({ response: { code: 'request.cursor_invalid' } });
     });
   });
 

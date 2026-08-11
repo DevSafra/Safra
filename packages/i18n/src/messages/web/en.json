@@ -139,7 +139,8 @@
     "loading": "Loading…",
     "error": "Something went wrong",
     "retry": "Try again",
-    "skipToContent": "Skip to content"
+    "skipToContent": "Skip to content",
+    "back": "Back"
   },
   "notFound": {
     "title": "Page not found",
@@ -191,8 +192,7 @@
     "step1": "SAFRA contacts the partner to confirm availability within two hours.",
     "step2": "On approval you receive WhatsApp and email with your voucher and QR code.",
     "step3": "On arrival you use your booking reference or QR code with the partner.",
-    "guarantee": "If the partner does not respond in time: the booking is cancelled, you are refunded in full, and compensation is added to your wallet automatically.",
-    "backHome": "Back to home"
+    "guarantee": "If the partner does not respond in time: the booking is cancelled, you are refunded in full, and compensation is added to your wallet automatically."
   },
   "paymentReturn": {
     "title": "Complete your payment by bank transfer",
@@ -302,7 +302,41 @@
       "checked_in": "Checked in",
       "completed": "Completed",
       "disputed": "Disputed"
-    }
+    },
+    "navHeading": "My account",
+    "navOverview": "Overview",
+    "navBookings": "My bookings",
+    "navWallet": "My wallet",
+    "navGifts": "Gift cards",
+    "navFavourites": "Favourites",
+    "navReviews": "My reviews",
+    "navInvoices": "Invoices",
+    "navProfile": "Profile",
+    "greeting": "Hello {name}",
+    "walletEyebrow": "SAFRA wallet",
+    "walletCurrentTitle": "Current balance",
+    "walletCurrentCaption": "Compensation and refunds · usable immediately",
+    "walletGiftTitle": "Gift card balance",
+    "walletGiftUnlinked": "Gift cards are not linked to accounts yet",
+    "walletTotalLabel": "Total available to spend",
+    "walletCombineNote": "Both balances can be combined with any payment method in a single transaction (P-007).",
+    "loadMore": "Show more",
+    "notBuiltHeading": "This section is not built yet",
+    "giftsNotBuilt": "A gift card is redeemed by its code, and nothing yet links a card to your account — so a balance cannot be shown here without inventing one.",
+    "favouritesNotBuilt": "Favourites are not built yet: there is no table storing what you pick, so there is nothing to show.",
+    "invoicesNotBuilt": "Invoices are not built yet. Deriving one from a booking would mean producing a financial document nobody issued, which is worse than not showing it.",
+    "nothingWaiting": "Nothing is waiting for you.",
+    "overviewNextStay": "Your next stay",
+    "profileFullName": "Full name",
+    "profileEmail": "Email address",
+    "profilePhone": "Phone number",
+    "profileNotSet": "Not set",
+    "profileEditUnavailable": "Editing your profile is not available yet.",
+    "reviewsSubmittedTitle": "Your published reviews",
+    "reviewsNone": "You have not written a review yet.",
+    "greetingGeneric": "Welcome back",
+    "profileNameUnavailable": "Your name and phone are not available yet — no endpoint reads the customer profile.",
+    "firstPage": "Back to the first page"
   },
   "reviews": {
     "title": "Review your stay",
@@ -322,7 +356,6 @@
     "hidden": "SAFRA hid this review after reviewing a report from the partner. It stays in your record and is not shown to visitors.",
     "failed": "Could not send your review. Please try again.",
     "unreachable": "Could not reach the server.",
-    "backToAccount": "Back to my account",
     "none": "No stays are waiting for your review."
   }
 }

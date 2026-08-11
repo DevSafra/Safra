@@ -9,6 +9,7 @@ import { AccountRecoveryService } from './account-recovery.service.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { AuthTokenService } from './auth-token.service.js';
+import { CustomerAccountService } from './customer-account.service.js';
 import { TokenService } from './token.service.js';
 import { TwoFactorController } from './two-factor.controller.js';
 import { TwoFactorService } from './two-factor.service.js';
@@ -23,6 +24,7 @@ import { TwoFactorService } from './two-factor.service.js';
     TokenService,
     AuthTokenService,
     AccountRecoveryService,
+    CustomerAccountService,
     TwoFactorService,
     PasswordService,
     FieldEncryptionService,

@@ -40,6 +40,16 @@
   --color-bad: #e06868;
   --color-pend: #9f8ce8;
   /*
+    §6.1's wallet panel is `linear-gradient(135deg, var(--bandA), var(--heroA))`, and `--goldA` is a
+    raw RGB TRIPLET so the handoff's tint ladder composes as `rgba(var(--goldA), .22)`. The staff apps
+    already carry both; the customer app did not, because nothing here needed a translucent gold fill
+    before the account dashboard. Every one has a counterpart in both light blocks below — including
+    the triplet, which is the half that is easy to forget.
+  */
+  --color-band: #1b1440;
+  --color-hero: #241b52;
+  --goldA: 232, 188, 102;
+  /*
     Seven tones added 2026-08-06 so that no two statuses VISIBLE ON ONE SCREEN share a colour
     (Bashar). The widest vocabulary is the payments registry, which unions payment, refund and
     wallet statuses onto one table — thirteen values, so thirteen colours. Hues are spread around
@@ -77,6 +87,9 @@
   --color-warn: #9e6e15;
   --color-bad: #c23f3f;
   --color-pend: #6c51c9;
+  --color-band: #e8ebf7;
+  --color-hero: #e2e6f5;
+  --goldA: 168, 122, 31;
   --color-teal: #0f7d78;
   --color-lime: #5f7d16;
   --color-indigo: #4356b8;
@@ -101,6 +114,9 @@
     --color-warn: #9e6e15;
     --color-bad: #c23f3f;
     --color-pend: #6c51c9;
+    --color-band: #e8ebf7;
+    --color-hero: #e2e6f5;
+    --goldA: 168, 122, 31;
     --color-teal: #0f7d78;
     --color-lime: #5f7d16;
     --color-indigo: #4356b8;
