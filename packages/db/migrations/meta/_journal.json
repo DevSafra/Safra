@@ -176,6 +176,13 @@
       "when": 1786435762414,
       "tag": "0024_new_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1786454815395,
+      "tag": "0025_good_nicolaos",
+      "breakpoints": true
     }
   ]
 }

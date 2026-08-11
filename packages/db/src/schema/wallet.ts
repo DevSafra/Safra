@@ -120,7 +120,15 @@ export const giftCards = pgTable(
   },
   (t) => [
     index('gift_cards_status_idx').on(t.status, t.expiresAt),
-    index('gift_cards_purchaser_idx').on(t.purchasedByCustomerId),
+    /*
+      `(purchased_by_customer_id, created_at)`, not the customer alone.
+
+      بطاقاتي is keyset-paginated on `(created_at, id)` like every other customer list, and the
+      single-column index made the database filter by customer and then SORT — the shape rule 2 warns
+      about, because the set being sorted grows with every card a customer buys. The composite matches
+      `bookings_customer_idx`, which is the pattern the other keyset lists already use.
+    */
+    index('gift_cards_purchaser_idx').on(t.purchasedByCustomerId, t.createdAt),
   ],
 );
 
