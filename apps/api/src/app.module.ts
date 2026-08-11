@@ -10,6 +10,7 @@ import { BookingsModule } from './bookings/bookings.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
+import { FavouritesModule } from './favourites/favourites.module.js';
 import { FxModule } from './fx/fx.module.js';
 import { LedgerModule } from './ledger/ledger.module.js';
 import { PartnerModule } from './partner/partner.module.js';
@@ -99,6 +100,7 @@ import { TwoFactorGuard } from './rbac/two-factor.guard.js';
     PaymentsModule,
     RankingModule,
     ReviewModule,
+    FavouritesModule,
     SanctionsModule,
     AdminModule,
     CatalogModule,

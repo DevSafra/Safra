@@ -24,6 +24,7 @@ export * from './payment.js';
 export * from './wallet.js';
 export * from './dispute.js';
 export * from './review.js';
+export * from './favourite.js';
 export * from './messaging.js';
 export * from './advertising.js';
 export * from './sanctions.js';

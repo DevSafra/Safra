@@ -265,3 +265,39 @@ export async function getMyReviews(cursor?: string) {
 
   return authedFetch(`/reviews/mine?${query.toString()}`, myReviewsSchema);
 }
+
+// ─── المفضلة (handoff §6) ─────────────────────────────────────────────────────
+
+const favouriteSchema = z.object({
+  slug: z.string(),
+  savedAt: z.string(),
+  /**
+   * Whether the listing can still be booked.
+   *
+   * A saved property that was later unpublished is REPORTED rather than dropped: silently removing it
+   * would look like the save had failed.
+   */
+  isAvailable: z.boolean(),
+  property: translatedNameSchema,
+  /* `properties.city_id` is NOT NULL behind a foreign key, so a favourite always has a city. */
+  city: translatedNameSchema,
+  rating: z.string().nullable(),
+  reviewsCount: z.number(),
+  fromPrice: z.string().nullable(),
+  currencyCode: z.string().nullable(),
+});
+
+export type Favourite = z.infer<typeof favouriteSchema>;
+
+const favouritesSchema = z.object({
+  items: z.array(favouriteSchema),
+  nextCursor: z.string().nullable(),
+});
+
+export async function getMyFavourites(cursor?: string) {
+  const query = new URLSearchParams({ limit: '12' });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return authedFetch(`/favourites?${query.toString()}`, favouritesSchema);
+}

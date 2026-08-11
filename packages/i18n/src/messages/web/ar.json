@@ -128,7 +128,10 @@
     "reviewsEmpty": "لا تقييمات بعد لهذا العقار.",
     "reviewsShowing": "أحدث {shown} من {total, plural, zero {لا تقييمات} one {تقييم واحد} two {تقييمين} few {# تقييمات} many {# تقييمًا} other {# تقييم}}",
     "reviewsPartnerReply": "رد المضيف",
-    "reviewsVerified": "من إقامة مؤكدة"
+    "reviewsVerified": "من إقامة مؤكدة",
+    "save": "حفظ في المفضلة",
+    "saved": "محفوظ في المفضلة",
+    "saveFailed": "تعذّر الحفظ. حاول مرة أخرى."
   },
   "city": {
     "availableStays": "الإقامات المتاحة في {city}",
@@ -323,7 +326,6 @@
     "loadMore": "عرض المزيد",
     "notBuiltHeading": "لم يُبنَ هذا القسم بعد",
     "giftsNotBuilt": "بطاقات الهدايا تُستبدل برمزها، ولا يوجد بعد ما يربط البطاقة بحسابك — لذلك لا يمكن عرض رصيد لك هنا دون تخمينه.",
-    "favouritesNotBuilt": "لم تُبنَ المفضلة بعد: لا يوجد جدول يحفظ ما تختاره، فلا شيء لعرضه.",
     "invoicesNotBuilt": "الفواتير غير مبنية بعد. اشتقاق فاتورة من حجز يعني إنشاء مستند مالي لم يصدره أحد، وهذا أسوأ من عدم عرضه.",
     "nothingWaiting": "لا شيء بانتظارك.",
     "overviewNextStay": "إقامتك القادمة",
@@ -336,7 +338,11 @@
     "reviewsNone": "لم تكتب تقييماً بعد.",
     "greetingGeneric": "أهلاً بك",
     "profileNameUnavailable": "الاسم ورقم الهاتف غير متاحين بعد — لا توجد بعد واجهة تقرأ الملف الشخصي.",
-    "firstPage": "العودة إلى الأول"
+    "firstPage": "العودة إلى الأول",
+    "favouritesNone": "لم تحفظ أي إقامة بعد.",
+    "favouriteRemove": "إزالة من المفضلة",
+    "favouriteUnavailable": "لم تعد متاحة",
+    "favouriteFrom": "من"
   },
   "reviews": {
     "title": "قيّم إقامتك",

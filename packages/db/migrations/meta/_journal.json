@@ -169,6 +169,13 @@
       "when": 1786397663902,
       "tag": "0023_graceful_doctor_faustus",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1786435762414,
+      "tag": "0024_new_zaran",
+      "breakpoints": true
     }
   ]
 }

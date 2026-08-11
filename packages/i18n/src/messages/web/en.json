@@ -128,7 +128,10 @@
     "reviewsEmpty": "No reviews for this property yet.",
     "reviewsShowing": "Showing the latest {shown} of {total, plural, one {1 review} other {# reviews}}",
     "reviewsPartnerReply": "The host replied",
-    "reviewsVerified": "From a completed stay"
+    "reviewsVerified": "From a completed stay",
+    "save": "Save to favourites",
+    "saved": "Saved to favourites",
+    "saveFailed": "Could not save. Try again."
   },
   "city": {
     "availableStays": "Available stays in {city}",
@@ -323,7 +326,6 @@
     "loadMore": "Show more",
     "notBuiltHeading": "This section is not built yet",
     "giftsNotBuilt": "A gift card is redeemed by its code, and nothing yet links a card to your account — so a balance cannot be shown here without inventing one.",
-    "favouritesNotBuilt": "Favourites are not built yet: there is no table storing what you pick, so there is nothing to show.",
     "invoicesNotBuilt": "Invoices are not built yet. Deriving one from a booking would mean producing a financial document nobody issued, which is worse than not showing it.",
     "nothingWaiting": "Nothing is waiting for you.",
     "overviewNextStay": "Your next stay",
@@ -336,7 +338,11 @@
     "reviewsNone": "You have not written a review yet.",
     "greetingGeneric": "Welcome back",
     "profileNameUnavailable": "Your name and phone are not available yet — no endpoint reads the customer profile.",
-    "firstPage": "Back to the first page"
+    "firstPage": "Back to the first page",
+    "favouritesNone": "You have not saved a stay yet.",
+    "favouriteRemove": "Remove from favourites",
+    "favouriteUnavailable": "No longer available",
+    "favouriteFrom": "from"
   },
   "reviews": {
     "title": "Review your stay",

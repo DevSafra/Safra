@@ -128,7 +128,10 @@
     "reviewsEmpty": "Für diese Unterkunft gibt es noch keine Bewertungen.",
     "reviewsShowing": "Neueste {shown} von {total, plural, one {1 Bewertung} other {# Bewertungen}}",
     "reviewsPartnerReply": "Der Gastgeber hat geantwortet",
-    "reviewsVerified": "Aus einem abgeschlossenen Aufenthalt"
+    "reviewsVerified": "Aus einem abgeschlossenen Aufenthalt",
+    "save": "Zu Favoriten hinzufügen",
+    "saved": "In Favoriten gespeichert",
+    "saveFailed": "Speichern fehlgeschlagen. Bitte erneut versuchen."
   },
   "city": {
     "availableStays": "Verfügbare Unterkünfte in {city}",
@@ -323,7 +326,6 @@
     "loadMore": "Mehr anzeigen",
     "notBuiltHeading": "Dieser Bereich ist noch nicht gebaut",
     "giftsNotBuilt": "Eine Geschenkkarte wird über ihren Code eingelöst, und nichts verknüpft eine Karte bislang mit Ihrem Konto — ein Guthaben ließe sich hier nur erfinden.",
-    "favouritesNotBuilt": "Favoriten sind noch nicht gebaut: Es gibt keine Tabelle, die Ihre Auswahl speichert, also gibt es nichts zu zeigen.",
     "invoicesNotBuilt": "Rechnungen sind noch nicht gebaut. Eine aus einer Buchung abzuleiten hieße, ein Finanzdokument zu erzeugen, das niemand ausgestellt hat — schlimmer, als es nicht zu zeigen.",
     "nothingWaiting": "Es wartet nichts auf Sie.",
     "overviewNextStay": "Ihr nächster Aufenthalt",
@@ -336,7 +338,11 @@
     "reviewsNone": "Sie haben noch keine Bewertung geschrieben.",
     "greetingGeneric": "Willkommen zurück",
     "profileNameUnavailable": "Name und Telefonnummer sind noch nicht verfügbar — es gibt keinen Endpunkt, der das Kundenprofil liest.",
-    "firstPage": "Zur ersten Seite"
+    "firstPage": "Zur ersten Seite",
+    "favouritesNone": "Sie haben noch keine Unterkunft gespeichert.",
+    "favouriteRemove": "Aus Favoriten entfernen",
+    "favouriteUnavailable": "Nicht mehr verfügbar",
+    "favouriteFrom": "ab"
   },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",
