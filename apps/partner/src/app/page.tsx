@@ -208,7 +208,7 @@ function Requests({
                     <Ltr>{request.reference}</Ltr>
                   </p>
                   <p className="mt-0.5 text-[12.5px] text-muted">
-                    {request.unitName} · {request.checkIn} → {request.checkOut} ·{' '}
+                    {request.unitName} · {request.checkIn} ← {request.checkOut} ·{' '}
                     {fill(t.dashboard.requestsNights, { n: count(request.nights) })} ·{' '}
                     {fill(t.dashboard.requestsGuests, { n: count(request.guests) })}
                   </p>

@@ -92,7 +92,7 @@ export default async function PayoutPage({
             label={t.sections.payouts.period}
             value={
               <Ltr>
-                {payout.periodStart} → {payout.periodEnd}
+                {payout.periodStart} ← {payout.periodEnd}
               </Ltr>
             }
           />
@@ -152,7 +152,7 @@ export default async function PayoutPage({
                     <Td>{booking.property ?? t.admin.noData}</Td>
                     <Td>
                       <Ltr className="text-[11.5px] text-faint">
-                        {booking.checkIn} → {booking.checkOut}
+                        {booking.checkIn} ← {booking.checkOut}
                       </Ltr>
                     </Td>
                     <Td>

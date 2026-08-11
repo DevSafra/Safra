@@ -97,7 +97,7 @@ export default async function PayoutPage({
           />
           <Row
             label={t.payouts.colPeriod}
-            value={`${payout.periodStart} → ${payout.periodEnd}`}
+            value={`${payout.periodStart} ← ${payout.periodEnd}`}
           />
           {payout.scheduledFor ? (
             <Row label={t.payouts.scheduledFor} value={payout.scheduledFor} />
@@ -136,7 +136,7 @@ export default async function PayoutPage({
                   </Ltr>
                   <span className="text-[12px] text-muted">{booking.property ?? ''}</span>
                   <Ltr className="text-[11.5px] text-faint">
-                    {booking.checkIn} → {booking.checkOut}
+                    {booking.checkIn} ← {booking.checkOut}
                   </Ltr>
                   <span className="ms-auto text-[13px] font-bold text-gold">
                     <Ltr>{amount(booking.amount, payout.currencyCode)}</Ltr>

@@ -184,7 +184,7 @@ function columns(position: {
       header: t.sections.payouts.colPeriod,
       render: (row) => (
         <Ltr className="whitespace-nowrap text-[11.5px] text-faint">
-          {row.periodStart} → {row.periodEnd}
+          {row.periodStart} ← {row.periodEnd}
         </Ltr>
       ),
     },

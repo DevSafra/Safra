@@ -95,7 +95,7 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
 
       <p className="mt-1.5 text-[11.5px] text-faint">
         <Ltr>
-          {payout.periodStart} → {payout.periodEnd}
+          {payout.periodStart} ← {payout.periodEnd}
         </Ltr>
         {' · '}
         {count(payout.bookingCount)} {t.payouts.colBookings}
