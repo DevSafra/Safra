@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { PasswordField } from '@safra/ui';
+import { PasswordField, passwordsMatch } from '@safra/ui';
 import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
@@ -59,6 +59,24 @@ export function AuthForm({
     setFieldErrors({});
 
     const form = new FormData(event.currentTarget);
+
+    /*
+      Registration only. Signing in has one password field, and asking somebody to type an existing
+      password twice would be friction with nothing to catch.
+
+      Reported against the confirmation FIELD rather than as a form-level banner, which is what the
+      other three forms do — `fieldErrors` already drives `PasswordField`'s `error` slot, so the
+      message lands on the input that has the problem and sets `aria-invalid` on it.
+    */
+    if (
+      mode === 'register' &&
+      !passwordsMatch(text(form, 'password'), text(form, 'confirm'))
+    ) {
+      setFieldErrors({ confirm: t('passwordMismatch') });
+      setSubmitting(false);
+
+      return;
+    }
 
     const body =
       mode === 'login'
@@ -193,6 +211,24 @@ export function AuthForm({
         error={fieldErrors['password']}
         required
       />
+
+      {/*
+        Register only, and never sent: `registerSchema` takes one password, and a second field would
+        be refused by a strict schema rather than ignored. The confirmation is a typo guard, and a
+        typo here costs an account somebody cannot sign in to.
+      */}
+      {mode === 'register' ? (
+        <PasswordField
+          name="confirm"
+          showLabel={t('showPassword')}
+          hideLabel={t('hidePassword')}
+          label={t('confirmPassword')}
+          showRequiredMark
+          autoComplete="new-password"
+          error={fieldErrors['confirm']}
+          required
+        />
+      ) : null}
 
       <button
         type="submit"

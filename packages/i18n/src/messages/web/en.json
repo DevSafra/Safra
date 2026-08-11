@@ -279,7 +279,8 @@
     "checkEmail": "Check your email",
     "checkEmailBody": "If you did not have an account with this address, we have sent you a confirmation link. If you did, we have sent you a message explaining how to sign in or reset your password.",
     "confirmNewPassword": "Confirm new password",
-    "passwordMismatch": "The two passwords do not match."
+    "passwordMismatch": "The two passwords do not match.",
+    "confirmPassword": "Confirm password"
   },
   "account": {
     "title": "My account",

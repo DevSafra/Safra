@@ -279,7 +279,8 @@
     "checkEmail": "Prüfen Sie Ihre E-Mails",
     "checkEmailBody": "Falls Sie mit dieser Adresse noch kein Konto hatten, haben wir Ihnen einen Bestätigungslink gesendet. Falls doch, haben wir Ihnen erklärt, wie Sie sich anmelden oder Ihr Passwort zurücksetzen.",
     "confirmNewPassword": "Neues Passwort bestätigen",
-    "passwordMismatch": "Die beiden Passwörter stimmen nicht überein."
+    "passwordMismatch": "Die beiden Passwörter stimmen nicht überein.",
+    "confirmPassword": "Passwort bestätigen"
   },
   "account": {
     "title": "Mein Konto",

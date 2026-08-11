@@ -42,12 +42,24 @@ const field = (page: Page, name: string) => page.getByRole('textbox', { name });
  *
  * `noValidate` is already set on the form, so the request does reach the route handler — which
  * is the point: this must exercise the SERVER's error path, not the browser's.
+ *
+ * EVERY OTHER FIELD IS VALID, including both passwords. It used to fill only the email and rely on
+ * an otherwise-empty form still reaching the API. That stopped being true when registration grew a
+ * password confirmation (2026-08-11): the client refuses to send a request whose two passwords do
+ * not match, and two empty fields do not match, so the API was never called and the test failed on
+ * a missing Arabic sentence. Filling the form properly is also what the test MEANS — "a validation
+ * error from the API renders in Arabic" is about the email being wrong, not about everything being
+ * blank.
  */
 async function submitBadEmail(page: Page, locale: 'ar' | 'de') {
   const copy = (locale === 'ar' ? arWeb : deWeb).auth;
 
   await page.goto(`/${locale}/register`);
+  await page.locator('input[name=fullName]').fill('اختبار اللغة');
   await field(page, copy.email).fill('not-an-email');
+  await page.locator('input[name=phone]').fill('+963912345678');
+  await page.locator('input[name=password]').fill('a-long-passphrase-1');
+  await page.locator('input[name=confirm]').fill('a-long-passphrase-1');
   await page.getByRole('button', { name: copy.createAccount }).click();
 }
 

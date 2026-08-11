@@ -48,8 +48,29 @@ test('the registration password has the toggle too', async ({ page }) => {
   const password = field(page, 'Password');
   await expect(password).toHaveAttribute('type', 'password');
 
-  await page.getByRole('button', { name: 'Show password' }).click();
+  /* `.first()`: the confirmation field added in 2026-08-11 brings a second toggle onto this page. */
+  await page.getByRole('button', { name: 'Show password' }).first().click();
   await expect(password).toHaveAttribute('type', 'text');
+});
+
+/**
+ * Registering asks for the password twice, and signing in does not.
+ *
+ * One component renders both screens, so the confirmation has to appear on exactly one of them — the
+ * register-only branch is the thing worth asserting. Nothing is submitted: no account is created, and
+ * the mismatch rule itself is proven in `password-match.test.ts`.
+ */
+test('registration confirms the password and sign-in does not', async ({ page }) => {
+  await page.goto('/en/register');
+  await expect(page.locator('input[name=password]')).toHaveCount(1);
+  await expect(page.locator('input[name=confirm]')).toHaveCount(1);
+
+  await page.goto('/en/login');
+  await expect(page.locator('input[name=password]')).toHaveCount(1);
+  await expect(
+    page.locator('input[name=confirm]'),
+    'signing in must not ask for a confirmation',
+  ).toHaveCount(0);
 });
 
 /**
