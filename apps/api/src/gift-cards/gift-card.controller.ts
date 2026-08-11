@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
 import {
@@ -53,6 +53,15 @@ export class GiftCardController {
    */
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('redeem')
+  /*
+    200, not Nest's default 201 for a POST.
+
+    Redeeming acts on a card that already exists — it does not create a resource the caller can then go
+    and fetch, and there is no `Location` to send. `purchase` below keeps 201, because that one really
+    does mint something new. The web forms test `response.ok` either way, so this is about the API
+    telling the truth rather than about fixing a break.
+  */
+  @HttpCode(HttpStatus.OK)
   @AuditExempt('Audited by the service, which records the card reference and the amount.')
   async redeem(
     @CurrentUser() user: AccessTokenClaims | undefined,
