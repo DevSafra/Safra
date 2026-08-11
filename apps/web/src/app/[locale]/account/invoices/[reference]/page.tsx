@@ -6,10 +6,12 @@ import { getTranslations } from 'next-intl/server';
 import { AccountShell } from '@/components/account-shell';
 import { BackLink } from '@/components/back-link';
 import { DateRange } from '@/components/date-range';
+import { PrintButton } from '@/components/print-button';
 import { StatusPill } from '@/components/booking-status-pill';
 import { getAccountSummary, getInvoice, type InvoiceLineRow } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
+import { ltrIsolate } from '@/lib/bidi';
 import { formatMoney, localisedName } from '@/lib/localise';
 import { returnParam } from '@/lib/return-to';
 import type { Locale } from '@/i18n/routing';
@@ -105,7 +107,11 @@ export default async function AccountInvoicePage({
       title={t('navInvoices')}
     >
       <div className="grid gap-6">
-        <BackLink href={`/${locale}/account/invoices`} locale={locale} />
+        <div className="flex flex-wrap items-center gap-3 print:hidden">
+          <BackLink href={`/${locale}/account/invoices`} locale={locale} />
+          <PrintButton label={t('invoiceDownload')} />
+          <span className="text-xs text-faint">{t('invoicePrintNote')}</span>
+        </div>
 
         {/* ── The stay this receipt is for ── */}
         <section className="rounded-card border border-line bg-card p-5">
@@ -150,7 +156,7 @@ export default async function AccountInvoicePage({
 
           <Link
             href={`/${locale}/booking/${encodeURIComponent(invoice.reference)}?${returnParam('invoices')}`}
-            className="mt-4 inline-flex min-h-10 w-fit items-center text-sm text-gold hover:underline lg:min-h-0"
+            className="mt-4 inline-flex min-h-10 w-fit items-center text-sm text-gold hover:underline print:hidden lg:min-h-0"
           >
             {t('invoiceBookingLink')}
           </Link>
@@ -185,7 +191,7 @@ export default async function AccountInvoicePage({
 
           <p className="mt-2 text-xs text-faint">
             {invoice.paidAt
-              ? t('invoicePaidOn', { date: invoice.paidAt.slice(0, 10) })
+              ? t('invoicePaidOn', { date: ltrIsolate(invoice.paidAt.slice(0, 10)) })
               : t('invoiceUnpaid')}
           </p>
         </section>

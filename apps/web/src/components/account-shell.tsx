@@ -113,7 +113,7 @@ export async function AccountShell({
   };
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 lg:grid-cols-[220px_1fr] lg:items-start">
+    <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 print:block print:max-w-none print:p-0 lg:grid-cols-[220px_1fr] lg:items-start">
       {/*
         The nav comes FIRST in the DOM and moves into column one from `lg` up.
 
@@ -122,9 +122,10 @@ export async function AccountShell({
         stacked console links pushed every section below the fold, which a single 40px tab row does
         not do. It scrolls inside its own box, so the page still never scrolls sideways.
       */}
+      {/* `print:hidden` — screen navigation. On paper the reader already holds the document. */}
       <nav
         aria-label={t('navHeading')}
-        className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 lg:mx-0 lg:col-start-1 lg:row-start-1 lg:flex-col lg:px-0 lg:pb-0"
+        className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1 print:hidden lg:mx-0 lg:col-start-1 lg:row-start-1 lg:flex-col lg:px-0 lg:pb-0"
       >
         {SECTIONS.map((section) => {
           const current = section.id === active;
@@ -172,7 +173,9 @@ export async function AccountShell({
       <div className="min-w-0 lg:col-start-2 lg:row-start-1">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <h1 className="font-display text-3xl font-bold text-gold">{title}</h1>
-          <SignOutButton locale={locale} />
+          <span className="print:hidden">
+            <SignOutButton locale={locale} />
+          </span>
         </div>
 
         <div className="mt-8">{children}</div>

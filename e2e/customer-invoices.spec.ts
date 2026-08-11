@@ -127,6 +127,73 @@ test.describe('الفواتير', () => {
       expect(response?.status(), `${forged} must 404`).toBe(404);
     }
 
+    /*
+      ── The PDF ──
+
+      `window.print()` opens a native dialog Playwright cannot drive, so what is asserted is everything
+      up to it: the control exists, and the document the dialog would capture is the RECEIPT rather than
+      a screenshot of the app. `emulateMedia` applies the print stylesheet without printing anything,
+      which is the only way to see this — the screen render is green whether or not the print rules work.
+    */
+    await page.goto(`/en/account/invoices/${encodeURIComponent(reference)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+
+    const download = page.getByRole('button', { name: en.account.invoiceDownload });
+
+    await expect(download).toBeVisible();
+
+    await page.emulateMedia({ media: 'print' });
+
+    /* The screen chrome leaves the paper: the site header, the account nav, and the control itself. */
+    await expect(page.locator('header')).toBeHidden();
+    await expect(
+      page.getByRole('navigation', { name: en.account.navHeading }),
+    ).toBeHidden();
+    await expect(download).toBeHidden();
+    await expect(
+      page.getByRole('link', { name: en.account.invoiceBookingLink }),
+    ).toBeHidden();
+
+    /* The record itself stays, and so does the sentence saying what it is not. */
+    await expect(page.getByText(reference).first()).toBeVisible();
+    await expect(
+      page.getByText(en.account.invoiceLines.accommodation).first(),
+    ).toBeVisible();
+    await expect(page.getByText(en.account.invoicesNotTax)).toBeVisible();
+
+    /* Paper is white. A dark card behind black text prints as a solid block of ink. */
+    const paper = await page.evaluate(
+      () => getComputedStyle(document.body).backgroundColor,
+    );
+
+    expect(paper).toBe('rgb(255, 255, 255)');
+
+    await page.emulateMedia({ media: 'screen' });
+
+    /*
+      ── The ISO date is isolated in Arabic ──
+
+      `«دفع في 2026-08-08»` rendered as `«دفع في 08-08-2026»`: hyphens are bidi-NEUTRAL, so an RTL
+      paragraph lays the three numeric runs out right to left and the date reads backwards while every
+      digit is still correct. Invisible to a string assertion — the DOM held the right characters — and
+      found by generating the PDF and looking at it.
+
+      What can be checked here is the mechanism: the U+2066 isolate reaching the rendered page. Whether
+      the browser then DRAWS it correctly is what the PDF render proved.
+    */
+    await page.goto(`/ar/account/invoices/${encodeURIComponent(reference)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+
+    const arabicPaid = await page.locator('section').first().innerText();
+    const paidLine = (await page.locator('body').innerText())
+      .split('\n')
+      .find((line) => line.includes('2026-') && line.includes('\u2066'));
+
+    expect(arabicPaid.length).toBeGreaterThan(0);
+    expect(paidLine, 'the paid-on date must carry a U+2066 isolate').toBeDefined();
+
     // ── No page scrolls sideways, at every documented width ──
     for (const width of [390, 768, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 });

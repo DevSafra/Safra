@@ -233,3 +233,72 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/**
+ * Paper (Bashar, 2026-08-11: "the customer should be able to download the invoice as a pdf file").
+ *
+ * ## Why the browser makes the PDF and not the server
+ *
+ * The receipt has to read correctly in ARABIC, and Arabic is not a font substitution — it needs
+ * contextual glyph shaping and bidirectional layout. The PDF libraries that would run in the API
+ * (`pdfkit`, `pdf-lib`) do neither, so a server-rendered receipt would come out as disconnected
+ * left-to-right letterforms: worse than no PDF at all, and worse in a way nobody testing in English
+ * would notice. Correct Arabic in a PDF means a real text engine, which means either the customer's
+ * browser or a headless one of ours.
+ *
+ * The customer's browser is already there, already has the fonts, costs no CPU on a request path that
+ * has a 200 ms budget, and needs no queue. `docs/FUTURE-WORK.md` O-fin-2 records what a server-side
+ * PDF would take, and why that is deployment work rather than a display change.
+ *
+ * ## Colour is redefined rather than overridden per element
+ *
+ * Every surface in this app paints with a `--color-*` token, so flipping the tokens once turns the
+ * whole document to paper. The alternative — a `print:bg-white print:text-black` on each element —
+ * misses whichever element is added next, and the failure mode is a page of dark ink.
+ */
+@media print {
+  :root,
+  :root[data-theme='dark'],
+  :root[data-theme='light'] {
+    --color-bg: #ffffff;
+    --color-card: #ffffff;
+    --color-field: #ffffff;
+    --color-line: #c8ccd8;
+    --color-text: #000000;
+    --color-muted: #33383f;
+    --color-faint: #5a5f6b;
+    --color-gold: #6b4d10;
+    --color-band: #ffffff;
+    --color-hero: #ffffff;
+    --goldA: 107, 77, 16;
+  }
+
+  /* Ink, not screen: a dark card behind black text prints as a solid block. */
+  body {
+    background: #ffffff;
+  }
+
+  /*
+    A4 with a real margin, because the browser's default header eats into the first line otherwise.
+    `A4` rather than `letter`: the merchant entity is German (M-1) and the customers are not in the US.
+  */
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
+
+  /* A receipt is filed and referred back to; a section split across two sheets is not. */
+  section,
+  li {
+    break-inside: avoid;
+  }
+
+  /*
+    Links print their text, not their target.
+    Nothing here needs `content: attr(href)` — the reference identifies the booking, and a page of
+    `https://…` URLs after every label is noise on a document somebody is filing.
+  */
+  a {
+    text-decoration: none;
+  }
+}

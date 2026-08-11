@@ -8,6 +8,7 @@ import { StatusPill } from '@/components/booking-status-pill';
 import { getAccountSummary, getMyInvoices } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
+import { ltrIsolate } from '@/lib/bidi';
 import { formatMoney, localisedName } from '@/lib/localise';
 
 /**
@@ -113,7 +114,9 @@ export default async function AccountInvoicesPage({
                     */}
                     <span className="text-xs text-faint">
                       {invoice.paidAt
-                        ? t('invoicePaidOn', { date: invoice.paidAt.slice(0, 10) })
+                        ? t('invoicePaidOn', {
+                            date: ltrIsolate(invoice.paidAt.slice(0, 10)),
+                          })
                         : t('invoiceUnpaid')}
                     </span>
                   </span>

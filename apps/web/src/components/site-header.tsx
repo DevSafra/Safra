@@ -32,7 +32,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur-sm">
+    <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur-sm print:hidden">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
         <Link href={`/${locale}`} className="flex items-center gap-3 me-auto">
           <span

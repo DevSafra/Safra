@@ -396,7 +396,9 @@
       "partially_refunded": "Partially refunded"
     },
     "passwordConfirm": "Confirm new password",
-    "passwordMismatch": "The two passwords do not match."
+    "passwordMismatch": "The two passwords do not match.",
+    "invoiceDownload": "Download PDF",
+    "invoicePrintNote": "Choose “Save as PDF” in the print dialog."
   },
   "reviews": {
     "title": "Review your stay",

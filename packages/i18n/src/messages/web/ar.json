@@ -396,7 +396,9 @@
       "partially_refunded": "مستردة جزئياً"
     },
     "passwordConfirm": "تأكيد كلمة المرور الجديدة",
-    "passwordMismatch": "كلمتا المرور غير متطابقتين."
+    "passwordMismatch": "كلمتا المرور غير متطابقتين.",
+    "invoiceDownload": "تحميل PDF",
+    "invoicePrintNote": "اختر «حفظ بصيغة PDF» في نافذة الطباعة."
   },
   "reviews": {
     "title": "قيّم إقامتك",
