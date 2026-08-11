@@ -88,6 +88,16 @@ export class FxRateService {
       return cached.rate;
     }
 
+    /*
+      `ORDER BY effective_from DESC, id DESC` — the id breaks a tie, and a tie is not hypothetical.
+
+      An admin correcting a rate seconds after setting it, or a bulk import stamping one moment,
+      produces two rows sharing `effective_from`. Ordering by that column alone leaves the winner to
+      the planner, so the rate a booking is priced at could differ between two identical requests.
+      `uuidv7()` is time-ordered, so `id DESC` means "the one written last" — which is the one an
+      admin just corrected TO. `list()` carries the same tiebreak, so the registry an operator reads
+      cannot disagree with what pricing actually used.
+    */
     const rows = await this.db.execute<{ rate: string; effective_from: string }>(sql`
       SELECT f.rate::text AS rate, f.effective_from::text AS effective_from
       FROM fx_rates f
@@ -96,7 +106,7 @@ export class FxRateService {
       WHERE base.code = ${currencyCode}
         AND quote.code = ${ACCOUNTING_CURRENCY}
         AND f.effective_from <= now()
-      ORDER BY f.effective_from DESC
+      ORDER BY f.effective_from DESC, f.id DESC
       LIMIT 1
     `);
 
@@ -157,7 +167,7 @@ export class FxRateService {
       JOIN currencies quote ON quote.id = f.quote_currency_id
       WHERE quote.code = ${ACCOUNTING_CURRENCY}
         AND f.effective_from <= now()
-      ORDER BY base.code, f.effective_from DESC
+      ORDER BY base.code, f.effective_from DESC, f.id DESC
     `);
 
     return rows.rows.map((row) => {
@@ -191,7 +201,21 @@ export class FxRateService {
     actorRole?: Role | undefined;
     actorUserId?: string | undefined;
   }): Promise<FxRateRecord> {
-    const effectiveFrom = input.effectiveFrom ?? new Date().toISOString();
+    /**
+     * When no date is given, the effective time comes from the DATABASE clock, not this process's.
+     *
+     * `rateToSyp` filters `effective_from <= now()`, which is the database's clock. Stamping the row
+     * with `new Date()` therefore compares two clocks, and an app server even slightly ahead of the
+     * database future-dates its own write: the rate is in the table, the read refuses it, and pricing
+     * answers «التسعير غير متاح مؤقتاً» — the exact outage this service exists to prevent, arriving
+     * intermittently and only under skew. One clock decides both halves.
+     *
+     * An EXPLICIT `effectiveFrom` is still honoured verbatim: scheduling a rate for a future moment,
+     * or backdating one, is a deliberate act with a date the caller chose.
+     */
+    const effectiveAt = input.effectiveFrom
+      ? sql`${input.effectiveFrom}::timestamptz`
+      : sql`now()`;
 
     /**
      * The previous rate, captured BEFORE the insert so the audit row can show what
@@ -200,15 +224,17 @@ export class FxRateService {
      */
     const previous = (await this.list()).find((r) => r.currency === input.currency);
 
+    let stored = input.effectiveFrom ?? '';
+
     await this.db.transaction(async (tx) => {
-      const rows = await tx.execute<{ id: string }>(sql`
+      const rows = await tx.execute<{ id: string; effective_from: string }>(sql`
         INSERT INTO fx_rates
           (base_currency_id, quote_currency_id, rate, effective_from, source, created_by_user_id)
-        SELECT base.id, quote.id, ${input.rate}::numeric, ${effectiveFrom}::timestamptz,
+        SELECT base.id, quote.id, ${input.rate}::numeric, ${effectiveAt},
                ${input.source}, ${input.actorUserId ?? null}
         FROM currencies base, currencies quote
         WHERE base.code = ${input.currency} AND quote.code = ${ACCOUNTING_CURRENCY}
-        RETURNING id
+        RETURNING id, effective_from::text AS effective_from
       `);
 
       if (!rows.rows[0]) {
@@ -225,6 +251,8 @@ export class FxRateService {
        * currency and rate arrive in the body — so it recorded only `{"ok":true}`,
        * which tells a reviewer nothing about a change to a financial parameter (§15).
        */
+      stored = rows.rows[0].effective_from;
+
       await this.audit.record(
         {
           actorUserId: input.actorUserId,
@@ -239,7 +267,8 @@ export class FxRateService {
             currency: input.currency,
             quoteCurrency: ACCOUNTING_CURRENCY,
             rate: input.rate,
-            effectiveFrom,
+            /* What was STORED, not what was intended — they differ whenever the default is used. */
+            effectiveFrom: rows.rows[0].effective_from,
             source: input.source,
           },
         },
@@ -256,7 +285,7 @@ export class FxRateService {
 
     this.logger.log(
       `FX rate set: ${input.currency}→${ACCOUNTING_CURRENCY} = ${input.rate} ` +
-        `effective ${effectiveFrom} (${input.source}).`,
+        `effective ${stored} (${input.source}).`,
     );
 
     const current = await this.list();
@@ -267,7 +296,7 @@ export class FxRateService {
       record ?? {
         currency: input.currency,
         rate: input.rate,
-        effectiveFrom,
+        effectiveFrom: stored,
         source: input.source,
         ageHours: 0,
         stale: false,
