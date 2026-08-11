@@ -1657,6 +1657,24 @@ LABELS, so a buyer can tell their cards apart, and the UI says so in as many wor
 queue job, and it also means deciding whether a code in an inbox is acceptable at all: it is a bearer
 instrument, so an email is a spendable secret sitting in somebody's mailbox.
 
+**Two consequences of the cash-only rule, both accepted.**
+
+A gift card may only be bought with الرصيد الحالي — the part of the balance that did not itself come from
+a gift card (Bashar, 2026-08-11). محفظتي shows the split, derived gift-first from the immutable statement
+rather than stored in a second column that every debit would have to keep in step
+(`WalletService.composition`).
+
+1. **It is a one-way ratchet.** Buying a card out of cash and redeeming it back converts cash into gift
+   money permanently, and that is correct — you gave a gift, and money returning from a card is gift
+   money. It does mean a browser test cannot buy-then-redeem on every run: four cycles emptied the
+   testbed wallet's cash entirely. `e2e/customer-gifts.spec.ts` therefore proves the page and the
+   refusals, and leaves the money moves to the integration suite, where they roll back.
+2. **The split assumes the balance is explained by its history.** Every movement the app makes writes a
+   `wallet_transactions` row, so that holds in production — but the testbed used to seed a bare balance
+   with nothing behind it, and محفظتي then reported a wallet that had never seen a gift card as entirely
+   gift-derived. `seed-testbed.ts` now writes the opening credit, and clears the gift-card, favourites
+   and wallet-transaction rows it had never needed to clear before.
+
 **The code is shown exactly once**, in the response to the purchase. It is stored only as
 `sha256(normalised)` plus the last four symbols, never logged, and never returned by a read. A buyer who
 loses it before passing it on needs staff to cancel and reissue — the same trade every gift card makes,
