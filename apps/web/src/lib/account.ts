@@ -301,3 +301,85 @@ export async function getMyFavourites(cursor?: string) {
 
   return authedFetch(`/favourites?${query.toString()}`, favouritesSchema);
 }
+
+// ─── الفواتير (handoff §6) ────────────────────────────────────────────────────
+
+/**
+ * A receipt.
+ *
+ * Every amount is a STRING, and stays one all the way to `formatMoney`. `numeric(14,2)` does not fit a
+ * JavaScript number without losing the last cent at the far end of the range, and a money figure that
+ * is occasionally wrong is worse than one that is always a string.
+ */
+const invoiceSummarySchema = z.object({
+  reference: z.string(),
+  bookingStatus: z.string(),
+  issuedAt: z.string(),
+  paidAt: z.string().nullable(),
+  checkIn: z.string(),
+  checkOut: z.string(),
+  nights: z.number(),
+  property: translatedNameSchema.extend({ slug: z.string() }),
+  city: translatedNameSchema,
+  currencyCode: z.string(),
+  totalAmount: z.string(),
+});
+
+export type InvoiceSummaryRow = z.infer<typeof invoiceSummarySchema>;
+
+const invoicesSchema = z.object({
+  items: z.array(invoiceSummarySchema),
+  nextCursor: z.string().nullable(),
+});
+
+/**
+ * The line keys the API is allowed to send.
+ *
+ * An enum rather than a string, because each key becomes a LOOK-UP in the copy catalogue: an unknown
+ * key would render as a missing-message placeholder in the middle of a financial document. Rejecting
+ * the response is the louder and more honest failure.
+ */
+const invoiceLineSchema = z.object({
+  key: z.enum(['accommodation', 'serviceFee', 'discount', 'giftCard', 'wallet']),
+  amount: z.string(),
+  deduction: z.boolean(),
+});
+
+export type InvoiceLineRow = z.infer<typeof invoiceLineSchema>;
+
+const invoicePaymentSchema = z.object({
+  reference: z.string(),
+  method: z.string(),
+  status: z.string(),
+  amount: z.string(),
+  currencyCode: z.string(),
+  capturedAt: z.string().nullable(),
+});
+
+export type InvoicePaymentRow = z.infer<typeof invoicePaymentSchema>;
+
+const invoiceDetailSchema = invoiceSummarySchema.extend({
+  lines: z.array(invoiceLineSchema),
+  payments: z.array(invoicePaymentSchema),
+});
+
+export type InvoiceDetailRow = z.infer<typeof invoiceDetailSchema>;
+
+export async function getMyInvoices(cursor?: string) {
+  const query = new URLSearchParams({ limit: '10' });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return authedFetch(`/invoices?${query.toString()}`, invoicesSchema);
+}
+
+/**
+ * One receipt.
+ *
+ * The API answers 404 for a reference that is not this customer's, indistinguishably from one that
+ * does not exist — the same reasoning as `getReviewForBooking`, and it matters more here because a
+ * receipt names what somebody paid.
+ */
+export async function getInvoice(reference: string) {
+  return authedFetch(`/invoices/${encodeURIComponent(reference)}`, invoiceDetailSchema);
+}

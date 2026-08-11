@@ -32,6 +32,8 @@ const ORIGINS = {
   bookings: '/account/bookings',
   reviews: '/account/reviews',
   wallet: '/account/wallet',
+  /* الفواتير: a receipt links to the booking it describes, so the booking must be able to come back. */
+  invoices: '/account/invoices',
 } as const;
 
 export type ReturnOrigin = keyof typeof ORIGINS;

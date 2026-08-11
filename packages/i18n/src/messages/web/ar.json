@@ -220,7 +220,10 @@
     "sham_cash": "شام كاش",
     "klarnaHint": "ادفع لاحقاً أو بالتقسيط عبر Klarna",
     "cardHint": "يتم التحقق من البطاقة عبر مصرفك (3-D Secure)",
-    "shamCashHint": "محفظة إلكترونية داخل سوريا"
+    "shamCashHint": "محفظة إلكترونية داخل سوريا",
+    "gift_card": "بطاقة هدية",
+    "wallet": "محفظة سفرة",
+    "bank_transfer": "حوالة مصرفية"
   },
   "auth": {
     "signIn": "تسجيل الدخول",
@@ -326,7 +329,6 @@
     "loadMore": "عرض المزيد",
     "notBuiltHeading": "لم يُبنَ هذا القسم بعد",
     "giftsNotBuilt": "بطاقات الهدايا تُستبدل برمزها، ولا يوجد بعد ما يربط البطاقة بحسابك — لذلك لا يمكن عرض رصيد لك هنا دون تخمينه.",
-    "invoicesNotBuilt": "الفواتير غير مبنية بعد. اشتقاق فاتورة من حجز يعني إنشاء مستند مالي لم يصدره أحد، وهذا أسوأ من عدم عرضه.",
     "nothingWaiting": "لا شيء بانتظارك.",
     "overviewNextStay": "إقامتك القادمة",
     "profileFullName": "الاسم الكامل",
@@ -357,7 +359,40 @@
     "passwordWrong": "كلمة المرور الحالية غير صحيحة.",
     "passwordFailed": "تعذّر تغيير كلمة المرور. حاول مرة أخرى.",
     "passwordRule": "اثنا عشر حرفاً على الأقل، وتختلف عن الحالية.",
-    "emailNotEditable": "لتغيير البريد الإلكتروني تواصل مع الدعم: تغييره يتطلب تأكيد العنوان الجديد."
+    "emailNotEditable": "لتغيير البريد الإلكتروني تواصل مع الدعم: تغييره يتطلب تأكيد العنوان الجديد.",
+    "invoicesIntro": "سجل بما دفعته مقابل كل حجز.",
+    "invoicesNotTax": "هذه سجلات دفع من سفرة، وليست فواتير ضريبية صادرة رسمياً. إن احتجت مستنداً ضريبياً، تواصل معنا.",
+    "noInvoices": "لا توجد فواتير بعد. تظهر الفاتورة هنا بعد أول حجز.",
+    "invoiceIssuedLabel": "تاريخ الحجز",
+    "invoicePaidOn": "دُفع في {date}",
+    "invoiceUnpaid": "لم يُدفع بعد",
+    "invoiceTotalLabel": "المجموع",
+    "invoiceOpen": "عرض الفاتورة",
+    "invoiceBreakdownHeading": "تفصيل المبلغ",
+    "invoiceStayHeading": "الإقامة",
+    "invoicePaymentsHeading": "المدفوعات",
+    "invoiceNoPayments": "لا توجد محاولات دفع مسجلة على هذا الحجز.",
+    "invoiceNightsLabel": "الليالي",
+    "invoiceReferenceLabel": "المرجع",
+    "invoiceBookingLink": "عرض الحجز",
+    "invoiceNotFound": "لا توجد فاتورة بهذا المرجع في حسابك.",
+    "invoiceLines": {
+      "accommodation": "قيمة الإقامة",
+      "serviceFee": "رسوم الخدمة",
+      "discount": "خصم",
+      "giftCard": "بطاقة هدية",
+      "wallet": "من المحفظة"
+    },
+    "paymentStatus": {
+      "initiated": "بدأت",
+      "requires_action": "تحتاج تحققاً",
+      "authorized": "محجوزة",
+      "captured": "مقبوضة",
+      "failed": "فشلت",
+      "expired": "منتهية",
+      "refunded": "مستردة",
+      "partially_refunded": "مستردة جزئياً"
+    }
   },
   "reviews": {
     "title": "قيّم إقامتك",

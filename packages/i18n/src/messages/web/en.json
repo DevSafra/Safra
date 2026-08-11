@@ -220,7 +220,10 @@
     "sham_cash": "Sham Cash",
     "klarnaHint": "Pay later or in instalments with Klarna",
     "cardHint": "Your bank will verify the card (3-D Secure)",
-    "shamCashHint": "Mobile wallet inside Syria"
+    "shamCashHint": "Mobile wallet inside Syria",
+    "gift_card": "Gift card",
+    "wallet": "SAFRA wallet",
+    "bank_transfer": "Bank transfer"
   },
   "auth": {
     "signIn": "Sign in",
@@ -326,7 +329,6 @@
     "loadMore": "Show more",
     "notBuiltHeading": "This section is not built yet",
     "giftsNotBuilt": "A gift card is redeemed by its code, and nothing yet links a card to your account — so a balance cannot be shown here without inventing one.",
-    "invoicesNotBuilt": "Invoices are not built yet. Deriving one from a booking would mean producing a financial document nobody issued, which is worse than not showing it.",
     "nothingWaiting": "Nothing is waiting for you.",
     "overviewNextStay": "Your next stay",
     "profileFullName": "Full name",
@@ -357,7 +359,40 @@
     "passwordWrong": "Your current password is not correct.",
     "passwordFailed": "Could not change your password. Try again.",
     "passwordRule": "At least twelve characters, and different from your current one.",
-    "emailNotEditable": "To change your email address, contact support: a change has to confirm the new address first."
+    "emailNotEditable": "To change your email address, contact support: a change has to confirm the new address first.",
+    "invoicesIntro": "A record of what you paid for each booking.",
+    "invoicesNotTax": "These are payment records from SAFRA, not officially issued tax invoices. If you need a tax document, get in touch.",
+    "noInvoices": "No invoices yet. One appears here after your first booking.",
+    "invoiceIssuedLabel": "Booked on",
+    "invoicePaidOn": "Paid on {date}",
+    "invoiceUnpaid": "Not paid yet",
+    "invoiceTotalLabel": "Total",
+    "invoiceOpen": "View invoice",
+    "invoiceBreakdownHeading": "Breakdown",
+    "invoiceStayHeading": "Stay",
+    "invoicePaymentsHeading": "Payments",
+    "invoiceNoPayments": "No payment attempts are recorded against this booking.",
+    "invoiceNightsLabel": "Nights",
+    "invoiceReferenceLabel": "Reference",
+    "invoiceBookingLink": "View booking",
+    "invoiceNotFound": "No invoice with that reference in your account.",
+    "invoiceLines": {
+      "accommodation": "Accommodation",
+      "serviceFee": "Service fee",
+      "discount": "Discount",
+      "giftCard": "Gift card",
+      "wallet": "Wallet"
+    },
+    "paymentStatus": {
+      "initiated": "Started",
+      "requires_action": "Needs verification",
+      "authorized": "Held",
+      "captured": "Captured",
+      "failed": "Failed",
+      "expired": "Expired",
+      "refunded": "Refunded",
+      "partially_refunded": "Partially refunded"
+    }
   },
   "reviews": {
     "title": "Review your stay",

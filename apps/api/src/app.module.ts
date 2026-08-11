@@ -12,6 +12,7 @@ import { AdminModule } from './admin/admin.module.js';
 import { CatalogModule } from './catalog/catalog.module.js';
 import { FavouritesModule } from './favourites/favourites.module.js';
 import { FxModule } from './fx/fx.module.js';
+import { InvoicesModule } from './invoices/invoices.module.js';
 import { LedgerModule } from './ledger/ledger.module.js';
 import { PartnerModule } from './partner/partner.module.js';
 import { PayoutModule } from './payouts/payout.module.js';
@@ -101,6 +102,7 @@ import { TwoFactorGuard } from './rbac/two-factor.guard.js';
     RankingModule,
     ReviewModule,
     FavouritesModule,
+    InvoicesModule,
     SanctionsModule,
     AdminModule,
     CatalogModule,

@@ -220,7 +220,10 @@
     "sham_cash": "Sham Cash",
     "klarnaHint": "Später zahlen oder in Raten mit Klarna",
     "cardHint": "Ihre Bank prüft die Karte (3-D Secure)",
-    "shamCashHint": "Mobile Wallet innerhalb Syriens"
+    "shamCashHint": "Mobile Wallet innerhalb Syriens",
+    "gift_card": "Geschenkkarte",
+    "wallet": "SAFRA-Guthaben",
+    "bank_transfer": "Banküberweisung"
   },
   "auth": {
     "signIn": "Anmelden",
@@ -326,7 +329,6 @@
     "loadMore": "Mehr anzeigen",
     "notBuiltHeading": "Dieser Bereich ist noch nicht gebaut",
     "giftsNotBuilt": "Eine Geschenkkarte wird über ihren Code eingelöst, und nichts verknüpft eine Karte bislang mit Ihrem Konto — ein Guthaben ließe sich hier nur erfinden.",
-    "invoicesNotBuilt": "Rechnungen sind noch nicht gebaut. Eine aus einer Buchung abzuleiten hieße, ein Finanzdokument zu erzeugen, das niemand ausgestellt hat — schlimmer, als es nicht zu zeigen.",
     "nothingWaiting": "Es wartet nichts auf Sie.",
     "overviewNextStay": "Ihr nächster Aufenthalt",
     "profileFullName": "Vollständiger Name",
@@ -357,7 +359,40 @@
     "passwordWrong": "Ihr aktuelles Passwort ist nicht korrekt.",
     "passwordFailed": "Passwort konnte nicht geändert werden. Bitte erneut versuchen.",
     "passwordRule": "Mindestens zwölf Zeichen und anders als das aktuelle.",
-    "emailNotEditable": "Für eine Änderung der E-Mail-Adresse wenden Sie sich an den Support: die neue Adresse muss zuerst bestätigt werden."
+    "emailNotEditable": "Für eine Änderung der E-Mail-Adresse wenden Sie sich an den Support: die neue Adresse muss zuerst bestätigt werden.",
+    "invoicesIntro": "Eine Aufstellung dessen, was Sie für jede Buchung bezahlt haben.",
+    "invoicesNotTax": "Dies sind Zahlungsbelege von SAFRA, keine offiziell ausgestellten Steuerrechnungen. Wenn Sie ein Steuerdokument benötigen, melden Sie sich bei uns.",
+    "noInvoices": "Noch keine Rechnungen. Nach Ihrer ersten Buchung erscheint hier eine.",
+    "invoiceIssuedLabel": "Gebucht am",
+    "invoicePaidOn": "Bezahlt am {date}",
+    "invoiceUnpaid": "Noch nicht bezahlt",
+    "invoiceTotalLabel": "Gesamt",
+    "invoiceOpen": "Rechnung ansehen",
+    "invoiceBreakdownHeading": "Aufstellung",
+    "invoiceStayHeading": "Aufenthalt",
+    "invoicePaymentsHeading": "Zahlungen",
+    "invoiceNoPayments": "Zu dieser Buchung sind keine Zahlungsversuche erfasst.",
+    "invoiceNightsLabel": "Nächte",
+    "invoiceReferenceLabel": "Referenz",
+    "invoiceBookingLink": "Buchung ansehen",
+    "invoiceNotFound": "Keine Rechnung mit dieser Referenz in Ihrem Konto.",
+    "invoiceLines": {
+      "accommodation": "Unterkunft",
+      "serviceFee": "Servicegebühr",
+      "discount": "Rabatt",
+      "giftCard": "Geschenkkarte",
+      "wallet": "Guthaben"
+    },
+    "paymentStatus": {
+      "initiated": "Gestartet",
+      "requires_action": "Bestätigung erforderlich",
+      "authorized": "Reserviert",
+      "captured": "Eingezogen",
+      "failed": "Fehlgeschlagen",
+      "expired": "Abgelaufen",
+      "refunded": "Erstattet",
+      "partially_refunded": "Teilweise erstattet"
+    }
   },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",
