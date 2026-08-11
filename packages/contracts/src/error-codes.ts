@@ -234,6 +234,7 @@ export const ERROR = {
   GIFT_CARD_EXPIRED: 'gift_card.expired',
   GIFT_CARD_CANCELLED: 'gift_card.cancelled',
   GIFT_CARD_AMOUNT_INVALID: 'gift_card.amount_invalid',
+  GIFT_CARD_CASH_ONLY: 'gift_card.cash_only',
   WALLET_INSUFFICIENT_BALANCE: 'wallet.insufficient_balance',
   VALIDATION_TOO_LONG: 'validation.too_long',
 } as const;

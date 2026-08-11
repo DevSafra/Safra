@@ -121,6 +121,10 @@ type CardRow = {
  * consequences — recorded in `docs/FUTURE-WORK.md` rather than done in passing. A wallet debit is a
  * complete, correct purchase today: it refuses rather than going negative, it is audited, and it uses
  * the same locking as every other movement.
+ *
+ * And only the CASH part of that balance may pay for it — never money that arrived from another gift
+ * card. Otherwise a gift could be poured from card to card forever, resetting its expiry each time and
+ * turning a balance tied to one account into a bearer instrument. See `WalletService.composition`.
  */
 @Injectable()
 export class GiftCardService {
@@ -305,18 +309,37 @@ export class GiftCardService {
 
     return this.db.transaction(async (tx) => {
       /*
-        Debited FIRST, so an insufficient balance refuses before a card exists.
+        Checked FIRST, so a refusal happens before a card exists — a live, spendable card behind a
+        failed payment is the one outcome that must not be possible.
 
-        `debit` will not go negative — the wallet is SAFRA's liability to the customer, not a credit
-        line — so this is what enforces "you can only buy what you hold". Doing it after the insert
-        would leave a live, spendable card behind a failed payment.
+        `debit` will not go negative either, since the wallet is SAFRA's liability to the customer
+        rather than a credit line. That is the floor; the rule below is stricter.
       */
-      const wallet = await this.wallet.findByCustomer(profileId);
+      const wallet = await this.wallet.composition(profileId);
 
       if (!wallet) throw badRequest(ERROR.WALLET_INSUFFICIENT_BALANCE);
 
-      if (Number(wallet.balance) < Number(input.amount)) {
-        throw badRequest(ERROR.WALLET_INSUFFICIENT_BALANCE);
+      /*
+        A card may only be bought with الرصيد الحالي — the part of the balance that did NOT come from a
+        gift card (Bashar, 2026-08-11).
+
+        Without this, gift money could be poured into a fresh card indefinitely: each new card resets
+        whatever expiry the old one carried, and it turns a non-transferable balance into a bearer
+        instrument somebody else can spend. The wallet is where a gift ENDS.
+      */
+      const cash = Number(wallet.balance) - Number(wallet.giftBalance);
+
+      if (cash < Number(input.amount)) {
+        /*
+          Two different refusals, because they need two different sentences. Somebody holding $35 who is
+          told their balance is insufficient for a $25 card has been told something untrue; the reason is
+          the SOURCE of the money, not the amount of it.
+        */
+        throw badRequest(
+          Number(wallet.balance) >= Number(input.amount)
+            ? ERROR.GIFT_CARD_CASH_ONLY
+            : ERROR.WALLET_INSUFFICIENT_BALANCE,
+        );
       }
 
       const paid = await this.wallet.debit(tx as unknown as Database, {

@@ -90,7 +90,20 @@ export async function getMyBookings(cursor?: string) {
 // ─── Wallet ──────────────────────────────────────────────────────────────────
 
 const walletSchema = z.object({
-  wallet: z.object({ balance: z.string(), currencyCode: z.string() }).nullable(),
+  wallet: z
+    .object({
+      balance: z.string(),
+      /**
+       * How much of the balance arrived from a gift card.
+       *
+       * Derived by the API, never stored — see `WalletService.composition`. Required rather than
+       * optional: if the field ever stops arriving, محفظتي should fail its parse loudly instead of
+       * quietly reporting every balance as entirely non-gift.
+       */
+      giftBalance: z.string(),
+      currencyCode: z.string(),
+    })
+    .nullable(),
 });
 
 export type WalletBalance = z.infer<typeof walletSchema>['wallet'];

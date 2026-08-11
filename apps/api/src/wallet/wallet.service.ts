@@ -397,6 +397,115 @@ export class WalletService {
   }
 
   /**
+   * The balance, split into the part that came from gift cards and the rest.
+   *
+   * Bashar, 2026-08-11: محفظتي should show «رصيد بطاقات الهدايا ٢٥$» and «الرصيد الحالي ١٠$» with
+   * «المجموع المتاح للإنفاق ٣٥$» beneath them.
+   *
+   * ## The split needs a spending ORDER, and this is it
+   *
+   * A wallet holds ONE balance — one row, one number — so "how much of it came from a gift card" has no
+   * answer until you decide which money is spent first. Nothing in the schema records that, because
+   * nothing needs to: a debit reduces the balance and every currency unit in it is identical.
+   *
+   * Two rules together, and the second exists because of a rule Bashar added the same day — a gift card
+   * may only be BOUGHT with الرصيد الحالي, never with gift money:
+   *
+   * 1. **Gift money is spent first** on ordinary spending — a booking, a fee.
+   * 2. **Buying a gift card does not touch it**, so that debit is excluded from what consumes it.
+   *
+   *     gift = clamp(Σ gift_card_transfer CREDITS − Σ debits OTHER THAN a card purchase, 0, balance)
+   *
+   * The exclusion in (2) is not a nicety; without it the two rules contradict each other. Gift 25 and
+   * cash 10, then a 10 card bought out of cash: the balance is 25, and a rule that let that debit
+   * consume gift money would report gift 15 and cash 10 — claiming a purchase came from money it was
+   * forbidden to use. With the exclusion it reports gift 25 and cash 0, which is what happened.
+   *
+   * Worked through the rest: a $25 card redeemed onto a $10 refund balance shows 25 and 10. Spend $20 on
+   * a stay and it shows 5 and 10 — the gift went first. Spend $30 and it shows 0 and 5. The two parts
+   * always sum to the balance, which is the one invariant a reader can check for themselves.
+   *
+   * Gift-first for ordinary spending is the conservative choice: promotional money is the part that can
+   * carry an expiry, so spending it first never tells somebody they still hold gift money they have used.
+   *
+   * A `gift_card_transfer` DEBIT can only be a card purchase — that reason is written in exactly two
+   * places, the redemption credit and the purchase debit — so the predicate is exact rather than a guess.
+   *
+   * ## What it assumes
+   *
+   * That `balance` equals the sum of its history. Every movement this service makes writes a
+   * `wallet_transactions` row, so that holds for any wallet the app has touched — but a balance set
+   * DIRECTLY, with no row behind it, is money the derivation cannot attribute, and the clamp then hands
+   * it to the gift side. The testbed used to seed exactly that, and محفظتي showed «الرصيد الحالي ٠$» on a
+   * wallet that had never seen a gift card; `seed-testbed.ts` now writes the opening credit too.
+   *
+   * The `least(…, balance)` clamp is defensive rather than load-bearing. With a complete history and the
+   * cash-only purchase rule enforced, gift-credited minus gift-consumed cannot exceed the balance: card
+   * purchases are capped at the cash part, so the cash part can never go negative.
+   *
+   * ## Why derived rather than a second column
+   *
+   * A `gift_balance` column would have to be kept in step by every debit in the system, and the first
+   * one that forgot would produce two numbers that disagree about the same money. Derivation cannot
+   * drift: it is computed from the same append-only rows the statement is drawn from.
+   *
+   * ## Why it is not on `findByCustomer`
+   *
+   * That method is on the checkout and gift-purchase paths, which need a balance and a currency and
+   * nothing else. This aggregate is one indexed pass over `wallet_transactions_wallet_idx` per call —
+   * cheap for a statement a person reads, and not worth paying for on every write path.
+   *
+   * The arithmetic stays in SQL, in `numeric`. Doing it in JavaScript would put money through a float.
+   * The result is cast to `numeric(14, 2)` — the column's own type — because `greatest(0, …)` otherwise
+   * yields an integer zero and an empty gift part would print as "0" beside balances reading "35.00".
+   */
+  async composition(
+    customerProfileId: string,
+  ): Promise<(WalletBalance & { giftBalance: string }) | null> {
+    const rows = await this.db.execute<{
+      id: string;
+      balance: string;
+      currency_id: string;
+      code: string;
+      gift_balance: string;
+    }>(sql`
+      SELECT w.id, w.balance::text AS balance, w.currency_id, cur.code,
+             greatest(
+               0,
+               least(
+                 coalesce(moved.gift_credited, 0) - coalesce(moved.spent_from_gift, 0),
+                 w.balance
+               )
+             )::numeric(14, 2)::text AS gift_balance
+      FROM wallets w
+      JOIN currencies cur ON cur.id = w.currency_id
+      LEFT JOIN LATERAL (
+        SELECT
+          sum(CASE WHEN t.direction = 'credit' AND t.reason = 'gift_card_transfer'
+                   THEN t.amount ELSE 0 END) AS gift_credited,
+          sum(CASE WHEN t.direction = 'debit' AND t.reason <> 'gift_card_transfer'
+                   THEN t.amount ELSE 0 END) AS spent_from_gift
+        FROM wallet_transactions t
+        WHERE t.wallet_id = w.id
+      ) moved ON true
+      WHERE w.customer_profile_id = ${customerProfileId}
+        AND w.deleted_at IS NULL
+    `);
+
+    const row = rows.rows[0];
+
+    if (!row) return null;
+
+    return {
+      walletId: row.id,
+      balance: row.balance,
+      currencyId: row.currency_id,
+      currencyCode: row.code,
+      giftBalance: row.gift_balance,
+    };
+  }
+
+  /**
    * One page of the customer's statement, newest first.
    *
    * Keyset-paginated on `(created_at, id)` against the existing

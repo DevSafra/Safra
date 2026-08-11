@@ -13,12 +13,19 @@ import en from '../packages/i18n/src/messages/web/en.json' assert { type: 'json'
  * function props; React refuses to serialise a function across that boundary, so every render threw and
  * the page 500ed. `pnpm verify` was green throughout. A browser found it in seconds.
  *
- * ## It restores what it spends
+ * ## Why it does NOT buy a card
  *
- * The test buys a card and then redeems it, so the wallet ends where it started — the same discipline
- * the rows-per-page rule demands, because this suite shares one account across specs AND across runs. A
- * spec that only bought would drain the fixture wallet a little on every run until an unrelated
- * assertion failed for a reason nobody could trace.
+ * It used to buy one and redeem it, which leaves the BALANCE where it started — and that looked like
+ * enough until a gift card could only be bought with الرصيد الحالي (Bashar, 2026-08-11). Under that rule
+ * a buy-then-redeem cycle converts 25 of cash into 25 of gift money every single run, permanently: the
+ * purchase debit comes out of the cash part, and the redemption credit lands in the gift part. Four runs
+ * later the fixture wallet was entirely gift-derived and could not buy anything, and the spec would have
+ * started failing for a reason with no relationship to any change.
+ *
+ * So the money moves are proven in `gift-card.integration.test.ts` — 36 tests, inside a transaction that
+ * rolls back, where they cost nothing. What is left here is what only a browser can see: that the page
+ * renders at all, that a refusal reaches the reader in their own language, and that محفظتي's three
+ * figures agree with each other.
  *
  * One sign-in, in the `signed-in` project, which is ordered last for the login budget.
  */
@@ -67,57 +74,26 @@ test.describe('بطاقات الهدايا', () => {
       timeout: 15_000,
     });
 
-    // ── Buy the smallest card ──
-    await page.selectOption('select[name=amount]', '25.00');
-    await page.locator('input[name=recipientName]').fill('E2E Recipient');
-    await page
-      .getByRole('button', { name: en.account.giftBuySubmit, exact: true })
-      .click();
-
-    const shown = page.locator('[data-gift-code]');
-
-    await expect(shown).toBeVisible({ timeout: 20_000 });
-
-    const code = (await shown.innerText()).trim();
-
-    /* Four groups of five Crockford symbols — `I`, `L`, `O` and `U` never appear. */
-    expect(code).toMatch(/^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/);
-
     /*
-      The code is shown ONCE. After a reload it is gone, and the list below never carries it — only the
-      last four. A read that returned a usable code would be a way to spend other people's money.
+      ── محفظتي splits the balance, and the parts agree with the total ──
+
+      The two cards and the total are three figures a reader can check against each other, so that is
+      what is asserted rather than any particular amount — the fixture's balance is not this spec's
+      business, and pinning a number here would make it fail the first time somebody made a booking.
     */
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.locator('[data-gift-code]')).toHaveCount(0);
+    await page.goto('/en/account/wallet', { waitUntil: 'domcontentloaded' });
 
-    const body = await page.locator('body').innerText();
-
-    expect(body, 'the page must not carry the code after a reload').not.toContain(code);
-    expect(body, 'nor the code without its hyphens').not.toContain(
-      code.replace(/-/g, ''),
+    const panel = await page.locator('section').first().innerText();
+    const amounts = [...panel.matchAll(/\$([\d,]+\.\d{2})/g)].map((m) =>
+      Number(m[1]?.replace(/,/g, '')),
     );
-    /* The card itself IS listed, by reference. */
-    expect(body).toMatch(/GIF-\d+/);
 
-    // ── Redeem it, which puts the balance back ──
-    await page.locator('input[name=code]').fill(code);
-    await page
-      .getByRole('button', { name: en.account.giftRedeemSubmit, exact: true })
-      .click();
-
-    await expect(banner).toContainText('added to your wallet', {
-      timeout: 20_000,
-    });
-
-    // ── A second attempt pays out nothing and says why ──
-    await page.locator('input[name=code]').fill(code);
-    await page
-      .getByRole('button', { name: en.account.giftRedeemSubmit, exact: true })
-      .click();
-
-    await expect(banner).toContainText('already been redeemed', {
-      timeout: 15_000,
-    });
+    /* Current balance, gift card balance, then the total beneath them. */
+    expect(amounts, 'the panel must print three amounts').toHaveLength(3);
+    expect(
+      (amounts[0] ?? 0) + (amounts[1] ?? 0),
+      'the two parts must sum to the total available to spend',
+    ).toBeCloseTo(amounts[2] ?? -1, 2);
 
     /*
       ── Arabic, and no sideways scroll at any documented width ──

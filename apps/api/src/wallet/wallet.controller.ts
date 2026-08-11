@@ -38,12 +38,17 @@ export class WalletController {
    */
   @Get()
   async balance(@CurrentUser() user: AccessTokenClaims | undefined) {
-    const wallet = await this.wallet.findByCustomer(requireCustomerProfileId(user));
+    const wallet = await this.wallet.composition(requireCustomerProfileId(user));
 
     return {
       wallet: wallet
         ? {
             balance: wallet.balance,
+            /*
+              The part that came from gift cards, derived gift-first — see `composition`. Sent as its
+              own figure rather than as a percentage or a flag, because محفظتي prints it as money.
+            */
+            giftBalance: wallet.giftBalance,
             currencyCode: wallet.currencyCode,
           }
         : null,

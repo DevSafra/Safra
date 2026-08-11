@@ -57,6 +57,18 @@ export default async function AccountWalletPage({
   const failed = wallet === 'failed' || transactions === 'failed';
   const expired = wallet === 'unauthenticated' || transactions === 'unauthenticated';
   const balance = failed || expired ? null : wallet.wallet;
+
+  /*
+    الرصيد الحالي is the balance MINUS the gift part, computed here rather than sent as a third figure:
+    two of the three are independent and the third is their difference, so sending all three would be one
+    more chance for them to disagree.
+
+    `toFixed(2)` because `formatMoney` takes a decimal STRING — the subtraction is the only arithmetic on
+    this page, and it is between two figures that are already exact to the cent.
+  */
+  const cash = balance
+    ? (Number(balance.balance) - Number(balance.giftBalance)).toFixed(2)
+    : '0.00';
   const entries = failed || expired ? null : transactions;
 
   return (
@@ -94,16 +106,28 @@ export default async function AccountWalletPage({
 
             {/* The handoff's own grid: `repeat(auto-fit, minmax(220px, 1fr))`, gap 18px. */}
             <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[18px]">
+              {/*
+                Two REAL figures now (Bashar, 2026-08-11).
+
+                The gift card told the wallet how much of it came from a gift, and the two parts always
+                sum to the balance printed beneath them — see `WalletService.composition` for the
+                gift-first rule that decides the split, and for why buying a card cannot touch it.
+
+                `walletCurrentTitle` therefore means the part that did NOT come from a gift card, which
+                is exactly what its caption already said: «تعويضات ومبالغ مستردة».
+              */}
               <BalanceCard
                 title={t('walletCurrentTitle')}
-                amount={formatMoney(balance.balance, balance.currencyCode, locale)}
+                amount={formatMoney(cash, balance.currencyCode, locale, { exact: true })}
                 caption={t('walletCurrentCaption')}
                 tone="text-text"
               />
               <BalanceCard
                 title={t('walletGiftTitle')}
-                amount="—"
-                caption={t('walletGiftUnlinked')}
+                amount={formatMoney(balance.giftBalance, balance.currencyCode, locale, {
+                  exact: true,
+                })}
+                caption={t('walletGiftCaption')}
                 tone="text-gold"
               />
             </div>
@@ -114,11 +138,16 @@ export default async function AccountWalletPage({
             >
               <span className="text-sm text-muted">{t('walletTotalLabel')}</span>
               {/*
-                The sum of what is KNOWN — the wallet. With the gift balance unavailable there is
-                nothing else to add, and adding an assumed zero would state a total nobody computed.
+                The wallet's own balance, not the two cards added up.
+
+                They are equal by construction — the split is derived FROM this figure and clamped to it
+                — and printing the stored number rather than a sum is what makes that checkable. A total
+                computed on the page could disagree with the balance the API holds; this one cannot.
               */}
               <span className="text-[16px] font-extrabold text-gold" dir="ltr">
-                {formatMoney(balance.balance, balance.currencyCode, locale)}
+                {formatMoney(balance.balance, balance.currencyCode, locale, {
+                  exact: true,
+                })}
               </span>
             </div>
 

@@ -443,6 +443,147 @@ describeIfDb('GiftCardService', () => {
     expect(result.card.recipientEmail).toBe('laila@safra.test');
   });
 
+  // ─── The split, and where a purchase may draw from ─────────────────────────
+
+  /**
+   * The two parts always sum to the balance.
+   *
+   * That is the one invariant a reader can check on the screen, so it is the one asserted here for
+   * every case below rather than only the figures themselves.
+   */
+  it('reports the gift part and the rest, summing to the balance', async () => {
+    await fund('10.00');
+    await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '25.00' });
+    await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX');
+
+    const split = await wallet.composition(PROFILE_ID);
+
+    /* Bashar's own example: a $25 card on a $10 refund balance reads 25 and 10, total 35. */
+    expect(split?.balance).toBe('35.00');
+    expect(split?.giftBalance).toBe('25.00');
+    expect(Number(split?.balance) - Number(split?.giftBalance)).toBe(10);
+  });
+
+  it('has no gift part when nothing came from a card', async () => {
+    await fund('40.00');
+
+    const split = await wallet.composition(PROFILE_ID);
+
+    expect(split?.giftBalance).toBe('0.00');
+    expect(split?.balance).toBe('40.00');
+  });
+
+  /** Gift money goes first on ordinary spending, which is the conservative order. */
+  it('spends the gift part first on a booking', async () => {
+    await fund('10.00');
+    await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '25.00' });
+    await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX');
+
+    await wallet.debit(db, {
+      customerProfileId: PROFILE_ID,
+      amount: '20.00',
+      currencyId: await idOfCurrency(db, 'USD'),
+      reason: 'booking_payment',
+    });
+
+    const split = await wallet.composition(PROFILE_ID);
+
+    expect(split?.balance).toBe('15.00');
+    expect(split?.giftBalance).toBe('5.00');
+  });
+
+  it('never reports a negative gift part once the gift is used up', async () => {
+    await fund('10.00');
+    await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '25.00' });
+    await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX');
+
+    await wallet.debit(db, {
+      customerProfileId: PROFILE_ID,
+      amount: '30.00',
+      currencyId: await idOfCurrency(db, 'USD'),
+      reason: 'booking_payment',
+    });
+
+    const split = await wallet.composition(PROFILE_ID);
+
+    expect(split?.balance).toBe('5.00');
+    expect(split?.giftBalance).toBe('0.00');
+  });
+
+  /**
+   * Buying a card must NOT consume the gift part, or the two rules contradict each other.
+   *
+   * Gift 25 and cash 30, then a 25 card bought out of cash: if that debit ate gift money the split would
+   * read 5 and 25 — claiming a purchase came from money it was forbidden to use. It must read 25 and 5.
+   */
+  it('does not let a card purchase consume the gift part', async () => {
+    await fund('30.00');
+    await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '25.00' });
+    await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX');
+
+    await giftCards.purchase(customer(), { amount: '25.00' });
+
+    const split = await wallet.composition(PROFILE_ID);
+
+    expect(split?.balance).toBe('30.00');
+    expect(split?.giftBalance, 'the gift part must be untouched by a purchase').toBe(
+      '25.00',
+    );
+  });
+
+  /**
+   * A card may only be bought with الرصيد الحالي (Bashar, 2026-08-11).
+   *
+   * Gift money poured into a fresh card would reset whatever expiry the old one carried and turn a
+   * balance tied to one account into a bearer instrument. The wallet is where a gift ENDS.
+   */
+  it('refuses to buy a card with gift money, even when the total covers it', async () => {
+    await fund('10.00');
+    await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '25.00' });
+    await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX');
+
+    /* The total is 35, so this is affordable — and still refused, because only 10 of it is cash. */
+    await expect(
+      giftCards.purchase(customer(), { amount: '25.00' }),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'gift_card.cash_only' },
+    });
+  });
+
+  /**
+   * And the refusal says WHICH problem it is.
+   *
+   * Telling somebody holding $35 that their balance is insufficient for a $25 card is untrue: the
+   * reason is the source of the money, not the amount.
+   */
+  it('distinguishes "not enough" from "not that money"', async () => {
+    await fund('10.00');
+    await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '25.00' });
+    await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX');
+
+    /* 200 exceeds even the total, so this is the ordinary insufficient-balance refusal. */
+    await expect(
+      giftCards.purchase(customer(), { amount: '200.00' }),
+    ).rejects.toMatchObject({ response: { code: 'wallet.insufficient_balance' } });
+  });
+
+  it('allows a card bought entirely from the cash part', async () => {
+    await fund('30.00');
+    await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '50.00' });
+    await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX');
+
+    const bought = await giftCards.purchase(customer(), { amount: '25.00' });
+
+    expect(bought.card.originalAmount).toBe('25.00');
+
+    const split = await wallet.composition(PROFILE_ID);
+
+    /* 80 − 25 = 55, and the gift part is untouched at 50, so the cash part fell from 30 to 5. */
+    expect(split?.balance).toBe('55.00');
+    expect(split?.giftBalance).toBe('50.00');
+  });
+
   // ─── Listing ───────────────────────────────────────────────────────────────
 
   it('lists the cards this customer bought and nobody else’s', async () => {

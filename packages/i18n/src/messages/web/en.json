@@ -326,7 +326,6 @@
     "walletCurrentTitle": "Current balance",
     "walletCurrentCaption": "Compensation and refunds · usable immediately",
     "walletGiftTitle": "Gift card balance",
-    "walletGiftUnlinked": "Gift cards are not linked to accounts yet",
     "walletTotalLabel": "Total available to spend",
     "walletCombineNote": "Both balances can be combined with any payment method in a single transaction (P-007).",
     "loadMore": "Show more",
@@ -408,7 +407,7 @@
     "giftRedeemed": "{amount} was added to your wallet. Your balance is now {balance}.",
     "giftRedeemFailed": "That could not be redeemed right now. Please try again.",
     "giftBuyTitle": "Buy a gift card",
-    "giftBuyIntro": "The value comes out of your wallet balance, and the card is issued in the same currency.",
+    "giftBuyIntro": "The value comes out of your current balance — not your gift card balance — and the card is issued in the same currency.",
     "giftAmountLabel": "Value",
     "giftRecipientName": "Recipient name (optional)",
     "giftRecipientEmail": "Recipient email (optional)",
@@ -430,7 +429,8 @@
       "used": "Redeemed",
       "expired": "Expired",
       "cancelled": "Cancelled"
-    }
+    },
+    "walletGiftCaption": "Redeemed from gift cards · spent first"
   },
   "reviews": {
     "title": "Review your stay",

@@ -326,7 +326,6 @@
     "walletCurrentTitle": "Aktuelles Guthaben",
     "walletCurrentCaption": "Entschädigungen und Rückerstattungen · sofort nutzbar",
     "walletGiftTitle": "Geschenkkarten-Guthaben",
-    "walletGiftUnlinked": "Geschenkkarten sind noch nicht mit Konten verknüpft",
     "walletTotalLabel": "Insgesamt verfügbar",
     "walletCombineNote": "Beide Guthaben lassen sich in einem Vorgang mit jeder Zahlungsart kombinieren (P-007).",
     "loadMore": "Mehr anzeigen",
@@ -408,7 +407,7 @@
     "giftRedeemed": "{amount} wurde Ihrem Guthaben hinzugefügt. Ihr Guthaben beträgt jetzt {balance}.",
     "giftRedeemFailed": "Das konnte gerade nicht eingelöst werden. Bitte erneut versuchen.",
     "giftBuyTitle": "Geschenkkarte kaufen",
-    "giftBuyIntro": "Der Betrag wird von Ihrem Guthaben abgebucht; die Karte wird in derselben Währung ausgegeben.",
+    "giftBuyIntro": "Der Betrag wird von Ihrem aktuellen Guthaben abgebucht — nicht vom Geschenkkarten-Guthaben — und die Karte wird in derselben Währung ausgegeben.",
     "giftAmountLabel": "Wert",
     "giftRecipientName": "Name des Empfängers (optional)",
     "giftRecipientEmail": "E-Mail des Empfängers (optional)",
@@ -430,7 +429,8 @@
       "used": "Eingelöst",
       "expired": "Abgelaufen",
       "cancelled": "Storniert"
-    }
+    },
+    "walletGiftCaption": "Aus Geschenkkarten eingelöst · wird zuerst verwendet"
   },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",

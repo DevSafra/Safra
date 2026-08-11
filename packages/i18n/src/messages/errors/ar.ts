@@ -89,6 +89,8 @@ export const ar = {
   'gift_card.already_used': 'تم استبدال بطاقة الهدية هذه من قبل.',
   'gift_card.expired': 'انتهت صلاحية بطاقة الهدية هذه.',
   'gift_card.cancelled': 'أُلغيت بطاقة الهدية هذه. يرجى التواصل مع الدعم.',
+  'gift_card.cash_only':
+    'لا يمكن شراء بطاقة هدية إلا من الرصيد الحالي، وليس من رصيد بطاقات الهدايا.',
   'gift_card.amount_invalid': 'اختر أحد مبالغ بطاقات الهدايا المتاحة.',
   'wallet.insufficient_balance': 'رصيد محفظتك لا يكفي لهذه العملية.',
   'validation.too_long': 'هذه القيمة طويلة جداً.',
