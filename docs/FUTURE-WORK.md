@@ -413,68 +413,58 @@ a translation one.
 **Effort:** small — one substitution point in the message-rendering path, plus a decision about
 already-stored bodies.
 
-### O-test-1 — `fx-rate.integration.test.ts` failed once and has not reproduced
+### O-test-1 — `fx-rate.integration.test.ts`: cause identified and fixed 2026-08-11
 
-**What happened:** during a `pnpm verify` on 2026-08-05, five of the seventeen FX tests failed —
-`returns the rate once one is set`, `invalidates its cache on write`, `does not cache a miss`,
-`audits the change`, and two listing tests — all throwing the "no rate configured" refusal
-immediately after a rate had been set.
+**Status:** cause found, two real bugs fixed, suite migrated · **Owner:** **Bashar** ·
+**Left open** until a month of green runs, because the original drift cannot be re-created on demand.
 
-**What is known:**
+**What happened:** on 2026-08-05, and again during a `pnpm verify` on 2026-08-11, several FX tests
+failed — `returns the rate once one is set`, `invalidates its cache on write`, `does not cache a
+miss`, `audits the change`, and two listing tests — every one of them throwing the "no rate
+configured" refusal **immediately after a rate had been set**. Never reproducible on a re-run.
 
-- It is not reproducible. Seven consecutive full-suite runs and six isolated runs of the file are
-  green, with and without the app servers running.
-- Nothing in the change being verified touches `fx/`, `fx_rates`, or the money path.
-- The failing run was the only one made while all three app servers were live against the same
-  Postgres.
+**The cause, with high confidence.** `set()` stamped `effective_from` with `new Date().toISOString()`
+— the APP process's clock — while `rateToSyp()` and `list()` filter `effective_from <= now()`, the
+DATABASE's clock. Two clocks decide the two halves of one operation, so whenever the app's clock is
+even a millisecond ahead of the database's, a rate is written future-dated and the very next read
+refuses it. That is exactly the reported symptom, exactly those tests, and nothing else in the suite.
 
-**The suspected coupling, unproven:** the suite does `DELETE FROM fx_rates` in `beforeEach` —
-wholesale, because the table carries no test marker — and reads back rates it sets with an
-`effective_from` of "now". Any second actor on that database between the write and the read
-produces exactly this symptom. The other two suites that need FX stub it and say in comments that
-they do so precisely to stay off this table, so within the test process there is no second writer;
-a separate process is the remaining candidate.
+The intermittency fits too: PostgreSQL runs in Docker (`safra-pg`), so the comparison is a macOS host
+clock against a Linux VM clock, and that pair drifts — most visibly after the host sleeps and resumes.
+The earlier note that the failing run was "the only one made while all three app servers were live"
+was a coincidence; the servers were never the second writer, as the entry itself suspected.
 
-**What would settle it:** give `fx_rates` a test marker so the suite can scope its cleanup instead
-of truncating, and assert on a rate whose `effective_from` is comfortably in the past rather than
-`now()`. Both are small. Neither has been done, because a fix for a failure that cannot be
-reproduced cannot be verified — this entry exists so the next occurrence is recognised as the
-second one rather than investigated from scratch.
+It is also no longer a guess: freezing `now()` inside a transaction reproduces the identical failure
+**deterministically**, which is how it was found.
 
-**Do not paper over it with a retry.** `playwright.config.ts` sets `retries: 0` deliberately, and
-the same reasoning applies here: an intermittent failure in the money path is the last thing that
-should be hidden.
+**What was fixed:**
 
-**Second occurrence, 2026-08-11.** One test failed — `returns the rate once one is set` — during a
-full `pnpm verify`, with the same "no rate configured" refusal immediately after a rate had been set.
-Recognised rather than investigated from scratch, which is what this entry was for.
+1. **One clock decides both halves** — an omitted `effectiveFrom` is now stamped `now()` by the
+   database itself, in the INSERT. An explicit date is still honoured verbatim, because scheduling or
+   backdating a rate is a deliberate act. The audit row and the log record what was STORED rather
+   than what was intended, since those differ whenever the default is used.
+2. **A tiebreak, found while fixing the first** — two rates sharing one `effective_from` (an admin
+   correcting a rate seconds later, or a bulk import stamping one moment) left the winner to the query
+   planner, so a booking could be priced at either rate between two identical requests. Both queries
+   now order by `effective_from DESC, id DESC`, and `uuidv7()` being time-ordered makes that "the one
+   written last". `list()` carries the same tiebreak so the registry cannot disagree with pricing.
+3. **The suite no longer commits** — moved from `createDatabase` to `createRollbackDatabase`. Its
+   wholesale `DELETE FROM fx_rates` now happens inside a transaction that rolls back, and the
+   `afterAll` that used to leave the table CLEARED for the whole machine is gone. Verified: a rate
+   committed before the run is still there after it, and the suite passes either way.
 
-**What that run ruled OUT.** The entry's own hypothesis was a second actor on the database, suspected
-to be the app servers. It is not:
+Both bugs carry regression tests: `is in force immediately when no effective date is given` and
+`prefers the last written rate when two share an effective moment`.
 
-- **Not another test suite.** `payments` and `wallet` are the only other suites that mention
-  `fx_rates`, and both only mention it in a COMMENT saying they deliberately stay off it. Nothing
-  else writes the table.
-- **Not a scheduled job.** No `@Cron` in the API touches `fx_rates`; the only app-side writer is
-  `FxRateService` on an explicit `POST /admin/fx-rates`, which nothing fires automatically.
-- **Not a shared cache.** `FxRateService`'s cache is a per-instance in-memory `Map`, and it caches
-  only successful lookups — a miss is never stored, so no stale "no rate" can be read back.
-- **Not simply "servers running".** The suite passed 17/17 in isolation with all four servers live,
-  and 90/90 three times alongside `payments` and `wallet`. It needs the timing of the full run.
+**A correction to this entry's own history.** An earlier version proposed scoping the cleanup with a
+test marker and asserting on a comfortably-past `effective_from`. The second half would have made the
+suite pass while leaving the production bug in place — the tests were right to fail, and a rate set
+"now" being immediately in force is exactly the property worth keeping under test.
 
-**What is now known about the suite itself, and is the leading hypothesis.** It is the only
-integration suite that does NOT use the rollback harness — `createDatabase(DATABASE_URL, 2)`, so every
-write COMMITS — and it clears the table with a wholesale `DELETE FROM fx_rates` in `beforeEach`. That
-makes it both vulnerable and dangerous, and it points at the suite racing ITSELF: an unawaited write in
-one test, or a `beforeEach` delete overlapping the previous test's read, would produce exactly this
-symptom and would explain why only this file fails and only under full-suite load.
-
-**Next step, now cheap enough to be worth doing:** move it onto `createRollbackDatabase` like the other
-21 suites, which removes the wholesale delete entirely because nothing escapes the transaction. If the
-pool of 2 exists for a reason the rollback harness cannot serve, scope the delete to the rows the suite
-wrote instead. Either is verifiable against this diagnosis in a way the previous one was not.
-
-**Owner:** engineering, next time it appears.
+**Note for the dev environment:** nothing seeds `fx_rates` — neither `db:seed` nor `db:testbed`, both
+deliberately, since a hardcoded rate goes stale and a wrong rate is worse than a missing one. A
+USD→SYP rate of 13000.00 was inserted manually on 2026-08-11 so the local app can price bookings.
+Delete it to get the "no rate configured" behaviour back.
 
 ### O-test-2 — The browser suite runs at the API's rate-limit ceiling
 
