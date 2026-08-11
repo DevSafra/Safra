@@ -1,5 +1,7 @@
 import { headers } from 'next/headers';
 
+import { SIDEBAR_SCRIPT } from '@safra/ui';
+
 import { THEME_SCRIPT } from '@/lib/theme-script';
 
 /**
@@ -21,7 +23,15 @@ export async function ThemeScript() {
   return (
     <script
       {...(nonce ? { nonce } : {})}
-      dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }}
+      /*
+        Theme AND sidebar, concatenated into ONE nonce'd script — the same shape both staff apps use.
+
+        The sidebar half arrived when حسابي grew a collapsible sidebar (2026-08-11). It is safe to extend
+        this string because the CSP admits it by NONCE, not by hash: a hashed policy would have to be
+        updated in lockstep, and the symptom of forgetting is a blocked script, which presents as the
+        layout jumping rather than as anything mentioning security.
+      */
+      dangerouslySetInnerHTML={{ __html: `${THEME_SCRIPT}${SIDEBAR_SCRIPT}` }}
     />
   );
 }

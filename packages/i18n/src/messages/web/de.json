@@ -430,7 +430,9 @@
       "expired": "Abgelaufen",
       "cancelled": "Storniert"
     },
-    "walletGiftCaption": "Aus Geschenkkarten eingelöst · wird zuerst verwendet"
+    "walletGiftCaption": "Aus Geschenkkarten eingelöst · wird zuerst verwendet",
+    "navShowSidebar": "Menü anzeigen",
+    "navHideSidebar": "Menü ausblenden"
   },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",

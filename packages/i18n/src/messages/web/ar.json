@@ -430,7 +430,9 @@
       "expired": "منتهية",
       "cancelled": "ملغاة"
     },
-    "walletGiftCaption": "مُستبدلة من بطاقات هدايا · تُصرف أولاً"
+    "walletGiftCaption": "مُستبدلة من بطاقات هدايا · تُصرف أولاً",
+    "navShowSidebar": "إظهار القائمة",
+    "navHideSidebar": "إخفاء القائمة"
   },
   "reviews": {
     "title": "قيّم إقامتك",

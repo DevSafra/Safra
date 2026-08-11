@@ -235,6 +235,121 @@ body {
 }
 
 /**
+ * حسابي's shell — the same arrangement as لوحة الشريك and the staff console.
+ *
+ * Bashar, 2026-08-11: the customer dashboard's sidebar should match the other two. So: a hamburger at
+ * every width, the choice persisted and applied before paint, the content reclaiming the column when
+ * the sidebar is hidden, and below `lg` a drawer over the content with a backdrop.
+ *
+ * ## Why this is CSS keyed on an attribute, not Tailwind classes
+ *
+ * The layout depends on `data-sidebar` on `<html>`, which a blocking pre-paint script sets. React state
+ * resolves after hydration, and a 220px column appearing a frame late is a visible jump rather than a
+ * subtle one. The same reason the two staff apps do it this way.
+ *
+ * ## Why `account-*` rather than reusing `portal-*`
+ *
+ * These are different documents with different chrome — the customer app has a public site header above
+ * this shell, the portals have none — and a shared class name would read as a shared element that could
+ * be changed in one place. The behaviour is shared through `@safra/ui`, which is where it belongs; the
+ * geometry is stated per app, exactly as the console and the partner portal already state it twice.
+ */
+.account-layout {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.account-backdrop {
+  display: none;
+}
+
+@media (min-width: 64rem) {
+  /* Default and `shown`: the sidebar is a column. */
+  .account-layout {
+    grid-template-columns: 220px 1fr;
+  }
+
+  :root[data-sidebar='hidden'] .account-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .account-sidebar {
+    position: sticky;
+    /* Clear of the sticky site header, which the portals do not have. */
+    top: 5.5rem;
+    grid-column-start: 1;
+    grid-row-start: 1;
+  }
+
+  .account-main {
+    grid-column-start: 2;
+    grid-row-start: 1;
+  }
+
+  /* With no column beside it, the content occupies the only one. */
+  :root[data-sidebar='hidden'] .account-main {
+    grid-column-start: 1;
+  }
+}
+
+:root[data-sidebar='hidden'] .account-sidebar {
+  display: none;
+}
+
+/**
+ * One column on paper.
+ *
+ * The sidebar is `print:hidden`, and `display: none` on a grid ITEM does not remove its grid TRACK —
+ * so a printed receipt came out shoved sideways by an empty 220px column. That exact bug was fixed once
+ * for the invoice, before this shell existed, and reintroduced the moment the layout moved from Tailwind
+ * classes into this file: `print:block` and `.account-layout` have the same specificity, and this rule
+ * comes later in the stylesheet, so the hand-written one wins.
+ *
+ * Stated HERE rather than as a `print:` utility on the element, so the geometry and its print behaviour
+ * cannot drift apart again.
+ */
+@media print {
+  .account-layout {
+    display: block;
+    max-width: none;
+    padding: 0;
+  }
+}
+
+/**
+ * Below `lg`, a shown sidebar is a drawer over the content.
+ *
+ * `inset-inline-start`, never `left`: in Arabic the drawer must come from the RIGHT, and a physical
+ * property would slide it in from the wrong edge.
+ */
+@media (max-width: 63.999rem) {
+  .account-sidebar {
+    position: fixed;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 50;
+    width: 260px;
+    max-width: 88vw;
+    /* The drawer does not scroll — its nav does, so sign out stays above the fold. */
+    overflow: hidden;
+    border-radius: 0;
+  }
+
+  :root:not([data-sidebar='shown']) .account-sidebar {
+    display: none;
+  }
+
+  :root[data-sidebar='shown'] .account-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    display: block;
+    background: rgb(0 0 0 / 0.55);
+  }
+}
+
+/**
  * Paper (Bashar, 2026-08-11: "the customer should be able to download the invoice as a pdf file").
  *
  * ## Why the browser makes the PDF and not the server

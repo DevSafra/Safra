@@ -96,6 +96,61 @@ test.describe('بطاقات الهدايا', () => {
     ).toBeCloseTo(amounts[2] ?? -1, 2);
 
     /*
+      ── The sidebar behaves like the other two dashboards ──
+
+      Asserted from THIS test's session rather than its own spec, because a second `test` under this
+      describe would get a fresh context and spend a second customer sign-in, and the suite has no room
+      for one. It is the same set of properties `partner-sidebar.spec.ts` checks: the hamburger is at
+      every width, the choice persists, the content reclaims the column, and below `lg` the sidebar is a
+      drawer that Escape dismisses.
+    */
+    await page.goto('/en/account', { waitUntil: 'domcontentloaded' });
+
+    const hamburger = page.getByRole('button', { name: /menu/i }).first();
+    const sidebar = page.locator('#account-sidebar');
+
+    await expect(hamburger).toBeVisible();
+    await expect(sidebar).toBeVisible();
+    /* Sign out lives at the FOOT of the sidebar, as on both staff surfaces. */
+    await expect(sidebar.getByRole('button', { name: /sign out/i })).toBeVisible();
+
+    await hamburger.click();
+    await expect(sidebar).toBeHidden();
+    await expect(hamburger).toHaveAttribute('aria-expanded', 'false');
+
+    /* With no column beside it, the content occupies the only one. */
+    expect(
+      await page.evaluate(
+        () =>
+          getComputedStyle(document.querySelector('.account-main') as Element)
+            .gridColumnStart,
+      ),
+    ).toBe('1');
+
+    /* The choice survives a reload, because it is written before paint rather than by React. */
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(sidebar).toBeHidden();
+
+    await hamburger.click();
+    await expect(sidebar).toBeVisible();
+
+    /* Below `lg` it is a drawer with a backdrop, and Escape puts it away. */
+    await page.evaluate(() => localStorage.removeItem('safra-sidebar'));
+    await page.setViewportSize({ width: 390, height: 880 });
+    await page.goto('/en/account', { waitUntil: 'domcontentloaded' });
+    await expect(hamburger, 'the hamburger is available on a phone too').toBeVisible();
+
+    await hamburger.click();
+    await expect(sidebar).toBeVisible();
+    await expect(page.locator('.account-backdrop')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(sidebar).toBeHidden();
+
+    await page.evaluate(() => localStorage.removeItem('safra-sidebar'));
+    await page.setViewportSize({ width: 1280, height: 1000 });
+
+    /*
       ── Arabic, and no sideways scroll at any documented width ──
 
       In the same test rather than its own, because a second `test` under this describe would get a fresh

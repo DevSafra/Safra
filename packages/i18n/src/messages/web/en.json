@@ -430,7 +430,9 @@
       "expired": "Expired",
       "cancelled": "Cancelled"
     },
-    "walletGiftCaption": "Redeemed from gift cards · spent first"
+    "walletGiftCaption": "Redeemed from gift cards · spent first",
+    "navShowSidebar": "Show menu",
+    "navHideSidebar": "Hide menu"
   },
   "reviews": {
     "title": "Review your stay",
