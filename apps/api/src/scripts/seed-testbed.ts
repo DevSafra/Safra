@@ -596,6 +596,17 @@ async function build(db: Seeder): Promise<void> {
     SELECT id FROM properties WHERE partner_id IN (${testbedPartners}))`);
   await db.execute(sql`DELETE FROM property_images WHERE property_id IN (
     SELECT id FROM properties WHERE partner_id IN (${testbedPartners}))`);
+  /*
+    Favourites reference properties, so they go first.
+
+    Added when المفضلة landed and missed here: `favourites.property_id` is a plain foreign key, so one
+    saved listing on a testbed property made `db:testbed` fail on the DELETE below — and the error a
+    person sees is a truncated "Failed query: DELETE FROM properties", which names neither the table
+    that blocked it nor the row.
+  */
+  await db.execute(sql`DELETE FROM favourites WHERE property_id IN (
+    SELECT id FROM properties WHERE partner_id IN (${testbedPartners}))
+    OR customer_profile_id IN (${testbedProfiles})`);
   await db.execute(sql`DELETE FROM properties WHERE partner_id IN (${testbedPartners})`);
 
   /*
@@ -614,6 +625,34 @@ async function build(db: Seeder): Promise<void> {
     sql`DELETE FROM ledger_entries WHERE partner_id IN (${testbedPartners})`,
   );
   await db.execute(sql`ALTER TABLE ledger_entries ENABLE TRIGGER USER`);
+  /*
+    The gift cards a testbed customer bought, and their history.
+
+    `gift_card_transactions` is append-only by trigger like the ledger and the wallet statement, so the
+    trigger comes off for the same reason. Both were missed when بطاقات الهدايا landed, and the symptom
+    was a truncated "Failed query: DELETE FROM customer_profiles" that named nothing useful.
+  */
+  await db.execute(sql`ALTER TABLE gift_card_transactions DISABLE TRIGGER USER`);
+  await db.execute(sql`DELETE FROM gift_card_transactions WHERE gift_card_id IN (
+    SELECT id FROM gift_cards WHERE purchased_by_customer_id IN (${testbedProfiles}))`);
+  await db.execute(sql`ALTER TABLE gift_card_transactions ENABLE TRIGGER USER`);
+  await db.execute(
+    sql`DELETE FROM gift_cards WHERE purchased_by_customer_id IN (${testbedProfiles})`,
+  );
+
+  /*
+    Wallet transactions are append-only by trigger, so the trigger comes off to clear them — exactly
+    what this script already does for `ledger_entries` a few lines up, and for the same reason: the
+    immutability is there to protect PRODUCTION evidence, and a testbed reset is not that.
+    
+    This is why the wallet used to be seeded as a bare balance with no history behind it. That worked
+    until محفظتي started deriving how much of a balance came from a gift card by reading these rows —
+    money with no transaction behind it is money the derivation cannot attribute.
+  */
+  await db.execute(sql`ALTER TABLE wallet_transactions DISABLE TRIGGER USER`);
+  await db.execute(sql`DELETE FROM wallet_transactions WHERE wallet_id IN (
+    SELECT id FROM wallets WHERE customer_profile_id IN (${testbedProfiles}))`);
+  await db.execute(sql`ALTER TABLE wallet_transactions ENABLE TRIGGER USER`);
   await db.execute(
     sql`DELETE FROM wallets WHERE customer_profile_id IN (${testbedProfiles})`,
   );
@@ -809,10 +848,35 @@ async function build(db: Seeder): Promise<void> {
 
   if (!profile) throw new Error('Could not create the customer profile.');
 
-  await db.insert(schema.wallets).values({
-    customerProfileId: profile.id,
+  /*
+    The opening balance is seeded WITH the transaction that explains it.
+
+    Every movement the app makes writes a `wallet_transactions` row, so `balance` always equals the sum
+    of its history — and محفظتي now relies on that: it derives how much of the balance came from a gift
+    card by walking those rows. A balance set directly, with nothing behind it, is money the derivation
+    cannot attribute, so it read «الرصيد الحالي ٠$» beside «رصيد بطاقات الهدايا ٣٥$» on a wallet that had
+    never seen a gift card.
+
+    `sla_compensation` because that is what an opening testbed balance represents: goodwill credit.
+  */
+  const [seededWallet] = await db
+    .insert(schema.wallets)
+    .values({
+      customerProfileId: profile.id,
+      currencyId: usd.id,
+      balance: '25.00',
+    })
+    .returning();
+
+  if (!seededWallet) throw new Error('Could not create the wallet.');
+
+  await db.insert(schema.walletTransactions).values({
+    walletId: seededWallet.id,
+    direction: 'credit',
+    reason: 'sla_compensation',
+    amount: '25.00',
     currencyId: usd.id,
-    balance: '25.00',
+    balanceAfter: '25.00',
   });
 
   // ── The bookings ──────────────────────────────────────────────────────────
