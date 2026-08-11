@@ -45,6 +45,52 @@ export const phoneSchema = z
   .trim()
   .regex(/^\+[1-9]\d{7,14}$/, ERROR.VALIDATION_PHONE_FORMAT);
 
+/**
+ * Editing your own profile (handoff §6, الملف الشخصي).
+ *
+ * Name and phone only. EMAIL is deliberately absent: changing the address a person signs in with has
+ * to prove they still hold the new one, which is a verification flow with a pending-address column and
+ * a mail template — a separate feature, not a field on this form. Offering it here would either skip
+ * that proof or fail silently.
+ *
+ * `.strict()` so an unknown field is a 400 rather than a silently ignored attempt to write something
+ * else, and at least one field must be present: an empty PATCH is a mistake worth reporting.
+ */
+export const profileUpdateSchema = z
+  .object({
+    fullName: z.string().trim().min(2).max(120).optional(),
+    phone: phoneSchema.optional(),
+  })
+  .strict()
+  .refine((v) => v.fullName !== undefined || v.phone !== undefined, {
+    message: ERROR.VALIDATION_ONE_FIELD_REQUIRED,
+  });
+
+export type ProfileUpdateInput = z.infer<typeof profileUpdateSchema>;
+
+/**
+ * Changing your own password.
+ *
+ * The CURRENT password is required, and that is the whole security value: an access token that leaked
+ * — from a shared machine, an XSS, a stolen phone — must not be enough to lock the owner out of their
+ * own account. Knowing the present password is the second factor this operation has.
+ *
+ * The new one goes through the same `passwordSchema` as registration, so the policy cannot drift
+ * between the two doors into the same column.
+ */
+export const passwordChangeSchema = z
+  .object({
+    currentPassword: z.string().min(1).max(256),
+    newPassword: passwordSchema,
+  })
+  .strict()
+  .refine((v) => v.newPassword !== v.currentPassword, {
+    message: ERROR.VALIDATION_PASSWORD_UNCHANGED,
+    path: ['newPassword'],
+  });
+
+export type PasswordChangeInput = z.infer<typeof passwordChangeSchema>;
+
 export const registerSchema = z
   .object({
     email: emailSchema,

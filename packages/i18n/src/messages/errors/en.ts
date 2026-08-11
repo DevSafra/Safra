@@ -212,6 +212,7 @@ export const en = {
   'validation.rate_syp_fixed': 'The SYP to SYP rate is always 1 and cannot be set.',
   'validation.price_range': 'Minimum price cannot exceed maximum price.',
   'validation.one_field_required': 'Provide at least one field to update.',
+  'validation.password_unchanged': 'Your new password must differ from your current one.',
   'validation.rejection_notes_required':
     'A rejection requires notes explaining what must change.',
   'validation.document_rejection_notes_required':

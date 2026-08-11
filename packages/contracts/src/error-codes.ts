@@ -216,6 +216,7 @@ export const ERROR = {
   VALIDATION_RATE_SYP_FIXED: 'validation.rate_syp_fixed',
   VALIDATION_PRICE_RANGE: 'validation.price_range',
   VALIDATION_ONE_FIELD_REQUIRED: 'validation.one_field_required',
+  VALIDATION_PASSWORD_UNCHANGED: 'validation.password_unchanged',
   VALIDATION_REJECTION_NOTES_REQUIRED: 'validation.rejection_notes_required',
   VALIDATION_DOCUMENT_REJECTION_NOTES_REQUIRED:
     'validation.document_rejection_notes_required',

@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   Req,
   Res,
@@ -17,13 +18,17 @@ import {
   type EmailVerificationConfirmInput,
   type LoginInput,
   type LoginResponse,
+  type PasswordChangeInput,
   type PasswordResetConfirmInput,
   type PasswordResetRequestInput,
+  type ProfileUpdateInput,
   type RegisterInput,
   emailVerificationConfirmSchema,
   loginSchema,
+  passwordChangeSchema,
   passwordResetConfirmSchema,
   passwordResetRequestSchema,
+  profileUpdateSchema,
   registerSchema,
 } from '@safra/contracts';
 
@@ -344,6 +349,45 @@ export class AuthController {
   @AuditExempt('A customer reading their own profile and counters; changes nothing.')
   async myProfile(@CurrentUser() user: AccessTokenClaims | undefined) {
     return this.customerAccount.summary(user);
+  }
+
+  /**
+   * Editing your own name and phone.
+   *
+   * Takes no id — the service writes the profile the verified token names, so this cannot be pointed at
+   * anybody else. Audited inside the service, which is why it is not exempt here.
+   */
+  @Patch('me/profile')
+  @AuditExempt('CustomerAccountService records customer.profile_updated transactionally.')
+  async updateMyProfile(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(profileUpdateSchema)) body: ProfileUpdateInput,
+  ) {
+    return this.customerAccount.updateProfile(user, body);
+  }
+
+  /**
+   * Changing your own password.
+   *
+   * Throttled far tighter than the per-IP default: this endpoint verifies a password, so it is a place
+   * somebody with a borrowed screen can guess one. Five a minute matches the login budget, and the
+   * five-attempt account lockout does NOT apply here — the caller is already authenticated — so the
+   * limiter is the only brake there is.
+   */
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('me/password')
+  @AuditExempt('CustomerAccountService records both the change and a refusal.')
+  async changeMyPassword(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(passwordChangeSchema)) body: PasswordChangeInput,
+    @Req() request: Request,
+  ) {
+    await this.customerAccount.changePassword(user, body, {
+      ipAddress: request.ip,
+      userAgent: request.get('user-agent'),
+    });
+
+    return { changed: true };
   }
 
   private respond(result: AuthResult, response: Response): LoginResponse {

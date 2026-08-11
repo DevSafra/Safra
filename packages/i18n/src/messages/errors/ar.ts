@@ -194,6 +194,7 @@ export const ar = {
     'سعر الليرة السورية مقابل نفسها يساوي 1 دائماً ولا يمكن تعديله.',
   'validation.price_range': 'الحد الأدنى للسعر لا يمكن أن يتجاوز الحد الأعلى.',
   'validation.one_field_required': 'أدخل حقلاً واحداً على الأقل للتعديل.',
+  'validation.password_unchanged': 'كلمة المرور الجديدة يجب أن تختلف عن الحالية.',
   'validation.rejection_notes_required': 'الرفض يتطلب ملاحظات توضح ما يجب تغييره.',
   'validation.document_rejection_notes_required':
     'الرفض يتطلب ملاحظات توضح الخطأ في المستند.',

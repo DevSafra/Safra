@@ -245,6 +245,8 @@ export const de = {
     'Der Kurs SYP zu SYP ist immer 1 und kann nicht gesetzt werden.',
   'validation.price_range': 'Der Mindestpreis darf den Höchstpreis nicht überschreiten.',
   'validation.one_field_required': 'Bitte mindestens ein Feld zum Ändern angeben.',
+  'validation.password_unchanged':
+    'Das neue Passwort muss sich vom aktuellen unterscheiden.',
   'validation.rejection_notes_required':
     'Eine Ablehnung erfordert Hinweise dazu, was geändert werden muss.',
   'validation.document_rejection_notes_required':

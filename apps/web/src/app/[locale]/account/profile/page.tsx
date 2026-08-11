@@ -2,18 +2,22 @@ import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 
 import { AccountShell } from '@/components/account-shell';
+import { PasswordForm, ProfileForm } from '@/components/profile-forms';
 import { getAccountSummary } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 
 /**
  * الملف الشخصي — handoff §6.
  *
- * Read-only. The name and phone come from `GET /auth/me/profile`, which reads `customer_profiles` —
- * the session cookie carries `id`, `email`, `role` and `permissions` and no name at all, and
- * `GET /auth/me` only echoes the token's claims.
+ * The name and phone come from `GET /auth/me/profile`, which reads `customer_profiles`: the session
+ * cookie carries `id`, `email`, `role` and `permissions` and no name at all.
  *
- * Editing still has no endpoint: no profile update, and no password change beyond the emailed RESET
- * flow. The section says so rather than offering a form that could not submit.
+ * ## Email is shown but not editable, and the page says why
+ *
+ * Changing the address somebody signs in with has to prove they still hold the new one — a verification
+ * flow with a pending-address column and a mail template, which is a separate feature rather than a
+ * field on this form. `profileUpdateSchema` is `.strict()`, so an attempt to send one is refused rather
+ * than silently ignored; the sentence under the address is what stops that being a mystery.
  */
 export const dynamic = 'force-dynamic';
 
@@ -37,8 +41,8 @@ export default async function AccountProfilePage({
     <AccountShell
       locale={locale}
       active="profile"
-      summary={summary}
       title={t('navProfile')}
+      summary={summary}
     >
       <div className="grid gap-6">
         <dl className="grid gap-4 rounded-card border border-line bg-card p-5">
@@ -48,27 +52,51 @@ export default async function AccountProfilePage({
             <dd className="mt-1 text-text" dir="ltr">
               {session.user.email}
             </dd>
-          </div>
-
-          <div>
-            <dt className="text-sm text-muted">{t('profileFullName')}</dt>
-            <dd className={`mt-1 ${summary ? 'text-text' : 'text-faint'}`}>
-              {summary?.fullName || t('profileNotSet')}
-            </dd>
-          </div>
-
-          <div>
-            <dt className="text-sm text-muted">{t('profilePhone')}</dt>
-            {/* A phone number is a Latin run, and a leading `+` is what the bidi algorithm moves. */}
-            <dd className={`mt-1 ${summary ? 'text-text' : 'text-faint'}`} dir="ltr">
-              {summary?.phone || t('profileNotSet')}
+            <dd className="mt-1 text-xs leading-relaxed text-faint">
+              {t('emailNotEditable')}
             </dd>
           </div>
         </dl>
 
-        <p className="rounded-lg border border-dashed border-gold/35 bg-card p-4 text-sm leading-relaxed text-faint">
-          {t('profileEditUnavailable')}
-        </p>
+        {/*
+          The form needs the CURRENT values so it can send only what changed, so it renders only once the
+          summary has been read. A failed read leaves the fields absent rather than pre-filled with
+          blanks that a save would then write over the real name.
+        */}
+        {summary ? (
+          <ProfileForm
+            locale={locale}
+            initial={{ fullName: summary.fullName, phone: summary.phone }}
+            labels={{
+              editTitle: t('profileEditTitle'),
+              fullName: t('profileFullName'),
+              phone: t('profilePhone'),
+              save: t('profileSave'),
+              saving: t('profileSaving'),
+              saved: t('profileSaved'),
+              saveFailed: t('profileSaveFailed'),
+            }}
+          />
+        ) : (
+          <p className="text-sm text-bad">{t('loadFailed')}</p>
+        )}
+
+        <PasswordForm
+          locale={locale}
+          labels={{
+            title: t('passwordTitle'),
+            current: t('passwordCurrent'),
+            next: t('passwordNew'),
+            show: t('passwordShow'),
+            hide: t('passwordHide'),
+            submit: t('passwordSubmit'),
+            submitting: t('passwordSubmitting'),
+            changed: t('passwordChanged'),
+            wrong: t('passwordWrong'),
+            failed: t('passwordFailed'),
+            rule: t('passwordRule'),
+          }}
+        />
       </div>
     </AccountShell>
   );
