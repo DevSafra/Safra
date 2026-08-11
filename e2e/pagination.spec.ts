@@ -119,7 +119,17 @@ test.afterAll(async ({ request }) => {
  * 11–99 takes the singular «نتيجة» again. A test pinned to one form asserts a grammar bug rather
  * than the presence of a total, and would fail the day the fixture count crossed a boundary.
  */
-const RESULT_COUNT = /نتيجة|نتائج/;
+/**
+ * The result count, in every Arabic plural form the catalogue can produce.
+ *
+ * `/نتيجة|نتائج/` was not enough, and the gap took a registry holding exactly TWO rows to expose:
+ * Arabic has a DUAL, so `t.table.found` renders «نتيجتان» at n=2 — spelled with a ت where the
+ * singular has a ة, matching neither alternative. Every registry was empty or larger, so the bar
+ * looked untotalled the first time one had two rows in it (بطاقات الهدايا, 2026-08-11).
+ *
+ * `نتيج` covers the singular, the dual and both capped duals; `نتائج` is the separate broken plural.
+ */
+const RESULT_COUNT = /نتيج|نتائج/;
 
 test.describe('the pagination bar', () => {
   /**
