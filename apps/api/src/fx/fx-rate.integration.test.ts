@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { FxRateService } from './fx-rate.service.js';
@@ -16,34 +16,58 @@ import { FxRateService } from './fx-rate.service.js';
  * return.
  *
  * Skipped when DATABASE_URL is unset; CI provisions a database and runs it.
+ *
+ * ## Why the ROLLBACK harness (O-test-1, fixed 2026-08-11)
+ *
+ * This suite used `createDatabase`, which COMMITS, and cleared the table with a wholesale
+ * `DELETE FROM fx_rates` between tests. Vitest runs test files in parallel, so those deletions landed
+ * in the middle of whatever else was running: every other suite that prices a booking needs a rate,
+ * and the ones that convert a wallet movement need two. It failed intermittently — twice, days apart,
+ * and never on a re-run — and it was the only suite in the repo doing committed cross-suite damage.
+ *
+ * Inside a transaction that always rolls back, the same `DELETE` is invisible to every other
+ * connection and undone at the end, so the testbed's real rates survive the run. The harness is safe
+ * here because nothing below is ABOUT concurrency: it serialises statements on one connection, which
+ * would remove the subject of a test whose point was two things at once. These twenty-one are all
+ * sequential behaviour — refusing a missing rate, choosing the effective one, caching, and audit.
  */
 const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('FxRateService', () => {
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
   let db: Database;
   let fx: FxRateService;
 
-  beforeAll(() => {
-    db = createDatabase(DATABASE_URL as string, 2);
+  beforeEach(async () => {
+    await harness.begin();
+    db = harness.db;
 
     /**
      * A real AuditService, not a stub. `set()` writes its audit row inside the same
      * transaction as the rate insert, so stubbing it out would leave the most
      * important property — that a rate change is never recorded without its audit
      * trail — untested.
+     *
+     * Built per test rather than once: the cache is per-INSTANCE, so a fresh service is a fresh
+     * cache, and the rolled-back transaction it holds is the one this test is running in.
      */
     fx = new FxRateService(db, new AuditService(db));
+
+    /*
+      Still cleared, because several tests below assert what happens when NO rate is configured and
+      the testbed seeds real ones. The difference is that this `DELETE` now happens inside the
+      transaction and is rolled back, so it cannot reach another suite.
+    */
+    await clearRates(db);
+  });
+
+  afterEach(async () => {
+    await harness.rollback();
   });
 
   afterAll(async () => {
-    await clearRates(db);
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
-  });
-
-  beforeEach(async () => {
-    await clearRates(db);
-    fx.invalidate();
+    await harness.close();
   });
 
   describe('refusing to invent a rate', () => {
@@ -113,6 +137,58 @@ describeIfDb('FxRateService', () => {
 
       fx.invalidate();
       expect(await fx.rateToSyp('USD')).toBe('13500.00000000');
+    });
+
+    /**
+     * A rate set with NO effective date is in force immediately.
+     *
+     * The row used to be stamped with `new Date()` from this process while the read filters
+     * `effective_from <= now()` on the DATABASE clock. Two clocks, so an app server even slightly
+     * ahead future-dated its own write: the rate was in the table, the read refused it, and pricing
+     * answered "temporarily unavailable" — the outage this whole suite exists to prevent, arriving
+     * intermittently and only under skew. Both halves now use the database clock.
+     */
+    it('is in force immediately when no effective date is given', async () => {
+      await fx.set({ currency: 'USD', rate: '13000.00', source: 'manual' });
+
+      fx.invalidate();
+      expect(await fx.rateToSyp('USD')).toBe('13000.00000000');
+    });
+
+    /**
+     * Two rates sharing one effective moment: the one written LAST wins.
+     *
+     * Not hypothetical — an admin correcting a rate seconds after setting it, or a bulk import
+     * stamping a single moment, produces exactly this. `ORDER BY effective_from DESC` alone leaves
+     * the winner to the query planner, so a booking could be priced at either rate between two
+     * identical requests. The `id DESC` tiebreak makes it the later write, because `uuidv7()` is
+     * time-ordered.
+     *
+     * The date is passed EXPLICITLY so the test does not depend on how the harness resolves `now()`.
+     */
+    it('prefers the last written rate when two share an effective moment', async () => {
+      const moment = new Date(Date.now() - 3_600_000).toISOString();
+
+      await fx.set({
+        currency: 'USD',
+        rate: '11000.00',
+        effectiveFrom: moment,
+        source: 'manual',
+      });
+      await fx.set({
+        currency: 'USD',
+        rate: '19000.00',
+        effectiveFrom: moment,
+        source: 'manual',
+      });
+
+      fx.invalidate();
+      expect(await fx.rateToSyp('USD')).toBe('19000.00000000');
+
+      /* And the registry must agree with what pricing used, or an operator cannot trust either. */
+      const listed = (await fx.list()).find((r) => r.currency === 'USD');
+
+      expect(listed?.rate).toBe('19000.00000000');
     });
 
     it('keeps the earlier row rather than overwriting it', async () => {
