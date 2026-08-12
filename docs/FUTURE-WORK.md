@@ -261,7 +261,7 @@ Bashar's instruction (2026-08-02): no product expansion until the must-haves hav
 
 | Item                                       | Note                                                                                                                                                                                                                                                                                   |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Messaging and disputes**                 | The largest gap. SRS §4 defines a support agent as handling bookings, messages and disputes; only bookings exist. Permissions are assigned but there are no tables — which makes the platform look more capable than it is                                                             |
+| **Disputes**                               | SRS §4 defines a support agent as handling bookings, messages and disputes. Messaging is now BUILT — see O-web-3 — and `disputes`/`dispute_evidence` have tables and an admin service, but no customer or partner route into raising one                                               |
 | Remaining 11 of the 18 §9.3 admin sections | The 7 built are those that block onboarding or administration. Since 2026-08-04 all eighteen appear in the sidebar — dimmed and `aria-disabled` when unbuilt — so the console shows how much is missing instead of hiding it                                                           |
 | Payment rails and payouts (items 84, 135)  | Deferred by decision 2026-08-01                                                                                                                                                                                                                                                        |
 | Gift cards and coupons (items 142–143)     | Compose onto the split-payment seam                                                                                                                                                                                                                                                    |
@@ -1602,6 +1602,45 @@ reminder of the intent. Neither is a fault, but neither is caching.
 **Guarded by** `e2e/public-routes.spec.ts`, which crawls the public site's own links rather than checking
 a list somebody remembered to write.
 
+### O-web-3 — الدعم ships; what it does not do yet
+
+**Status:** built on all three dashboards · **Owner:** **Bashar** · **Recorded:** 2026-08-12
+
+Bashar asked for a الدعم page on the customer and partner dashboards, with staff managing everything.
+Delivered:
+
+| Surface                     | What it does                                                      |
+| --------------------------- | ----------------------------------------------------------------- |
+| Customer `/account/support` | list, open, thread, reply — three locales                         |
+| Partner `/support`          | the same, Arabic, a fifth sidebar destination                     |
+| Console `/messages`         | the existing three-party inbox, now showing and answering tickets |
+
+**A ticket is a CONVERSATION, not a new table.** `conversations`/`messages` already carried the thread,
+the contact-detail redaction, the staff unread counter and internal staff-only notes. What was missing was
+a legal SHAPE: `conversations_exactly_one_subject` demanded a booking, a dispute or a partner. The `_v2`
+constraint allows a subject-less thread provided a customer is named; a partner ticket already fitted.
+
+**Two things this corrects in this document.** Messaging was described as "the largest gap … there are no
+tables", which was already wrong — `conversations`, `messages`, a redaction module and a full admin inbox
+all existed. And the console's scope filter keyed on `coalesce(booking.city, partner.city)`, which is NULL
+for a customer's ticket; a NULL never matches an `IN (…)` list, so every ticket would have been invisible
+to a city-scoped operator while looking present to a super admin. Both fixed.
+
+**What it does NOT do yet, in the order it will be missed:**
+
+| Missing                              | Why it matters                                                                                                                                                                                                                                                                     |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **No notification when staff reply** | A customer learns of an answer only by returning to the page. `notifications` and the WhatsApp/email log already exist, so this is wiring a template to the reply path rather than new infrastructure — and it is the difference between a support channel and a page people check |
+| No attachment                        | A photograph of a broken heater is the evidence most complaints turn on. `dispute_evidence` has a shape for this; support threads have none                                                                                                                                        |
+| No closing from the asking side      | Only staff can close a thread. A customer whose problem resolved itself cannot say so, so the console's unread queue keeps counting it                                                                                                                                             |
+| No dispute route                     | The disputes tables exist and nothing reaches them from either dashboard — see §6                                                                                                                                                                                                  |
+
+**Tested:** 21 integration tests (cross-account 404s, partner↔customer isolation, redaction on open and
+reply, internal notes never returned, closed threads read-only, unread counter incrementing rather than
+resetting, keyset paging staying stable when an older ticket is bumped), 13 contract tests, and a browser
+round trip in `e2e/partner-support.spec.ts` where the partner opens a ticket, staff answer it from the
+console, and the partner sees the answer.
+
 ### O-web-2 — Two public links point at pages that do not exist
 
 **Status:** open, product decision · **Owner:** **Bashar** · **Recorded:** 2026-08-12
@@ -1742,15 +1781,15 @@ and the reason the console has no endpoint that reveals a code either.
 
 ## 6. Deferred until after launch
 
-| Item                                            | Why it can wait                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Messaging and disputes**                      | The largest product gap — SRS §4 defines a support agent as handling bookings, messages and disputes, and only bookings exist. Permissions are defined and assigned but there are no tables, modules or UI, which makes the platform look more capable than it is. Deferrable **only** because there is no in-app messaging at all, so everything is already out-of-band. Stops being deferrable the moment volume outgrows phone and WhatsApp. |
-| Remaining 12 of the 18 §9.3 admin sections      | The six built are those that block partner onboarding                                                                                                                                                                                                                                                                                                                                                                                           |
-| UK (OFSI), US (OFAC/SDN) and UN sanctions lists | Deliberate: EU-only suits a German entity under EU law. **Revisit before taking US or UK payments.**                                                                                                                                                                                                                                                                                                                                            |
-| Emergency Mode per city/country (EC-009)        | No operational need yet                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| Gift cards and coupons (items 142–143)          | Compose cheaply onto the split-payment seam already built                                                                                                                                                                                                                                                                                                                                                                                       |
-| Payment rails and payouts (items 84, 135)       | Deferred by Bashar 2026-08-01. Blocks taking money; does not block staff operation. Item 84 additionally needs item 194, payout mechanism per country.                                                                                                                                                                                                                                                                                          |
-| Redis-backed settings invalidation              | 30-second cross-replica staleness is accepted; bookings snapshot the values they used, so no booking can be corrupted                                                                                                                                                                                                                                                                                                                           |
+| Item                                            | Why it can wait                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Disputes**                                    | Messaging is no longer part of this gap: الدعم ships on all three dashboards (O-web-3). What remains is DISPUTES — the tables and the admin service exist, but nothing lets a customer or partner raise one, so a disagreement about a stay still arrives by phone. Deferrable while support tickets carry that traffic; stops being deferrable when a refund is argued over in a thread nobody can attach evidence to. |
+| Remaining 12 of the 18 §9.3 admin sections      | The six built are those that block partner onboarding                                                                                                                                                                                                                                                                                                                                                                   |
+| UK (OFSI), US (OFAC/SDN) and UN sanctions lists | Deliberate: EU-only suits a German entity under EU law. **Revisit before taking US or UK payments.**                                                                                                                                                                                                                                                                                                                    |
+| Emergency Mode per city/country (EC-009)        | No operational need yet                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Gift cards and coupons (items 142–143)          | Compose cheaply onto the split-payment seam already built                                                                                                                                                                                                                                                                                                                                                               |
+| Payment rails and payouts (items 84, 135)       | Deferred by Bashar 2026-08-01. Blocks taking money; does not block staff operation. Item 84 additionally needs item 194, payout mechanism per country.                                                                                                                                                                                                                                                                  |
+| Redis-backed settings invalidation              | 30-second cross-replica staleness is accepted; bookings snapshot the values they used, so no booking can be corrupted                                                                                                                                                                                                                                                                                                   |
 
 ---
 
