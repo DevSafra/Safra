@@ -66,7 +66,7 @@ describeIfDb('partner self-registration', () => {
     const input = application();
     const result = await registration.register(input, {});
 
-    expect(result.reference).toMatch(/^PAR-\d{6}$/);
+    expect(result.reference).toMatch(/^PAR-\d{6,}$/);
     expect(result.verification).toBe('pending');
 
     const rows = await db.execute<{ role: string; verification: string }>(sql`

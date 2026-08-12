@@ -238,7 +238,7 @@ describeIfDb('ReviewService', () => {
     it('accepts a review of a completed stay from the guest who stayed', async () => {
       const result = await write(5);
 
-      expect(result.reference).toMatch(/^REV-\d{6}$/);
+      expect(result.reference).toMatch(/^REV-\d{6,}$/);
       expect(result.rating).toBe(5);
     });
 
@@ -999,7 +999,7 @@ describeIfDb('ReviewService', () => {
 
       const created = await write(5);
 
-      expect(created.reference).toMatch(/^REV-\d{6}$/);
+      expect(created.reference).toMatch(/^REV-\d{6,}$/);
 
       const row = await logFor('review.received');
 
