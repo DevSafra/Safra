@@ -22,7 +22,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:seed": "tsx src/seed/index.ts",
-    "db:reset-dev": "tsx src/scripts/reset-dev.ts"
+    "db:reset-dev": "tsx src/scripts/reset-dev.ts",
+    "load:generate": "tsx src/scripts/generate-load-data.ts",
+    "load:reset": "tsx src/scripts/reset-load-db.ts",
+    "load:invariants": "tsx src/scripts/check-load-invariants.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",
