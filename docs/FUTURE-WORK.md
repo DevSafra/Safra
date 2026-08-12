@@ -1567,6 +1567,64 @@ rehearsal rather than treating it as separate work.
 Terms of service, privacy policy and the partner contract (roadmap item 196) have not
 been reviewed. Required for a German merchant entity handling EU personal data.
 
+### O-web-1 — The public pages cannot be statically generated while the CSP nonce is per-request
+
+**Status:** city pages fixed by rendering them dynamically · **Owner:** **Bashar** ·
+**Recorded:** 2026-08-12
+
+All nine city pages returned **500 in production**, in all three locales, and both suites were green
+throughout — `pnpm verify` never renders a page, and no spec had ever requested one. Found by auditing
+the log noise that came out of an unrelated investigation.
+
+**The cause.** `/city/[slug]` declared `generateStaticParams`, which commits those routes to build-time
+output. The locale layout renders `ThemeScript`, which calls `headers()` to read the CSP nonce — the
+inline theme/sidebar script is written by hand, so Next cannot nonce it automatically. A prerender has no
+request, so `headers()` throws `DYNAMIC_SERVER_USAGE`; Next tolerates that on a route it may render
+dynamically and cannot on one promised as static.
+
+**The fix applied:** `dynamic = 'force-dynamic'` on the city page. The caching that mattered is
+untouched — `getCity`, `getCities` and `searchForDisplay` each carry `next: { revalidate: 300 }`, so the
+API is hit once per five minutes per query rather than once per visitor. What was given up is HTML
+assembly, not data.
+
+**The deeper item, not done.** Two things stand between these pages and real static output:
+
+| Blocker    | Note                                                                                                                                                                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The nonce  | A statically generated page cannot carry a per-request nonce. Making the inline script CSP-**hash**-based would remove the `headers()` call — `apps/web/src/lib/theme-script.ts` already notes that "the CSP has to hash these exact bytes", so the intent existed |
+| The header | `SiteHeader` shows «حسابي» or «تسجيل الدخول» from the session cookie. A static page bakes one in and serves it to everybody — the same staleness reported on the navbar, made permanent. Static output needs that chrome moved out of the cached shell             |
+
+**Also inert, and worth knowing:** `/` declares `revalidate = 300` and `/property/[slug]` declares
+`revalidate = 60`, and neither can take effect for the same reason — both read a request through the
+layout. They render dynamically today. Removing the declarations would be honest; keeping them is a
+reminder of the intent. Neither is a fault, but neither is caching.
+
+**Guarded by** `e2e/public-routes.spec.ts`, which crawls the public site's own links rather than checking
+a list somebody remembered to write.
+
+### O-web-2 — Two public links point at pages that do not exist
+
+**Status:** open, product decision · **Owner:** **Bashar** · **Recorded:** 2026-08-12
+
+Found by the crawl above:
+
+| Link                           | Where                           | Label            |
+| ------------------------------ | ------------------------------- | ---------------- |
+| `/{locale}/partner`            | the home page's partner section | «سجّل كشريك»     |
+| `/{locale}/support?property=…` | the property page               | report-a-listing |
+
+Both 404. Neither page has ever existed, so this is unbuilt scope rather than a regression — but a call
+to action that 404s is a broken promise on the busiest page of the site, and the project's own pattern
+elsewhere is to say what is missing rather than to dead-end (`AccountNotBuilt`, and the console's dimmed
+sections).
+
+Three ways out, and the choice is Bashar's: build the pages, point the links at something real (partner
+registration lives in a different app on a different origin, so that needs a configured public URL), or
+remove the links until there is somewhere to send people.
+
+`e2e/public-routes.spec.ts` carries both in `KNOWN_MISSING`, and fails if either starts resolving — so
+whichever way it is fixed, the list has to be updated rather than quietly outliving the problem.
+
 ### O-fin-1 — الفواتير is a receipt, and a tax invoice is a different document
 
 **Status:** built as a receipt, deliberately · **Owner:** **Bashar + Legal** ·
