@@ -433,7 +433,8 @@
     },
     "walletGiftCaption": "Aus Geschenkkarten eingelöst · wird zuerst verwendet",
     "navShowSidebar": "Menü anzeigen",
-    "navHideSidebar": "Menü ausblenden"
+    "navHideSidebar": "Menü ausblenden",
+    "giftSpendable": "Aktuell verfügbares Guthaben: {amount}"
   },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",

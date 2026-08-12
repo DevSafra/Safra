@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { AccountShell } from '@/components/account-shell';
 import { BuyForm, RedeemForm } from '@/components/gift-card-forms';
-import { getAccountSummary, getMyGiftCards } from '@/lib/account';
+import { getAccountSummary, getMyGiftCards, getMyWallet } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { formatMoney } from '@/lib/localise';
@@ -55,7 +55,31 @@ export default async function AccountGiftsPage({
   const t = await getTranslations('account');
   const cards = await getMyGiftCards(cursor || undefined);
 
-  const walletCurrency = summary?.counters.walletCurrency ?? '';
+  /*
+    The wallet is read for its COMPOSITION, not its total: a card may only be bought with الرصيد الحالي,
+    so the figure the form should state is the balance minus the gift part. The summary above carries
+    only the total, which is the number that made a refusal look arbitrary.
+
+    A failed read leaves the hint off rather than blocking the form — the API refuses an unaffordable
+    purchase on its own authority either way.
+  */
+  const walletRead = await getMyWallet();
+  const wallet =
+    walletRead === 'failed' || walletRead === 'unauthenticated'
+      ? null
+      : walletRead.wallet;
+
+  const walletCurrency = wallet?.currencyCode ?? summary?.counters.walletCurrency ?? '';
+
+  /* Balance minus the gift part. Both figures come from one read, so they cannot disagree. */
+  const spendable = wallet
+    ? formatMoney(
+        (Number(wallet.balance) - Number(wallet.giftBalance)).toFixed(2),
+        wallet.currencyCode,
+        locale,
+        { exact: true },
+      )
+    : '';
 
   return (
     <AccountShell locale={locale} active="gifts" summary={summary} title={t('navGifts')}>
@@ -64,7 +88,7 @@ export default async function AccountGiftsPage({
       <div className="mt-4 grid gap-6 lg:grid-cols-2 lg:items-start">
         <RedeemForm locale={locale} />
 
-        <BuyForm locale={locale} walletCurrency={walletCurrency} />
+        <BuyForm locale={locale} walletCurrency={walletCurrency} spendable={spendable} />
       </div>
 
       {/* ── The cards this reader bought. Never their codes — only the last four. ── */}

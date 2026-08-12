@@ -433,7 +433,8 @@
     },
     "walletGiftCaption": "Redeemed from gift cards · spent first",
     "navShowSidebar": "Show menu",
-    "navHideSidebar": "Hide menu"
+    "navHideSidebar": "Hide menu",
+    "giftSpendable": "Current balance available to spend: {amount}"
   },
   "reviews": {
     "title": "Review your stay",

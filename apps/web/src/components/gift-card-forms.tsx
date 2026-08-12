@@ -179,6 +179,7 @@ export function RedeemForm({ locale }: { readonly locale: Locale }) {
 export function BuyForm({
   locale,
   walletCurrency,
+  spendable,
 }: {
   readonly locale: Locale;
   /**
@@ -189,6 +190,14 @@ export function BuyForm({
    * reader has no wallet yet, in which case the bare figure is shown rather than a wrong symbol.
    */
   readonly walletCurrency: string;
+  /**
+   * The part of the balance a card may actually be bought with — الرصيد الحالي, not the total.
+   *
+   * Shown under the amount, because the alternative is what Bashar hit (2026-08-12): pick an amount the
+   * TOTAL covers, submit, and get told the rule. Naming the spendable figure up front turns a refusal
+   * into a choice. An empty string when there is no wallet yet, in which case there is nothing to state.
+   */
+  readonly spendable: string;
 }) {
   const t = useTranslations('account');
   const router = useRouter();
@@ -329,6 +338,11 @@ export function BuyForm({
               </option>
             ))}
           </select>
+          {spendable === '' ? null : (
+            <span className="text-xs text-faint">
+              {t('giftSpendable', { amount: spendable })}
+            </span>
+          )}
         </label>
 
         <label className="grid gap-1">
