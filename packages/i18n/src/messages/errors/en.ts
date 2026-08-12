@@ -91,7 +91,7 @@ export const en = {
   'gift_card.expired': 'This gift card has expired.',
   'gift_card.cancelled': 'This gift card has been cancelled. Please contact support.',
   'gift_card.cash_only':
-    'A gift card can only be bought with your current balance, not with gift card balance.',
+    'Your current balance is not enough for this card. A gift card can only be bought with your current balance, not with gift card balance.',
   'gift_card.amount_invalid': 'Choose one of the available gift card amounts.',
   'wallet.insufficient_balance': 'Your wallet balance is not enough for this.',
   'validation.too_long': 'This value is too long.',
