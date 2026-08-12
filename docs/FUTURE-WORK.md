@@ -1286,6 +1286,106 @@ the migration case.
 
 **Owner:** engineering.
 
+### O-scale-2 — OPEN, SEVERE: search returns HTTP 500 at the documented volumes
+
+**Status:** open · **Owner:** engineering, needs Bashar's call on approach · **Found:** 2026-08-12 by
+the first run against production-shaped data · **Severity:** the primary traffic path does not work
+
+Search is 80 % of real traffic (`docs/load-testing.md` §1). At the volumes that document specifies —
+50,000 properties, 200,000 units, 73M availability days — **one search takes 144 seconds.** The API's
+pool sets `statement_timeout: 15_000`, so what a customer actually receives is **HTTP 500**. This is
+not "slow at scale"; it is broken at scale, and the budget is 200 ms.
+
+| Query                                  | Measured   | Over budget |
+| -------------------------------------- | ---------- | ----------- |
+| Search, no filters                     | 144,488 ms | **722×**    |
+| Search, one city (⅑ of inventory)      | 39,705 ms  | 199×        |
+| Same query with the CTE `MATERIALIZED` | 42,810 ms  | 214×        |
+
+**The measurement is a laptop's, and the SHAPE is not.** One request touched **167,493,752 shared
+buffers**. No hardware makes that a 200 ms operation, and the count grows linearly with inventory.
+Two sorts spilled to disk (`external merge`). Those are properties of the plan.
+
+**Four causes, in the order they cost:**
+
+1. **Every search prices every unit in the country.** `Parallel Seq Scan on units` (200,000 rows) and
+   on `properties` (50,000), then the per-night price is computed for each candidate, and only then is
+   anything sorted or limited. A city filter helps only in proportion — ⅑ of the inventory took ⅑ of
+   the time — because it narrows the candidate set without changing the shape.
+2. **The price subquery runs three times per candidate.** `bookable` is a CTE referenced once, so
+   PostgreSQL INLINES it, and `b.stay_total` appears three times in `candidates` (the value, the
+   `nightlyFrom` division, and the sort key). The plan shows `SubPlan 1/2/3`, each `loops=150000`.
+   Adding one word — `WITH bookable AS MATERIALIZED (…)` — collapses it to a single SubPlan and takes
+   144 s to 43 s. **A 3.4× win from one word**, and still 214× over budget, which is why it is listed
+   second rather than as the fix.
+3. **Pricing two nights reads a unit's whole year.** The plan shows `Index Scan using
+availability_days_unit_id_date_pk … rows=365 loops=150000`: because `generate_series` is the outer
+   side of the LEFT JOIN, the date is not an index bound, so all 365 days come back and are
+   hash-joined down to 2.
+4. **`DISTINCT ON` plus a window function force the whole candidate set to be materialised and
+   sorted** before `LIMIT` applies. The limit cannot be pushed down.
+
+**What this does NOT show.** Nothing about concurrency — this is a single query, run alone. The real
+run will be worse. And the invariants are unaffected: `pnpm load:invariants` passes over 5M bookings
+and 20M ledger entries.
+
+**The remedies, in `docs/load-testing.md` §"What we do if it fails" order.** (1) is not an index —
+the indexes exist and are used; the query asks for too much. My reading, for Bashar's decision:
+
+- **Narrow before pricing.** Push city, type and guest-count filters into `bookable` so the price is
+  computed for hundreds of units, not two hundred thousand. This is the real fix and it is a rewrite
+  of the search query, not a tweak.
+- **`MATERIALIZED` now.** One word, 3.4×, no behaviour change. Worth taking regardless.
+- **Precompute the nightly total.** A per-unit-per-date price is derivable; a materialised view or a
+  denormalised column refreshed on availability writes turns the SubPlan into a lookup.
+- **Reconsider `recommendation_score` ordering.** Sorting by a column the candidate set does not
+  provide is what forbids the LIMIT pushdown.
+
+**I have not touched the search query.** It is the primary traffic path and the fix is a design
+decision about how search is shaped, not a defect with one obvious repair. The evidence is here; the
+call is Bashar's.
+
+### O-scale-1 — FIXED: every reference stopped working at 999,999 rows
+
+**Status:** fixed 2026-08-12 · **Found by** building the load-test data generator · **Severity:** would
+have been an outage at the volumes rule 2 targets
+
+**What was wrong.** Twelve tables carry a human-readable reference — `CUS-000042`, `BKG-2026-000042`,
+`PAY-000042` — and every default was `lpad(nextval(…)::text, 6, '0')`. **`lpad` TRUNCATES** when its
+input is longer than the width, keeping the first six characters: `lpad('1000000', 6, '0')` is
+`'100000'`. So the millionth row was handed the reference the hundred-thousandth row already had. And
+because the digit that falls off is the LAST one, ten consecutive counter values then collapse onto a
+single reference.
+
+The unique index turned that into a failed `INSERT` — an outage rather than two bookings quoting one
+number to two customers. That is the better of the two failures and still a hard ceiling of **999,999
+rows** on customers, partners, properties, bookings, payments, reviews, payouts, disputes,
+conversations, gift cards and both advertising tables.
+
+**Why nobody hit it.** No environment had ever held a million of anything. The development database
+has 2,703 properties and 5,871 bookings; the fixtures are smaller still. It was reachable only by
+generating the volumes in `docs/load-testing.md` — 1M users, 5M bookings — which is what found it, on
+the row after 999,999, before a single request had been sent.
+
+**The relevant numbers.** Rule 2 targets **1M users**. The load plan specifies **5M bookings**. So the
+ceiling sat at the documented target for one table and at a fifth of the documented volume for
+another — not a theoretical limit, the actual design point.
+
+**The fix** is a `reference_number(bigint)` function in `migrations/pre/0000_prerequisites.sql` that
+pads to six digits **without truncating**, and twelve `ALTER COLUMN … SET DEFAULT` in migration
+`0026`. Below a million the output is byte-identical, so no existing reference changes and no row
+needed rewriting; past it, references simply grow a digit — `CUS-1000000`.
+
+**Guarded by `apps/api/src/database/reference-ceiling.integration.test.ts`**, which drives the
+sequence to 999,998 with `setval` and inserts across the boundary rather than inserting a million
+rows. Its last test reads every `reference` default out of `information_schema` and fails if any of
+them uses `lpad` again — because all twelve shared one bug by being copied from each other, and that
+is how the thirteenth would arrive.
+
+**The general lesson, worth more than the fix:** the defect was invisible to every test, every review
+and every environment, and visible immediately to a million rows. It is the argument for building the
+generator before the hosting decision rather than after.
+
 ### O-page-1 — What numbered pages cost, and when it stops being affordable
 
 **What:** The console's fifteen registries moved from keyset cursors to `OFFSET` + `count(*)` on
@@ -2290,3 +2390,4 @@ Kept because the reason something was blocked is often the reason it returns.
 | 2026-08-06 | The messages registry lost its pagination bar whenever it was empty                     | `/messages` rendered the empty notice INSTEAD of the list and the bar, unlike the ten `<table>` registries, where `AdminTable` returns the notice and the parent keeps the bar. An empty result is usually a filter that matched nothing or a page past the end, so hiding the pager there stranded the reader with no total, no size control and no way back to page one — the exact failure the "Tables and pagination" rule exists to prevent. Found by `e2e/pagination.spec.ts` once the testbed stopped leaving stale threads behind.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 2026-08-12 | A staff reply to a support ticket reached nobody                                        | The first gap under **O-web-3**: an answer was discoverable only by returning to the page, which made الدعم somewhere people check rather than somewhere they are answered. `MessagingService.reply` now emails the asker via the `support.replied` template in their own language, with the ticket reference and a link and never the message text — bodies are stored redacted and the original is discarded, so repeating it in an inbox would put back exactly what the redaction removed. An internal note notifies nobody, which is the leak that would have mattered most and is tested for by name                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 2026-08-12 | The public home page listed no cities, and had not for some time                        | **O-web-4.** `cities.categories` is an enum ARRAY, which node-postgres hands back as the literal string `'{historic}'` unless it is cast — while the `db.execute` generic declared `string[]`, an assertion nothing checks. The web app validates the response and falls back to an empty list, so the destinations grid and the city selector rendered empty rather than erroring, and `/ar/city/*` became unreachable from the site. Invisible until a rebuild replaced a long-running API process built from older code. `to_jsonb(c.categories)`, plus a test asserting the runtime shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 2026-08-12 | Every human-readable reference broke at 999,999 rows                                    | **O-scale-1.** Twelve tables defaulted their reference to `lpad(nextval(…)::text, 6, '0')`, and `lpad` TRUNCATES past the width: the millionth row was handed the reference the hundred-thousandth already had, and ten consecutive counter values then collapsed onto one. The unique index made it a failed INSERT — an outage at exactly the volumes rule 2 targets (1M users) and a fifth of the load plan's bookings. Invisible to every test because no environment had ever held a million of anything; found by building the load-test data generator. Fixed with a `reference_number()` helper that pads without truncating, plus a test that reads every reference default out of `information_schema` and refuses `lpad`                                                                                                                                                                                                                                                                                                                                        |

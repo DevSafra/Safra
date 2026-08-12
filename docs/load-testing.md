@@ -2,9 +2,56 @@
 
 Ready to execute the day a deployment target exists. Nothing here needs further design.
 
-**Status: planned, never run.** No capacity number has been claimed anywhere in this repository,
-and none should be until this has been executed against real infrastructure — a figure measured on
-a laptop is worse than no figure, because somebody will plan around it.
+**Status: the harness is BUILT; no capacity run has happened.** Since 2026-08-12 the generator and
+all six k6 scenarios exist, so the day infrastructure appears the test runs rather than starts.
+
+**No capacity number has been claimed anywhere in this repository, and none should be** until this
+has been executed against real infrastructure — a figure measured on a laptop is worse than no
+figure, because somebody will plan around it. That prohibition covers percentiles and throughput. It
+does NOT cover the two things a local run answers honestly, and both are worth having early:
+
+| Honest locally          | Why the hardware does not matter                                                                                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Query plans**         | A sequential scan on a five-million-row table on a request path is a missing index on any machine. §Metrics already calls this "the check that catches a missing index" |
+| **Business invariants** | An exclusion constraint either held under concurrency or it did not; a ledger group either balances or it does not. `pnpm load:invariants`                              |
+
+**What it has already found.** Two defects, neither reachable at fixture volumes:
+
+- **`O-scale-1`** — a hard ceiling at 999,999 rows on twelve reference columns, hit by the GENERATOR
+  before a single request was sent. Fixed.
+- **`O-scale-2`** — search takes **144 seconds** at these volumes and the API's 15-second statement
+  timeout turns that into an HTTP 500. Open; the plan shape, not the hardware, is the problem.
+
+Both were invisible to every test, every review and every environment, and visible immediately to a
+million rows. That is the argument for building this harness before the hosting decision rather than
+after.
+
+## Running it
+
+```bash
+export LOAD_DATABASE_URL=postgresql://…/safra_load   # the name MUST contain "load"
+
+pnpm load:reset                                       # drops and recreates it
+DATABASE_URL=$LOAD_DATABASE_URL pnpm db:migrate
+DATABASE_URL=$LOAD_DATABASE_URL pnpm db:seed          # reference data only
+LOAD_SCALE=1 pnpm load:generate                       # 0.01 for a smoke test
+
+k6 run -e API_URL=http://localhost:4000 load/01-search-browse.js
+pnpm load:invariants                                  # after EVERY run
+```
+
+`LOAD_SCALE` is a fraction of the volumes in §Data; `LOAD_FRACTION` scales a scenario's virtual
+users the same way, so any scenario can be smoke-tested against itself in thirty seconds. The
+generator **refuses any database whose name does not contain `load`**, and refuses a database that
+already holds data — the append-only tables cannot be emptied, so a re-run needs a fresh one.
+
+**Raise the throttle first, or the run measures the rate limiter.** `THROTTLE_DEFAULT_LIMIT` defaults
+to **120 requests per minute**, which one virtual user exceeds in seconds: a first attempt here fired
+731 iterations in 22 seconds and every later request came back `429`, with the percentiles looking
+excellent because refusing a request is fast. Start the API under test with
+`THROTTLE_DEFAULT_LIMIT=100000` — the schema's maximum, and it refuses to boot above it — and treat
+any run that did not do so as void. The limiter deserves
+its own measurement, which is scenario 4's job and nobody else's.
 
 ---
 
@@ -118,9 +165,28 @@ read by every search, and no partitioning strategy has been chosen. If a scenari
 probably fail here — and the answer is likely range partitioning by date, which is a migration
 better designed with a measurement in hand than without.
 
-A generator does not exist. Writing one is **unblocked engineering work** (~1 day) and it should be
-written before the hosting decision, not after, so the day infrastructure exists the test runs
-rather than starts.
+**The generator exists** since 2026-08-12: `packages/db/src/scripts/generate-load-data.ts`, run with
+`pnpm load:generate`. Everything is server-side `INSERT … SELECT … FROM generate_series`, chunked
+where a single statement would hold too much open.
+
+Four things about it are decisions rather than details:
+
+- **Constraints are kept, not dropped.** Bulk loaders usually drop indexes and rebuild them. The
+  `daterange` exclusion constraint and the deferred ledger-balance trigger are part of the shape being
+  measured, so the generated data is made to satisfy them instead — bookings get non-overlapping
+  stays per unit, ledger legs come in balanced groups of four.
+- **`ledger_entries` is chunked into separate transactions**, because its balance check is a
+  `DEFERRABLE INITIALLY DEFERRED … FOR EACH ROW` constraint trigger: PostgreSQL queues one event per
+  inserted row and holds the queue until COMMIT, so twenty million rows in one transaction queues
+  twenty million events before a single check runs. **This applies to any future ledger backfill** —
+  it is a property of the constraint, not of the generator.
+- **It refuses a database whose name lacks `load`,** and refuses one that already holds data. The
+  append-only tables reject TRUNCATE by trigger, so there is no cleaning up after a partial run.
+- **`availability_days` stays 365 days per unit at every scale.** A unit with four days of calendar is
+  not a smaller version of a real unit; scale reduces the NUMBER of units instead.
+
+Measured throughput on a development laptop: ~150,000 availability rows/second, so the full 73M rows
+take about eight minutes and the whole set roughly 25 GB.
 
 ---
 
@@ -138,7 +204,10 @@ lock waits, replication lag, connection count against `max_connections`.
 **Redis:** hit rate, evictions, memory, latency.
 
 **Business invariants, checked after every run:** zero double-bookings, every ledger group balanced,
-zero orphaned payments, `notifications` all terminal.
+zero orphaned payments, `notifications` all terminal. **`pnpm load:invariants` runs all four** and
+exits non-zero on a violation, so it can gate a run in CI. It reads only, so it is safe to point at a
+real environment after a run there — and it prints the row counts it checked over, because "all
+invariants hold" over an empty database is not a result.
 
 ---
 
@@ -148,7 +217,29 @@ zero orphaned payments, `notifications` all terminal.
 need natively; and it runs in CI. Alternatives considered: Gatling (Scala, another language in the
 stack for one purpose), Locust (Python, same), JMeter (XML).
 
-Scripts live in `load/` — **not written yet**, and writing them is unblocked.
+**Scripts live in `load/` and all six exist** since 2026-08-12:
+
+| File                       | Scenario                                                | Needs                                              |
+| -------------------------- | ------------------------------------------------------- | -------------------------------------------------- |
+| `config.js`                | shared thresholds, the documented ramp, query variation | —                                                  |
+| `01-search-browse.js`      | 1                                                       | load data                                          |
+| `02-booking-contention.js` | 2                                                       | load data                                          |
+| `03-console-pagination.js` | 3                                                       | `LOAD_STAFF_TOKEN`                                 |
+| `04-auth-under-attack.js`  | 4                                                       | `LOAD_BYSTANDER_EMAIL` / `_PASSWORD`, throwaway DB |
+| `05-media.js`              | 5                                                       | seeded images                                      |
+| `06-soak.js`               | 6                                                       | 12 hours                                           |
+
+Three conventions worth knowing before editing them:
+
+- **The success criteria are expressed as k6 thresholds**, so a run cannot be reported green by
+  reading the percentile and ignoring the error rate. k6 exits non-zero when any threshold fails.
+- **Queries VARY per iteration.** Every virtual user asking for the same city and dates would be
+  answered from PostgreSQL's cache after the first, and the run would measure the cache rather than the
+  index — the easiest way to produce a load test that passes and predicts nothing.
+- **A refusal is not an error.** Scenarios 2 and 4 expect 409s and 401s by design, so they set
+  `expectedStatuses` to treat anything under 500 as handled; only a 5xx spends the error budget.
+  Nothing that only the database can see is expressed as a k6 threshold — a counter nothing
+  increments passes at zero and reads as proof. That is what `pnpm load:invariants` is for.
 
 ---
 
