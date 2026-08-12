@@ -85,13 +85,20 @@ export default async function PropertyPage({
   return (
     <article className="mx-auto max-w-6xl px-4 py-8">
       <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
-        <Link href={`/${locale}`} className="hover:text-gold">
+        {/* Both breadcrumb links are controls — see the note on the city page. */}
+        <Link
+          href={`/${locale}`}
+          className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
+        >
           {tc('backHome')}
         </Link>
         <span aria-hidden className="mx-2">
           ←
         </span>
-        <Link href={`/${locale}/city/${property.city.slug}`} className="hover:text-gold">
+        <Link
+          href={`/${locale}/city/${property.city.slug}`}
+          className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
+        >
           {cityName}
         </Link>
         <span aria-hidden className="mx-2">

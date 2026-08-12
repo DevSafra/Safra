@@ -56,6 +56,12 @@ const CUSTOMER = [
   '/ar',
   '/ar/search',
   '/ar/city/petra',
+  /*
+    A property page, added 2026-08-12. Its breadcrumb carried two 36x17 links and no responsive test had
+    ever requested the route — the same blind spot that hid the city page's, which only surfaced when
+    that route stopped answering 500.
+  */
+  '/ar/property/coastal-resort',
   '/ar/login',
   '/ar/register',
   '/ar/forgot-password',

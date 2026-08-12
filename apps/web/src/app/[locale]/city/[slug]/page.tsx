@@ -124,7 +124,18 @@ export default async function CityPage({
         />
         <div className="relative mx-auto max-w-6xl px-4 py-14 sm:py-20">
           <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
-            <Link href={`/${locale}`} className="hover:text-gold">
+            {/*
+              A breadcrumb link is a CONTROL, so it carries the 40px floor below `lg`.
+
+              `min-height` does nothing to an inline element, which is why `inline-flex` comes with it —
+              the same combination the project rule names for anchors styled as controls. These were
+              36x17 at 390px: the city page's went unnoticed because that route answered 500 until
+              2026-08-12, and the property page's because no responsive test requested it.
+            */}
+            <Link
+              href={`/${locale}`}
+              className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
+            >
               {t('backHome')}
             </Link>
             <span aria-hidden className="mx-2">
