@@ -237,6 +237,13 @@ export const ERROR = {
   GIFT_CARD_CASH_ONLY: 'gift_card.cash_only',
   WALLET_INSUFFICIENT_BALANCE: 'wallet.insufficient_balance',
   VALIDATION_TOO_LONG: 'validation.too_long',
+  /*
+    الدعم. A too-short message gets its own code rather than the generic one: "say a bit more" is
+    actionable, where "invalid" on a free-text box tells somebody nothing about what to change.
+  */
+  SUPPORT_MESSAGE_TOO_SHORT: 'support.message_too_short',
+  SUPPORT_TICKET_NOT_FOUND: 'support.ticket_not_found',
+  SUPPORT_TICKET_CLOSED: 'support.ticket_closed',
 } as const;
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR];

@@ -46,6 +46,7 @@ export type AccountSection =
   | 'favourites'
   | 'reviews'
   | 'invoices'
+  | 'support'
   | 'profile';
 
 /**
@@ -68,6 +69,7 @@ const SECTIONS: readonly { readonly id: AccountSection; readonly path: string }[
   { id: 'favourites', path: '/favourites' },
   { id: 'reviews', path: '/reviews' },
   { id: 'invoices', path: '/invoices' },
+  { id: 'support', path: '/support' },
 ];
 
 /** Which nav label each section uses. Separate from the id so the catalogue keys stay explicit. */
@@ -79,6 +81,7 @@ const LABEL_KEY: Record<AccountSection, string> = {
   favourites: 'navFavourites',
   reviews: 'navReviews',
   invoices: 'navInvoices',
+  support: 'navSupport',
   profile: 'navProfile',
 };
 

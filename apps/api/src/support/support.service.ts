@@ -1,0 +1,342 @@
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { sql, type SQL } from 'drizzle-orm';
+
+import type { Database } from '@safra/db';
+import {
+  ERROR,
+  type SupportMessage,
+  type SupportQuery,
+  type SupportThread,
+  type SupportTicket,
+  decodeCursor,
+  encodeCursor,
+} from '@safra/contracts';
+
+import { DATABASE } from '../database/database.module.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
+import { redactContactDetails } from '../messaging/redaction.js';
+import { badRequest, notFound, unauthorized } from '../common/errors/app-error.js';
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `CNV-000042`. Bounded before it reaches a query — the lookup is parameterised regardless. */
+const REFERENCE_PATTERN = /^CNV-\d{1,12}$/;
+
+/**
+ * Who is asking, and therefore which threads exist for them.
+ *
+ * A customer and a partner are scoped by DIFFERENT columns, and neither may name the column's value —
+ * it comes from the verified token. Staff have their own module (`admin/messaging.service.ts`) and do
+ * not come through here.
+ */
+type Asker =
+  | { readonly kind: 'customer'; readonly profileId: string; readonly userId: string }
+  | { readonly kind: 'partner'; readonly partnerId: string; readonly userId: string };
+
+type TicketRow = {
+  id: string;
+  reference: string;
+  created_at: string;
+  last_message_at: string | null;
+  closed_at: string | null;
+  message_count: number;
+  last_message: string | null;
+};
+
+/**
+ * الدعم — opening and continuing a support request.
+ *
+ * ## A ticket is a subject-less conversation
+ *
+ * `conversations_exactly_one_subject_v2` allows a thread with no booking, dispute or partner provided a
+ * customer is named; a partner's ticket is the long-standing `partner_id`-only shape. So a ticket needs
+ * no new table, and it lands in the console's existing inbox rather than in a second place staff have to
+ * remember to look.
+ *
+ * ## Every body is redacted, including the first
+ *
+ * `redactContactDetails` runs on the way IN and the original is not kept — the same rule the messaging
+ * module applies to staff replies. A support form is the most obvious place to try to pass a phone
+ * number, so exempting it would quietly reopen the hole the rule exists to close. `redactedCount` tells
+ * the sender it happened, because somebody whose number was masked will otherwise wait for a call that
+ * cannot come.
+ *
+ * ## Internal notes are never returned
+ *
+ * `messages.internal` is how staff talk to each other inside a thread. Every read here filters it out.
+ * That is one `AND internal = false` standing between a customer and staff's private assessment of
+ * their complaint, so it is applied in ONE place — `messagesOf` — rather than at each call site.
+ */
+@Injectable()
+export class SupportService {
+  private readonly logger = new Logger(SupportService.name);
+
+  constructor(@Inject(DATABASE) private readonly db: Database) {}
+
+  /** The caller, as a scope. Refuses anyone who is neither a customer nor a partner. */
+  private askerOf(claims: AccessTokenClaims | undefined): Asker {
+    if (!claims) throw unauthorized(ERROR.AUTH_REQUIRED);
+
+    if (claims.customerProfileId) {
+      return {
+        kind: 'customer',
+        profileId: claims.customerProfileId,
+        userId: claims.sub,
+      };
+    }
+
+    if (claims.partnerId) {
+      return { kind: 'partner', partnerId: claims.partnerId, userId: claims.sub };
+    }
+
+    /*
+      Staff reach the same threads through the console, which has its own service and its own
+      permissions. Sending them here would give them a customer's view of a thread they are meant to
+      moderate — including no sight of the internal notes they wrote.
+    */
+    throw notFound(ERROR.CUSTOMER_NOT_FOUND);
+  }
+
+  /**
+   * The WHERE fragment that defines "my tickets", used by every read and write.
+   *
+   * A ticket is subject-less, so a customer's filter says so explicitly: without the three NULL checks
+   * this would also return every booking thread they are a participant in, which belongs on the booking
+   * rather than on الدعم. A partner's threads are `partner_id`-only by construction.
+   */
+  private scopeOf(asker: Asker): SQL {
+    return asker.kind === 'customer'
+      ? sql`c.customer_profile_id = ${asker.profileId}::uuid
+            AND c.booking_id IS NULL AND c.dispute_id IS NULL AND c.partner_id IS NULL`
+      : sql`c.partner_id = ${asker.partnerId}::uuid
+            AND c.booking_id IS NULL AND c.dispute_id IS NULL`;
+  }
+
+  /** The columns a ticket row needs, listed once so the list and the thread cannot diverge. */
+  private get projection() {
+    return sql`
+      c.id, c.reference,
+      c.created_at::text      AS created_at,
+      c.last_message_at::text AS last_message_at,
+      c.closed_at::text       AS closed_at,
+      coalesce(m.n, 0)::int   AS message_count,
+      last.body               AS last_message
+    `;
+  }
+
+  /** The joins for the projection. `internal = false` in BOTH, or a count would leak a note's existence. */
+  private get joins() {
+    return sql`
+      FROM conversations c
+      LEFT JOIN (
+        SELECT conversation_id, count(*) AS n FROM messages
+        WHERE internal = false GROUP BY conversation_id
+      ) m ON m.conversation_id = c.id
+      LEFT JOIN LATERAL (
+        SELECT body FROM messages
+        WHERE conversation_id = c.id AND internal = false
+        ORDER BY created_at DESC LIMIT 1
+      ) last ON TRUE
+    `;
+  }
+
+  private ticketOf(row: TicketRow): SupportTicket {
+    return {
+      reference: row.reference,
+      openedAt: row.created_at,
+      lastMessageAt: row.last_message_at,
+      closed: row.closed_at !== null,
+      messageCount: row.message_count,
+      lastMessage: row.last_message,
+    };
+  }
+
+  /** The visible messages of a thread, oldest first. Internal notes are excluded here and only here. */
+  private async messagesOf(conversationId: string): Promise<SupportMessage[]> {
+    const rows = await this.db.execute<{
+      id: string;
+      sender_kind: string;
+      body: string;
+      redacted_count: number;
+      created_at: string;
+    }>(sql`
+      SELECT id, sender_kind::text AS sender_kind, body, redacted_count,
+             created_at::text AS created_at
+      FROM messages
+      WHERE conversation_id = ${conversationId}::uuid AND internal = false
+      ORDER BY created_at ASC
+    `);
+
+    return rows.rows.map((row) => ({
+      id: row.id,
+      sender: row.sender_kind as SupportMessage['sender'],
+      body: row.body,
+      redactedCount: row.redacted_count,
+      createdAt: row.created_at,
+    }));
+  }
+
+  /** One ticket the caller owns, or a 404 — including when it belongs to somebody else. */
+  private async findOwn(asker: Asker, reference: string): Promise<TicketRow> {
+    if (!REFERENCE_PATTERN.test(reference)) {
+      throw notFound(ERROR.SUPPORT_TICKET_NOT_FOUND);
+    }
+
+    const found = await this.db.execute<TicketRow>(sql`
+      SELECT ${this.projection}
+      ${this.joins}
+      WHERE c.reference = ${reference}
+        AND c.deleted_at IS NULL
+        AND ${this.scopeOf(asker)}
+      LIMIT 1
+    `);
+
+    const row = found.rows.at(0);
+
+    /*
+      The scope is IN the query rather than checked after it. A reference is sequential and quotable, so
+      "fetch then compare" would answer a different error for a thread that exists and is not yours —
+      which is enough to enumerate other people's tickets.
+    */
+    if (!row) throw notFound(ERROR.SUPPORT_TICKET_NOT_FOUND);
+
+    return row;
+  }
+
+  /** Opens a ticket, with its first message. */
+  async open(
+    claims: AccessTokenClaims | undefined,
+    body: string,
+  ): Promise<SupportThread> {
+    const asker = this.askerOf(claims);
+    const redacted = redactContactDetails(body);
+
+    const created = await this.db.transaction(async (tx) => {
+      const rows = await tx.execute<{ id: string; reference: string }>(sql`
+        INSERT INTO conversations
+          (customer_profile_id, partner_id, last_message_at, unread_for_staff)
+        VALUES (
+          ${asker.kind === 'customer' ? asker.profileId : null}::uuid,
+          ${asker.kind === 'partner' ? asker.partnerId : null}::uuid,
+          now(), 1
+        )
+        RETURNING id, reference
+      `);
+
+      const conversation = rows.rows.at(0);
+
+      if (!conversation) throw badRequest(ERROR.SUPPORT_TICKET_NOT_FOUND);
+
+      await tx.execute(sql`
+        INSERT INTO messages
+          (conversation_id, sender_kind, sender_user_id, body, redacted_count, internal)
+        VALUES (${conversation.id}::uuid, ${asker.kind}::message_sender,
+                ${asker.userId}::uuid, ${redacted.body}, ${redacted.redactedCount}, false)
+      `);
+
+      return conversation;
+    });
+
+    /* Reference and redaction count only — a ticket body is the customer's own words, not log material. */
+    this.logger.log(
+      `Support ticket ${created.reference} opened by a ${asker.kind}` +
+        `${redacted.redactedCount > 0 ? ` (${redacted.redactedCount} contact detail(s) masked)` : ''}.`,
+    );
+
+    return this.thread(claims, created.reference);
+  }
+
+  /** One ticket with its messages. */
+  async thread(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+  ): Promise<SupportThread> {
+    const asker = this.askerOf(claims);
+    const row = await this.findOwn(asker, reference);
+
+    return { ...this.ticketOf(row), messages: await this.messagesOf(row.id) };
+  }
+
+  /** Adds a message to a ticket the caller owns. */
+  async reply(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+    body: string,
+  ): Promise<SupportThread> {
+    const asker = this.askerOf(claims);
+    const row = await this.findOwn(asker, reference);
+
+    /* A closed thread is read-only. Reopening it silently would hide the fact that staff ended it. */
+    if (row.closed_at !== null) throw badRequest(ERROR.SUPPORT_TICKET_CLOSED);
+
+    const redacted = redactContactDetails(body);
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        INSERT INTO messages
+          (conversation_id, sender_kind, sender_user_id, body, redacted_count, internal)
+        VALUES (${row.id}::uuid, ${asker.kind}::message_sender, ${asker.userId}::uuid,
+                ${redacted.body}, ${redacted.redactedCount}, false)
+      `);
+
+      /*
+        `unread_for_staff + 1`, not `= 1`: the counter is what the console sorts its inbox by, and
+        overwriting it would make three unanswered messages look like one.
+      */
+      await tx.execute(sql`
+        UPDATE conversations
+        SET last_message_at = now(), unread_for_staff = unread_for_staff + 1, updated_at = now()
+        WHERE id = ${row.id}::uuid
+      `);
+    });
+
+    return this.thread(claims, reference);
+  }
+
+  /** The caller's own tickets, newest activity first. */
+  async list(claims: AccessTokenClaims | undefined, query: SupportQuery) {
+    const asker = this.askerOf(claims);
+
+    let after: { sortKey: string; id: string } | null = null;
+
+    if (query.cursor !== undefined) {
+      const decoded = decodeCursor(query.cursor);
+
+      if (!decoded || !UUID_PATTERN.test(decoded.id)) {
+        throw badRequest(ERROR.REQUEST_CURSOR_INVALID);
+      }
+
+      after = { sortKey: decoded.sortKey, id: decoded.id };
+    }
+
+    /*
+      Ordered by `created_at`, not `last_message_at`, and the keyset is the reason: the cursor column has
+      to be immutable, and a reply moves `last_message_at` — which would make a row jump pages between
+      two requests and silently skip whatever it passed.
+    */
+    const keyset = after
+      ? sql`AND (c.created_at, c.id) < (${after.sortKey}::timestamptz, ${after.id}::uuid)`
+      : sql``;
+
+    const rows = await this.db.execute<TicketRow>(sql`
+      SELECT ${this.projection}
+      ${this.joins}
+      WHERE c.deleted_at IS NULL
+        AND ${this.scopeOf(asker)}
+        ${keyset}
+      ORDER BY c.created_at DESC, c.id DESC
+      LIMIT ${query.limit + 1}
+    `);
+
+    const page = rows.rows.slice(0, query.limit);
+    const last = page.at(-1);
+
+    return {
+      items: page.map((row) => this.ticketOf(row)),
+      nextCursor:
+        rows.rows.length > query.limit && last
+          ? encodeCursor(last.created_at, last.id)
+          : null,
+    };
+  }
+}

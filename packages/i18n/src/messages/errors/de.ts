@@ -112,6 +112,10 @@ export const de = {
   'gift_card.amount_invalid':
     'Bitte einen der verfügbaren Geschenkkarten-Beträge wählen.',
   'wallet.insufficient_balance': 'Ihr Guthaben reicht dafür nicht aus.',
+  'support.message_too_short': 'Bitte beschreiben Sie das Problem etwas genauer.',
+  'support.ticket_not_found': 'Diese Support-Anfrage wurde nicht gefunden.',
+  'support.ticket_closed':
+    'Diese Support-Anfrage ist geschlossen. Bitte eröffnen Sie eine neue.',
   'validation.too_long': 'Dieser Wert ist zu lang.',
   'wallet.not_found': 'Dieser Kunde hat kein Guthabenkonto.',
   'wallet.amount_not_positive': 'Eine Guthabenbuchung muss einen positiven Betrag haben.',

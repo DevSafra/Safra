@@ -433,3 +433,63 @@ export async function getMyGiftCards(cursor?: string) {
 
   return authedFetch(`/gift-cards?${query.toString()}`, giftCardsSchema);
 }
+
+// ─── الدعم (Bashar, 2026-08-12) ───────────────────────────────────────────────
+
+/**
+ * A support message as its sender may see it.
+ *
+ * There is no `internal` field, and there must never be one: staff write their assessment of a complaint
+ * into the same thread, and the API filters those out. A schema that accepted the flag would make a leak
+ * upstream invisible here rather than loud.
+ */
+const supportMessageSchema = z.object({
+  id: z.string(),
+  sender: z.enum(['customer', 'partner', 'staff', 'system']),
+  body: z.string(),
+  /** How many contact-detail spans were masked, so the sender learns it happened. */
+  redactedCount: z.number(),
+  createdAt: z.string(),
+});
+
+export type SupportMessageRow = z.infer<typeof supportMessageSchema>;
+
+const supportTicketSchema = z.object({
+  reference: z.string(),
+  openedAt: z.string(),
+  lastMessageAt: z.string().nullable(),
+  closed: z.boolean(),
+  messageCount: z.number(),
+  lastMessage: z.string().nullable(),
+});
+
+export type SupportTicketRow = z.infer<typeof supportTicketSchema>;
+
+const supportThreadSchema = supportTicketSchema.extend({
+  messages: z.array(supportMessageSchema),
+});
+
+export type SupportThreadRow = z.infer<typeof supportThreadSchema>;
+
+const supportListSchema = z.object({
+  items: z.array(supportTicketSchema),
+  nextCursor: z.string().nullable(),
+});
+
+export async function getMySupportTickets(cursor?: string) {
+  const query = new URLSearchParams({ limit: '10' });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return authedFetch(`/support?${query.toString()}`, supportListSchema);
+}
+
+/**
+ * One thread.
+ *
+ * The API answers 404 for somebody else's ticket indistinguishably from one that does not exist, so this
+ * returns 'failed' for both and the page renders not-found — references are sequential.
+ */
+export async function getSupportThread(reference: string) {
+  return authedFetch(`/support/${encodeURIComponent(reference)}`, supportThreadSchema);
+}
