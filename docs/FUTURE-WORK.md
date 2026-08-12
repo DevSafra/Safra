@@ -1681,8 +1681,26 @@ after a rebuild replaced the running API. Fixed with `to_jsonb(c.categories)` an
 `catalog/catalog.integration.test.ts`, which asserts the RUNTIME SHAPE the type system cannot see, and
 which fails if the cast is removed.
 
-**Worth a sweep:** every other `db.execute` generic claiming an array. `admin/geo.service.ts` already
-converts in SQL (`array_to_string`), so this was the only reader of an enum array that did not.
+**The sweep, done 2026-08-12 — one bug, and the class is now enforced.**
+
+Asked the DATABASE rather than the schema files, because the schema is what somebody believes and
+`information_schema` is what is there. Ten array columns exist; `cities.categories` is the only one
+whose element type is not a base type, so it was the only instance of this bug. The other nine are
+`text[]` or `int4[]`, and each was confirmed to parse — at runtime, through the real driver, not by
+reading node-postgres's parser table.
+
+Widened to the same MECHANISM on non-array columns, since a lying generic is the actual fault and an
+enum array is only one way to get one. All 31 `db.execute` generics declaring a `number` field were
+mapped to the SQL expression that produces them: every one is `int4`/`smallint` or carries an explicit
+`::int`. The `numeric` and `bigint` columns — money, `properties.rating`, the ad counters — are already
+handled the house way, `::text` in the query and `Number()` at the boundary, and the two bare readers
+of `properties.rating` are honest (`Record<string, unknown>`, and `string | null`). Nothing else to fix.
+
+**Guarded by `database/array-columns.integration.test.ts`**, which reads the array columns out of
+`information_schema` and fails when one appears whose element type the driver cannot parse and which
+nobody has put on `CAST_REQUIRED`. It is data-independent — every check runs against an empty array
+literal cast to the element type — so it works on a fresh migration and cannot pass because a table
+was empty. It also holds the list honest in reverse: an entry that starts parsing must be removed.
 
 ### O-web-2 — Two public links point at pages that do not exist
 
