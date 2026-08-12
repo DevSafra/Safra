@@ -15,19 +15,33 @@ import { dynamicMessage } from '@/lib/dynamic-message';
 /**
  * City page (SRS §5.4).
  *
- * Server-rendered and revalidated, because the spec makes this page an explicit
- * SEO target. Rendering the stays on the client would leave a crawler with an
- * empty shell — the listings ARE the indexable content.
+ * Server-rendered, because the spec makes this page an explicit SEO target: rendering the stays on the
+ * client would leave a crawler with an empty shell, and the listings ARE the indexable content. That
+ * still holds — every request returns complete HTML.
+ *
+ * ## Why it is NOT pre-rendered at build time
+ *
+ * It used to declare `generateStaticParams`, and every city page answered **500** in production as a
+ * result. Two reasons, and either alone is enough:
+ *
+ * 1. **The layout reads a request.** `ThemeScript` pulls the CSP nonce out of the response header with
+ *    `headers()`, because the script is inlined by hand and Next cannot nonce it automatically. A
+ *    prerender has no request, so `headers()` throws `DYNAMIC_SERVER_USAGE` — which Next tolerates on a
+ *    route it may render dynamically, and cannot on one that `generateStaticParams` has committed to
+ *    static output. The symptom was a 500 with the message omitted, which is why it survived a green
+ *    `pnpm verify` and a green `pnpm e2e`: nothing in either suite requests a city page.
+ *
+ * 2. **The layout renders per-VISITOR chrome.** `SiteHeader` shows «حسابي» or «تسجيل الدخول» depending
+ *    on the session cookie. A statically generated page bakes one of those in and serves it to
+ *    everybody — the same staleness Bashar reported on the navbar, made permanent.
+ *
+ * The caching that actually mattered is untouched: `getCity`, `getCities` and `searchForDisplay` each
+ * carry `next: { revalidate: 300 }`, so the API is hit once per five minutes per query rather than once
+ * per visitor. What is given up is HTML assembly, not data.
+ *
+ * `docs/FUTURE-WORK.md` records what making these pages genuinely static would take.
  */
-export const revalidate = 300;
-
-/** Pre-render every city in every language at build time. */
-export async function generateStaticParams() {
-  const cities = await getCities();
-  return routing.locales.flatMap((locale) =>
-    cities.map((city) => ({ locale, slug: city.slug })),
-  );
-}
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({
   params,
