@@ -3,7 +3,6 @@ import { getTranslations } from 'next-intl/server';
 
 import { LOCALE_LABELS, type Locale, routing } from '@/i18n/routing';
 import { getSession } from '@/lib/session-server';
-import { HeaderThemeToggle } from './header-theme-toggle';
 import { ORNAMENT_BRAND } from '@safra/ui';
 
 /**
@@ -109,8 +108,6 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
             {auth('signIn')}
           </Link>
         )}
-
-        <HeaderThemeToggle />
       </div>
     </header>
   );

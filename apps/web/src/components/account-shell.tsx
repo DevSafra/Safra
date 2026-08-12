@@ -233,9 +233,10 @@ export async function AccountShell({
           the aside is only as tall as its content so it sits immediately under the last nav row. One
           rule, both shapes, because the aside is a flex column.
 
-          The toggle is a MOVE, not a copy: `HeaderThemeToggle` renders nothing on account routes, so
-          there is one control for one setting rather than two on the same screen. The header keeps it
-          everywhere else, because the public site has no sidebar to hold it.
+          This is now the ONLY theme control in the customer app: Bashar had it removed from the navbar
+          (2026-08-12). A visitor who has not signed in therefore gets no manual switch and follows their
+          OS preference instead, which `whenUnset='system'` and the `prefers-color-scheme` block in
+          `globals.css` already handle between them.
 
           `whenUnset='system'` — unlike the staff apps, this app's CSS HAS a `prefers-color-scheme`
           rule, so with no explicit choice the screen follows the visitor's OS and the icon has to say
