@@ -262,6 +262,62 @@ test.describe('بطاقات الهدايا', () => {
     }
 
     /*
+      ── الدعم: open a request, mask a phone number, reply ──
+
+      Here rather than in its own spec, for the reason the sidebar and theme assertions above are: a second
+      `test` under this describe gets a fresh context and spends a second customer sign-in, and the budget
+      has no room for one. The partner side DOES have its own spec, because that project replays a stored
+      session and so costs nothing.
+
+      It leaves a ticket behind every run. Messages are append-only by trigger, so a spec cannot tidy up
+      here — and reusing an existing thread would stop exercising the OPEN path after the first run.
+      `db:testbed` clears them, which is what bounds the count.
+    */
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.goto('/en/account/support', { waitUntil: 'domcontentloaded' });
+
+    await expect(
+      page.getByRole('heading', { name: en.account.supportOpenTitle }),
+    ).toBeVisible();
+
+    /* A phone number goes in on purpose: contact details are redacted on the way IN and never kept. */
+    await page
+      .locator('textarea[name=body]')
+      .fill('The heating did not work for two nights. Call me on 0955123456 please.');
+
+    /*
+      `form:has(textarea)`, not the last submit on the page — the account sidebar's sign-out is itself a
+      submit button, and a looser selector signs the reader out. That cost a debugging cycle on the
+      partner side of this same feature.
+    */
+    await page.locator('form:has(textarea) button[type=submit]').click();
+    await page.waitForURL(/\/account\/support\/CNV-/, { timeout: 20_000 });
+
+    const thread = page.locator('ol');
+
+    await expect(thread).not.toContainText('0955123456');
+    /* Announced, or the sender waits for a call that cannot come. */
+    await expect(thread).toContainText('masked');
+
+    const messagesBefore = await page.locator('ol li').count();
+
+    await page.locator('textarea[name=body]').fill('It is still not fixed today.');
+    await page.locator('form:has(textarea) button[type=submit]').click();
+    await expect(page.locator('ol li')).toHaveCount(messagesBefore + 1, {
+      timeout: 20_000,
+    });
+
+    /* Listed, and a reference that is not this customer's is a 404 rather than a different error. */
+    await page.goto('/en/account/support', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('a[href*="/account/support/CNV-"]').first()).toBeVisible();
+
+    const foreign = await page.goto('/en/account/support/CNV-000001', {
+      waitUntil: 'domcontentloaded',
+    });
+
+    expect(foreign?.status()).toBe(404);
+
+    /*
       ── And signing out is reflected immediately too ──
 
       The mirror of the bug above, and the worse half: the home page used to keep saying «حسابي» after the
