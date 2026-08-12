@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 
 import { partnerAr as t } from '../packages/i18n/src/partner.js';
 import { PARTNER_BASE as BASE, PARTNER_STATE } from './partner-session.js';
+import { STAFF_STATE } from './staff.js';
+import { adminAr } from '../packages/i18n/src/admin.js';
 
 /**
  * الدعم, partner side (Bashar, 2026-08-12).
@@ -28,8 +30,14 @@ test.use({ baseURL: BASE, storageState: PARTNER_STATE });
 
 const ENOUGH = 'مستحقاتي لم تُحدَّث هذا الشهر ولم يردّ أحد على رسالتي.';
 
+/** The console, where staff answer. Its own origin, so its own base URL. */
+const ADMIN = process.env['ADMIN_URL'] ?? 'http://localhost:3001';
+
 test.describe('الدعم', () => {
-  test('opens a request, masks a phone number, and replies', async ({ page }) => {
+  test('opens a request, masks a phone number, and replies', async ({
+    page,
+    browser,
+  }) => {
     await page.goto('/support');
 
     /* The destination exists in the sidebar, not only as a URL. */
@@ -53,6 +61,10 @@ test.describe('الدعم', () => {
     */
     await page.locator('form:has(textarea) button[type=submit]').click();
     await page.waitForURL(/\/support\/CNV-/, { timeout: 20_000 });
+
+    const reference = (page.url().split('/').pop() ?? '').trim();
+
+    expect(reference).toMatch(/^CNV-\d+$/);
 
     const thread = page.locator('ol');
 
@@ -81,6 +93,57 @@ test.describe('الدعم', () => {
     });
 
     expect(foreign?.status()).toBe(404);
+
+    /*
+      ── And staff can actually answer it ──
+
+      The half of "manage everything" that nothing asserted until now. A ticket is a conversation with no
+      other subject, so it should appear in the console's existing inbox — and the scope filter there keys
+      on `coalesce(booking.city, partner.city)`, which is NULL for a ticket. A NULL never matches an
+      `IN (…)` list, so before that filter was widened every ticket was invisible to a city-scoped
+      operator while looking present to a super admin. This is the assertion that would have caught it.
+
+      A second CONTEXT rather than a second spec: the ticket has to exist first, and ordering between spec
+      files is not something to depend on. `STAFF_STATE` is the session `auth.setup.ts` already captured,
+      so this costs nothing from the sign-in budget either.
+    */
+    const staffContext = await browser.newContext({ storageState: STAFF_STATE });
+    const staffPage = await staffContext.newPage();
+
+    try {
+      await staffPage.goto(`${ADMIN}/messages?q=${encodeURIComponent(reference)}`, {
+        waitUntil: 'domcontentloaded',
+      });
+
+      /*
+        Asserted on the LINK, not on the text.
+
+        The inbox prints the SUBJECT's reference — for a partner ticket that is the partner's own, not the
+        conversation's — so searching for `CNV-…` and expecting to read it back finds nothing even when the
+        row is right there. The href is what carries the thread's identity.
+      */
+      const row = staffPage.locator(`a[href*="${reference}"]`).first();
+
+      await expect(row, 'the ticket must reach the console inbox').toBeVisible();
+
+      /* Open the thread and answer it. */
+      await row.click();
+      await staffPage.waitForLoadState('domcontentloaded');
+
+      const answer = 'تم التواصل مع المالية بشأن مستحقاتك.';
+
+      await staffPage.locator('textarea').first().fill(answer);
+      await staffPage
+        .getByRole('button', { name: adminAr.sections.messages.reply })
+        .click();
+      await expect(staffPage.getByText(answer).first()).toBeVisible({ timeout: 20_000 });
+
+      /* And the partner sees it — the whole point of the thread being shared. */
+      await page.goto(`/support/${reference}`, { waitUntil: 'domcontentloaded' });
+      await expect(page.locator('ol')).toContainText(answer);
+    } finally {
+      await staffContext.close();
+    }
 
     // ── No page scrolls sideways ──
     for (const width of [390, 768, 1024, 1440]) {
