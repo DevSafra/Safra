@@ -104,7 +104,16 @@ export class MessagingService {
     */
     const conditions: SQL[] = [
       sql`c.deleted_at IS NULL`,
-      scopeFilter(query.actor, 'coalesce(b.city_id, p.city_id)'),
+      /*
+        A SUPPORT TICKET has no city, and a city-scoped operator must still see it.
+
+        The filter keys on `coalesce(booking.city, partner.city)`, which is NULL for a customer's ticket
+        — and a NULL never matches an `IN (…)` list, so every ticket would have vanished from a regional
+        operator's inbox while looking present to a super admin. Tickets are unrouted by nature: nobody
+        has decided whose they are yet, so everyone who can read the inbox can see them.
+      */
+      sql`(${scopeFilter(query.actor, 'coalesce(b.city_id, p.city_id)')}
+           OR coalesce(b.city_id, p.city_id) IS NULL)`,
     ];
 
     if (query.q) {
@@ -143,8 +152,9 @@ export class MessagingService {
       SELECT c.id, c.reference,
              CASE WHEN c.booking_id IS NOT NULL THEN 'booking'
                   WHEN c.dispute_id IS NOT NULL THEN 'dispute'
-                  ELSE 'partner' END        AS subject_kind,
-             coalesce(b.reference, d.reference, p.reference) AS subject_reference,
+                  WHEN c.partner_id IS NOT NULL THEN 'partner'
+                  ELSE 'support' END        AS subject_kind,
+             coalesce(b.reference, d.reference, p.reference, c.reference) AS subject_reference,
              cust.full_name                 AS customer,
              p.display_name                 AS partner,
              c.unread_for_staff,
