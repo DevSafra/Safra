@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { LOCALE_LABELS, type Locale, routing } from '@/i18n/routing';
 import { getSession } from '@/lib/session-server';
-import { ThemeToggle } from './theme-toggle';
+import { HeaderThemeToggle } from './header-theme-toggle';
 import { ORNAMENT_BRAND } from '@safra/ui';
 
 /**
@@ -110,7 +110,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           </Link>
         )}
 
-        <ThemeToggle />
+        <HeaderThemeToggle />
       </div>
     </header>
   );

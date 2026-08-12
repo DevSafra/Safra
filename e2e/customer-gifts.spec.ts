@@ -114,6 +114,49 @@ test.describe('بطاقات الهدايا', () => {
     /* Sign out lives at the FOOT of the sidebar, as on both staff surfaces. */
     await expect(sidebar.getByRole('button', { name: /sign out/i })).toBeVisible();
 
+    /*
+      ── The theme toggle lives beside sign out, and ONLY there ──
+
+      Bashar, 2026-08-12: move it into the dashboard beside sign out, the way لوحة الشريك has it. A MOVE:
+      `HeaderThemeToggle` renders nothing on account routes, so a count of one is the assertion that
+      matters — two controls for one setting is what this replaced. The partner suite checks the same
+      properties in `partner-sidebar.spec.ts`.
+    */
+    const themeButton = page.getByRole('button', { name: /mode/i });
+
+    await expect(themeButton, 'one toggle on an account page, not two').toHaveCount(1);
+    await expect(sidebar.getByRole('button', { name: /mode/i })).toBeVisible();
+
+    const themeOf = () =>
+      page.evaluate(() => document.documentElement.dataset.theme ?? '');
+    const before = await themeOf();
+
+    await themeButton.click();
+    await expect
+      .poll(themeOf, { message: 'clicking must change the theme' })
+      .not.toBe(before);
+
+    const switched = await themeOf();
+
+    /* The label names the DESTINATION, so it has to flip with the state. */
+    await expect(themeButton).toHaveAttribute(
+      'aria-label',
+      switched === 'dark' ? /light/i : /dark/i,
+    );
+
+    /* Remembered, because a pre-paint script applies it rather than React. */
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    expect(await themeOf()).toBe(switched);
+
+    /* The public site keeps its own, in the header — that is why this is a move and not a removal. */
+    await page.goto('/en', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByRole('button', { name: /mode/i })).toHaveCount(1);
+    await expect(
+      page.locator('header').getByRole('button', { name: /mode/i }),
+    ).toBeVisible();
+
+    await page.goto('/en/account', { waitUntil: 'domcontentloaded' });
+
     await hamburger.click();
     await expect(sidebar).toBeHidden();
     await expect(hamburger).toHaveAttribute('aria-expanded', 'false');

@@ -10,10 +10,11 @@
     "partner": "Partner dashboard",
     "admin": "Admin",
     "account": "My account",
-    "theme": "Switch theme",
     "language": "Language",
     "currency": "Currency",
-    "breadcrumb": "Breadcrumb"
+    "breadcrumb": "Breadcrumb",
+    "themeToLight": "Switch to light mode",
+    "themeToDark": "Switch to dark mode"
   },
   "home": {
     "heroCountries": "Syria · Jordan · Lebanon",

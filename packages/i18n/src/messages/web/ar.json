@@ -10,10 +10,11 @@
     "partner": "لوحة الشريك",
     "admin": "لوحة الإدارة",
     "account": "حسابي",
-    "theme": "تغيير المظهر",
     "language": "اللغة",
     "currency": "العملة",
-    "breadcrumb": "مسار التنقل"
+    "breadcrumb": "مسار التنقل",
+    "themeToLight": "التبديل إلى المظهر الفاتح",
+    "themeToDark": "التبديل إلى المظهر الداكن"
   },
   "home": {
     "heroCountries": "سوريا · الأردن · لبنان",

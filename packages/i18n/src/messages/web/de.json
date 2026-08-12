@@ -10,10 +10,11 @@
     "partner": "Partner-Dashboard",
     "admin": "Verwaltung",
     "account": "Mein Konto",
-    "theme": "Design wechseln",
     "language": "Sprache",
     "currency": "Währung",
-    "breadcrumb": "Brotkrümelnavigation"
+    "breadcrumb": "Brotkrümelnavigation",
+    "themeToLight": "Zum hellen Design wechseln",
+    "themeToDark": "Zum dunklen Design wechseln"
   },
   "home": {
     "heroCountries": "Syrien · Jordanien · Libanon",
