@@ -61,13 +61,13 @@ export type AccountSection =
  */
 const SECTIONS: readonly { readonly id: AccountSection; readonly path: string }[] = [
   { id: 'overview', path: '' },
+  { id: 'profile', path: '/profile' },
   { id: 'bookings', path: '/bookings' },
   { id: 'wallet', path: '/wallet' },
   { id: 'gifts', path: '/gifts' },
   { id: 'favourites', path: '/favourites' },
   { id: 'reviews', path: '/reviews' },
   { id: 'invoices', path: '/invoices' },
-  { id: 'profile', path: '/profile' },
 ];
 
 /** Which nav label each section uses. Separate from the id so the catalogue keys stay explicit. */
