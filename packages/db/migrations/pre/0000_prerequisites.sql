@@ -30,6 +30,30 @@ CREATE SEQUENCE IF NOT EXISTS advertiser_reference_seq   START 1;
 CREATE SEQUENCE IF NOT EXISTS payout_reference_seq       START 1;
 CREATE SEQUENCE IF NOT EXISTS review_reference_seq       START 1;
 
+-- ----------------------------------------------------------------------------
+-- The reference NUMBER, padded to six digits and never truncated.
+--
+-- Every reference default used to be lpad(nextval(...)::text, 6, '0') directly, and lpad
+-- TRUNCATES when its input is longer than the width, keeping the FIRST six characters:
+-- lpad('1000000', 6, '0') is '100000'. So the millionth row of any of the twelve referenced
+-- tables was handed the reference the hundred-thousandth row already had — and because the
+-- digit that falls off is the LAST one, ten consecutive counter values then collapse onto a
+-- single reference. The unique index turned that into a failed INSERT — an outage rather than
+-- two bookings quoting one number to two customers, which is the better of the two failures
+-- and still a hard ceiling at 999,999 rows.
+--
+-- It bit at exactly the volumes this platform is designed for: rule 2 targets 1M users, and
+-- docs/load-testing.md's data plan calls for 5M bookings. Found by generating that data
+-- (2026-08-12) — the insert failed on the row after 999,999.
+--
+-- Below a million the output is unchanged, so every existing reference keeps its format and
+-- no row needs rewriting. Past it, references simply grow a digit: CUS-1000000.
+CREATE OR REPLACE FUNCTION reference_number(n bigint) RETURNS text AS $$
+  SELECT CASE WHEN length(n::text) >= 6 THEN n::text ELSE lpad(n::text, 6, '0') END;
+$$ LANGUAGE sql IMMUTABLE;
+COMMENT ON FUNCTION reference_number(bigint) IS
+  'Zero-pads a reference counter to six digits WITHOUT truncating past 999999. Never use lpad directly for a reference: it silently truncates and collides.';
+
 -- Booking references are BKG-<year>-NNNNNN, so the counter restarts each January.
 CREATE OR REPLACE FUNCTION reset_booking_sequence_yearly() RETURNS void AS $$
 BEGIN

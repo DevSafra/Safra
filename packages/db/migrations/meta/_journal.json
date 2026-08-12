@@ -183,6 +183,13 @@
       "when": 1786454815395,
       "tag": "0025_good_nicolaos",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1786548151451,
+      "tag": "0026_fantastic_frank_castle",
+      "breakpoints": true
     }
   ]
 }

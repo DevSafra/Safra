@@ -80,7 +80,7 @@ export const properties = pgTable(
     reference: text('reference')
       .notNull()
       .unique()
-      .default(sql`'PRO-' || lpad(nextval('property_reference_seq')::text, 6, '0')`),
+      .default(sql`'PRO-' || reference_number(nextval('property_reference_seq'))`),
     partnerId: foreignId('partner_id')
       .notNull()
       .references(() => partners.id),

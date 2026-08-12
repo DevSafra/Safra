@@ -43,7 +43,7 @@ export const partners = pgTable(
     reference: text('reference')
       .notNull()
       .unique()
-      .default(sql`'PAR-' || lpad(nextval('partner_reference_seq')::text, 6, '0')`),
+      .default(sql`'PAR-' || reference_number(nextval('partner_reference_seq'))`),
     /** Owning login. Staff of a partner get their own users rows later. */
     userId: foreignId('user_id')
       .notNull()
@@ -341,7 +341,7 @@ export const partnerPayouts = pgTable(
     reference: text('reference')
       .notNull()
       .unique()
-      .default(sql`'PYT-' || lpad(nextval('payout_reference_seq')::text, 6, '0')`),
+      .default(sql`'PYT-' || reference_number(nextval('payout_reference_seq'))`),
     partnerId: foreignId('partner_id')
       .notNull()
       .references(() => partners.id),

@@ -59,7 +59,7 @@ export const disputes = pgTable(
     reference: text('reference')
       .notNull()
       .unique()
-      .default(sql`'DSP-' || lpad(nextval('dispute_reference_seq')::text, 6, '0')`),
+      .default(sql`'DSP-' || reference_number(nextval('dispute_reference_seq'))`),
 
     bookingId: foreignId('booking_id')
       .notNull()

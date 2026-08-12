@@ -49,7 +49,7 @@ export const reviews = pgTable(
     reference: text('reference')
       .notNull()
       .unique()
-      .default(sql`'REV-' || lpad(nextval('review_reference_seq')::text, 6, '0')`),
+      .default(sql`'REV-' || reference_number(nextval('review_reference_seq'))`),
 
     /** The stay this is about. Unique — one review per booking, enforced below. */
     bookingId: foreignId('booking_id')

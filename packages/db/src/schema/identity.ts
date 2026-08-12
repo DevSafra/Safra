@@ -200,7 +200,7 @@ export const customerProfiles = pgTable(
     reference: text('reference')
       .notNull()
       .unique()
-      .default(sql`'CUS-' || lpad(nextval('customer_reference_seq')::text, 6, '0')`),
+      .default(sql`'CUS-' || reference_number(nextval('customer_reference_seq'))`),
     /** Null = guest checkout. Set when the guest later registers. */
     userId: foreignId('user_id').references(() => users.id),
     fullName: text('full_name').notNull(),

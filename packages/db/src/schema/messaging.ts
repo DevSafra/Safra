@@ -48,7 +48,7 @@ export const conversations = pgTable(
     reference: text('reference')
       .notNull()
       .unique()
-      .default(sql`'CNV-' || lpad(nextval('conversation_reference_seq')::text, 6, '0')`),
+      .default(sql`'CNV-' || reference_number(nextval('conversation_reference_seq'))`),
 
     bookingId: foreignId('booking_id').references(() => bookings.id),
     disputeId: foreignId('dispute_id').references(() => disputes.id),

@@ -30,7 +30,7 @@ export const payments = pgTable(
     reference: text('reference')
       .notNull()
       .unique()
-      .default(sql`'PAY-' || lpad(nextval('payment_reference_seq')::text, 6, '0')`),
+      .default(sql`'PAY-' || reference_number(nextval('payment_reference_seq'))`),
     bookingId: foreignId('booking_id')
       .notNull()
       .references(() => bookings.id),

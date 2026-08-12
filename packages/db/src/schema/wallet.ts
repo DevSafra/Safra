@@ -98,7 +98,7 @@ export const giftCards = pgTable(
     reference: text('reference')
       .notNull()
       .unique()
-      .default(sql`'GIF-' || lpad(nextval('gift_card_reference_seq')::text, 6, '0')`),
+      .default(sql`'GIF-' || reference_number(nextval('gift_card_reference_seq'))`),
     codeHash: text('code_hash').notNull().unique(),
     codeLast4: text('code_last4').notNull(),
     originalAmount: money('original_amount').notNull(),

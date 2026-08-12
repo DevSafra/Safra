@@ -47,7 +47,7 @@ export const bookings = pgTable(
       .notNull()
       .unique()
       .default(
-        sql`'BKG-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('booking_reference_seq')::text, 6, '0')`,
+        sql`'BKG-' || to_char(now(), 'YYYY') || '-' || reference_number(nextval('booking_reference_seq'))`,
       ),
 
     customerProfileId: foreignId('customer_profile_id')

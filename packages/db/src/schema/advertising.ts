@@ -38,7 +38,7 @@ export const advertisers = pgTable(
     reference: text('reference')
       .notNull()
       .unique()
-      .default(sql`'ADV-' || lpad(nextval('advertiser_reference_seq')::text, 6, '0')`),
+      .default(sql`'ADV-' || reference_number(nextval('advertiser_reference_seq'))`),
     name: text('name').notNull(),
     kind: advertiserKind('kind').notNull(),
     cityId: foreignId('city_id')
@@ -81,7 +81,7 @@ export const adCampaigns = pgTable(
     reference: text('reference')
       .notNull()
       .unique()
-      .default(sql`'ADS-' || lpad(nextval('ad_reference_seq')::text, 6, '0')`),
+      .default(sql`'ADS-' || reference_number(nextval('ad_reference_seq'))`),
 
     advertiserId: foreignId('advertiser_id')
       .notNull()
