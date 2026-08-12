@@ -6,6 +6,7 @@ import {
   emailVerificationMail,
   passwordResetMail,
   staffInvitationMail,
+  supportRepliedMail,
 } from './mail.templates.js';
 
 /**
@@ -57,6 +58,17 @@ describe('transactional email', () => {
           expiresInHours: 48,
         }),
       shows: 'مدير عمليات',
+    },
+    {
+      name: 'supportReplied',
+      render: (locale: string) =>
+        supportRepliedMail({
+          to: 'customer@example.com',
+          locale,
+          reference: 'CNV-000042',
+          url: 'https://safra.example/ar/account/support/CNV-000042',
+        }),
+      shows: 'CNV-000042',
     },
   ] as const;
 

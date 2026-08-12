@@ -4,8 +4,12 @@ import { z } from 'zod';
 
 import type { Database } from '@safra/db';
 import { COUNT_CAP, ERROR, type OffsetPage, offsetPage } from '@safra/contracts';
+import { resolveLocale } from '@safra/i18n';
 
 import { DATABASE } from '../database/database.module.js';
+import { ENV, type Env } from '../config/env.js';
+import { supportRepliedMail } from '../mail/mail.templates.js';
+import { NotificationService } from '../notifications/notification.service.js';
 import { redactContactDetails } from '../messaging/redaction.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
@@ -66,10 +70,22 @@ export interface MessageRow {
  * replies. Exempting staff would be the obvious shortcut and the wrong one: a support agent
  * pasting a partner's number to a customer defeats the rule just as thoroughly, and the mask makes
  * the attempt visible in a thread nobody can edit afterwards.
+ *
+ * ## A reply on a TICKET reaches the person who is waiting for it
+ *
+ * A staff answer used to be discoverable only by returning to the page, which made الدعم somewhere
+ * people check rather than somewhere they are answered. `reply` now emails the asker — see
+ * `notifyAskerOfReply` for who that is, what the email may contain, and why an internal note is
+ * silent.
  */
 @Injectable()
 export class MessagingService {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    /* `notifier`, not `notifications` — this class already has a `notifications()` READ, the log. */
+    private readonly notifier: NotificationService,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
   /** The row count for a page, capped, over the same `FROM … WHERE` the list uses. */
   private async countOf(fromWhere: SQL): Promise<number> {
@@ -261,7 +277,132 @@ export class MessagingService {
       `);
     });
 
+    /*
+      Told AFTER the transaction has committed, and only for a reply the asker can actually read.
+
+      `internal` is the whole check. An internal note is how staff talk to each other inside the
+      thread, and it is filtered out of every read the customer or partner performs — a notice
+      saying "you have an answer" that leads to a page showing nothing new is the mildest way that
+      leak can go wrong, and naming the note in the subject line is the worst.
+
+      Outside the transaction because the send is still in-request: a mail server that hung would
+      otherwise hold a transaction open across an SMTP round trip. The queue this belongs behind is
+      FUTURE-WORK item 9 (BullMQ), and `NotificationService.notify` is the seam it moves behind —
+      it already records `queued` before sending and swallows a failed send, so a reply is never
+      undone by an unreachable mailbox.
+    */
+    if (!input.internal) {
+      await this.notifyAskerOfReply(conversation.id);
+    }
+
     return this.thread(reference);
+  }
+
+  /**
+   * Emails the customer or partner whose SUPPORT TICKET was just answered.
+   *
+   * ## Tickets only, and why the others are excluded rather than forgotten
+   *
+   * The `WHERE` refuses any thread with a booking or a dispute — the same shape
+   * `SupportService.scopeOf` defines as "mine". A booking thread has two parties and no route into
+   * it from either dashboard: الدعم lists subject-less threads only, so a link to a booking thread's
+   * reference answers 404 to the person who followed it. Emailing one would be worse than silence.
+   *
+   * ## The recipient is derived from the thread, never passed in
+   *
+   * A ticket names exactly one of the two, so `coalesce` resolves it without a branch. Staff supply
+   * the text and nothing about who reads it — the same rule the review and booking notices follow.
+   *
+   * ## The RECIPIENT's language, not the agent's
+   *
+   * A customer's is `customer_profiles.preferred_locale` and a partner's is on their user row. The
+   * agent writing the reply is Arabic-only by construction, so taking the locale from the actor
+   * would send every German customer Arabic and nothing would fail.
+   */
+  private async notifyAskerOfReply(conversationId: string): Promise<void> {
+    /*
+      One query, one row, or nothing.
+
+      `coalesce(cu.status, pu.status) = 'active'` is the guard: a suspended or closed account is not
+      written to, and a customer profile with no user at all — a guest, which cannot open a ticket —
+      falls to NULL and is skipped rather than emailed. Safe by omission in both directions.
+    */
+    const found = await this.db.execute<{
+      reference: string;
+      customer_profile_id: string | null;
+      partner_id: string | null;
+      email: string | null;
+      locale: string | null;
+    }>(sql`
+      SELECT c.reference,
+             c.customer_profile_id,
+             c.partner_id,
+             coalesce(cp.email, pu.email)                       AS email,
+             coalesce(cp.preferred_locale, pu.preferred_locale) AS locale
+      FROM conversations c
+      LEFT JOIN customer_profiles cp ON cp.id = c.customer_profile_id
+      LEFT JOIN users cu             ON cu.id = cp.user_id
+      LEFT JOIN partners pa          ON pa.id = c.partner_id
+      LEFT JOIN users pu             ON pu.id = pa.user_id
+      WHERE c.id = ${conversationId}::uuid
+        AND c.booking_id IS NULL
+        AND c.dispute_id IS NULL
+        AND coalesce(cu.status, pu.status) = 'active'
+      LIMIT 1
+    `);
+
+    const row = found.rows[0];
+
+    if (!row?.email) return;
+
+    const asker = row.customer_profile_id
+      ? ({ kind: 'customer', customerProfileId: row.customer_profile_id } as const)
+      : row.partner_id
+        ? ({ kind: 'partner', partnerId: row.partner_id } as const)
+        : null;
+
+    if (!asker) return;
+
+    /*
+      Resolved rather than passed through. `preferred_locale` is an unconstrained text column, so a
+      value of `fr` would build /fr/account/support/… — a URL the web app answers 404 to, in an
+      email whose body is in Arabic. One helper decides what an unrecognised locale means, and the
+      link then matches the language it is written in.
+    */
+    const locale = resolveLocale(row.locale ?? 'ar');
+
+    const url =
+      asker.kind === 'customer'
+        ? new URL(
+            `/${locale}/account/support/${row.reference}`,
+            this.env.APP_URL,
+          ).toString()
+        : new URL(`/support/${row.reference}`, this.env.PARTNER_URL).toString();
+
+    await this.notifier.notify(
+      'support.replied',
+      supportRepliedMail({
+        to: row.email,
+        locale,
+        reference: row.reference,
+        url,
+      }),
+      locale,
+      /*
+        The RECIPIENT's id, not the thread's.
+
+        `notify`'s subject has no `conversation_id` and does not gain one here. Those columns exist
+        so the delivery log can answer "was this person told?", which is asked when somebody
+        disputes that they were — and the recipient's id answers it, while a thread id would need a
+        migration, a fourth subject FK on a table whose shape already carries three, and a join in
+        the console query, to record something the inbox already shows against the same person. The
+        ticket itself is not lost: `template_key` is `support.replied` and the thread is one click
+        away from the same customer or partner.
+      */
+      asker.kind === 'customer'
+        ? { customerProfileId: asker.customerProfileId }
+        : { partnerId: asker.partnerId },
+    );
   }
 
   // ── واتساب والبريد ─────────────────────────────────────────────────────────

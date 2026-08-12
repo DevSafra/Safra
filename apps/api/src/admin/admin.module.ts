@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
+import { NotificationService } from '../notifications/notification.service.js';
 import { PartnerTwoFactorService } from '../auth/partner-two-factor.service.js';
 import { AdminGrantsController, AdminGrantsService } from './grants.controller.js';
 import { AdminController } from './admin.controller.js';
@@ -73,6 +74,8 @@ import { StaffScopeService } from './staff-scope.service.js';
     // §8's customer-facing and commercial domains — see CommsController.
     DisputeService,
     MessagingService,
+    // A staff reply on a ticket emails the asker. MailService comes from AuthModule's exports.
+    NotificationService,
     AdvertisingService,
     PartnerContractService,
     // B-12 staff scope and B-13 the audited export (Bashar, 2026-08-04).

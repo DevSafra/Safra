@@ -29,4 +29,8 @@ export const de = {
     subject: 'Eine Buchung wartet auf Sie — {reference}',
     body: 'Eine neue Buchungsanfrage wartet auf Ihre Entscheidung.\n\nReferenz: {reference}\nUnterkunft: {property}\nAnreise: {checkIn}\nAbreise: {checkOut}\n\nSie haben bis {deadline} Zeit zu antworten. Eine Anfrage, die bis dahin unbeantwortet bleibt, wird automatisch storniert und ein Verstoß wegen "keine Antwort" wird Ihrem Konto zugeordnet.\n\nAnfrage hier öffnen:\n{url}\n\nIhr SAFRA-Team',
   },
+  supportReplied: {
+    subject: 'Das Support-Team hat auf Ihre Anfrage geantwortet — {reference}',
+    body: 'Das SAFRA-Support-Team hat auf Ihre Support-Anfrage geantwortet.\n\nReferenz: {reference}\n\nÖffnen Sie das Gespräch, um die Antwort zu lesen und fortzusetzen:\n{url}\n\nWir versenden keine Nachrichtentexte per E-Mail; das vollständige Gespräch finden Sie in Ihrem Konto.\n\nIhr SAFRA-Team',
+  },
 } as const;

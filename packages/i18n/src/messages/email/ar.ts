@@ -41,4 +41,16 @@ export const ar = {
     subject: 'حجز بانتظار ردّك — {reference}',
     body: 'لديك طلب حجز جديد بانتظار قرارك.\n\nالمرجع: {reference}\nالعقار: {property}\nالوصول: {checkIn}\nالمغادرة: {checkOut}\n\nأمامك حتى {deadline} للرد. الطلب الذي لا يُردّ عليه قبل هذا الموعد يُلغى تلقائيًا وتُسجَّل مخالفة «عدم الرد» على حسابك.\n\nافتح الطلب من هنا:\n{url}\n\nفريق سفرة',
   },
+  /*
+    The reply itself is NOT in this email, and the copy says so.
+
+    Message bodies are stored redacted and the original is not kept (`db/schema/messaging.ts`);
+    repeating the text in an inbox would put back exactly what the redaction removed. The sentence
+    about it is not an apology — an email that looks truncated reads as a fault, and somebody who
+    thinks they have already read the answer does not open the thread.
+  */
+  supportReplied: {
+    subject: 'ردّ فريق الدعم على طلبك — {reference}',
+    body: 'ردّ فريق سفرة على طلب الدعم الخاص بك.\n\nالمرجع: {reference}\n\nافتح المحادثة لقراءة الرد ومتابعتها:\n{url}\n\nلا نرسل نص الرسائل في البريد الإلكتروني؛ المحادثة كاملة في حسابك.\n\nفريق سفرة',
+  },
 } as const;

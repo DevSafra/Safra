@@ -29,4 +29,8 @@ export const en = {
     subject: 'A booking is waiting for you — {reference}',
     body: 'You have a new booking request waiting for your decision.\n\nReference: {reference}\nProperty: {property}\nCheck-in: {checkIn}\nCheck-out: {checkOut}\n\nYou have until {deadline} to respond. A request left unanswered past that time is cancelled automatically and a "no response" violation is recorded against your account.\n\nOpen the request here:\n{url}\n\nThe SAFRA team',
   },
+  supportReplied: {
+    subject: 'The support team replied to your request — {reference}',
+    body: 'The SAFRA support team has replied to your support request.\n\nReference: {reference}\n\nOpen the conversation to read the reply and continue it:\n{url}\n\nWe do not send message text by email; the whole conversation is in your account.\n\nThe SAFRA team',
+  },
 } as const;

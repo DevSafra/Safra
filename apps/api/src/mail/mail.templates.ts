@@ -184,6 +184,35 @@ export function reviewRepliedMail(input: {
  * clock from the dashboard, and the whole point of the email is reaching somebody who is not
  * looking at the dashboard.
  */
+/**
+ * Staff have answered a support ticket.
+ *
+ * ## It carries a link and NOT the answer
+ *
+ * Every message body in a thread is stored REDACTED and the original is deliberately discarded
+ * (`packages/db/src/schema/messaging.ts`). Putting the reply text in an email would recreate in an
+ * inbox exactly what the redaction removed from the database — and an inbox is the one place the
+ * platform cannot reach to correct it afterwards.
+ *
+ * So the notice is a pointer: the ticket's reference, and the URL of the thread. The body says out
+ * loud that the text is not included, because a message that looks truncated reads as a fault, and
+ * somebody who believes they have already read the answer never opens the thread.
+ */
+export function supportRepliedMail(input: {
+  to: string;
+  locale: string;
+  reference: string;
+  url: string;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).supportReplied;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { reference: input.reference }),
+    text: fill(copy.body, { reference: input.reference, url: input.url }),
+  };
+}
+
 export function bookingNeedsActionMail(input: {
   to: string;
   locale: string;
