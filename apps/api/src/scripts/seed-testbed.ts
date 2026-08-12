@@ -664,6 +664,25 @@ async function build(db: Seeder): Promise<void> {
   );
   await db.execute(sql`ALTER TABLE ledger_entries ENABLE TRIGGER USER`);
   /*
+    Support threads and their messages.
+
+    Every browser run opens a real ticket — the e2e specs must, because reusing an existing thread would
+    stop exercising the OPEN path — so without this they accumulate one per run and clutter the console's
+    inbox for good. `messages` is append-only by trigger, like the ledger and the wallet statement, so the
+    trigger comes off for the same reason: the immutability protects PRODUCTION evidence, and a testbed
+    reset is not that.
+  */
+  await db.execute(sql`ALTER TABLE messages DISABLE TRIGGER USER`);
+  await db.execute(sql`DELETE FROM messages WHERE conversation_id IN (
+    SELECT c.id FROM conversations c
+    WHERE c.customer_profile_id IN (${testbedProfiles})
+       OR c.partner_id IN (${testbedPartners}))`);
+  await db.execute(sql`ALTER TABLE messages ENABLE TRIGGER USER`);
+  await db.execute(sql`DELETE FROM conversations
+    WHERE customer_profile_id IN (${testbedProfiles})
+       OR partner_id IN (${testbedPartners})`);
+
+  /*
     The gift cards a testbed customer bought, and their history.
 
     `gift_card_transactions` is append-only by trigger like the ledger and the wallet statement, so the
