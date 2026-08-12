@@ -408,11 +408,29 @@ SELECT add_constraint_if_missing('disputes', 'disputes_compensation_non_negative
 -- The booking, dispute and partner columns are mutually exclusive rather than merely
 -- "at least one": a thread attached to both a booking and an unrelated partner would
 -- appear in two inboxes with two different sets of participants.
-SELECT add_constraint_if_missing('conversations', 'conversations_exactly_one_subject', $def$
+--
+-- The v2 relaxation (2026-08-12) adds ONE more shape: a SUPPORT TICKET, which is about
+-- nothing but the person who opened it. Bashar asked for a الدعم page on the customer and
+-- partner dashboards, and "I need help" is not necessarily about a booking — insisting on one
+-- would either force customers to pick an unrelated booking or leave them with no way to ask.
+--
+-- So: exactly one subject as before, OR no subject at all provided a customer is named. The
+-- customer column cannot simply join the sum, because a booking-scoped thread also carries it
+-- as a PARTICIPANT — `customer_profile_id` says who is in the thread, not what it is about.
+-- A partner's support ticket needs nothing new: `partner_id` alone was always a legal shape.
+ALTER TABLE conversations DROP CONSTRAINT IF EXISTS conversations_exactly_one_subject;
+
+SELECT add_constraint_if_missing('conversations', 'conversations_exactly_one_subject_v2', $def$
   CHECK (
     (booking_id IS NOT NULL)::int
     + (dispute_id IS NOT NULL)::int
     + (partner_id IS NOT NULL)::int = 1
+    OR (
+      booking_id IS NULL
+      AND dispute_id IS NULL
+      AND partner_id IS NULL
+      AND customer_profile_id IS NOT NULL
+    )
   )
 $def$);
 

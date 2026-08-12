@@ -1362,7 +1362,7 @@ async function conversation(db: Seeder, customerProfileId: string): Promise<void
   const [thread] = await db
     .insert(schema.conversations)
     /*
-      Exactly ONE subject — `conversations_exactly_one_subject` enforces it. A thread attached to
+      Exactly ONE subject — `conversations_exactly_one_subject_v2` enforces it. A thread attached to
       both a booking and a partner would appear in two inboxes with two different sets of
       participants, so the booking is the subject and the dispute is reached through it.
     */
