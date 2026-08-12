@@ -56,6 +56,18 @@ test.describe('بطاقات الهدايا', () => {
     await page.locator('button[type=submit]').first().click();
     await page.waitForURL(/\/account\/gifts/, { timeout: 20_000 });
 
+    /*
+      ── The navbar knows we are signed in, WITHOUT a reload ──
+
+      Reported by Bashar (2026-08-12): the header kept offering «تسجيل الدخول» after signing in and only
+      corrected itself on a manual reload. `SiteHeader` is server-rendered from the session cookie, and
+      `router.refresh()` + `push()` refreshed the page being LEFT while the destination came from a router
+      cache entry built before the cookie existed. `reloadInto` makes it a real navigation. The
+      sign-out direction is checked at the end of this test.
+    */
+    await expect(page.locator('header')).toContainText(en.auth.account);
+    await expect(page.locator('header')).not.toContainText(en.auth.signIn);
+
     /* Both halves render at all — the assertion the function-prop bug would have failed. */
     await expect(
       page.getByRole('heading', { name: en.account.giftRedeemTitle }),
@@ -148,12 +160,12 @@ test.describe('بطاقات الهدايا', () => {
     await page.reload({ waitUntil: 'domcontentloaded' });
     expect(await themeOf()).toBe(switched);
 
-    /* The public site keeps its own, in the header — that is why this is a move and not a removal. */
+    /*
+      And the navbar has NONE — Bashar had it removed from there entirely (2026-08-12), so the sidebar
+      foot is the only theme control in the app. A signed-out visitor follows their OS preference.
+    */
     await page.goto('/en', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('button', { name: /mode/i })).toHaveCount(1);
-    await expect(
-      page.locator('header').getByRole('button', { name: /mode/i }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /mode/i })).toHaveCount(0);
 
     await page.goto('/en/account', { waitUntil: 'domcontentloaded' });
 
@@ -248,5 +260,22 @@ test.describe('بطاقات الهدايا', () => {
         `/ar/account/gifts scrolls sideways at ${width}px`,
       ).toBeLessThanOrEqual(0);
     }
+
+    /*
+      ── And signing out is reflected immediately too ──
+
+      The mirror of the bug above, and the worse half: the home page used to keep saying «حسابي» after the
+      session was destroyed. Last in this test because it ends the session.
+    */
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.goto('/en/account', { waitUntil: 'domcontentloaded' });
+    await page
+      .locator('#account-sidebar')
+      .getByRole('button', { name: /sign out/i })
+      .click();
+    await page.waitForURL(/\/en$/, { timeout: 20_000 });
+
+    await expect(page.locator('header')).toContainText(en.auth.signIn);
+    await expect(page.locator('header')).not.toContainText(en.auth.account);
   });
 });

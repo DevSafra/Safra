@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 
 import { PasswordField, passwordMismatch, passwordsMatch } from '@safra/ui';
 
+import { reloadInto } from '@/lib/session-navigation';
+
 /**
  * الملف الشخصي's two forms (handoff §6).
  *
@@ -180,7 +182,6 @@ export function PasswordForm({
   readonly locale: string;
   readonly labels: PasswordLabels;
 }) {
-  const router = useRouter();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -253,7 +254,8 @@ export function PasswordForm({
         page, their session would keep working until the access token expired and then break with no
         explanation.
       */
-      router.push(`/${locale}/login`);
+      /* Every session was revoked, this one included, so the whole document has to be re-fetched. */
+      reloadInto(`/${locale}/login`);
     } catch {
       setBusy(false);
       setMessage({ kind: 'bad', text: labels.failed });

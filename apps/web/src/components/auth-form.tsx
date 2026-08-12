@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { PasswordField, passwordsMatch } from '@safra/ui';
 import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
+import { reloadInto } from '@/lib/session-navigation';
 import { errorMessage } from '@safra/i18n';
 import { isErrorCode } from '@safra/contracts';
 
@@ -42,7 +42,6 @@ export function AuthForm({
   redirectTo: string;
 }) {
   const t = useTranslations('auth');
-  const router = useRouter();
 
   const [submitting, setSubmitting] = useState(false);
   /** Registration succeeded — the same screen whether or not the address was already taken. */
@@ -127,8 +126,12 @@ export function AuthForm({
         return;
       }
 
-      router.refresh();
-      router.push(redirectTo);
+      /*
+        A full document load, not `router.push`. The header is server-rendered from the session cookie,
+        and the router cache may hold a copy of the destination made while nobody was signed in — see
+        `reloadInto`.
+      */
+      reloadInto(redirectTo);
     } catch {
       setFormError(t('networkError'));
       setSubmitting(false);

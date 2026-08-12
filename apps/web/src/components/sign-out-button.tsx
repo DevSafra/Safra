@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
+import { reloadInto } from '@/lib/session-navigation';
 
 /**
  * Sign out.
@@ -17,7 +17,6 @@ import type { Locale } from '@/i18n/routing';
  */
 export function SignOutButton({ locale }: { locale: Locale }) {
   const t = useTranslations('auth');
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   async function signOut() {
@@ -35,10 +34,12 @@ export function SignOutButton({ locale }: { locale: Locale }) {
        */
     }
 
-    // refresh() first, so the server components that render the header re-execute
-    // and observe the cleared cookie rather than serving the cached signed-in tree.
-    router.refresh();
-    router.push(`/${locale}`);
+    /*
+      A full document load. `router.refresh()` + `push()` left the home page wearing the SIGNED-IN
+      header — «حسابي» after signing out — because the refresh applies to the page being left and the
+      push renders a cached copy of the destination. See `reloadInto`.
+    */
+    reloadInto(`/${locale}`);
   }
 
   return (

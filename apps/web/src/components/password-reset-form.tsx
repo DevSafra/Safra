@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
 
 import { PasswordField, passwordsMatch } from '@safra/ui';
+
+import { reloadInto } from '@/lib/session-navigation';
 
 /**
  * Both halves of a password reset (SRS §4).
@@ -27,7 +28,6 @@ export function PasswordResetForm({
   token?: string;
 }) {
   const t = useTranslations('auth');
-  const router = useRouter();
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +88,8 @@ export function PasswordResetForm({
        * session including any this browser held, so there is nothing to return to —
        * the customer has to authenticate with the password they just chose.
        */
-      router.push(`/${locale}/login?reset=1`);
+      /* The reset revoked every session, so the header must be rebuilt from the cleared cookie. */
+      reloadInto(`/${locale}/login?reset=1`);
     } catch {
       setError(t('networkError'));
       setSubmitting(false);
