@@ -1626,20 +1626,63 @@ all existed. And the console's scope filter keyed on `coalesce(booking.city, par
 for a customer's ticket; a NULL never matches an `IN (…)` list, so every ticket would have been invisible
 to a city-scoped operator while looking present to a super admin. Both fixed.
 
+**The reply notice — done 2026-08-12.** A staff reply on a ticket now emails the asker in their own
+language: `MessagingService.notifyAskerOfReply`, template `support.replied`, copy in all three locales.
+Three decisions worth not rediscovering. The email carries the REFERENCE and a link and never the
+message text, because bodies are stored redacted and the original is discarded — repeating it in an
+inbox would put back what the redaction removed, and the copy says so out loud so a pointer does not
+read as a truncation. An INTERNAL note sends nothing, which is the worst leak this feature could have
+caused and has its own test. And `notify`'s subject records the RECIPIENT's id rather than gaining a
+`conversation_id` column: those FKs exist to answer "was this person told", which the recipient's id
+answers, whereas a thread id would need a migration and a fourth subject FK to record what the inbox
+already shows against the same person. Scoped to TICKETS — a booking or dispute thread has no route
+into it from either dashboard, so a link to one would 404 for whoever followed it.
+
 **What it does NOT do yet, in the order it will be missed:**
 
-| Missing                              | Why it matters                                                                                                                                                                                                                                                                     |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **No notification when staff reply** | A customer learns of an answer only by returning to the page. `notifications` and the WhatsApp/email log already exist, so this is wiring a template to the reply path rather than new infrastructure — and it is the difference between a support channel and a page people check |
-| No attachment                        | A photograph of a broken heater is the evidence most complaints turn on. `dispute_evidence` has a shape for this; support threads have none                                                                                                                                        |
-| No closing from the asking side      | Only staff can close a thread. A customer whose problem resolved itself cannot say so, so the console's unread queue keeps counting it                                                                                                                                             |
-| No dispute route                     | The disputes tables exist and nothing reaches them from either dashboard — see §6                                                                                                                                                                                                  |
+| Missing                         | Why it matters                                                                                                                                                                     |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No attachment                   | A photograph of a broken heater is the evidence most complaints turn on. `dispute_evidence` has a shape for this; support threads have none                                        |
+| No closing from the asking side | Only staff can close a thread. A customer whose problem resolved itself cannot say so, so the console's unread queue keeps counting it                                             |
+| No dispute route                | The disputes tables exist and nothing reaches them from either dashboard — see §6                                                                                                  |
+| The send is still in-request    | `notify` records `queued` and then awaits SMTP, outside the transaction. Every notice in the platform does this; the queue is item 9 and this is one more caller waiting behind it |
 
 **Tested:** 21 integration tests (cross-account 404s, partner↔customer isolation, redaction on open and
 reply, internal notes never returned, closed threads read-only, unread counter incrementing rather than
 resetting, keyset paging staying stable when an older ticket is bumped), 13 contract tests, and a browser
 round trip in `e2e/partner-support.spec.ts` where the partner opens a ticket, staff answer it from the
 console, and the partner sees the answer.
+
+**The notice adds 11 more** in `admin/messaging.integration.test.ts` — an internal note notifying nobody,
+no message body in any column of the delivery row or in the email, the recipient's language rather than
+the agent's, a suspended account not written to, a booking thread staying silent, and a reply that posts
+anyway when the mail server refuses it.
+
+### O-web-4 — The public home page had no cities at all, and a stale server hid it
+
+**Status:** FIXED 2026-08-12 · **Found by** `e2e/public-routes.spec.ts` · **Recorded:** 2026-08-12
+
+`cities.categories` is an array of a Postgres ENUM. node-postgres parses arrays only for element types
+it has a built-in parser for, so selected bare through `db.execute` the column arrived as the literal
+string `'{historic}'` — while the call's own type generic declared `string[]`. A generic on
+`db.execute` is an ASSERTION, not a check, so the types were satisfied and every test passed.
+
+Then the consumer swallowed it. `apps/web/src/lib/catalog.ts` validates each response and returns an
+empty list rather than throwing — right for a reference endpoint that blipped, and exactly wrong here.
+`getCities()` returned `[]` on every request, so the public home page rendered its whole destinations
+grid and its city selector EMPTY, and `/ar/city/*` was unreachable from anywhere on the site. The
+single-city endpoint kept working, because it goes through the query builder, where Drizzle parses the
+literal itself.
+
+**Three failures had to line up, and each one is the lesson.** A typed `db.execute` that nothing
+verifies; a fallback that turns a contract violation into missing content; and `next start` serving a
+long-running process built from older code, which is what kept the crawl green — the bug only appeared
+after a rebuild replaced the running API. Fixed with `to_jsonb(c.categories)` and held by
+`catalog/catalog.integration.test.ts`, which asserts the RUNTIME SHAPE the type system cannot see, and
+which fails if the cast is removed.
+
+**Worth a sweep:** every other `db.execute` generic claiming an array. `admin/geo.service.ts` already
+converts in SQL (`array_to_string`), so this was the only reader of an enum array that did not.
 
 ### O-web-2 — Two public links point at pages that do not exist
 
@@ -2227,3 +2270,5 @@ Kept because the reason something was blocked is often the reason it returns.
 | 2026-08-06 | `db:testbed` could destroy a testbed and rebuild nothing                                | It cleared the previous fixtures before writing the new ones, outside any transaction. A run that stopped partway — on the payout foreign key described in O-data-2 — left a console with no disputes and no message threads, and `e2e/admin-sections.spec.ts` then reported that absence as a product regression. The whole clear-and-seed is now one transaction, so a failed run leaves exactly what was there before.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | 2026-08-06 | `db:reset-dev` silently skipped tables nobody had listed                                | `partner_payouts` and `partner_payout_items` shipped with the payout ledger and were never added to `CLEAR_TABLES`, so a "reset" database kept 66 payouts and 201 items — and the leftovers then blocked the seed from deleting the bookings they covered. A reset that quietly leaves a table populated is worse than one that fails, because the next seed builds on rows the developer believes are gone. The script now compares `information_schema` against both lists before it starts and refuses, naming the unlisted table.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 2026-08-06 | The messages registry lost its pagination bar whenever it was empty                     | `/messages` rendered the empty notice INSTEAD of the list and the bar, unlike the ten `<table>` registries, where `AdminTable` returns the notice and the parent keeps the bar. An empty result is usually a filter that matched nothing or a page past the end, so hiding the pager there stranded the reader with no total, no size control and no way back to page one — the exact failure the "Tables and pagination" rule exists to prevent. Found by `e2e/pagination.spec.ts` once the testbed stopped leaving stale threads behind.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-08-12 | A staff reply to a support ticket reached nobody                                        | The first gap under **O-web-3**: an answer was discoverable only by returning to the page, which made الدعم somewhere people check rather than somewhere they are answered. `MessagingService.reply` now emails the asker via the `support.replied` template in their own language, with the ticket reference and a link and never the message text — bodies are stored redacted and the original is discarded, so repeating it in an inbox would put back exactly what the redaction removed. An internal note notifies nobody, which is the leak that would have mattered most and is tested for by name                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-08-12 | The public home page listed no cities, and had not for some time                        | **O-web-4.** `cities.categories` is an enum ARRAY, which node-postgres hands back as the literal string `'{historic}'` unless it is cast — while the `db.execute` generic declared `string[]`, an assertion nothing checks. The web app validates the response and falls back to an empty list, so the destinations grid and the city selector rendered empty rather than erroring, and `/ar/city/*` became unreachable from the site. Invisible until a rebuild replaced a long-running API process built from older code. `to_jsonb(c.categories)`, plus a test asserting the runtime shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
