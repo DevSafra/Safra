@@ -103,6 +103,20 @@ describeIfDb('MessagingService — telling the asker a reply arrived', () => {
     locale: 'ar',
   });
 
+  /**
+   * Delivery rows addressed to the two accounts THIS test seeded, and nobody else.
+   *
+   * Scoped rather than counted table-wide, and the difference is not pedantry: the browser suite
+   * answers a real ticket through the real API, so `notifications` holds COMMITTED `support.replied`
+   * rows that every later transaction can see. A table-wide `count(*)` therefore passed before
+   * `pnpm e2e` had ever run and failed afterwards — an ordering flake whose cause has no
+   * relationship to the change that trips it.
+   *
+   * The seeded ids are fresh per test, so this is the notice reaching THIS person.
+   */
+  const mine = () =>
+    sql`(customer_profile_id = ${customerProfileId}::uuid OR partner_id = ${partnerId}::uuid)`;
+
   /** The newest delivery row for a template, whatever its outcome. */
   const logFor = async (templateKey: string) =>
     (
@@ -119,7 +133,7 @@ describeIfDb('MessagingService — telling the asker a reply arrived', () => {
         SELECT template_key, locale, status::text AS status,
                booking_id, dispute_id, customer_profile_id, partner_id, failure_reason
         FROM notifications
-        WHERE template_key = ${templateKey}
+        WHERE template_key = ${templateKey} AND ${mine()}
         ORDER BY queued_at DESC
         LIMIT 1
       `)
@@ -129,7 +143,8 @@ describeIfDb('MessagingService — telling the asker a reply arrived', () => {
     Number(
       (
         await db.execute<{ n: string }>(sql`
-          SELECT count(*)::text AS n FROM notifications WHERE template_key = ${templateKey}
+          SELECT count(*)::text AS n FROM notifications
+          WHERE template_key = ${templateKey} AND ${mine()}
         `)
       ).rows[0]?.n ?? 0,
     );
