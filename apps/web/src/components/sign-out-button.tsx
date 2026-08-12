@@ -46,7 +46,18 @@ export function SignOutButton({ locale }: { locale: Locale }) {
       type="button"
       onClick={() => void signOut()}
       disabled={busy}
-      className="rounded-lg border border-line px-4 py-2 text-sm text-muted transition-colors hover:border-gold/50 hover:text-text disabled:opacity-60"
+      /*
+        `w-full`, so it fills the row it is given (Bashar, 2026-08-12).
+
+        Its only home is the foot of the account sidebar, beside the 40px theme toggle, and shrink-to-fit
+        left it floating in the middle of a stretched wrapper — the partner portal's sign-out has taken
+        the rest of its row since that shell was built.
+
+        `cursor-pointer` because Tailwind's reset leaves `<button>` with the default arrow, and the
+        project rule is that anything clickable feels clickable. Height comes from `globals.css`, which
+        gives every `button` a 40px floor below `lg`.
+      */
+      className="w-full cursor-pointer rounded-lg border border-line px-4 py-2 text-sm text-muted transition-colors hover:border-gold/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-60"
     >
       {busy ? t('signingOut') : t('signOut')}
     </button>
