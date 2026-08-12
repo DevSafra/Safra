@@ -19,7 +19,22 @@ import { notFound } from '../common/errors/app-error.js';
 export class CatalogService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
-  /** Cities for the search selector and the destinations grid. */
+  /**
+   * Cities for the search selector and the destinations grid.
+   *
+   * ## `to_jsonb(c.categories)`, never the bare column
+   *
+   * `categories` is an array of a Postgres ENUM, and node-postgres parses arrays only for element
+   * types it has a built-in parser for. Selected bare, the column arrives as the LITERAL string
+   * `'{historic}'` while the generic below promises `string[]` — and a generic on `db.execute` is
+   * an assertion, not a check, so nothing failed.
+   *
+   * The consumer then swallowed it: `apps/web/src/lib/catalog.ts` validates the response and falls
+   * back to an empty list rather than throwing, which is right for a reference endpoint that
+   * blipped and exactly wrong here. The public home page rendered its destinations grid and its
+   * city selector EMPTY, permanently, while `/cities/:slug` — which goes through the query builder,
+   * where Drizzle parses the literal itself — kept working.
+   */
   async cities() {
     const rows = await this.db.execute<{
       slug: string;
@@ -33,7 +48,8 @@ export class CatalogService {
       SELECT
         c.slug, c.name_ar, c.name_en, c.name_de,
         co.code AS country_code,
-        c.categories,
+        -- An enum array reaches the driver as a literal string unless it is cast. See above.
+        to_jsonb(c.categories) AS categories,
         -- The count shown on a destination card must reflect what a visitor can
         -- actually book, so unpublished inventory is excluded.
         (
