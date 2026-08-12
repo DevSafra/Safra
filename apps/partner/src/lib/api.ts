@@ -531,3 +531,57 @@ export async function getPropertyImages(reference: string) {
     z.array(propertyImageSchema),
   );
 }
+
+// ─── الدعم (Bashar, 2026-08-12) ───────────────────────────────────────────────
+
+/**
+ * A support thread as its partner may see it.
+ *
+ * No `internal` field, and there must never be one: staff write to each other inside the same thread and
+ * the API filters those out. A schema that accepted the flag would make a leak upstream invisible here
+ * rather than loud.
+ */
+const supportMessageSchema = z.object({
+  id: z.string(),
+  sender: z.enum(['customer', 'partner', 'staff', 'system']),
+  body: z.string(),
+  redactedCount: z.number(),
+  createdAt: z.string(),
+});
+
+const supportTicketSchema = z.object({
+  reference: z.string(),
+  openedAt: z.string(),
+  lastMessageAt: z.string().nullable(),
+  closed: z.boolean(),
+  messageCount: z.number(),
+  lastMessage: z.string().nullable(),
+});
+
+export type PartnerSupportTicket = z.infer<typeof supportTicketSchema>;
+
+const supportThreadSchema = supportTicketSchema.extend({
+  messages: z.array(supportMessageSchema),
+});
+
+export type PartnerSupportThread = z.infer<typeof supportThreadSchema>;
+
+export async function getMySupportTickets() {
+  return partnerFetch(
+    '/support?limit=20',
+    z.object({
+      items: z.array(supportTicketSchema),
+      nextCursor: z.string().nullable(),
+    }),
+  );
+}
+
+/**
+ * One thread.
+ *
+ * A reference that is not this partner's answers 404, indistinguishably from one that does not exist —
+ * `CNV-` references are sequential, so any difference would let one partner count another's requests.
+ */
+export async function getSupportThread(reference: string) {
+  return partnerFetch(`/support/${encodeURIComponent(reference)}`, supportThreadSchema);
+}

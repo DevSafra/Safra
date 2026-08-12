@@ -38,7 +38,8 @@ export function Shell({
 }: {
   readonly title: string;
   readonly partnerName: string;
-  readonly active: 'dashboard' | 'properties' | 'calendars' | 'payouts' | 'reviews';
+  readonly active:
+    'dashboard' | 'properties' | 'calendars' | 'payouts' | 'reviews' | 'support';
   /**
    * The §7 sidebar badges — `عقاراتي 3` and `التقييمات ★ 4.7`.
    *
@@ -127,6 +128,12 @@ export function Shell({
             label={t.nav.reviews}
             current={active === 'reviews'}
             badge={badges?.reviews}
+          />
+          {/* Last: it is where a partner goes when something else on this list did not work. */}
+          <Item
+            href="/support"
+            label={t.nav.supportPage}
+            current={active === 'support'}
           />
         </nav>
 

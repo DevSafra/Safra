@@ -13,6 +13,31 @@ export const ar = {
   /** The document title and the wordmark line. */
   brand: 'سفرة — لوحة الشريك',
 
+  /** الدعم — a partner asking SAFRA for help (Bashar, 2026-08-12). */
+  support: {
+    title: 'الدعم',
+    intro: 'اطرح مشكلتك وسيتابعها فريق سفرة معك هنا.',
+    openTitle: 'طلب دعم جديد',
+    bodyLabel: 'اشرح المشكلة',
+    bodyHint: 'عشرة أحرف على الأقل. لا تكتب رقم هاتف أو بريداً — تُحجب تلقائياً ولن تصل.',
+    submit: 'إرسال الطلب',
+    submitting: 'جارٍ الإرسال…',
+    failed: 'تعذّر إرسال الطلب الآن. يرجى المحاولة مرة أخرى.',
+    mineTitle: 'طلباتي',
+    none: 'لا توجد طلبات دعم بعد.',
+    openLabel: 'مفتوح',
+    closedLabel: 'مغلق',
+    messages: 'الرسائل: {count}',
+    replyLabel: 'ردّك',
+    replySubmit: 'إرسال',
+    closedNote: 'هذا الطلب مغلق. افتح طلباً جديداً إذا احتجت المساعدة مرة أخرى.',
+    redacted: 'حُجبت {count} من بيانات الاتصال في هذه الرسالة.',
+    senderPartner: 'أنت',
+    senderStaff: 'فريق سفرة',
+    senderSystem: 'النظام',
+    back: 'رجوع',
+  },
+
   nav: {
     heading: 'لوحة الشريك',
     dashboard: 'لوحة التحكم',
@@ -20,6 +45,7 @@ export const ar = {
     calendars: 'التقويمات',
     reviews: 'التقييمات',
     payouts: 'مستحقاتي',
+    supportPage: 'الدعم',
     /** The handoff's sidebar footer, verbatim. */
     support: 'الدعم: partners@safra.com',
     showSidebar: 'إظهار قائمة التنقل',
