@@ -5,6 +5,7 @@ import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
 import { MediaReachabilityService } from '../storage/media-reachability.service.js';
+import { QUEUE } from '../queue/queue.definitions.js';
 
 /**
  * The gauges alerting reads, in Prometheus exposition format.
@@ -103,13 +104,15 @@ export class MetricsService {
   }
 
   private async collect(): Promise<Gauge[]> {
-    const [jobs, notifications, sanctions, webhooks, sla] = await Promise.all([
-      this.jobs(),
-      this.notifications(),
-      this.sanctions(),
-      this.webhooks(),
-      this.sla(),
-    ]);
+    const [jobs, notifications, sanctions, webhooks, sla, deadLetters] =
+      await Promise.all([
+        this.jobs(),
+        this.notifications(),
+        this.sanctions(),
+        this.webhooks(),
+        this.sla(),
+        this.deadLetters(),
+      ]);
 
     return [
       ...jobs,
@@ -117,6 +120,7 @@ export class MetricsService {
       ...sanctions,
       ...webhooks,
       ...sla,
+      ...deadLetters,
       {
         name: 'safra_media_reachable',
         help: '1 when the media bucket answers for a missing object, 0 when it refuses or is unreachable.',
@@ -344,6 +348,64 @@ export class MetricsService {
    * refund and compensation under §6.4 who is not getting either. The sweep failing is invisible
    * from the sweep's own side — it simply does not run — so this counts the CONSEQUENCE instead.
    */
+  /**
+   * Jobs that exhausted every retry and are waiting for a person.
+   *
+   * ## Why the TABLE and not the queue
+   *
+   * `docs/background-jobs-design.md`: alert on the table, not on Redis. Two reasons, and the second
+   * is the important one. A Redis gauge needs the scraper to reach Redis, which means a second
+   * credential and a second thing to be down. And a dead letter is precisely the evidence that must
+   * survive a Redis failure — asking Redis how many jobs it lost is asking the wrong process.
+   *
+   * ## Outstanding, not total
+   *
+   * A dead letter that somebody has retried or discarded is history. Counting it would leave the
+   * alert firing after the work was done, which is how a page becomes something people silence.
+   * Served by `dead_letter_jobs_outstanding_idx`, which is partial on exactly this predicate.
+   */
+  private async deadLetters(): Promise<Gauge[]> {
+    const rows = await this.db.execute<{
+      queue: string;
+      n: string;
+      oldest: string | null;
+    }>(sql`
+      SELECT queue, count(*)::text AS n,
+             EXTRACT(EPOCH FROM (now() - min(failed_at)))::text AS oldest
+      FROM dead_letter_jobs
+      WHERE resolved_at IS NULL
+      GROUP BY queue
+    `);
+
+    /*
+      Zero is reported explicitly for every known queue rather than omitted.
+
+      An absent series is indistinguishable from a failed scrape, which is the same reasoning
+      `safra_job_last_success_age_seconds` uses for -1: the case that must never be missed is the one
+      where the signal is silent.
+    */
+    const byQueue = new Map(rows.rows.map((row) => [row.queue, row]));
+
+    return [
+      {
+        name: 'safra_dead_letter_jobs',
+        help: 'Jobs that exhausted every retry and nobody has retried or discarded yet.',
+        samples: Object.values(QUEUE).map((queue) => ({
+          labels: { queue },
+          value: Number(byQueue.get(queue)?.n ?? 0),
+        })),
+      },
+      {
+        name: 'safra_dead_letter_oldest_seconds',
+        help: 'Age of the oldest unresolved dead letter. 0 when there are none.',
+        samples: Object.values(QUEUE).map((queue) => ({
+          labels: { queue },
+          value: Number(byQueue.get(queue)?.oldest ?? 0),
+        })),
+      },
+    ];
+  }
+
   private async sla(): Promise<Gauge[]> {
     const rows = await this.db.execute<{ n: string }>(sql`
       SELECT count(*)::text AS n
