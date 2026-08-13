@@ -161,89 +161,86 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
   }
 
   return (
-    <>
-      {/*
-        The step's own caption, which is the one piece of heading text that CHANGES — the page renders
-        the static subtitle and this replaces it once the password has been accepted.
-      */}
-      {awaitingCode ? (
-        <p className="mb-6 text-sm text-muted">{t.login.codeTitle}</p>
-      ) : null}
-
+    <div className="grid gap-4">
       {error ? (
         <p
           role="alert"
-          className="mb-4 rounded-lg border border-bad/40 bg-bad/10 p-3 text-sm text-bad"
+          className="rounded-lg border border-bad/40 bg-bad/10 p-3 text-sm text-bad"
         >
           {error}
         </p>
       ) : null}
 
       {awaitingCode ? (
-        /* `void`: the handler is async and the attribute expects a void return. */
         <form
+          /*
+            A distinct key per step, copied from the console's form for the reason recorded there:
+            React reuses a DOM node when the element type at a position is unchanged, so swapping one
+            <input> for another RECYCLED it — and the code field arrived pre-filled with the password.
+            Distinct keys force an unmount, which is what makes that impossible rather than unlikely.
+          */
+          key="second-factor"
           onSubmit={(event) => {
             void submitCode(event);
           }}
+          noValidate
           className="grid gap-4"
         >
-          <label className="grid gap-1.5">
-            <span className="text-[12.5px] text-muted">{t.login.codeLabel}</span>
-            {/*
-              `dir="ltr"`: both a six-digit code and a XXXX-XXXX-XXXX recovery code are Latin runs,
-              and the hyphens are bidi-neutral — without this they reorder on an RTL page.
+          <p className="text-sm text-muted">
+            {t.login.signingInAs} <span className="text-text">{email.trim()}</span>
+          </p>
 
-              No `autoFocus`. The field is the only one on the step, and moving focus without the
-              person asking is disorienting for a screen-reader user who has just been told the
-              password was accepted.
-            */}
-            <input
-              name="code"
-              dir="ltr"
-              inputMode="text"
-              autoComplete="one-time-code"
-              required
-              className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-start text-text"
-            />
-          </label>
+          {/*
+            `dir="ltr"`: a six-digit code and a XXXX-XXXX-XXXX recovery code are both Latin runs and
+            the hyphens are bidi-neutral, so without this they reorder on an RTL page.
+          */}
+          <Field
+            name="code"
+            label={t.login.codeTitle}
+            hint={t.login.codeLabel}
+            dir="ltr"
+            inputMode="text"
+            autoComplete="one-time-code"
+            required
+          />
 
           <button
             type="submit"
             disabled={busy}
-            className="min-h-10 cursor-pointer rounded-lg bg-gold px-4 py-2.5 font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? t.login.codeChecking : t.login.codeSubmit}
           </button>
 
+          {/* A way back, because the alternative is reloading the page. */}
           <button
             type="button"
             onClick={() => {
               setAwaitingCode(false);
               setError(null);
             }}
-            className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-2 text-[12.5px] text-faint hover:text-muted"
+            className="cursor-pointer text-sm text-muted underline-offset-4 hover:text-gold hover:underline"
           >
             {t.login.codeBack}
           </button>
         </form>
       ) : (
         <form
+          key="credentials"
           onSubmit={(event) => {
             void submitCredentials(event);
           }}
+          noValidate
           className="grid gap-4"
         >
-          <label className="grid gap-1.5">
-            <span className="text-[12.5px] text-muted">{t.login.email}</span>
-            <input
-              name="email"
-              type="email"
-              required
-              autoComplete="email"
-              defaultValue={email}
-              className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-text"
-            />
-          </label>
+          <Field
+            name="email"
+            type="email"
+            label={t.login.email}
+            defaultValue={email}
+            autoComplete="username"
+            required
+          />
 
           <PasswordField
             name="password"
@@ -251,20 +248,62 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
             showLabel={t.login.showPassword}
             hideLabel={t.login.hidePassword}
             autoComplete="current-password"
+            required
           />
 
           <button
             type="submit"
             disabled={busy}
-            className="min-h-10 cursor-pointer rounded-lg bg-gold px-4 py-2.5 font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? t.login.signingIn : t.login.submit}
           </button>
         </form>
       )}
-    </>
+    </div>
   );
 }
+
+/**
+ * One labelled input, with the console's exact classes.
+ *
+ * A local copy rather than a shared component, and that is the same call the two apps already make
+ * about `SupportForm`: they share the RULES through `@safra/contracts` and `@safra/ui`, not their
+ * markup. What is shared here is the token vocabulary — `text-muted`, `bg-field`, `border-line` —
+ * which is what actually makes the two screens look like one product.
+ */
+const Field = function Field({
+  name,
+  label,
+  hint,
+  ...rest
+}: {
+  readonly name: string;
+  readonly label: string;
+  readonly hint?: string;
+} & React.InputHTMLAttributes<HTMLInputElement>) {
+  const id = `field-${name}`;
+
+  return (
+    <div className="grid gap-1.5">
+      <label htmlFor={id} className="text-sm text-muted">
+        {label}
+      </label>
+      <input
+        id={id}
+        name={name}
+        aria-describedby={hint ? `${id}-hint` : undefined}
+        className="rounded-lg border border-line bg-field px-3 py-2.5 text-text"
+        {...rest}
+      />
+      {hint ? (
+        <span id={`${id}-hint`} className="text-xs text-faint">
+          {hint}
+        </span>
+      ) : null}
+    </div>
+  );
+};
 
 /**
  * What to say about a refused sign-in.

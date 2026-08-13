@@ -97,6 +97,14 @@ export const ar = {
      * they should not have to answer while locked out.
      */
     codeTitle: 'رمز التحقق',
+    /*
+      Whose account is being signed into, shown above the code field.
+
+      The same sentence the console uses, because the two sign-in screens are one design (Bashar,
+      2026-08-13): after the password is accepted the page shows only a code box, and without this the
+      person cannot tell whether it accepted the address they meant to type.
+    */
+    signingInAs: 'تسجيل الدخول باسم',
     codeLabel: 'رمز المُصادِق المكوَّن من ٦ أرقام، أو أحد رموز الاسترداد.',
     codeSubmit: 'تأكيد',
     codeChecking: 'جارٍ التحقق…',

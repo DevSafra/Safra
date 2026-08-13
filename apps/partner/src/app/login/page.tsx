@@ -48,13 +48,15 @@ export default async function LoginPage({
         </p>
 
         {/*
-          Amiri, which the console does not use, and kept on purpose: the partner portal sets the
-          display face on its headings throughout, and the sign-in page is not the place to be the one
-          screen that does not.
+          The console's heading exactly: the UI face, `font-semibold`, `text-text`.
+
+          It was Amiri in gold, on the reasoning that the partner portal sets the display face on its
+          headings throughout. Bashar overruled that (2026-08-13) and the instruction is the stronger
+          argument: these two screens are ONE design. A person who has been signed out of both in the
+          same week should not be able to tell them apart except by the words, and matching "mostly"
+          is what makes the difference look like a mistake rather than a choice.
         */}
-        <h1 className="mt-3 font-[family-name:var(--font-amiri)] text-2xl font-bold text-gold">
-          {t.login.title}
-        </h1>
+        <h1 className="mt-3 text-2xl font-semibold text-text">{t.login.title}</h1>
         <p className="mt-1 text-sm text-muted">{t.login.subtitle}</p>
 
         <div className="mt-8 rounded-xl border border-line bg-card p-6">
