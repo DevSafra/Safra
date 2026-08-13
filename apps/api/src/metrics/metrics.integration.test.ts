@@ -241,6 +241,83 @@ describeIfDb('MetricsService', () => {
       ).toBeGreaterThanOrEqual(0);
     });
 
+    /** One rejected and one genuine event, so the two gauges can be told apart. */
+    const receive = async (kind: 'rejected' | 'awaiting'): Promise<void> => {
+      await db.execute(sql`
+        INSERT INTO payment_provider_events
+          (provider, provider_event_id, event_type, payload, signature_verified)
+        VALUES ('simulator', ${`probe-${kind}-${Math.random()}`},
+                ${kind === 'rejected' ? 'unparsed' : 'payment.captured'},
+                '{}'::jsonb,
+                ${kind !== 'rejected'})
+      `);
+    };
+
+    /**
+     * The alert-14 false positive, pinned.
+     *
+     * A webhook rejected on arrival — bad signature, or a body that would not parse — is stored for
+     * forensics and can NEVER be processed, so it sits at `processed_at IS NULL` for the thirty days
+     * before retention prunes it. Counting it as backlog made a PAGE-severity alert with a 15-minute
+     * threshold fire permanently after one malformed request: the development database had been in
+     * that state for 8.8 days, with 204 permanently-unprocessable rows, when this was found.
+     */
+    it('leaves a rejected webhook out of the backlog it can never join', async () => {
+      const before = await scrape();
+
+      await receive('rejected');
+      service.invalidate();
+
+      const after = await scrape();
+
+      expect(after['safra_payment_events_unprocessed']).toBe(
+        before['safra_payment_events_unprocessed'],
+      );
+    });
+
+    it('does count an event that is genuinely waiting', async () => {
+      const before = await scrape();
+
+      await receive('awaiting');
+      service.invalidate();
+
+      const after = await scrape();
+
+      expect(after['safra_payment_events_unprocessed']).toBe(
+        (before['safra_payment_events_unprocessed'] ?? 0) + 1,
+      );
+    });
+
+    /** Rejected events are not ignored — they are a different signal with a different shape. */
+    it('counts a rejected webhook as a rejection instead', async () => {
+      const before = await scrape();
+
+      await receive('rejected');
+      service.invalidate();
+
+      const after = await scrape();
+
+      expect(after['safra_payment_events_rejected_24h']).toBe(
+        (before['safra_payment_events_rejected_24h'] ?? 0) + 1,
+      );
+    });
+
+    /**
+     * Between them the two gauges must account for every unprocessed row, or an event could be
+     * invisible to both — which is worse than the false positive this replaced.
+     */
+    it('classifies every unprocessed event as either awaiting or rejected', async () => {
+      const rows = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n
+        FROM payment_provider_events
+        WHERE processed_at IS NULL
+          AND NOT (signature_verified AND event_type <> 'unparsed')
+          AND NOT (NOT signature_verified OR event_type = 'unparsed')
+      `);
+
+      expect(Number(rows.rows[0]?.n ?? -1)).toBe(0);
+    });
+
     /**
      * The SLA sweep failing is invisible from its own side — it simply does not run. So this counts
      * the CONSEQUENCE: bookings past their deadline that nobody has refunded or compensated.
