@@ -5,6 +5,7 @@ import { AppModule } from './app.module.js';
 import { envSchema, ENV } from './config/env.js';
 import { DATABASE } from './database/database.module.js';
 import { REDIS } from './redis/redis.tokens.js';
+import { MAIL_QUEUE, QUEUE_REDIS } from './queue/queue.tokens.js';
 
 /**
  * The API boots.
@@ -29,6 +30,11 @@ import { REDIS } from './redis/redis.tokens.js';
  *
  * `compile()` and not `init()`: initialisation starts the cron schedule and opens listeners, which
  * is a different question and one the e2e suite already answers.
+ *
+ * The queue connection is overridden for the same reason and needed adding when the queue arrived:
+ * its factory CONNECTS, and it also asserts the instance's eviction policy — so left real, this test
+ * would hang for five seconds against a URL that does not resolve and report a graph problem it had
+ * not found.
  */
 describe('AppModule', () => {
   it('resolves every provider in the container', async () => {
@@ -38,6 +44,10 @@ describe('AppModule', () => {
       .overrideProvider(DATABASE)
       .useValue({})
       .overrideProvider(REDIS)
+      .useValue({})
+      .overrideProvider(QUEUE_REDIS)
+      .useValue({})
+      .overrideProvider(MAIL_QUEUE)
       .useValue({})
       .compile();
 

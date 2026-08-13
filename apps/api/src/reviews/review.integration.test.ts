@@ -8,6 +8,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import type { Env } from '../config/env.js';
 import type { MailService } from '../mail/mail.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
+import { createInlineMailQueue } from '../queue/queue.testing.js';
 import { PropertyDetailService } from '../catalog/property-detail.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { ReviewService } from './review.service.js';
@@ -78,7 +79,15 @@ describeIfDb('ReviewService', () => {
     },
   } as unknown as MailService;
 
-  const notifications = new NotificationService(db, mail);
+  /*
+    An inline queue, so `notify` still sends and records in one call and every assertion below
+    keeps the meaning it had before the mail queue existed — see `queue.testing.ts`.
+  */
+  const mailQueue = createInlineMailQueue();
+  const notifications = new NotificationService(db, mail, mailQueue.queue);
+
+  mailQueue.autoRun = (job) =>
+    notifications.deliver(job.notificationId, job.templateKey, job.mail);
   const service = new ReviewService(db, new AuditService(db), notifications, {
     APP_URL: 'http://localhost:3000',
     PARTNER_URL: 'http://localhost:3002',

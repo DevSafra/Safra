@@ -25,6 +25,7 @@ import { MoneySettingsService } from '../settings/money-settings.service.js';
 import type { Env } from '../config/env.js';
 import type { MailService } from '../mail/mail.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
+import { createInlineMailQueue } from '../queue/queue.testing.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { AuditService } from '../common/audit/audit.service.js';
@@ -141,13 +142,24 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       },
     } as unknown as MailService;
 
+    /*
+      An inline queue, so `notify` still sends and records in one call. Without it the notification
+      row would stay `queued` — correct for the queue, and not what these tests describe: they are
+      about a capture telling the partner, and the delivery outcome is the assertion.
+    */
+    const mailQueue = createInlineMailQueue();
+    const notifications = new NotificationService(db, mail, mailQueue.queue);
+
+    mailQueue.autoRun = (job) =>
+      notifications.deliver(job.notificationId, job.templateKey, job.mail);
+
     actions = new BookingActionsService(
       db,
       settings,
       audit,
       ledger,
       wallet,
-      new NotificationService(db, mail),
+      notifications,
       { PARTNER_URL: 'http://localhost:3002' } as unknown as Env,
     );
 

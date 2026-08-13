@@ -6,6 +6,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { MessagingService } from './messaging.service.js';
 import { SupportService } from '../support/support.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
+import { createInlineMailQueue } from '../queue/queue.testing.js';
 import type { MailService } from '../mail/mail.service.js';
 import type { Env } from '../config/env.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -64,7 +65,15 @@ describeIfDb('MessagingService — telling the asker a reply arrived', () => {
     },
   } as unknown as MailService;
 
-  const notifications = new NotificationService(db, mail);
+  /*
+    An inline queue, so `notify` still sends and records in one call and every assertion below
+    keeps the meaning it had before the mail queue existed — see `queue.testing.ts`.
+  */
+  const mailQueue = createInlineMailQueue();
+  const notifications = new NotificationService(db, mail, mailQueue.queue);
+
+  mailQueue.autoRun = (job) =>
+    notifications.deliver(job.notificationId, job.templateKey, job.mail);
   const messaging = new MessagingService(db, notifications, {
     APP_URL: 'http://localhost:3000',
     PARTNER_URL: 'http://localhost:3002',
