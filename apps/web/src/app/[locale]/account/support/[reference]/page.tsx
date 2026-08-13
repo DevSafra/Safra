@@ -5,6 +5,7 @@ import { getTranslations } from 'next-intl/server';
 import { AccountShell } from '@/components/account-shell';
 import { BackLink } from '@/components/back-link';
 import { SupportForm } from '@/components/support-forms';
+import { SupportClose } from '@/components/support-close';
 import { getAccountSummary, getSupportThread } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -150,6 +151,20 @@ export default async function AccountSupportThreadPage({
                 failed: t('supportFailed'),
               }}
             />
+
+            {/* Ending the request sits under the reply, not beside it: the common action leads. */}
+            <div className="mt-5 border-t border-line pt-5">
+              <SupportClose
+                locale={locale}
+                reference={thread.reference}
+                labels={{
+                  submit: t('supportCloseLabel'),
+                  submitting: t('supportCloseSubmitting'),
+                  hint: t('supportCloseHint'),
+                  failed: t('supportCloseFailed'),
+                }}
+              />
+            </div>
           </section>
         )}
       </div>

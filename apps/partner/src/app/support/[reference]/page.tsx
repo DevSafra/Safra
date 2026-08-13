@@ -5,6 +5,7 @@ import { getMyProfile, getSupportThread, sidebarBadges } from '@/lib/api';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { SupportForm } from '@/components/support-form';
+import { SupportClose } from '@/components/support-close';
 import { fill, t } from '@/lib/strings';
 
 /**
@@ -134,6 +135,11 @@ export default async function SupportThreadPage({
       ) : (
         <section className="mt-4 rounded-[14px] border border-line bg-card p-4">
           <SupportForm reference={thread.reference} />
+
+          {/* Ending the thread sits under the reply, not beside it: the common action leads. */}
+          <div className="mt-4 border-t border-line pt-4">
+            <SupportClose reference={thread.reference} />
+          </div>
         </section>
       )}
     </Shell>

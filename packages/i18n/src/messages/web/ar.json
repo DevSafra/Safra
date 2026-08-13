@@ -456,7 +456,11 @@
     "supportSenderCustomer": "أنت",
     "supportSenderPartner": "أنت",
     "supportSenderStaff": "فريق سفرة",
-    "supportSenderSystem": "النظام"
+    "supportSenderSystem": "النظام",
+    "supportCloseLabel": "لم أعد بحاجة إلى المساعدة",
+    "supportCloseHint": "سيُغلق هذا الطلب. يمكنك فتح طلب جديد في أي وقت.",
+    "supportCloseSubmitting": "جارٍ الإغلاق…",
+    "supportCloseFailed": "تعذّر إغلاق الطلب. يرجى المحاولة مرة أخرى."
   },
   "reviews": {
     "title": "قيّم إقامتك",

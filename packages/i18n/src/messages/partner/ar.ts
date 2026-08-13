@@ -11,7 +11,8 @@
  */
 export const ar = {
   /** The document title and the wordmark line. */
-  brand: 'سفرة — لوحة الشريك',
+  /* A PIPE, never a dash — see the admin catalogue's `meta.title` for the reason. */
+  brand: 'سفرة | لوحة الشريك',
 
   /** الدعم — a partner asking SAFRA for help (Bashar, 2026-08-12). */
   support: {
@@ -36,6 +37,10 @@ export const ar = {
     senderStaff: 'فريق سفرة',
     senderSystem: 'النظام',
     back: 'رجوع',
+    closeLabel: 'لم أعد بحاجة إلى المساعدة',
+    closeHint: 'سيُغلق هذا الطلب. يمكنك فتح طلب جديد في أي وقت.',
+    closeSubmitting: 'جارٍ الإغلاق…',
+    closeFailed: 'تعذّر إغلاق الطلب. يرجى المحاولة مرة أخرى.',
   },
 
   nav: {

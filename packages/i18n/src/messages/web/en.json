@@ -456,7 +456,11 @@
     "supportSenderCustomer": "You",
     "supportSenderPartner": "You",
     "supportSenderStaff": "SAFRA team",
-    "supportSenderSystem": "System"
+    "supportSenderSystem": "System",
+    "supportCloseLabel": "I no longer need help",
+    "supportCloseHint": "This closes the request. You can always open a new one.",
+    "supportCloseSubmitting": "Closing…",
+    "supportCloseFailed": "The request could not be closed. Please try again."
   },
   "reviews": {
     "title": "Review your stay",
