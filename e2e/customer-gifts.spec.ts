@@ -318,6 +318,107 @@ test.describe('بطاقات الهدايا', () => {
     expect(foreign?.status()).toBe(404);
 
     /*
+      ── النزاعات: raise a dispute on a paid booking ──
+
+      In this test rather than its own, for the same budget reason as الدعم above: a second `test` would
+      spend another customer sign-in.
+
+      The assertion that matters is not that the row appears. It is that raising one HOLDS THE HOST'S
+      PAYOUT — the console derives the freeze from an unresolved dispute — which is why the form names
+      the booking from a select of the customer's OWN paid bookings rather than from a text field. A
+      reference typed by hand into a field is a reference somebody else's booking could be typed into.
+    */
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await page.goto('/en/account/disputes', { waitUntil: 'domcontentloaded' });
+
+    /* The destination exists in the account nav, not only as a URL. */
+    await expect(
+      page.getByRole('link', { name: en.account.navDisputes, exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: en.account.disputesOpenTitle }),
+    ).toBeVisible();
+
+    /* The consequence is stated before the form, not after the button. */
+    await expect(page.getByText(en.account.disputesIntro)).toBeVisible();
+
+    /*
+      A title unique to this run, and the assertions key off IT rather than off a row count.
+
+      Every run leaves a dispute behind — the rows are a record and a spec cannot tidy up after itself
+      here — so "one more row than before" holds only on a clean database, and `ul li` also matches the
+      account nav's own list. Asserting the row THIS run created is unambiguous and stable.
+    */
+    /*
+      LETTERS, not `Date.now()`.
+
+      The first version suffixed the title with a millisecond timestamp, and the redactor masked it:
+      thirteen consecutive digits is exactly what a phone number looks like, so the stored title became
+      "The door was locked all evening ⟨محجوب⟩" and the assertion hunted for a string that could never
+      exist. The feature under test ate the fixture.
+
+      Anything unique that goes into a redacted field has to be unlike a contact detail.
+    */
+    const raised = `The door was locked all evening ${Math.random()
+      .toString(36)
+      .replace(/[^a-z]/g, '')
+      .slice(0, 8)}`;
+
+    /*
+      The REASON rotates with how many disputes already exist.
+
+      One live dispute is allowed per booking per reason — a second freezes the host's payout twice
+      over for the same complaint — so a spec that always picked the same reason on the same booking
+      collided with its own previous run and was refused `dispute.already_open`. Choosing by the count
+      already on the page means run one takes the first reason, run two the second, and so on.
+
+      `db:testbed` deletes the testbed bookings' disputes, which is what bounds this: without a reset
+      the fifth consecutive run on one booking exhausts the four reasons. Said plainly rather than
+      left as a rare flake for somebody else to find.
+    */
+    const existing = await page.locator('#disputes-list li').count();
+
+    await page.locator('select[name=kind]').selectOption({ index: existing % 4 });
+
+    /*
+      A phone number goes in on purpose. A dispute is where somebody is most likely to write "just call
+      me" — they are upset and they want a person — so this is where the mask matters most.
+    */
+    await page.locator('input[name=title]').fill(raised);
+    await page
+      .locator('textarea[name=description]')
+      .fill(
+        'Nobody was there when we arrived and the key box was empty. Call me on 0955123456.',
+      );
+
+    await page.locator('form:has(textarea) button[type=submit]').click();
+
+    /* The dispute this run raised is listed, with a DSP- reference. */
+    const disputeRow = page.locator('#disputes-list li').filter({ hasText: raised });
+
+    await expect(disputeRow).toBeVisible({ timeout: 20_000 });
+    await expect(disputeRow).toContainText('DSP-');
+
+    /* Masked, and said out loud — otherwise they wait for a call that cannot come. */
+    await expect(disputeRow).not.toContainText('0955123456');
+    await expect(disputeRow).toContainText('masked');
+
+    /* No page scrolls sideways, at every width the project promises. */
+    for (const width of [390, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/en/account/disputes', { waitUntil: 'domcontentloaded' });
+
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+
+      expect(
+        overflow,
+        `/account/disputes scrolls sideways at ${width}px`,
+      ).toBeLessThanOrEqual(0);
+    }
+
+    /*
       ── And signing out is reflected immediately too ──
 
       The mirror of the bug above, and the worse half: the home page used to keep saying «حسابي» after the
