@@ -98,12 +98,26 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
         { href: `/${locale}/account/disputes`, label: account('navDisputes') },
       ],
     },
+    {
+      /*
+        The column this footer was built without.
+
+        `O-web-5` recorded the absence rather than filling it with links to nothing — every link
+        here resolves, and until 2026-08-14 neither page existed. They do now, and they say plainly
+        which parts still need legal copy rather than pretending to be finished.
+      */
+      title: t('legal'),
+      links: [
+        { href: `/${locale}/terms`, label: t('terms') },
+        { href: `/${locale}/privacy`, label: t('privacy') },
+      ],
+    },
   ];
 
   return (
     <footer className="mt-16 border-t border-line bg-card/40 print:hidden">
       <div className="mx-auto max-w-6xl px-4 py-10">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {groups.map((group) => (
             <nav key={group.title} aria-label={group.title}>
               <h2 className="text-sm font-bold text-text">{group.title}</h2>

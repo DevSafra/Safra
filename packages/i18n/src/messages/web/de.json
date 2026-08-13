@@ -523,6 +523,57 @@
     "currency": "Währung",
     "currencyApply": "Preise in dieser Währung anzeigen",
     "currencyNote": "Umgerechnete Preise sind Richtwerte. Der berechnete Betrag erscheint beim Bezahlen in der Währung des Inserats.",
-    "languageApply": "Website in dieser Sprache anzeigen"
+    "languageApply": "Website in dieser Sprache anzeigen",
+    "legal": "Rechtliches",
+    "terms": "Nutzungsbedingungen",
+    "privacy": "Datenschutzhinweis"
+  },
+  "legal": {
+    "updated": "Zuletzt aktualisiert: {date}",
+    "pendingTitle": "Diese Seite ist noch nicht vollständig",
+    "pendingBody": "Das Folgende beschreibt, was die Plattform tatsächlich tut. Es fehlt, was sich nicht aus dem System ableiten lässt: die juristische Person und ihre eingetragene Anschrift, die Kontaktstelle für Datenschutz, die zuständige Aufsichtsbehörde und das anwendbare Recht. Diese Angaben werden vor dem Start ergänzt.",
+    "backHome": "Zurück zur Startseite",
+    "terms": {
+      "title": "Nutzungsbedingungen",
+      "intro": "Diese Bedingungen beschreiben, was SAFRA leistet, wozu Sie sich verpflichten und wozu wir uns verpflichten. Sie sind bewusst verständlich formuliert — eine Bedingung, die niemand versteht, hält auch niemand ein.",
+      "roleHeading": "Was SAFRA ist",
+      "roleBody": "SAFRA ist ein Vermittler. Die Unterkunft selbst wird von dem Partner bereitgestellt, dem die Immobilie gehört oder der sie verwaltet; dieser Partner ist für den Zustand des Objekts und für Ihren Empfang verantwortlich. SAFRA übernimmt Inserat, Buchung, Zahlung, Support und Streitfälle.",
+      "bookingHeading": "Buchung und Bestätigung",
+      "bookingBody": "Sie wählen Ihre Daten und zahlen; die Anfrage geht dann an den Partner, der sie innerhalb von 120 Minuten bestätigt.\n\nBuchungen für denselben Tag schließen um 17:00 Uhr Ortszeit der Stadt, denn eine späte Ankunft ohne Bestätigung ist kein Aufenthalt.",
+      "noResponseHeading": "Wenn der Partner nicht antwortet",
+      "noResponseBody": "Verstreicht die Bestätigungsfrist ohne Antwort, wird die Buchung automatisch storniert, der Betrag vollständig erstattet und eine Entschädigung zulasten des Partners erfasst.\n\nSie zahlen nichts für ein Versäumnis, an dem Sie keinen Anteil hatten.",
+      "priceHeading": "Preis und Leistungsumfang",
+      "priceBody": "Der beim Bezahlen angezeigte Preis ist der berechnete Betrag, in der Währung des Inserats. Er enthält die Servicegebühr von SAFRA, die vor der Zahlung gesondert ausgewiesen wird.\n\nBeim Stöbern können Preise in einer von Ihnen gewählten Währung umgerechnet erscheinen. Diese Angaben sind Richtwerte zum Vergleich; berechnet wird der Betrag in der Währung des Inserats.",
+      "cancelHeading": "Stornierung und Erstattung",
+      "cancelBody": "Der Partner wählt eine Stornobedingung aus einem von SAFRA freigegebenen Katalog und kann keine eigenen Bedingungen erfinden. Sie wird auf der Objektseite und in den Buchungsdetails vor der Zahlung angezeigt.\n\nInnerhalb der Frist der jeweiligen Bedingung beträgt die Erstattung nie weniger als 50 %.",
+      "reviewsHeading": "Bewertungen",
+      "reviewsBody": "Bewerten können Sie erst nach einem abgeschlossenen Aufenthalt. Eine Bewertung wird nie gelöscht — sie kann bei Regelverstoß ausgeblendet werden und bleibt samt Begründung erhalten.\n\nTelefonnummern und E-Mail-Adressen werden in Bewertungen und Nachrichten nicht veröffentlicht, sondern automatisch maskiert.",
+      "disputesHeading": "Streitfälle",
+      "disputesBody": "War der Aufenthalt nicht wie beschrieben oder war niemand zum Empfang da, eröffnen Sie einen Streitfall in Ihrem Konto. Das friert die Auszahlung an den Partner für diese Buchung ein, bis der Fall geklärt ist.",
+      "changesHeading": "Änderungen dieser Bedingungen",
+      "changesBody": "Diese Bedingungen können sich ändern. Wesentliche Änderungen werden vor Inkrafttreten angekündigt; für eine bestehende Buchung gelten weiterhin die Bedingungen, unter denen sie zustande kam.",
+      "lawHeading": "Anwendbares Recht",
+      "lawBody": "Wird vor dem Start ergänzt."
+    },
+    "privacy": {
+      "title": "Datenschutzhinweis",
+      "intro": "Diese Seite erklärt, was wir über Sie erheben, warum, wie lange wir es aufbewahren und wer es sieht. Sie ist aus dem tatsächlichen Verhalten des Systems geschrieben, nicht aus einer Vorlage.",
+      "whoHeading": "Wer für Ihre Daten verantwortlich ist",
+      "whoBody": "Wird vor dem Start ergänzt: die juristische Person, ihre eingetragene Anschrift und die Kontaktstelle für Datenschutzfragen.",
+      "collectHeading": "Was wir erheben",
+      "collectBody": "Kontodaten: Name, E-Mail-Adresse, Telefonnummer und bevorzugte Sprache. Ihr Passwort wird gehasht gespeichert (Argon2id) und ist nicht wiederherstellbar; ein Zwei-Faktor-Geheimnis wird verschlüsselt gespeichert.\n\nBuchungs- und Zahlungsdaten: Daten, Gästezahl, Beträge, das Objekt und die Aufzeichnung der Geldbewegungen.\n\nNachrichten und Streitfälle: der Text, den Sie an den Support oder in einem Streitfall schreiben. Telefonnummern und E-Mail-Adressen darin werden vor der Speicherung automatisch maskiert; das Original wird nicht aufbewahrt.\n\nTechnische Daten: Ihre IP-Adresse, zur Begrenzung von Missbrauch und zum Schutz der Anmeldung.",
+      "whyHeading": "Warum wir sie erheben",
+      "whyBody": "Um Ihre Buchung zustande zu bringen und zu verwalten, Zahlungen einzuziehen und zu erstatten, Support zu leisten und Streitfälle zu klären, Betrug und Missbrauch zu verhindern und buchhalterische sowie gesetzliche Pflichten zu erfüllen.",
+      "shareHeading": "Wer sie außerdem sieht",
+      "shareBody": "Der Partner, bei dem Sie buchen: Ihr Name, Ihre Daten und was er zu Ihrem Empfang benötigt — nicht mehr.\n\nUnser Zahlungsdienstleister, unser E-Mail-Anbieter und der Speicherdienst, in dem Fotos und Rechnungen liegen.\n\nWir verkaufen oder vermieten Ihre Daten nicht und nutzen sie nicht für Werbung außerhalb der Plattform.",
+      "keepHeading": "Wie lange wir sie aufbewahren",
+      "keepBody": "Buchungs- und Zahlungsunterlagen bleiben so lange erhalten, wie buchhalterische Pflichten und die Klärung von Streitfällen es erfordern.\n\nVon Mitarbeitenden angeforderte Exportdateien werden nach sieben Tagen gelöscht. Unsignierte Zahlungs-Callbacks werden nach dreißig Tagen gelöscht.\n\nObjektfotos bleiben erhalten, weil sie belegen, was ein Inserat am Tag der Buchung versprochen hat.\n\nNichts wird automatisch endgültig gelöscht; Datensätze werden archiviert und bleiben nachprüfbar.",
+      "rightsHeading": "Ihre Rechte",
+      "rightsBody": "Sie können eine Kopie Ihrer Daten verlangen, Unrichtiges berichtigen lassen, die Löschung von Daten verlangen, für deren Aufbewahrung es keinen Grund gibt, die Übertragung an eine andere Stelle verlangen, einer bestimmten Verarbeitung widersprechen und eine Einwilligung widerrufen, soweit die Verarbeitung darauf beruht.\n\nSie können sich außerdem bei der zuständigen Aufsichtsbehörde beschweren. Diese Behörde wird vor dem Start benannt.",
+      "cookiesHeading": "Cookies",
+      "cookiesBody": "Wir verwenden genau drei:\n\nsafra_session — notwendig; hält Sie angemeldet. Ohne dieses Cookie funktioniert die Website nicht.\n\nsafra-theme — das von Ihnen gewählte helle oder dunkle Erscheinungsbild.\n\nsafra_currency — die Währung, in der Sie Preise sehen möchten.\n\nWir verwenden keine Werbe-Tracker und keine Analysedienste Dritter.",
+      "contactHeading": "Kontakt",
+      "contactBody": "Wird vor dem Start ergänzt: die Kontaktadresse für Datenschutzfragen."
+    }
   }
 }

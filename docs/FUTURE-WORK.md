@@ -1994,27 +1994,43 @@ nobody has put on `CAST_REQUIRED`. It is data-independent — every check runs a
 literal cast to the element type — so it works on a fresh migration and cannot pass because a table
 was empty. It also holds the list honest in reverse: an entry that starts parsing must be removed.
 
-### O-web-5 — The site has a footer, and no Terms or Privacy page to put in it
+### O-web-5 — Terms and Privacy exist; the legal particulars do not
 
-**Status:** open, product decision · **Owner:** **Bashar** · **Recorded:** 2026-08-13
+**Status:** open, needs LEGAL input · **Owner:** **Bashar** · **Recorded:** 2026-08-13 · **Built:** 2026-08-14
 
-A footer now renders on every page of the customer site (`SiteFooter`, mounted in the locale layout,
-so the console and the partner portal are untouched by construction). **Every link in it resolves**,
-which is why it is shorter than a footer usually is: About, Contact, Terms, Privacy and a partner
-signup are all conventional and none of those pages exists.
+`/{locale}/terms` and `/{locale}/privacy` are live in all three languages, linked from a قانوني
+column in the footer, and swept by `e2e/responsive.spec.ts`.
 
-That absence is worth stating rather than filling with links to nothing — `O-web-2` below is already
-an open item about two links that 404, and adding six more at the bottom of every page would repeat
-a known mistake at far greater scale.
+**Everything in them was written from the code, and is checkable.** The 120-minute confirmation
+window, the 17:00 same-day cutoff, the 50% refund floor, the compensation when a partner does not
+answer, reviews being hidden rather than deleted, a dispute freezing a payout — each is a behaviour
+with tests behind it. The privacy notice states that passwords are hashed with Argon2id, that
+two-factor secrets are encrypted at rest, that contact details are masked out of messages and
+disputes BEFORE storage with no original kept, that exports are deleted after seven days and
+unsigned payment callbacks after thirty, and that photographs are retained deliberately as evidence
+of what a listing claimed. It names the three cookies this site sets and no others, because there
+are no advertising trackers and no third-party analytics to disclose — and `customer-locale.spec.ts`
+fails if a fourth cookie is ever added without the page being updated.
 
-**Terms and Privacy are the two that are not merely conventional.** The platform takes payments,
-stores customer data and operates in the EU market, so a privacy notice is a GDPR obligation rather
-than a nicety, and cancellation terms are quoted per booking but never stated once for the site.
-Both need legal copy, in three languages, which is Bashar's to supply or commission — not something
-to draft here. Until then the footer says nothing about them, which is the honest state.
+**Four things are missing, and none of them is an engineering question:**
 
-`e2e/customer-locale.spec.ts` asserts the footer's RTL layout; nothing yet asserts a legal link,
-because there is nothing to assert.
+| Missing                                     | Needed for                                        |
+| ------------------------------------------- | ------------------------------------------------- |
+| The legal entity and its registered address | Both pages — the controller's identity under GDPR |
+| A contact address for privacy questions     | The privacy notice                                |
+| The competent supervisory authority         | The right to complain                             |
+| Governing law and jurisdiction              | The terms                                         |
+
+Both pages carry a visible notice at the top listing exactly these, so the pages read as unfinished
+rather than as confident boilerplate wrapped around blanks. That is the project's existing pattern —
+the console dims a control it cannot honour, and `AccountNotBuilt` names what is missing. **A legal
+page that looks finished and is not is the one a person relies on.**
+
+**Neither page has had legal review.** What is there is accurate about the system; whether it is
+sufficient, and correctly worded for the jurisdictions SAFRA will operate in, is a question for a
+lawyer. `LEGAL_UPDATED` in `apps/web/src/lib/legal.ts` is a constant rather than `new Date()`
+precisely so the "last updated" line cannot claim a review that never happened — change it in the
+same commit that changes the wording, and never otherwise.
 
 ### O-web-6 — Currency switching works, and only one pair has a rate
 
@@ -2227,6 +2243,20 @@ and would we find out?** Three changed status.
 requirements (1, 7, 10), and six stand as accepted.
 
 ## 8. Known risks and traps
+
+### `now()` is the TRANSACTION timestamp, so rows written in one test all tie
+
+Found 2026-08-14, in a suite that had passed for weeks. `audit_log.created_at` defaults to `now()`,
+and PostgreSQL's `now()` is `transaction_timestamp()` — so every row a test writes shares one value,
+because `createRollbackDatabase` runs the whole test inside a single transaction.
+
+A query ordering by it therefore leaves the order to the heap. `ORDER BY created_at` held insertion
+order until a loaded parallel run happened not to, and the failure looked like a real regression in
+the image audit trail.
+
+**Order by `id` when asserting a SEQUENCE.** Every primary key here is `uuidv7()`: unique, and
+time-ordered by construction. Ordering by a timestamp is fine when only one row is wanted, which is
+what the other suites doing it are after.
 
 ### The footer is on every page, so a loose selector is now ambiguous
 

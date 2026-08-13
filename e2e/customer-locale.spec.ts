@@ -397,3 +397,72 @@ test.describe('a Latin-valued field on an Arabic page', () => {
     await expect(page.locator('main')).not.toContainText('ل.س');
   });
 });
+
+/**
+ * شروط الاستخدام and سياسة الخصوصية.
+ *
+ * ## What is worth asserting about a legal page
+ *
+ * Not the prose — that is the catalogue's job and duplicating a paragraph here would make the test
+ * pass while the app served a stale one. What matters is that the pages EXIST in every language the
+ * site serves, that the footer actually reaches them, and that the notice about what is still
+ * outstanding is visible rather than buried.
+ *
+ * That last one is the point. `O-web-5` records these as needing legal copy that is not an
+ * engineer's to write — the registered entity, the privacy contact, the supervisory authority, the
+ * governing law. The pages say so at the top. If somebody later fills those in and removes the
+ * notice, this test fails and makes them confirm the removal was deliberate.
+ */
+test.describe('the legal pages', () => {
+  for (const locale of ['ar', 'en', 'de'] as const) {
+    test(`terms and privacy both render in ${locale}`, async ({ page }) => {
+      for (const path of [`/${locale}/terms`, `/${locale}/privacy`]) {
+        const response = await page.goto(path);
+
+        expect(response?.status(), `${path} resolves`).toBe(200);
+        /* A heading and real sections, not an empty shell with a title. */
+        await expect(page.locator('h1')).toBeVisible();
+        expect(await page.locator('article section h2').count()).toBeGreaterThan(4);
+      }
+    });
+  }
+
+  test('the footer reaches both, and says what is still outstanding', async ({
+    page,
+  }) => {
+    await page.goto('/ar');
+
+    await page
+      .locator('footer')
+      .getByRole('link', { name: arWeb.legal.terms.title })
+      .click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/ar/terms');
+
+    /* The notice is a `note`, not an `alert` — standing context rather than something that fired. */
+    await expect(page.getByRole('note')).toContainText(arWeb.legal.pendingTitle);
+
+    await page
+      .locator('footer')
+      .getByRole('link', { name: arWeb.legal.privacy.title })
+      .click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/ar/privacy');
+    await expect(page.getByRole('note')).toContainText(arWeb.legal.pendingTitle);
+  });
+
+  /**
+   * The cookie section names the three cookies this site actually sets.
+   *
+   * A privacy notice is a factual claim about a system, and this is the claim most likely to drift:
+   * a fourth cookie added without a thought here turns the page into a false statement. Naming them
+   * in the test means adding one breaks a test rather than a promise.
+   */
+  test('the cookie section names exactly the cookies the site sets', async ({ page }) => {
+    await page.goto('/en/privacy');
+
+    const body = page.locator('article');
+
+    await expect(body).toContainText('safra_session');
+    await expect(body).toContainText('safra-theme');
+    await expect(body).toContainText('safra_currency');
+  });
+});

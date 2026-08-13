@@ -67,6 +67,13 @@ const CUSTOMER = [
   '/ar/forgot-password',
   '/ar/account',
   '/ar/checkout',
+  /*
+    The legal pages, added 2026-08-14. Long-form prose in a right-to-left column is exactly where a
+    fixed measure or an unwrapped Latin token (`safra_session`, `Argon2id`) pushes a page sideways,
+    and both are things these documents necessarily contain.
+  */
+  '/ar/terms',
+  '/ar/privacy',
   '/en',
   '/en/search',
   '/de',

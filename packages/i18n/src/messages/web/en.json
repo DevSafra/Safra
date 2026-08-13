@@ -523,6 +523,57 @@
     "currency": "Currency",
     "currencyApply": "Show prices in this currency",
     "currencyNote": "Converted prices are indicative. What you are charged is shown at checkout, in the listing's own currency.",
-    "languageApply": "Show the site in this language"
+    "languageApply": "Show the site in this language",
+    "legal": "Legal",
+    "terms": "Terms of use",
+    "privacy": "Privacy notice"
+  },
+  "legal": {
+    "updated": "Last updated: {date}",
+    "pendingTitle": "This page is not finished",
+    "pendingBody": "What follows describes what the platform actually does. What is missing is what cannot be derived from the system: the legal entity and its registered address, the privacy contact, the competent supervisory authority, and the governing law. These are completed before launch.",
+    "backHome": "Back to the home page",
+    "terms": {
+      "title": "Terms of use",
+      "intro": "These terms describe what SAFRA provides, what you agree to, and what we commit to. They are written plainly on purpose — a term nobody understands is a term nobody keeps.",
+      "roleHeading": "What SAFRA is",
+      "roleBody": "SAFRA is an intermediary. The accommodation itself is provided by the partner who owns or manages the property, and that partner is responsible for the state of the place and for receiving you. SAFRA handles listing, booking, payment, support and disputes.",
+      "bookingHeading": "Booking and confirmation",
+      "bookingBody": "You choose your dates and pay, and the request then goes to the partner to confirm within 120 minutes.\n\nSame-day bookings close at 17:00 in the city's own time, because arriving late with nothing confirmed is not a stay.",
+      "noResponseHeading": "If the partner does not answer",
+      "noResponseBody": "If the confirmation window passes with no answer, the booking is cancelled automatically, you are refunded in full, and compensation is recorded against the partner.\n\nYou pay nothing for a failure you had no part in.",
+      "priceHeading": "Price and what it includes",
+      "priceBody": "The price shown at checkout is what you are charged, in the listing's own currency. It includes SAFRA's service fee, itemised separately in the breakdown before you pay.\n\nWhile browsing, prices may be shown converted into a currency you chose. Those figures are indicative and for comparison only; the amount charged is the one in the listing's currency.",
+      "cancelHeading": "Cancellation and refunds",
+      "cancelBody": "The partner chooses a cancellation policy from a set SAFRA approves and cannot invent terms of their own. The policy is shown on the property page and in the booking details before you pay.\n\nWithin the policy's window the refund is never less than 50%.",
+      "reviewsHeading": "Reviews",
+      "reviewsBody": "You can review only after a completed stay. A review is never deleted — it can be hidden if it breaks the rules, and it is kept along with the reason it was hidden.\n\nPhone numbers and email addresses are not published inside reviews or messages; they are masked automatically.",
+      "disputesHeading": "Disputes",
+      "disputesBody": "If the stay was not as described, or nobody was there to receive you, open a dispute from your account. Opening one freezes the partner's payout for that booking until it is settled.",
+      "changesHeading": "Changes to these terms",
+      "changesBody": "These terms may change. A material change is announced before it takes effect, and an existing booking stays governed by the terms it was made under.",
+      "lawHeading": "Governing law",
+      "lawBody": "To be completed before launch."
+    },
+    "privacy": {
+      "title": "Privacy notice",
+      "intro": "This page explains what we collect about you, why, how long we keep it, and who sees it. It is written from what the system actually does rather than from a template.",
+      "whoHeading": "Who is responsible for your data",
+      "whoBody": "To be completed before launch: the legal entity, its registered address, and the contact point for privacy questions.",
+      "collectHeading": "What we collect",
+      "collectBody": "Account details: your name, email address, phone number and preferred language. Your password is stored hashed (Argon2id) and cannot be recovered; a two-factor secret is stored encrypted.\n\nBooking and payment details: dates, guest counts, amounts, the property, and the record of money movements.\n\nMessages and disputes: the text you write to support or in a dispute. Phone numbers and email addresses inside that text are masked automatically before it is stored, and the original is not kept.\n\nTechnical data: your IP address, used to limit abuse and protect sign-in.",
+      "whyHeading": "Why we collect it",
+      "whyBody": "To make and manage your booking, to take and refund payment, to provide support and settle disputes, to prevent fraud and abuse, and to meet accounting and legal obligations.",
+      "shareHeading": "Who else sees it",
+      "shareBody": "The partner you book with: your name, your dates, and what they need to receive you — no more.\n\nOur payment provider, our email provider, and the storage service that holds photographs and invoices.\n\nWe do not sell or rent your data to anyone, and we do not use it for advertising off the platform.",
+      "keepHeading": "How long we keep it",
+      "keepBody": "Booking and payment records are kept for as long as accounting obligations and dispute resolution require.\n\nExport files requested by staff are deleted after seven days. Unsigned payment callbacks are deleted after thirty days.\n\nProperty photographs are kept, because they are the evidence of what a listing claimed on the day somebody booked it.\n\nNothing is hard-deleted automatically; records are archived and remain auditable.",
+      "rightsHeading": "Your rights",
+      "rightsBody": "You may ask for a copy of your data, for anything wrong to be corrected, for data we have no reason to keep to be deleted, for it to be transferred elsewhere, to object to a particular use, and to withdraw consent where the use rests on it.\n\nYou may also complain to the competent supervisory authority. That authority is named before launch.",
+      "cookiesHeading": "Cookies",
+      "cookiesBody": "We use exactly three:\n\nsafra_session — essential, and what keeps you signed in. The site does not work without it.\n\nsafra-theme — the light or dark appearance you chose.\n\nsafra_currency — the currency you prefer to see prices in.\n\nWe use no advertising trackers and no third-party analytics.",
+      "contactHeading": "Contact us",
+      "contactBody": "To be completed before launch: the contact address for privacy questions."
+    }
   }
 }
