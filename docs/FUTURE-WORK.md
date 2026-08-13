@@ -943,6 +943,44 @@ The wording returns to the handoff's the moment a deduction is real.
 
 **Owner:** Bashar for the five questions above, then engineering. Not blocking anything else.
 
+### O-ops-2 — FIXED: the payment-webhook alert could only ever be a false positive
+
+**Status:** fixed 2026-08-13 · **Found:** by scraping `/internal/metrics` off the running dev API
+while looking for something else
+
+`safra_payment_events_unprocessed` counted every `payment_provider_events` row with
+`processed_at IS NULL`. That reads as "waiting to be processed" and is not: a webhook whose signature
+failed, or whose body would not parse, is stored deliberately for forensics as `event_type =
+'unparsed'` and **can never be processed**. Those rows sit unprocessed for the thirty days until
+`WebhookRetentionService` prunes them.
+
+Alert 14 is severity **PAGE** with a 15-minute threshold. So the first malformed request any
+environment received armed a page that could not be cleared for a month. The development database
+was **8.8 days into exactly that**, reporting 219 events with the oldest at 761,811 seconds — and
+every single one of the 219 was unsigned, meaning **the alert had never once had a true positive.**
+
+**Fixed by splitting the question in two,** because both halves matter and they are not the same:
+
+| Gauge                               | Means                               | Alert shape        |
+| ----------------------------------- | ----------------------------------- | ------------------ |
+| `safra_payment_events_unprocessed`  | Parseable, signed, not yet acted on | backlog AGE, page  |
+| `safra_payment_events_rejected_24h` | Refused on arrival in the last day  | RATE, ticket (14b) |
+
+A burst of rejections is a forged-signature attempt or a provider changing their payload format —
+worth knowing, and not "a paid booking did not advance". After the fix the same database reports
+`unprocessed 0`, `oldest 0`, `rejected_24h 40` (today's browser-suite runs).
+
+**The data was NOT touched.** Giving rejected rows a terminal `processed_at` would have been the
+tidier-looking fix and would have broken retention: `pruneUnverified` deletes on
+`signature_verified = false AND processed_at IS NULL`, so they would never be pruned again.
+
+**Guarded by four tests** in `metrics.integration.test.ts`, including one that asserts the two
+predicates between them account for EVERY unprocessed row — an event invisible to both gauges would
+be worse than the false positive this replaced.
+
+**Also corrected in `docs/alerting.md`:** it listed `GET /internal/metrics` as "(to build)". It has
+been built for some time. A readiness document that understates what exists is its own hazard.
+
 ### O-ops-1 — Scheduled jobs are visible; alerting is not
 
 **Shipped 2026-08-07.** `payout-accrual` runs hourly and `ranking-recompute` nightly, both through
@@ -2411,3 +2449,4 @@ Kept because the reason something was blocked is often the reason it returns.
 | 2026-08-12 | Every human-readable reference broke at 999,999 rows                                    | **O-scale-1.** Twelve tables defaulted their reference to `lpad(nextval(…)::text, 6, '0')`, and `lpad` TRUNCATES past the width: the millionth row was handed the reference the hundred-thousandth already had, and ten consecutive counter values then collapsed onto one. The unique index made it a failed INSERT — an outage at exactly the volumes rule 2 targets (1M users) and a fifth of the load plan's bookings. Invisible to every test because no environment had ever held a million of anything; found by building the load-test data generator. Fixed with a `reference_number()` helper that pads without truncating, plus a test that reads every reference default out of `information_schema` and refuses `lpad`                                                                                                                                                                                                                                                                                                                                        |
 | 2026-08-13 | Search returned HTTP 500 at the documented volumes                                      | **O-scale-2.** 144 seconds for one search over 50k properties / 200k units / 73M availability days, against a 200 ms budget and a 15 s statement timeout. Four behaviour-preserving changes: property filters moved INTO the pricing CTE so a city search stops pricing the whole country (and `properties_published_idx` becomes usable), the per-night price sum rewritten algebraically so it stops reading 365 rows to price 2 nights, a `ROW_NUMBER()` that every row discarded deleted, and two anti-joins over the same date range merged into one. City search 39.7 s → 213 ms, unfiltered 144 s → 3.9 s. Held by 25 tests written against the OLD query first; search had none before                                                                                                                                                                                                                                                                                                                                                                             |
 | 2026-08-13 | Search still took 3.9 s to browse without a destination                                 | The tail of **O-scale-2**, after the query rewrite. Three partial indexes on `availability_days` — each of search's three questions of that table looks for the exception, and the primary key could find the rows but not answer them, so every probe hit the heap — plus choosing the page's properties by rank BEFORE pricing them, which is exact for the two property-ranked sorts and disabled for the two price-ranked ones. 3.9 s → 0.59 s for the default. `price_asc` unfiltered remains at 2.75 s: its ranking key is the value being computed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 2026-08-13 | The payment-webhook page alert could only ever be a false positive                      | **O-ops-2.** `safra_payment_events_unprocessed` counted every row with `processed_at IS NULL`, including webhooks rejected on arrival — which can never be processed and sit for the 30 days until retention prunes them. Alert 14 is severity PAGE at 15 minutes, so one malformed request armed an unclearable page; the dev database had been in that state 8.8 days with 219 events, all unsigned, meaning the alert had never had a true positive. Split into a backlog gauge (parseable, signed, awaiting) and a rejection RATE gauge, with a test asserting every unprocessed row is classified by exactly one of them                                                                                                                                                                                                                                                                                                                                                                                                                                              |

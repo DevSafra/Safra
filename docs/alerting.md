@@ -38,24 +38,25 @@ Each of those is a query against a table this application already writes.
 
 ## Signals, thresholds, and severity
 
-| #   | Signal                    | Source                    | Condition                                                         | Severity | Why this threshold                                                       |
-| --- | ------------------------- | ------------------------- | ----------------------------------------------------------------- | -------- | ------------------------------------------------------------------------ |
-| 1   | Accrual stopped           | `scheduled_job_runs`      | no `completed` row for `payout-accrual` in **2 h**                | **page** | Runs hourly; two misses is a pattern, not a blip                         |
-| 2   | Ranking stopped           | `scheduled_job_runs`      | no `completed` row for `ranking-recompute` in **26 h**            | ticket   | Daily at 03:00; one missed night is tolerable                            |
-| 3   | Job failing repeatedly    | `scheduled_job_runs`      | ≥3 `failed` rows for one job in 6 h                               | **page** | One failure can be a dispute opening mid-run; three is code or data      |
-| 4   | Notifications failing     | `notifications`           | `failed` ≥ 20 % of the last 50, or ≥10 consecutive                | **page** | A partner not told is a partner unfairly fined                           |
-| 5   | No notifications at all   | `notifications`           | zero rows in 6 h during 08:00–22:00 Damascus                      | ticket   | Catches a wiring break that produces no failures either                  |
-| 6   | Sanctions feed stale      | `sanctions_list_versions` | newest `fetched_at` older than **48 h**                           | **page** | Compliance obligation, not a product feature                             |
-| 7   | Sanctions refresh failing | job log                   | ≥2 consecutive failures                                           | ticket   |                                                                          |
-| 8   | Media unreadable          | `/health/ready`           | `media` ≠ `ok` on any replica                                     | **page** | Every photograph on the platform is broken                               |
-| 9   | Startup failure           | process exit              | container restarts ≥3 times in 10 min                             | **page** | Crash-looping replica                                                    |
-| 10  | Readiness failing         | `/health/ready`           | 503 on >½ of replicas for 2 min                                   | **page** | Database gone                                                            |
-| 11  | Redis degraded            | `/health/ready`           | `redis: degraded` for 10 min                                      | ticket   | Rate limiting is failing open — a security control is off                |
-| 12  | Error rate                | structured logs           | 5xx > 2 % of requests over 5 min                                  | **page** |                                                                          |
-| 13  | Latency budget            | access log                | p95 > 200 ms or p99 > 500 ms over 10 min                          | ticket   | Rule 3's stated budget                                                   |
-| 14  | Payment webhook backlog   | `payment_webhook_events`  | unprocessed rows older than 15 min                                | **page** | Money captured, booking not advanced                                     |
-| 15  | SLA sweep backlog         | `bookings`                | `pending_confirmation` past `confirmation_deadline_at` by >15 min | **page** | The sweep is not running; customers owed compensation are not getting it |
-| 16  | Disk / bucket growth      | infrastructure            | >80 % capacity                                                    | ticket   |                                                                          |
+| #   | Signal                    | Source                    | Condition                                                         | Severity | Why this threshold                                                                         |
+| --- | ------------------------- | ------------------------- | ----------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------ |
+| 1   | Accrual stopped           | `scheduled_job_runs`      | no `completed` row for `payout-accrual` in **2 h**                | **page** | Runs hourly; two misses is a pattern, not a blip                                           |
+| 2   | Ranking stopped           | `scheduled_job_runs`      | no `completed` row for `ranking-recompute` in **26 h**            | ticket   | Daily at 03:00; one missed night is tolerable                                              |
+| 3   | Job failing repeatedly    | `scheduled_job_runs`      | ≥3 `failed` rows for one job in 6 h                               | **page** | One failure can be a dispute opening mid-run; three is code or data                        |
+| 4   | Notifications failing     | `notifications`           | `failed` ≥ 20 % of the last 50, or ≥10 consecutive                | **page** | A partner not told is a partner unfairly fined                                             |
+| 5   | No notifications at all   | `notifications`           | zero rows in 6 h during 08:00–22:00 Damascus                      | ticket   | Catches a wiring break that produces no failures either                                    |
+| 6   | Sanctions feed stale      | `sanctions_list_versions` | newest `fetched_at` older than **48 h**                           | **page** | Compliance obligation, not a product feature                                               |
+| 7   | Sanctions refresh failing | job log                   | ≥2 consecutive failures                                           | ticket   |                                                                                            |
+| 8   | Media unreadable          | `/health/ready`           | `media` ≠ `ok` on any replica                                     | **page** | Every photograph on the platform is broken                                                 |
+| 9   | Startup failure           | process exit              | container restarts ≥3 times in 10 min                             | **page** | Crash-looping replica                                                                      |
+| 10  | Readiness failing         | `/health/ready`           | 503 on >½ of replicas for 2 min                                   | **page** | Database gone                                                                              |
+| 11  | Redis degraded            | `/health/ready`           | `redis: degraded` for 10 min                                      | ticket   | Rate limiting is failing open — a security control is off                                  |
+| 12  | Error rate                | structured logs           | 5xx > 2 % of requests over 5 min                                  | **page** |                                                                                            |
+| 13  | Latency budget            | access log                | p95 > 200 ms or p99 > 500 ms over 10 min                          | ticket   | Rule 3's stated budget                                                                     |
+| 14  | Payment webhook backlog   | `payment_provider_events` | rows AWAITING processing older than 15 min                        | **page** | Money captured, booking not advanced. Excludes events rejected on arrival — see 14b        |
+| 14b | Rejected webhooks         | `payment_provider_events` | > 20 rejected in 24 h                                             | ticket   | Bad signature or unparseable body: a forgery attempt, or a provider changing their payload |
+| 15  | SLA sweep backlog         | `bookings`                | `pending_confirmation` past `confirmation_deadline_at` by >15 min | **page** | The sweep is not running; customers owed compensation are not getting it                   |
+| 16  | Disk / bucket growth      | infrastructure            | >80 % capacity                                                    | ticket   |                                                                                            |
 
 **"Page" means wake somebody.** With three engineers and no rota yet, that is one on-call phone.
 If the rota does not exist at launch, every `page` above becomes a ticket **and the launch
@@ -81,16 +82,17 @@ creates the belief that somebody is watching.
 Prometheus text exposition, version 0.0.4. **The scraper never needs database credentials**, and
 the schema stays an implementation detail rather than being encoded in somebody else's rule file.
 
-| Series                                                             | Alerts | Notes                                                                                                                           |
-| ------------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `safra_job_last_success_age_seconds{job}`                          | 1, 2   | **-1 means never completed** — reported rather than omitted, because an absent series is indistinguishable from a failed scrape |
-| `safra_job_failures_6h{job}`                                       | 3      | A `skipped` run is another replica doing nothing, and never counts as a success                                                 |
-| `safra_notifications_1h{status}`                                   | 4, 5   | `sent`, `failed`, and `queued` — the last is its own failure: written, never sent, never retried                                |
-| `safra_sanctions_snapshot_age_seconds{source}`                     | 6      | `{source="none"} -1` while `M-2` is unresolved                                                                                  |
-| `safra_payment_events_unprocessed` + `_oldest_unprocessed_seconds` | 14     | Count and age: fifty events thirty seconds old is a busy minute; one stuck an hour is a paid booking that did not advance       |
-| `safra_bookings_sla_overdue`                                       | 15     | Counts the CONSEQUENCE, because a sweep that stops running produces no signal of its own                                        |
-| `safra_media_reachable`                                            | 8      | 1 or 0                                                                                                                          |
-| `safra_metrics_collection_seconds`                                 | —      | Self-monitoring: this endpoint must stay cheap. **20 ms measured**                                                              |
+| Series                                                             | Alerts | Notes                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `safra_job_last_success_age_seconds{job}`                          | 1, 2   | **-1 means never completed** — reported rather than omitted, because an absent series is indistinguishable from a failed scrape                                                                                                                                                                                     |
+| `safra_job_failures_6h{job}`                                       | 3      | A `skipped` run is another replica doing nothing, and never counts as a success                                                                                                                                                                                                                                     |
+| `safra_notifications_1h{status}`                                   | 4, 5   | `sent`, `failed`, and `queued` — the last is its own failure: written, never sent, never retried                                                                                                                                                                                                                    |
+| `safra_sanctions_snapshot_age_seconds{source}`                     | 6      | `{source="none"} -1` while `M-2` is unresolved                                                                                                                                                                                                                                                                      |
+| `safra_payment_events_unprocessed` + `_oldest_unprocessed_seconds` | 14     | Count and age of events AWAITING processing. Fifty events thirty seconds old is a busy minute; one stuck an hour is a paid booking that did not advance. **Excludes rejected events, which can never be processed** — counting them made this alert fire permanently after one malformed request (fixed 2026-08-13) |
+| `safra_payment_events_rejected_24h`                                | 14b    | Webhooks refused on arrival. A rate, not a backlog: the number that matters is how many arrived, not how long they have sat                                                                                                                                                                                         |
+| `safra_bookings_sla_overdue`                                       | 15     | Counts the CONSEQUENCE, because a sweep that stops running produces no signal of its own                                                                                                                                                                                                                            |
+| `safra_media_reachable`                                            | 8      | 1 or 0                                                                                                                                                                                                                                                                                                              |
+| `safra_metrics_collection_seconds`                                 | —      | Self-monitoring: this endpoint must stay cheap. **20 ms measured**                                                                                                                                                                                                                                                  |
 
 **Access.** Bearer token in `METRICS_TOKEN`. No token configured, wrong token, missing token and
 missing scheme all answer **404** — fail closed, and quietly, so the route is indistinguishable
@@ -162,10 +164,20 @@ groups:
         labels: { severity: page }
 
       # 14 — money captured, booking not advanced.
+      #
+      # The gauge counts only events that CAN be processed. A rejected webhook stays
+      # unprocessed for the thirty days before retention prunes it, so including it here
+      # made this rule fire forever after one malformed request.
       - alert: PaymentEventsBacklogged
         expr: safra_payment_events_oldest_unprocessed_seconds > 900
         for: 5m
         labels: { severity: page }
+
+      # 14b — somebody is sending us rubbish, or a provider changed their format.
+      - alert: PaymentWebhooksRejected
+        expr: safra_payment_events_rejected_24h > 20
+        for: 15m
+        labels: { severity: ticket }
 
       # 15 — the sweep is not running; customers owed compensation are not getting it.
       - alert: SlaSweepNotRunning
@@ -206,7 +218,7 @@ Whatever is chosen, it attaches at exactly four places:
 1. **`GET /api/v1/health`** — liveness. Container orchestrator.
 2. **`GET /api/v1/health/ready`** — readiness. Load balancer, and alerts 8/10/11.
 3. **stdout** — structured JSON, one object per line, already correlation-tagged. Alerts 12/13.
-4. **`GET /internal/metrics`** _(to build)_ — the table-derived gauges. Alerts 1–7, 14, 15.
+4. **`GET /internal/metrics`** — the table-derived gauges, bearer-token authenticated. Alerts 1–7, 14, 14b, 15. **Built**; nine gauges, 20 ms to collect.
 
 Nothing else in the application needs to change. **No alerting decision blocks any product work**,
 and no product decision blocks alerting.
