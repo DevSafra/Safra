@@ -319,9 +319,22 @@ test.describe('honesty rules the design and the register require', () => {
   test('a staff reply has its contact details redacted', async ({ page }) => {
     await page.goto('/messages');
 
-    const thread = page.locator('a[href^="/messages/"]').first();
+    /*
+      An OPEN thread, not merely the first one.
 
-    test.skip((await thread.count()) === 0, 'No seeded conversation');
+      The inbox is newest-first and staff — and now the asker, who can close their own request — end
+      threads, so the newest row is often closed. `MessagingService.reply` refuses a closed thread, so
+      picking blindly makes this spec fail with a redaction error message about a conversation that was
+      never repliable. The row carries a «مغلقة» pill when it is closed; `filter({ hasNot })` is what
+      turns that into a selector.
+    */
+    const rows = page.locator('a[href^="/messages/"]');
+    const thread = rows
+      .filter({ hasNot: page.getByText(t.sections.messages.closed) })
+      .first();
+
+    test.skip((await rows.count()) === 0, 'No seeded conversation');
+    test.skip((await thread.count()) === 0, 'Every seeded conversation is closed');
 
     await thread.click();
     await page.getByRole('textbox').first().fill('اتصل بي على 0944123456 بخصوص الحجز');

@@ -145,6 +145,33 @@ test.describe('الدعم', () => {
       await staffContext.close();
     }
 
+    /*
+      ── The asker ends it themselves ──
+
+      The gap this closes: only staff could close a thread, so a problem that resolved itself sat in the
+      console's queue for ever. Asserted LAST, because closing is final — `reply` refuses a closed thread
+      — so every assertion above has to happen while it is still open.
+
+      `form:has(button)` scoped by the button's own name rather than a positional selector, for the same
+      reason the reply uses `form:has(textarea)`: the sidebar's sign-out is also a submit button.
+    */
+    await page.goto(`/support/${reference}`, { waitUntil: 'domcontentloaded' });
+
+    const close = page.getByRole('button', { name: t.support.closeLabel });
+
+    await expect(close, 'the asker needs a way to end their own request').toBeVisible();
+    await close.click();
+
+    /* The badge flips, and the reply box is gone — a closed thread is read-only. */
+    await expect(page.getByText(t.support.closedLabel).first()).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.locator('textarea[name=body]')).toHaveCount(0);
+    await expect(page.getByText(t.support.closedNote)).toBeVisible();
+
+    /* And the history survives: closing ends the thread, it does not hide it. */
+    await expect(page.locator('ol li').first()).toBeVisible();
+
     // ── No page scrolls sideways ──
     for (const width of [390, 768, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 });

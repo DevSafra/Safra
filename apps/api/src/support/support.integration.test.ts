@@ -286,6 +286,92 @@ describeIfDb('SupportService', () => {
     expect(seen.messages).toHaveLength(1);
   });
 
+  // ─── Closing it yourself ──────────────────────────────────────────────────
+
+  /**
+   * The gap this closes: only staff could end a thread, so a problem that resolved itself sat in the
+   * console's queue for ever and somebody eventually read it to learn it was nothing.
+   */
+  it('lets the asker close their own ticket', async () => {
+    const thread = await support.open(customer(), LONG);
+
+    const closed = await support.close(customer(), thread.reference);
+
+    expect(closed.closed).toBe(true);
+    /* The history stays readable — closing ends the thread, it does not hide it. */
+    expect(closed.messages).toHaveLength(1);
+  });
+
+  /**
+   * And the point of it: the staff queue stops counting it.
+   *
+   * `unread_for_staff` is what the console's inbox SORTS by, so an abandoned ticket does not merely
+   * linger — it sits near the top, ahead of people who are still waiting. Closing that left the
+   * counter alone would satisfy the letter of the gap and not its purpose.
+   */
+  it('clears the staff unread counter when the asker closes it', async () => {
+    const thread = await support.open(customer(), LONG);
+
+    await support.reply(customer(), thread.reference, 'Adding a second message to it.');
+
+    const before = await unreadFor(thread.reference);
+
+    expect(
+      before,
+      'the fixture must start with something waiting on staff',
+    ).toBeGreaterThan(0);
+
+    await support.close(customer(), thread.reference);
+
+    expect(await unreadFor(thread.reference)).toBe(0);
+  });
+
+  /** The button is on a reloadable page, so the second press must mean what the first did. */
+  it('is idempotent', async () => {
+    const thread = await support.open(customer(), LONG);
+
+    await support.close(customer(), thread.reference);
+    const again = await support.close(customer(), thread.reference);
+
+    expect(again.closed).toBe(true);
+  });
+
+  /** Closing is final. Reopening silently would hide that the thread was ended. */
+  it('refuses a reply after the asker closes it', async () => {
+    const thread = await support.open(customer(), LONG);
+
+    await support.close(customer(), thread.reference);
+
+    await expect(
+      support.reply(customer(), thread.reference, 'Actually, one more thing.'),
+    ).rejects.toMatchObject({ status: 400, response: { code: 'support.ticket_closed' } });
+  });
+
+  /** The same boundary every other read and write here enforces: it is a 404, not a 403. */
+  it('is a 404 when closing somebody else’s ticket', async () => {
+    const theirs = await support.open(customer(OTHER_PROFILE_ID, OTHER_USER_ID), LONG);
+
+    await expect(support.close(customer(), theirs.reference)).rejects.toMatchObject({
+      status: 404,
+    });
+  });
+
+  /** A partner closes their own the same way, through the same method and the same scope. */
+  it('lets a partner close a partner ticket', async () => {
+    const thread = await support.open(partner, LONG);
+
+    expect((await support.close(partner, thread.reference)).closed).toBe(true);
+  });
+
+  const unreadFor = async (reference: string): Promise<number> =>
+    Number(
+      (
+        await db.execute<{ n: string }>(sql`
+          SELECT unread_for_staff::text AS n FROM conversations WHERE reference = ${reference}
+        `)
+      ).rows[0]?.n ?? -1,
+    );
+
   // ─── Paging ───────────────────────────────────────────────────────────────
 
   it('pages without repeating or losing a ticket', async () => {

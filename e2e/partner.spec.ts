@@ -1,10 +1,13 @@
+import { authenticator } from 'otplib';
 import { expect, test } from '@playwright/test';
 
 import { partnerAr as t } from '../packages/i18n/src/partner.js';
 import {
   PARTNER_BASE as BASE,
+  PARTNER_EMAIL,
   PARTNER_PASSWORD as PASSWORD,
   PARTNER_STATE,
+  PARTNER_TOTP_SECRET,
   UNENROLLED_PARTNER_EMAIL as UNENROLLED_EMAIL,
 } from './partner-session.js';
 
@@ -49,6 +52,51 @@ test.describe('the partner dashboard', () => {
 
     expect(response?.url()).toContain('/login');
     expect(new URL(page.url()).searchParams.get('next')).toBe('/properties');
+
+    /*
+      And the page renders like a sign-in page rather than a bare form.
+
+      The brand mark is the point: these are the two screens somebody lands on when something has gone
+      wrong, and one that does not look like the product is indistinguishable from a phishing page.
+      Both consoles now build it the same way — a server page around a client form.
+    */
+    await expect(page.getByRole('heading', { name: t.login.title })).toBeVisible();
+    await expect(page.getByText(t.login.subtitle)).toBeVisible();
+  });
+
+  /**
+   * Where they were going is honoured, not merely recorded.
+   *
+   * The middleware sets `?next=` and says in its own comment that the login page re-validates it —
+   * and the form always navigated to `/`, so a partner following a link to their calendar signed in
+   * and arrived at the dashboard. The assertion above proved the parameter was SET; nothing proved it
+   * was USED, which is exactly the gap a parameter gets dropped through.
+   *
+   * It has to be the ENROLLED partner and a real code: an unenrolled one is held at `/enrol-2fa` by
+   * middleware whatever the form does, so testing with them would pass against the bug. That costs one
+   * sign-in from the budget, and it is the only path that can catch this.
+   */
+  test('returns a partner to where they were going', async ({ page }) => {
+    await page.context().clearCookies();
+
+    await page.goto(`${BASE}/login?next=%2Fproperties`);
+    await page.getByLabel(t.login.email).fill(PARTNER_EMAIL);
+    await page.getByLabel(t.login.password, { exact: true }).fill(PASSWORD);
+    await page.getByRole('button', { name: t.login.submit }).click();
+
+    /* A code with only a moment left would expire between generation and submission. */
+    if (authenticator.timeRemaining() < 5) {
+      await new Promise((resolve) => setTimeout(resolve, 6_000));
+    }
+
+    await page
+      .getByLabel(t.login.codeLabel)
+      .fill(authenticator.generate(PARTNER_TOTP_SECRET));
+    await page.getByRole('button', { name: t.login.codeSubmit }).click();
+
+    /* `/properties`, not `/` — the whole assertion. */
+    await page.waitForURL(`${BASE}/properties`, { timeout: 20_000 });
+    expect(new URL(page.url()).pathname).toBe('/properties');
   });
 
   /**
