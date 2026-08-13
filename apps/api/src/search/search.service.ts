@@ -109,23 +109,36 @@ export class SearchService {
     }[query.sort];
 
     const rows = await this.db.execute<Record<string, unknown>>(sql`
-      WITH bookable AS (
+      WITH bookable AS MATERIALIZED (
         SELECT
           u.id                AS unit_id,
           u.property_id,
           u.currency_id,
-          -- Sum the ACTUAL nightly prices across the stay: a per-day override
-          -- (availability_days.price) wins over the unit's base price, so a
-          -- seasonal or weekend rate is reflected in the total the guest sees.
-          (
-            SELECT SUM(COALESCE(ad.price, u.base_price))
-            FROM generate_series(
-              ${query.checkIn}::date,
-              ${query.checkOut}::date - INTERVAL '1 day',
-              INTERVAL '1 day'
-            ) AS d(day)
-            LEFT JOIN availability_days ad
-              ON ad.unit_id = u.id AND ad.date = d.day::date
+          -- The stay's price, as the base rate plus what the overrides CHANGE.
+          --
+          -- Equivalent to summing COALESCE(ad.price, u.base_price) over every night, which is how
+          -- this was written, and far cheaper to execute. That form drove the sum from
+          -- generate_series LEFT JOINed to availability_days, so the date never became an index
+          -- bound: the plan read all 365 of a unit's rows and hash-joined them down to the two
+          -- nights being priced, for every candidate unit (O-scale-2).
+          --
+          -- Written this way the subquery is a bounded range scan on (unit_id, date) that touches
+          -- only the nights in the stay that actually carry an override, and usually none of them.
+          -- The algebra: nights × base, plus (override − base) for each overridden night, is the
+          -- same total as base for the plain nights plus the override for the priced ones.
+          --
+          -- A row with a NULL price is a status-only row, so it must NOT read as a free night. It
+          -- is excluded here and falls into the base-rate term, which is what COALESCE did.
+          u.base_price * ${nights} + COALESCE(
+            (
+              SELECT SUM(ad.price - u.base_price)
+              FROM availability_days ad
+              WHERE ad.unit_id = u.id
+                AND ad.date >= ${query.checkIn}::date
+                AND ad.date <  ${query.checkOut}::date
+                AND ad.price IS NOT NULL
+            ),
+            0
           ) AS stay_total
         FROM units u
         JOIN properties p ON p.id = u.property_id
@@ -138,16 +151,67 @@ export class SearchService {
           AND ${nights} >= u.min_nights
           AND (u.max_nights IS NULL OR ${nights} <= u.max_nights)
 
-          -- Anti-join 1: no day in the range is closed, booked or under
-          -- maintenance. An ABSENT row means available — §8.4 puts the burden on
-          -- the partner to close dates, so units are open by default rather than
-          -- requiring 365 rows before a listing can sell.
+          -- ── Narrow BEFORE pricing ────────────────────────────────────────
+          --
+          -- City, type and cancellation policy are properties of the PROPERTY, and they used to be
+          -- applied in candidates — after every unit in the country had already been priced and
+          -- had its availability checked. So a search of one city did the work of a search of all
+          -- of them, and properties_published_idx, which exists precisely for
+          -- (city_id, recommendation_score) over published rows, could never be used.
+          --
+          -- They are repeated in candidates rather than moved. Applying the same predicate twice
+          -- cannot change the result, and it means this optimisation cannot quietly alter what a
+          -- guest sees if one of these is not exactly equivalent to the join it mirrors.
+          ${
+            query.citySlug
+              ? sql`AND p.city_id = (
+                      SELECT id FROM cities WHERE slug = ${query.citySlug} AND deleted_at IS NULL
+                    )`
+              : sql``
+          }
+          ${
+            query.propertyTypeCode
+              ? sql`AND p.property_type_id = (
+                      SELECT id FROM property_types WHERE code = ${query.propertyTypeCode}
+                    )`
+              : sql``
+          }
+          ${
+            query.freeCancellationOnly
+              ? sql`AND p.cancellation_policy_id IN (
+                      SELECT id FROM cancellation_policies
+                      WHERE (tiers -> 0 ->> 'refundPercent')::int = 100
+                    )`
+              : sql``
+          }
+
+          -- Anti-join 1: the calendar says no.
+          --
+          -- Two rules over the same rows, so ONE scan rather than two: a day in the range that is
+          -- closed, booked or under maintenance, OR an arrival day carrying a minimum-nights
+          -- override this stay is too short for. They were separate NOT EXISTS clauses, each
+          -- opening its own index scan on (unit_id, date) for every candidate unit — and at 200,000
+          -- units an unfiltered search made 450,000 lookups into a 73-million-row table.
+          --
+          -- The union of the two predicates is the union of the two excluded sets, so this is the
+          -- same set of units. The min-nights term keeps its date = arrival restriction, which is
+          -- inside the range being scanned.
+          --
+          -- An ABSENT row means available — §8.4 puts the burden on the partner to close dates, so
+          -- units are open by default rather than needing 365 rows before a listing can sell.
           AND NOT EXISTS (
             SELECT 1 FROM availability_days ad
             WHERE ad.unit_id = u.id
               AND ad.date >= ${query.checkIn}::date
               AND ad.date <  ${query.checkOut}::date
-              AND ad.status <> 'available'
+              AND (
+                ad.status <> 'available'
+                OR (
+                  ad.date = ${query.checkIn}::date
+                  AND ad.min_nights IS NOT NULL
+                  AND ${nights} < ad.min_nights
+                )
+              )
           )
 
           -- Anti-join 2: no live booking overlaps. Uses the same '[)' bound as the
@@ -159,15 +223,6 @@ export class SearchService {
               AND b.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
               AND daterange(b.check_in, b.check_out, '[)')
                   && daterange(${query.checkIn}::date, ${query.checkOut}::date, '[)')
-          )
-
-          -- Per-day minimum-nights override applies from the arrival date.
-          AND NOT EXISTS (
-            SELECT 1 FROM availability_days ad
-            WHERE ad.unit_id = u.id
-              AND ad.date = ${query.checkIn}::date
-              AND ad.min_nights IS NOT NULL
-              AND ${nights} < ad.min_nights
           )
 
           ${
@@ -247,7 +302,14 @@ export class SearchService {
           }
         ORDER BY b.property_id, b.stay_total ASC
       )
-      SELECT c.*, ROW_NUMBER() OVER (ORDER BY ${orderBy}) AS row_no
+      -- No ROW_NUMBER() here.
+      --
+      -- There was one, aliased row_no, and stripSortColumns deleted it from every row before
+      -- returning them: nothing read it, in this file or anywhere else. A window function is
+      -- computed over the WHOLE partition before LIMIT can apply, so the cost of ranking every
+      -- matching property was paid on every search and then discarded. Removing it lets the sort
+      -- feed the limit directly.
+      SELECT c.*
       FROM candidates c
       ORDER BY ${orderBy}
       LIMIT ${query.limit + 1}
@@ -324,11 +386,7 @@ function encodeOffset(offset: number): string {
 
 /** Drops the duplicate columns that exist only to drive ORDER BY. */
 function stripSortColumns(row: Record<string, unknown>): SearchResultItem {
-  const {
-    row_no: _rowNo,
-    recommendation_score: _rs,
-    stay_total_sort: _st,
-    ...rest
-  } = row;
+  const { recommendation_score: _rs, stay_total_sort: _st, ...rest } = row;
+
   return rest as unknown as SearchResultItem;
 }
