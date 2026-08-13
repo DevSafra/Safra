@@ -1,7 +1,8 @@
 # Background jobs: BullMQ design and migration plan
 
-Implementation-ready. Blocked only on `M-1` (the hosting decision), by Bashar's instruction — not by
-any open design question.
+**Phases 1 and 2 are BUILT** (2026-08-13, on Bashar's instruction). Phases 3–6 remain, and are
+implementation-ready. What was blocked was never a design question: it was the decision to make Redis
+durable infrastructure, and that decision has now been taken.
 
 > **Why it waits.** BullMQ turns Redis from a cache into **durable job infrastructure**. A lost
 > Redis today costs rate limiting for a few minutes; a lost Redis after this costs queued work. That
@@ -51,9 +52,11 @@ replaced by a queue that cannot run two of the same job. Simpler, and the lock d
 - **`removeOnComplete: { age: 86400, count: 10000 }`** — a day of history is enough to answer "did
   it run", and unbounded completed jobs are a memory leak with a retention question attached.
 - **`removeOnFail: false`.** A failed job is evidence. It stays until moved or resolved.
-- **Job ids are deterministic where the work is.** `notification:<id>`, `accrual:<YYYY-MM-DDTHH>`.
+- **Job ids are deterministic where the work is.** `notification-<id>`, `accrual-<YYYY-MM-DDTHH>`.
   BullMQ refuses a duplicate id, which makes at-least-once delivery safe **at the queue level** as
-  well as at the database level.
+  well as at the database level. **A DASH, not a colon** — this document said `notification:<id>`
+  and BullMQ rejects it outright (`Custom Id cannot contain :`), because the colon is its own key
+  separator. Corrected 2026-08-13 after the first enqueue failed.
 
 **Retries do not replace idempotency, they require it.** Every job must be safe to run twice, and
 they already are: `partner_payout_items.booking_id` is unique, notification rows are keyed, image
@@ -157,8 +160,17 @@ data a staff member needs is the dead-letter screen, which is behind our own RBA
   RPO stops being one second.
 - **Restore order** matters: database first, then Redis, then start workers. Starting workers
   against a restored Redis and a stale database would replay jobs against rows that no longer match.
-- **A total Redis loss is survivable**: re-drive from the database rows above. That procedure must
-  be written and **tested** as part of `M-3`, alongside the database restore drill.
+- **A total Redis loss is DETECTABLE, and not yet re-drivable.** Corrected 2026-08-13, having built
+  phase 2 and looked. Scanning for `notifications` rows still `queued` finds exactly what was lost —
+  that half works, and `safra_notifications_1h{status="queued"}` already alerts on it. But a
+  `notifications` row deliberately stores **no recipient, no subject and no body** (rule 1: this
+  table is read by every support agent), so the row identifies the lost notice and cannot
+  reconstruct it. Re-sending means re-deriving the email from the subject FKs — which is a
+  per-template reconstructor keyed by `template_key`, and does not exist.
+  **This is a real gap in the recovery story, not a missing script.** Until it is closed, a total
+  Redis loss means the notices in flight are identifiable and unsendable. Tracked as `O-notify-2`;
+  it belongs with `M-3`'s restore drill, because a drill that cannot re-drive has not been passed.
+- **Restore order** matters as stated above regardless.
 
 ---
 

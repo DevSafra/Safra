@@ -1139,7 +1139,58 @@ units are edited one at a time through `PATCH /partner/units/:id`, which has no 
 
 **Owner:** engineering.
 
-### O-notify-1 — Notifications exist for three events, and are sent in the request
+### O-notify-2 — BullMQ phases 1 and 2 are built; a total Redis loss is detectable, not re-drivable
+
+**Status:** phases 1–2 done 2026-08-13 · **Open:** the re-drive gap below, and phases 3–6
+
+Bashar took the decision the design was waiting on (2026-08-13), so Redis is now durable job
+infrastructure rather than a cache. What shipped:
+
+| Piece                             | Where                                                       |
+| --------------------------------- | ----------------------------------------------------------- |
+| Five queues declared, `mail` live | `queue/queue.definitions.ts`                                |
+| Worker process                    | `apps/api/src/worker.ts`, `pnpm worker`, 30 s SIGTERM grace |
+| `notify` enqueues; a worker sends | `NotificationService.notify` / `.deliver`                   |
+| Dead letters, durable             | `dead_letter_jobs` + `DeadLetterService`, payload redacted  |
+| Backoff with jitter               | `jitteredBackoff`, capped per queue                         |
+| Alerting                          | `safra_dead_letter_jobs{queue}`, alert 17 (page)            |
+
+**The boot-time durability guard is the part worth keeping.** The design's operational requirements
+say `maxmemory-policy` must be `noeviction` — "this single setting is the difference between a queue
+and a cache" — and a managed Redis sold as a cache defaults to `allkeys-lru`, under which jobs are
+accepted and silently discarded under memory pressure. Retrying cannot detect that, so
+`assertQueueRedisIsDurable` reads the policy and the AOF setting at boot and REFUSES to start in
+production. A documented requirement that cannot verify itself is one waiting to be violated.
+
+**Two defects the build found in the design itself:**
+
+1. **The job-id convention was not implementable.** The document specified `notification:<id>`;
+   BullMQ answers `Custom Id cannot contain :`, because the colon is its own key separator. Every
+   enqueue threw for the ten minutes before it was caught — and threw QUIETLY, because `notify`
+   swallows enqueue failures so that a booking is never undone by Redis. 34 rows sat at `queued` as a
+   result, which is precisely the recovery state the design intends. Now `notification-<id>`.
+2. **The re-drive half of the recovery story does not exist, and cannot be written as described.**
+   The design says "a total Redis loss is survivable: re-drive from the database rows". Detection
+   works — a `queued` row identifies exactly what was lost, and
+   `safra_notifications_1h{status="queued"}` already alerts on it. **Reconstruction does not.** A
+   `notifications` row deliberately carries no recipient, no subject and no body (rule 1: every
+   support agent reads that table), so the row says what was lost and cannot say what to send.
+   Re-sending means re-deriving the email from the subject FKs per template — a reconstructor keyed
+   by `template_key`, which nobody has written and the design never mentioned.
+
+**Why (2) matters beyond tidiness.** It is a precondition of launch blocker 2: a restore drill that
+cannot re-drive has not been passed, it has been performed. Either each template gains a
+reconstructor, or `notifications` gains a non-PII parameter bag sufficient to re-render, or the
+recovery claim is downgraded to "identifiable and unsendable" and said out loud. **That is a decision,
+and it is Bashar's** — the third option may well be right for four low-volume notices.
+
+**Tested:** 9 integration tests in `queue/mail-queue.integration.test.ts` against a real Redis and a
+real BullMQ worker, on their own obliterated key prefix — the row reaching `sent` on the far side, the
+deterministic id refusing a duplicate enqueue, a dead letter recorded with neither the payload nor the
+provider's error carrying an address, and the backoff's bounds, growth and per-queue cap. Plus a
+browser run with a worker live: the staff support reply crossed the queue and was delivered.
+
+### O-notify-1 — Notifications exist for four events, and are now QUEUED
 
 **Shipped 2026-08-08.** Three notices, in the recipient's own language, each recorded:
 `booking.needs_action` to the partner, `review.received` to the partner, `review.replied` to the
@@ -2450,3 +2501,4 @@ Kept because the reason something was blocked is often the reason it returns.
 | 2026-08-13 | Search returned HTTP 500 at the documented volumes                                      | **O-scale-2.** 144 seconds for one search over 50k properties / 200k units / 73M availability days, against a 200 ms budget and a 15 s statement timeout. Four behaviour-preserving changes: property filters moved INTO the pricing CTE so a city search stops pricing the whole country (and `properties_published_idx` becomes usable), the per-night price sum rewritten algebraically so it stops reading 365 rows to price 2 nights, a `ROW_NUMBER()` that every row discarded deleted, and two anti-joins over the same date range merged into one. City search 39.7 s → 213 ms, unfiltered 144 s → 3.9 s. Held by 25 tests written against the OLD query first; search had none before                                                                                                                                                                                                                                                                                                                                                                             |
 | 2026-08-13 | Search still took 3.9 s to browse without a destination                                 | The tail of **O-scale-2**, after the query rewrite. Three partial indexes on `availability_days` — each of search's three questions of that table looks for the exception, and the primary key could find the rows but not answer them, so every probe hit the heap — plus choosing the page's properties by rank BEFORE pricing them, which is exact for the two property-ranked sorts and disabled for the two price-ranked ones. 3.9 s → 0.59 s for the default. `price_asc` unfiltered remains at 2.75 s: its ranking key is the value being computed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | 2026-08-13 | The payment-webhook page alert could only ever be a false positive                      | **O-ops-2.** `safra_payment_events_unprocessed` counted every row with `processed_at IS NULL`, including webhooks rejected on arrival — which can never be processed and sit for the 30 days until retention prunes them. Alert 14 is severity PAGE at 15 minutes, so one malformed request armed an unclearable page; the dev database had been in that state 8.8 days with 219 events, all unsigned, meaning the alert had never had a true positive. Split into a backlog gauge (parseable, signed, awaiting) and a rejection RATE gauge, with a test asserting every unprocessed row is classified by exactly one of them                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 2026-08-13 | Every notification was sent inside the request that caused it                           | **O-notify-2.** BullMQ phases 1–2: `notify` writes its row and enqueues, a separate worker process sends, failures retry with jittered backoff and land in a durable `dead_letter_jobs` table with the payload redacted. A boot-time guard refuses to start in production against a Redis configured as a cache, because `allkeys-lru` discards queued jobs silently. Two defects in the design document itself came out of building it: the specified job-id format `notification:<id>` is rejected by BullMQ outright, and the "re-drive from the database rows" recovery story cannot be implemented as written — a `notifications` row identifies a lost notice but deliberately holds nothing to reconstruct it                                                                                                                                                                                                                                                                                                                                                       |
