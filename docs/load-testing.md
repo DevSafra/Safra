@@ -20,9 +20,10 @@ does NOT cover the two things a local run answers honestly, and both are worth h
 - **`O-scale-1`** — a hard ceiling at 999,999 rows on twelve reference columns, hit by the GENERATOR
   before a single request was sent. Fixed.
 - **`O-scale-2`** — search took **144 seconds** at these volumes and the API's 15-second statement
-  timeout turned that into an HTTP 500. Fixed 2026-08-13: filtered searches now answer inside the
-  200 ms budget (213 ms for a city, 141 ms with a type), and the unfiltered browse went from 144 s to
-  3.9 s. That last one is still 20× over budget and needs a different approach — see the entry.
+  timeout turned that into an HTTP 500. Fixed 2026-08-13: **144 s → 0.59 s** for the default
+  unfiltered search and **39.7 s → 166 ms** for a city, via four plan-preserving query changes, three
+  partial indexes, and choosing the page before pricing it where the ranking allows. One case is left
+  at 2.75 s — `price_asc` with no filters, which cannot know its page without pricing everything.
 
 Both were invisible to every test, every review and every environment, and visible immediately to a
 million rows. That is the argument for building this harness before the hosting decision rather than

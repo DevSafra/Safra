@@ -1286,67 +1286,82 @@ the migration case.
 
 **Owner:** engineering.
 
-### O-scale-2 — FIXED for filtered search; the unfiltered browse remains
+### O-scale-2 — FIXED: search went from 144 seconds to 0.6
 
-**Status:** fixed 2026-08-13, one gap left · **Found:** 2026-08-12, the first run against
-production-shaped data · **Was:** the primary traffic path returned HTTP 500
+**Status:** fixed 2026-08-13 · **Found:** 2026-08-12, the first run against production-shaped data ·
+**Was:** the primary traffic path returned HTTP 500
 
 Search is 80 % of real traffic (`docs/load-testing.md` §1). At the documented volumes — 50,000
-properties, 200,000 units, 73M availability days — one search took **144 seconds**, and since the
-pool sets `statement_timeout: 15_000`, what a customer received was **HTTP 500**. Not slow at scale;
-broken at scale, against a 200 ms budget.
+properties, 200,000 units, 73M availability days — one search took **144 seconds**, and since the pool
+sets `statement_timeout: 15_000`, what a customer received was **HTTP 500**. Not slow at scale; broken
+at scale, against a 200 ms budget.
 
-| Query             | Before     | After    | Change   | Budget     |
-| ----------------- | ---------- | -------- | -------- | ---------- |
-| City + type       | —          | 141 ms   | —        | **within** |
-| One city          | 39,705 ms  | 213 ms   | **186×** | **within** |
-| No filters at all | 144,488 ms | 3,900 ms | **37×**  | 20× over   |
+All figures below are measured through the real endpoint against `safra_load`, warm:
 
-**Four changes, all behaviour-preserving, in descending order of what they bought:**
+| Query                                   | Before     | After    | Change    |
+| --------------------------------------- | ---------- | -------- | --------- |
+| One city                                | 39,705 ms  | 166 ms   | **239×**  |
+| City + type                             | —          | 141 ms   | —         |
+| No filters, `recommended` (the default) | 144,488 ms | 590 ms   | **245×**  |
+| No filters, `rating_desc`               | —          | 575 ms   | —         |
+| No filters, `price_asc`                 | —          | 2,750 ms | see below |
 
-1. **Narrow before pricing.** City, type and cancellation-policy filters moved INTO the `bookable`
-   CTE, where they belong: they were applied afterwards, so a search of one city priced and
-   availability-checked every unit in the country first. This is what unlocked
-   `properties_published_idx` — `(city_id, recommendation_score DESC) WHERE status = 'published'`,
-   an index that already existed and that the old query shape made unusable. The predicates are
-   REPEATED in `candidates` rather than moved, so applying them twice cannot change a result.
+**Six changes. The first four preserve the plan's meaning exactly; the fifth adds indexes; the sixth
+adds a second query shape and is the only one with a correctness argument to make.**
+
+1. **Narrow before pricing.** City, type and cancellation-policy filters moved INTO the availability
+   CTE. They were applied afterwards, so a search of one city priced and availability-checked every
+   unit in the country first. This unlocked `properties_published_idx` —
+   `(city_id, recommendation_score DESC) WHERE status = 'published'` — an index that already existed
+   and that the old query shape made unusable. The predicates are REPEATED downstream rather than
+   moved, so applying them twice cannot change a result.
 2. **Price with algebra instead of a row per night.** `SUM(COALESCE(ad.price, u.base_price))` over a
    `generate_series` LEFT JOIN meant the date was never an index bound: the plan read all 365 of a
    unit's availability rows and hash-joined them down to the two being priced. Rewritten as
-   `nights × base + Σ(override − base)` — the same total — it is a bounded range scan on
-   `(unit_id, date)` touching only nights that carry an override, usually none.
+   `nights × base + Σ(override − base)` — the same total by algebra — it is a bounded range scan.
 3. **Deleted a window function nobody read.** `ROW_NUMBER() OVER (…) AS row_no` was computed over
-   every matching property and then deleted from each row by `stripSortColumns`. A window function
-   is evaluated over the whole partition before `LIMIT` applies, so the cost of ranking the entire
-   result set was paid on every search and thrown away.
+   every matching property and then deleted from each row by `stripSortColumns`. A window function is
+   evaluated over the whole partition before `LIMIT` applies, so search paid to rank its entire result
+   set on every request and threw the answer away.
 4. **Merged two anti-joins into one scan.** The closed-day rule and the minimum-nights rule read the
-   same `(unit_id, date)` range separately, so an unfiltered search made 450,000 index lookups into
-   a 73M-row table. As one `NOT EXISTS` with an OR it makes 205,000. The union of the predicates is
-   the union of the excluded sets, so the result is identical.
+   same `(unit_id, date)` range separately. The union of the predicates is the union of the excluded
+   sets, so the result is identical.
+5. **Three partial indexes** — `migrations/post/0006`. Every one of search's three questions of
+   `availability_days` looks for the EXCEPTION, and an absent row means an available, unpriced,
+   unconstrained night. The primary key can find the rows but not answer the questions, because
+   `status`, `min_nights` and `price` are not in it — so each probe fetched the heap, 150,000 random
+   reads into a 9.5 GB table. `availability_days_blocked_idx` is 124 MB against the key's 4,684 MB and
+   turned the anti-join into a single bitmap scan; `availability_days_priced_idx` carries `price` in
+   its payload, so the price sum is an Index Only Scan and never touches the heap (0.149 ms → 0.021 ms
+   per probe). Cost, stated: three more indexes on the table partners write when editing a calendar.
+6. **Choose the page before pricing it, where the ranking allows.** `recommended` and `rating_desc`
+   rank on `recommendation_score` and `rating` — columns of the PROPERTY, owing nothing to the dates
+   searched. So the page's properties are selected by rank first and only those are priced: twenty
+   instead of fifty thousand. This is what took the unfiltered default from 3.9 s to 0.59 s.
 
-`MATERIALIZED` on the CTE is in there too, but it is now worth little: with the price subquery
-cheap, evaluating it three times instead of once no longer dominates.
+**Why change 6 is exact, and where it does not apply.** It ranks with `RANK()`, not `ROW_NUMBER()`:
+ties share a rank, so `rk <= n` admits EVERY property level with the last one on (score, rating). That
+matters because `recommended`'s third key is the price, which the fast path has not yet computed — with
+`ROW_NUMBER` a tied property would be cut arbitrarily and the cut would decide an ordering the price is
+supposed to decide. A test proves it: switch `RANK` to `ROW_NUMBER` and it fails.
 
-**What remains, and why it is a different problem.** A search with NO destination still takes ~3.9 s,
-because it must decide availability for all 200,000 units to find the cheapest bookable one per
-property, then sort 50,000 properties. No index fixes that — the query is asked for something
-proportional to the whole inventory. Three ways out, none of them free:
+It is disabled for `price_asc`/`price_desc`, whose ranking key IS the thing being computed, and for any
+search carrying `minPrice`/`maxPrice`, because a price filter can eliminate every unit of a property —
+so a property inside the rank window can drop out and one outside it should have taken its place.
+Narrowing first would return a short page and silently omit a match.
 
-- **Early termination for property-ordered sorts.** `recommended` (the §5.5 default) and
-  `rating_desc` rank on PROPERTY columns, so the query could walk properties in score order, take the
-  first page that has a bookable unit, and price only those. It does not work for `price_asc` /
-  `price_desc`, whose ranking key is the thing being computed — so it means two query shapes.
-- **Cache the unfiltered first page.** It is identical for every visitor with the same dates and
-  party size. This contradicts a deliberate decision recorded in `apps/web/src/lib/catalog.ts` —
-  "caching availability would sell a room that is already taken" — so it is Bashar's call, and a
-  short TTL changes the size of that risk rather than removing it.
-- **Require a destination.** A product decision. §5.2 explicitly allows searching without one.
+**The remaining case is `price_asc` with no filters, at 2.75 s.** It must price all 150,000 candidates
+to know which are cheapest; there is no ordering trick available. It is a deliberate user action rather
+than the default, and it is 52× better than it was. Closing it needs a precomputed nightly total — a
+materialised view refreshed on availability writes — which is real work for a case nobody lands on
+first.
 
-**Guarded by `apps/api/src/search/search.integration.test.ts`** — 25 tests, written BEFORE the
-rewrite and passing against the original query, which is what makes them evidence of preserved
-meaning rather than a description of the new behaviour. They cover what a guest would notice: the
-anti-joins, per-night pricing including the priceless-row and departure-day edges, cheapest-unit
-selection, every filter and sort, and paging. Search had **no tests at all** before this.
+**Guarded by `apps/api/src/search/search.integration.test.ts`** — 27 tests. Search had **none** before
+this. They were written against the ORIGINAL query and all passed before a line changed, which is what
+makes them evidence of preserved meaning rather than a description of the new behaviour. Two earn
+their place beyond that: one asks the same question down both query shapes and requires byte-identical
+answers (`maxPrice` far above every fixture disables the fast path without changing which properties
+match), and one levels three properties on score and rating so the boundary tie is exercised.
 
 ### O-scale-1 — FIXED: every reference stopped working at 999,999 rows
 
@@ -2395,3 +2410,4 @@ Kept because the reason something was blocked is often the reason it returns.
 | 2026-08-12 | The public home page listed no cities, and had not for some time                        | **O-web-4.** `cities.categories` is an enum ARRAY, which node-postgres hands back as the literal string `'{historic}'` unless it is cast — while the `db.execute` generic declared `string[]`, an assertion nothing checks. The web app validates the response and falls back to an empty list, so the destinations grid and the city selector rendered empty rather than erroring, and `/ar/city/*` became unreachable from the site. Invisible until a rebuild replaced a long-running API process built from older code. `to_jsonb(c.categories)`, plus a test asserting the runtime shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | 2026-08-12 | Every human-readable reference broke at 999,999 rows                                    | **O-scale-1.** Twelve tables defaulted their reference to `lpad(nextval(…)::text, 6, '0')`, and `lpad` TRUNCATES past the width: the millionth row was handed the reference the hundred-thousandth already had, and ten consecutive counter values then collapsed onto one. The unique index made it a failed INSERT — an outage at exactly the volumes rule 2 targets (1M users) and a fifth of the load plan's bookings. Invisible to every test because no environment had ever held a million of anything; found by building the load-test data generator. Fixed with a `reference_number()` helper that pads without truncating, plus a test that reads every reference default out of `information_schema` and refuses `lpad`                                                                                                                                                                                                                                                                                                                                        |
 | 2026-08-13 | Search returned HTTP 500 at the documented volumes                                      | **O-scale-2.** 144 seconds for one search over 50k properties / 200k units / 73M availability days, against a 200 ms budget and a 15 s statement timeout. Four behaviour-preserving changes: property filters moved INTO the pricing CTE so a city search stops pricing the whole country (and `properties_published_idx` becomes usable), the per-night price sum rewritten algebraically so it stops reading 365 rows to price 2 nights, a `ROW_NUMBER()` that every row discarded deleted, and two anti-joins over the same date range merged into one. City search 39.7 s → 213 ms, unfiltered 144 s → 3.9 s. Held by 25 tests written against the OLD query first; search had none before                                                                                                                                                                                                                                                                                                                                                                             |
+| 2026-08-13 | Search still took 3.9 s to browse without a destination                                 | The tail of **O-scale-2**, after the query rewrite. Three partial indexes on `availability_days` — each of search's three questions of that table looks for the exception, and the primary key could find the rows but not answer them, so every probe hit the heap — plus choosing the page's properties by rank BEFORE pricing them, which is exact for the two property-ranked sorts and disabled for the two price-ranked ones. 3.9 s → 0.59 s for the default. `price_asc` unfiltered remains at 2.75 s: its ranking key is the value being computed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
