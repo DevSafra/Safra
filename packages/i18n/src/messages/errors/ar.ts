@@ -83,6 +83,9 @@ export const ar = {
   'contract.not_awaiting_signature': 'لا يمكن تسجيل التوقيع إلا على عقد بانتظار التوقيع.',
   'dispute.not_found': 'لم يُعثر على هذا النزاع.',
   'dispute.already_closed': 'هذا النزاع مغلق بالفعل.',
+  'dispute.booking_not_disputable':
+    'لا يمكن فتح نزاع على هذا الحجز. النزاع متاح للحجوزات المدفوعة فقط.',
+  'dispute.already_open': 'لديك نزاع مفتوح على هذا الحجز للسبب نفسه.',
   'conversation.not_found_or_closed': 'المحادثة غير موجودة أو مغلقة.',
   'campaign.not_found': 'لم يُعثر على هذه الحملة.',
   'gift_card.code_invalid': 'رمز بطاقة الهدية غير صحيح. تحقّق منه وحاول مرة أخرى.',

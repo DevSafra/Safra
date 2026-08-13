@@ -105,6 +105,10 @@ export const ERROR = {
   CONTRACT_NOT_AWAITING_SIGNATURE: 'contract.not_awaiting_signature',
   DISPUTE_NOT_FOUND: 'dispute.not_found',
   DISPUTE_ALREADY_CLOSED: 'dispute.already_closed',
+  /** A booking nobody has paid for has nothing at stake, so there is nothing to dispute. */
+  DISPUTE_BOOKING_NOT_DISPUTABLE: 'dispute.booking_not_disputable',
+  /** One open dispute per booking per reason. A second would freeze the payout twice over. */
+  DISPUTE_ALREADY_OPEN: 'dispute.already_open',
   CONVERSATION_NOT_FOUND_OR_CLOSED: 'conversation.not_found_or_closed',
   CAMPAIGN_NOT_FOUND: 'campaign.not_found',
   WALLET_NOT_FOUND: 'wallet.not_found',

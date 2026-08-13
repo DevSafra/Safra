@@ -84,6 +84,10 @@ export const en = {
   'contract.not_awaiting_signature': 'Only a contract awaiting signature can be signed.',
   'dispute.not_found': 'Dispute not found.',
   'dispute.already_closed': 'This dispute is already closed.',
+  'dispute.booking_not_disputable':
+    'This booking cannot be disputed. Only a paid booking can be.',
+  'dispute.already_open':
+    'You already have an open dispute about this booking for that reason.',
   'conversation.not_found_or_closed': 'Conversation not found or closed.',
   'campaign.not_found': 'Campaign not found.',
   'gift_card.code_invalid': 'That gift card code is not valid. Check it and try again.',

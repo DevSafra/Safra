@@ -12,6 +12,7 @@ export * from './permissions.js';
 export * from './property.js';
 export * from './scope.js';
 export * from './search.js';
+export * from './dispute.js';
 export * from './support.js';
 export * from './table-preferences.js';
 export * from './two-factor.js';

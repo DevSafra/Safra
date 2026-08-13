@@ -99,6 +99,10 @@ export const de = {
     'Nur ein Vertrag, der auf die Signatur wartet, kann als signiert markiert werden.',
   'dispute.not_found': 'Streitfall nicht gefunden.',
   'dispute.already_closed': 'Dieser Streitfall ist bereits geschlossen.',
+  'dispute.booking_not_disputable':
+    'Für diese Buchung kann kein Streitfall eröffnet werden. Das ist nur bei einer bezahlten Buchung möglich.',
+  'dispute.already_open':
+    'Sie haben zu dieser Buchung bereits einen offenen Streitfall aus demselben Grund.',
   'conversation.not_found_or_closed': 'Unterhaltung nicht gefunden oder geschlossen.',
   'campaign.not_found': 'Kampagne nicht gefunden.',
   'gift_card.code_invalid':
