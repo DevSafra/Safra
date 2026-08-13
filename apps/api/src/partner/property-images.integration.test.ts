@@ -552,10 +552,21 @@ describeIfDb('PropertyImageService', () => {
       await service.reorder(partner(), reference, { imageIds: [b.id, a.id] });
       await service.archive(partner(), reference, a.id);
 
+      /*
+        `ORDER BY id`, not `created_at`.
+
+        `created_at` defaults to `now()`, and in PostgreSQL `now()` is the TRANSACTION timestamp —
+        so every row this test writes shares one value, because the rollback harness runs the whole
+        test inside a single transaction. Ordering by a column where all five rows tie leaves the
+        order to the heap, which held insertion order until a loaded parallel run happened not to.
+
+        `id` is `uuidv7()`: unique, and time-ordered by construction, so it is the sequence these
+        events actually happened in.
+      */
       const rows = await db.execute<{ action: string }>(sql`
         SELECT action FROM audit_log
         WHERE action LIKE 'property_image.%' AND actor_user_id = ${partnerUserId}
-        ORDER BY created_at
+        ORDER BY id
       `);
 
       expect(rows.rows.map((row) => row.action)).toEqual([
