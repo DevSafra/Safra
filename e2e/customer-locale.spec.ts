@@ -291,6 +291,54 @@ test.describe('a Latin-valued field on an Arabic page', () => {
   });
 
   /**
+   * Light/dark, from the footer, and it survives changing language or currency.
+   *
+   * ## Why the control is here at all
+   *
+   * Until 2026-08-13 the customer site's theme toggle lived ONLY inside حسابي, so a visitor who was
+   * not signed in could not change the theme and one who was had to find it in a sidebar. It now
+   * sits beside language and currency, which are the other two "how this site is presented to me"
+   * controls.
+   *
+   * ## And why the survival half is asserted
+   *
+   * Both of those controls navigate — the currency one is a POST and a redirect, a full document
+   * load. The theme is applied before first paint by a nonce'd inline script, and the failure mode
+   * if that script is ever blocked or dropped is not an error but a page that silently comes back
+   * the wrong colour. Nothing else would catch it.
+   */
+  test('switches the theme from the footer and keeps it across a currency change', async ({
+    page,
+  }) => {
+    await page.goto('/ar');
+
+    const background = () =>
+      page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+    const before = await background();
+
+    await page
+      .locator('footer')
+      .getByRole('button', { name: arWeb.nav.themeToDark })
+      .click();
+
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset['theme']))
+      .toBe('dark');
+
+    const dark = await background();
+
+    expect(dark, 'the page actually repainted').not.toBe(before);
+
+    /* A full document load, which is where a pre-paint script either works or does not. */
+    await page.locator('footer details').last().click();
+    await page.locator('footer button[name="currency"][value="SYP"]').click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/ar');
+
+    expect(await background(), 'the theme survived the redirect').toBe(dark);
+  });
+
+  /**
    * The currency control, end to end — and the line that keeps it honest.
    *
    * A converted price is an ESTIMATE from one rate a staff member typed. The listing's own amount

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
-import { SidebarBackdrop, SidebarToggle, ThemeToggle } from '@safra/ui';
+import { SidebarBackdrop, SidebarToggle } from '@safra/ui';
 
 import { SignOutButton } from '@/components/sign-out-button';
 import type { AccountSummary } from '@/lib/account';
@@ -118,8 +118,6 @@ export async function AccountShell({
   readonly children: React.ReactNode;
 }) {
   const t = await getTranslations('account');
-  /* The theme labels live in `nav`, shared with the header that used to carry this control. */
-  const tn = await getTranslations('nav');
 
   /*
     §6 marks exactly three items. Each is omitted rather than shown as «0»: an absent badge says
@@ -252,14 +250,20 @@ export async function AccountShell({
           rule, so with no explicit choice the screen follows the visitor's OS and the icon has to say
           so. Passing `'dark'` here would show a crescent on a light page.
         */}
-        <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-3">
-          <ThemeToggle
-            toLightLabel={tn('themeToLight')}
-            toDarkLabel={tn('themeToDark')}
-            whenUnset="system"
-          />
+        {/*
+          The theme toggle MOVED to the site footer (Bashar, 2026-08-13), beside language and
+          currency.
 
-          {/* `flex-1` so it takes the rest of the row beside the 40px toggle, as the partner's does. */}
+          It was here from 2026-08-12, when it moved out of the header on the principle that two
+          controls for one setting is worse than one. That principle is why it is not in both
+          places now: the footer renders on every page of the customer site INCLUDING this one, so
+          keeping a second copy here would be the exact thing the earlier move removed.
+
+          What the move buys is the coverage the sidebar could never have — until now a visitor who
+          was not signed in could not change the theme at all, because the only control was inside
+          حسابي.
+        */}
+        <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-3">
           <div className="min-w-0 flex-1">
             <SignOutButton locale={locale} />
           </div>
