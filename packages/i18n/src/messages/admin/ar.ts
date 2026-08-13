@@ -38,7 +38,14 @@
 export const ar = {
   /** Document metadata — the browser tab and any bookmark. */
   meta: {
-    title: 'سفرة — مركز القيادة',
+    /*
+      A PIPE, never a dash. Bashar's instruction (2026-08-13), for both consoles.
+
+      A dash reads as a subtitle — "سفرة, the command centre" — and a browser tab truncates from the
+      end, so the half that survives is the half that says which product it is rather than which app.
+      The pipe separates two names of equal weight, which is what these are.
+    */
+    title: 'سفرة | مركز القيادة',
   },
 
   login: {
