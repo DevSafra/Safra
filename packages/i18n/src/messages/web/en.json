@@ -460,7 +460,24 @@
     "supportCloseLabel": "I no longer need help",
     "supportCloseHint": "This closes the request. You can always open a new one.",
     "supportCloseSubmitting": "Closing…",
-    "supportCloseFailed": "The request could not be closed. Please try again."
+    "supportCloseFailed": "The request could not be closed. Please try again.",
+    "navDisputes": "Disputes",
+    "disputesTitle": "My disputes",
+    "disputesNone": "You have not raised a dispute.",
+    "disputesOpenTitle": "Raise a dispute",
+    "disputesIntro": "If something went seriously wrong with a stay you paid for, raise it here. SAFRA reviews it and holds the host’s payout for that booking until it is settled.",
+    "disputesBooking": "Which booking",
+    "disputesReason": "What went wrong",
+    "disputesSubject": "In one line",
+    "disputesBody": "What happened",
+    "disputesBodyHint": "At least twenty characters. Do not write a phone number or an email — they are masked automatically and will not reach anyone.",
+    "disputesSubmit": "Raise the dispute",
+    "disputesSubmitting": "Sending…",
+    "disputesFailed": "The dispute could not be raised. Please try again.",
+    "disputesNoBookings": "A dispute can only be raised about a booking you have paid for.",
+    "disputesRedacted": "{count} contact detail(s) were masked.",
+    "disputesResolution": "SAFRA’s answer",
+    "disputesOpened": "Raised"
   },
   "reviews": {
     "title": "Review your stay",
@@ -481,5 +498,17 @@
     "failed": "Could not send your review. Please try again.",
     "unreachable": "Could not reach the server.",
     "none": "No stays are waiting for your review."
+  },
+  "disputeKinds": {
+    "property_unavailable": "The place was closed or unavailable when I arrived",
+    "not_as_described": "It did not match the photos or the description",
+    "partner_no_response": "The host never responded to my booking",
+    "complaint": "Something else"
+  },
+  "disputeStatuses": {
+    "open": "Open",
+    "investigating": "Being investigated",
+    "resolved": "Settled",
+    "rejected": "Declined"
   }
 }

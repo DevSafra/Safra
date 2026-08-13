@@ -493,3 +493,66 @@ export async function getMySupportTickets(cursor?: string) {
 export async function getSupportThread(reference: string) {
   return authedFetch(`/support/${encodeURIComponent(reference)}`, supportThreadSchema);
 }
+
+// ─── النزاعات ────────────────────────────────────────────────────────────────
+
+/**
+ * A dispute, as the asking side is told about it.
+ *
+ * Parsed rather than trusted, like every other read here. `kind` and `status` are checked against
+ * the enums the catalogue has labels for — an unknown value would otherwise render as a missing
+ * translation, which is how a machine identifier reaches a screen.
+ */
+const disputeSchema = z.object({
+  reference: z.string(),
+  bookingReference: z.string(),
+  kind: z.enum([
+    'property_unavailable',
+    'not_as_described',
+    'partner_no_response',
+    'complaint',
+  ]),
+  status: z.enum(['open', 'investigating', 'resolved', 'rejected']),
+  title: z.string(),
+  openedAt: z.string(),
+  closedAt: z.string().nullable(),
+  resolution: z.string().nullable(),
+  redactedCount: z.number(),
+});
+
+export type DisputeRow = z.infer<typeof disputeSchema>;
+
+const disputeListSchema = z.object({
+  items: z.array(disputeSchema),
+  nextCursor: z.string().nullable(),
+});
+
+export async function getMyDisputes(cursor?: string) {
+  const query = new URLSearchParams({ limit: '10' });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return authedFetch(`/disputes?${query.toString()}`, disputeListSchema);
+}
+
+/**
+ * The bookings a dispute could be raised about.
+ *
+ * Asked of the API rather than filtered from the booking list in the browser: the rule for what is
+ * disputable is enforced server-side when the dispute is opened, and a picker that decided it
+ * separately would drift — offering a booking the API then refuses.
+ */
+const disputableSchema = z.object({
+  items: z.array(
+    z.object({
+      reference: z.string(),
+      property: z.string().nullable(),
+      checkIn: z.string(),
+      status: z.string(),
+    }),
+  ),
+});
+
+export async function getDisputableBookings() {
+  return authedFetch('/disputes/disputable-bookings', disputableSchema);
+}

@@ -47,6 +47,7 @@ export type AccountSection =
   | 'reviews'
   | 'invoices'
   | 'support'
+  | 'disputes'
   | 'profile';
 
 /**
@@ -70,6 +71,11 @@ const SECTIONS: readonly { readonly id: AccountSection; readonly path: string }[
   { id: 'reviews', path: '/reviews' },
   { id: 'invoices', path: '/invoices' },
   { id: 'support', path: '/support' },
+  /*
+    النزاعات last, and directly after الدعم on purpose: a dispute is the escalation of a support
+    request, so the order on the page is the order a person moves through them.
+  */
+  { id: 'disputes', path: '/disputes' },
 ];
 
 /** Which nav label each section uses. Separate from the id so the catalogue keys stay explicit. */
@@ -82,6 +88,7 @@ const LABEL_KEY: Record<AccountSection, string> = {
   reviews: 'navReviews',
   invoices: 'navInvoices',
   support: 'navSupport',
+  disputes: 'navDisputes',
   profile: 'navProfile',
 };
 

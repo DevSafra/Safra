@@ -460,7 +460,24 @@
     "supportCloseLabel": "Ich brauche keine Hilfe mehr",
     "supportCloseHint": "Damit wird die Anfrage geschlossen. Sie können jederzeit eine neue stellen.",
     "supportCloseSubmitting": "Wird geschlossen…",
-    "supportCloseFailed": "Die Anfrage konnte nicht geschlossen werden. Bitte versuchen Sie es erneut."
+    "supportCloseFailed": "Die Anfrage konnte nicht geschlossen werden. Bitte versuchen Sie es erneut.",
+    "navDisputes": "Streitfälle",
+    "disputesTitle": "Meine Streitfälle",
+    "disputesNone": "Sie haben keinen Streitfall eröffnet.",
+    "disputesOpenTitle": "Streitfall eröffnen",
+    "disputesIntro": "Wenn bei einem bezahlten Aufenthalt etwas schwerwiegend schiefgelaufen ist, eröffnen Sie hier einen Streitfall. SAFRA prüft ihn und hält die Auszahlung an den Gastgeber für diese Buchung zurück, bis er geklärt ist.",
+    "disputesBooking": "Welche Buchung",
+    "disputesReason": "Was ist passiert",
+    "disputesSubject": "In einer Zeile",
+    "disputesBody": "Was geschehen ist",
+    "disputesBodyHint": "Mindestens zwanzig Zeichen. Schreiben Sie keine Telefonnummer und keine E-Mail-Adresse — sie werden automatisch maskiert und erreichen niemanden.",
+    "disputesSubmit": "Streitfall eröffnen",
+    "disputesSubmitting": "Wird gesendet…",
+    "disputesFailed": "Der Streitfall konnte nicht eröffnet werden. Bitte versuchen Sie es erneut.",
+    "disputesNoBookings": "Ein Streitfall ist nur zu einer bezahlten Buchung möglich.",
+    "disputesRedacted": "{count} Kontaktangabe(n) wurden maskiert.",
+    "disputesResolution": "Antwort von SAFRA",
+    "disputesOpened": "Eröffnet"
   },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",
@@ -481,5 +498,17 @@
     "failed": "Die Bewertung konnte nicht gesendet werden. Bitte erneut versuchen.",
     "unreachable": "Der Server ist nicht erreichbar.",
     "none": "Keine Aufenthalte warten auf Ihre Bewertung."
+  },
+  "disputeKinds": {
+    "property_unavailable": "Die Unterkunft war bei meiner Ankunft geschlossen oder nicht verfügbar",
+    "not_as_described": "Sie entsprach nicht den Fotos oder der Beschreibung",
+    "partner_no_response": "Der Gastgeber hat auf meine Buchung nie geantwortet",
+    "complaint": "Etwas anderes"
+  },
+  "disputeStatuses": {
+    "open": "Offen",
+    "investigating": "In Prüfung",
+    "resolved": "Geklärt",
+    "rejected": "Abgelehnt"
   }
 }

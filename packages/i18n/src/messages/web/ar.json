@@ -460,7 +460,24 @@
     "supportCloseLabel": "لم أعد بحاجة إلى المساعدة",
     "supportCloseHint": "سيُغلق هذا الطلب. يمكنك فتح طلب جديد في أي وقت.",
     "supportCloseSubmitting": "جارٍ الإغلاق…",
-    "supportCloseFailed": "تعذّر إغلاق الطلب. يرجى المحاولة مرة أخرى."
+    "supportCloseFailed": "تعذّر إغلاق الطلب. يرجى المحاولة مرة أخرى.",
+    "navDisputes": "النزاعات",
+    "disputesTitle": "نزاعاتي",
+    "disputesNone": "لم تفتح أي نزاع.",
+    "disputesOpenTitle": "فتح نزاع",
+    "disputesIntro": "إذا حدث خلل جوهري في إقامة دفعت ثمنها، افتح نزاعاً هنا. تدرسه سفرة وتُوقف تحويل مستحقات المضيف عن هذا الحجز حتى يُحسم.",
+    "disputesBooking": "أي حجز",
+    "disputesReason": "ما الذي حدث",
+    "disputesSubject": "في سطر واحد",
+    "disputesBody": "ماذا جرى",
+    "disputesBodyHint": "عشرون حرفاً على الأقل. لا تكتب رقم هاتف أو بريداً — تُحجب تلقائياً ولن تصل.",
+    "disputesSubmit": "فتح النزاع",
+    "disputesSubmitting": "جارٍ الإرسال…",
+    "disputesFailed": "تعذّر فتح النزاع. يرجى المحاولة مرة أخرى.",
+    "disputesNoBookings": "النزاع متاح فقط على حجز دفعت ثمنه.",
+    "disputesRedacted": "حُجبت {count} من بيانات الاتصال.",
+    "disputesResolution": "ردّ سفرة",
+    "disputesOpened": "فُتح"
   },
   "reviews": {
     "title": "قيّم إقامتك",
@@ -481,5 +498,17 @@
     "failed": "تعذّر إرسال التقييم. حاول مرة أخرى.",
     "unreachable": "تعذّر الوصول إلى الخادم.",
     "none": "لا إقامات بانتظار تقييمك."
+  },
+  "disputeKinds": {
+    "property_unavailable": "المكان كان مغلقاً أو غير متاح عند وصولي",
+    "not_as_described": "لم يكن مطابقاً للصور أو للوصف",
+    "partner_no_response": "المضيف لم يردّ على حجزي",
+    "complaint": "سبب آخر"
+  },
+  "disputeStatuses": {
+    "open": "مفتوح",
+    "investigating": "قيد الدراسة",
+    "resolved": "محسوم",
+    "rejected": "مرفوض"
   }
 }
