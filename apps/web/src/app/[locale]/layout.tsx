@@ -1,10 +1,13 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { Amiri, Cairo } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
 import { LOCALE_DIRECTION, isLocale, routing } from '@/i18n/routing';
+import { THEME_COOKIE } from '@safra/ui';
+
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { ThemeScript } from '@/components/theme-script';
@@ -86,8 +89,28 @@ export default async function LocaleLayout({
   const t = await getTranslations({ locale, namespace: 'common' });
   const direction = LOCALE_DIRECTION[locale];
 
+  /*
+    The theme, rendered by the SERVER so that React owns the attribute.
+
+    A pre-paint script sets `data-theme` on a cold load, which is what keeps a chosen theme from
+    flashing. It is not enough on its own: `/ar` and `/en` are different instances of this layout,
+    so changing LANGUAGE re-renders `<html>`, and React drops an attribute it did not write. A
+    visitor who had chosen light then watched the site turn dark because they changed the language
+    (Bashar, 2026-08-13).
+
+    Reading the cookie here puts the attribute in the markup, where React keeps it across that
+    navigation. Only an explicit `dark` is emitted — the default is light and needs no attribute,
+    and emitting one for it would mean two ways to say the same thing.
+  */
+  const theme = (await cookies()).get(THEME_COOKIE)?.value;
+
   return (
-    <html lang={locale} dir={direction} suppressHydrationWarning>
+    <html
+      lang={locale}
+      dir={direction}
+      {...(theme === 'dark' ? { 'data-theme': 'dark' } : {})}
+      suppressHydrationWarning
+    >
       <head>
         <ThemeScript />
       </head>

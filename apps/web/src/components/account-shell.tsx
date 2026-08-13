@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
-import { SidebarBackdrop, SidebarToggle } from '@safra/ui';
+import { SidebarBackdrop, SidebarToggle, ThemeToggle } from '@safra/ui';
 
 import { SignOutButton } from '@/components/sign-out-button';
 import type { AccountSummary } from '@/lib/account';
@@ -118,6 +118,8 @@ export async function AccountShell({
   readonly children: React.ReactNode;
 }) {
   const t = await getTranslations('account');
+  /* The theme labels live in `nav`, shared with the header that used to carry this control. */
+  const tn = await getTranslations('nav');
 
   /*
     §6 marks exactly three items. Each is omitted rather than shown as «0»: an absent badge says
@@ -251,19 +253,26 @@ export async function AccountShell({
           so. Passing `'dark'` here would show a crescent on a light page.
         */}
         {/*
-          The theme toggle MOVED to the site footer (Bashar, 2026-08-13), beside language and
-          currency.
+          The theme toggle lives HERE and in the two staff sidebars — the three dashboards — and
+          nowhere else (Bashar, 2026-08-13).
 
-          It was here from 2026-08-12, when it moved out of the header on the principle that two
-          controls for one setting is worse than one. That principle is why it is not in both
-          places now: the footer renders on every page of the customer site INCLUDING this one, so
-          keeping a second copy here would be the exact thing the earlier move removed.
+          It briefly moved to the site footer, beside language and currency, on the reading that all
+          three are "how this site is presented to me". That was wrong: theme is a control for
+          somebody working in a dashboard, not part of the public site's chrome, and the public
+          default is simply white.
 
-          What the move buys is the coverage the sidebar could never have — until now a visitor who
-          was not signed in could not change the theme at all, because the only control was inside
-          حسابي.
+          `whenUnset="light"` because the customer CSS no longer consults `prefers-color-scheme` —
+          with no explicit choice the page IS light, so the icon must offer dark. Passing `'system'`
+          here would show a crescent on a light page for anyone whose OS prefers dark.
         */}
         <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-3">
+          <ThemeToggle
+            toLightLabel={tn('themeToLight')}
+            toDarkLabel={tn('themeToDark')}
+            whenUnset="light"
+          />
+
+          {/* `flex-1` so it takes the rest of the row beside the 40px toggle, as the partner's does. */}
           <div className="min-w-0 flex-1">
             <SignOutButton locale={locale} />
           </div>

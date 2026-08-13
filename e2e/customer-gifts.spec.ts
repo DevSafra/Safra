@@ -127,23 +127,20 @@ test.describe('بطاقات الهدايا', () => {
     await expect(sidebar.getByRole('button', { name: /sign out/i })).toBeVisible();
 
     /*
-      ── The theme toggle lives in the FOOTER, and ONLY there ──
+      ── The theme toggle lives beside sign out, and ONLY there ──
 
-      Two moves, one principle. Bashar moved it out of the header into this sidebar on 2026-08-12
-      because two controls for one setting is worse than one; he moved it into the site footer on
-      2026-08-13, beside language and currency. The count is what carries that principle, and it is
-      unchanged — what changed is where the one control lives.
+      Bashar, 2026-08-12: move it into the dashboard beside sign out, the way لوحة الشريك has it. A
+      MOVE: a count of one is the assertion that matters — two controls for one setting is what this
+      replaced. The partner suite checks the same properties in `partner-sidebar.spec.ts`.
 
-      The footer is the only home that reaches a visitor who is NOT signed in, which the sidebar
-      never could. `partner-sidebar.spec.ts` checks the staff equivalent, which is unaffected.
+      It spent an afternoon in the site footer on 2026-08-13, beside language and currency, and came
+      back: theme is a control for somebody working in a DASHBOARD, and the public site is simply
+      white. The three dashboards have it; nothing else does.
     */
     const themeButton = page.getByRole('button', { name: /mode/i });
 
     await expect(themeButton, 'one toggle on an account page, not two').toHaveCount(1);
-    await expect(
-      page.locator('footer').getByRole('button', { name: /mode/i }),
-    ).toBeVisible();
-    await expect(sidebar.getByRole('button', { name: /mode/i })).toHaveCount(0);
+    await expect(sidebar.getByRole('button', { name: /mode/i })).toBeVisible();
 
     const themeOf = () =>
       page.evaluate(() => document.documentElement.dataset.theme ?? '');
@@ -167,21 +164,12 @@ test.describe('بطاقات الهدايا', () => {
     expect(await themeOf()).toBe(switched);
 
     /*
-      A SIGNED-OUT visitor has the control too, in the footer.
-
-      This asserted the opposite until 2026-08-13: the navbar toggle had been removed entirely
-      (Bashar, 2026-08-12) and the sidebar foot was the only theme control in the app, so a visitor
-      who was not signed in simply followed their OS. Bashar reversed that when the footer gained
-      language and currency — all three are "how this site is presented to me", and two of them
-      being available to everybody while the third required an account was the inconsistency.
-
-      The navbar still has none, which is the half that did NOT change.
+      And the PUBLIC site has none — not in the navbar and not in the footer. A signed-out visitor
+      gets white, which since 2026-08-13 is the default outright rather than whatever their OS
+      prefers.
     */
     await page.goto('/en', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('button', { name: /mode/i })).toHaveCount(1);
-    await expect(
-      page.locator('header').getByRole('button', { name: /mode/i }),
-    ).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /mode/i })).toHaveCount(0);
 
     await page.goto('/en/account', { waitUntil: 'domcontentloaded' });
 

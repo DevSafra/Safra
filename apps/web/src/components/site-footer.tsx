@@ -6,7 +6,7 @@ import { LOCALE_LABELS, type Locale, routing } from '@/i18n/routing';
 import { getCurrencyCatalogue } from '@/lib/catalog';
 import { DISPLAY_CURRENCIES, displayCurrency } from '@/lib/currency';
 import { swapLocale } from '@/lib/locale-path';
-import { ORNAMENT_BRAND, ThemeToggle } from '@safra/ui';
+import { ORNAMENT_BRAND } from '@safra/ui';
 
 /**
  * The site footer, on every page of the customer site and nowhere else.
@@ -158,24 +158,6 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
                 symbolOf={symbolOf}
                 label={t('currency')}
                 help={t('currencyApply')}
-              />
-
-              {/*
-                Light/dark, in the same row as language and currency (Bashar, 2026-08-13).
-
-                It belongs with them: all three are "how this site is presented to me", and until now
-                the customer site had this control ONLY inside حسابي — so a visitor who was not
-                signed in could not change the theme at all, and one who was had to go looking for it
-                in a sidebar. Both staff apps already carry it at the foot of their sidebar.
-
-                `whenUnset="system"` because the customer CSS HAS a `prefers-color-scheme` rule, so
-                with no explicit choice the screen follows the visitor's OS and the icon must say so.
-                Passing `'dark'` here would show a crescent on a light page.
-              */}
-              <ThemeToggle
-                toLightLabel={nav('themeToLight')}
-                toDarkLabel={nav('themeToDark')}
-                whenUnset="system"
               />
             </div>
           </div>

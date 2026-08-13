@@ -69,11 +69,30 @@
 }
 
 /**
- * Light theme. Applied by an explicit `data-theme`, and also honoured when the
- * visitor's OS prefers light AND no explicit choice has been made — so the toggle
- * always wins over the system preference in both directions.
+ * Light is the DEFAULT, unconditionally (Bashar, 2026-08-13).
+ *
+ * ## What this replaced, and why
+ *
+ * There were three copies of this palette: a `[data-theme='light']` rule, a
+ * `prefers-color-scheme: light` media query, and the dark tokens on bare `:root`. So the customer
+ * site's default was DARK, and it turned light only when the visitor's OS asked for it.
+ *
+ * That is what caused the bug this fixes. `data-theme` is set by a script OUTSIDE React, and
+ * navigating between `/ar` and `/en` re-renders `<html>` and drops it — so a visitor who had chosen
+ * light, on an OS preferring dark, watched the site turn dark because they changed the language.
+ * The attribute is now also rendered by the server (see the layout), and the fallback beneath it is
+ * light rather than the OS, so neither half can produce that again.
+ *
+ * ## `:not([data-theme='dark'])` rather than a media query
+ *
+ * One selector, one copy of the palette, and it answers all three cases: no attribute is light,
+ * an explicit `light` is light, and only an explicit `dark` reaches the dark tokens on `:root`.
+ * Specificity (0,2,0) beats the bare `:root` (0,1,0), so no `!important` and no ordering trap.
+ *
+ * The OS preference is deliberately NOT consulted. Bashar's instruction is that the default is
+ * always white; a site that quietly follows the operating system has a default nobody chose.
  */
-:root[data-theme='light'] {
+:root:not([data-theme='dark']) {
   --color-bg: #f5f6fa;
   --color-card: #ffffff;
   --color-field: #f1f3f8;
@@ -97,34 +116,6 @@
   --color-crimson: #a8285c;
   --color-slate: #5a6480;
   --color-stone: #7a6a5e;
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']):not([data-theme='light']) {
-    --color-bg: #f5f6fa;
-    --color-card: #ffffff;
-    --color-field: #f1f3f8;
-    --color-line: #dfe3ed;
-    --color-text: #1d2333;
-    --color-muted: #5c6377;
-    --color-faint: #7c8296;
-    --color-gold: #a87a1f;
-    --color-sky: #2e66a8;
-    --color-ok: #1f7d53;
-    --color-warn: #9e6e15;
-    --color-bad: #c23f3f;
-    --color-pend: #6c51c9;
-    --color-band: #e8ebf7;
-    --color-hero: #e2e6f5;
-    --goldA: 168, 122, 31;
-    --color-teal: #0f7d78;
-    --color-lime: #5f7d16;
-    --color-indigo: #4356b8;
-    --color-orange: #b35418;
-    --color-crimson: #a8285c;
-    --color-slate: #5a6480;
-    --color-stone: #7a6a5e;
-  }
 }
 
 /**

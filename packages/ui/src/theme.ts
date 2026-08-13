@@ -22,6 +22,25 @@ export type Theme = 'dark' | 'light';
 export const THEME_STORAGE_KEY = 'safra-theme';
 
 /**
+ * The same choice, as a COOKIE, so a server can render `data-theme` itself.
+ *
+ * ## Why `localStorage` alone was not enough
+ *
+ * The pre-paint script sets the attribute outside React's knowledge, and that is fine until React
+ * re-renders `<html>` — which the customer app does when the visitor changes LOCALE, because
+ * `/ar` and `/en` are different layout instances. React writes the props it was given and the
+ * attribute is dropped, so a visitor who had chosen light watched the site change colour because
+ * they changed the language (reported by Bashar, 2026-08-13).
+ *
+ * A cookie is readable on the server, so the attribute can be part of the rendered markup and
+ * React owns it. `localStorage` is still written: it is what the pre-paint script reads, and that
+ * script is what prevents a flash on a cold load.
+ *
+ * Not `HttpOnly` — it is a display preference, and `applyTheme` writes it from the browser.
+ */
+export const THEME_COOKIE = 'safra-theme';
+
+/**
  * The pre-paint theme script.
  *
  * A single exported constant so that anything needing to hash THESE EXACT BYTES for a
@@ -83,5 +102,20 @@ export function applyTheme(theme: Theme): void {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   } catch {
     // Private browsing. The choice holds for this page view and is not remembered.
+  }
+
+  try {
+    /*
+      And a cookie, so the SERVER can render the attribute — see `THEME_COOKIE`.
+
+      A year, `SameSite=Lax` so arriving from a link keeps the choice, and `Secure` only where
+      there is TLS to be secure about: setting it unconditionally would make the cookie silently
+      fail to write on `http://localhost`, which is where this is developed.
+    */
+    const secure = location.protocol === 'https:' ? '; Secure' : '';
+
+    document.cookie = `${THEME_COOKIE}=${theme}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+  } catch {
+    // Nothing to do: the attribute and localStorage above already carry the choice.
   }
 }

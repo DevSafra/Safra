@@ -291,54 +291,79 @@ test.describe('a Latin-valued field on an Arabic page', () => {
   });
 
   /**
-   * Light/dark, from the footer, and it survives changing language or currency.
+   * Changing the language must not change the THEME.
    *
-   * ## Why the control is here at all
+   * ## The bug, exactly
    *
-   * Until 2026-08-13 the customer site's theme toggle lived ONLY inside حسابي, so a visitor who was
-   * not signed in could not change the theme and one who was had to find it in a sidebar. It now
-   * sits beside language and currency, which are the other two "how this site is presented to me"
-   * controls.
+   * A visitor on a light page pressed «English» and the site turned dark (Bashar, 2026-08-13).
+   * Nothing about the theme had been touched.
    *
-   * ## And why the survival half is asserted
+   * Two causes, both now removed. `data-theme` was written by a pre-paint script, outside React —
+   * and `/ar` and `/en` are different instances of the locale layout, so switching language
+   * re-rendered `<html>` and React dropped the attribute it had not written. Underneath it, the
+   * customer palette defaulted to DARK and only turned light when the OS asked, so losing the
+   * attribute on an OS preferring dark meant losing the light page.
    *
-   * Both of those controls navigate — the currency one is a POST and a redirect, a full document
-   * load. The theme is applied before first paint by a nonce'd inline script, and the failure mode
-   * if that script is ever blocked or dropped is not an error but a page that silently comes back
-   * the wrong colour. Nothing else would catch it.
+   * The attribute is now rendered by the SERVER from a cookie, and the default beneath it is white
+   * unconditionally. This asserts the visible half of both.
+   *
+   * ## Why it emulates a dark-preferring OS
+   *
+   * That is the configuration the bug needed. On a light-preferring machine the fallback happened
+   * to be the same colour as the choice, so the attribute could vanish and nothing showed — which
+   * is why three earlier attempts to reproduce it found nothing.
    */
-  test('switches the theme from the footer and keeps it across a currency change', async ({
-    page,
-  }) => {
-    await page.goto('/ar');
+  test.describe('changing the language leaves the theme alone', () => {
+    test.use({ colorScheme: 'dark' });
 
-    const background = () =>
-      page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    test('a white page stays white when the language changes', async ({ page }) => {
+      await page.goto('/ar');
 
-    const before = await background();
+      const background = () =>
+        page.evaluate(() => getComputedStyle(document.body).backgroundColor);
 
-    await page
-      .locator('footer')
-      .getByRole('button', { name: arWeb.nav.themeToDark })
-      .click();
+      /* White by default, whatever the operating system prefers. */
+      const light = await background();
 
-    await expect
-      .poll(() => page.evaluate(() => document.documentElement.dataset['theme']))
-      .toBe('dark');
+      expect(light, 'the default is white').toBe('rgb(245, 246, 250)');
 
-    const dark = await background();
+      await page.locator('footer details').first().click();
+      await page.locator('footer').getByRole('link', { name: 'English' }).click();
+      await page.waitForURL('**/en');
 
-    expect(dark, 'the page actually repainted').not.toBe(before);
+      expect(await background(), 'the language change did not repaint the site').toBe(
+        light,
+      );
+    });
 
-    /* A full document load, which is where a pre-paint script either works or does not. */
-    await page.locator('footer details').last().click();
-    await page.locator('footer button[name="currency"][value="SYP"]').click();
-    await expect.poll(() => new URL(page.url()).pathname).toBe('/ar');
+    /* And a visitor who DID choose dark keeps it — the same drop, from the other direction. */
+    test('a dark page stays dark when the language changes', async ({ page }) => {
+      await page.goto('/ar');
+      await page.evaluate(() => {
+        document.cookie = 'safra-theme=dark; Path=/; Max-Age=3600; SameSite=Lax';
+        localStorage.setItem('safra-theme', 'dark');
+      });
+      await page.reload({ waitUntil: 'networkidle' });
 
-    expect(await background(), 'the theme survived the redirect').toBe(dark);
+      const dark = await page.evaluate(
+        () => getComputedStyle(document.body).backgroundColor,
+      );
+
+      expect(dark).not.toBe('rgb(245, 246, 250)');
+
+      await page.locator('footer details').first().click();
+      await page.locator('footer').getByRole('link', { name: 'English' }).click();
+      await page.waitForURL('**/en');
+
+      expect(
+        await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
+        'the chosen theme survived the locale change',
+      ).toBe(dark);
+    });
   });
 
   /**
+   * The currency control, end to end — and the line that keeps it honest.  /**
    * The currency control, end to end — and the line that keeps it honest.
    *
    * A converted price is an ESTIMATE from one rate a staff member typed. The listing's own amount
