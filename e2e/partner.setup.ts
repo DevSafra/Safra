@@ -53,7 +53,12 @@ setup('capture a partner session', async ({ page, context }) => {
     await new Promise((resolve) => setTimeout(resolve, 6000));
   }
 
-  await page.getByLabel(t.login.codeLabel).fill(authenticator.generate(SECRET));
+  /*
+    `codeTitle`, not `codeLabel`. The sign-in form was rebuilt to the console's shape on 2026-08-13,
+    where a field has a short LABEL and a longer HINT — so the label is «رمز التحقق» and the sentence
+    about six digits or a recovery code is the hint, which `getByLabel` does not match.
+  */
+  await page.getByLabel(t.login.codeTitle).fill(authenticator.generate(SECRET));
   await page.getByRole('button', { name: t.login.codeSubmit }).click();
 
   await page.waitForURL(`${BASE}/`);

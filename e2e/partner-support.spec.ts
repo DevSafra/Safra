@@ -136,11 +136,24 @@ test.describe('الدعم', () => {
       await staffPage
         .getByRole('button', { name: adminAr.sections.messages.reply })
         .click();
-      await expect(staffPage.getByText(answer).first()).toBeVisible({ timeout: 20_000 });
+
+      /*
+        Scoped to the thread LIST, not to the page.
+
+        `getByText(answer)` anywhere on the page also matches the textarea the answer was just typed
+        into, so the assertion passed whether or not the reply was ever posted — and the failure then
+        surfaced further down, as the partner not seeing a message the staff side had "confirmed".
+        Asserting inside the `<ul>` the console renders its messages into is what makes this a check
+        that the reply LANDED.
+      */
+      await expect(staffPage.locator('ul').getByText(answer).first()).toBeVisible({
+        timeout: 20_000,
+      });
 
       /* And the partner sees it — the whole point of the thread being shared. */
       await page.goto(`/support/${reference}`, { waitUntil: 'domcontentloaded' });
-      await expect(page.locator('ol')).toContainText(answer);
+      /* 20s, like its sibling above: a staff reply now enqueues a notification before it answers. */
+      await expect(page.locator('ol')).toContainText(answer, { timeout: 20_000 });
     } finally {
       await staffContext.close();
     }

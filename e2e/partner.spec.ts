@@ -90,7 +90,7 @@ test.describe('the partner dashboard', () => {
     }
 
     await page
-      .getByLabel(t.login.codeLabel)
+      .getByLabel(t.login.codeTitle)
       .fill(authenticator.generate(PARTNER_TOTP_SECRET));
     await page.getByRole('button', { name: t.login.codeSubmit }).click();
 
