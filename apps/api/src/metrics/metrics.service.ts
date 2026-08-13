@@ -258,16 +258,57 @@ export class MetricsService {
   }
 
   /**
-   * Alert 14: money captured, booking not advanced.
+   * Alert 14: money captured, booking not advanced. And alert 14b: somebody is sending us rubbish.
    *
-   * Both the count and the age of the oldest. A backlog of fifty that is thirty seconds old is a
-   * busy minute; one event stuck for an hour is a booking somebody paid for and did not get.
+   * ## Why the backlog excludes rejected events
+   *
+   * `processed_at IS NULL` looks like "waiting to be processed" and is not. A webhook whose
+   * signature failed, or whose body could not be parsed, is stored deliberately for forensics with
+   * `event_type = 'unparsed'`, and it can NEVER be processed — there is nothing to act on. Those
+   * rows stay `processed_at IS NULL` until `WebhookRetentionService` prunes them after 30 days.
+   *
+   * Counting them as backlog meant alert 14 — severity PAGE, threshold 15 minutes — fired
+   * permanently the first time any environment received one malformed request, and could not be
+   * cleared for a month. The development database was 8.8 days into exactly that when this was
+   * found (2026-08-13): 219 "unprocessed" events, 204 of them permanently unprocessable.
+   *
+   * An alert that is always firing is an alert nobody reads, and the first page on-call receives
+   * being an unclearable false positive is how monitoring gets switched off.
+   *
+   * ## So they are counted SEPARATELY, because a flood of them matters too
+   *
+   * A burst of rejected webhooks is a forged-signature attempt or a provider changing their payload
+   * format. Both are worth knowing, and neither is "a paid booking did not advance". Different
+   * meaning, different gauge, different alert shape: a RATE over 24 hours rather than a backlog age.
    */
   private async webhooks(): Promise<Gauge[]> {
-    const rows = await this.db.execute<{ n: string; oldest: string | null }>(sql`
-      SELECT count(*)::text AS n,
-             EXTRACT(EPOCH FROM (now() - min(created_at)))::text AS oldest
+    /*
+      The predicate for "genuinely waiting": parseable, signed, and not yet acted on. It must stay in
+      step with the rejected predicate below — between them they should cover every unprocessed row,
+      or an event could be invisible to both gauges.
+    */
+    const rows = await this.db.execute<{
+      n: string;
+      oldest: string | null;
+      rejected: string;
+    }>(sql`
+      SELECT
+        count(*) FILTER (WHERE signature_verified AND event_type <> 'unparsed')::text AS n,
+        EXTRACT(EPOCH FROM (now() - min(created_at)
+          FILTER (WHERE signature_verified AND event_type <> 'unparsed')))::text AS oldest,
+        count(*) FILTER (
+          WHERE (NOT signature_verified OR event_type = 'unparsed')
+            AND created_at >= now() - interval '24 hours'
+        )::text AS rejected
       FROM payment_provider_events
+      -- Both gauges live inside the unprocessed set, so the shared predicate is a WHERE and the
+      -- split is a FILTER. Written the other way round — three FILTERs over the whole table — this
+      -- became a SEQ SCAN, on an endpoint scraped every fifteen seconds on every replica, over a
+      -- table that grows with every webhook ever received. payment_provider_events_unprocessed_idx
+      -- is (created_at) WHERE processed_at IS NULL, and this is what reaches it.
+      --
+      -- A rejected event is never processed, so bounding rejections by this predicate loses none of
+      -- them; retention prunes them at 30 days, far outside the 24-hour window counted here.
       WHERE processed_at IS NULL
     `);
 
@@ -276,13 +317,22 @@ export class MetricsService {
     return [
       {
         name: 'safra_payment_events_unprocessed',
-        help: 'Payment provider events received and not yet processed.',
+        help:
+          'Payment provider events awaiting processing. Excludes events that were rejected on ' +
+          'arrival and can never be processed — see safra_payment_events_rejected_24h.',
         samples: [{ value: Number(row?.n ?? 0) }],
       },
       {
         name: 'safra_payment_events_oldest_unprocessed_seconds',
-        help: 'Age of the oldest unprocessed payment event. 0 when there are none.',
+        help: 'Age of the oldest event awaiting processing. 0 when there are none.',
         samples: [{ value: row?.oldest === null ? 0 : Number(row?.oldest ?? 0) }],
+      },
+      {
+        name: 'safra_payment_events_rejected_24h',
+        help:
+          'Webhooks rejected on arrival in the last 24 hours — bad signature or unparseable body. ' +
+          'A burst means a forgery attempt or a provider changing their payload format.',
+        samples: [{ value: Number(row?.rejected ?? 0) }],
       },
     ];
   }
