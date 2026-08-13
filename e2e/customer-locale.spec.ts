@@ -155,3 +155,96 @@ test.describe('Arabic plurals on a real page', () => {
     expect(text).toMatch(/تقييم/);
   });
 });
+
+/**
+ * A Latin-valued field on an Arabic page, and the number quoted beside it.
+ *
+ * ## Two different bugs with one cause
+ *
+ * A phone number, an email and a URL are laid out LEFT TO RIGHT whatever the page reads. Getting
+ * that wrong produces two distinct failures, and this covers both because fixing one is what breaks
+ * the other:
+ *
+ * 1. **Placement.** `dir="ltr"` alone makes the element's own start edge the LEFT one, so the value
+ *    sits flush left inside a full-width field while its label sits on the right. `field-ltr` sets
+ *    the direction and takes the alignment from the DOCUMENT — the one thing a `dir` attribute
+ *    cannot express.
+ * 2. **Order.** `+` is bidi-NEUTRAL. Inside an Arabic sentence it takes the paragraph's direction
+ *    and lands after the digits, so the hint quoted «963912345678+» — a format nobody could type.
+ *    U+2066…U+2069 make the number its own left-to-right run.
+ *
+ * Both were reported by Bashar from a screenshot of the checkout form (2026-08-13), and neither is
+ * visible to `pnpm verify`: the markup and the catalogue are both correct in each case. Only a
+ * browser resolves the bidi algorithm and the computed style.
+ */
+test.describe('a Latin-valued field on an Arabic page', () => {
+  /* A real property and unit, or the checkout renders no guest form to inspect. */
+  const CHECKOUT =
+    '/ar/checkout?property=payments-test-property' +
+    '&unitId=27b8b887-a81e-4d3d-ac2f-74503fe0c7af' +
+    '&checkIn=2026-11-10&checkOut=2026-11-12&adults=2';
+
+  test('lays the phone number out left to right at the reader´s start edge', async ({
+    page,
+  }) => {
+    await page.goto(CHECKOUT);
+
+    const phone = page.locator('input[name="phone"]');
+
+    await expect(phone).toBeVisible();
+
+    const style = await phone.evaluate((el) => {
+      const computed = getComputedStyle(el);
+
+      return { direction: computed.direction, textAlign: computed.textAlign };
+    });
+
+    /* The digits run left to right… */
+    expect(style.direction).toBe('ltr');
+    /* …and the value still starts where the reader starts, which on this page is the right. */
+    expect(style.textAlign).toBe('right');
+  });
+
+  test('keeps the + at the head of the example number', async ({ page }) => {
+    await page.goto(CHECKOUT);
+
+    const hint = page.locator('#field-phone-hint');
+
+    await expect(hint).toBeVisible();
+
+    const text = (await hint.textContent()) ?? '';
+
+    /*
+      Asserted on the ISOLATION rather than on the rendered pixels, because the characters are what
+      the code controls and the rendering is what the browser owes us for them. U+2066 is
+      LEFT-TO-RIGHT ISOLATE and U+2069 is POP DIRECTIONAL ISOLATE.
+    */
+    expect(text).toContain('⁦+963912345678⁩');
+
+    /* And the plus is never stranded after the digits, which is what the bug looked like. */
+    expect(text).not.toContain('963912345678+');
+  });
+
+  /**
+   * The footer is on every page of the customer site, so its own RTL is worth one assertion.
+   *
+   * `ms-auto` rather than `ml-auto` on the copyright: a logical margin puts it at the trailing
+   * edge in both directions, where a physical one pins it to the left of an Arabic page — which is
+   * the START, beside the language links it is supposed to be opposite.
+   */
+  test('puts the footer copyright opposite the language links', async ({ page }) => {
+    await page.goto('/ar');
+
+    const footer = page.locator('footer');
+    const languages = footer.getByRole('navigation', { name: arWeb.footer.language });
+    const copyright = footer.locator('p').last();
+
+    const [nav, rights] = await Promise.all([
+      languages.boundingBox(),
+      copyright.boundingBox(),
+    ]);
+
+    /* Right-to-left: the language links start the row, the copyright ends it on the left. */
+    expect(nav && rights && nav.x).toBeGreaterThan(rights?.x ?? 0);
+  });
+});

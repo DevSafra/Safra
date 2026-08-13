@@ -10,6 +10,7 @@ import type { Locale } from '@/i18n/routing';
 import { formatMoney } from '@/lib/localise';
 import { errorMessage } from '@safra/i18n';
 import { dynamicMessage } from '@/lib/dynamic-message';
+import { PHONE_EXAMPLE, ltrIsolate } from '@/lib/bidi';
 
 interface FieldErrors {
   [field: string]: string | undefined;
@@ -183,9 +184,22 @@ export function CheckoutForm({
           name="phone"
           type="tel"
           label={t('phone')}
-          placeholder="+963912345678"
+          placeholder={PHONE_EXAMPLE}
           autoComplete="tel"
-          hint={t('phoneHint')}
+          /*
+            `ltrIsolate` around the number, and it is what fixes «مثل ‎+963…» rendering as
+            «963…+».
+
+            The `+` is bidi-NEUTRAL: inside an Arabic sentence it takes the paragraph's direction
+            and lands after the digits, at the wrong end, so the hint quoted a format nobody could
+            type. U+2066…U+2069 make the number its own left-to-right run and leave the sentence
+            around it alone. Reported by Bashar (2026-08-13) against this hint.
+
+            The PLACEHOLDER above needs no isolation: the field is `field-ltr`, so the whole input
+            is already a left-to-right run — and control characters there would be real characters
+            in a real value.
+          */
+          hint={t('phoneHint', { example: ltrIsolate(PHONE_EXAMPLE) })}
           error={fieldErrors['guest.phone']}
           required
         />
@@ -450,6 +464,18 @@ function Field({
   error?: string | undefined;
   hint?: string | undefined;
 } & React.InputHTMLAttributes<HTMLInputElement>) {
+  /*
+    A phone number, an email or a URL is laid out LEFT TO RIGHT whatever the page reads.
+
+    `field-ltr` sets the direction and takes the ALIGNMENT from the document rather than from the
+    element, so the value still sits at the reader's start edge — the right, in Arabic. `dir="ltr"`
+    alone fixes the order and breaks the placement: the value goes flush left inside a full-width
+    field while its own label sits on the right. Reported by Bashar against البريد الإلكتروني and
+    رقم الهاتف (2026-08-11); the profile form was fixed then and this shared `Field` was not, which
+    is why the checkout and registration phone fields still had it (2026-08-13).
+  */
+  const latinValue = rest.type === 'tel' || rest.type === 'email' || rest.type === 'url';
+
   const id = `field-${name}`;
   const describedBy = [error ? `${id}-error` : null, hint ? `${id}-hint` : null]
     .filter(Boolean)
@@ -467,7 +493,7 @@ function Field({
         aria-describedby={describedBy || undefined}
         className={`rounded-lg border bg-field px-3 py-2.5 text-text ${
           error ? 'border-bad' : 'border-line'
-        }`}
+        } ${latinValue ? 'field-ltr' : ''}`}
         {...rest}
       />
       {hint ? (

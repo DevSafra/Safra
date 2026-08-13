@@ -53,3 +53,18 @@ const PDI = '⁩';
 export function ltrIsolate(value: string): string {
   return value === '' ? value : `${LRI}${value}${PDI}`;
 }
+
+/**
+ * The example phone number shown as a placeholder and quoted in the hint beside it.
+ *
+ * ## Why it is a constant and not a catalogue string
+ *
+ * It is a NUMBER, not prose: it reads identically in Arabic, English and German, and three copies
+ * of it in three catalogues is three places for one of them to drift into a number that is not a
+ * valid Syrian mobile. `docs/i18n.md` already exempts reference prefixes and enum values on the
+ * same reasoning — a translator has nothing to do here.
+ *
+ * The SENTENCE around it stays in the catalogue with an `{example}` placeholder, because that
+ * sentence is prose and its word order is the first casualty of translation.
+ */
+export const PHONE_EXAMPLE = '+963912345678';

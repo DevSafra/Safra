@@ -165,7 +165,7 @@
     "fullName": "Full name",
     "email": "Email address",
     "phone": "Phone number (WhatsApp)",
-    "phoneHint": "International format, e.g. +963912345678",
+    "phoneHint": "International format, e.g. {example}",
     "submit": "Continue to payment",
     "submitting": "Processing…",
     "terms": "By continuing you accept the cancellation policy and SAFRA's terms.",
@@ -510,5 +510,13 @@
     "investigating": "Being investigated",
     "resolved": "Settled",
     "rejected": "Declined"
+  },
+  "footer": {
+    "about": "SAFRA books stays across the Levant — from a single night to a long stay, with clear prices and cancellation terms written down before you pay.",
+    "explore": "Explore",
+    "account": "Your account",
+    "language": "Language",
+    "rights": "© {year} SAFRA. All rights reserved.",
+    "madeFor": "Built for the Arab market, in Arabic first."
   }
 }

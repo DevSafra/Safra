@@ -5,6 +5,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
 import { LOCALE_DIRECTION, isLocale, routing } from '@/i18n/routing';
+import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { ThemeScript } from '@/components/theme-script';
 
@@ -90,7 +91,9 @@ export default async function LocaleLayout({
       <head>
         <ThemeScript />
       </head>
-      <body className={`${amiri.variable} ${cairo.variable} min-h-dvh bg-bg text-text`}>
+      <body
+        className={`${amiri.variable} ${cairo.variable} flex min-h-dvh flex-col bg-bg text-text`}
+      >
         <NextIntlClientProvider>
           {/* Keyboard users must be able to bypass the header on every page. */}
           <a
@@ -100,7 +103,15 @@ export default async function LocaleLayout({
             {t('skipToContent')}
           </a>
           <SiteHeader locale={locale} />
-          <main id="main">{children}</main>
+          {/*
+            `flex-1` on the main, so a short page — a 404, a confirmation — still pushes the footer
+            to the bottom of the viewport instead of leaving it floating halfway up with dead space
+            beneath it. The body is the flex column that makes that work.
+          */}
+          <main id="main" className="flex-1">
+            {children}
+          </main>
+          <SiteFooter locale={locale} />
         </NextIntlClientProvider>
       </body>
     </html>

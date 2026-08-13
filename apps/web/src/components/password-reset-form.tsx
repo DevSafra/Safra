@@ -210,6 +210,18 @@ function Field({
   label: string;
   hint?: string | undefined;
 } & React.InputHTMLAttributes<HTMLInputElement>) {
+  /*
+    A phone number, an email or a URL is laid out LEFT TO RIGHT whatever the page reads.
+
+    `field-ltr` sets the direction and takes the ALIGNMENT from the document rather than from the
+    element, so the value still sits at the reader's start edge — the right, in Arabic. `dir="ltr"`
+    alone fixes the order and breaks the placement: the value goes flush left inside a full-width
+    field while its own label sits on the right. Reported by Bashar against البريد الإلكتروني and
+    رقم الهاتف (2026-08-11); the profile form was fixed then and this shared `Field` was not, which
+    is why the checkout and registration phone fields still had it (2026-08-13).
+  */
+  const latinValue = rest.type === 'tel' || rest.type === 'email' || rest.type === 'url';
+
   const id = `field-${name}`;
 
   return (
@@ -221,7 +233,9 @@ function Field({
         id={id}
         name={name}
         aria-describedby={hint ? `${id}-hint` : undefined}
-        className="rounded-lg border border-line bg-field px-3 py-2.5 text-text"
+        className={`rounded-lg border border-line bg-field px-3 py-2.5 text-text ${
+          latinValue ? 'field-ltr' : ''
+        }`}
         {...rest}
       />
       {hint ? (

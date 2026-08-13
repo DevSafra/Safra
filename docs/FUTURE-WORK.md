@@ -1994,6 +1994,28 @@ nobody has put on `CAST_REQUIRED`. It is data-independent — every check runs a
 literal cast to the element type — so it works on a fresh migration and cannot pass because a table
 was empty. It also holds the list honest in reverse: an entry that starts parsing must be removed.
 
+### O-web-5 — The site has a footer, and no Terms or Privacy page to put in it
+
+**Status:** open, product decision · **Owner:** **Bashar** · **Recorded:** 2026-08-13
+
+A footer now renders on every page of the customer site (`SiteFooter`, mounted in the locale layout,
+so the console and the partner portal are untouched by construction). **Every link in it resolves**,
+which is why it is shorter than a footer usually is: About, Contact, Terms, Privacy and a partner
+signup are all conventional and none of those pages exists.
+
+That absence is worth stating rather than filling with links to nothing — `O-web-2` below is already
+an open item about two links that 404, and adding six more at the bottom of every page would repeat
+a known mistake at far greater scale.
+
+**Terms and Privacy are the two that are not merely conventional.** The platform takes payments,
+stores customer data and operates in the EU market, so a privacy notice is a GDPR obligation rather
+than a nicety, and cancellation terms are quoted per booking but never stated once for the site.
+Both need legal copy, in three languages, which is Bashar's to supply or commission — not something
+to draft here. Until then the footer says nothing about them, which is the honest state.
+
+`e2e/customer-locale.spec.ts` asserts the footer's RTL layout; nothing yet asserts a legal link,
+because there is nothing to assert.
+
 ### O-web-2 — Two public links point at pages that do not exist
 
 **Status:** open, product decision · **Owner:** **Bashar** · **Recorded:** 2026-08-12

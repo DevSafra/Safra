@@ -165,7 +165,7 @@
     "fullName": "Vollständiger Name",
     "email": "E-Mail-Adresse",
     "phone": "Telefonnummer (WhatsApp)",
-    "phoneHint": "Internationales Format, z. B. +963912345678",
+    "phoneHint": "Internationales Format, z. B. {example}",
     "submit": "Weiter zur Zahlung",
     "submitting": "Wird verarbeitet…",
     "terms": "Mit dem Fortfahren akzeptieren Sie die Stornierungsbedingungen und die AGB von SAFRA.",
@@ -510,5 +510,13 @@
     "investigating": "In Prüfung",
     "resolved": "Geklärt",
     "rejected": "Abgelehnt"
+  },
+  "footer": {
+    "about": "SAFRA vermittelt Unterkünfte in der Levante — von einer Nacht bis zum Langzeitaufenthalt, mit klaren Preisen und Stornobedingungen, die vor der Zahlung feststehen.",
+    "explore": "Entdecken",
+    "account": "Ihr Konto",
+    "language": "Sprache",
+    "rights": "© {year} SAFRA. Alle Rechte vorbehalten.",
+    "madeFor": "Für den arabischen Markt gebaut, zuerst auf Arabisch."
   }
 }
