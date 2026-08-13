@@ -2,16 +2,19 @@ import 'reflect-metadata';
 
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { Worker } from 'bullmq';
+import type { Worker } from 'bullmq';
 import type { Redis } from 'ioredis';
 
 import { AppModule } from './app.module.js';
 import { JsonLogger } from './common/logging/json.logger.js';
 import { loadEnv } from './config/env.js';
 import { MailProcessor } from './queue/mail.processor.js';
-import { CONCURRENCY, QUEUE, jitteredBackoff } from './queue/queue.definitions.js';
+import { MediaProcessor } from './queue/media.processor.js';
+import { ScheduledProcessor } from './queue/scheduled.processor.js';
+import { ExportProcessor } from './queue/export.processor.js';
+import { QUEUE } from './queue/queue.definitions.js';
+import { startWorker, stopWorkers } from './queue/queue.runtime.js';
 import { QUEUE_REDIS } from './queue/queue.tokens.js';
-import type { MailJobData } from './queue/mail.job.js';
 
 /**
  * The worker entrypoint. Same image as the API, different command.
@@ -20,25 +23,33 @@ import type { MailJobData } from './queue/mail.job.js';
  *
  * `docs/background-jobs-design.md`, operational requirements: **worker processes are a separate
  * deployment, and worker scaling is independent of API replicas — that is the point.** A worker
- * embedded in the API would tie the amount of background capacity to the amount of request capacity,
- * and would put CPU-bound work (image variants, in a later phase) on the same event loop as a
- * checkout. It also means a queue backlog can be drained by adding workers without adding web
- * capacity, and a traffic spike can be absorbed without adding workers.
+ * embedded in the API would tie the amount of background capacity to the amount of request
+ * capacity, and would put CPU-bound work on the same event loop as a checkout. That last one stopped
+ * being hypothetical in phase 3: `media` runs six `sharp` encodes per job at concurrency 4, and
+ * sharing an event loop with a payment would be visible in the p95.
+ *
+ * It also means a queue backlog can be drained by adding workers without adding web capacity, and a
+ * traffic spike can be absorbed without adding workers.
  *
  * ## It boots the whole AppModule
  *
  * Which looks heavier than necessary and is the right trade: processors call the same services the
- * API does — `NotificationService`, `MailService`, the database pool, the settings cache — and
- * assembling a reduced module for the worker would mean a second wiring of the same graph, to be kept
- * in step by hand. Nest's container is what resolves it correctly in both processes. No HTTP listener
- * is started, so nothing is exposed.
+ * API does — `NotificationService`, `ImageService`, the database pool, the settings cache — and
+ * assembling a reduced module for the worker would mean a second wiring of the same graph, to be
+ * kept in step by hand. Nest's container is what resolves it correctly in both processes. No HTTP
+ * listener is started, so nothing is exposed.
+ *
+ * ## Adding a queue is one entry in `WORKERS`
+ *
+ * Everything a worker must share — the key prefix, the jitter strategy, the dead-letter hookup, the
+ * event handlers — lives in `queue.runtime.ts`. A queue added by copying a block instead would
+ * eventually be missing one of them, and would behave differently from its siblings for a reason
+ * invisible in either file.
  *
  * ## Shutdown is the part that matters
  *
  * `SIGTERM` → stop accepting new jobs, finish what is in flight, then exit, with a 30-second grace.
- * A worker killed mid-job leaves that job locked until BullMQ's stall detection reclaims it, which
- * looks like a job that took minutes for no reason. `worker.close()` without `force` waits for the
- * active job, which is exactly the behaviour a rolling deploy needs.
+ * A worker killed mid-job leaves that job locked until BullMQ's stall detection reclaims it.
  */
 const SHUTDOWN_GRACE_MS = 30_000;
 
@@ -56,55 +67,17 @@ async function bootstrap(): Promise<void> {
   app.enableShutdownHooks();
 
   const connection = app.get<Redis>(QUEUE_REDIS);
-  const mailProcessor = app.get(MailProcessor);
-
-  const worker = new Worker<MailJobData>(
-    QUEUE.mail,
-    (job) => mailProcessor.process(job),
-    {
-      connection,
-      prefix: 'safra',
-      concurrency: CONCURRENCY.mail,
-      /*
-        Exponential backoff WITH JITTER, which BullMQ has no built-in for. Registered by the name the
-        job options reference, so the policy lives in one place and a queue cannot accidentally use
-        the unjittered default: without jitter, every retry in the estate lands on a recovering mail
-        server simultaneously and puts it back down.
-      */
-      settings: {
-        backoffStrategy: (attemptsMade: number, _type, _err, job) =>
-          jitteredBackoff(
-            attemptsMade,
-            Number(
-              job?.opts.backoff && typeof job.opts.backoff === 'object'
-                ? job.opts.backoff.delay
-                : 30_000,
-            ) || 30_000,
-            QUEUE.mail,
-          ),
-      },
-    },
-  );
-
   const log = new Logger('Worker');
 
-  worker.on('completed', (job) => {
-    log.log(`${QUEUE.mail}/${job.name} ${job.id} completed.`);
-  });
+  /** Every live queue and the class that runs its jobs. Adding one is a row here. */
+  const workers: Worker<never>[] = [
+    startWorker(QUEUE.mail, connection, app.get(MailProcessor)),
+    startWorker(QUEUE.media, connection, app.get(MediaProcessor)),
+    startWorker(QUEUE.scheduled, connection, app.get(ScheduledProcessor)),
+    startWorker(QUEUE.exports, connection, app.get(ExportProcessor)),
+  ] as Worker<never>[];
 
-  worker.on('failed', (job, error) => {
-    /*
-      Awaiting is not possible in an event handler, and an unhandled rejection here would take the
-      worker down — so the dead-letter write catches its own errors (it does) and this only reports.
-    */
-    void mailProcessor.onFailed(job, error);
-    log.warn(`${QUEUE.mail} job ${job?.id ?? 'unknown'} failed: ${error.message}`);
-  });
-
-  /* A worker with no error listener crashes the process when Redis blips. */
-  worker.on('error', (error) => log.error(`Worker error: ${error.message}`));
-
-  log.log(`Worker ready: ${QUEUE.mail} at concurrency ${CONCURRENCY.mail}.`);
+  log.log(`Worker ready: ${workers.length} queues.`);
 
   let shuttingDown = false;
 
@@ -115,22 +88,9 @@ async function bootstrap(): Promise<void> {
       shuttingDown = true;
       log.log(`${signal} received: finishing in-flight jobs, then exiting.`);
 
-      /*
-        A hard deadline. `close()` waits for the active job, which is right, and a job that hangs
-        would otherwise hold the deployment open indefinitely — so the grace period is enforced here
-        rather than left to whatever the orchestrator's kill timeout happens to be.
-      */
-      const deadline = setTimeout(() => {
-        log.error(`Still busy after ${SHUTDOWN_GRACE_MS}ms. Exiting anyway.`);
-        process.exit(1);
-      }, SHUTDOWN_GRACE_MS);
-
-      deadline.unref();
-
       void (async () => {
         try {
-          await worker.close();
-          await app.close();
+          await stopWorkers(workers, app, SHUTDOWN_GRACE_MS, log);
           log.log('Worker stopped cleanly.');
           process.exit(0);
         } catch (error) {

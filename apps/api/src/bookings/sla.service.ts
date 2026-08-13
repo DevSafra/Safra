@@ -1,5 +1,4 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -9,6 +8,7 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { MONEY_SCALE, toMinor } from '../common/money.js';
 import { MoneySettingsService } from '../settings/money-settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
+import { JobRunService } from '../common/jobs/job-run.service.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
 const SLA_LOCK_KEY = 8_421_002;
@@ -37,37 +37,49 @@ export class SlaService {
     private readonly money: MoneySettingsService,
     private readonly ledger: LedgerService,
     private readonly wallet: WalletService,
+    private readonly runs: JobRunService,
   ) {}
 
-  @Cron(CronExpression.EVERY_MINUTE, { name: 'booking-sla-sweep' })
   async sweep(): Promise<void> {
-    const acquired = await this.db.execute<{ locked: boolean }>(
-      sql`SELECT pg_try_advisory_lock(${SLA_LOCK_KEY}) AS locked`,
-    );
+    /*
+      Through `JobRunService`, which is the lock AND the record — as of BullMQ phase 4.
 
-    if (acquired.rows[0]?.locked !== true) {
-      // Another replica is sweeping. Skipping is correct — the work is not lost.
-      return;
-    }
+      This method had its own hand-rolled copy of the advisory lock and wrote nothing to
+      `scheduled_job_runs`. That table is what the runbook queries and what
+      `safra_job_last_success_age_seconds` alerts on, so of the five recurring jobs only two were
+      visible to it — and the SWEEP was one of the three that were not.
 
-    try {
-      const expiredPayments = await this.expireUnpaidBookings();
-      const expiredConfirmations = await this.expireUnconfirmedBookings();
+      That is the worst possible one to be missing. A sweep that stops firing does not throw and
+      does not log: it produces silence, and the consequence of the silence is that customers owed
+      §6.4 compensation do not get it. «الفشل الذي لا يلاحظه أحد» — the failure nobody notices — is
+      exactly what a row per run makes queryable, because an ABSENCE cannot be logged.
 
-      if (expiredPayments > 0 || expiredConfirmations > 0) {
-        this.logger.log(
-          `SLA sweep: ${expiredPayments} unpaid expired, ${expiredConfirmations} unconfirmed expired.`,
+      `runExclusively` also records a `skipped` row when another replica holds the lock, so a
+      four-node fleet reads as four attempts and one run rather than as a job running a quarter as
+      often as it does.
+    */
+    await this.runs
+      .runExclusively('booking-sla-sweep', SLA_LOCK_KEY, async () => {
+        const expiredPayments = await this.expireUnpaidBookings();
+        const expiredConfirmations = await this.expireUnconfirmedBookings();
+
+        return { expiredPayments, expiredConfirmations };
+      })
+      .catch((error: unknown) => {
+        /*
+          Swallowed HERE rather than inside the job, which is a deliberate difference from the
+          other four.
+
+          `runExclusively` records the failure and then re-throws, which is right: on the queue a
+          thrown job is retried. But this method is also called by the `@Cron` fallback path, where
+          an unhandled rejection kills the process — and a failed sweep must never take the API
+          down when the next minute would have retried anyway. Catching after the row is written
+          keeps both properties.
+        */
+        this.logger.error(
+          `SLA sweep failed: ${error instanceof Error ? error.message : String(error)}`,
         );
-      }
-    } catch (error) {
-      // Never throw from a scheduled job: an unhandled rejection kills the process,
-      // and a failed sweep must not take the API down. The next minute retries.
-      this.logger.error(
-        `SLA sweep failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    } finally {
-      await this.db.execute(sql`SELECT pg_advisory_unlock(${SLA_LOCK_KEY})`);
-    }
+      });
   }
 
   /**

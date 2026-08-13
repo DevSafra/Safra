@@ -65,6 +65,34 @@ export const propertyStatus = pgEnum('property_status', [
   'archived',
 ]);
 
+/**
+ * Where an uploaded photograph is in the pipeline.
+ *
+ * Exists because encoding moved OFF the request (BullMQ phase 3). The upload validates the file and
+ * stores the bytes; a worker decodes and re-encodes them into the six variants that get served. So
+ * between those two moments there is a row whose `file_key` names an object that does not exist yet,
+ * and the difference between "will exist shortly" and "will never exist" has to be recordable —
+ * otherwise the customer gallery and the partner's manager both have to guess.
+ *
+ * `ready` is the DEFAULT so that every row written before this column existed keeps being served.
+ */
+export const imageStatus = pgEnum('image_status', ['processing', 'ready', 'failed']);
+
+/**
+ * Where a requested export is in the pipeline.
+ *
+ * `running` is separate from `queued` on purpose: a large export takes minutes, and an operator
+ * watching a row that says «في الانتظار» for four minutes concludes it is stuck. Knowing work has
+ * STARTED is the difference between waiting and re-requesting, and a re-request is another full
+ * scan of the bookings table.
+ */
+export const exportStatus = pgEnum('export_status', [
+  'queued',
+  'running',
+  'ready',
+  'failed',
+]);
+
 /** SRS §8.4: per-day calendar state for a unit. */
 export const dayStatus = pgEnum('day_status', [
   'available',

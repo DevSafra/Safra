@@ -1,8 +1,9 @@
 import { sql } from 'drizzle-orm';
-import { index, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { index, integer, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
 
-import { jobRunStatus } from './enums.js';
-import { createdAt, primaryId } from './_shared.js';
+import { exportStatus, jobRunStatus } from './enums.js';
+import { createdAt, foreignId, primaryId, timestamps } from './_shared.js';
+import { users } from './identity.js';
 
 /**
  * What the scheduled jobs did, and when they last did it.
@@ -121,5 +122,79 @@ export const deadLetterJobs = pgTable(
       .on(t.failedAt)
       .where(sql`resolved_at IS NULL`),
     index('dead_letter_jobs_queue_idx').on(t.queue, t.failedAt),
+  ],
+);
+
+/**
+ * A CSV somebody asked for, and where it got to.
+ *
+ * ## Why an export is a ROW and not a response
+ *
+ * It used to be neither: `GET /admin/bookings/export` built the file inside the request and streamed
+ * it back, capped at 20,000 rows *because* it was synchronous. Rule 2 names exports among the work
+ * that must not block a request, and the cap was that rule being paid for in missing data — an
+ * operator exporting a busy quarter got a truncated file with a comment at the bottom.
+ *
+ * Making it a row is what removes the cap. It also makes the export a THING: it has a reference the
+ * operator can quote, a status they can watch, a size they can see before downloading, and an
+ * expiry after which it stops existing.
+ *
+ * ## The file is private and expires
+ *
+ * A booking export is the cheapest way to pull a large slice of customer data out of the platform,
+ * so the object lives under a prefix the bucket policy does not grant anonymous read to, and it is
+ * fetched through the API by an authorised caller whose download writes an audit row. `expires_at`
+ * exists because a CSV of every booking sitting in a bucket forever is a breach waiting for a
+ * misconfiguration.
+ */
+export const exportJobs = pgTable(
+  'export_jobs',
+  {
+    id: primaryId(),
+    reference: text('reference')
+      .notNull()
+      .unique()
+      .default(sql`'EXP-' || reference_number(nextval('export_reference_seq'))`),
+    /**
+     * Who asked. Not nullable: an export with no requester is one nobody can be asked
+     * about, and this table exists partly to answer that question.
+     */
+    requestedByUserId: foreignId('requested_by_user_id')
+      .notNull()
+      .references(() => users.id),
+    /** `bookings` today. Text rather than an enum so a second report needs no migration. */
+    kind: text('kind').notNull(),
+    /**
+     * The filters the export was run with, as an ALLOW-LISTED object.
+     *
+     * Stored so the file can be explained later — "2,531 rows" means nothing without
+     * knowing which slice — and re-validated on the way out, because a `jsonb` column is
+     * not a promise about its own shape.
+     */
+    filters: jsonb('filters')
+      .$type<Record<string, string | null>>()
+      .notNull()
+      .default({}),
+    status: exportStatus('status').notNull().default('queued'),
+    /** Rows written. Null until it is `ready`; shown so a suspiciously small file is visible. */
+    rowCount: integer('row_count'),
+    /** Where the CSV is. Private prefix; null until ready, and null again once pruned. */
+    fileKey: text('file_key'),
+    /** An ERROR code, never a sentence — the operator reads it in their own language. */
+    failureCode: text('failure_code'),
+    /** After this the object is deleted and the row becomes a record that it existed. */
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    /* The screen: this operator's exports, newest first. */
+    index('export_jobs_requester_idx').on(t.requestedByUserId, t.createdAt),
+    /*
+      The unfinished ones — small by construction, and what the stuck-export gauge reads on every
+      metrics scrape. Partial for the same reason as `property_images_processing_idx`.
+    */
+    index('export_jobs_pending_idx')
+      .on(t.createdAt)
+      .where(sql`status IN ('queued', 'running')`),
   ],
 );

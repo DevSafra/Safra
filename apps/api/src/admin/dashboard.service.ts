@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { SLA_EXPIRY_WARNING_MINUTES } from '@safra/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -29,6 +30,24 @@ const RECENT_AUDIT = 4;
  * A dashboard that shows a confident zero for a feature that does not exist is worse than
  * one that admits the gap: staff would read "no open disputes" and act on it.
  */
+/**
+ * The metrics `counters()` produces, as a type.
+ *
+ * One list, matching the UNION in the query below. It exists so a caller inside the API can read
+ * `counters.sla_expiring_soon` and be told at compile time if that metric stops being produced —
+ * which is exactly what the dashboard's EC-008 alert and the bookings registry's expiring filter both
+ * depend on agreeing about.
+ */
+export type DashboardCounterName =
+  | 'bookings_today'
+  | 'bookings_yesterday'
+  | 'pending_confirmation'
+  | 'sla_expiring_soon'
+  | 'cancelled_today'
+  | 'cancelled_today_with_fine'
+  | 'partners_pending_verification'
+  | 'properties_pending_review';
+
 @Injectable()
 export class DashboardService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
@@ -114,7 +133,7 @@ export class DashboardService {
         FROM bookings b
         WHERE b.status = 'pending_confirmation'
           AND b.confirmation_deadline_at IS NOT NULL
-          AND b.confirmation_deadline_at <= now() + INTERVAL '30 minutes'
+          AND b.confirmation_deadline_at <= now() + (${SLA_EXPIRY_WARNING_MINUTES}::int * INTERVAL '1 minute')
           AND b.deleted_at IS NULL
           AND ${inScope('b')}
       UNION ALL
@@ -141,9 +160,18 @@ export class DashboardService {
           AND ${inScope('pr')}
     `);
 
+    /*
+      Named, rather than left to inference.
+
+      `Object.fromEntries` infers an index signature, and spreading that into the object literal below
+      DROPS it — so `overview().counters` was typed as holding only the two revenue fields, and every
+      counter the query actually produces was invisible to the type system. Nothing noticed because the
+      console re-declares the shape in its own Zod schema, so the only reader that could have caught it
+      validates independently.
+    */
     const counters = Object.fromEntries(
       rows.rows.map((row) => [row.metric, Number(row.value)]),
-    );
+    ) as Record<DashboardCounterName, number>;
 
     /**
      * SAFRA's revenue is the commission plus the service fee — never the booking total,

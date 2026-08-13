@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { JobRunService } from '../common/jobs/job-run.service.js';
 import { RecommendationService } from './recommendation.service.js';
@@ -23,7 +22,7 @@ export class RankingScheduler {
    * 03:00 is chosen to sit after midnight in all three launch markets (UTC+2/+3)
    * while still being the quietest part of their night.
    */
-  @Cron(CronExpression.EVERY_DAY_AT_3AM, { name: 'ranking-recompute' })
+
   async nightlyRecompute(): Promise<void> {
     await this.runs.runExclusively('ranking-recompute', RANKING_LOCK_KEY, async () => {
       const scores = await this.recommendation.recomputeAll();

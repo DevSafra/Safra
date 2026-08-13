@@ -135,6 +135,49 @@ export class NotificationService {
   }
 
   /**
+   * Puts a lost notification back on the queue, from a mail somebody else rebuilt.
+   *
+   * ## Why this is separate from `notify`
+   *
+   * `notify` writes a row and enqueues. A re-drive already HAS the row — it is the thing that
+   * identified the loss — so calling `notify` would write a second one, and the delivery log would
+   * show two notices where one was owed. That log is the first thing read when somebody disputes a
+   * §6.4 fine, so an extra row is not a cosmetic problem.
+   *
+   * ## The enqueue failure is swallowed, again
+   *
+   * Same reasoning as `notify`, and more so here: this runs inside a recurring job during whatever
+   * incident lost the queue in the first place. A throw would fail the whole batch on the first
+   * row, and that row would still be `queued` — so the next occurrence would try it first and fail
+   * identically. Returning false lets the batch continue and the count be honest.
+   *
+   * `mailJobId` is deterministic, so a row whose job still exists is refused by BullMQ rather than
+   * sent twice. That is the safety net that makes re-driving optimistically the right default.
+   */
+  async reenqueue(
+    notificationId: string,
+    templateKey: string,
+    mail: OutgoingMail,
+  ): Promise<boolean> {
+    try {
+      await this.queue.add(
+        MAIL_JOB,
+        { notificationId, templateKey, mail } satisfies MailJobData,
+        { ...JOB_OPTIONS.mail, jobId: mailJobId(notificationId) },
+      );
+
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Could not re-drive notification ${notificationId}: ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
+
+      return false;
+    }
+  }
+
+  /**
    * Sends the mail and marks the row terminal. Called by the worker, never by a request.
    *
    * ## Why the worker calls back into this class

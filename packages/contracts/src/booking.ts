@@ -77,3 +77,18 @@ export const bookingQuoteSchema = z
   });
 
 export type BookingQuoteInput = z.infer<typeof bookingQuoteSchema>;
+
+/**
+ * How close §6.4's confirmation window has to be before it is "expiring soon".
+ *
+ * ## Why this is a constant and not a literal in three queries
+ *
+ * It was a literal in three: the dashboard's EC-008 counter, the review service's queue metric, and
+ * the bookings registry's filter. Three copies of a threshold that has to AGREE — the alert says
+ * "twelve expiring soon" and the filter it links to must return twelve, or the operator concludes one
+ * of them is broken and stops trusting both.
+ *
+ * Thirty minutes is a product judgement: long enough that somebody can act, short enough that the
+ * queue is not everything still pending.
+ */
+export const SLA_EXPIRY_WARNING_MINUTES = 30;

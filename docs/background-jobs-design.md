@@ -183,15 +183,90 @@ scrape; alerts armed. No application change. _Verifiable on its own._
 `NotificationService.notify` writes its row and enqueues instead of sending. Everything else is
 untouched. **This alone removes the accepted deviation in `O-notify-1`.**
 
-**Phase 3 — `media`.** Upload stores the original and enqueues processing; the manager shows a
-processing state. Needs a small UI change and an `images.status` column — the only phase with a
-schema migration.
+**Phase 3 — `media`. DONE 2026-08-13.** Upload validates, stores the original under a PRIVATE
+`incoming/` prefix and enqueues; a worker decodes, re-encodes and publishes; the manager shows a
+processing state and polls while anything is rendering. `property_images` gained `status`,
+`original_key` and `failure_code`.
 
-**Phase 4 — `scheduled`.** As above, with both paths live for a week.
+> **The design said "stores the original" and left out where.** The whole security property of the
+> image pipeline is that nothing the client uploaded is ever SERVED, and a queue necessarily creates
+> a window where the platform holds the file exactly as it arrived. `bootstrap-media.ts` grants
+> anonymous read on `properties/*` and nothing else, so the parked file goes to `incoming/` — which
+> is not in that grant. It is deleted the moment the variants exist, and kept deliberately when a
+> render fails, because then it is the evidence.
 
-**Phase 5 — `webhooks`, `exports`.** New capability rather than migration.
+> **Validation did NOT move to the worker, and must not.** A file that is not an image, or is a
+> decompression bomb, or is 30 px wide, is refused inside the request in single-digit milliseconds.
+> Deferred, the same upload becomes a job that fails, a dead letter, and a partner staring at a
+> gallery with no idea why. The split is `inspect` (request) and `render` (worker).
 
-**Phase 6 — remove** the advisory lock, the `@Cron` decorators, and the flag.
+> **Four readers had to learn the difference.** The customer gallery, the listing card's cover, the
+> partner's own manager and — the one nothing on any screen would have revealed — the RANKING's
+> photo count. §5.5 rewards photo count, so counting an image that has not rendered lets a partner
+> raise their own recommendation score with files that fail. The predicate is one constant in
+> `image-visibility.ts`, for the same reason a paginated list shares one `fromWhere`.
+
+**Phase 4 — `scheduled`. DONE 2026-08-13.** The five recurring jobs are BullMQ repeatable jobs,
+declared at boot by `ScheduledRegistrar` and dispatched by `ScheduledProcessor` to the same service
+methods the decorators called. `JOBS_VIA_QUEUE` (default `true`) is the flag this section asks for:
+set it `false` and the schedules are REMOVED from Redis and the `@Cron` path takes over. Both paths
+exist, exactly one runs, and `CronGate` says which at boot.
+
+> **The migration found that three of the five jobs never recorded a run at all.** This document
+> says `scheduled_job_runs` "must keep being written — from inside the job, exactly as now", and
+> "as now" turned out to mean two of five: the payout accrual and the ranking recompute went through
+> `JobRunService`, while the SLA sweep, the sanctions refresh and webhook retention each had their
+> own hand-rolled copy of the advisory lock and wrote nothing.
+>
+> The SLA sweep is the worst one to have been missing. `safra_job_last_success_age_seconds` reads
+> that table, so the job whose silence means customers owed §6.4 compensation do not get it was the
+> job alerting could not see. All three now go through `runExclusively`, which is the lock and the
+> record together — and three copies of the lock are gone.
+
+> **A repeatable schedule lives in Redis, not in the code.** So the registrar reconciles in both
+> directions: it declares what should exist and DELETES what should not. Without the second half, a
+> renamed job keeps firing forever from a schedule no deploy can reach, producing occurrences no
+> worker recognises.
+
+**Phase 5 — `exports`. DONE 2026-08-13. `webhooks` NOT BUILT — see below.** Requesting an export is
+a `POST` that writes an `export_jobs` row and enqueues; a worker builds the CSV, stores it under a
+private `exports/` prefix and sets a seven-day expiry; the operator collects it from
+الملفات المصدَّرة, which polls while anything is still building.
+
+> **The 20,000-row cap is gone.** It existed only because the file was built inside a request — an
+> operator exporting a busy quarter received a truncated CSV with a comment at the bottom explaining
+> that it was one. The ceiling is now 250,000, which answers a different question: how large a file
+> is useful, rather than how long a request may block. It is still STATED in the file when it bites.
+
+> **Two audit rows, not one.** `booking.export_requested` when it is asked for, `booking.exported`
+> when bytes actually leave. The synchronous version could only write one and wrote it before the
+> response, so an abandoned download recorded as an export.
+
+> **Authorisation is re-derived on the far side, never carried.** The job payload is a row id. The
+> worker reads the requester and their city scope from the database AS THEY STAND WHEN IT RUNS —
+> because a job queued a minute before somebody's access was revoked must not hand them the data a
+> minute after.
+
+> **`webhooks` was not built, and the reason is that there is nothing to migrate.** This document
+> lists the queue for "outbound partner/PSP callbacks", and no such capability exists: `PaymentWebhookService`
+> RECEIVES webhooks, nothing sends them, and no partner has asked for one. Building a delivery
+> subsystem with retries, a dead letter and an alert for a feature that does not exist would be
+> infrastructure nobody can test against a real receiver. The queue stays declared in
+> `queue.definitions.ts` with its retry policy, so the day an outbound webhook is specified the
+> decision is already made.
+
+**Phase 6 — DONE 2026-08-13, with one deliberate deviation.** The `@Cron` decorators are gone, the
+`JOBS_VIA_QUEUE` flag is gone, and `CronGate` with them. **The advisory lock stays.**
+
+> The stated reason for dropping it was that `scheduled` at concurrency 1 is "a stronger guarantee
+> across a cluster than a lock this codebase has to remember to take". The first half is true. The
+> second stopped being true in phase 4: the lock now lives inside `JobRunService.runExclusively`,
+> which is the only way any job body is reached, so there is nothing left for anybody to remember.
+>
+> What removing it would cost is the case the queue does not cover — anything invoking a job body
+> OUTSIDE the queue. A "run now" button in the console is an obvious future feature, and the failure
+> it would cause is payout accrual running twice. Two round trips per job run is not a price worth
+> paying to delete that.
 
 Each phase is independently shippable and independently revertible. **Phases 1 and 2 are worth doing
 on their own** even if the rest waits.

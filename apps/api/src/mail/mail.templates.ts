@@ -238,3 +238,39 @@ export function bookingNeedsActionMail(input: {
     }),
   };
 }
+
+/**
+ * The re-drive notice: something was waiting, and we cannot say exactly what.
+ *
+ * ## Why this template has to exist
+ *
+ * `docs/background-jobs-design.md` claims a total loss of Redis is survivable because the work can
+ * be "re-driven from the database rows". Detection always worked — a `queued` row names exactly
+ * what was lost — but RECONSTRUCTION could not be written as described, and the register recorded
+ * that as an open gap against launch blocker 2.
+ *
+ * The reason is a deliberate design choice elsewhere: a `notifications` row carries no recipient, no
+ * subject and no body, because every support agent can read that table. So the row says a partner
+ * was to be told about a review, and cannot say WHICH review.
+ *
+ * Three of the four notices are in that position. Rather than downgrade the recovery claim to
+ * "identifiable and unsendable", they are re-driven as this: a notice that says something is
+ * waiting and links to the screen where it is. That is less than the original and considerably more
+ * than silence, and it is honest about being a summary rather than pretending to be the first
+ * message.
+ *
+ * `booking.needs_action` is the exception and is rebuilt in full — its `booking_id` is enough.
+ */
+export function notificationWaitingMail(input: {
+  to: string;
+  locale: string;
+  url: string;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).waiting;
+
+  return {
+    to: input.to,
+    subject: copy.subject,
+    text: fill(copy.body, { url: input.url }),
+  };
+}

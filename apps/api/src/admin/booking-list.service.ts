@@ -2,7 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { COUNT_CAP, type OffsetPage, offsetPage } from '@safra/contracts';
+import {
+  COUNT_CAP,
+  SLA_EXPIRY_WARNING_MINUTES,
+  type OffsetPage,
+  offsetPage,
+} from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
@@ -27,6 +32,13 @@ export interface BookingListQuery {
   readonly page: number;
   readonly status?: string | undefined;
   readonly q?: string | undefined;
+  /**
+   * §6.4's confirmation window about to lapse — the dashboard's EC-008 alert, as a list.
+   *
+   * A boolean rather than a window the caller chooses, because the COUNT on the dashboard and the
+   * ROWS in this list have to agree. `SLA_EXPIRY_WARNING_MINUTES` is the single definition both read.
+   */
+  readonly expiring?: boolean | undefined;
 }
 
 /**
@@ -94,6 +106,22 @@ export class BookingListService {
       conditions.push(sql`b.status = ${query.status}::booking_status`);
     }
 
+    if (query.expiring) {
+      /*
+        The same predicate the dashboard counts, so the alert and this list cannot disagree.
+
+        `bookings_sla_idx` is (status, confirmation_deadline_at) WHERE status = 'pending_confirmation',
+        which serves exactly this — the status term is implied by the partial index and stated anyway,
+        because a filter that depended on the index's WHERE clause to be correct would break silently
+        if the index were ever redefined.
+      */
+      conditions.push(sql`
+        b.status = 'pending_confirmation'::booking_status
+        AND b.confirmation_deadline_at IS NOT NULL
+        AND b.confirmation_deadline_at
+              <= now() + (${SLA_EXPIRY_WARNING_MINUTES}::int * INTERVAL '1 minute')`);
+    }
+
     if (query.q) {
       const term = `%${query.q}%`;
 
@@ -140,7 +168,16 @@ export class BookingListService {
              to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at
         ${fromWhere}
-        ORDER BY b.created_at DESC, b.id DESC
+        /*
+          Soonest-first when the filter is the expiring one, newest-first otherwise.
+
+          An operator opening "twelve expiring soon" needs the one with four minutes left at the top;
+          created_at DESC would put the newest booking there, which is the one with the MOST time.
+          The id breaks the tie either way, so the order is total and a page cannot repeat a row.
+        */
+        ORDER BY
+          ${query.expiring ? sql`b.confirmation_deadline_at ASC` : sql`b.created_at DESC`},
+          b.id DESC
         LIMIT ${query.limit} ${this.pageOffset(query)}
       `),
       this.countOf(fromWhere),

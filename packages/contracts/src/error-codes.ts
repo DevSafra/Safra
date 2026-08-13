@@ -95,6 +95,24 @@ export const ERROR = {
   UPLOAD_NOT_AN_IMAGE: 'upload.not_an_image',
   UPLOAD_IMAGE_UNREADABLE: 'upload.image_unreadable',
   UPLOAD_IMAGE_TOO_LARGE: 'upload.image_too_large',
+  /**
+   * The variants could not be produced, after the upload itself was accepted.
+   *
+   * Distinct from every code above it, which are all refusals the UPLOADER sees in the response.
+   * This one is discovered later, by a worker, and is stored on the row so the partner can be told
+   * in their own language why a photograph they successfully sent is not on their listing.
+   */
+  UPLOAD_IMAGE_PROCESSING_FAILED: 'upload.image_processing_failed',
+  /**
+   * The four states a requested export can be in that are not "here is your file".
+   *
+   * `EXPORT_NOT_FOUND` also covers somebody else's export, deliberately — the two must be
+   * indistinguishable, or the endpoint becomes a way to discover which references exist.
+   */
+  EXPORT_NOT_FOUND: 'export.not_found',
+  EXPORT_NOT_READY: 'export.not_ready',
+  EXPORT_FAILED: 'export.failed',
+  EXPORT_EXPIRED: 'export.expired',
   IMAGE_NOT_FOUND: 'image.not_found',
   /** A reorder that does not name exactly the property's live images. */
   IMAGE_ORDER_MISMATCH: 'image.order_mismatch',

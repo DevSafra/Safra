@@ -9,7 +9,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { SanctionsService } from '../sanctions/sanctions.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { ERROR } from '@safra/contracts';
+import { ERROR, SLA_EXPIRY_WARNING_MINUTES } from '@safra/contracts';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
 /**
@@ -524,7 +524,7 @@ export class ReviewService {
         FROM bookings
         WHERE status = 'pending_confirmation'
           AND confirmation_deadline_at IS NOT NULL
-          AND confirmation_deadline_at <= now() + INTERVAL '30 minutes'
+          AND confirmation_deadline_at <= now() + (${SLA_EXPIRY_WARNING_MINUTES}::int * INTERVAL '1 minute')
           AND deleted_at IS NULL
     `);
 

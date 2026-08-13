@@ -1,6 +1,7 @@
 import type { Queue } from 'bullmq';
 
 import type { MailJobData } from './mail.job.js';
+import type { MediaJobData } from './media.job.js';
 
 /**
  * A `mail` queue that runs in the test process, with no Redis.
@@ -28,24 +29,32 @@ import type { MailJobData } from './mail.job.js';
  * Built rather than excluded, like `@safra/db`'s `createRollbackDatabase` — test support that several
  * suites share has to live somewhere they can all import.
  */
-export interface InlineMailQueue {
+export interface InlineQueue<T> {
   /** Pass this where a `Queue` is expected. */
   readonly queue: Queue;
   /** Everything enqueued, in order, whether or not it has been run. */
-  readonly jobs: MailJobData[];
+  readonly jobs: T[];
   /** Job ids seen, so a test can assert the deterministic-id contract. */
   readonly jobIds: string[];
   /** When set, `add` runs the job immediately instead of buffering it. */
-  autoRun: ((data: MailJobData) => Promise<void>) | null;
+  autoRun: ((data: T) => Promise<void>) | null;
   /** Runs and clears whatever is buffered. */
-  drain(run: (data: MailJobData) => Promise<void>): Promise<void>;
+  drain(run: (data: T) => Promise<void>): Promise<void>;
 }
 
-export function createInlineMailQueue(): InlineMailQueue {
-  const jobs: MailJobData[] = [];
+/**
+ * Generic over the job payload, because `media` needs exactly the same double.
+ *
+ * The two queues differ in what they carry and in nothing else that a test asserting the SEAM cares
+ * about: something was enqueued, under a deterministic id, and the row it names is in the state the
+ * recovery story depends on. A second copy of this file for `media` would have been forty lines of
+ * the same reasoning, and would have drifted the first time one of them gained a behaviour.
+ */
+export function createInlineQueue<T>(): InlineQueue<T> {
+  const jobs: T[] = [];
   const jobIds: string[] = [];
 
-  const inline: InlineMailQueue = {
+  const inline: InlineQueue<T> = {
     jobs,
     jobIds,
     autoRun: null,
@@ -58,7 +67,7 @@ export function createInlineMailQueue(): InlineMailQueue {
     },
 
     queue: {
-      add: async (_name: string, data: MailJobData, options?: { jobId?: string }) => {
+      add: async (_name: string, data: T, options?: { jobId?: string }) => {
         jobIds.push(options?.jobId ?? '');
 
         if (inline.autoRun) {
@@ -81,4 +90,14 @@ export function createInlineMailQueue(): InlineMailQueue {
   };
 
   return inline;
+}
+
+/** The `mail` queue's double. Named so existing suites read the same as before. */
+export function createInlineMailQueue(): InlineQueue<MailJobData> {
+  return createInlineQueue<MailJobData>();
+}
+
+/** The `media` queue's double — see `createInlineQueue`. */
+export function createInlineMediaQueue(): InlineQueue<MediaJobData> {
+  return createInlineQueue<MediaJobData>();
 }

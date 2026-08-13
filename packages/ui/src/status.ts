@@ -75,6 +75,15 @@ const STATUS_TONES: Record<string, Tone> = {
   pending_confirmation: 'pend',
   /** Also purple, in a vocabulary that has no `pending_confirmation` to clash with. */
   processing: 'pend',
+  /*
+    An export being BUILT by a worker (BullMQ phase 5).
+
+    `indigo` rather than reusing `processing`'s purple: the two never share a screen, so the rule
+    would allow it, but a distinct value earning a distinct colour is what keeps rule 1 checkable —
+    "the same status is the same colour everywhere" is only meaningful while one colour means one
+    thing.
+  */
+  running: 'indigo',
 
   /*
     ── Payouts ───────────────────────────────────────────────────────────────
@@ -94,6 +103,8 @@ const STATUS_TONES: Record<string, Tone> = {
   investigating: 'warn',
   paused: 'warn',
   queued: 'warn',
+  /* A built export, waiting to be collected. Distinct from `active`'s green by design. */
+  ready: 'lime',
   awaiting_partner_signature: 'warn',
   /** A closed payout period waiting for somebody to decide to send it. */
   pending_release: 'warn',
@@ -186,6 +197,14 @@ export const VOCABULARIES: Readonly<Record<string, readonly string[]>> = {
    * keeps its red there and here — the same status is the same colour everywhere, which is rule 1.
    */
   payout: ['accruing', 'pending_release', 'on_hold', 'scheduled', 'paid', 'cancelled'],
+  /**
+   * A requested CSV, on الملفات المصدَّرة.
+   *
+   * Four values on one table, so four tones. `queued` keeps the amber it has on سجل المراسلات and
+   * `failed` the red it has everywhere — the same status is the same colour across screens, which
+   * is rule 1, and it is why these two are not re-chosen here.
+   */
+  export: ['queued', 'running', 'ready', 'failed'],
 };
 
 /**

@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { JobRunService } from '../common/jobs/job-run.service.js';
 import { PayoutService } from './payout.service.js';
@@ -41,11 +40,6 @@ export class PayoutScheduler {
     private readonly payouts: PayoutService,
     private readonly runs: JobRunService,
   ) {}
-
-  @Cron(CronExpression.EVERY_HOUR, { name: 'payout-accrual' })
-  async hourlyAccrual(): Promise<void> {
-    await this.run();
-  }
 
   /**
    * One accrual, locked and recorded — the cron's body, and what the manual endpoint calls.

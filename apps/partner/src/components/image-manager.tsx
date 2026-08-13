@@ -1,7 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+
+import { isErrorCode } from '@safra/contracts';
+import { errorMessage } from '@safra/i18n';
 
 import type { PropertyImage } from '@/lib/api';
 import { count } from '@/lib/format';
@@ -46,6 +49,31 @@ export function ImageManager({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const rendering = images.some((image) => image.status === 'processing');
+
+  /**
+   * Re-reads while anything is still rendering, and stops the moment nothing is.
+   *
+   * This screen is server-rendered and otherwise refreshes only after an ACTION, which was correct
+   * while an upload returned a finished photograph. Since BullMQ phase 3 it returns a tile that
+   * fills itself in a second or two later — so without this the partner watches «جارٍ التحضير…»
+   * until they happen to reload, which is indistinguishable from a broken upload.
+   *
+   * Conditional on `rendering`, so a gallery of finished photographs polls NOTHING: an unconditional
+   * interval would be every open property page in the estate re-rendering on the server every two
+   * seconds, forever, to learn that nothing changed.
+   *
+   * Two seconds because a render takes about one. Faster would mostly catch itself mid-encode.
+   */
+  useEffect(() => {
+    if (!rendering) return;
+
+    const timer = setTimeout(() => router.refresh(), 2_000);
+
+    return () => clearTimeout(timer);
+    /* `images` is the dependency that matters: each refresh gives a new array, which re-arms this. */
+  }, [rendering, images, router]);
 
   async function act(
     path: string,
@@ -92,9 +120,10 @@ export function ImageManager({
    *
    * ## Why sequential and not parallel
    *
-   * Each upload decodes, resizes and re-encodes six variants with sharp, so ten at once is ten
-   * concurrent libvips jobs on the API — and the endpoint's own throttle is twenty a minute
-   * precisely because the work is heavy. Sequential also makes the two invariants hold: the FIRST
+   * The encoding itself is no longer the reason — that moved to a worker in BullMQ phase 3, so ten
+   * uploads are now ten fast requests and ten queued jobs rather than ten concurrent libvips runs.
+   * What is left is the reason that never depended on it: the endpoint is throttled to twenty a
+   * minute, and sequential requests make the two invariants hold. The FIRST
    * image becomes the cover, and each new one goes after the last. Both are computed from the rows
    * that exist when the request arrives, so parallel uploads race and the resulting order is
    * whatever the event loop decided.
@@ -233,11 +262,38 @@ export function ImageManager({
                   optimise. `alt` is the partner's own text, or empty — a filename in an alt
                   attribute is worse than nothing for a screen-reader user.
                 */}
-                <img
-                  src={image.urls.thumbnail}
-                  alt={image.alt.ar ?? ''}
-                  className="h-full w-full object-cover"
-                />
+                {/*
+                  The picture is only rendered once it EXISTS.
+
+                  A `processing` row carries the URLs its variants will have, and none of them
+                  resolves yet — so drawing the `<img>` would put a broken-image glyph on the tile
+                  for the second or two the encode takes, which is the single most alarming thing
+                  this screen could show somebody who has just uploaded a photograph.
+                */}
+                {image.status === 'ready' ? (
+                  <img
+                    src={image.urls.thumbnail}
+                    alt={image.alt.ar ?? ''}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-3 text-center">
+                    <span
+                      className={`text-[12.5px] font-bold ${
+                        image.status === 'failed' ? 'text-bad' : 'text-muted'
+                      }`}
+                    >
+                      {image.status === 'failed'
+                        ? t.images.failedState
+                        : t.images.processing}
+                    </span>
+                    <span className="text-[10.5px] text-faint">
+                      {image.status === 'failed'
+                        ? reasonFor(image.failureCode)
+                        : t.images.processingNote}
+                    </span>
+                  </div>
+                )}
 
                 {image.isCover ? (
                   <span className="absolute top-2 start-2 rounded-full border border-gold bg-gold/20 px-2.5 py-0.5 text-[10.5px] font-bold text-gold">
@@ -422,6 +478,18 @@ function AltField({
       />
     </label>
   );
+}
+
+/**
+ * Turns a stored `failure_code` into a sentence in the reader's language.
+ *
+ * The API stores an ERROR CODE on the row, never a message: a `sharp` error would be English,
+ * unlocalisable, and would quote whatever the uploaded file claimed about itself. `isErrorCode`
+ * guards the lookup so a value that is not one of ours cannot be printed — a stored string is not
+ * a place to trust blindly, even one only our own worker writes.
+ */
+function reasonFor(code: string | null): string {
+  return code && isErrorCode(code) ? errorMessage(code, 'ar') : t.images.failedHint;
 }
 
 function Small({

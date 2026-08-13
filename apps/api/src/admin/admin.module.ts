@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 
 import { AuditService } from '../common/audit/audit.service.js';
-import { JobRunService } from '../common/jobs/job-run.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { PartnerTwoFactorService } from '../auth/partner-two-factor.service.js';
 import { AdminGrantsController, AdminGrantsService } from './grants.controller.js';
@@ -33,6 +32,7 @@ import { MessagingService } from './messaging.service.js';
 import { AdvertisingService } from './advertising.service.js';
 import { PartnerContractService } from './partner-contract.service.js';
 import { BookingExportService } from './booking-export.service.js';
+import { ExportRequestService } from './export-request.service.js';
 import { StaffScopeService } from './staff-scope.service.js';
 
 @Module({
@@ -58,7 +58,6 @@ import { StaffScopeService } from './staff-scope.service.js';
     BookingDetailService,
     SettingsAdminService,
     AuditService,
-    JobRunService,
     PartnerTwoFactorService,
     MeService,
     StaffService,
@@ -81,7 +80,8 @@ import { StaffScopeService } from './staff-scope.service.js';
     // B-12 staff scope and B-13 the audited export (Bashar, 2026-08-04).
     StaffScopeService,
     BookingExportService,
+    ExportRequestService,
   ],
-  exports: [ReviewService],
+  exports: [ReviewService, BookingExportService],
 })
 export class AdminModule {}

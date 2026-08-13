@@ -34,6 +34,7 @@ import { WalletModule } from '../wallet/wallet.module.js';
   ],
   exports: [
     BookingsService,
+    SlaService,
     BookingAccessService,
     BookingCreationService,
     BookingActionsService,

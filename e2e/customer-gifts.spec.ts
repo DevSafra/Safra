@@ -365,20 +365,52 @@ test.describe('بطاقات الهدايا', () => {
       .slice(0, 8)}`;
 
     /*
-      The REASON rotates with how many disputes already exist.
+      The BOOKING and the REASON are chosen from the pairs this account has not used yet.
 
       One live dispute is allowed per booking per reason — a second freezes the host's payout twice
-      over for the same complaint — so a spec that always picked the same reason on the same booking
-      collided with its own previous run and was refused `dispute.already_open`. Choosing by the count
-      already on the page means run one takes the first reason, run two the second, and so on.
+      over for the same complaint — so the pair a run picks must be one no earlier run picked. The
+      first version rotated the reason by the row count on the page, which is the same thing only
+      while the count stays under four: the fixture's newest booking took all four reasons in four
+      runs and the fifth was refused `dispute.already_open`, which surfaces as the new row simply
+      never arriving.
 
-      `db:testbed` deletes the testbed bookings' disputes, which is what bounds this: without a reset
-      the fifth consecutive run on one booking exhausts the four reasons. Said plainly rather than
-      left as a rare flake for somebody else to find.
+      So the pairs already spent are read off the list itself — every row prints its booking
+      reference and its reason — and the first unspent combination is used. That is eight bookings
+      by four reasons rather than four, and when it does run out it says so here instead of failing
+      twenty lines later on a missing row.
     */
-    const existing = await page.locator('#disputes-list li').count();
+    const spent = new Set<string>();
 
-    await page.locator('select[name=kind]').selectOption({ index: existing % 4 });
+    for (const row of await page.locator('#disputes-list li').all()) {
+      const text = (await row.textContent()) ?? '';
+      const booking = /BKG-[\d-]+/.exec(text)?.[0];
+
+      for (const [kind, label] of Object.entries(en.disputeKinds)) {
+        if (booking && text.includes(label)) spent.add(`${booking}|${kind}`);
+      }
+    }
+
+    const bookingOptions = await page
+      .locator('select[name=bookingReference] option')
+      .evaluateAll((options) =>
+        options.map((option) => (option as HTMLOptionElement).value),
+      );
+
+    const pair = bookingOptions
+      .flatMap((booking) =>
+        Object.keys(en.disputeKinds).map((kind) => ({ booking, kind })),
+      )
+      .find(({ booking, kind }) => !spent.has(`${booking}|${kind}`));
+
+    if (!pair) {
+      throw new Error(
+        'Every booking/reason pair on the fixture account already has a live dispute. ' +
+          'Run `pnpm db:testbed` to clear them.',
+      );
+    }
+
+    await page.locator('select[name=bookingReference]').selectOption(pair.booking);
+    await page.locator('select[name=kind]').selectOption(pair.kind);
 
     /*
       A phone number goes in on purpose. A dispute is where somebody is most likely to write "just call

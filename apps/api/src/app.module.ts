@@ -31,7 +31,8 @@ import { HealthModule } from './health/health.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { DisputeModule } from './disputes/dispute.module.js';
 import { QueueModule } from './queue/queue.module.js';
-import { MailWorkerModule } from './queue/mail-worker.module.js';
+import { JobsModule } from './common/jobs/jobs.module.js';
+import { WorkerModule } from './queue/worker.module.js';
 import { RedisThrottlerStorage } from './redis/redis-throttler.storage.js';
 import {
   accountTracker,
@@ -48,7 +49,8 @@ import { TwoFactorGuard } from './rbac/two-factor.guard.js';
     QueueModule,
     DisputeModule,
     /* The mail worker's processor. Constructed in both processes; only worker.ts runs it. */
-    MailWorkerModule,
+    JobsModule,
+    WorkerModule,
     DatabaseModule,
     RedisModule,
     // Cron support for the nightly ranking recompute. The job itself takes a

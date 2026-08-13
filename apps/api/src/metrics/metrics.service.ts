@@ -104,7 +104,7 @@ export class MetricsService {
   }
 
   private async collect(): Promise<Gauge[]> {
-    const [jobs, notifications, sanctions, webhooks, sla, deadLetters] =
+    const [jobs, notifications, sanctions, webhooks, sla, deadLetters, imagePipeline] =
       await Promise.all([
         this.jobs(),
         this.notifications(),
@@ -112,6 +112,7 @@ export class MetricsService {
         this.webhooks(),
         this.sla(),
         this.deadLetters(),
+        this.imagePipeline(),
       ]);
 
     return [
@@ -121,6 +122,7 @@ export class MetricsService {
       ...webhooks,
       ...sla,
       ...deadLetters,
+      ...imagePipeline,
       {
         name: 'safra_media_reachable',
         help: '1 when the media bucket answers for a missing object, 0 when it refuses or is unreachable.',
@@ -402,6 +404,56 @@ export class MetricsService {
           labels: { queue },
           value: Number(byQueue.get(queue)?.oldest ?? 0),
         })),
+      },
+    ];
+  }
+
+  /**
+   * Photographs that were accepted and never rendered.
+   *
+   * ## Why this is a separate signal from the dead letters
+   *
+   * A dead letter means a job ran, failed every attempt, and said so. This counts the case with no
+   * job at all: `notify`-style enqueue swallowing means an upload whose `media.add` threw leaves a
+   * `processing` row and NOTHING in Redis, and so does a worker that is simply not running. Both are
+   * silent — the partner sees a tile that never finishes, and no alert fires, because from the
+   * queue's point of view nothing ever went wrong.
+   *
+   * ## Why it is an age and not a count
+   *
+   * A count is meaningless without knowing how long: at any instant several images are legitimately
+   * mid-render. The oldest one's age is the signal — under a minute is a working pipeline, an hour
+   * is a stopped worker. Zero when the queue is empty, which is the ordinary state.
+   *
+   * The partial index `property_images_processing_idx` is what makes this cheap enough to run on
+   * every scrape of an ever-growing table.
+   */
+  /*
+    Not `media()` — that name is taken by the injected `MediaReachabilityService` field, and a
+    method and a property of the same name on one class is a silent shadow rather than an error in
+    some positions. The same clash cost time in `MessagingService` (`notifications`), which is why
+    this one is named for what it measures instead.
+  */
+  private async imagePipeline(): Promise<Gauge[]> {
+    const rows = await this.db.execute<{ n: string; oldest: string | null }>(sql`
+      SELECT count(*)::text AS n,
+             EXTRACT(EPOCH FROM (now() - min(updated_at)))::text AS oldest
+      FROM property_images
+      WHERE status = 'processing'
+    `);
+
+    const row = rows.rows[0];
+
+    return [
+      {
+        name: 'safra_images_processing',
+        help: 'Uploaded photographs waiting for a worker to render their variants.',
+        samples: [{ labels: {}, value: Number(row?.n ?? 0) }],
+      },
+      {
+        name: 'safra_images_processing_oldest_seconds',
+        help: 'Age of the longest-waiting unrendered photograph. 0 when none are waiting.',
+        samples: [{ labels: {}, value: Number(row?.oldest ?? 0) }],
       },
     ];
   }

@@ -88,6 +88,11 @@ export default async function BookingsPage({
   const q = first('q');
   // Dropped rather than forwarded if it is not a real status — see `oneOf`.
   const status = oneOf(params['status'], STATUSES);
+  /*
+    §6.4's window about to lapse. Present-or-absent rather than true/false: a URL somebody pastes
+    should read `?expiring=1`, and any other value is simply not the filter.
+  */
+  const expiring = first('expiring') === '1';
   const page = pageNumber(first('page'));
   // The URL wins, then this reader's saved size for bookings, then ten — see `resolvePageSize`.
   const size = await resolvePageSize('bookings', first('size'));
@@ -96,7 +101,7 @@ export default async function BookingsPage({
   const back = returnQuery({ page, size, q, status });
 
   const [result, counts] = await Promise.all([
-    getBookings({ q, status, page, limit: size }),
+    getBookings({ q, status, expiring, page, limit: size }),
     sidebarCounts(),
   ]);
 
@@ -115,12 +120,32 @@ export default async function BookingsPage({
                   {fill(t.sections.bookings.count, { n: count(total(result.counts)) })}
                 </ToolbarNote>
                 {/*
-                  The export carries the CURRENT filters, so what downloads is what is on screen.
-                  An export that ignored the filter would have somebody reconcile the wrong set
-                  against a bank statement with no way to tell.
+                  The export carries the CURRENT filters, so what is built is what is on screen. An
+                  export that ignored the filter would have somebody reconcile the wrong set against
+                  a bank statement with no way to tell.
+
+                  A FORM, not a link, since BullMQ phase 5: the button asks a worker to build the
+                  file rather than downloading one. A GET that creates a row would let a prefetch or
+                  a pasted link produce an export in somebody's name, and an export is the cheapest
+                  way to pull a large slice of customer data out of this console. It posts and
+                  redirects to الملفات المصدَّرة, where the file is collected.
                 */}
-                <OutlineAction href={exportHref({ q, status })} download>
-                  {t.table.exportCsv}
+                <form
+                  action="/bookings/exports/request"
+                  method="post"
+                  className="contents"
+                >
+                  {q ? <input type="hidden" name="q" value={q} /> : null}
+                  {status ? <input type="hidden" name="status" value={status} /> : null}
+                  <button
+                    type="submit"
+                    className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-line bg-field px-3.5 text-[12.5px] text-text2 hover:border-gold hover:text-gold lg:min-h-0 lg:py-2"
+                  >
+                    {t.table.exportCsv}
+                  </button>
+                </form>
+                <OutlineAction href="/bookings/exports">
+                  {t.table.exportsLink}
                 </OutlineAction>
               </>
             )
@@ -131,6 +156,28 @@ export default async function BookingsPage({
             in one navigation, and the result is a URL somebody can send to a colleague — which
             the prototype's live-filtering input cannot produce.
           */}
+          {/*
+            A CHECKBOX, not a hidden field.
+
+            It has to do two jobs. It carries the filter through a search — without that, typing a
+            query while looking at "expiring soon" would silently widen the view to every booking,
+            which is the paging rule's other half. And it gives the filter an OFF switch: arriving
+            here from the dashboard's EC-008 alert and having no way back to the full table would
+            leave an operator on a view they cannot explain.
+
+            `value="1"` because that is the only value the API accepts — see the query schema.
+          */}
+          <label className="flex cursor-pointer items-center gap-2 text-[12.5px] text-muted">
+            <input
+              type="checkbox"
+              name="expiring"
+              value="1"
+              defaultChecked={expiring}
+              className="size-4 cursor-pointer accent-gold"
+            />
+            {t.sections.bookings.expiringOnly}
+          </label>
+
           <select
             name="status"
             defaultValue={status ?? ''}
@@ -163,7 +210,7 @@ export default async function BookingsPage({
             <TablePagination
               basePath="/bookings"
               section="bookings"
-              query={{ q, status }}
+              query={{ q, status, ...(expiring ? { expiring: '1' } : {}) }}
               page={result.page}
               pages={result.pages}
               total={result.total}
@@ -259,18 +306,4 @@ const columns = (back: string): readonly AdminColumn<BookingListItem>[] => [
 
 function total(counts: Record<string, number>): number {
   return Object.values(counts).reduce((sum, value) => sum + value, 0);
-}
-
-function exportHref(filters: {
-  q?: string | undefined;
-  status?: string | undefined;
-}): string {
-  const params = new URLSearchParams();
-
-  if (filters.q) params.set('q', filters.q);
-  if (filters.status) params.set('status', filters.status);
-
-  const query = params.toString();
-
-  return `/bookings/export${query ? `?${query}` : ''}`;
 }

@@ -15,7 +15,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { foreignId, money, notDeleted, primaryId, timestamps } from './_shared.js';
-import { dayStatus, propertyStatus } from './enums.js';
+import { dayStatus, imageStatus, propertyStatus } from './enums.js';
 import { cities, currencies } from './geo.js';
 import { partners } from './partner.js';
 import { users } from './identity.js';
@@ -171,9 +171,45 @@ export const propertyImages = pgTable(
     variantWidths: integer('variant_widths').array().notNull().default([]),
     isCover: boolean('is_cover').notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
+    /**
+     * Where this photograph is in the pipeline — see `imageStatus`.
+     *
+     * Defaults to `ready` so every row that existed before encoding moved off the
+     * request keeps being served. A new upload sets `processing` explicitly.
+     */
+    status: imageStatus('status').notNull().default('ready'),
+    /**
+     * The uploaded bytes, parked until a worker has re-encoded them.
+     *
+     * Under a PRIVATE prefix — `bootstrap-media.ts` grants anonymous read on
+     * `properties/*` and nothing else, and this is the one moment the platform holds
+     * a file exactly as a stranger sent it. Cleared and the object deleted once the
+     * variants exist, so this column doubles as the way to find orphans.
+     */
+    originalKey: text('original_key'),
+    /**
+     * Why processing failed, as an ERROR code — never a sentence.
+     *
+     * The partner is shown this, so it is resolved through the catalogue in their own
+     * language. A `sharp` message would be English, unlocalisable, and would quote
+     * whatever the uploaded file claimed about itself.
+     */
+    failureCode: text('failure_code'),
     ...timestamps,
   },
-  (t) => [index('property_images_property_idx').on(t.propertyId, t.sortOrder)],
+  (t) => [
+    index('property_images_property_idx').on(t.propertyId, t.sortOrder),
+    /*
+      The unfinished ones. Small by construction — a row leaves this index within
+      seconds of arriving — which is what makes it the right shape for the two
+      questions asked of it: the worker's "is this row still mine to finish", and the
+      metrics scrape's "is anything STUCK", which runs on every scrape and must not
+      read the whole table to answer.
+    */
+    index('property_images_processing_idx')
+      .on(t.updatedAt)
+      .where(sql`status = 'processing'`),
+  ],
 );
 
 /**

@@ -194,6 +194,11 @@ export const ar = {
   'upload.image_type_unsupported':
     'تُقبل صور JPEG أو PNG أو WebP أو AVIF أو HEIF أو TIFF فقط.',
   'upload.image_too_small': 'يجب أن تكون أبعاد الصورة {min}×{min} بكسل على الأقل.',
+  'upload.image_processing_failed': 'تعذّرت معالجة هذه الصورة. جرّب رفعها مرة أخرى.',
+  'export.not_found': 'لا يوجد تصدير بهذا الرقم.',
+  'export.not_ready': 'التصدير قيد التحضير. حدّث الصفحة بعد قليل.',
+  'export.failed': 'تعذّر إنشاء هذا التصدير. اطلبه مرة أخرى.',
+  'export.expired': 'انتهت صلاحية هذا الملف. اطلب تصديراً جديداً.',
   'setting.unknown':
     'لا يوجد إعداد بهذا الاسم. الإعدادات مُهيّأة مسبقاً ولا تُنشأ من هذه الشاشة.',
   'setting.value_rate':

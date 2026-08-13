@@ -503,6 +503,18 @@ export const ar = {
     uploading: 'جارٍ الرفع…',
     cover: 'صورة الغلاف',
     makeCover: 'اجعلها صورة الغلاف',
+    /**
+     * The two states an upload can be in before it is a photograph on a listing.
+     *
+     * Encoding moved to a worker (BullMQ phase 3), so the tile appears immediately and its picture
+     * arrives a moment later. Saying so is not decoration: a blank tile that fills itself in reads
+     * as a broken upload, and a partner who reloads or re-uploads because of it makes the queue
+     * longer for the same photograph.
+     */
+    processing: 'جارٍ التحضير…',
+    processingNote: 'تظهر الصورة خلال لحظات. يمكنك متابعة العمل.',
+    failedState: 'تعذّرت المعالجة',
+    failedHint: 'ارفع الصورة مرة أخرى.',
     moveUp: 'تقديم',
     moveDown: 'تأخير',
     archive: 'أرشفة',

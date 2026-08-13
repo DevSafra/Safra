@@ -1,4 +1,5 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { Queue } from 'bullmq';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -13,6 +14,11 @@ import {
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { ImageService } from '../storage/image.service.js';
+import { StorageService } from '../storage/storage.service.js';
+import { IMAGE_IS_LIVE } from '../storage/image-visibility.js';
+import { MEDIA_QUEUE } from '../queue/queue.tokens.js';
+import { JOB_OPTIONS } from '../queue/queue.definitions.js';
+import { MEDIA_JOB, mediaJobId } from '../queue/media.job.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
@@ -44,10 +50,14 @@ const MAX_IMAGES_PER_PROPERTY = 30;
  */
 @Injectable()
 export class PropertyImageService {
+  private readonly logger = new Logger(PropertyImageService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly images: ImageService,
+    private readonly storage: StorageService,
     private readonly audit: AuditService,
+    @Inject(MEDIA_QUEUE) private readonly media: Queue,
   ) {}
 
   /** What this property currently has, in display order. */
@@ -56,8 +66,13 @@ export class PropertyImageService {
 
     const rows = await this.db.execute<ImageRow>(sql`
       SELECT id, file_key, width, height, variant_widths, is_cover, sort_order,
-             alt_ar, alt_en, alt_de
+             alt_ar, alt_en, alt_de, status::text AS status, failure_code
       FROM property_images
+      /*
+        The OWNER's set, so a photograph that is still rendering is shown rather than hidden — one
+        that vanished for ten seconds and came back would read as a bug — and one that FAILED is
+        shown too, because it is the only place the partner can be told why.
+      */
       WHERE property_id = ${property.id} AND deleted_at IS NULL
       ORDER BY sort_order, created_at
     `);
@@ -66,11 +81,27 @@ export class PropertyImageService {
   }
 
   /**
-   * Accepts one photograph.
+   * Accepts one photograph, and hands the encoding to a worker.
    *
    * `mimetype` and `originalname` are BOTH ignored — either can be set to anything by the client,
-   * and only the decoded file header is evidence. `ImageService.process` re-encodes, which strips
-   * EXIF (and with it the GPS coordinates of somebody's home) as a side effect of doing the work.
+   * and only the decoded file header is evidence.
+   *
+   * ## What moved, and what deliberately did not
+   *
+   * Until BullMQ phase 3 this method decoded the file and wrote six re-encoded variants before
+   * answering, which is roughly a second and a half of CPU and the reason the endpoint is throttled
+   * to 20/min. That work is now a `media` job.
+   *
+   * **Validation did not move.** `inspect` still runs here, so a file that is not an image, or is a
+   * decompression bomb, or is too small to use, is refused with a 400 the person who chose it can
+   * read. Deferring that would turn a bad file into a dead letter and a silent gap in a gallery.
+   *
+   * ## The bytes are parked somewhere a stranger cannot read
+   *
+   * Between this method and the worker there is one moment where the platform holds a file exactly
+   * as it arrived — the one thing `ImageService` otherwise guarantees never happens. It goes under
+   * `incoming/`, which is outside the `properties/*` anonymous-read grant, and it is deleted as soon
+   * as the variants exist.
    */
   async upload(
     claims: AccessTokenClaims | undefined,
@@ -102,21 +133,39 @@ export class PropertyImageService {
     */
     const nextPosition = await this.nextSortOrder(property.id);
 
-    const processed = await this.images.process(file.buffer, {
+    /* Cheap, and it throws — a file that is not a usable photograph never reaches storage. */
+    const inspected = await this.images.inspect(file.buffer);
+
+    const fileKey = this.images.keyFor({
       kind: 'properties',
       owner: property.reference,
     });
+    const originalKey = this.images.incomingKeyFor(fileKey);
+
+    /*
+      Stored BEFORE the row exists, so the row is never a promise the storage cannot keep. The
+      reverse order would leave a `processing` row pointing at an object that was never written if
+      the upload failed here, and the worker would find nothing and mark it dead — a photograph the
+      partner watched succeed, failing seconds later for a reason nothing records.
+    */
+    await this.storage.put(originalKey, file.buffer, 'application/octet-stream');
 
     const inserted = await this.db.transaction(async (tx) => {
       const [row] = await tx
         .insert(schema.propertyImages)
         .values({
           propertyId: property.id,
-          fileKey: processed.fileKey,
-          width: processed.width,
-          height: processed.height,
-          // Distinct widths only — each appears twice, once per format.
-          variantWidths: [...new Set(processed.variants.map((v) => v.width))],
+          fileKey,
+          /*
+            Known already: `inspect` read them from the header. The row is therefore complete apart
+            from `variant_widths`, which is the one thing that genuinely cannot be known until the
+            encodes have run — the pipeline never upscales, so the real widths depend on the source.
+          */
+          width: inspected.width,
+          height: inspected.height,
+          variantWidths: [],
+          status: 'processing',
+          originalKey,
           /* The first image becomes the cover, so a listing is never coverless. */
           isCover: existing === 0,
           sortOrder: nextPosition,
@@ -133,9 +182,9 @@ export class PropertyImageService {
           subjectType: 'property',
           subjectId: property.id,
           after: {
-            fileKey: processed.fileKey,
-            width: processed.width,
-            height: processed.height,
+            fileKey,
+            width: inspected.width,
+            height: inspected.height,
             /* Recorded for support, never used as a key. */
             uploadedAs: file.originalname,
           },
@@ -146,15 +195,46 @@ export class PropertyImageService {
       return row;
     });
 
+    /*
+      After the commit, and its failure is swallowed — the same shape as `NotificationService.notify`.
+
+      An enqueue that throws must not undo an upload the partner has already been told succeeded, and
+      the row is the durable record: it sits at `processing` with its `original_key` set, which is
+      exactly what a re-drive needs and what `safra_images_processing_stuck` alerts on. Losing the
+      job is recoverable; losing the row is not.
+    */
+    try {
+      await this.media.add(
+        MEDIA_JOB,
+        { imageId: inserted.id, originalKey, fileKey },
+        { ...JOB_OPTIONS.media, jobId: mediaJobId(inserted.id) },
+      );
+    } catch (error) {
+      this.logger.error(
+        `Could not enqueue rendering for image ${inserted.id}: ` +
+          `${error instanceof Error ? error.message : String(error)}. ` +
+          'The row stays processing and is recoverable by re-drive.',
+      );
+    }
+
     return {
       id: inserted.id,
-      fileKey: processed.fileKey,
-      width: processed.width,
-      height: processed.height,
+      fileKey,
+      width: inspected.width,
+      height: inspected.height,
+      status: 'processing' as const,
+      /*
+        The URLs are returned, and none of them resolves yet.
+
+        Deliberate: they are the addresses those variants WILL have, the manager needs them to render
+        the tile once processing finishes, and withholding them would mean a second shape of this
+        response that the client has to branch on. `status` is the field that says whether they work
+        — which is the whole reason the column exists.
+      */
       urls: {
-        thumbnail: this.images.publicUrl(processed.fileKey, 400),
-        medium: this.images.publicUrl(processed.fileKey, 800),
-        large: this.images.publicUrl(processed.fileKey, 1600),
+        thumbnail: this.images.publicUrl(fileKey, 400),
+        medium: this.images.publicUrl(fileKey, 800),
+        large: this.images.publicUrl(fileKey, 1600),
       },
     };
   }
@@ -211,7 +291,7 @@ export class PropertyImageService {
           SET is_cover = true
           WHERE id = (
             SELECT id FROM property_images
-            WHERE property_id = ${property.id} AND deleted_at IS NULL
+            WHERE property_id = ${property.id} AND ${IMAGE_IS_LIVE}
             ORDER BY sort_order, created_at
             LIMIT 1
           )
@@ -399,7 +479,7 @@ export class PropertyImageService {
   private async nextSortOrder(propertyId: string): Promise<number> {
     const result = await this.db.execute<{ next: string }>(
       sql`SELECT coalesce(max(sort_order) + 1, 0)::text AS next FROM property_images
-          WHERE property_id = ${propertyId} AND deleted_at IS NULL`,
+          WHERE property_id = ${propertyId} AND ${IMAGE_IS_LIVE}`,
     );
 
     return Number(result.rows[0]?.next ?? 0);
@@ -408,7 +488,7 @@ export class PropertyImageService {
   private async countLive(propertyId: string): Promise<number> {
     const result = await this.db.execute<{ count: string }>(
       sql`SELECT count(*)::text AS count FROM property_images
-          WHERE property_id = ${propertyId} AND deleted_at IS NULL`,
+          WHERE property_id = ${propertyId} AND ${IMAGE_IS_LIVE}`,
     );
 
     return Number(result.rows[0]?.count ?? 0);
@@ -423,6 +503,9 @@ export class PropertyImageService {
       variantWidths: row.variant_widths ?? [],
       isCover: row.is_cover,
       sortOrder: row.sort_order,
+      status: row.status,
+      /* An ERROR code. The partner's app resolves it; it is never a sentence from here. */
+      failureCode: row.failure_code,
       alt: { ar: row.alt_ar, en: row.alt_en, de: row.alt_de },
       urls: {
         thumbnail: this.images.publicUrl(row.file_key, 400),
@@ -436,6 +519,8 @@ export class PropertyImageService {
 type ImageRow = {
   id: string;
   file_key: string;
+  status: string;
+  failure_code: string | null;
   width: number | null;
   height: number | null;
   variant_widths: number[] | null;

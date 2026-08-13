@@ -247,6 +247,12 @@ export const de = {
   'upload.image_type_unsupported':
     'Es werden nur JPEG-, PNG-, WebP-, AVIF-, HEIF- oder TIFF-Bilder akzeptiert.',
   'upload.image_too_small': 'Bilder müssen mindestens {min}x{min} Pixel groß sein.',
+  'upload.image_processing_failed':
+    'Dieses Bild konnte nicht verarbeitet werden. Bitte erneut hochladen.',
+  'export.not_found': 'Kein Export mit dieser Referenz.',
+  'export.not_ready': 'Dieser Export wird noch erstellt. Bitte gleich neu laden.',
+  'export.failed': 'Dieser Export konnte nicht erstellt werden. Bitte erneut anfordern.',
+  'export.expired': 'Diese Datei ist abgelaufen. Bitte einen neuen Export anfordern.',
   'setting.unknown':
     'Diese Einstellung existiert nicht. Einstellungen werden vorab angelegt, nicht hier erstellt.',
   'setting.value_rate':

@@ -14,7 +14,20 @@ export interface ExportFilters {
 }
 
 /** Hard ceiling. 20,000 rows is a generous real export and a bounded response. */
-const MAX_ROWS = 20_000;
+/**
+ * The ceiling on one export.
+ *
+ * It was 20,000 **because the file was built inside a request** — and an operator exporting a busy
+ * quarter got a truncated CSV with a comment at the bottom saying so. BullMQ phase 5 moved the build
+ * to a worker, where nobody is holding a connection open, so the number now answers a different
+ * question: how large a single file is useful and safe to produce, rather than how long a request
+ * may block.
+ *
+ * A quarter of a million rows is roughly 25 MB of CSV — beyond what a spreadsheet opens comfortably
+ * and well past the point where a filter is the better answer. Kept, so the ceiling is a deliberate
+ * limit rather than a forgotten one, and still STATED in the file when it bites.
+ */
+const MAX_ROWS = 250_000;
 
 const HEADER = [
   'reference',
@@ -69,7 +82,17 @@ export class BookingExportService {
    */
   async toCsv(
     actor: AccessTokenClaims | undefined,
-    filters: ExportFilters,
+    filters: ExportFilters & {
+      /**
+       * Whether to write `booking.exported` here.
+       *
+       * False from the queue, where the request already wrote `booking.export_requested` and the
+       * DOWNLOAD writes `booking.exported`. A row written here would record an export that nobody
+       * has received yet — and the whole point of splitting the two events is that asking for a
+       * file and collecting it are different acts by possibly different people.
+       */
+      audit?: boolean;
+    },
   ): Promise<{ csv: string; rowCount: number; truncated: boolean }> {
     const conditions: SQL[] = [
       sql`b.deleted_at IS NULL`,
@@ -136,25 +159,26 @@ export class BookingExportService {
       own `created_at`), which filters, and how many records. `audit_log` is append-only by trigger,
       so this entry is immutable and shows up in سجل التدقيق like any other.
     */
-    await this.audit.record({
-      actorUserId: actor?.sub,
-      actorRole: actor?.role,
-      action: 'booking.exported',
-      subjectType: 'booking_export',
-      subjectId: null,
-      after: {
-        format: 'csv',
-        filters: {
-          q: filters.q ?? null,
-          status: filters.status ?? null,
+    if (filters.audit !== false)
+      await this.audit.record({
+        actorUserId: actor?.sub,
+        actorRole: actor?.role,
+        action: 'booking.exported',
+        subjectType: 'booking_export',
+        subjectId: null,
+        after: {
+          format: 'csv',
+          filters: {
+            q: filters.q ?? null,
+            status: filters.status ?? null,
+          },
+          rowCount: rows.rows.length,
+          matchedCount: total,
+          truncated,
+          /* Whether the exporter's own scope narrowed the set — the audit reader needs to know. */
+          scoped: actor?.scope?.kind === 'cities',
         },
-        rowCount: rows.rows.length,
-        matchedCount: total,
-        truncated,
-        /* Whether the exporter's own scope narrowed the set — the audit reader needs to know. */
-        scoped: actor?.scope?.kind === 'cities',
-      },
-    });
+      });
 
     const lines: string[] = [HEADER.join(',')];
 

@@ -97,9 +97,21 @@ describe('storedPageSize', () => {
  * `new URL()`, so they are checked rather than assumed to have been kept in step.
  */
 describe('the section maps', () => {
+  /**
+   * One or more lowercase segments, and nothing else.
+   *
+   * It was a SINGLE segment until `exports` arrived at `/bookings/exports` (BullMQ phase 5) — a
+   * registry that belongs under الحجوزات rather than in the sidebar, the same way `payouts` and
+   * `reviews` belong under other sections but happen to sit at the root.
+   *
+   * The widening is deliberate and keeps the property that matters. What this guards is the save
+   * endpoint's redirect: the danger is a path that leaves the console, so `//evil.test`, a scheme,
+   * a backslash, a `..` or a host must all be unmatchable. Lowercase letters and slashes are none
+   * of those, and the next test asserts the `//` case directly.
+   */
   it('has a path and parameter names for every section', () => {
     for (const section of TABLE_SECTIONS) {
-      expect(TABLE_SECTION_PATHS[section], section).toMatch(/^\/[a-z]*$/);
+      expect(TABLE_SECTION_PATHS[section], section).toMatch(/^(\/[a-z]+)+$/);
       expect(TABLE_SECTION_PARAMS[section]?.page, section).toBeTruthy();
       expect(TABLE_SECTION_PARAMS[section]?.size, section).toBeTruthy();
     }
@@ -111,11 +123,14 @@ describe('the section maps', () => {
     expect(TABLE_SECTION_PARAMS.staffScope).not.toStrictEqual(TABLE_SECTION_PARAMS.staff);
   });
 
-  /** Every path is same-origin and single-segment — never `//evil.test`. */
+  /** Every path is same-origin and relative — never `//evil.test`, a scheme, or a traversal. */
   it('cannot redirect off the console', () => {
     for (const path of Object.values(TABLE_SECTION_PATHS)) {
       expect(path.startsWith('/')).toBe(true);
       expect(path.startsWith('//')).toBe(false);
+      expect(path).not.toContain(':');
+      expect(path).not.toContain('\\');
+      expect(path).not.toContain('..');
     }
   });
 });

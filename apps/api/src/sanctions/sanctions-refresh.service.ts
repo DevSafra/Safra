@@ -1,13 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { sql } from 'drizzle-orm';
 
-import type { Database } from '@safra/db';
-
-import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
 import { parseEuSanctionsXml } from './eu-list.parser.js';
 import { EU_SOURCE, SanctionsService } from './sanctions.service.js';
+import { JobRunService } from '../common/jobs/job-run.service.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
 const SANCTIONS_LOCK_KEY = 8_421_003;
@@ -40,9 +36,9 @@ export class SanctionsRefreshService {
   private readonly logger = new Logger(SanctionsRefreshService.name);
 
   constructor(
-    @Inject(DATABASE) private readonly db: Database,
     @Inject(ENV) private readonly env: Env,
     private readonly sanctions: SanctionsService,
+    private readonly runs: JobRunService,
   ) {
     if (!env.SANCTIONS_FEED_URL) {
       this.logger.warn(
@@ -54,39 +50,38 @@ export class SanctionsRefreshService {
     }
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_4AM, { name: 'sanctions-refresh' })
   async refresh(): Promise<void> {
-    if (!this.env.SANCTIONS_FEED_URL) return;
+    const url = this.env.SANCTIONS_FEED_URL;
 
-    const acquired = await this.db.execute<{ locked: boolean }>(
-      sql`SELECT pg_try_advisory_lock(${SANCTIONS_LOCK_KEY}) AS locked`,
-    );
+    if (!url) return;
 
-    // Another replica is refreshing. Skipping is correct — the work is not lost.
-    if (acquired.rows[0]?.locked !== true) return;
+    /* The lock AND the run record, in one place — see the note in `SlaService.sweep`. */
+    await this.runs
+      .runExclusively('sanctions-refresh', SANCTIONS_LOCK_KEY, async () => {
+        const result = await this.fetchAndImport(url);
 
-    try {
-      const result = await this.fetchAndImport(this.env.SANCTIONS_FEED_URL);
+        this.logger.log(
+          result.unchanged
+            ? `Sanctions list unchanged (${result.entryCount} entries).`
+            : `Sanctions list refreshed: ${result.entryCount} entries.`,
+        );
 
-      this.logger.log(
-        result.unchanged
-          ? `Sanctions list unchanged (${result.entryCount} entries).`
-          : `Sanctions list refreshed: ${result.entryCount} entries.`,
-      );
-    } catch (error) {
-      /**
-       * Never throws out of a scheduled job — an unhandled rejection kills the
-       * process. A failed refresh is not silent, though: the list ages, and once it
-       * passes the staleness limit verification refuses outright. The failure
-       * surfaces as a blocked queue rather than as a check that quietly stopped
-       * happening.
-       */
-      this.logger.error(
-        `Sanctions refresh failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    } finally {
-      await this.db.execute(sql`SELECT pg_advisory_unlock(${SANCTIONS_LOCK_KEY})`);
-    }
+        return { entries: result.entryCount, unchanged: result.unchanged };
+      })
+      .catch((error: unknown) => {
+        /**
+         * Recorded by `runExclusively` first, then swallowed here — an unhandled rejection on the
+         * `@Cron` fallback path kills the process.
+         *
+         * A failed refresh was never silent: the list ages, and once it passes the staleness limit
+         * verification refuses outright, so the failure surfaces as a blocked partner queue. What
+         * it lacked was a row saying WHEN it last succeeded, which is the difference between
+         * "verification is blocked" and "verification is blocked because this stopped on Tuesday".
+         */
+        this.logger.error(
+          `Sanctions refresh failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
   }
 
   /** Fetches, parses and imports. Exposed so an admin can trigger it on demand. */

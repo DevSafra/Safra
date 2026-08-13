@@ -282,6 +282,44 @@ test.describe('the pagination bar', () => {
   });
 
   /**
+   * The EC-008 filter behaves like every other one — and can be turned off.
+   *
+   * It arrives from the dashboard's most urgent alert, which until 2026-08-13 had a dimmed button on
+   * the stale grounds that no browsable booking list existed. Two things have to hold for that link
+   * to be worth following: the filter survives a search (or typing a query silently widens the view
+   * back to every booking), and it has an OFF switch (or an operator who followed the alert is stuck
+   * on a table they cannot explain).
+   */
+  test('the expiring filter survives a search and can be cleared', async ({ page }) => {
+    await page.goto('/bookings?expiring=1&size=5');
+
+    /*
+      By ROLE and name, not by `input[name="expiring"]`.
+
+      That selector matches two elements, and both are correct: the toolbar's checkbox, and a hidden
+      field inside the pagination bar's own form — which is exactly how the filter survives a typed
+      page number. The visible control is the one this test drives.
+    */
+    const toggle = page.getByRole('checkbox', {
+      name: t.sections.bookings.expiringOnly,
+    });
+
+    await expect(toggle).toBeChecked();
+
+    /* A search keeps it: the checkbox is inside the toolbar's form. */
+    await page.locator('input[name="q"]').fill('BKG');
+    await page.getByRole('button', { name: new RegExp(`^${t.table.search}$`) }).click();
+
+    await expect.poll(() => new URL(page.url()).searchParams.get('expiring')).toBe('1');
+
+    /* And unchecking it leaves the filtered view rather than trapping the reader in it. */
+    await toggle.uncheck();
+    await page.getByRole('button', { name: new RegExp(`^${t.table.search}$`) }).click();
+
+    await expect.poll(() => new URL(page.url()).searchParams.get('expiring')).toBeNull();
+  });
+
+  /**
    * A hand-edited URL cannot break the page.
    *
    * The API rejects a limit over 100 and a page over 100,000 with a 400, so an unclamped

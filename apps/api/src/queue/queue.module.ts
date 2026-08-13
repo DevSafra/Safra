@@ -11,7 +11,13 @@ import { Redis } from 'ioredis';
 import { ENV, type Env } from '../config/env.js';
 import { QUEUE } from './queue.definitions.js';
 import { assertQueueRedisIsDurable } from './queue.durability.js';
-import { MAIL_QUEUE, QUEUE_REDIS } from './queue.tokens.js';
+import {
+  EXPORTS_QUEUE,
+  MAIL_QUEUE,
+  MEDIA_QUEUE,
+  QUEUE_REDIS,
+  SCHEDULED_QUEUE,
+} from './queue.tokens.js';
 
 /**
  * The producer side of the queues: connections and `Queue` handles, no workers.
@@ -35,6 +41,11 @@ import { MAIL_QUEUE, QUEUE_REDIS } from './queue.tokens.js';
  * `REDIS_QUEUE_URL` defaults to `REDIS_URL`, so development runs one instance and production can
  * separate them without a code change.
  */
+/** A producer handle on the shared connection, namespaced so deployments cannot collide. */
+function producerFor(name: string, connection: Redis): Queue {
+  return new Queue(name, { connection, prefix: 'safra' });
+}
+
 @Global()
 @Module({
   providers: [
@@ -69,26 +80,44 @@ import { MAIL_QUEUE, QUEUE_REDIS } from './queue.tokens.js';
         return client;
       },
     },
+    /*
+      One factory per queue, built from the same helper.
+
+      `prefix: 'safra'` is the part that must not be forgotten on a new queue: it namespaces the
+      Redis keys so two deployments can share one instance without colliding — a staging worker
+      picking up a production job is a data leak, not a mix-up. Writing it once is how the fifth
+      queue gets it right without anybody remembering to.
+    */
     {
       provide: MAIL_QUEUE,
       inject: [QUEUE_REDIS],
-      useFactory: (connection: Redis): Queue =>
-        new Queue(QUEUE.mail, {
-          connection,
-          /*
-            Prefixed so two deployments can share one Redis without colliding — a staging worker
-            picking up a production job is a data leak, not a mix-up.
-          */
-          prefix: 'safra',
-        }),
+      useFactory: (connection: Redis): Queue => producerFor(QUEUE.mail, connection),
+    },
+    {
+      provide: MEDIA_QUEUE,
+      inject: [QUEUE_REDIS],
+      useFactory: (connection: Redis): Queue => producerFor(QUEUE.media, connection),
+    },
+    {
+      provide: SCHEDULED_QUEUE,
+      inject: [QUEUE_REDIS],
+      useFactory: (connection: Redis): Queue => producerFor(QUEUE.scheduled, connection),
+    },
+    {
+      provide: EXPORTS_QUEUE,
+      inject: [QUEUE_REDIS],
+      useFactory: (connection: Redis): Queue => producerFor(QUEUE.exports, connection),
     },
   ],
-  exports: [QUEUE_REDIS, MAIL_QUEUE],
+  exports: [QUEUE_REDIS, MAIL_QUEUE, MEDIA_QUEUE, SCHEDULED_QUEUE, EXPORTS_QUEUE],
 })
 export class QueueModule implements OnApplicationShutdown {
   constructor(
     @Inject(QUEUE_REDIS) private readonly redis: Redis,
     @Inject(MAIL_QUEUE) private readonly mail: Queue,
+    @Inject(MEDIA_QUEUE) private readonly media: Queue,
+    @Inject(SCHEDULED_QUEUE) private readonly scheduled: Queue,
+    @Inject(EXPORTS_QUEUE) private readonly exportsQueue: Queue,
   ) {}
 
   /**
@@ -99,7 +128,12 @@ export class QueueModule implements OnApplicationShutdown {
    */
   async onApplicationShutdown(): Promise<void> {
     try {
-      await this.mail.close();
+      await Promise.all([
+        this.mail.close(),
+        this.media.close(),
+        this.scheduled.close(),
+        this.exportsQueue.close(),
+      ]);
       await this.redis.quit();
     } catch {
       /* Already gone, or the server went first. Shutdown must not fail. */

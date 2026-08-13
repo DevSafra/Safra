@@ -195,12 +195,19 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
           code: 'EC-008',
           text: `${count(counters.sla_expiring_soon)} ${t.admin.attentionSla}`,
           /*
-            No destination: §9.4 is a lookup by reference and there is deliberately no
-            browsable list of bookings, so there is nowhere to send a reviewer with "the
-            twelve expiring soon". The row still belongs here — the count is the alert —
-            and the action is dimmed rather than pointed at a screen that redirects back.
+            The most time-critical row on this screen, and until 2026-08-13 the only one with no
+            destination.
+
+            The reason recorded here was that §9.4 is a lookup by reference and there is "deliberately
+            no browsable list of bookings" — which stopped being true when الحجوزات was built. So the
+            console's most urgent alert had a dimmed button on grounds that no longer held: an operator
+            was told twelve windows are about to lapse and given nowhere to go.
+
+            `?expiring=1` filters the registry on the SAME predicate this counter uses, both reading
+            `SLA_EXPIRY_WARNING_MINUTES`, so the number here and the rows there cannot disagree — and
+            that view is ordered soonest-first, which is the order somebody acting on it needs.
           */
-          href: undefined,
+          href: '/bookings?expiring=1',
         }
       : null,
     counters.partners_pending_verification > 0
@@ -217,10 +224,15 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
           href: '/properties',
         }
       : null,
-  ].filter(
-    (row): row is { code: string; text: string; href: string | undefined } =>
-      row !== null,
-  );
+    /*
+      `href` is required now that every row has one — see EC-008 above.
+
+      It was optional, and the dimmed no-destination branch below went with it. Both are gone rather
+      than kept "in case": a fallback that nothing can reach is not an affordance, it is unreachable
+      UI that a reader has to decide whether to trust. A future row without a destination brings its
+      own branch back, and the type will say so at the point it is added.
+    */
+  ].filter((row): row is { code: string; text: string; href: string } => row !== null);
 
   return (
     <section className="rounded-[15px] border border-[rgba(var(--badA),0.45)] bg-card p-4.5">
@@ -242,22 +254,12 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
                 {row.code}
               </span>
               <span className="text-[12.5px] text-text2">{row.text}</span>
-              {row.href ? (
-                <Link
-                  href={row.href}
-                  className="ms-auto inline-flex min-h-10 cursor-pointer items-center rounded-[7px] border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
-                >
-                  {t.admin.handle}
-                </Link>
-              ) : (
-                <span
-                  aria-disabled="true"
-                  title={t.nav.notBuilt}
-                  className="ms-auto cursor-not-allowed rounded-[7px] border border-line px-3.5 py-1 text-[11.5px] font-bold text-faint/60"
-                >
-                  {t.admin.handle}
-                </span>
-              )}
+              <Link
+                href={row.href}
+                className="ms-auto inline-flex min-h-10 cursor-pointer items-center rounded-[7px] border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+              >
+                {t.admin.handle}
+              </Link>
             </li>
           ))}
         </ul>

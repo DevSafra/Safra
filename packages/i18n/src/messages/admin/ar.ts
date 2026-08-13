@@ -215,6 +215,7 @@ export const ar = {
     /** Submits the pagination bar's form — see the note in `table-pagination.tsx`. */
     apply: 'تطبيق',
     exportCsv: 'تصدير CSV',
+    exportsLink: 'الملفات المصدَّرة',
 
     /*
       The bar under every table: صفحة ‹ [١] › من ١٠٢ — اعرض [٢٥] صفًا — ٢٥٣١ نتيجة.
@@ -277,6 +278,8 @@ export const ar = {
      */
     dateRange: '{from} ← {to}',
     colTime: 'الوقت',
+    colFilter: 'المرشِّح',
+    colFile: 'الملف',
   },
 
   /**
@@ -287,9 +290,36 @@ export const ar = {
    * quoted exactly and must not be paraphrased.
    */
   sections: {
+    /**
+     * الملفات المصدَّرة — where a requested CSV is collected.
+     *
+     * A screen rather than a download because the file is built by a worker (BullMQ phase 5): the
+     * operator asks, and comes back. Every word here exists to answer "where is my file" without
+     * anybody having to ask support.
+     */
+    exports: {
+      title: 'الملفات المصدَّرة',
+      note: 'يُجهَّز الملف في الخلفية، وتتحدّث حالته تلقائياً. نزّله من هنا عندما يصبح جاهزاً.',
+      expiry: 'تُحذف الملفات بعد سبعة أيام. اطلب تصديراً جديداً بعدها.',
+      requested: 'طُلب',
+      rows: 'الصفوف',
+      expires: 'ينتهي',
+      by: 'الطالب',
+      download: 'تنزيل',
+      filtersNone: 'كل الحجوزات',
+      failed: 'تعذّر إنشاء الملف.',
+      requestFailed: 'تعذّر إرسال الطلب. حاول مرة أخرى.',
+      back: 'رجوع إلى الحجوزات',
+    },
     bookings: {
       searchPlaceholder: 'بحث برقم الحجز، العقار، العميل…',
       allStatuses: 'كل الحالات',
+      /*
+        The dashboard's EC-008 alert, as a filter on this table. A CHECKBOX rather than a hidden
+        field: arriving from the alert has to be leavable, and a filter with no off switch is a
+        table an operator concludes is broken.
+      */
+      expiringOnly: 'تنتهي مهلتها قريباً',
       count: '{n} حجز · كل حجز له خط زمني وسجل تدقيق ورقم مرجعي (P-004)',
       note: 'فتح أي حجز يعرض: بيانات العميل والشريك والعقار والدفع والرسائل والواتساب والبريد والخط الزمني، مع ملاحظات داخلية لا يراها العميل أو الشريك. تغيير الحالة بصلاحيات محددة فقط ويسجَّل في سجل التدقيق.',
     },
@@ -1139,6 +1169,14 @@ export const ar = {
    * an empty cell reads as "no value" and is a lie.
    */
   enums: {
+    /** `export_status`. Four words, four colours — the rule that no two share either. */
+    exportStatus: {
+      queued: 'في الانتظار',
+      running: 'قيد الإنشاء',
+      ready: 'جاهز',
+      failed: 'فشل',
+    },
+
     /**
      * The payout lifecycle, in the reader's language.
      *

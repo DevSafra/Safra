@@ -31,6 +31,7 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { AuditService } from '../common/audit/audit.service.js';
 import type { FxRateService } from '../fx/fx-rate.service.js';
 import type { SettingsService } from '../settings/settings.service.js';
+import { JobRunService } from '../common/jobs/job-run.service.js';
 
 /**
  * The payment path against a REAL PostgreSQL.
@@ -171,7 +172,13 @@ describeIfDb('payment collection, webhooks and refunds', () => {
      * the path worth exercising. If a conversion ever crept in, the FX stub above
      * would throw and `resolveOrFallback` would log it rather than hide it.
      */
-    sla = new SlaService(db, new MoneySettingsService(settings, fx), ledger, wallet);
+    sla = new SlaService(
+      db,
+      new MoneySettingsService(settings, fx),
+      ledger,
+      wallet,
+      new JobRunService(db),
+    );
     webhooks = new PaymentWebhookService(db, registry, actions, access);
     refunds = new RefundService(db, registry, ledger, audit, wallet);
     intents = new PaymentIntentService(

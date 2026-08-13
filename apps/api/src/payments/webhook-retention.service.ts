@@ -1,10 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { JobRunService } from '../common/jobs/job-run.service.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
 const RETENTION_LOCK_KEY = 8_421_004;
@@ -51,38 +51,36 @@ const BATCH_SIZE = 5_000;
 export class WebhookRetentionService {
   private readonly logger = new Logger(WebhookRetentionService.name);
 
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly runs: JobRunService,
+  ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_3AM, { name: 'webhook-retention' })
   async prune(): Promise<void> {
-    const acquired = await this.db.execute<{ locked: boolean }>(
-      sql`SELECT pg_try_advisory_lock(${RETENTION_LOCK_KEY}) AS locked`,
-    );
+    /* The lock AND the run record, in one place — see the note in `SlaService.sweep`. */
+    await this.runs
+      .runExclusively('webhook-retention', RETENTION_LOCK_KEY, async () => {
+        const deleted = await this.pruneUnverified();
 
-    // Another replica is pruning. Skipping is correct — the work is not lost.
-    if (acquired.rows[0]?.locked !== true) return;
+        if (deleted > 0) {
+          this.logger.log(
+            `Pruned ${deleted} unverified webhook payload(s) older than ` +
+              `${UNVERIFIED_RETENTION_DAYS} days.`,
+          );
+        }
 
-    try {
-      const deleted = await this.pruneUnverified();
-
-      if (deleted > 0) {
-        this.logger.log(
-          `Pruned ${deleted} unverified webhook payload(s) older than ` +
-            `${UNVERIFIED_RETENTION_DAYS} days.`,
+        return { deleted };
+      })
+      .catch((error: unknown) => {
+        /**
+         * Recorded first, then swallowed — an unhandled rejection on the `@Cron` fallback path
+         * kills the process, and a failed prune only means the table stays larger for another day.
+         */
+        this.logger.error(
+          `Webhook retention pass failed: ` +
+            `${error instanceof Error ? error.message : String(error)}`,
         );
-      }
-    } catch (error) {
-      /**
-       * Never throws out of a scheduled job — an unhandled rejection kills the
-       * process. A failed prune only means the table stays larger for another day.
-       */
-      this.logger.error(
-        `Webhook retention pass failed: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
-      );
-    } finally {
-      await this.db.execute(sql`SELECT pg_advisory_unlock(${RETENTION_LOCK_KEY})`);
-    }
+      });
   }
 
   /**

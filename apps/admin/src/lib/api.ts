@@ -542,11 +542,14 @@ function listQuery(params: {
   page?: number | undefined;
   status?: string | undefined;
   limit?: number | undefined;
+  expiring?: boolean | undefined;
 }): string {
   const search = new URLSearchParams();
 
   if (params.q) search.set('q', params.q);
   if (params.status) search.set('status', params.status);
+  /* Only sent when it is on: the API's schema coerces, and `expiring=false` would coerce to TRUE. */
+  if (params.expiring) search.set('expiring', '1');
   search.set('page', String(params.page ?? 1));
   search.set('limit', String(params.limit ?? DEFAULT_PAGE_SIZE));
 
@@ -581,7 +584,9 @@ const bookingListSchema = offsetPage(bookingListItemSchema).extend({
 export type BookingListItem = z.infer<typeof bookingListItemSchema>;
 export type BookingList = z.infer<typeof bookingListSchema>;
 
-export async function getBookings(params: ListParams & { status?: string | undefined }) {
+export async function getBookings(
+  params: ListParams & { status?: string | undefined; expiring?: boolean | undefined },
+) {
   return staffFetch(`/admin/bookings${listQuery(params)}`, bookingListSchema);
 }
 
@@ -1033,6 +1038,27 @@ export async function getNotifications(
   params: ListParams & { status?: string | undefined },
 ) {
   return staffFetch(`/admin/notifications${listQuery(params)}`, notificationsSchema);
+}
+
+/** One requested CSV, as `GET /admin/exports` returns it. */
+const exportItemSchema = z.object({
+  reference: z.string(),
+  kind: z.string(),
+  status: z.string(),
+  rowCount: z.number().nullable(),
+  filters: z.record(z.string(), z.string().nullable()),
+  failureCode: z.string().nullable(),
+  requestedByEmail: z.string(),
+  createdAt: z.string(),
+  expiresAt: z.string().nullable(),
+});
+
+const exportsSchema = offsetPage(exportItemSchema);
+
+export type ExportItem = z.infer<typeof exportItemSchema>;
+
+export async function getExports(params: ListParams) {
+  return staffFetch(`/admin/exports${listQuery(params)}`, exportsSchema);
 }
 
 const campaignItemSchema = z.object({

@@ -366,27 +366,65 @@ test.describe('honesty rules the design and the register require', () => {
   });
 
   /**
-   * The CSV export downloads through the API, which is what makes it auditable (B-13).
+   * The export is REQUESTED, built by a worker, and collected — the whole of BullMQ phase 5.
    *
-   * Asserts the file arrives, carries the on-screen filter, and leads with a UTF-8 BOM — without
-   * which Excel on Windows mangles every Arabic property name, which is most of the file.
+   * ## What this replaced
+   *
+   * It used to click a link and assert the CSV came back in the response, capped at 20,000 rows
+   * because the file was built inside the request. Rule 2 names exports among the work that must
+   * not block a request, and that cap was the rule being paid for in missing data.
+   *
+   * ## Why the whole round trip is one test
+   *
+   * The three halves only mean anything together: asking must not download anything, the file must
+   * actually appear without a human doing anything else, and what arrives must be the filtered set
+   * with its BOM. A test of any one of them passes on a build where the other two are broken.
+   *
+   * **This is where the suite depends on `pnpm worker`.** With no worker the row sits at «في
+   * الانتظار» and the poll below times out here, which is a legible failure rather than a
+   * mysterious one further down.
    */
-  test('the bookings export downloads a filtered, BOM-prefixed CSV', async ({ page }) => {
+  test('requests an export, waits for the worker, and collects a filtered CSV', async ({
+    page,
+  }) => {
+    /*
+      Longer than the suite default, because this one waits for another PROCESS.
+      
+      An `expect` timeout cannot exceed the test's own — the first version asked for 60 seconds
+      inside a 30-second test and reported the test timeout instead, which reads as the export
+      being broken rather than as the budget being wrong.
+    */
+    test.setTimeout(90_000);
+
     await page.goto('/bookings?status=cancelled');
 
-    const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      page.getByRole('link', { name: t.table.exportCsv }).click(),
-    ]);
+    /*
+      A BUTTON now, not a link. The verb is the point: a GET that created a row would let a
+      prefetch or a pasted link produce an export in somebody's name.
+    */
+    await page.getByRole('button', { name: t.table.exportCsv }).click();
 
-    expect(download.suggestedFilename()).toBe('safra-bookings.csv');
+    /* POST → 303 → the collection screen, which is an ordinary shareable GET. */
+    await page.waitForURL(/\/bookings\/exports/);
+
+    const firstRow = page.locator('tbody tr').first();
+
+    await expect(firstRow).toBeVisible();
 
     /*
-      `download.path()` returns a string for a completed download; Playwright types it as
-      `Promise<string>`, so no assertion is needed and the linter rightly refuses one.
+      The status pill moves on its own — «في الانتظار» → «قيد الإنشاء» → «جاهز» — because a worker
+      is doing the work. Polling the DOWNLOAD control rather than the pill: it is what the operator
+      actually needs and it only exists once there is a file behind it.
     */
-    const path = await download.path();
+    const download = firstRow.getByRole('link', { name: t.sections.exports.download });
 
+    await expect(download).toBeVisible({ timeout: 60_000 });
+
+    const [file] = await Promise.all([page.waitForEvent('download'), download.click()]);
+
+    expect(file.suggestedFilename()).toMatch(/^EXP-\d+\.csv$/);
+
+    const path = await file.path();
     const { readFileSync } = await import('node:fs');
     const text = readFileSync(path, 'utf8');
     const lines = text.split('\n').filter(Boolean);
@@ -396,7 +434,7 @@ test.describe('honesty rules the design and the register require', () => {
     expect(lines[0]?.replace(/^\uFEFF/, '')).toContain('reference,property,customer');
     expect(lines.length).toBeGreaterThan(1);
 
-    // The filter was applied: every data row ends in the requested status.
+    // The filter survived the round trip: every data row ends in the requested status.
     for (const line of lines.slice(1).filter((row) => !row.startsWith('#'))) {
       expect(line.trim().endsWith('cancelled')).toBe(true);
     }

@@ -1,0 +1,245 @@
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { sql } from 'drizzle-orm';
+
+import { createRollbackDatabase, type Database } from '@safra/db';
+import { SLA_EXPIRY_WARNING_MINUTES } from '@safra/contracts';
+
+import { BookingListService } from './booking-list.service.js';
+import { DashboardService } from './dashboard.service.js';
+
+/**
+ * «الحجوزات» filtered to §6.4's window about to lapse, and the dashboard count that links to it.
+ *
+ * ## Why the two are tested TOGETHER
+ *
+ * The dashboard says "twelve confirmation windows are about to lapse" and its button now opens this
+ * filter. If the two disagree by one row, the operator concludes one of them is broken — and stops
+ * trusting both. They read the same threshold from `SLA_EXPIRY_WARNING_MINUTES`, and this is the test
+ * that holds them to it: a fixture placed either side of the boundary must be counted and listed, or
+ * neither.
+ *
+ * That is also why the count is taken from `DashboardService` rather than recomputed here. A test that
+ * wrote the predicate a third time would prove the predicate agrees with itself.
+ */
+const DATABASE_URL = process.env['DATABASE_URL'];
+const describeIfDb = DATABASE_URL ? describe : describe.skip;
+
+describeIfDb('the expiring-soon booking filter', () => {
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  const db: Database = harness.db;
+  const bookings = new BookingListService(db);
+  const dashboard = new DashboardService(db);
+
+  /** Minutes from now at which each fixture's confirmation window closes. */
+  const INSIDE = SLA_EXPIRY_WARNING_MINUTES - 5;
+  const OUTSIDE = SLA_EXPIRY_WARNING_MINUTES + 30;
+
+  let expiringSoon = '';
+  let expiringLater = '';
+  let confirmed = '';
+
+  beforeEach(async () => {
+    await harness.begin();
+    await seed();
+  });
+
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
+  afterAll(async () => {
+    await harness.close();
+  });
+
+  const listed = async (expiring: boolean): Promise<string[]> => {
+    const page = await bookings.list({ page: 1, limit: 50, expiring });
+
+    return page.items.map((row) => row.reference);
+  };
+
+  // ─── What the filter selects ───────────────────────────────────────────────
+
+  it('lists a booking whose window closes inside the warning period', async () => {
+    expect(await listed(true)).toContain(expiringSoon);
+  });
+
+  it('leaves out one whose window closes after it', async () => {
+    expect(await listed(true)).not.toContain(expiringLater);
+  });
+
+  /** The filter is about a window that is still open, so a booking already answered is not in it. */
+  it('leaves out a booking that is no longer awaiting confirmation', async () => {
+    expect(await listed(true)).not.toContain(confirmed);
+  });
+
+  it('lists all three when the filter is off', async () => {
+    const all = await listed(false);
+
+    expect(all).toContain(expiringSoon);
+    expect(all).toContain(expiringLater);
+    expect(all).toContain(confirmed);
+  });
+
+  // ─── The agreement that matters ────────────────────────────────────────────
+
+  /**
+   * The dashboard's number and this list's length, from the same fixtures.
+   *
+   * Scoped to the two rows this test created by comparing the DELTA rather than the absolute figures:
+   * the development database holds other pending bookings, and an absolute assertion would be a
+   * statement about them.
+   */
+  it('counts exactly what it lists', async () => {
+    const before = (await dashboard.overview()).counters.sla_expiring_soon;
+
+    /* A second booking inside the window, so both numbers have to move by one. */
+    await db.execute(sql`
+      INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                            check_in, check_out, guests_adults, status, paid_at,
+                            confirmation_deadline_at,
+                            base_amount, customer_fee_value, customer_fee_amount,
+                            partner_commission_rate, partner_commission_amount,
+                            total_amount, partner_payable_amount, currency_id,
+                            fx_rate_to_syp, total_syp, cancellation_policy_snapshot)
+      SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+             current_date + 200, current_date + 202, 2, 'pending_confirmation'::booking_status,
+             now(), now() + (${INSIDE}::int * INTERVAL '1 minute'),
+             '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+             b.currency_id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
+      FROM bookings b WHERE b.reference = ${expiringSoon}
+    `);
+
+    const after = (await dashboard.overview()).counters.sla_expiring_soon;
+    const rows = await listed(true);
+
+    expect(after - before, 'the dashboard counted the new booking').toBe(1);
+    expect(rows.filter((reference) => reference === expiringSoon)).toHaveLength(1);
+  });
+
+  // ─── The order somebody acting on it needs ─────────────────────────────────
+
+  /**
+   * Soonest first, not newest first.
+   *
+   * The default order is `created_at DESC`, which puts the booking with the MOST time left at the top
+   * of a list whose entire purpose is the one with the least. The fixture inserted second closes
+   * later, so under the default order it would lead.
+   */
+  it('puts the closest deadline first', async () => {
+    await db.execute(sql`
+      UPDATE bookings
+      SET confirmation_deadline_at = now() + INTERVAL '2 minutes'
+      WHERE reference = ${expiringLater}
+    `);
+
+    const rows = await listed(true);
+    const soonest = rows.indexOf(expiringLater);
+    const later = rows.indexOf(expiringSoon);
+
+    expect(soonest).toBeGreaterThanOrEqual(0);
+    expect(later).toBeGreaterThanOrEqual(0);
+    expect(
+      soonest,
+      'the two-minute deadline must lead the twenty-five-minute one',
+    ).toBeLessThan(later);
+  });
+
+  /** Three bookings on one unit: one closing soon, one closing later, one already confirmed. */
+  async function seed(): Promise<void> {
+    const made = await db.execute<{
+      soon: string;
+      later: string;
+      done: string;
+    }>(sql`
+      WITH ref AS (
+        SELECT (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1) AS city_id,
+               (SELECT id FROM currencies WHERE code = 'USD')           AS currency_id,
+               (SELECT id FROM property_types LIMIT 1)                  AS type_id,
+               (SELECT id FROM partner_types LIMIT 1)                   AS partner_type_id,
+               (SELECT id FROM cancellation_policies LIMIT 1)            AS policy_id
+      ), cu AS (
+        INSERT INTO users (email, phone, role, status)
+        VALUES ('sla-' || gen_random_uuid() || '@safra.test', '+963900000090', 'customer', 'active')
+        RETURNING id
+      ), pu AS (
+        INSERT INTO users (email, phone, role, status)
+        VALUES ('sla-p-' || gen_random_uuid() || '@safra.test', '+963900000091', 'partner', 'active')
+        RETURNING id
+      ), cp AS (
+        INSERT INTO customer_profiles (user_id, full_name, email, phone, is_guest)
+        SELECT cu.id, 'مهلة', 'sla-' || gen_random_uuid() || '@safra.test', '+963900000090', false
+        FROM cu RETURNING id
+      ), pa AS (
+        INSERT INTO partners (user_id, partner_type_id, legal_name, display_name, city_id,
+                              address, phone, email, verification)
+        SELECT pu.id, ref.partner_type_id, 'SLA Test', 'مهلة', ref.city_id, 'x',
+               '+963900000091', 'sla-p-' || gen_random_uuid() || '@safra.test', 'approved'
+        FROM pu, ref RETURNING id, city_id
+      ), pr AS (
+        INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
+                                slug, name_ar, name_en, name_de, address, status)
+        SELECT pa.id, ref.city_id, ref.type_id, ref.policy_id,
+               'sla-test-' || gen_random_uuid(), 'مهلة', 'SLA', 'SLA', 'x', 'published'
+        FROM pa, ref RETURNING id, partner_id
+      ), un AS (
+        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
+                           currency_id)
+        SELECT pr.id, 'وحدة', 'Unit', 'Einheit', 2, '100.00', ref.currency_id
+        FROM pr, ref RETURNING id
+      ), soon AS (
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status, paid_at,
+                              confirmation_deadline_at,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot)
+        SELECT cp.id, un.id, pr.id, pr.partner_id, ref.city_id,
+               current_date + 100, current_date + 102, 2,
+               'pending_confirmation'::booking_status, now(),
+               now() + (${INSIDE}::int * INTERVAL '1 minute'),
+               '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+               ref.currency_id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
+        FROM cp, un, pr, ref RETURNING reference
+      ), later AS (
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status, paid_at,
+                              confirmation_deadline_at,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot)
+        SELECT cp.id, un.id, pr.id, pr.partner_id, ref.city_id,
+               current_date + 110, current_date + 112, 2,
+               'pending_confirmation'::booking_status, now(),
+               now() + (${OUTSIDE}::int * INTERVAL '1 minute'),
+               '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+               ref.currency_id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
+        FROM cp, un, pr, ref RETURNING reference
+      ), done AS (
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status, paid_at,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot)
+        SELECT cp.id, un.id, pr.id, pr.partner_id, ref.city_id,
+               current_date + 120, current_date + 122, 2,
+               'confirmed'::booking_status, now(),
+               '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+               ref.currency_id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
+        FROM cp, un, pr, ref RETURNING reference
+      )
+      SELECT soon.reference AS soon, later.reference AS later, done.reference AS done
+      FROM soon, later, done
+    `);
+
+    const row = made.rows[0];
+
+    if (!row) throw new Error('Seed produced no row.');
+
+    expiringSoon = row.soon;
+    expiringLater = row.later;
+    confirmed = row.done;
+  }
+});

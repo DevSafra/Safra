@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { imageIsPublished } from '../storage/image-visibility.js';
 
 export interface RecommendationWeights {
   rating: number;
@@ -91,7 +92,12 @@ export class RecommendationService {
         LEFT JOIN LATERAL (
           SELECT COUNT(*) AS image_count
           FROM property_images pi
-          WHERE pi.property_id = p.id AND pi.deleted_at IS NULL
+          /*
+            Rendered images only, and this is the one of the four that nothing on any screen shows.
+            §5.5 REWARDS photo count, so counting a photograph that has not rendered — or never
+            will — lets a partner raise their own recommendation score by uploading files that fail.
+          */
+          WHERE pi.property_id = p.id AND ${imageIsPublished('pi')}
         ) img ON TRUE
         LEFT JOIN LATERAL (
           SELECT COUNT(DISTINCT ua.amenity_id) AS amenity_count

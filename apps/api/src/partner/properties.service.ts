@@ -14,6 +14,7 @@ import {
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
+import { imageIsPublished } from '../storage/image-visibility.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
@@ -288,7 +289,7 @@ export class PropertiesService {
       JOIN property_types pt ON pt.id = pr.property_type_id
       LEFT JOIN LATERAL (
         SELECT pi.file_key, pi.variant_widths FROM property_images pi
-        WHERE pi.property_id = pr.id AND pi.deleted_at IS NULL
+        WHERE pi.property_id = pr.id AND ${imageIsPublished('pi')}
         ORDER BY pi.is_cover DESC, pi.sort_order ASC
         LIMIT 1
       ) img ON true

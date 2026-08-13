@@ -87,8 +87,23 @@ async function upload(page: Page, fixture: string): Promise<string> {
 
   await page.locator('input[type="file"]').setInputFiles(`e2e/fixtures/${fixture}`);
 
-  /* Processing is real work — decode, resize, re-encode, store — so this is not instant. */
+  /* The tile appears as soon as the upload is accepted — it is a `processing` row at this point. */
   await expect(cards(page)).toHaveCount(before.length + 1, { timeout: 30_000 });
+
+  /*
+    Then WAIT FOR THE PICTURE.
+    
+    Since BullMQ phase 3 the request stores the file and returns; a worker decodes and re-encodes
+    it, and the tile carries «جارٍ التحضير…» with no `<img>` at all until that finishes. So a card
+    count is no longer evidence that a photograph exists, and every helper below reads `img` sources
+    to identify cards — which would find nothing.
+    
+    This is also the spec's real dependency on the worker: with `pnpm worker` not running, this
+    times out here rather than failing something further down for a reason that looks unrelated.
+  */
+  await expect(cards(page).locator('img')).toHaveCount(before.length + 1, {
+    timeout: 30_000,
+  });
 
   const after = await sources(page);
   const added = after.filter((src) => !before.includes(src));

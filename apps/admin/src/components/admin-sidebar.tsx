@@ -50,9 +50,12 @@ const NAV: readonly NavItem[] = [
   { key: 'giftCards', href: '/giftcards' },
   { key: 'coupons', href: '/coupons' },
   /*
-    The last four have routes but no data behind them. They link to a page that NAMES what is
-    missing, which is better than both alternatives: a dead nav item tells the operator nothing,
-    and an empty table tells them something false.
+    All eighteen are built. This list is the whole console, not a built-first subset.
+
+    It carried a note until 2026-08-13 saying the last four were routes with no data behind them,
+    and that had been untrue for some time: every section below queries its own registry, pages it
+    and paints its statuses like the ones above. A stale comment about what is MISSING is the worst
+    kind, because the next person reads it as a backlog and plans work that is already done.
   */
   { key: 'ads', href: '/ads' },
   { key: 'disputes', href: '/disputes', warn: true },

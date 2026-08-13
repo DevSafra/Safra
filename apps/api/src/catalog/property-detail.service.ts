@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { imageIsPublished } from '../storage/image-visibility.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { ERROR } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
@@ -243,7 +244,7 @@ export class PropertyDetailService {
       SELECT i.file_key, i.alt_ar, i.alt_en, i.alt_de, i.width, i.height, i.variant_widths, i.is_cover
       FROM property_images i
       JOIN properties p ON p.id = i.property_id
-      WHERE p.slug = ${slug} AND i.deleted_at IS NULL
+      WHERE p.slug = ${slug} AND ${imageIsPublished('i')}
       ORDER BY i.is_cover DESC, i.sort_order
     `);
 

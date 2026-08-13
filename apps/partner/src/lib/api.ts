@@ -385,6 +385,14 @@ const propertyImageSchema = z.object({
   variantWidths: z.array(z.number()),
   isCover: z.boolean(),
   sortOrder: z.number(),
+  /*
+    Where the photograph is in the pipeline. `catch` rather than a bare enum: an API that gained a
+    fourth state must not blank this screen, and treating an unknown one as ready is the behaviour
+    the manager had before the column existed.
+  */
+  status: z.enum(['processing', 'ready', 'failed']).catch('ready'),
+  /** An ERROR code when it failed, resolved against the catalogue — never a sentence. */
+  failureCode: z.string().nullable().default(null),
   alt: z.object({
     ar: z.string().nullable(),
     en: z.string().nullable(),

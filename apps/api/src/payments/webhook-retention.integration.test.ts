@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { WebhookRetentionService } from './webhook-retention.service.js';
+import { JobRunService } from '../common/jobs/job-run.service.js';
 
 /**
  * Webhook retention against a REAL PostgreSQL.
@@ -26,7 +27,7 @@ describeIfDb('WebhookRetentionService', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   /* Every row this suite writes is discarded when the test that wrote it ends. */
   const db: Database = harness.db;
-  const service = new WebhookRetentionService(db);
+  const service = new WebhookRetentionService(db, new JobRunService(db));
 
   /** Namespaced so a run cannot touch rows belonging to any other suite. */
   const TAG = `retention-test-${process.pid}`;

@@ -7,6 +7,8 @@ import { PERMISSIONS as P } from '@safra/contracts';
 import { AuditService } from '../common/audit/audit.service.js';
 import { PropertyImageService } from './property-images.service.js';
 import type { ImageService } from '../storage/image.service.js';
+import type { StorageService } from '../storage/storage.service.js';
+import { createInlineMediaQueue } from '../queue/queue.testing.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
@@ -60,30 +62,49 @@ describeIfDb('PropertyImageService', () => {
     A stub that records what it was asked to do and hands back a plausible key. The real service
     shells out to sharp; a test that re-encoded three variants per upload would spend its time
     measuring libvips.
+
+    Since BullMQ phase 3 the upload path calls `inspect` and `keyFor` rather than `process` — the
+    validation half and the naming half, with the encoding gone to a worker. `render` is absent on
+    purpose: nothing in THIS suite should be able to reach it, and leaving it undefined means a
+    regression that put encoding back in the request fails here rather than passing slowly.
   */
   let uploads = 0;
   const images = {
-    process: (_buffer: Buffer, options: { owner: string }) => {
+    inspect: () => Promise.resolve({ width: 1600, height: 1067, format: 'jpeg' }),
+    keyFor: (options: { owner: string }) => {
       uploads += 1;
 
-      return Promise.resolve({
-        fileKey: `properties/${options.owner}/img-${uploads}`,
-        width: 1600,
-        height: 1067,
-        variants: [
-          { width: 400 },
-          { width: 400 },
-          { width: 800 },
-          { width: 800 },
-          { width: 1600 },
-          { width: 1600 },
-        ],
-      });
+      return `properties/${options.owner}/img-${uploads}`;
     },
+    incomingKeyFor: (fileKey: string) => `incoming/${fileKey.replaceAll('/', '_')}`,
     publicUrl: (key: string, width: number) => `https://media.test/${key}-${width}.webp`,
   } as unknown as ImageService;
 
-  const service = new PropertyImageService(db, images, new AuditService(db));
+  /** Records what was parked, so a test can assert the bytes went somewhere private first. */
+  const stored = new Map<string, Buffer>();
+  const storage = {
+    put: (key: string, body: Buffer) => {
+      stored.set(key, body);
+
+      return Promise.resolve({ key, contentType: 'application/octet-stream', size: 0 });
+    },
+    get: (key: string) => Promise.resolve(stored.get(key) ?? null),
+    remove: (key: string) => {
+      stored.delete(key);
+
+      return Promise.resolve();
+    },
+  } as unknown as StorageService;
+
+  const mediaQueue = createInlineMediaQueue();
+
+  const service = new PropertyImageService(
+    db,
+    images,
+    storage,
+    new AuditService(db),
+    mediaQueue.queue,
+  );
 
   let partnerId = '';
   let partnerUserId = '';
@@ -102,6 +123,18 @@ describeIfDb('PropertyImageService', () => {
   /** A partner with two properties: one draft to work on, one published to protect. */
   beforeEach(async () => {
     await harness.begin();
+
+    /*
+      The doubles are per FILE; the database is per TEST.
+
+      `harness.begin()` opens a transaction that `afterEach` rolls back, so every row a test writes
+      disappears — but `stored` and `mediaQueue` are ordinary objects created once at module scope
+      and would carry one test's uploads into the next. The symptom is an assertion about "one job"
+      failing with six, in a test that enqueued one, which reads as a bug in the code under test.
+    */
+    stored.clear();
+    mediaQueue.jobs.length = 0;
+    mediaQueue.jobIds.length = 0;
 
     const made = await db.execute<{
       partner_id: string;
@@ -184,13 +217,52 @@ describeIfDb('PropertyImageService', () => {
       expect(list[0]?.isCover).toBe(true);
     });
 
-    it('records the widths that were actually rendered', async () => {
-      await add();
+    /**
+     * The row an upload leaves behind is a PROMISE, and says so.
+     *
+     * Before BullMQ phase 3 this test asserted the rendered widths, because the request rendered
+     * them. It cannot any more, and the honest replacement is the state the request actually
+     * produces: dimensions known from the header, widths empty, status `processing`, and the
+     * uploaded bytes parked under a key the public read policy does not cover. The widths are proved
+     * on the other side of the queue, in `media-queue.integration.test.ts`, by running the worker.
+     */
+    it('leaves a processing row whose variants do not exist yet', async () => {
+      const uploaded = await add();
 
       const list = await service.list(partner(), reference);
 
-      /* Distinct widths only — the pipeline emits each twice, once per format. */
-      expect(list[0]?.variantWidths).toEqual([400, 800, 1600]);
+      expect(list[0]?.status).toBe('processing');
+      expect(list[0]?.variantWidths).toEqual([]);
+      /* From the header, so the gallery can reserve the right shape before the bytes arrive. */
+      expect(list[0]?.width).toBe(1600);
+      expect(uploaded.status).toBe('processing');
+    });
+
+    /**
+     * The one moment the platform holds a file exactly as a stranger sent it.
+     *
+     * `incoming/`, never `properties/` — `bootstrap-media.ts` grants anonymous read on
+     * `properties/*` and nothing else, so this prefix is the difference between an unvalidated
+     * upload being unreachable and it being a URL away. Asserted rather than trusted, because the
+     * prefix is a string in one method and nothing else would notice it changing.
+     */
+    it('parks the original outside the publicly readable prefix', async () => {
+      await add();
+
+      const parked = [...stored.keys()];
+
+      expect(parked).toHaveLength(1);
+      expect(parked[0]?.startsWith('incoming/')).toBe(true);
+      expect(parked[0]?.startsWith('properties/')).toBe(false);
+    });
+
+    /** The job names the row, deterministically, so a retried request is not a second render. */
+    it('enqueues exactly one render, keyed on the image row', async () => {
+      const uploaded = await add();
+
+      expect(mediaQueue.jobs).toHaveLength(1);
+      expect(mediaQueue.jobs[0]?.imageId).toBe(uploaded.id);
+      expect(mediaQueue.jobIds).toEqual([`image-${uploaded.id}`]);
     });
 
     it('refuses an empty upload', async () => {

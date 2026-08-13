@@ -212,6 +212,12 @@ export const en = {
   'upload.image_type_unsupported':
     'Only JPEG, PNG, WebP, AVIF, HEIF or TIFF images are accepted.',
   'upload.image_too_small': 'Images must be at least {min}x{min} pixels.',
+  'upload.image_processing_failed':
+    'This image could not be processed. Try uploading it again.',
+  'export.not_found': 'No export with that reference.',
+  'export.not_ready': 'That export is still being prepared. Refresh in a moment.',
+  'export.failed': 'That export could not be built. Request it again.',
+  'export.expired': 'That file has expired. Request a new export.',
   'setting.unknown':
     'No such setting. Settings are seeded, not created from this screen.',
   'setting.value_rate':

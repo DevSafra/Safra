@@ -41,6 +41,8 @@ export const TABLE_SECTIONS = [
   'payouts',
   /* The reported-review moderation queue, beside النزاعات. */
   'reviews',
+  /* Requested CSV exports, collected from a screen under الحجوزات rather than a sidebar section. */
+  'exports',
   /**
    * The staff SCOPE map, which is a second paged list on the same screen as the staff registry.
    *
@@ -77,6 +79,7 @@ export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   audit: '/audit',
   payouts: '/payouts',
   reviews: '/reviews',
+  exports: '/bookings/exports',
   staffScope: '/staff',
 };
 

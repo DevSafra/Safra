@@ -33,4 +33,19 @@ export const en = {
     subject: 'The support team replied to your request — {reference}',
     body: 'The SAFRA support team has replied to your support request.\n\nReference: {reference}\n\nOpen the conversation to read the reply and continue it:\n{url}\n\nWe do not send message text by email; the whole conversation is in your account.\n\nThe SAFRA team',
   },
+  /**
+   * The re-drive notice: something was waiting for you and we could not say exactly what.
+   *
+   * Sent only by `NotificationService.redrive`, when a notification row survived a total loss of
+   * the queue. The row records THAT somebody was to be told and who — it deliberately holds no
+   * recipient, subject or body (every support agent reads that table) — so a re-driven notice
+   * cannot name the review, the reply or the thread it was originally about.
+   *
+   * Saying that plainly and pointing at the right screen is the honest version. The alternative
+   * was silence, which is what happened before this existed.
+   */
+  waiting: {
+    subject: 'You have an update waiting in your SAFRA account',
+    body: 'Something in your SAFRA account was updated and we were not able to email you at the time.\n\nOpen this page to see it:\n{url}\n\nWe do not repeat the details by email — they are in your account.\n\nThe SAFRA team',
+  },
 } as const;

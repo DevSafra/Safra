@@ -13,3 +13,12 @@ export const QUEUE_REDIS = Symbol('QUEUE_REDIS');
 
 /** The `mail` queue's producer handle. */
 export const MAIL_QUEUE = Symbol('MAIL_QUEUE');
+
+/** The `media` queue's producer handle. */
+export const MEDIA_QUEUE = Symbol('MEDIA_QUEUE');
+
+/** The `scheduled` queue's producer handle — recurring jobs are declared through it. */
+export const SCHEDULED_QUEUE = Symbol('SCHEDULED_QUEUE');
+
+/** The `exports` queue's producer handle. */
+export const EXPORTS_QUEUE = Symbol('EXPORTS_QUEUE');

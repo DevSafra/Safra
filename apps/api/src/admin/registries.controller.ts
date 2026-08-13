@@ -17,6 +17,7 @@ import {
   PERMISSIONS as P,
   pageQuerySchema,
   setStaffScopeSchema,
+  type PageQuery,
   type SetStaffScopeInput,
 } from '@safra/contracts';
 
@@ -30,7 +31,7 @@ import { PromotionsService } from './promotions.service.js';
 import { GeoService } from './geo.service.js';
 import { ReportsService } from './reports.service.js';
 import { StaffOverviewService } from './staff-overview.service.js';
-import { BookingExportService } from './booking-export.service.js';
+import { ExportRequestService } from './export-request.service.js';
 import { StaffScopeService } from './staff-scope.service.js';
 import {
   EmergencyService,
@@ -64,6 +65,22 @@ const bookingStatusSchema = z.enum([
 
 const bookingListQuerySchema = listQuerySchema.extend({
   status: bookingStatusSchema.optional(),
+  /**
+   * §6.4's window about to lapse — the dashboard's EC-008 alert, as a list.
+   *
+   * A boolean rather than a number of minutes: the threshold has to match the COUNT the dashboard
+   * shows, and a caller-supplied window would let the two disagree. `SLA_EXPIRY_WARNING_MINUTES`
+   * lives in one place and every reader takes it from there.
+   *
+   * `literal('1')`, not `coerce.boolean()`. Coercion treats every non-empty string as true, so
+   * `?expiring=false` and `?expiring=0` would both TURN THE FILTER ON — a URL that says the opposite
+   * of what it does. Accepting exactly one value makes the query string honest and anything else
+   * simply not the filter.
+   */
+  expiring: z
+    .literal('1')
+    .optional()
+    .transform((value) => value === '1'),
 });
 
 const deactivateEmergencySchema = z
@@ -98,7 +115,7 @@ export class RegistriesController {
     private readonly reports: ReportsService,
     private readonly staffOverview: StaffOverviewService,
     private readonly emergency: EmergencyService,
-    private readonly bookingExport: BookingExportService,
+    private readonly exportRequests: ExportRequestService,
     private readonly staffScope: StaffScopeService,
   ) {}
 
@@ -122,19 +139,22 @@ export class RegistriesController {
   /**
    * تصدير CSV, audited (B-13).
    *
-   * `Header`-controlled download rather than a JSON payload the client turns into a file: the
-   * browser handles the save, and the API is the only thing that ever sees the whole set — which is
-   * what lets it write one accurate audit row.
+   * ## A POST that ASKS for a file, rather than a GET that is one
+   *
+   * The export is built by a worker now (BullMQ phase 5), which removes the 20,000-row truncation
+   * that existed only because the file was made inside a request. Two consequences follow from the
+   * verb rather than from taste: a GET that creates a row would let a prefetch or a pasted link
+   * produce an export in somebody's name, and a download that takes minutes cannot be a response.
    *
    * Throttled hard. An export is the cheapest way to pull a large slice of customer data out of the
    * console, so the limit is about bounding that, not about load.
    */
-  @Get('bookings/export')
+  @Post('bookings/export')
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @RequirePermissions(P.BOOKING_READ_ALL)
-  async exportBookings(
+  async requestBookingExport(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Query(
+    @Body(
       new ZodValidationPipe(
         z
           .object({
@@ -144,20 +164,51 @@ export class RegistriesController {
           .strict(),
       ),
     )
-    query: { q?: string | undefined; status?: string | undefined },
+    body: { q?: string | undefined; status?: string | undefined },
+  ) {
+    return this.exportRequests.request(user, body);
+  }
+
+  /**
+   * The exports this caller may collect.
+   *
+   * No extra permission beyond `BOOKING_READ_ALL`: the service scopes the list to the caller's own
+   * requests unless they hold `STAFF_MANAGE`, so the authorisation is in the WHERE clause where it
+   * cannot be forgotten.
+   */
+  @Get('exports')
+  @RequirePermissions(P.BOOKING_READ_ALL)
+  async listExports(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Query(new ZodValidationPipe(pageQuerySchema)) query: PageQuery,
+  ) {
+    return this.exportRequests.list(user, query);
+  }
+
+  /**
+   * The bytes.
+   *
+   * `Header`-controlled download rather than a JSON payload the client turns into a file: the
+   * browser handles the save, and the API is the only thing that ever sees the whole set — which is
+   * what lets it write one accurate audit row, here, immediately before the bytes leave.
+   *
+   * Throttled hard for the same reason the request is: an export is the cheapest way to pull a large
+   * slice of customer data out of the console.
+   */
+  @Get('exports/:reference/download')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @RequirePermissions(P.BOOKING_READ_ALL)
+  async downloadExport(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
     @Res() response: Response,
   ): Promise<void> {
-    const { csv, rowCount, truncated } = await this.bookingExport.toCsv(user, query);
+    const { filename, csv } = await this.exportRequests.download(user, reference);
 
     response.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    response.setHeader(
-      'Content-Disposition',
-      'attachment; filename="safra-bookings.csv"',
-    );
-    /* Never cached: it carries customer names and is generated per request and per scope. */
+    response.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    /* Never cached: it carries customer names and is scoped to one requester. */
     response.setHeader('Cache-Control', 'no-store');
-    response.setHeader('X-Row-Count', String(rowCount));
-    response.setHeader('X-Truncated', String(truncated));
     response.send(csv);
   }
 

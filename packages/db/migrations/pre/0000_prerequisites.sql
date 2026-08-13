@@ -29,6 +29,9 @@ CREATE SEQUENCE IF NOT EXISTS advertiser_reference_seq   START 1;
 -- else that moves money.
 CREATE SEQUENCE IF NOT EXISTS payout_reference_seq       START 1;
 CREATE SEQUENCE IF NOT EXISTS review_reference_seq       START 1;
+-- Added 2026-08-13 with BullMQ phase 5. An export is a FILE a person asked for and comes
+-- back to collect, so it needs a name they can quote to support when it is not there.
+CREATE SEQUENCE IF NOT EXISTS export_reference_seq       START 1;
 
 -- ----------------------------------------------------------------------------
 -- The reference NUMBER, padded to six digits and never truncated.

@@ -38,6 +38,6 @@ import { WalletModule } from '../wallet/wallet.module.js';
     // stateless, so a second instance costs nothing.
     AuditService,
   ],
-  exports: [RefundService],
+  exports: [RefundService, WebhookRetentionService],
 })
 export class PaymentsModule {}
