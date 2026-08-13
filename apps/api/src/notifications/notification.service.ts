@@ -4,9 +4,14 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 
+import { Queue } from 'bullmq';
+
 import { DATABASE } from '../database/database.module.js';
 import { MailService, type OutgoingMail } from '../mail/mail.service.js';
 import { redactContactDetails } from '../messaging/redaction.js';
+import { JOB_OPTIONS } from '../queue/queue.definitions.js';
+import { MAIL_JOB, mailJobId, type MailJobData } from '../queue/mail.job.js';
+import { MAIL_QUEUE } from '../queue/queue.tokens.js';
 
 /**
  * Telling somebody that something happened, and RECORDING that we told them.
@@ -37,12 +42,24 @@ import { redactContactDetails } from '../messaging/redaction.js';
  * not the notice went out. So `notify` swallows the send failure, records it, and returns — the
  * caller is told nothing, because there is nothing the caller should do differently.
  *
- * ## Not a queue, yet
+ * ## It is a queue now
  *
- * Sends happen in the request. That is honest for three low-volume notices and wrong for a
- * platform: a slow mail server becomes a slow API. `docs/FUTURE-WORK.md` carries the queue as
- * item 9 (BullMQ), deferred until the hosting decision is made. Until then this is the seam it
- * will move behind — every send already goes through one method with a recorded outcome.
+ * Sends used to happen in the request, which was honest for three low-volume notices and wrong for a
+ * platform: an unreachable SMTP server added its timeout to a booking. Since 2026-08-13 (BullMQ
+ * phase 2) `notify` writes the row and ENQUEUES; `MailProcessor` sends and marks the row terminal.
+ *
+ * **The row is written before the job exists, and that ordering is load-bearing.** It is what makes
+ * a total Redis loss survivable: pending work is recoverable by scanning `notifications` for rows
+ * still `queued`, so the queue is never the only record that something is owed. Any future job type
+ * must follow the same pattern — `docs/background-jobs-design.md`, "Backup and restore
+ * implications".
+ *
+ * ## What "queued" means in this table now
+ *
+ * It used to mean "about to be attempted, in this request". It now means "accepted, not yet
+ * attempted", which is a state that can outlive the process. The gauge `safra_notifications_1h`
+ * already treats `queued` as its own failure when it persists, and that reading is now the correct
+ * one rather than a pessimistic one.
  */
 @Injectable()
 export class NotificationService {
@@ -51,6 +68,7 @@ export class NotificationService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly mail: MailService,
+    @Inject(MAIL_QUEUE) private readonly queue: Queue,
   ) {}
 
   /**
@@ -90,12 +108,60 @@ export class NotificationService {
     if (!row) return;
 
     try {
+      await this.queue.add(
+        MAIL_JOB,
+        { notificationId: row.id, templateKey, mail } satisfies MailJobData,
+        {
+          ...JOB_OPTIONS.mail,
+          /* Deterministic: re-enqueueing the same notification row is a no-op, not a second email. */
+          jobId: mailJobId(row.id),
+        },
+      );
+    } catch (error) {
+      /*
+        The ENQUEUE failed, which is a different failure from a send failing.
+
+        The row stays `queued` rather than being marked `failed`, because that is the state the
+        recovery procedure looks for: a re-drive scans for `queued` rows and enqueues them again.
+        Marking it `failed` here would hide it from that scan and turn a recoverable Redis blip into
+        a notice nobody is ever told about.
+      */
+      this.logger.error(
+        `Could not enqueue notification ${templateKey} (${row.id}): ` +
+          `${error instanceof Error ? error.message : String(error)}. The row stays queued and is ` +
+          'recoverable by re-drive.',
+      );
+    }
+  }
+
+  /**
+   * Sends the mail and marks the row terminal. Called by the worker, never by a request.
+   *
+   * ## Why the worker calls back into this class
+   *
+   * The `notifications` row and the send are one unit of meaning, and the code that knows how to
+   * record an outcome is here — including the redaction the failure reason needs. A processor that
+   * wrote those updates itself would be a second place that knows the table's states, and the two
+   * would drift the first time a status was added.
+   *
+   * ## It THROWS on failure, unlike `notify`
+   *
+   * `notify` swallows, because its caller is a booking or a review that must not be undone by a mail
+   * server. This is the opposite: the worker's caller is BullMQ, and throwing is how a job asks to be
+   * retried. Swallowing here would report every failed send as a success and retire the job.
+   */
+  async deliver(
+    notificationId: string,
+    templateKey: string,
+    mail: OutgoingMail,
+  ): Promise<void> {
+    try {
       await this.mail.send(mail);
 
       await this.db.execute(sql`
         UPDATE notifications
         SET status = 'sent', sent_at = now(), attempts = attempts + 1
-        WHERE id = ${row.id}
+        WHERE id = ${notificationId}
       `);
     } catch (error) {
       /*
@@ -111,13 +177,21 @@ export class NotificationService {
         error instanceof Error ? error.message : 'unknown',
       ).body.slice(0, 300);
 
+      /*
+        `failed` is written on EVERY attempt, not only the last one, and `attempts` counts up. So a
+        row that is retried reads as failed between attempts and becomes `sent` when one succeeds —
+        which is the honest description of where it is, and what the delivery log is for.
+      */
       await this.db.execute(sql`
         UPDATE notifications
         SET status = 'failed', failure_reason = ${reason}, attempts = attempts + 1
-        WHERE id = ${row.id}
+        WHERE id = ${notificationId}
       `);
 
       this.logger.warn(`Notification ${templateKey} failed to send: ${reason}`);
+
+      /* Rethrown so BullMQ retries. See the method note. */
+      throw error;
     }
   }
 }
