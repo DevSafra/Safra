@@ -29,6 +29,7 @@ import { WalletModule } from './wallet/wallet.module.js';
 import { MetricsModule } from './metrics/metrics.module.js';
 import { HealthModule } from './health/health.module.js';
 import { RedisModule } from './redis/redis.module.js';
+import { DisputeModule } from './disputes/dispute.module.js';
 import { QueueModule } from './queue/queue.module.js';
 import { MailWorkerModule } from './queue/mail-worker.module.js';
 import { RedisThrottlerStorage } from './redis/redis-throttler.storage.js';
@@ -45,6 +46,7 @@ import { TwoFactorGuard } from './rbac/two-factor.guard.js';
   imports: [
     /* Global: producers are injected across the app, and the worker resolves them too. */
     QueueModule,
+    DisputeModule,
     /* The mail worker's processor. Constructed in both processes; only worker.ts runs it. */
     MailWorkerModule,
     DatabaseModule,
