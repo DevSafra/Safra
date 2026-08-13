@@ -19,8 +19,10 @@ does NOT cover the two things a local run answers honestly, and both are worth h
 
 - **`O-scale-1`** — a hard ceiling at 999,999 rows on twelve reference columns, hit by the GENERATOR
   before a single request was sent. Fixed.
-- **`O-scale-2`** — search takes **144 seconds** at these volumes and the API's 15-second statement
-  timeout turns that into an HTTP 500. Open; the plan shape, not the hardware, is the problem.
+- **`O-scale-2`** — search took **144 seconds** at these volumes and the API's 15-second statement
+  timeout turned that into an HTTP 500. Fixed 2026-08-13: filtered searches now answer inside the
+  200 ms budget (213 ms for a city, 141 ms with a type), and the unfiltered browse went from 144 s to
+  3.9 s. That last one is still 20× over budget and needs a different approach — see the entry.
 
 Both were invisible to every test, every review and every environment, and visible immediately to a
 million rows. That is the argument for building this harness before the hosting decision rather than

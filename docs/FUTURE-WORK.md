@@ -1286,64 +1286,67 @@ the migration case.
 
 **Owner:** engineering.
 
-### O-scale-2 — OPEN, SEVERE: search returns HTTP 500 at the documented volumes
+### O-scale-2 — FIXED for filtered search; the unfiltered browse remains
 
-**Status:** open · **Owner:** engineering, needs Bashar's call on approach · **Found:** 2026-08-12 by
-the first run against production-shaped data · **Severity:** the primary traffic path does not work
+**Status:** fixed 2026-08-13, one gap left · **Found:** 2026-08-12, the first run against
+production-shaped data · **Was:** the primary traffic path returned HTTP 500
 
-Search is 80 % of real traffic (`docs/load-testing.md` §1). At the volumes that document specifies —
-50,000 properties, 200,000 units, 73M availability days — **one search takes 144 seconds.** The API's
-pool sets `statement_timeout: 15_000`, so what a customer actually receives is **HTTP 500**. This is
-not "slow at scale"; it is broken at scale, and the budget is 200 ms.
+Search is 80 % of real traffic (`docs/load-testing.md` §1). At the documented volumes — 50,000
+properties, 200,000 units, 73M availability days — one search took **144 seconds**, and since the
+pool sets `statement_timeout: 15_000`, what a customer received was **HTTP 500**. Not slow at scale;
+broken at scale, against a 200 ms budget.
 
-| Query                                  | Measured   | Over budget |
-| -------------------------------------- | ---------- | ----------- |
-| Search, no filters                     | 144,488 ms | **722×**    |
-| Search, one city (⅑ of inventory)      | 39,705 ms  | 199×        |
-| Same query with the CTE `MATERIALIZED` | 42,810 ms  | 214×        |
+| Query             | Before     | After    | Change   | Budget     |
+| ----------------- | ---------- | -------- | -------- | ---------- |
+| City + type       | —          | 141 ms   | —        | **within** |
+| One city          | 39,705 ms  | 213 ms   | **186×** | **within** |
+| No filters at all | 144,488 ms | 3,900 ms | **37×**  | 20× over   |
 
-**The measurement is a laptop's, and the SHAPE is not.** One request touched **167,493,752 shared
-buffers**. No hardware makes that a 200 ms operation, and the count grows linearly with inventory.
-Two sorts spilled to disk (`external merge`). Those are properties of the plan.
+**Four changes, all behaviour-preserving, in descending order of what they bought:**
 
-**Four causes, in the order they cost:**
+1. **Narrow before pricing.** City, type and cancellation-policy filters moved INTO the `bookable`
+   CTE, where they belong: they were applied afterwards, so a search of one city priced and
+   availability-checked every unit in the country first. This is what unlocked
+   `properties_published_idx` — `(city_id, recommendation_score DESC) WHERE status = 'published'`,
+   an index that already existed and that the old query shape made unusable. The predicates are
+   REPEATED in `candidates` rather than moved, so applying them twice cannot change a result.
+2. **Price with algebra instead of a row per night.** `SUM(COALESCE(ad.price, u.base_price))` over a
+   `generate_series` LEFT JOIN meant the date was never an index bound: the plan read all 365 of a
+   unit's availability rows and hash-joined them down to the two being priced. Rewritten as
+   `nights × base + Σ(override − base)` — the same total — it is a bounded range scan on
+   `(unit_id, date)` touching only nights that carry an override, usually none.
+3. **Deleted a window function nobody read.** `ROW_NUMBER() OVER (…) AS row_no` was computed over
+   every matching property and then deleted from each row by `stripSortColumns`. A window function
+   is evaluated over the whole partition before `LIMIT` applies, so the cost of ranking the entire
+   result set was paid on every search and thrown away.
+4. **Merged two anti-joins into one scan.** The closed-day rule and the minimum-nights rule read the
+   same `(unit_id, date)` range separately, so an unfiltered search made 450,000 index lookups into
+   a 73M-row table. As one `NOT EXISTS` with an OR it makes 205,000. The union of the predicates is
+   the union of the excluded sets, so the result is identical.
 
-1. **Every search prices every unit in the country.** `Parallel Seq Scan on units` (200,000 rows) and
-   on `properties` (50,000), then the per-night price is computed for each candidate, and only then is
-   anything sorted or limited. A city filter helps only in proportion — ⅑ of the inventory took ⅑ of
-   the time — because it narrows the candidate set without changing the shape.
-2. **The price subquery runs three times per candidate.** `bookable` is a CTE referenced once, so
-   PostgreSQL INLINES it, and `b.stay_total` appears three times in `candidates` (the value, the
-   `nightlyFrom` division, and the sort key). The plan shows `SubPlan 1/2/3`, each `loops=150000`.
-   Adding one word — `WITH bookable AS MATERIALIZED (…)` — collapses it to a single SubPlan and takes
-   144 s to 43 s. **A 3.4× win from one word**, and still 214× over budget, which is why it is listed
-   second rather than as the fix.
-3. **Pricing two nights reads a unit's whole year.** The plan shows `Index Scan using
-availability_days_unit_id_date_pk … rows=365 loops=150000`: because `generate_series` is the outer
-   side of the LEFT JOIN, the date is not an index bound, so all 365 days come back and are
-   hash-joined down to 2.
-4. **`DISTINCT ON` plus a window function force the whole candidate set to be materialised and
-   sorted** before `LIMIT` applies. The limit cannot be pushed down.
+`MATERIALIZED` on the CTE is in there too, but it is now worth little: with the price subquery
+cheap, evaluating it three times instead of once no longer dominates.
 
-**What this does NOT show.** Nothing about concurrency — this is a single query, run alone. The real
-run will be worse. And the invariants are unaffected: `pnpm load:invariants` passes over 5M bookings
-and 20M ledger entries.
+**What remains, and why it is a different problem.** A search with NO destination still takes ~3.9 s,
+because it must decide availability for all 200,000 units to find the cheapest bookable one per
+property, then sort 50,000 properties. No index fixes that — the query is asked for something
+proportional to the whole inventory. Three ways out, none of them free:
 
-**The remedies, in `docs/load-testing.md` §"What we do if it fails" order.** (1) is not an index —
-the indexes exist and are used; the query asks for too much. My reading, for Bashar's decision:
+- **Early termination for property-ordered sorts.** `recommended` (the §5.5 default) and
+  `rating_desc` rank on PROPERTY columns, so the query could walk properties in score order, take the
+  first page that has a bookable unit, and price only those. It does not work for `price_asc` /
+  `price_desc`, whose ranking key is the thing being computed — so it means two query shapes.
+- **Cache the unfiltered first page.** It is identical for every visitor with the same dates and
+  party size. This contradicts a deliberate decision recorded in `apps/web/src/lib/catalog.ts` —
+  "caching availability would sell a room that is already taken" — so it is Bashar's call, and a
+  short TTL changes the size of that risk rather than removing it.
+- **Require a destination.** A product decision. §5.2 explicitly allows searching without one.
 
-- **Narrow before pricing.** Push city, type and guest-count filters into `bookable` so the price is
-  computed for hundreds of units, not two hundred thousand. This is the real fix and it is a rewrite
-  of the search query, not a tweak.
-- **`MATERIALIZED` now.** One word, 3.4×, no behaviour change. Worth taking regardless.
-- **Precompute the nightly total.** A per-unit-per-date price is derivable; a materialised view or a
-  denormalised column refreshed on availability writes turns the SubPlan into a lookup.
-- **Reconsider `recommendation_score` ordering.** Sorting by a column the candidate set does not
-  provide is what forbids the LIMIT pushdown.
-
-**I have not touched the search query.** It is the primary traffic path and the fix is a design
-decision about how search is shaped, not a defect with one obvious repair. The evidence is here; the
-call is Bashar's.
+**Guarded by `apps/api/src/search/search.integration.test.ts`** — 25 tests, written BEFORE the
+rewrite and passing against the original query, which is what makes them evidence of preserved
+meaning rather than a description of the new behaviour. They cover what a guest would notice: the
+anti-joins, per-night pricing including the priceless-row and departure-day edges, cheapest-unit
+selection, every filter and sort, and paging. Search had **no tests at all** before this.
 
 ### O-scale-1 — FIXED: every reference stopped working at 999,999 rows
 
@@ -2391,3 +2394,4 @@ Kept because the reason something was blocked is often the reason it returns.
 | 2026-08-12 | A staff reply to a support ticket reached nobody                                        | The first gap under **O-web-3**: an answer was discoverable only by returning to the page, which made الدعم somewhere people check rather than somewhere they are answered. `MessagingService.reply` now emails the asker via the `support.replied` template in their own language, with the ticket reference and a link and never the message text — bodies are stored redacted and the original is discarded, so repeating it in an inbox would put back exactly what the redaction removed. An internal note notifies nobody, which is the leak that would have mattered most and is tested for by name                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | 2026-08-12 | The public home page listed no cities, and had not for some time                        | **O-web-4.** `cities.categories` is an enum ARRAY, which node-postgres hands back as the literal string `'{historic}'` unless it is cast — while the `db.execute` generic declared `string[]`, an assertion nothing checks. The web app validates the response and falls back to an empty list, so the destinations grid and the city selector rendered empty rather than erroring, and `/ar/city/*` became unreachable from the site. Invisible until a rebuild replaced a long-running API process built from older code. `to_jsonb(c.categories)`, plus a test asserting the runtime shape                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | 2026-08-12 | Every human-readable reference broke at 999,999 rows                                    | **O-scale-1.** Twelve tables defaulted their reference to `lpad(nextval(…)::text, 6, '0')`, and `lpad` TRUNCATES past the width: the millionth row was handed the reference the hundred-thousandth already had, and ten consecutive counter values then collapsed onto one. The unique index made it a failed INSERT — an outage at exactly the volumes rule 2 targets (1M users) and a fifth of the load plan's bookings. Invisible to every test because no environment had ever held a million of anything; found by building the load-test data generator. Fixed with a `reference_number()` helper that pads without truncating, plus a test that reads every reference default out of `information_schema` and refuses `lpad`                                                                                                                                                                                                                                                                                                                                        |
+| 2026-08-13 | Search returned HTTP 500 at the documented volumes                                      | **O-scale-2.** 144 seconds for one search over 50k properties / 200k units / 73M availability days, against a 200 ms budget and a 15 s statement timeout. Four behaviour-preserving changes: property filters moved INTO the pricing CTE so a city search stops pricing the whole country (and `properties_published_idx` becomes usable), the per-night price sum rewritten algebraically so it stops reading 365 rows to price 2 nights, a `ROW_NUMBER()` that every row discarded deleted, and two anti-joins over the same date range merged into one. City search 39.7 s → 213 ms, unfiltered 144 s → 3.9 s. Held by 25 tests written against the OLD query first; search had none before                                                                                                                                                                                                                                                                                                                                                                             |
