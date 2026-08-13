@@ -77,4 +77,23 @@ export class SupportController {
   ) {
     return this.support.reply(user, reference, body.body);
   }
+
+  /**
+   * "I no longer need help."
+   *
+   * No body: the reference in the path is the whole request, and the service takes the owner from the
+   * token rather than from anything sent. There is nothing here a caller could tamper with.
+   *
+   * Throttled like a reply rather than like opening a ticket. It is idempotent and it REMOVES work
+   * from the console queue, so the thing worth limiting is a loop, not a person pressing twice.
+   */
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @Post(':reference/close')
+  @AuditExempt('The thread IS the record; closed_at is on it.')
+  async close(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.support.close(user, reference);
+  }
 }

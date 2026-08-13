@@ -293,6 +293,62 @@ export class SupportService {
     return this.thread(claims, reference);
   }
 
+  /**
+   * The asker saying they no longer need help.
+   *
+   * ## Why this exists
+   *
+   * Only staff could close a thread, so a problem that resolved itself stayed in the console's queue
+   * for ever and somebody eventually read it to find out it was nothing. The unread counter is what
+   * the inbox sorts by, so an abandoned ticket does not merely linger — it sits near the top, ahead
+   * of people who are still waiting.
+   *
+   * ## So it clears `unread_for_staff` as well as setting `closed_at`
+   *
+   * Closing without that would satisfy the letter of the gap and not its point: the thread would read
+   * as closed and still be counted as waiting on us. Both are set in one statement.
+   *
+   * ## Idempotent
+   *
+   * Closing an already-closed thread returns it rather than failing. The button is on a page that can
+   * be reloaded and double-submitted, and the second press means exactly what the first did. A 400
+   * here would be a lecture about state the reader cannot see.
+   *
+   * ## No system message is written into the thread
+   *
+   * "The customer closed this request" is a sentence, and a message body is stored ONCE while the
+   * console reads Arabic and the customer app reads three languages. Storing it would put
+   * user-facing copy in a row nobody can translate afterwards — the exact failure the copy rule
+   * exists to prevent. The `closed` state is the record; the reader's own interface says what it
+   * means, in their own language.
+   *
+   * ## And it stays closed
+   *
+   * There is no reopen. `reply` already refuses a closed thread on the grounds that reopening
+   * silently would hide the fact that it was ended, and that reasoning does not change when it is the
+   * asker who ended it. Somebody who needs help again opens a ticket, which is one action and leaves
+   * the first thread readable.
+   */
+  async close(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+  ): Promise<SupportThread> {
+    const asker = this.askerOf(claims);
+    const row = await this.findOwn(asker, reference);
+
+    if (row.closed_at === null) {
+      await this.db.execute(sql`
+        UPDATE conversations
+        SET closed_at = now(), unread_for_staff = 0, updated_at = now()
+        WHERE id = ${row.id}::uuid AND closed_at IS NULL
+      `);
+
+      this.logger.log(`Support ticket ${reference} closed by the ${asker.kind}.`);
+    }
+
+    return this.thread(claims, reference);
+  }
+
   /** The caller's own tickets, newest activity first. */
   async list(claims: AccessTokenClaims | undefined, query: SupportQuery) {
     const asker = this.askerOf(claims);
