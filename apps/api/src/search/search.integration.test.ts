@@ -334,6 +334,86 @@ describeIfDb('SearchService', () => {
     );
   });
 
+  // ─── The two query shapes must agree ───────────────────────────────────────
+
+  /**
+   * The most important test in this file.
+   *
+   * `recommended` and `rating_desc` with no price filter take a FAST PATH: the page's properties are
+   * chosen by rank before anything is priced, so twenty properties are priced instead of fifty
+   * thousand. Any other combination prices everything and sorts afterwards.
+   *
+   * Two code paths answering one question is a correctness risk, and the only way to hold them
+   * together is to ask the same question both ways. `maxPrice` far above every fixture price cannot
+   * change WHICH properties match — it only disqualifies the fast path — so the two results must be
+   * identical, in the same order.
+   */
+  it('returns identical results whether or not the pre-pricing fast path is used', async () => {
+    for (const sort of ['recommended', 'rating_desc'] as const) {
+      const fast = await search.search(query({ sort }));
+      /* Same query, same matches, slow path — a ceiling nothing here comes close to. */
+      const slow = await search.search(query({ sort, maxPrice: 1_000_000 }));
+
+      expect(
+        slow.items.map((item) => item.slug),
+        sort,
+      ).toStrictEqual(fast.items.map((item) => item.slug));
+      expect(
+        slow.items.map((item) => item.stayTotal),
+        sort,
+      ).toStrictEqual(fast.items.map((item) => item.stayTotal));
+      expect(
+        slow.items.map((item) => item.unitId),
+        sort,
+      ).toStrictEqual(fast.items.map((item) => item.unitId));
+    }
+  });
+
+  /**
+   * Ties at the page boundary, which is why the fast path ranks with `RANK()` and not `ROW_NUMBER()`.
+   *
+   * Three properties share one recommendation score and one rating, so their order is decided by the
+   * third key — the price — which the fast path has not computed when it chooses the page. `RANK()`
+   * gives tied rows the same rank, so asking for one row still admits all three to be priced, and the
+   * cheapest wins. `ROW_NUMBER()` would have cut two of them off arbitrarily and returned whichever
+   * the scan happened to reach first.
+   */
+  it('picks the right row when the whole page is tied on score and rating', async () => {
+    /* Level the fixtures, then add a third property cheaper than both. */
+    await db.execute(sql`
+      UPDATE properties SET recommendation_score = '7.000', rating = '4.0'
+      WHERE slug IN (${cheapPropertySlug}, ${dearPropertySlug})
+    `);
+
+    const third = await db.execute<{ slug: string }>(sql`
+      WITH pr AS (
+        INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
+                                slug, name_ar, name_en, name_de, address, status,
+                                rating, recommendation_score)
+        SELECT ${partnerId}::uuid, p.city_id, p.property_type_id, p.cancellation_policy_id,
+               'search-tied-' || substr(gen_random_uuid()::text, 1, 8),
+               'ثالث', 'Third', 'Dritte', 'x', 'published', '4.0', '7.000'
+        FROM properties p WHERE p.slug = ${cheapPropertySlug}
+        RETURNING id, slug
+      ), un AS (
+        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
+                           currency_id, min_nights, is_active)
+        SELECT pr.id, 'و', 'U', 'E', 2, '10.00', u.currency_id, 1, true
+        FROM pr, units u WHERE u.id = ${cheapUnitId}::uuid
+        RETURNING id
+      )
+      SELECT pr.slug FROM pr, un
+    `);
+
+    const cheapest = third.rows[0]?.slug;
+
+    /* All three tie on (score, rating); the 10-a-night one is cheapest, so it must lead. */
+    const page = await search.search(query({ limit: 1 }));
+
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]?.slug).toBe(cheapest);
+  });
+
   // ─── Paging ────────────────────────────────────────────────────────────────
 
   it('pages without repeating a property, and stops', async () => {
