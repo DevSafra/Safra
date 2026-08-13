@@ -14,6 +14,13 @@ const TOTP_PATTERN = /^\d{6}$/;
 /**
  * Partner sign-in, in two steps.
  *
+ * ## A component, not a page
+ *
+ * Split out on 2026-08-13 so the partner sign-in screen is built the way the console's is: a SERVER
+ * page holds the ornament, the heading and the card, and only the interactive part ships as client
+ * JavaScript. Before, the whole screen was one `'use client'` page, so the layout and the copy were
+ * bundled and hydrated to render text that never changes.
+ *
  * Two rather than one since 2026-08-07, when partner 2FA became mandatory. The second step appears
  * only when the API says the credentials were ACCEPTED and the code is outstanding — never for a
  * mistyped password, which would present a code box to somebody who has nothing to type in it.
@@ -27,7 +34,7 @@ const TOTP_PATTERN = /^\d{6}$/;
  * reveal it makes people mistype, and a mistyped password costs one of five attempts before the
  * account locks.
  */
-export default function LoginPage() {
+export function PartnerLoginForm({ next }: { readonly next: string }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,10 +60,18 @@ export default function LoginPage() {
     return { ok: response.ok, status: response.status, payload };
   }
 
-  /** Signed in: invalidate the signed-out server layout before navigating into it. */
+  /**
+   * Signed in: invalidate the signed-out server layout before navigating into it.
+   *
+   * `next` is where the middleware said they were going, already validated by `safeRedirect` on the
+   * server. It was being DROPPED: the middleware sets `?next=` and says in its own comment that "the
+   * login page re-validates it", and this form always went to `/` — so a partner who followed a link
+   * to one of their calendars signed in and arrived at the dashboard instead. The browser suite
+   * asserted the parameter was set and nothing asserted it was used.
+   */
   function enter(): void {
     router.refresh();
-    router.replace('/');
+    router.replace(next === '' ? '/' : next);
   }
 
   async function submitCredentials(event: React.FormEvent<HTMLFormElement>) {
@@ -146,18 +161,19 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-10">
-      <h1 className="font-[family-name:var(--font-amiri)] text-3xl font-bold text-gold">
-        {t.login.title}
-      </h1>
-      <p className="mt-1 text-sm text-muted">
-        {awaitingCode ? t.login.codeTitle : t.login.subtitle}
-      </p>
+    <>
+      {/*
+        The step's own caption, which is the one piece of heading text that CHANGES — the page renders
+        the static subtitle and this replaces it once the password has been accepted.
+      */}
+      {awaitingCode ? (
+        <p className="mb-6 text-sm text-muted">{t.login.codeTitle}</p>
+      ) : null}
 
       {error ? (
         <p
           role="alert"
-          className="mt-6 rounded-lg border border-bad/40 bg-bad/10 p-3 text-sm text-bad"
+          className="mb-4 rounded-lg border border-bad/40 bg-bad/10 p-3 text-sm text-bad"
         >
           {error}
         </p>
@@ -169,7 +185,7 @@ export default function LoginPage() {
           onSubmit={(event) => {
             void submitCode(event);
           }}
-          className="mt-6 grid gap-4"
+          className="grid gap-4"
         >
           <label className="grid gap-1.5">
             <span className="text-[12.5px] text-muted">{t.login.codeLabel}</span>
@@ -215,7 +231,7 @@ export default function LoginPage() {
           onSubmit={(event) => {
             void submitCredentials(event);
           }}
-          className="mt-6 grid gap-4"
+          className="grid gap-4"
         >
           <label className="grid gap-1.5">
             <span className="text-[12.5px] text-muted">{t.login.email}</span>
@@ -246,7 +262,7 @@ export default function LoginPage() {
           </button>
         </form>
       )}
-    </main>
+    </>
   );
 }
 
