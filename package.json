@@ -33,7 +33,8 @@
     "partner:code": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api partner:code'",
     "media:bootstrap": "pnpm --filter @safra/api media:bootstrap",
     "load:reset": "pnpm --filter @safra/db load:reset",
-    "load:invariants": "pnpm --filter @safra/db load:invariants"
+    "load:invariants": "pnpm --filter @safra/db load:invariants",
+    "worker": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api start:worker'"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -15,7 +15,9 @@
     "dev:totp": "tsx src/scripts/dev-totp.ts",
     "db:testbed": "tsx src/scripts/seed-testbed.ts",
     "partner:code": "tsx src/scripts/partner-totp.ts",
-    "media:bootstrap": "tsx src/scripts/bootstrap-media.ts"
+    "media:bootstrap": "tsx src/scripts/bootstrap-media.ts",
+    "start:worker": "node dist/worker.js",
+    "dev:worker": "node --watch --import @swc-node/register/esm-register src/worker.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1098.0",
@@ -28,6 +30,7 @@
     "@safra/contracts": "workspace:*",
     "@safra/db": "workspace:*",
     "@safra/i18n": "workspace:*",
+    "bullmq": "^6.1.0",
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.2",
     "express": "^5.1.0",

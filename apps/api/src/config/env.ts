@@ -89,6 +89,21 @@ export const envSchema = z.object({
 
   REDIS_URL: z.string().url(),
 
+  /**
+   * Redis for the job QUEUES, which is not the same job as the one above.
+   *
+   * `REDIS_URL` holds rate-limit counters: losing them costs a few minutes of throttling. A queue
+   * holds work that has been accepted and not yet done, so losing it loses the work —
+   * `docs/background-jobs-design.md` is explicit that this is what changes Redis from a cache into
+   * infrastructure with a recovery point objective.
+   *
+   * Defaults to `REDIS_URL` so a single instance works, which is what development uses. Production
+   * should point this at a dedicated one: sharing forces the stricter persistence and eviction
+   * policy onto the rate limiter too, which is affordable but ought to be a choice rather than a
+   * side effect. `assertQueueRedisIsDurable` checks the policy either way.
+   */
+  REDIS_QUEUE_URL: z.string().url().optional(),
+
   JWT_ACCESS_SECRET: secretSchema,
   JWT_REFRESH_SECRET: secretSchema,
   ACCESS_TOKEN_TTL: z.string().default('15m'),
