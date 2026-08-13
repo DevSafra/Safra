@@ -108,38 +108,71 @@ export class SearchService {
       rating_desc: sql`c.rating DESC NULLS LAST, c.recommendation_score DESC`,
     }[query.sort];
 
+    const offset = this.decodeOffset(query.cursor);
+
+    /**
+     * Whether this search can decide its page BEFORE pricing anything.
+     *
+     * ## What it buys
+     *
+     * Pricing is the dominant cost of an unfiltered search: one index probe per candidate unit, and
+     * an unfiltered search has 150,000 of them. But `recommended` and `rating_desc` rank on
+     * `recommendation_score` and `rating`, which are columns of the PROPERTY and owe nothing to the
+     * dates being searched. So the page can be chosen first and only its properties priced — twenty
+     * of them instead of fifty thousand.
+     *
+     * ## Why the other two sorts cannot
+     *
+     * `price_asc` and `price_desc` rank BY the price, which is the thing being computed. There is no
+     * way to know which properties belong on page one without pricing all of them.
+     *
+     * ## Why a price filter also disqualifies it
+     *
+     * `minPrice`/`maxPrice` are applied after pricing, and they can eliminate every unit of a
+     * property — so a property inside the rank window can drop out, and one outside it should have
+     * taken its place. Narrowing first would then return a short page and silently omit a match.
+     */
+    const rankBeforePricing =
+      (query.sort === 'recommended' || query.sort === 'rating_desc') &&
+      query.minPrice === undefined &&
+      query.maxPrice === undefined;
+
+    /**
+     * The properties that can appear on this page, when pricing can be deferred.
+     *
+     * `RANK()`, deliberately, not `ROW_NUMBER()`: ties share a rank, so `rk <= n` returns EVERY
+     * property level with the last one on (score, rating). That is what keeps this exact. With
+     * `ROW_NUMBER` a property tied at the page boundary would be cut arbitrarily, and for
+     * `recommended` — whose third key is the price — the cut would decide an ordering that the price
+     * is supposed to decide.
+     */
+    const pageProperties = rankBeforePricing
+      ? sql`
+        AND u.property_id IN (
+          SELECT ranked.property_id FROM (
+            SELECT eligible.property_id,
+                   RANK() OVER (
+                     ORDER BY pr.recommendation_score DESC, pr.rating DESC NULLS LAST
+                   ) AS rk
+            FROM (SELECT DISTINCT available.property_id FROM available) eligible
+            JOIN properties pr ON pr.id = eligible.property_id
+          ) ranked
+          WHERE ranked.rk <= ${offset + query.limit + 1}
+        )`
+      : sql``;
+
     const rows = await this.db.execute<Record<string, unknown>>(sql`
-      WITH bookable AS MATERIALIZED (
+      -- available: which units could be slept in, with no price computed yet.
+      --
+      -- Pricing is a probe per unit, and an unfiltered search has 150,000 candidates. Splitting
+      -- availability from pricing is what lets the page be chosen first and only its properties
+      -- priced — see rankBeforePricing above.
+      WITH available AS MATERIALIZED (
         SELECT
           u.id                AS unit_id,
           u.property_id,
           u.currency_id,
-          -- The stay's price, as the base rate plus what the overrides CHANGE.
-          --
-          -- Equivalent to summing COALESCE(ad.price, u.base_price) over every night, which is how
-          -- this was written, and far cheaper to execute. That form drove the sum from
-          -- generate_series LEFT JOINed to availability_days, so the date never became an index
-          -- bound: the plan read all 365 of a unit's rows and hash-joined them down to the two
-          -- nights being priced, for every candidate unit (O-scale-2).
-          --
-          -- Written this way the subquery is a bounded range scan on (unit_id, date) that touches
-          -- only the nights in the stay that actually carry an override, and usually none of them.
-          -- The algebra: nights × base, plus (override − base) for each overridden night, is the
-          -- same total as base for the plain nights plus the override for the priced ones.
-          --
-          -- A row with a NULL price is a status-only row, so it must NOT read as a free night. It
-          -- is excluded here and falls into the base-rate term, which is what COALESCE did.
-          u.base_price * ${nights} + COALESCE(
-            (
-              SELECT SUM(ad.price - u.base_price)
-              FROM availability_days ad
-              WHERE ad.unit_id = u.id
-                AND ad.date >= ${query.checkIn}::date
-                AND ad.date <  ${query.checkOut}::date
-                AND ad.price IS NOT NULL
-            ),
-            0
-          ) AS stay_total
+          u.base_price
         FROM units u
         JOIN properties p ON p.id = u.property_id
         WHERE u.is_active
@@ -256,6 +289,43 @@ export class SearchService {
               : sql``
           }
       ),
+      bookable AS (
+        SELECT
+          u.unit_id,
+          u.property_id,
+          u.currency_id,
+          -- The stay's price, as the base rate plus what the overrides CHANGE.
+          --
+          -- Equivalent to summing COALESCE(ad.price, u.base_price) over every night, which is how
+          -- this was written, and far cheaper to execute. That form drove the sum from
+          -- generate_series LEFT JOINed to availability_days, so the date never became an index
+          -- bound: the plan read all 365 of a unit's rows and hash-joined them down to the two
+          -- nights being priced, for every candidate unit (O-scale-2).
+          --
+          -- Written this way the subquery is a bounded range scan that touches only the nights in
+          -- the stay carrying an override, and usually none of them. It is served index-only by
+          -- availability_days_priced_idx, which includes the price in its payload.
+          --
+          -- The algebra: nights × base, plus (override − base) for each overridden night, is the
+          -- same total as base for the plain nights plus the override for the priced ones.
+          --
+          -- A row with a NULL price is a status-only row, so it must NOT read as a free night. It
+          -- is excluded here and falls into the base-rate term, which is what COALESCE did.
+          u.base_price * ${nights} + COALESCE(
+            (
+              SELECT SUM(ad.price - u.base_price)
+              FROM availability_days ad
+              WHERE ad.unit_id = u.unit_id
+                AND ad.date >= ${query.checkIn}::date
+                AND ad.date <  ${query.checkOut}::date
+                AND ad.price IS NOT NULL
+            ),
+            0
+          ) AS stay_total
+        FROM available u
+        WHERE TRUE
+          ${pageProperties}
+      ),
       candidates AS (
         -- One row per PROPERTY, carrying its cheapest bookable unit. Guests search
         -- for a place to stay, not for a room id.
@@ -313,7 +383,7 @@ export class SearchService {
       FROM candidates c
       ORDER BY ${orderBy}
       LIMIT ${query.limit + 1}
-      OFFSET ${this.decodeOffset(query.cursor)}
+      OFFSET ${offset}
     `);
 
     const all = rows.rows;
@@ -322,9 +392,7 @@ export class SearchService {
 
     return {
       items,
-      nextCursor: hasMore
-        ? encodeOffset(this.decodeOffset(query.cursor) + query.limit)
-        : null,
+      nextCursor: hasMore ? encodeOffset(offset + query.limit) : null,
       firstBookableDate: verdict.firstBookableDate,
     };
   }
