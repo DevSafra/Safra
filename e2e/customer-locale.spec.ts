@@ -236,15 +236,91 @@ test.describe('a Latin-valued field on an Arabic page', () => {
     await page.goto('/ar');
 
     const footer = page.locator('footer');
-    const languages = footer.getByRole('navigation', { name: arWeb.footer.language });
-    const copyright = footer.locator('p').last();
+    const brand = footer.getByRole('link', { name: /SAFRA/ }).first();
+    const pickers = footer.locator('details').first();
 
-    const [nav, rights] = await Promise.all([
-      languages.boundingBox(),
-      copyright.boundingBox(),
+    const [identity, controls] = await Promise.all([
+      brand.boundingBox(),
+      pickers.boundingBox(),
     ]);
 
-    /* Right-to-left: the language links start the row, the copyright ends it on the left. */
-    expect(nav && rights && nav.x).toBeGreaterThan(rights?.x ?? 0);
+    /* Right-to-left: the brand starts the row on the right, the controls end it on the left. */
+    expect(identity && controls && identity.x).toBeGreaterThan(controls?.x ?? 0);
+  });
+
+  /**
+   * The language control moved OUT of the navbar (Bashar, 2026-08-13) and must not come back.
+   *
+   * Its justification in the header was that real anchors get the alternate-language pages indexed
+   * (§5.4). That property had to survive the move, so this asserts both halves: gone from the
+   * header, and still real anchors in the footer.
+   */
+  test('offers the languages in the footer and not in the navbar', async ({ page }) => {
+    await page.goto('/ar');
+
+    await expect(
+      page.locator('header').getByRole('link', { name: 'Deutsch' }),
+    ).toHaveCount(0);
+
+    /*
+      Opened first: a closed `<details>` hides its contents from the ACCESSIBILITY TREE, so a role
+      selector finds nothing there. The anchors are still in the DOM, which is what a crawler reads
+      — and `generateMetadata` emits the `hreflang` alternates regardless, which is the
+      authoritative signal either way.
+    */
+    await page.locator('footer details').first().click();
+
+    const german = page.locator('footer').getByRole('link', { name: 'Deutsch' });
+
+    await expect(german).toHaveAttribute('hreflang', 'de');
+  });
+
+  /**
+   * A language link keeps the reader's PAGE.
+   *
+   * The header's sent everybody to the home page, which on a property page threw away the property
+   * they had arrived at from a search engine — the one screen where language matters most.
+   */
+  test('keeps the page when the language changes', async ({ page }) => {
+    await page.goto('/ar/city/damascus');
+
+    await page.locator('footer details').first().click();
+    await page.locator('footer').getByRole('link', { name: 'English' }).click();
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/en/city/damascus');
+  });
+
+  /**
+   * The currency control, end to end — and the line that keeps it honest.
+   *
+   * A converted price is an ESTIMATE from one rate a staff member typed. The listing's own amount
+   * is printed beneath it, and checkout is never converted, because that is the figure somebody is
+   * actually charged. Both halves are asserted here; either alone would pass on a broken build.
+   */
+  test('converts browse prices and never the checkout total', async ({ page }) => {
+    await page.goto('/ar/city/damascus');
+
+    const card = page.locator('article').first();
+
+    await expect(card).toContainText('US$');
+
+    /*
+      Driven through the real control — a `<details>` and a form POST. A cookie set directly would
+      skip the one thing worth testing, which is that choosing a currency writes it and comes back
+      to the same page.
+    */
+    await page.locator('footer details').last().click();
+    await page.locator('footer button[name="currency"][value="SYP"]').click();
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/ar/city/damascus');
+    await expect(card).toContainText('ل.س');
+    /* The original, so an estimate is never mistaken for a quote. */
+    await expect(card).toContainText('US$');
+
+    /* Contractual: the amount a card is charged, in the listing's own currency, always. */
+    await page.goto(CHECKOUT);
+
+    await expect(page.locator('main')).toContainText('US$');
+    await expect(page.locator('main')).not.toContainText('ل.س');
   });
 });

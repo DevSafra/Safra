@@ -144,7 +144,8 @@
     "error": "Something went wrong",
     "retry": "Try again",
     "skipToContent": "Skip to content",
-    "back": "Back"
+    "back": "Back",
+    "convertedFrom": "converted from {amount}"
   },
   "notFound": {
     "title": "Page not found",
@@ -517,6 +518,11 @@
     "account": "Your account",
     "language": "Language",
     "rights": "© {year} SAFRA. All rights reserved.",
-    "madeFor": "Built for the Arab market, in Arabic first."
+    "madeFor": "Built for the Arab market, in Arabic first.",
+    "support": "Support",
+    "currency": "Currency",
+    "currencyApply": "Show prices in this currency",
+    "currencyNote": "Converted prices are indicative. What you are charged is shown at checkout, in the listing's own currency.",
+    "languageApply": "Show the site in this language"
   }
 }

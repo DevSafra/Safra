@@ -109,3 +109,23 @@ export async function getAmenities(): Promise<Amenity[]> {
 export async function getPublicSettings(): Promise<Record<string, unknown>> {
   return read('/settings/public', z.record(z.string(), z.unknown()), {});
 }
+
+const currencyCatalogueSchema = z.object({
+  currencies: z.array(z.object({ code: z.string(), symbol: z.string() })),
+  rates: z.array(z.object({ base: z.string(), quote: z.string(), rate: z.string() })),
+});
+
+/**
+ * The currencies a visitor may pick, and the rates that make conversion possible.
+ *
+ * Cached for the same five minutes as every other reference read. A rate is set by hand by staff
+ * and changes at most daily, so a browse price five minutes stale is not a category of error — and
+ * the alternative is one extra round trip on every page that prints a price.
+ *
+ * The empty fallback is load-bearing: with no rates, `convertForDisplay` finds no pair and every
+ * amount renders in its own currency, which is exactly the behaviour the site had before this
+ * existed. A reference endpoint blipping must not change what a price says.
+ */
+export async function getCurrencyCatalogue() {
+  return read('/currencies', currencyCatalogueSchema, { currencies: [], rates: [] });
+}

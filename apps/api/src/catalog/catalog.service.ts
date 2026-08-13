@@ -223,4 +223,55 @@ export class CatalogService {
 
     return Object.fromEntries(rows.map((r) => [r.key, r.value]));
   }
+
+  /**
+   * Active currencies, and the latest rate for every pair staff have recorded.
+   *
+   * ## One row per pair, newest first
+   *
+   * `fx_rates` is a HISTORY — a pair gains a row each time the rate is set, and the old rows stay,
+   * because a booking priced last month has to remain explicable. A display conversion wants only
+   * the current one, which is what `DISTINCT ON` selects.
+   *
+   * ## Both directions are not stored, and are not invented here either
+   *
+   * The table holds USD→SYP; it does not hold SYP→USD. Emitting the inverse from here would look
+   * like data and be arithmetic, and the moment a spread or a fee entered the picture the inverse
+   * would stop being one divided by the rate. The display side derives it and says so.
+   */
+  async currencies() {
+    const [currencies, rates] = await Promise.all([
+      this.db.execute<{ code: string; symbol: string | null }>(sql`
+        SELECT code, symbol FROM currencies WHERE is_active = true ORDER BY code
+      `),
+      this.db.execute<{
+        base: string;
+        quote: string;
+        rate: string;
+        effective_from: string;
+      }>(sql`
+        SELECT DISTINCT ON (f.base_currency_id, f.quote_currency_id)
+               b.code AS base, q.code AS quote, f.rate::text AS rate,
+               f.effective_from::text AS effective_from
+        FROM fx_rates f
+        JOIN currencies b ON b.id = f.base_currency_id
+        JOIN currencies q ON q.id = f.quote_currency_id
+        WHERE f.effective_from <= now()
+        ORDER BY f.base_currency_id, f.quote_currency_id, f.effective_from DESC
+      `),
+    ]);
+
+    return {
+      currencies: currencies.rows.map((row) => ({
+        code: row.code,
+        symbol: row.symbol ?? row.code,
+      })),
+      rates: rates.rows.map((row) => ({
+        base: row.base,
+        quote: row.quote,
+        rate: row.rate,
+        effectiveFrom: row.effective_from,
+      })),
+    };
+  }
 }

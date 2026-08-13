@@ -5,9 +5,11 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { SaveButton } from '@/components/save-button';
-import { formatMoney, localisedName, localisedText } from '@/lib/localise';
+import { localisedName, localisedText } from '@/lib/localise';
 import { getProperty, imageUrl, type PropertyDetail } from '@/lib/property';
 import { dynamicMessage } from '@/lib/dynamic-message';
+import { getCurrencyCatalogue } from '@/lib/catalog';
+import { convertForDisplay, displayCurrency } from '@/lib/currency';
 
 /**
  * Property page (SRS §5.6).
@@ -81,6 +83,24 @@ export default async function PropertyPage({
   const cityName = localisedName(property.city, locale);
   const cheapest = property.units[0];
   const defaultStay = firstAvailableWindow(property.calendar, cheapest?.minNights ?? 1);
+
+  /*
+    The visitor's chosen currency, and the rates that reach it. Both reads are cached for five
+    minutes and deduplicated per request, so this costs nothing the page was not already paying.
+  */
+  const common = await getTranslations('common');
+  const [{ rates }, target] = await Promise.all([
+    getCurrencyCatalogue(),
+    displayCurrency(),
+  ]);
+
+  const nightly = convertForDisplay(
+    cheapest?.basePrice ?? '0',
+    cheapest?.currencyCode ?? 'USD',
+    locale,
+    target,
+    rates,
+  );
 
   return (
     <article className="mx-auto max-w-6xl px-4 py-8">
@@ -317,11 +337,23 @@ export default async function PropertyPage({
             {cheapest ? (
               <>
                 <p className="text-2xl font-semibold text-gold">
-                  {formatMoney(cheapest.basePrice, cheapest.currencyCode, locale)}
+                  {nightly.text}
                   <span className="ms-1 text-sm font-normal text-faint">
                     {t('perNight')}
                   </span>
                 </p>
+                {/*
+                  The listing's own currency, printed whenever the figure above is not it.
+
+                  A browse price converts so it can be compared; the amount a booking is actually
+                  made against is this one, and checkout will show it. Omitting this line would
+                  turn an estimate into what looks like a quote.
+                */}
+                {nightly.converted ? (
+                  <p className="mt-1 text-xs text-faint">
+                    {common('convertedFrom', { amount: nightly.original })}
+                  </p>
+                ) : null}
                 <p className="mt-1 text-sm text-muted">
                   {t('guestsUpTo', { count: cheapest.maxGuests })}
                 </p>
@@ -337,11 +369,13 @@ export default async function PropertyPage({
                     <dt className="text-muted">{t('serviceFeeLabel')}</dt>
                     <dd className="text-text">
                       {property.fees.customerFeeMode === 'flat'
-                        ? formatMoney(
+                        ? convertForDisplay(
                             property.fees.customerFeeValue.toFixed(2),
                             cheapest.currencyCode,
                             locale,
-                          )
+                            target,
+                            rates,
+                          ).text
                         : `${(property.fees.customerFeeValue * 100).toFixed(0)}%`}
                     </dd>
                   </div>

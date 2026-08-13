@@ -57,7 +57,15 @@ test.describe('writing a review', () => {
     await page
       .getByRole('textbox', { name: en.auth.password, exact: true })
       .fill(PASSWORD);
-    await page.locator('button[type="submit"]').click();
+    /*
+      By NAME, not `button[type="submit"]`.
+
+      Since the footer gained a currency picker (2026-08-13) every page carries three more submit
+      buttons — one per currency — so the bare attribute selector is a strict-mode violation on a
+      page it used to match exactly once. The sign-out button in the account sidebar was already a
+      reason not to use `.last()`; this is the same trap from the other end.
+    */
+    await page.getByRole('button', { name: en.auth.signIn }).click();
 
     await page.waitForURL(/\/en\/account/);
 

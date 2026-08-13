@@ -144,7 +144,8 @@
     "error": "Etwas ist schiefgelaufen",
     "retry": "Erneut versuchen",
     "skipToContent": "Zum Inhalt springen",
-    "back": "Zurück"
+    "back": "Zurück",
+    "convertedFrom": "umgerechnet aus {amount}"
   },
   "notFound": {
     "title": "Seite nicht gefunden",
@@ -517,6 +518,11 @@
     "account": "Ihr Konto",
     "language": "Sprache",
     "rights": "© {year} SAFRA. Alle Rechte vorbehalten.",
-    "madeFor": "Für den arabischen Markt gebaut, zuerst auf Arabisch."
+    "madeFor": "Für den arabischen Markt gebaut, zuerst auf Arabisch.",
+    "support": "Hilfe",
+    "currency": "Währung",
+    "currencyApply": "Preise in dieser Währung anzeigen",
+    "currencyNote": "Umgerechnete Preise sind Richtwerte. Der berechnete Betrag erscheint beim Bezahlen in der Währung des Inserats.",
+    "languageApply": "Website in dieser Sprache anzeigen"
   }
 }

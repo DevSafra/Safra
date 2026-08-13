@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
 import { AccountShell } from '@/components/account-shell';
@@ -69,8 +70,11 @@ export default async function AccountDisputesPage({
 
   const bookings =
     disputable === 'failed' || disputable === 'unauthenticated' ? [] : disputable.items;
-  const rows =
-    disputes === 'failed' || disputes === 'unauthenticated' ? [] : disputes.items;
+  const disputePage =
+    disputes === 'failed' || disputes === 'unauthenticated'
+      ? { items: [], nextCursor: null }
+      : disputes;
+  const rows = disputePage.items;
 
   return (
     <AccountShell
@@ -168,6 +172,39 @@ export default async function AccountDisputesPage({
             ))}
           </ul>
         )}
+
+        {/*
+          Paging, which this list never had.
+
+          `getMyDisputes` asks for ten and returns a `nextCursor`, and the page threw it away — so a
+          customer with an eleventh dispute had no way to reach it from anywhere in the app. The
+          same control already exists on المفضلة and بطاقات الهدايا; النزاعات simply missed it.
+
+          Found by a browser test that could not see a dispute it knew existed (2026-08-13).
+        */}
+        {cursor || disputePage.nextCursor ? (
+          <nav
+            aria-label={t('navDisputes')}
+            className="mt-6 flex flex-wrap items-center gap-2"
+          >
+            {cursor ? (
+              <Link
+                href={`/${locale}/account/disputes`}
+                className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
+              >
+                {t('firstPage')}
+              </Link>
+            ) : null}
+            {disputePage.nextCursor ? (
+              <Link
+                href={`/${locale}/account/disputes?cursor=${encodeURIComponent(disputePage.nextCursor)}`}
+                className="inline-flex min-h-10 items-center rounded-lg border border-line px-4 text-sm text-muted lg:min-h-0 lg:py-2"
+              >
+                {t('loadMore')}
+              </Link>
+            ) : null}
+          </nav>
+        ) : null}
       </section>
     </AccountShell>
   );

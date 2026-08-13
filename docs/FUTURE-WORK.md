@@ -2016,6 +2016,30 @@ to draft here. Until then the footer says nothing about them, which is the hones
 `e2e/customer-locale.spec.ts` asserts the footer's RTL layout; nothing yet asserts a legal link,
 because there is nothing to assert.
 
+### O-web-6 — Currency switching works, and only one pair has a rate
+
+**Status:** open, needs data · **Owner:** **Bashar** · **Recorded:** 2026-08-13
+
+The footer offers USD, EUR and ل.س (Bashar, 2026-08-13). The mechanism is complete: the choice is a
+cookie, browse prices convert through the recorded rates, and **contractual amounts never convert** —
+checkout, invoices, the wallet and gift cards always show the figure a card is actually charged, in
+the listing's own currency. `convertForDisplay` lives in `lib/currency.ts` and the contractual
+surfaces simply do not import it.
+
+**`fx_rates` holds exactly one pair: USD→SYP, 13,000, source `verification`, effective 2026-08-11.**
+So picking ل.س converts today and picking EUR does not — a euro visitor sees dollars, unlabelled,
+which is the honest outcome rather than a euro figure derived from nothing. `rateBetween` returns
+null rather than 1 for a pair it cannot reach, and `currency.test.ts` holds it to that.
+
+What unblocks EUR is a rate and its provenance, which is a business decision rather than an
+engineering one: which source, whether a spread is applied, and how often it is refreshed. Staff can
+record one on the geography screen today. Two further points worth deciding at the same time:
+
+- **Nothing refreshes rates.** A rate entered by hand ages, and an aged rate on a browse page is a
+  price that flatters or insults. There is no scheduled refresh and no staleness warning.
+- **The inverse is derived, not stored.** `SYP → USD` is computed as `1 / 13000`, which holds while a
+  rate is a pure ratio and stops holding the moment a spread is baked into it.
+
 ### O-web-2 — Two public links point at pages that do not exist
 
 **Status:** open, product decision · **Owner:** **Bashar** · **Recorded:** 2026-08-12
@@ -2203,6 +2227,20 @@ and would we find out?** Three changed status.
 requirements (1, 7, 10), and six stand as accepted.
 
 ## 8. Known risks and traps
+
+### The footer is on every page, so a loose selector is now ambiguous
+
+Added 2026-08-13 with the site footer. Two specs broke the moment it shipped, both for the same
+reason: an assertion that had been unique became a strict-mode violation.
+
+- **`button[type="submit"]`** now matches three more buttons on every page — one per currency in the
+  footer's picker. `customer-review.spec.ts` used it for a sign-in form. Name the button.
+- **`getByRole('link', { name: … })`** for an account destination matches the account nav AND the
+  footer's column. Scope it — and note that the account shell's `aria-label` is on the ASIDE, so it
+  is `getByLabel(...)`, not `getByRole('navigation', …)`.
+
+The older half of the same trap is already recorded: never `button[type=submit]).last()`, which
+finds the sidebar's sign-out.
 
 ### Fixtures can assert things the product never could
 

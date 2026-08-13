@@ -6,7 +6,9 @@ import { AccountShell } from '@/components/account-shell';
 import { SaveButton } from '@/components/save-button';
 import { getAccountSummary, getMyFavourites } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
-import { formatMoney, localisedName } from '@/lib/localise';
+import { localisedName } from '@/lib/localise';
+import { getCurrencyCatalogue } from '@/lib/catalog';
+import { convertForDisplay, displayCurrency } from '@/lib/currency';
 
 /**
  * المفضلة — the listings this customer has saved (handoff §6).
@@ -40,6 +42,15 @@ export default async function AccountFavouritesPage({
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
 
   const t = await getTranslations('account');
+
+  /*
+    A saved listing is a BROWSE surface — somebody comparing what they shortlisted — so its price
+    converts like a search card's. Cached and request-deduplicated, so this adds no round trip.
+  */
+  const [{ rates }, target] = await Promise.all([
+    getCurrencyCatalogue(),
+    displayCurrency(),
+  ]);
   const property = await getTranslations('property');
 
   const [summaryRead, favouritesRead] = await Promise.all([
@@ -112,7 +123,15 @@ export default async function AccountFavouritesPage({
                   <p className="text-sm text-gold">
                     {t('favouriteFrom')}{' '}
                     <span dir="ltr">
-                      {formatMoney(item.fromPrice, item.currencyCode, locale)}
+                      {
+                        convertForDisplay(
+                          item.fromPrice,
+                          item.currencyCode,
+                          locale,
+                          target,
+                          rates,
+                        ).text
+                      }
                     </span>
                   </p>
                 ) : null}

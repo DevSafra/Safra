@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
-import { LOCALE_LABELS, type Locale, routing } from '@/i18n/routing';
+import type { Locale } from '@/i18n/routing';
 import { getSession } from '@/lib/session-server';
 import { ORNAMENT_BRAND } from '@safra/ui';
 
@@ -66,26 +66,15 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         </nav>
 
         {/*
-          Language switcher as real links, not a JS dropdown: crawlers follow them,
-          which is how the alternate-language versions of a city page get indexed.
+          The language switcher MOVED TO THE FOOTER (Bashar, 2026-08-13), which is where the
+          reference design puts it and where people look for it.
+
+          What had to survive the move is the reason it was links rather than a menu: a crawler
+          follows them, and that is how the alternate-language version of a city page gets indexed
+          (§5.4). The footer's are still real anchors, and they are better than these were — they
+          keep the reader's PAGE instead of sending everyone to the home page. `generateMetadata`
+          emits the `hreflang` alternates either way.
         */}
-        <nav aria-label={t('language')} className="flex items-center gap-1">
-          {routing.locales.map((code) => (
-            <Link
-              key={code}
-              href={`/${code}`}
-              hrefLang={code}
-              aria-current={code === locale ? 'true' : undefined}
-              className={
-                code === locale
-                  ? 'inline-flex min-h-10 items-center rounded-lg border border-gold/50 bg-card px-2.5 py-1.5 text-xs text-gold'
-                  : 'inline-flex min-h-10 items-center rounded-lg border border-transparent px-2.5 py-1.5 text-xs text-faint transition-colors hover:text-gold'
-              }
-            >
-              {LOCALE_LABELS[code]}
-            </Link>
-          ))}
-        </nav>
 
         {/*
           Account or sign in. The email is shown rather than a name because that is

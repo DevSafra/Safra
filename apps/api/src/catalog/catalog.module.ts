@@ -64,6 +64,30 @@ class CatalogController {
   async settings() {
     return this.catalog.publicSettings();
   }
+
+  /**
+   * The currencies a visitor may ask to see prices in, and the rates that make that possible.
+   *
+   * ## Why the rates are public
+   *
+   * They are not a secret: every one of them is already implied by a price the site prints. What
+   * they are is INCOMPLETE — `fx_rates` holds whatever staff have recorded, which today is one
+   * pair. So this endpoint answers "what can be converted", and the customer app shows an amount
+   * in its own currency whenever the answer is "not this one". That is the honest failure mode; the
+   * alternative is a price in euros that came from nowhere.
+   *
+   * ## What it deliberately does NOT do
+   *
+   * Convert. A rate applied by the API would put a converted figure into a payload that also
+   * carries the real one, and the two would eventually be confused at a call site. Conversion is a
+   * DISPLAY concern and stays on the display side, where the rule "contractual amounts are never
+   * converted" can be enforced per surface.
+   */
+  @Public()
+  @Get('currencies')
+  async currencies() {
+    return this.catalog.currencies();
+  }
 }
 
 @Module({

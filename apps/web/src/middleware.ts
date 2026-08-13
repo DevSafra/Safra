@@ -64,6 +64,16 @@ export default async function middleware(request: NextRequest) {
 
   request.headers.set('content-security-policy', csp);
 
+  /*
+    The path the visitor is on, forwarded so a SERVER component can read it.
+
+    Next gives a layout no access to the pathname — `usePathname` is a client hook — and the footer's
+    language control needs it: a switcher that sends every reader to the home page is a switcher
+    that loses their place, which on a property page is the whole visit. A header set here is the
+    documented way to get it there without turning the footer into a client component.
+  */
+  request.headers.set('x-safra-pathname', request.nextUrl.pathname);
+
   const rotated = await rotateIfStale(request);
 
   /**

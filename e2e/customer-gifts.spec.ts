@@ -331,9 +331,22 @@ test.describe('بطاقات الهدايا', () => {
     await page.setViewportSize({ width: 1280, height: 1000 });
     await page.goto('/en/account/disputes', { waitUntil: 'domcontentloaded' });
 
-    /* The destination exists in the account nav, not only as a URL. */
+    /*
+      Scoped to the ACCOUNT NAV, which is what this assertion is about.
+
+      The footer's الدعم column links to النزاعات too, so the unscoped role selector now matches
+      twice. Naming the navigation says which one is meant rather than relying on there being only
+      one — and the footer link is a second, deliberate route to the same page.
+    */
     await expect(
-      page.getByRole('link', { name: en.account.navDisputes, exact: true }),
+      page
+        /*
+          `getByLabel`, not `getByRole('navigation')`: the account shell puts its `aria-label` on
+          the ASIDE rather than the nav inside it, deliberately — the aside is what the hamburger
+          controls and what focus lands on, and labelling both would announce the words twice.
+        */
+        .getByLabel(en.account.navHeading)
+        .getByRole('link', { name: en.account.navDisputes, exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: en.account.disputesOpenTitle }),
@@ -365,58 +378,71 @@ test.describe('بطاقات الهدايا', () => {
       .slice(0, 8)}`;
 
     /*
-      The BOOKING and the REASON are chosen from the pairs this account has not used yet.
+      The BOOKING and the REASON are the first pair this account has not already spent.
 
       One live dispute is allowed per booking per reason — a second freezes the host's payout twice
-      over for the same complaint — so the pair a run picks must be one no earlier run picked. The
-      first version rotated the reason by the row count on the page, which is the same thing only
-      while the count stays under four: the fixture's newest booking took all four reasons in four
-      runs and the fifth was refused `dispute.already_open`, which surfaces as the new row simply
-      never arriving.
+      over for the same complaint — so a run must pick a pair no earlier run picked. Three attempts
+      at that failed, and the third is the one that mattered:
 
-      So the pairs already spent are read off the list itself — every row prints its booking
-      reference and its reason — and the first unspent combination is used. That is eight bookings
-      by four reasons rather than four, and when it does run out it says so here instead of failing
-      twenty lines later on a missing row.
+      1. Rotating the reason by the row count held only while the count stayed under four.
+      2. Reading the spent pairs off the rendered list held only while the account had ten or fewer
+         disputes: the list PAGES, the eleventh was invisible, and the set was silently incomplete.
+      3. Submitting and retrying on refusal cannot work at all — `POST /disputes` is throttled to
+         three a minute by design, so the fourth attempt is a 429 rather than an answer. A test
+         cannot brute-force a rate limit, and should not want to.
+
+      So the pairs are collected across EVERY page — which the list can now do, because paging it
+      was the product gap the second attempt exposed — and exactly one submit follows.
     */
     const spent = new Set<string>();
 
-    for (const row of await page.locator('#disputes-list li').all()) {
-      const text = (await row.textContent()) ?? '';
-      const booking = /BKG-[\d-]+/.exec(text)?.[0];
+    for (let page_ = 0; page_ < 20; page_ += 1) {
+      for (const row of await page.locator('#disputes-list li').all()) {
+        const text = (await row.textContent()) ?? '';
+        const booking = /BKG-[\d-]+/.exec(text)?.[0];
 
-      for (const [kind, label] of Object.entries(en.disputeKinds)) {
-        if (booking && text.includes(label)) spent.add(`${booking}|${kind}`);
+        for (const [kind, label] of Object.entries(en.disputeKinds)) {
+          if (booking && text.includes(label)) spent.add(`${booking}|${kind}`);
+        }
       }
+
+      const more = page.getByRole('link', { name: en.account.loadMore });
+
+      if ((await more.count()) === 0) break;
+
+      await more.click();
+      await page.waitForURL(/cursor=/);
     }
 
-    const bookingOptions = await page
-      .locator('select[name=bookingReference] option')
-      .evaluateAll((options) =>
-        options.map((option) => (option as HTMLOptionElement).value),
-      );
+    /* Back to the form, which only the first page carries. */
+    await page.goto('/en/account/disputes');
 
-    const pair = bookingOptions
-      .flatMap((booking) =>
-        Object.keys(en.disputeKinds).map((kind) => ({ booking, kind })),
-      )
-      .find(({ booking, kind }) => !spent.has(`${booking}|${kind}`));
+    const candidates = (
+      await page
+        .locator('select[name=bookingReference] option')
+        .evaluateAll((options) =>
+          options.map((option) => (option as HTMLOptionElement).value),
+        )
+    ).flatMap((booking) =>
+      Object.keys(en.disputeKinds).map((kind) => ({ booking, kind })),
+    );
+
+    const pair = candidates.find(({ booking, kind }) => !spent.has(`${booking}|${kind}`));
 
     if (!pair) {
       throw new Error(
-        'Every booking/reason pair on the fixture account already has a live dispute. ' +
-          'Run `pnpm db:testbed` to clear them.',
+        `Every booking/reason pair on the fixture account has a live dispute (${spent.size} ` +
+          'spent). Run `pnpm db:testbed` to clear them.',
       );
     }
 
     await page.locator('select[name=bookingReference]').selectOption(pair.booking);
     await page.locator('select[name=kind]').selectOption(pair.kind);
-
-    /*
-      A phone number goes in on purpose. A dispute is where somebody is most likely to write "just call
-      me" — they are upset and they want a person — so this is where the mask matters most.
-    */
     await page.locator('input[name=title]').fill(raised);
+    /*
+      A phone number goes in on purpose. A dispute is where somebody is most likely to write "just
+      call me" — they are upset and they want a person — so this is where the mask matters most.
+    */
     await page
       .locator('textarea[name=description]')
       .fill(
@@ -425,10 +451,11 @@ test.describe('بطاقات الهدايا', () => {
 
     await page.locator('form:has(textarea) button[type=submit]').click();
 
-    /* The dispute this run raised is listed, with a DSP- reference. */
     const disputeRow = page.locator('#disputes-list li').filter({ hasText: raised });
 
     await expect(disputeRow).toBeVisible({ timeout: 20_000 });
+
+    /* The dispute this run raised is listed, with a DSP- reference. */
     await expect(disputeRow).toContainText('DSP-');
 
     /* Masked, and said out loud — otherwise they wait for a call that cannot come. */
