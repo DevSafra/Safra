@@ -137,18 +137,20 @@ export function Shell({
           />
         </nav>
 
-        <p className="mt-3 border-t border-line px-2 pt-3 text-[11px] text-faint">
-          {t.nav.support}
-        </p>
-
         {/*
           The account controls, at the FOOT of the sidebar — the same decision the console records:
           a phone cannot hold a hamburger, a 28px title, the partner's name and two buttons on one
           line, and the wrap read as two headers.
 
           `mt-auto` pins them to the bottom of the DRAWER, which is full height, while on a desktop
-          the aside is only as tall as its content so they sit immediately under the support line.
+          the aside is only as tall as its content so they sit immediately under the nav.
           One rule, both shapes, because the aside is a flex column.
+
+          What used to sit between them was a «الدعم: partners@safra.com» line from the original
+          handoff. Removed 2026-08-14 (Bashar): الدعم is a SCREEN now, one item up in this same nav,
+          and it opens a tracked thread. An email address beside it offers a second, worse route —
+          one with no reference, no status and no record on the partner's own account — and the two
+          together make the reader choose between a channel we answer and one we do not.
         */}
         <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line2 pt-3">
           {/*

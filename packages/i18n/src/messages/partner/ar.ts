@@ -51,8 +51,6 @@ export const ar = {
     reviews: 'التقييمات',
     payouts: 'مستحقاتي',
     supportPage: 'الدعم',
-    /** The handoff's sidebar footer, verbatim. */
-    support: 'الدعم: partners@safra.com',
     showSidebar: 'إظهار قائمة التنقل',
     hideSidebar: 'إخفاء قائمة التنقل',
     signOut: 'تسجيل الخروج',
