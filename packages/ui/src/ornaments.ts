@@ -27,5 +27,10 @@ export const ORNAMENT_CRESCENT = '☾';
 /** Four-pointed star, U+2726 — marks the second pledge. */
 export const ORNAMENT_STAR = '✦';
 
-/** Sun, U+2600 — the light-theme half of the theme toggle, paired with the crescent. */
-export const ORNAMENT_SUN = '☀';
+/*
+  `ORNAMENT_SUN` (U+2600) was here as the light half of the theme toggle. Removed 2026-08-14 with
+  the toggle's move to drawn icons: nothing rendered it any more, and an exported constant nobody
+  uses is the kind of thing the next person restores a use for rather than deletes.
+
+  The crescent stays — the homepage's pledges still set it beside the brand mark and the star.
+*/
