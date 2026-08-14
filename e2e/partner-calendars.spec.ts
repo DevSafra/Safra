@@ -63,6 +63,86 @@ test('a day on the dashboard opens التقويمات at that date', async ({ pa
   }
 
   /*
+    Every marker ring is painted INSIDE the cell it marks.
+
+    REGRESSION (Bashar, 2026-08-14: «14 متاح border ist not completely visible»). The today and
+    highlight markers were `ring-1`/`ring-2`, and a Tailwind ring is a box-shadow drawn OUTSIDE the
+    element. The grid scrolls in an `overflow-x-auto` box so it fits a phone, so a marked cell in the
+    first or last COLUMN had that ring clipped — today's gold outline was missing its left edge
+    whenever today fell on الجمعة, which is one day in seven and reads as a rendering fault.
+
+    Asserted as the invariant rather than as a class name: the ring's painted extent must not fall
+    outside the scrolling ancestor. An outward ring on an edge cell fails it; an inset one cannot,
+    because its extent is the cell's own box. Checking for `ring-inset` in `className` would pass
+    against a cell that had been given `overflow-visible` instead and still be describing the fix
+    rather than the requirement.
+  */
+  const escaping = await page.evaluate(() => {
+    const clipperOf = (element: HTMLElement) => {
+      for (let node = element.parentElement; node; node = node.parentElement) {
+        if (['auto', 'scroll', 'hidden'].includes(getComputedStyle(node).overflowX))
+          return node;
+      }
+      return null;
+    };
+
+    /*
+      Split on commas OUTSIDE parentheses. A computed `box-shadow` separates its layers with commas
+      and `rgba(0, 0, 0, 0)` contains three of its own, so a plain `.split(',')` mis-aligns every
+      layer after the first — and this check would then read one layer's `inset` off another's.
+    */
+    const layersOf = (shadow: string) => {
+      const layers: string[] = [];
+      let depth = 0;
+      let current = '';
+
+      for (const character of shadow) {
+        if (character === '(') depth += 1;
+        if (character === ')') depth -= 1;
+
+        if (character === ',' && depth === 0) {
+          layers.push(current);
+          current = '';
+        } else {
+          current += character;
+        }
+      }
+
+      return [...layers, current];
+    };
+
+    /** How far a layer reaches beyond the box: its SPREAD, the fourth length. Inset reaches zero. */
+    const reachOf = (layer: string) => {
+      if (layer.includes('inset')) return 0;
+
+      const lengths = layer.match(/-?[\d.]+px/g) ?? [];
+
+      return lengths.length >= 4 ? Number.parseFloat(lengths[3] ?? '0') : 0;
+    };
+
+    return Array.from(
+      document.querySelectorAll<HTMLElement>('[data-day-today], [data-day-highlight]'),
+    ).flatMap((cell) => {
+      const reach = Math.max(
+        0,
+        ...layersOf(getComputedStyle(cell).boxShadow).map(reachOf),
+      );
+      const clipper = clipperOf(cell);
+
+      if (!clipper || reach === 0) return [];
+
+      const box = cell.getBoundingClientRect();
+      const bounds = clipper.getBoundingClientRect();
+
+      return box.left - reach < bounds.left || box.right + reach > bounds.right
+        ? [{ day: cell.dataset['day'], reach }]
+        : [];
+    });
+  });
+
+  expect(escaping).toStrictEqual([]);
+
+  /*
     Every day cell's id must be unique, or there must be none.
 
     REGRESSION: the cells carried `id="day-<date>"` for fragment scrolling — correct on the one-grid

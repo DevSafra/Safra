@@ -134,11 +134,23 @@ export function MonthGrid({
                   The blue ring marks the day in every grid instead; auto-scrolling to it is not
                   implemented rather than half-implemented.
                 */
+                /*
+                  `ring-inset` on both rings, and that is not a style choice.
+
+                  A Tailwind ring is a box-shadow drawn OUTSIDE the element, and this grid sits in an
+                  `overflow-x-auto` box so it can scroll on a phone. A cell in the first or last
+                  column therefore has its ring clipped by that box — today's marker was missing its
+                  left edge whenever today fell on الجمعة, which is one day in seven and looks like a
+                  rendering fault rather than a design (Bashar, 2026-08-14).
+                  
+                  Inset draws it within the cell's own box, so it cannot be clipped, and it costs no
+                  layout: unlike a thicker border it does not move the content by a pixel.
+                */
                 className={`rounded-lg border p-1.5 text-center ${
                   DAY_TONES[day.status] ?? DAY_TONES['available'] ?? ''
                 } ${isPast ? 'opacity-45' : ''} ${
-                  isToday ? 'ring-1 ring-gold/70' : ''
-                } ${day.date === highlight ? 'ring-2 ring-sky' : ''}`}
+                  isToday ? 'ring-1 ring-gold/70 ring-inset' : ''
+                } ${day.date === highlight ? 'ring-2 ring-sky ring-inset' : ''}`}
               >
                 {/* The day number is a Latin numeral inside an Arabic page — its own `dir`. */}
                 <span className="block text-[12px] font-bold" dir="ltr">
