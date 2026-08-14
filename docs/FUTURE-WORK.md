@@ -2566,30 +2566,53 @@ tests. **Probed against a running system**, not read.
 **This is a self-review.** It finds implementation errors; it is not independent
 assurance and must not be quoted as such. See **S-9**.
 
+### Second pass — 2026-08-14
+
+A full sweep, prompted by Bashar's standing instruction that every implementation ends with a
+security pass. Eleven checks: secrets in the diff, every `sql.raw` call site, XSS sinks, route
+authorisation, session cookie flags, rate limiting, public routes, dangerous primitives, private
+storage prefixes, PII in logs, clickjacking headers and the metrics token comparison.
+
+**Three findings, all fixed in `e2b5394`. None would have been caught by a test.**
+
+| Finding                                                      | Severity | Why it mattered                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A staff email address written to a log line                  | Low      | Rule 1 forbids PII in logs; every other line logs `user.id`. Logs travel to aggregation and backups                                                                                                                                                                                                              |
+| `x-safra-pathname` trusted where the middleware does not run | Low      | The matcher excludes paths containing a dot, so that header is the CLIENT's on those routes. Nothing exploitable was reachable — `swapLocale` cannot leave the origin and the currency route re-validates `next` — but a request value used to build a link should not rest on two other functions being careful |
+| `POST /{locale}/currency` accepted a cross-site submission   | Low      | It takes no session, so `SameSite` on the session cookie did not protect it. Another site could change a visitor's display currency — small impact, but the shape of a CSRF                                                                                                                                      |
+
+**Verified sound this pass:** every `sql.raw` argument is a literal or a constant (10 call sites,
+up from 2 — the growth is why the old claim needed re-checking); every admin and partner controller
+carries a permission decorator; session cookies are `HttpOnly` + `Secure` + `SameSite=Strict`;
+`frame-ancestors 'none'` and `X-Frame-Options: DENY` are both live; the metrics token uses
+`timingSafeEqual` behind a length check; `exports/` and `incoming/` are absent from the bucket's
+anonymous-read grant; there is no `eval`, no `new Function`, no `child_process`; and the one
+`redis.eval` runs a constant Lua script.
+
 ### Verified sound — attacks attempted and defeated
 
 Each row is a thing that was actually tried against a running instance.
 
-| Attack                                              | Result                                                                |
-| --------------------------------------------------- | --------------------------------------------------------------------- |
-| Read another customer's booking                     | `404` — not `403`, which would confirm it exists                      |
-| Cancel / partner-confirm another's booking          | `403`                                                                 |
-| Reach any `/admin/*` route as a customer            | `403` on all five tried                                               |
-| Reach `/partner/*` as a customer                    | `403`                                                                 |
-| Set `role: super_admin` at registration             | `400`, unknown key rejected by `.strict()`                            |
-| Set `permissionOverrides` at registration           | `400`                                                                 |
-| Enumerate accounts via login                        | Identical message for known and unknown                               |
-| Enumerate via password reset                        | `204` for both                                                        |
-| CORS from `https://evil.example`                    | No `Access-Control-Allow-Origin` returned                             |
-| Brute-force one account                             | `401`×5 then `429`; account locked even after clearing the IP counter |
-| Replay a used refresh token                         | `401`, and the whole token family revoked                             |
-| SQL injection via reference/query                   | Only 2 `sql.raw` calls exist, both on compile-time constants          |
-| Path traversal on media                             | Allow-list pattern **and** a root-containment check                   |
-| 5 MB / 200 KB request body                          | `413`                                                                 |
-| Forge a log line via a newline in an email          | 0 forged lines — JSON serialisation escapes it                        |
-| Delete verified webhook evidence                    | Refused by trigger: "This row is evidence"                            |
-| Delete audit / ledger / timeline / settings history | Refused by trigger                                                    |
-| Backdate a webhook's `created_at`                   | Refused by trigger                                                    |
+| Attack                                              | Result                                                                                      |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Read another customer's booking                     | `404` — not `403`, which would confirm it exists                                            |
+| Cancel / partner-confirm another's booking          | `403`                                                                                       |
+| Reach any `/admin/*` route as a customer            | `403` on all five tried                                                                     |
+| Reach `/partner/*` as a customer                    | `403`                                                                                       |
+| Set `role: super_admin` at registration             | `400`, unknown key rejected by `.strict()`                                                  |
+| Set `permissionOverrides` at registration           | `400`                                                                                       |
+| Enumerate accounts via login                        | Identical message for known and unknown                                                     |
+| Enumerate via password reset                        | `204` for both                                                                              |
+| CORS from `https://evil.example`                    | No `Access-Control-Allow-Origin` returned                                                   |
+| Brute-force one account                             | `401`×5 then `429`; account locked even after clearing the IP counter                       |
+| Replay a used refresh token                         | `401`, and the whole token family revoked                                                   |
+| SQL injection via reference/query                   | Every `sql.raw` argument is a literal or a constant — re-verified 2026-08-14, 10 call sites |
+| Path traversal on media                             | Allow-list pattern **and** a root-containment check                                         |
+| 5 MB / 200 KB request body                          | `413`                                                                                       |
+| Forge a log line via a newline in an email          | 0 forged lines — JSON serialisation escapes it                                              |
+| Delete verified webhook evidence                    | Refused by trigger: "This row is evidence"                                                  |
+| Delete audit / ledger / timeline / settings history | Refused by trigger                                                                          |
+| Backdate a webhook's `created_at`                   | Refused by trigger                                                                          |
 
 Also confirmed: refresh cookie is `HttpOnly; SameSite=Strict; Path=/api/v1/auth` with
 `Secure` gated on production; EXIF is stripped by re-encoding through sharp; document

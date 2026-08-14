@@ -209,9 +209,6 @@ export const ar = {
     calendarTitle: 'تقويم {month} — كل وحداتك',
     calendarDefaultPrice: '{count} وحدة · تبدأ من {price}',
     /* One square per day, describing the portfolio rather than a single room. */
-    calendarDayFull: 'لا وحدة متاحة',
-    calendarDaySome: '{available} من {total} متاحة',
-    calendarDayFree: 'كل الوحدات متاحة',
     calendarDayDetail: '{date} · محجوز {booked} · مغلق {blocked} · متاح {available}',
     /*
       A discoverability line, not decoration. The squares became LINKS so a partner can act on a day,
@@ -222,12 +219,7 @@ export const ar = {
     legendPortfolioFree: 'كل الوحدات متاحة',
     legendPortfolioSome: 'متاح جزئيًا',
     legendPortfolioFull: 'لا شيء متاح',
-    calendarPerUnit: 'لتعديل الأسعار والإتاحة، افتح تقويم الوحدة من عقاراتي.',
     calendarNoUnits: 'لا وحدات بعد، فلا تقويم لعرضه.',
-    legendAvailable: 'متاح',
-    legendBooked: 'محجوز',
-    legendBlocked: 'مغلق',
-    legendMaintenance: 'صيانة',
     /** The handoff's reminder, verbatim. */
     calendarReminder:
       'تذكير: أجّرت الوحدة خارج سفرة؟ أغلق التاريخ فوراً. عدم تحديث التقويم يخفّض تقييمك الداخلي.',
@@ -337,7 +329,6 @@ export const ar = {
     units: 'الوحدات',
     unitsEmpty: 'لا وحدات بعد.',
     unitGuests: '{n} ضيف',
-    unitNights: 'أقل مدة {n} ليلة',
     unitInactive: 'موقوفة',
     openUnitCalendar: 'تقويم هذه الوحدة',
     /* The unit editor. Every unit on one screen, each saved on its own. */
@@ -541,7 +532,6 @@ export const ar = {
     /* Several at once: what landed, and what the limit refused. */
     uploadedSome: 'رُفعت {done} من {total} صور. تحقق من الصور المتبقية وأعد المحاولة.',
     limitReached: 'بلغت الحد الأقصى وهو {max} صورة لهذا العقار.',
-    uploadFailed: 'تعذّر رفع الصورة. تأكد أنها صورة صالحة وأصغر من ١٠ ميغابايت.',
     lastImage: 'لا يمكن أرشفة الصورة الأخيرة لعقار منشور. ارفع صورة بديلة أولاً.',
     failed: 'تعذّر تنفيذ الطلب.',
     unreachable: 'تعذّر الوصول إلى الخادم.',
@@ -669,7 +659,6 @@ export const ar = {
     replyLabel: 'ردّك — يظهر للجميع تحت التقييم، ولا يمكن تعديله بعد النشر.',
     replySubmit: 'نشر الرد',
     replied: 'ردّك',
-    alreadyReplied: 'سبق أن رددت على هذا التقييم.',
     reportLabel:
       'لماذا تُبلغ عن هذا التقييم؟ يصل النص إلى سفرة ولا يظهر للضيف. عشرة أحرف على الأقل.',
     reportSubmit: 'إرسال البلاغ',

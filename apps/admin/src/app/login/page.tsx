@@ -26,11 +26,13 @@ export default async function LoginPage({
   return (
     <main className="mx-auto grid min-h-screen max-w-sm place-content-center px-4">
       <div className="w-full">
-        <p className="text-3xl text-gold" aria-hidden>
+        <p className="text-3xl text-gold text-center" aria-hidden>
           {ORNAMENT_BRAND}
         </p>
-        <h1 className="mt-3 text-2xl font-semibold text-text">{t.login.title}</h1>
-        <p className="mt-1 text-sm text-muted">{t.login.subtitle}</p>
+        <h1 className="mt-3 text-2xl font-semibold text-text text-center">
+          {t.login.title}
+        </h1>
+        <p className="mt-1 text-sm text-muted text-center">{t.login.subtitle}</p>
 
         <div className="mt-8 rounded-xl border border-line bg-card p-6">
           <StaffLoginForm next={next === '/' ? '/' : next} />

@@ -43,7 +43,7 @@ export default async function LoginPage({
     <main className="mx-auto grid min-h-screen max-w-sm place-content-center px-4">
       <div className="w-full">
         {/* `aria-hidden`: an ornament is a glyph, and a screen reader announcing it says nothing. */}
-        <p className="text-3xl text-gold" aria-hidden>
+        <p className="text-3xl text-gold text-center" aria-hidden>
           {ORNAMENT_BRAND}
         </p>
 
@@ -56,8 +56,10 @@ export default async function LoginPage({
           same week should not be able to tell them apart except by the words, and matching "mostly"
           is what makes the difference look like a mistake rather than a choice.
         */}
-        <h1 className="mt-3 text-2xl font-semibold text-text">{t.login.title}</h1>
-        <p className="mt-1 text-sm text-muted">{t.login.subtitle}</p>
+        <h1 className="mt-3 text-2xl font-semibold text-text text-center">
+          {t.login.title}
+        </h1>
+        <p className="mt-1 text-sm text-muted text-center">{t.login.subtitle}</p>
 
         <div className="mt-8 rounded-xl border border-line bg-card p-6">
           <PartnerLoginForm next={next === '/' ? '/' : next} />

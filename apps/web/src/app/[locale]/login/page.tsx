@@ -47,8 +47,10 @@ export default async function LoginPage({
 
   return (
     <div className="mx-auto max-w-md px-4 py-16">
-      <h1 className="font-display text-3xl font-bold text-gold">{t('signInTitle')}</h1>
-      <p className="mt-2 text-sm text-muted">{t('signInSubtitle')}</p>
+      <h1 className="font-display text-3xl font-bold text-gold text-center">
+        {t('signInTitle')}
+      </h1>
+      <p className="mt-2 text-sm text-muted text-center">{t('signInSubtitle')}</p>
 
       {justReset ? (
         <p className="mt-6 rounded-lg border border-ok/40 bg-ok/10 p-3 text-sm text-ok">
