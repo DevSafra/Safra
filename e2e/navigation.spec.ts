@@ -231,19 +231,52 @@ test.describe('console navigation', () => {
     const clashes: string[] = [];
     const sameScreen: string[] = [];
     const latin: string[] = [];
+    const stretched: string[] = [];
 
     for (const section of SECTIONS) {
       await page.goto(section);
 
       const pills = await page.locator('[data-status-pill]').evaluateAll((nodes) =>
-        nodes.map((node) => ({
-          text: (node.textContent ?? '').trim(),
-          color: getComputedStyle(node).color,
-        })),
+        nodes.map((node) => {
+          /*
+            The INK width, measured off a range over the pill's own text rather than off the
+            element — the element is what may have been stretched, so measuring it would compare a
+            number against itself.
+          */
+          const range = document.createRange();
+
+          range.selectNodeContents(node);
+
+          return {
+            text: (node.textContent ?? '').trim(),
+            color: getComputedStyle(node).color,
+            ink: range.getBoundingClientRect().width,
+            box: node.getBoundingClientRect().width,
+          };
+        }),
       );
 
       for (const pill of pills) {
         if (!pill.text) continue;
+
+        /*
+          A pill is as wide as its word.
+
+          REGRESSION (Bashar, 2026-08-14: «many status carts much extended»). `StatusPill` is
+          `inline-block`, which is not enough: several cells wrap it in a `<div class="grid">` to
+          stack a note underneath, and a grid item whose width is `auto` is stretched to its track
+          by the default `justify-self: stretch`. The pill filled the whole الحالة column and read
+          as an empty input rather than as a status. `w-fit` on the component is the fix.
+
+          The allowance is the pill's own horizontal padding (0.625rem a side) plus 8px of slack
+          for sub-pixel text measurement — well under the width of a column, which is what the
+          failure looked like.
+        */
+        if (pill.box > pill.ink + 28) {
+          stretched.push(
+            `${section}: «${pill.text}» is ${Math.round(pill.box)}px around ${Math.round(pill.ink)}px of text`,
+          );
+        }
 
         /*
           A pill whose text is a run of Latin letters is an untranslated enum. Brands are allowed —
@@ -287,6 +320,7 @@ test.describe('console navigation', () => {
     expect(latin).toStrictEqual([]);
     expect(clashes).toStrictEqual([]);
     expect(sameScreen).toStrictEqual([]);
+    expect(stretched).toStrictEqual([]);
 
     // A sweep that found no pills would pass while proving nothing.
     expect(seen.size).toBeGreaterThan(5);

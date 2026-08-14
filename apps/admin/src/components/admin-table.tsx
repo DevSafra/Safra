@@ -205,7 +205,22 @@ export function StatusPill({ tone, children }: { tone: Tone; children: ReactNode
     */
     <span
       data-status-pill
-      className={`inline-block whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[10.5px] font-bold ${TONES[tone]}`}
+      /*
+        `w-fit`, and it is load-bearing rather than tidy (Bashar, 2026-08-14: «many status carts
+        much extended»).
+
+        `inline-block` is not enough. A grid or flex item whose width is `auto` is STRETCHED to its
+        track by the default `justify-self: stretch`, and several cells wrap the pill in a
+        `<div class="grid gap-1">` to stack a note underneath it — so the pill filled the whole
+        الحالة column and read as an empty input rather than as a status. `width: fit-content`
+        makes the width no longer `auto`, so stretch stops applying, in a grid and in a flex column
+        alike.
+
+        Fixed HERE and not at the call sites because the pill is a component precisely so that
+        every status looks the same; a rule that has to be remembered at each of the nineteen
+        sections is one that will be forgotten at the twentieth.
+      */
+      className={`inline-block w-fit whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[10.5px] font-bold ${TONES[tone]}`}
     >
       {children}
     </span>
