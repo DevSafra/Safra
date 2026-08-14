@@ -54,10 +54,11 @@ describe('transactional email', () => {
           to: 'agent@safra.com',
           url: 'https://safra.example/invite?token=q',
           locale,
-          roleLabel: 'مدير عمليات',
+          /* A CODE. What the reader sees is asserted per locale below, not here. */
+          role: 'operations_manager',
           expiresInHours: 48,
         }),
-      shows: 'مدير عمليات',
+      shows: '48',
     },
     {
       name: 'supportReplied',
@@ -107,6 +108,48 @@ describe('transactional email', () => {
       });
     }
   }
+
+  /**
+   * The invited person's ROLE reads in the invited person's language.
+   *
+   * REGRESSION (2026-08-14): the caller passed `role.replace(/_/g, ' ')`, so every invitation in
+   * every language named the role in English — «تمت دعوتك … بصفة: operations manager». Asserted
+   * per locale, because a single shared expectation is exactly what could not catch this.
+   */
+  describe('the staff invitation names the role in the reader’s language', () => {
+    const invite = (locale: string, role = 'operations_manager') =>
+      staffInvitationMail({
+        to: 'agent@safra.com',
+        url: 'https://safra.example/invite?token=q',
+        locale,
+        role,
+        expiresInHours: 48,
+      }).text;
+
+    it.each([
+      ['ar', 'مدير عمليات'],
+      ['en', 'Operations manager'],
+      ['de', 'Betriebsleitung'],
+    ])('names it in %s', (locale, word) => {
+      expect(invite(locale)).toContain(word);
+    });
+
+    /* And never the code, which is what the old caller produced with its underscores removed. */
+    it.each(['ar', 'en', 'de'])('never prints the raw code in %s', (locale) => {
+      expect(invite(locale)).not.toContain('operations_manager');
+      expect(invite(locale)).not.toContain('operations manager');
+    });
+
+    /**
+     * A role with no word falls back to the code rather than to a blank.
+     *
+     * `user_role` can gain a value before the three catalogues do, and an invitation reading
+     * «بصفة: » would be a broken sentence where «بصفة: data_officer» is an obvious gap.
+     */
+    it('falls back to the code for a role with no translation', () => {
+      expect(invite('ar', 'data_officer')).toContain('data_officer');
+    });
+  });
 
   /** `preferred_locale` is an unconstrained text column, so this is reachable from data. */
   it('falls back to Arabic for an unrecognised locale', () => {

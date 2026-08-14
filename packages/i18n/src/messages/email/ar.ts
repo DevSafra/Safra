@@ -24,6 +24,23 @@ export const ar = {
     subject: 'محاولة إنشاء حساب — سفرة',
     body: 'تلقّينا طلب إنشاء حساب في سفرة بهذا البريد الإلكتروني، ولديك حساب بالفعل.\n\nإذا كنت أنت من حاول التسجيل، سجّل الدخول من هنا:\n{signInUrl}\n\nنسيت كلمة المرور؟ أعد تعيينها من هنا:\n{resetUrl}\n\nإذا لم تكن أنت، فلا حاجة لأي إجراء — لم يتغيّر شيء في حسابك ولم يطّلع أحد على بياناتك.\n\nفريق سفرة',
   },
+  /**
+   * The staff roles, for the invitation.
+   *
+   * The invitation used to interpolate `role.replace(/_/g, ' ')`, so an Arabic email said
+   * «بصفة: operations manager» and a German one «als: support agent» (found 2026-08-14). The
+   * template now takes the ROLE CODE and resolves it here — the same rule the rest of the platform
+   * follows, applied to the one surface where the reader cannot ask what it meant.
+   *
+   * Keyed by `user_role`, staff values only. `customer` and `partner` are not invited to a console.
+   */
+  roles: {
+    super_admin: 'مدير عام',
+    operations_manager: 'مدير عمليات',
+    finance_officer: 'مسؤول مالي',
+    support_agent: 'موظف دعم',
+  } as Record<string, string>,
+
   staffInvitation: {
     subject: 'دعوة للانضمام إلى فريق سفرة',
     body: 'تمت دعوتك للانضمام إلى لوحة تحكم سفرة بصفة: {roleLabel}.\n\nافتح الرابط التالي لتعيين كلمة المرور الخاصة بك:\n{url}\n\nتنتهي صلاحية الرابط خلال {expiresInHours} ساعة ويمكن استخدامه مرة واحدة فقط.\n\nبعد تعيين كلمة المرور سيُطلب منك تفعيل المصادقة الثنائية قبل استخدام الحساب.\n\nإذا لم تكن تتوقع هذه الدعوة، لا تفتح الرابط وأبلغ فريق سفرة.\n\nفريق سفرة',

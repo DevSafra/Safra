@@ -116,18 +116,27 @@ export function accountExistsMail(input: {
 export function staffInvitationMail(input: {
   to: string;
   url: string;
-  roleLabel: string;
+  /**
+   * The role CODE — `operations_manager` — not a label.
+   *
+   * It used to be a label, built by the caller as `role.replace(/_/g, ' ')`, which put an English
+   * phrase inside an Arabic and a German sentence: «تمت دعوتك … بصفة: operations manager». The
+   * word belongs to the reader's language, so it is resolved here, where the locale is known.
+   */
+  role: string;
   locale: string;
   expiresInHours: number;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).staffInvitation;
+  const messages = emailMessages(resolveLocale(input.locale));
+  const copy = messages.staffInvitation;
 
   return {
     to: input.to,
     subject: copy.subject,
     text: fill(copy.body, {
       url: input.url,
-      roleLabel: input.roleLabel,
+      /* Falls back to the code: an unnamed role is an obvious gap, an empty one is a broken email. */
+      roleLabel: messages.roles[input.role] ?? input.role,
       expiresInHours: input.expiresInHours,
     }),
   };

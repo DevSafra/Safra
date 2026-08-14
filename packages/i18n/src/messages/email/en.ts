@@ -12,6 +12,14 @@ export const en = {
     subject: 'Account sign-up attempt — SAFRA',
     body: 'Somebody tried to create a SAFRA account with this email address, and you already have one.\n\nIf that was you, sign in here:\n{signInUrl}\n\nForgotten your password? Reset it here:\n{resetUrl}\n\nIf it was not you, there is nothing to do — nothing about your account has changed and nobody saw your details.\n\nThe SAFRA team',
   },
+  /** The staff roles, for the invitation. See `ar.ts` for why the template takes a code. */
+  roles: {
+    super_admin: 'Super admin',
+    operations_manager: 'Operations manager',
+    finance_officer: 'Finance officer',
+    support_agent: 'Support agent',
+  } as Record<string, string>,
+
   staffInvitation: {
     subject: 'You have been invited to the SAFRA admin console',
     body: 'You have been invited to the SAFRA admin console as: {roleLabel}.\n\nOpen this link to set your password:\n{url}\n\nThe link expires in {expiresInHours} hours and can be used once.\n\nAfter setting a password you will be required to enable two-factor authentication before the account can be used.\n\nIf you were not expecting this invitation, do not open the link and tell the SAFRA team.\n\nThe SAFRA team',

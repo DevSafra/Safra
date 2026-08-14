@@ -394,7 +394,7 @@ export class StaffService {
       staffInvitationMail({
         to: email,
         url: `${this.env.ADMIN_URL}/invitation/${token}`,
-        roleLabel: role.replace(/_/g, ' '),
+        role,
         locale,
         expiresInHours: INVITATION_TTL_MS / 3_600_000,
       }),
