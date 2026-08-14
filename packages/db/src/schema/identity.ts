@@ -13,7 +13,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { createdAt, foreignId, notDeleted, primaryId, timestamps } from './_shared.js';
-import { authTokenPurpose, userRole, userStatus } from './enums.js';
+import { authTokenPurpose, gender, userRole, userStatus } from './enums.js';
 import { cities, currencies } from './geo.js';
 
 /**
@@ -207,6 +207,14 @@ export const customerProfiles = pgTable(
     email: text('email').notNull(),
     phone: text('phone').notNull(),
     preferredLocale: text('preferred_locale').notNull().default('ar'),
+    /**
+     * How to address this person. Optional at registration and after it.
+     *
+     * `undisclosed` by default rather than nullable — see the enum. Nothing in the platform
+     * BRANCHES on it: it is used to address somebody correctly and for nothing else, which is what
+     * keeps collecting it proportionate.
+     */
+    gender: gender('gender').notNull().default('undisclosed'),
     preferredCurrencyId: foreignId('preferred_currency_id').references(
       () => currencies.id,
     ),

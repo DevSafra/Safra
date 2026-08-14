@@ -50,7 +50,8 @@ describeIfDb('partner self-registration', () => {
 
     return {
       email: `partner-reg-${id}@safra.test`,
-      password: 'a-long-enough-password',
+      /* Meets the composition checklist added 2026-08-14 — see `PASSWORD_RULES`. */
+      password: 'A-Long-Enough-Password-9!',
       phone: '+963912340000',
       legalName: `Levant Stays ${id} LLC`,
       displayName: `Levant Stays ${id}`,

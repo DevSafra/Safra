@@ -119,6 +119,14 @@ export const en = {
   'validation.email_invalid': 'A valid email address is required.',
   'validation.required': 'This field is required.',
   'validation.password_too_short': 'Password must be at least {min} characters.',
+  'validation.password_composition':
+    'Your password needs an uppercase letter, a lowercase letter, a number, a symbol, and at least 12 characters.',
+  'validation.password_common':
+    'That password is among the most used and is guessed first. Choose another — four unrelated words works well.',
+  'validation.password_predictable':
+    'That password is predictable: repeated or sequential characters. Length alone does not help when the pattern is obvious.',
+  'validation.password_contains_identity':
+    'Do not use your email, your name, or the name of this site inside your password.',
   'validation.code_six_digits': 'Authenticator code must be 6 digits.',
   'validation.date_format': 'Date must be in YYYY-MM-DD format.',
   'validation.date_unreal': 'Date is not a real calendar date.',

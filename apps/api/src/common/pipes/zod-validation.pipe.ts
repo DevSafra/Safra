@@ -1,7 +1,7 @@
 import { BadRequestException, HttpStatus, type PipeTransform } from '@nestjs/common';
 import type { ZodType } from 'zod';
 
-import { ERROR, isErrorCode } from '@safra/contracts';
+import { ERROR, errorParamsOf, isErrorCode } from '@safra/contracts';
 import { errorMessage } from '@safra/i18n';
 
 /**
@@ -42,17 +42,20 @@ export class ZodValidationPipe<T> implements PipeTransform<unknown, T> {
           const code = isErrorCode(issue.message)
             ? issue.message
             : ERROR.VALIDATION_REQUIRED;
+          const params = errorParamsOf(issue);
 
           return {
             field: issue.path.join('.') || '(root)',
             code,
+            /* Forwarded so the client can fill the same placeholders in the reader's language. */
+            ...(params ? { params } : {}),
             /*
               `message` stays the client-facing field text for anything not taught the codes.
               For a Zod default it is Zod's own wording, which is the honest thing to show: it
               describes the shape mismatch and names no server state.
             */
             message: isErrorCode(issue.message)
-              ? errorMessage(code, 'en')
+              ? errorMessage(code, 'en', params)
               : issue.message,
           };
         }),

@@ -147,6 +147,19 @@ export const ERROR = {
   VALIDATION_EMAIL_INVALID: 'validation.email_invalid',
   VALIDATION_REQUIRED: 'validation.required',
   VALIDATION_PASSWORD_TOO_SHORT: 'validation.password_too_short',
+  /**
+   * The three ways a password long enough can still be weak (2026-08-14).
+   *
+   * Length was the only rule, so `aaaaaaaaaaaa` and `123456789012` were accepted on a platform
+   * holding wallet balances. These are the blocklist half of NIST SP 800-63B, which the policy had
+   * adopted only the first half of — and each is a distinct thing to tell somebody, because "pick a
+   * different one" and "stop using your own email" are different instructions.
+   */
+  /** The visible checklist beside the field, as a refusal for anything not rendering it. */
+  VALIDATION_PASSWORD_COMPOSITION: 'validation.password_composition',
+  VALIDATION_PASSWORD_COMMON: 'validation.password_common',
+  VALIDATION_PASSWORD_PREDICTABLE: 'validation.password_predictable',
+  VALIDATION_PASSWORD_CONTAINS_IDENTITY: 'validation.password_contains_identity',
   VALIDATION_CODE_SIX_DIGITS: 'validation.code_six_digits',
   VALIDATION_DATE_FORMAT: 'validation.date_format',
   VALIDATION_DATE_UNREAL: 'validation.date_unreal',
@@ -276,4 +289,40 @@ export function isErrorCode(value: unknown): value is ErrorCode {
     typeof value === 'string' &&
     (Object.values(ERROR) as readonly string[]).includes(value)
   );
+}
+
+/**
+ * The values a message needs, read off the Zod issue that produced it.
+ *
+ * ## Why this lives in contracts rather than beside a validator
+ *
+ * A schema writes `.min(12, ERROR.VALIDATION_PASSWORD_TOO_SHORT)` and the catalogue entry for that
+ * code says "at least {min} characters" — the number lives in the schema, the sentence lives in the
+ * catalogue, and something has to join them. Zod puts the bound on the issue, so the join is
+ * derivation rather than a hand-written map of code to parameters.
+ *
+ * It is HERE because more than one place validates the same schema. The API's `ZodValidationPipe`
+ * does, and so do the customer app's `/api/auth/*` proxy routes, which parse locally and refuse
+ * before calling the API at all. That second path is what shipped the bug: the API was fixed to
+ * forward `{ min: 12 }` and the registration form still printed «يجب أن تكون كلمة المرور {min} أحرف
+ * على الأقل.», because for a short password the request never reached the API (Bashar, 2026-08-14).
+ *
+ * Four copies of this function would have been four chances for one to be forgotten. One copy, in
+ * the package that owns both the codes and the schemas, is the only arrangement where fixing it
+ * once fixes it everywhere.
+ */
+export function errorParamsOf(issue: {
+  readonly code?: string;
+  readonly minimum?: unknown;
+  readonly maximum?: unknown;
+}): Record<string, string | number> | undefined {
+  if (issue.code === 'too_small' && typeof issue.minimum === 'number') {
+    return { min: issue.minimum };
+  }
+
+  if (issue.code === 'too_big' && typeof issue.maximum === 'number') {
+    return { max: issue.maximum };
+  }
+
+  return undefined;
 }

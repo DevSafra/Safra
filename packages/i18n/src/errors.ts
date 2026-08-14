@@ -65,13 +65,34 @@ export function errorMessage(
     failure this would otherwise ship: a German translation using {days} where the Arabic
     uses {maxDays}.
   */
-  if (!params) return template;
+  const filled = params
+    ? template.replace(/\{(\w+)\}/g, (match, name: string) => {
+        const value = params[name];
 
-  return template.replace(/\{(\w+)\}/g, (match, name: string) => {
-    const value = params[name];
+        return value === undefined ? match : String(value);
+      })
+    : template;
 
-    return value === undefined ? match : String(value);
-  });
+  /*
+    A placeholder that survived is a BUG, and the generic message is the honest way to show it.
+
+    Seventeen entries here carry one. If a caller resolves such a code without the values — because
+    the API forgot to forward them, or a new parameterised message was added and one call site
+    missed — the reader would otherwise be shown «يجب أن تكون كلمة المرور {min} أحرف على الأقل.»,
+    which is what Bashar reported on the registration form (2026-08-14).
+
+    Returning the generic sentence loses precision and keeps the page truthful. Stripping the
+    placeholder instead was considered and rejected: «كلمة المرور أحرف على الأقل» is a broken
+    sentence, and a broken sentence reads as a broken product rather than as a missing number.
+
+    This is a NET, not the fix. The fix is that `ZodValidationPipe` and `app-error` both forward
+    their parameters; `errors-complete.test.ts` holds the catalogues to agreeing on the names.
+  */
+  if (/\{\w+\}/.test(filled)) {
+    return catalogue[GENERIC] ?? fallback[GENERIC] ?? '';
+  }
+
+  return filled;
 }
 
 /** The error catalogues, for the completeness tests. */

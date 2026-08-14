@@ -329,6 +329,10 @@ importers:
         version: 4.4.3
 
   packages/ui:
+    dependencies:
+      '@safra/contracts':
+        specifier: workspace:*
+        version: link:../contracts
     devDependencies:
       '@types/react':
         specifier: ^19.0.0

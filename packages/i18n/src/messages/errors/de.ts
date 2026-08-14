@@ -139,6 +139,14 @@ export const de = {
   'validation.required': 'Dieses Feld ist erforderlich.',
   'validation.password_too_short':
     'Das Passwort muss mindestens {min} Zeichen lang sein.',
+  'validation.password_composition':
+    'Ihr Passwort braucht einen Groß- und einen Kleinbuchstaben, eine Zahl, ein Sonderzeichen und mindestens 12 Zeichen.',
+  'validation.password_common':
+    'Dieses Passwort gehört zu den meistgenutzten und wird zuerst erraten. Bitte ein anderes wählen — vier zusammenhanglose Wörter eignen sich gut.',
+  'validation.password_predictable':
+    'Dieses Passwort ist vorhersehbar: wiederholte oder aufeinanderfolgende Zeichen. Länge allein hilft nicht, wenn das Muster offensichtlich ist.',
+  'validation.password_contains_identity':
+    'Verwenden Sie nicht Ihre E-Mail-Adresse, Ihren Namen oder den Namen dieser Website im Passwort.',
   'validation.code_six_digits': 'Der Authenticator-Code besteht aus 6 Ziffern.',
   'validation.date_format': 'Datum im Format JJJJ-MM-TT.',
   'validation.date_unreal': 'Dieses Datum existiert nicht.',

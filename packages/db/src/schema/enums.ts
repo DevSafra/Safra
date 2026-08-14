@@ -93,6 +93,25 @@ export const exportStatus = pgEnum('export_status', [
   'failed',
 ]);
 
+/**
+ * A customer's gender, as they choose to state it.
+ *
+ * ## Why `undisclosed` is a value rather than a NULL
+ *
+ * "Not answered" and "answered, and the answer is that I would rather not say" are different
+ * facts, and a null cannot tell them apart. The first is a form somebody skipped; the second is a
+ * choice, and a system that keeps re-asking somebody who already declined is one that did not
+ * listen.
+ *
+ * ## And why only three
+ *
+ * The field exists to address people correctly. Three values is what that needs, and every value
+ * beyond it is personal data collected for no stated purpose — which under GDPR is the test, not
+ * whether a longer list would be more complete. The privacy notice names this field and says what
+ * it is for.
+ */
+export const gender = pgEnum('gender', ['male', 'female', 'undisclosed']);
+
 /** SRS §8.4: per-day calendar state for a unit. */
 export const dayStatus = pgEnum('day_status', [
   'available',

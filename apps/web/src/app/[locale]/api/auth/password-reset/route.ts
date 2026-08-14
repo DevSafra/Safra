@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import {
   ERROR,
+  errorParamsOf,
   passwordResetConfirmSchema,
   passwordResetRequestSchema,
 } from '@safra/contracts';
@@ -47,6 +48,15 @@ export async function POST(request: Request): Promise<NextResponse> {
           // reader's locale; sending it as `message` made every field show the generic
           // "something went wrong" while the API knew exactly which field was wrong.
           code: issue.message,
+          /*
+            And the VALUES the sentence interpolates.
+
+            This route parses the same schema the API does and refuses before calling it, so for a
+            short password the API is never reached — which is why fixing the API alone left the
+            registration form still printing «{min}» (Bashar, 2026-08-14). `errorParamsOf` is the
+            one derivation both sides share.
+          */
+          ...(errorParamsOf(issue) ? { params: errorParamsOf(issue) } : {}),
         })),
       },
       { status: 400 },

@@ -1,5 +1,13 @@
 import { z } from 'zod';
 import { ERROR } from './error-codes.js';
+import {
+  PASSWORD_RULES,
+  passwordEchoesIdentity,
+  passwordWeakness,
+} from './password-strength.js';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from './password-length.js';
+
+export { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH };
 
 /**
  * The single definition of what an auth request may contain. The API validates
@@ -26,8 +34,56 @@ export type Locale = z.infer<typeof localeSchema>;
  */
 export const passwordSchema = z
   .string()
-  .min(12, ERROR.VALIDATION_PASSWORD_TOO_SHORT)
-  .max(256, ERROR.VALIDATION_PASSWORD_TOO_LONG);
+  .min(PASSWORD_MIN_LENGTH, ERROR.VALIDATION_PASSWORD_TOO_SHORT)
+  .max(PASSWORD_MAX_LENGTH, ERROR.VALIDATION_PASSWORD_TOO_LONG)
+  /*
+    And it must not be one of the ones people actually choose.
+
+    Length was the whole policy until 2026-08-14, so `aaaaaaaaaaaa` and `123456789012` were accepted
+    on a platform holding wallet balances and payout accounts. `passwordWeakness` is the blocklist
+    half of NIST SP 800-63B — the half this policy had skipped while adopting the "length beats
+    composition" half, which is kept.
+
+    On the SCHEMA rather than at a call site, so every route that accepts a password inherits it:
+    registration, reset, change, staff invitation, partner registration. A check added per endpoint
+    is a check the next endpoint forgets.
+
+    `superRefine` rather than `refine` because the reason must reach the reader — "pick a different
+    one" and "stop repeating a character" are different instructions, and a single boolean would
+    collapse them into one unhelpful sentence.
+  */
+  .superRefine((password, context) => {
+    /*
+      The composition checklist first, because it is what the meter beside the field is showing.
+
+      A refusal for something the checklist has already ticked green would be the one thing worse
+      than no meter: `PASSWORD_RULES` is the single definition both read, so they cannot disagree.
+    */
+    /*
+      `length` is EXCLUDED here, because `.min()` above already owns it and says it better.
+
+      Left in, a ten-character `Shortpass1!` produced two issues — "at least 12 characters" and the
+      whole composition sentence — and the second won, so somebody one character short was told to
+      add a capital they already had. The meter still SHOWS length, because a checklist that omitted
+      the most important requirement would be the wrong thing to look at.
+    */
+    if (PASSWORD_RULES.some((rule) => rule.id !== 'length' && !rule.test(password))) {
+      context.addIssue({
+        code: 'custom',
+        message: ERROR.VALIDATION_PASSWORD_COMPOSITION,
+      });
+
+      return;
+    }
+
+    /*
+      Then the blocklist, which is what keeps the checklist honest. `Password1!` ticks every box
+      above and is still one of the most-guessed passwords there is.
+    */
+    const weakness = passwordWeakness(password);
+
+    if (weakness) context.addIssue({ code: 'custom', message: weakness });
+  });
 
 export const emailSchema = z
   .string()
@@ -91,15 +147,58 @@ export const passwordChangeSchema = z
 
 export type PasswordChangeInput = z.infer<typeof passwordChangeSchema>;
 
+/**
+ * How a customer chooses to be addressed.
+ *
+ * ## Required, and «أفضّل عدم الإفصاح» is one of the answers
+ *
+ * Bashar asked for it to be required (2026-08-14). Required means a CHOICE must be made — it does
+ * not mean the choice must be male or female, and `undisclosed` stays a first-class value rather
+ * than a polite way of leaving the field blank.
+ *
+ * That distinction is the whole design. A required field with only two answers forces somebody to
+ * state something untrue about themselves, which produces worse data than no data and is a poor
+ * thing to do besides. A required field with three lets the answer "I would rather not say" be
+ * RECORDED, which is different from never having been asked and is what the enum stores.
+ *
+ * Nothing in the platform branches on it; it exists so somebody can be addressed correctly, which
+ * is what keeps collecting it proportionate under data minimisation.
+ */
+export const genderSchema = z.enum(['male', 'female', 'undisclosed']);
+export type Gender = z.infer<typeof genderSchema>;
+
 export const registerSchema = z
   .object({
     email: emailSchema,
     password: passwordSchema,
     fullName: z.string().trim().min(2).max(120),
     phone: phoneSchema,
+    /* Required: a choice must be made, and `undisclosed` is one of the choices. */
+    gender: genderSchema,
     preferredLocale: localeSchema.default('ar'),
   })
-  .strict();
+  .strict()
+  /*
+    The one check that needs the whole object.
+
+    A password containing your own email address is the first one an attacker holding a leaked
+    address list writes down. `passwordSchema` cannot see it — a schema for a string knows only the
+    string — so it is applied here, where the email and the name are in scope.
+
+    The issue is attached to `password`, not to the object, so the message lands under the field the
+    person has to change rather than at the top of the form.
+  */
+  .superRefine((value, context) => {
+    if (
+      passwordEchoesIdentity(value.password, { email: value.email, name: value.fullName })
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['password'],
+        message: ERROR.VALIDATION_PASSWORD_CONTAINS_IDENTITY,
+      });
+    }
+  });
 export type RegisterInput = z.infer<typeof registerSchema>;
 
 export const loginSchema = z

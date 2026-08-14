@@ -2032,6 +2032,67 @@ lawyer. `LEGAL_UPDATED` in `apps/web/src/lib/legal.ts` is a constant rather than
 precisely so the "last updated" line cannot claim a review that never happened — change it in the
 same commit that changes the wording, and never otherwise.
 
+### O-sec-2 — Registration keeps a duplicate address silent, by decision
+
+**Status:** decided 2026-08-14 · **Owner:** **Bashar**
+
+Bashar asked that registration not be allowed for an address that already has an account. **It
+already was not**: `users_email_unique` is a partial unique index over the live rows, and `register`
+returns `created: false` without inserting. What was missing was a test asserting it directly rather
+than by implication — now in `registration-enumeration.integration.test.ts`.
+
+**What was NOT changed is the visible refusal**, and that was Bashar's call when the trade was put to
+him (2026-08-14): an error saying «هذا البريد مسجّل بالفعل» is one request with a definitive answer,
+which is the cheapest enumeration oracle a system can offer. A stranger could test any address, and
+a leaked address list becomes a verified customer list. The neutral answer stays, and the person who
+owns the address learns they already have an account from their inbox, where only they can see it.
+
+This confirms the 2026-08-07 decision rather than reversing it.
+
+### O-sec-1 — Password strength is checked locally; a breach corpus would be stronger
+
+**Status:** open, needs a DECISION · **Owner:** **Bashar** · **Recorded:** 2026-08-14
+
+**Updated 2026-08-14, second pass.** Bashar asked for a visible strength checklist from a reference
+design, so `PASSWORD_RULES` now also requires an uppercase letter, a lowercase letter, a digit and a
+symbol, rendered live beside the field by `PasswordStrengthMeter`. That is a reversal of the "no
+composition rules" position, taken deliberately: the checklist teaches what strong means and gives
+immediate feedback, and **the blocklist is what makes it safe** — `Password123!` satisfies every
+visible rule and is still refused. Composition alone would have been weaker than what was there.
+
+Two things the reference design could not know. **The minimum stays twelve, not the eight it showed**
+— lowering a floor on a platform holding wallet balances is a regression somebody would have to
+justify. And **Arabic has no case**, so a literal "one capital letter" rule would have refused every
+password written in this site's primary language; a caseless letter satisfies both case rules, which
+is why «مطر أزرق فوق الجبل ٩!» is accepted.
+
+The policy was twelve characters and nothing else, so `aaaaaaaaaaaa`, `123456789012`,
+`qwertyuiop12` and `Password1234` all opened accounts on a platform holding wallet balances and
+payout details. `passwordSchema` now also refuses low character variety, repeated runs, keyboard and
+alphabet sequences, a few hundred common passwords in Latin and Arabic script — folded so
+`P@ssw0rd!2024` and `password` collapse to one entry — and, at registration, a password containing
+the person's own email or name. No composition rule was added: forcing a symbol produces
+`Password1!`, which is weaker than four words.
+
+**What would be stronger is a breach corpus.** `HaveIBeenPwned`'s range API answers "has this hash
+prefix been seen" without ever learning the password — five characters of a SHA-1 go out, hundreds
+of suffixes come back — and it covers hundreds of millions of real leaked passwords rather than the
+few hundred shipped here. Three things need deciding, none of them engineering:
+
+| Question                                         | Why it is not mine to answer                           |
+| ------------------------------------------------ | ------------------------------------------------------ |
+| Is an outbound call to a third party approved?   | "Approved tools only" — this is a new external service |
+| What happens when it is unreachable?             | Fail open (accept) or fail closed (refuse to register) |
+| Is the added latency acceptable on registration? | It is one more network hop on the signup path          |
+
+Until then the local list is the floor. It is deliberately short: it ships to the browser inside
+`@safra/contracts`, and the ten-thousandth entry is worth less than the bytes.
+
+**Two gaps that remain, and are cheap to close if wanted.** The identity check needs the email, so it
+applies at REGISTRATION only — a password reset or an invitation carries a token, and the API knows
+the account from it, so the same check could run in those services. And nothing re-checks an
+existing password: everybody who registered before today keeps whatever they chose.
+
 ### O-web-6 — Currency switching works, and only one pair has a rate
 
 **Status:** open, needs data · **Owner:** **Bashar** · **Recorded:** 2026-08-13

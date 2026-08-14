@@ -52,6 +52,18 @@ interface ErrorBody {
   readonly statusCode: number;
   readonly code: ErrorCode;
   readonly message: string;
+  /**
+   * The values the message interpolates, forwarded so a CLIENT can interpolate them too.
+   *
+   * Seventeen catalogue entries carry a placeholder — `{min}`, `{maxMb}`, `{max}` and friends. The
+   * body used to spend them on the English `message` and drop them, so a client resolving the code
+   * against the reader's own language had nothing to fill the placeholder with and printed it
+   * literally: «يجب أن تكون كلمة المرور {min} أحرف على الأقل.» on the registration form, reported by
+   * Bashar (2026-08-14).
+   *
+   * Omitted entirely when there are none, so the common body is unchanged.
+   */
+  readonly params?: Readonly<Record<string, string | number>>;
 }
 
 /**
@@ -62,7 +74,12 @@ interface ErrorBody {
  * reader is known, which is never inside the API.
  */
 function body(status: number, code: ErrorCode, params?: ErrorParams): ErrorBody {
-  return { statusCode: status, code, message: errorMessage(code, 'en', params) };
+  return {
+    statusCode: status,
+    code,
+    message: errorMessage(code, 'en', params),
+    ...(params ? { params } : {}),
+  };
 }
 
 /** Values interpolated into the message — `{maxNights}`, `{key}`. */

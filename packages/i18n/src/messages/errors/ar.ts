@@ -117,6 +117,14 @@ export const ar = {
   'validation.email_invalid': 'أدخل بريداً إلكترونياً صحيحاً.',
   'validation.required': 'هذا الحقل مطلوب.',
   'validation.password_too_short': 'يجب أن تكون كلمة المرور {min} أحرف على الأقل.',
+  'validation.password_composition':
+    'يجب أن تحتوي كلمة المرور على حرف كبير وحرف صغير ورقم ورمز، و12 حرفًا على الأقل.',
+  'validation.password_common':
+    'كلمة المرور هذه من الأكثر استخداماً وتُجرَّب أولاً. اختر شيئاً آخر — أربع كلمات لا علاقة لها ببعضها خيار جيد.',
+  'validation.password_predictable':
+    'كلمة المرور هذه متوقّعة: حروف مكرّرة أو متسلسلة. الطول وحده لا يكفي إن كان النمط واضحاً.',
+  'validation.password_contains_identity':
+    'لا تستخدم بريدك أو اسمك أو اسم الموقع داخل كلمة المرور.',
   'validation.code_six_digits': 'رمز المصادقة ستة أرقام.',
   'validation.date_format': 'التاريخ بصيغة سنة-شهر-يوم.',
   'validation.date_unreal': 'هذا التاريخ غير موجود في التقويم.',

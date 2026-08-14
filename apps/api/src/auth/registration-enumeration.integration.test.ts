@@ -50,9 +50,12 @@ describeIfDb('registration does not reveal whether an address is taken', () => {
 
   const input = (email: string) => ({
     email,
-    password: 'a-correct-password-1',
+    /* Meets the composition checklist added 2026-08-14 — see `PASSWORD_RULES`. */
+    password: 'A-Correct-Password-1',
     fullName: 'Enumeration Probe',
     phone: '+963900000123',
+    /* Required since 2026-08-14 — a choice must be made, and this is one of the three. */
+    gender: 'undisclosed' as const,
     preferredLocale: 'ar' as const,
   });
 
@@ -152,5 +155,32 @@ describeIfDb('registration does not reveal whether an address is taken', () => {
 
     expect(spy).toHaveBeenCalledTimes(1);
     spy.mockRestore();
+  });
+  /**
+   * A second account is never created for an address that already has one.
+   *
+   * Bashar asked for this explicitly (2026-08-14). It was already true — `users_email_unique` is a
+   * partial unique index over the live rows, and `register` returns `created: false` without
+   * inserting — but "already true" is a property somebody has to be able to check, and nothing
+   * asserted it directly. The tests above prove the two ANSWERS are indistinguishable; this proves
+   * what actually happened behind the identical answer.
+   */
+  it('creates no second account for an address that already has one', async () => {
+    const email = fresh();
+
+    const first = await service.register(input(email));
+    const second = await service.register(input(email));
+
+    expect(first.created, 'the first attempt made the account').toBe(true);
+    expect(second.created, 'the second did not').toBe(false);
+    /* The same account, not a new one that happens to share the address. */
+    expect(second.userId).toBe(first.userId);
+
+    const accounts = await db.execute<{ count: string }>(sql`
+      SELECT count(*)::text AS count FROM users
+      WHERE email = ${email} AND deleted_at IS NULL
+    `);
+
+    expect(accounts.rows[0]?.count, 'exactly one row for the address').toBe('1');
   });
 });

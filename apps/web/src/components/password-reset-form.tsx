@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
 
-import { PasswordField, passwordsMatch } from '@safra/ui';
+import { PasswordField, PasswordStrengthMeter, passwordsMatch } from '@safra/ui';
 
 import { reloadInto } from '@/lib/session-navigation';
 
@@ -29,6 +29,8 @@ export function PasswordResetForm({
 }) {
   const t = useTranslations('auth');
 
+  /* Held so the meter can classify it as it is typed — see the note in `AuthForm`. */
+  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -141,8 +143,25 @@ export function PasswordResetForm({
             name="password"
             label={t('newPassword')}
             autoComplete="new-password"
-            hint={t('passwordHint')}
             required
+            onChange={(event) => setPassword(event.target.value)}
+          />
+
+          {/*
+            The same checklist as registration, because this sets a password against the same
+            schema. Without it, the one screen somebody reaches BECAUSE they could not get in would
+            be the one that does not say what a valid password looks like.
+          */}
+          <PasswordStrengthMeter
+            password={password}
+            progressLabel={t('strength')}
+            labels={{
+              length: t('ruleLength'),
+              uppercase: t('ruleUppercase'),
+              lowercase: t('ruleLowercase'),
+              digit: t('ruleDigit'),
+              symbol: t('ruleSymbol'),
+            }}
           />
 
           {/* Never sent: the API takes one password, and the confirmation is a typo guard. */}

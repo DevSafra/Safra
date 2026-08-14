@@ -58,8 +58,9 @@ async function submitBadEmail(page: Page, locale: 'ar' | 'de') {
   await page.locator('input[name=fullName]').fill('اختبار اللغة');
   await field(page, copy.email).fill('not-an-email');
   await page.locator('input[name=phone]').fill('+963912345678');
-  await page.locator('input[name=password]').fill('a-long-passphrase-1');
-  await page.locator('input[name=confirm]').fill('a-long-passphrase-1');
+  await page.locator('select[name=gender]').selectOption('undisclosed');
+  await page.locator('input[name=password]').fill('A-Long-Passphrase-1!');
+  await page.locator('input[name=confirm]').fill('A-Long-Passphrase-1!');
   await page.getByRole('button', { name: copy.createAccount }).click();
 }
 
@@ -464,5 +465,257 @@ test.describe('the legal pages', () => {
     await expect(body).toContainText('safra_session');
     await expect(body).toContainText('safra-theme');
     await expect(body).toContainText('safra_currency');
+  });
+});
+
+/**
+ * A message that interpolates a value must show the VALUE, in every language.
+ *
+ * ## The bug
+ *
+ * The registration form printed «يجب أن تكون كلمة المرور {min} أحرف على الأقل.» — the placeholder
+ * itself, where the number belongs (Bashar, 2026-08-14). Seventeen entries in the error catalogue
+ * carry one, so this was never about passwords.
+ *
+ * Three things had to be true and none was: the API had to send the values alongside the code, the
+ * web proxy — which parses the same schema and refuses BEFORE calling the API, so for a short
+ * password the API is never reached — had to send them too, and the form had to pass them on.
+ *
+ * ## Why a browser test rather than a unit one
+ *
+ * There are unit tests at each layer, and all three could pass while the screen still showed
+ * `{min}`: the shape being right and the sentence being wrong is exactly the state this shipped
+ * in. Only rendering the form answers what a person reads.
+ */
+test.describe('a message that interpolates a value', () => {
+  for (const [locale, expected] of [
+    ['ar', 'كلمة المرور'],
+    ['en', 'Password must be at least'],
+    ['de', 'mindestens'],
+  ] as const) {
+    test(`shows the number, not the placeholder, in ${locale}`, async ({ page }) => {
+      await page.goto(`/${locale}/register`);
+
+      await page.locator('input[name=fullName]').fill('Test');
+      await page
+        .locator('input[name=email]')
+        .fill(`ph-${Math.random().toString(36).slice(2, 10)}@example.test`);
+      await page.locator('input[name=phone]').fill('+963912345678');
+      await page.locator('select[name=gender]').selectOption('undisclosed');
+      await page.locator('input[name=password]').fill('Shortpass1!');
+      await page.locator('input[name=confirm]').fill('Shortpass1!');
+      await page.locator('form button[type=submit]').first().click();
+
+      const error = page.locator('[id$="-error"]').first();
+
+      await expect(error).toBeVisible();
+
+      const text = (await error.textContent()) ?? '';
+
+      /* The value the schema enforces… */
+      expect(text).toContain('12');
+      /* …the sentence in the reader's own language… */
+      expect(text).toContain(expected);
+      /* …and never the raw placeholder, which is what a reader actually saw. */
+      expect(text).not.toMatch(/\{\w+\}/);
+    });
+  }
+
+  /**
+   * The checklist states the length, and nothing else does.
+   *
+   * There used to be a hint under the field reading «١٢ حرفًا على الأقل» in Arabic-Indic digits
+   * while the error below it said «12» — two numeral systems for one number, a line apart, because
+   * the hint was a typed-out copy of a bound the schema owns. Bashar had the hint removed once the
+   * live checklist showed the same requirement (2026-08-14), so there is now exactly one place the
+   * number appears and it is computed.
+   */
+  test('states the length requirement once, in the checklist', async ({ page }) => {
+    await page.goto('/ar/register');
+
+    const lengthChip = page.locator('[data-met]').first();
+
+    await expect(lengthChip).toContainText('12');
+    /* And the removed hint has not come back alongside it. */
+    await expect(page.getByText('الطول أهم من الرموز')).toHaveCount(0);
+  });
+});
+
+/**
+ * A weak password is refused, in the reader's language, before an account exists.
+ *
+ * ## What this guards
+ *
+ * The policy was twelve characters and nothing else, so `aaaaaaaaaaaa` and `Password1234` opened
+ * accounts on a platform holding wallet balances and payout details (Bashar, 2026-08-14). The
+ * checks now live on `passwordSchema`, which every password route shares.
+ *
+ * `password-strength.test.ts` proves the rules. This proves the two things a unit test cannot: that
+ * the refusal survives the round trip through the proxy and the form, and that it arrives as a
+ * sentence somebody can act on rather than as a code or a generic "something went wrong".
+ */
+test.describe('password strength', () => {
+  const register = async (page: Page, password: string) => {
+    await page.goto('/ar/register');
+    await page.locator('input[name=fullName]').fill('اختبار');
+    await page
+      .locator('input[name=email]')
+      .fill(`pw-${Math.random().toString(36).slice(2, 10)}@example.test`);
+    await page.locator('input[name=phone]').fill('+963912345678');
+    await page.locator('select[name=gender]').selectOption('undisclosed');
+    await page.locator('input[name=password]').fill(password);
+    await page.locator('input[name=confirm]').fill(password);
+    await page.locator('form button[type=submit]').first().click();
+  };
+
+  it_refuses('a character held down', 'Aaaaaaaaaa1!', 'validation.password_predictable');
+  it_refuses('a common password', 'Password123!', 'validation.password_common');
+
+  /**
+   * Declared as a helper so each case is its own test rather than a loop that stops at the first
+   * failure — with a shared account and a throttle, knowing which one broke matters.
+   */
+  function it_refuses(what: string, password: string, code: keyof typeof ar) {
+    test(`refuses ${what}, and says why in Arabic`, async ({ page }) => {
+      await register(page, password);
+
+      const error = page.locator('[id$="-error"]').first();
+
+      await expect(error).toBeVisible();
+      /* The catalogue's own sentence — never a code, and never the generic fallback. */
+      await expect(error).toHaveText(ar[code]);
+      /* And no account was made: the form is still the form. */
+      await expect(page).toHaveURL(/\/register/);
+    });
+  }
+
+  /**
+   * A password somebody following the hint would actually choose is accepted.
+   *
+   * Asserted on the CONFIRMATION, not on a redirect. Registration answers 202 and the form swaps
+   * itself for «تحقّق من بريدك الإلكتروني» — it deliberately does not navigate, because the account
+   * is not usable until the address is verified. The first version of this test waited for the URL
+   * to change and failed on a registration that had entirely succeeded.
+   */
+  test('accepts four unrelated words', async ({ page }) => {
+    await register(page, 'مطر أزرق فوق الجبل ٩!');
+
+    await expect(page.getByText(arWeb.auth.checkEmail)).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator('[id$="-error"]')).toHaveCount(0);
+  });
+});
+
+/**
+ * The live strength meter beside the new-password field.
+ *
+ * Asked for by Bashar from a reference design (2026-08-14). What it must do is tick requirements as
+ * they are met, and — the part that matters — agree with what the server enforces. A checklist that
+ * goes green on a password the API then refuses is worse than no checklist: it tells somebody their
+ * password is fine and then rejects it.
+ *
+ * `PASSWORD_RULES` in `@safra/contracts` is the single definition the schema refines against and the
+ * meter renders, so this asserts the visible half of that arrangement.
+ */
+test.describe('the password strength meter', () => {
+  test('ticks each requirement as it is met', async ({ page }) => {
+    await page.goto('/ar/register');
+
+    const chips = page.locator('[data-met]');
+    const met = () => page.locator('[data-met="true"]');
+
+    /* Five requirements, none met, before anything is typed. */
+    await expect(chips).toHaveCount(5);
+    await expect(met()).toHaveCount(0);
+
+    const field = page.locator('input[name=password]');
+
+    /* Lowercase only: one requirement. */
+    await field.fill('abcdefghijkl');
+    await expect(met()).toHaveCount(2);
+
+    /* Adding a capital, a digit and a symbol completes the set. */
+    await field.fill('Abcdefghijk1!');
+    await expect(met()).toHaveCount(5);
+  });
+
+  /**
+   * Arabic satisfies both case rules, because Arabic HAS no case.
+   *
+   * A literal "one uppercase letter" rule cannot be met by «مطر أزرق فوق الجبل», so as drawn it
+   * would have refused every password written in this site's primary language and quietly forced
+   * everybody onto a Latin keyboard. That is a script requirement, not a strength requirement.
+   */
+  test('does not demand a capital letter of a script that has none', async ({ page }) => {
+    await page.goto('/ar/register');
+
+    await page.locator('input[name=password]').fill('مطر أزرق فوق الجبل ٩!');
+
+    await expect(page.locator('[data-met="true"]')).toHaveCount(5);
+  });
+
+  /**
+   * A full checklist is not a promise of acceptance, and must not be drawn as one.
+   *
+   * `Password123!` ticks every box and is still refused, because it is one of the most-guessed
+   * passwords there is. The meter measures the checklist; the blocklist is what keeps the checklist
+   * honest.
+   */
+  test('a complete checklist does not override the blocklist', async ({ page }) => {
+    await page.goto('/ar/register');
+
+    await page.locator('input[name=fullName]').fill('اختبار');
+    await page
+      .locator('input[name=email]')
+      .fill(`m-${Math.random().toString(36).slice(2, 10)}@example.test`);
+    await page.locator('input[name=phone]').fill('+963912345678');
+    await page.locator('select[name=gender]').selectOption('undisclosed');
+    await page.locator('input[name=password]').fill('Password123!');
+    await page.locator('input[name=confirm]').fill('Password123!');
+
+    await expect(page.locator('[data-met="true"]')).toHaveCount(5);
+
+    await page.locator('form button[type=submit]').first().click();
+
+    await expect(page.locator('[id$="-error"]').first()).toHaveText(
+      ar['validation.password_common'],
+    );
+  });
+});
+
+/**
+ * الجنس on the registration form (Bashar, 2026-08-14).
+ *
+ * REQUIRED, and the third option is why that is acceptable: a choice has to be made, but «أفضّل عدم
+ * الإفصاح» is one of the choices rather than a polite way of leaving the field blank. A required
+ * field with only two answers would force somebody to state something untrue about themselves,
+ * which is worse data than none and a poor thing to do besides.
+ */
+test.describe('the gender field', () => {
+  test('must be chosen, and «prefer not to say» is one of the choices', async ({
+    page,
+  }) => {
+    await page.goto('/ar/register');
+
+    const select = page.locator('select[name=gender]');
+
+    await expect(select).toBeVisible();
+    /* Required: nothing is pre-selected, and the placeholder cannot be chosen back. */
+    await expect(select).toHaveValue('');
+    await expect(select).toHaveJSProperty('required', true);
+    await expect(select.locator('option[disabled]')).toHaveCount(1);
+
+    await select.selectOption('undisclosed');
+
+    await page.locator('input[name=fullName]').fill('اختبار');
+    await page
+      .locator('input[name=email]')
+      .fill(`g-${Math.random().toString(36).slice(2, 10)}@example.test`);
+    await page.locator('input[name=phone]').fill('+963912345678');
+    await page.locator('select[name=gender]').selectOption('undisclosed');
+    await page.locator('input[name=password]').fill('A-Long-Passphrase-1!');
+    await page.locator('input[name=confirm]').fill('A-Long-Passphrase-1!');
+    await page.locator('form button[type=submit]').first().click();
+
+    await expect(page.getByText(arWeb.auth.checkEmail)).toBeVisible({ timeout: 20_000 });
   });
 });

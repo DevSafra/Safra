@@ -161,6 +161,8 @@ export class AuthService {
           email: input.email,
           phone: input.phone,
           preferredLocale: input.preferredLocale,
+          /* Required by the schema, so it is always a choice the person actually made. */
+          gender: input.gender,
           isGuest: false,
         })
         .returning({ id: schema.customerProfiles.id });

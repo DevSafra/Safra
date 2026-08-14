@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
-import { PasswordField, passwordsMatch } from '@safra/ui';
+import { PasswordField, PasswordStrengthMeter, passwordsMatch } from '@safra/ui';
 import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
@@ -44,6 +44,14 @@ export function AuthForm({
 }) {
   const t = useTranslations('auth');
 
+  /*
+    Held so the strength meter can classify it as it is typed.
+
+    In STATE rather than read from the DOM, because the meter re-renders on every keystroke and
+    React is what drives that. It is never persisted, never put in a ref that outlives the form and
+    never sent separately — submission still reads `FormData`, exactly as before.
+  */
+  const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   /** Registration succeeded — the same screen whether or not the address was already taken. */
   const [sent, setSent] = useState(false);
@@ -86,6 +94,7 @@ export function AuthForm({
             password: text(form, 'password'),
             fullName: text(form, 'fullName'),
             phone: text(form, 'phone'),
+            gender: text(form, 'gender'),
             preferredLocale: locale,
           };
 
@@ -189,6 +198,43 @@ export function AuthForm({
         required
       />
 
+      {/*
+        Required (Bashar, 2026-08-14) — a choice must be made, and «أفضّل عدم الإفصاح» is one of the
+        choices rather than a way of leaving it blank.
+
+        The empty option is kept and `required` is set on the select, so the field starts with
+        nothing pre-selected and the browser refuses to submit until something is picked. Defaulting
+        to a value instead would record an answer nobody gave, which is the failure a required field
+        is supposed to prevent — and `disabled` on the placeholder stops it being chosen back.
+      */}
+      {mode === 'register' ? (
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="field-gender" className="text-sm text-muted">
+            {t('gender')} <span className="text-gold">*</span>
+          </label>
+          <select
+            id="field-gender"
+            name="gender"
+            defaultValue=""
+            required
+            aria-invalid={fieldErrors['gender'] ? 'true' : undefined}
+            className={`min-h-10 cursor-pointer rounded-lg border bg-field px-3 py-2.5 text-text lg:min-h-0 ${
+              fieldErrors['gender'] ? 'border-bad' : 'border-line'
+            }`}
+          >
+            <option value="" disabled>
+              {t('genderChoose')}
+            </option>
+            <option value="male">{t('genderMale')}</option>
+            <option value="female">{t('genderFemale')}</option>
+            <option value="undisclosed">{t('genderUndisclosed')}</option>
+          </select>
+          {fieldErrors['gender'] ? (
+            <span className="text-xs text-bad">{fieldErrors['gender']}</span>
+          ) : null}
+        </div>
+      ) : null}
+
       {mode === 'register' ? (
         <Field
           name="phone"
@@ -211,10 +257,31 @@ export function AuthForm({
         // "new-password" tells a password manager to OFFER one on registration and
         // not to autofill the existing one; "current-password" does the opposite.
         autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
-        hint={mode === 'register' ? t('passwordHint') : undefined}
         error={fieldErrors['password']}
         required
+        onChange={(event) => setPassword(event.target.value)}
       />
+
+      {/*
+        The live checklist, on REGISTRATION only.
+        
+        On sign-in it would be noise at best and a hint at worst: the password already exists, the
+        rules cannot change it, and drawing attention to which ones it fails would tell whoever is
+        looking at the screen something about somebody else's password.
+      */}
+      {mode === 'register' ? (
+        <PasswordStrengthMeter
+          password={password}
+          progressLabel={t('strength')}
+          labels={{
+            length: t('ruleLength'),
+            uppercase: t('ruleUppercase'),
+            lowercase: t('ruleLowercase'),
+            digit: t('ruleDigit'),
+            symbol: t('ruleSymbol'),
+          }}
+        />
+      ) : null}
 
       {/*
         Register only, and never sent: `registerSchema` takes one password, and a second field would
@@ -343,7 +410,7 @@ function applyError(
 
       for (const entry of record['errors']) {
         if (typeof entry === 'object' && entry !== null && 'field' in entry) {
-          const item = entry as { field?: unknown; code?: unknown };
+          const item = entry as { field?: unknown; code?: unknown; params?: unknown };
           if (typeof item.field === 'string') {
             /*
               Read `code`, never `message`.
@@ -353,9 +420,17 @@ function applyError(
               input, which made the one place on the page where wording matters most the one
               place that ignored the reader's language.
             */
+            /*
+              The PARAMS travel with the code, and the message is nothing without them.
+
+              Seventeen catalogue entries interpolate a value. Resolving one without it printed the
+              placeholder to the reader — «يجب أن تكون كلمة المرور {min} أحرف على الأقل.» on this
+              very form (Bashar, 2026-08-14). The API now sends them; this passes them on.
+            */
             mapped[item.field] = errorMessage(
               typeof item.code === 'string' ? item.code : null,
               locale,
+              asParams(item.params),
             );
           }
         }
@@ -382,7 +457,9 @@ function applyError(
     const code = (body as { code?: unknown }).code;
 
     if (isErrorCode(code)) {
-      setFormError(errorMessage(code, locale));
+      setFormError(
+        errorMessage(code, locale, asParams((body as { params?: unknown }).params)),
+      );
       return;
     }
   }
@@ -408,4 +485,25 @@ function applyError(
   }
 
   setFormError(t('genericError'));
+}
+
+/**
+ * The `params` an error body carries, narrowed to what `errorMessage` will interpolate.
+ *
+ * A response body is caller-supplied data, so this validates rather than casts: an object of
+ * strings and numbers, or nothing. Anything else — a nested object, an array, a function smuggled
+ * through some future serialiser — is dropped, and the message falls back to the generic one rather
+ * than interpolating something unexpected into a sentence a person reads.
+ */
+function asParams(value: unknown): Record<string, string | number> | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return undefined;
+
+  const params: Record<string, string | number> = {};
+
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === 'string' || typeof item === 'number') params[key] = item;
+  }
+
+  return Object.keys(params).length > 0 ? params : undefined;
 }

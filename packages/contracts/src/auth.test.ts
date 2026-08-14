@@ -67,7 +67,11 @@ describe('profileUpdateSchema', () => {
 });
 
 describe('passwordChangeSchema', () => {
-  const valid = { currentPassword: 'the-old-one-12', newPassword: 'a-brand-new-one-13' };
+  /*
+    Both meet the composition checklist — uppercase, lowercase, digit, symbol, twelve characters.
+    This suite is about the SHAPE of the change request, so the passwords must not be what fails.
+  */
+  const valid = { currentPassword: 'The-Old-One-12', newPassword: 'A-Brand-New-One-13' };
 
   it('accepts a current password and a compliant new one', () => {
     expect(passwordChangeSchema.safeParse(valid).success).toBe(true);
@@ -86,7 +90,7 @@ describe('passwordChangeSchema', () => {
 
   it('applies the same length policy as registration', () => {
     const result = passwordChangeSchema.safeParse({
-      currentPassword: 'the-old-one-12',
+      currentPassword: 'The-Old-One-12',
       newPassword: 'short',
     });
 
@@ -123,9 +127,10 @@ describe('passwordChangeSchema', () => {
    * would mean the password somebody typed is not the one that was stored.
    */
   it('keeps surrounding whitespace in a password', () => {
-    const padded = '  a padded passphrase  ';
+    /* Uppercase, digit and symbol, so the COMPOSITION rules are met and whitespace is the subject. */
+    const padded = '  A Padded Passphrase 9!  ';
     const result = passwordChangeSchema.safeParse({
-      currentPassword: 'the-old-one-12',
+      currentPassword: 'The-Old-One-12',
       newPassword: padded,
     });
 

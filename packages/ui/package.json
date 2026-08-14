@@ -26,5 +26,8 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist"
-  ]
+  ],
+  "dependencies": {
+    "@safra/contracts": "workspace:*"
+  }
 }
