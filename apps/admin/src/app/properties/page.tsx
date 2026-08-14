@@ -162,7 +162,15 @@ const columns = (back: string): readonly AdminColumn<PropertyListItem>[] => [
   {
     key: 'type',
     header: t.table.colType,
-    render: (row) => <span className="text-text2">{row.propertyType}</span>,
+    /*
+      The word, not the code. This column printed «rural_house» and «apartment» down an otherwise
+      Arabic table (Bashar, 2026-08-14). The API sends `property_types.code` and that is right —
+      the code is the stable thing — so the console resolves it here, the same way it resolves
+      every other enum it displays.
+    */
+    render: (row) => (
+      <span className="text-text2">{label(t.enums.propertyType, row.propertyType)}</span>
+    ),
   },
   {
     key: 'city',

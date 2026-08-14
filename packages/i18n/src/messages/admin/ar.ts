@@ -1109,6 +1109,34 @@ export const ar = {
   },
 
   /**
+   * What an audit entry was ABOUT — `audit_log.subject_type`.
+   *
+   * The action was translated in 2026-08-04 and the subject beside it was not, so السجل and
+   * الموظفون printed «booking_export» and «customer_profile» in Latin under an Arabic action
+   * (found 2026-08-14 by the console's own sweep, after Bashar reported the same class of defect
+   * on العقارات). Fourteen values, matching every `subject_type` present in the database.
+   *
+   * Same contract as `auditAction`: the stored value is a machine identifier and part of the
+   * evidence, so it is translated HERE and never at the source.
+   */
+  auditSubject: {
+    booking: 'حجز',
+    booking_export: 'تصدير حجوزات',
+    customer_profile: 'ملف عميل',
+    fx_rate: 'سعر صرف',
+    gift_card: 'بطاقة هدية',
+    partner: 'شريك',
+    partner_payout: 'مستحقات شريك',
+    property: 'عقار',
+    property_image: 'صورة عقار',
+    review: 'تقييم',
+    setting: 'إعداد',
+    unit: 'وحدة',
+    user: 'مستخدم',
+    wallet: 'محفظة',
+  } as Record<string, string>,
+
+  /**
    * Audit actions, so the activity panel is not a list of English identifiers.
    *
    * Keyed on the value stored in `audit_log.action`, which is a machine identifier and part
@@ -1159,6 +1187,53 @@ export const ar = {
    * an empty cell reads as "no value" and is a lie.
    */
   enums: {
+    /**
+     * `property_types.code`. The seven kinds of listing SAFRA takes.
+     *
+     * The registry's النوع column and the detail screen's subtitle both printed the CODE —
+     * «rural_house», «chalet» — down an otherwise Arabic table (Bashar, 2026-08-14). The same
+     * seven words are in `partner/ar.ts`; they are here rather than shared because a console
+     * vocabulary and a partner-facing one are free to diverge in register, and because the two
+     * packages' catalogues have never imported from one another.
+     *
+     * `property_types` also carries `name_ar` in the database, and the API could have sent that
+     * instead. It sends the CODE on purpose: a code is stable, a name is copy, and the project's
+     * rule is that the API answers with the former and the reader's own surface resolves it.
+     */
+    propertyType: {
+      hotel: 'فندق',
+      apartment: 'شقة مفروشة',
+      villa: 'فيلا',
+      farm: 'مزرعة',
+      chalet: 'شاليه',
+      rural_house: 'بيت ريفي',
+      camp: 'مخيم',
+    },
+
+    /**
+     * `TRIP_ATTRIBUTES` from `@safra/contracts` — what a listing is good for.
+     *
+     * Rendered on the detail screen as chips, and until 2026-08-14 rendered as
+     * `attribute.replace(/_/g, ' ')`, which is the exact expression the status rule names as
+     * forbidden. It produced «internet», «business», «history» in Latin on an Arabic screen.
+     *
+     * Ten entries, matching the contract exactly. The customer app has had the same ten in
+     * `web/*.json` under `attributes` since search shipped — this is the console catching up, not
+     * new copy.
+     */
+    tripAttribute: {
+      sea: 'بحر',
+      mountain: 'جبل',
+      history: 'تاريخ',
+      nature: 'طبيعة',
+      families: 'عائلات',
+      honeymoon: 'شهر عسل',
+      pool: 'مسبح',
+      parking: 'موقف سيارات',
+      internet: 'إنترنت',
+      business: 'أعمال',
+    },
+
     /** `export_status`. Four words, four colours — the rule that no two share either. */
     exportStatus: {
       queued: 'في الانتظار',

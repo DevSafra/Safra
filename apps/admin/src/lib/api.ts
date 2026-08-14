@@ -253,6 +253,7 @@ const propertyDetailSchema = z.object({
   ),
   units: z.array(
     z.object({
+      nameAr: z.string(),
       nameEn: z.string(),
       maxGuests: z.number(),
       basePrice: z.string(),

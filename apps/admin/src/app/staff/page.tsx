@@ -7,7 +7,7 @@ import { TablePagination } from '@/components/table-pagination';
 import { FootNote, Ltr } from '@/components/admin-table';
 import { StaffAdmin } from '@/components/staff-admin';
 import { ScopePanel } from '@/components/scope-panel';
-import { auditAction, fill, roleName, t } from '@/lib/strings';
+import { auditAction, auditSubject, fill, roleName, t } from '@/lib/strings';
 import { pageNumber, pageSize } from '@/lib/search-params';
 import { listParamsFor } from '@/lib/table-size';
 
@@ -284,7 +284,9 @@ function Activity({ rows }: { rows: StaffOverview['activity'] }) {
                 {row.actor ?? t.admin.systemActor}
               </span>
               <span className="text-text2">{auditAction(row.action)}</span>
-              <span className="text-[11px] text-faint">{row.subjectType}</span>
+              <span className="text-[11px] text-faint">
+                {auditSubject(row.subjectType)}
+              </span>
               <Ltr className="ms-auto text-[11px] text-faint">
                 {shortDateTime(row.at)}
               </Ltr>

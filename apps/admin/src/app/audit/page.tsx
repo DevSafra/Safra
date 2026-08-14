@@ -5,7 +5,7 @@ import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import { AdminTable, Ltr, type AdminColumn } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { t, auditAction, roleName } from '@/lib/strings';
+import { t, auditAction, auditSubject, roleName } from '@/lib/strings';
 import { pageNumber } from '@/lib/search-params';
 import { resolvePageSize } from '@/lib/table-size';
 
@@ -198,7 +198,7 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
     */
     render: (row) => (
       <div className="grid gap-0.5">
-        <span className="text-[11px] text-faint">{row.subjectType}</span>
+        <span className="text-[11px] text-faint">{auditSubject(row.subjectType)}</span>
         {row.subjectId ? (
           <Ltr className="text-[10.5px] text-sky">{row.subjectId.slice(0, 8)}</Ltr>
         ) : null}

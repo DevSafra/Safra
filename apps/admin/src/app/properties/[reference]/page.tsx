@@ -48,17 +48,25 @@ export default async function PropertyPage({
     <Shell back={back}>
       <header>
         <p className="text-xs text-faint">{property.reference}</p>
-        <h1 className="mt-1 text-2xl font-semibold text-text">
-          {property.nameEn ?? property.nameAr}
-        </h1>
+        {/*
+          The ARABIC name, not `nameEn ?? nameAr`.
+
+          This is the Arabic-only console and the registry it was opened from lists `nameAr`, so
+          the English name here meant the heading did not match the row that was clicked (Bashar,
+          2026-08-14). `nameAr` is `NOT NULL` in the database, so there is nothing to fall back to
+          and nothing to lose.
+        */}
+        <h1 className="mt-1 text-2xl font-semibold text-text">{property.nameAr}</h1>
         {/*
           Arabic city name first, and the status through the catalogue rather than the raw enum
           spaced out — this line read «apartment · Damascus · pending review» on an Arabic screen
-          (Bashar, 2026-08-06). The status also gets the registry's pill, so العقارات and this
+          (Bashar, 2026-08-06). The TYPE was the half of that left unfixed: it still printed the
+          code until 2026-08-14. The status also gets the registry's pill, so العقارات and this
           screen cannot disagree about its colour.
         */}
         <p className="mt-1 text-sm text-muted">
-          {property.propertyType.code} · {property.city.nameAr ?? property.city.nameEn}
+          {label(t.enums.propertyType, property.propertyType.code)} ·{' '}
+          {property.city.nameAr ?? property.city.nameEn}
         </p>
         <p className="mt-2">
           <StatusPill tone={statusTone(property.status)}>
@@ -127,8 +135,14 @@ export default async function PropertyPage({
         </dl>
 
         {property.descriptionAr || property.descriptionEn ? (
+          /*
+            Arabic first, English only when the partner wrote no Arabic. It was the other way
+            round, so an operator reviewing a listing read its English copy on an Arabic screen —
+            and the description is the thing being REVIEWED, so reading a different version of it
+            from the one a customer will see is not a cosmetic difference.
+          */
           <p className="mt-3 whitespace-pre-wrap rounded-lg border border-line bg-card p-4 text-sm text-muted">
-            {property.descriptionEn ?? property.descriptionAr}
+            {property.descriptionAr ?? property.descriptionEn}
           </p>
         ) : (
           <p className="mt-3 text-sm text-faint">
@@ -143,7 +157,14 @@ export default async function PropertyPage({
                 key={attribute}
                 className="rounded-full border border-line bg-field px-2.5 py-0.5 text-xs text-muted"
               >
-                {attribute.replace(/_/g, ' ')}
+                {/*
+                  `label()`, not `replace(/_/g, ' ')` — the expression the status rule names as
+                  forbidden, and this is what it looked like: «internet business history» in Latin
+                  on an Arabic screen (Bashar, 2026-08-14). `label` still falls back to the raw
+                  value, so an attribute added to the contract and not to the catalogue shows as an
+                  obvious gap rather than as a blank chip.
+                */}
+                {label(t.enums.tripAttribute, attribute)}
               </li>
             ))}
           </ul>
@@ -185,10 +206,15 @@ export default async function PropertyPage({
           <ul className="grid gap-2 text-sm">
             {property.units.map((unit) => (
               <li
-                key={unit.nameEn}
+                /*
+                  Keyed on the ARABIC name, which is what is displayed. A key taken from a field
+                  the list does not show is a key that can collide while the screen looks fine —
+                  two rooms may share an English name and differ in Arabic.
+                */
+                key={unit.nameAr}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-card px-4 py-3"
               >
-                <span className="text-text">{unit.nameEn}</span>
+                <span className="text-text">{unit.nameAr}</span>
                 <span className="text-xs text-faint">
                   {plural(t.sections.propertyDetail.unitLine, {
                     guests: unit.maxGuests,

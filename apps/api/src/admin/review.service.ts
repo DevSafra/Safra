@@ -128,8 +128,21 @@ export class ReviewService {
         images: {
           columns: { fileKey: true, width: true, height: true, isCover: true },
         },
+        /*
+          `nameAr` as well as `nameEn`. The console is Arabic-only and was listing every room by
+          its ENGLISH name under an Arabic heading (Bashar, 2026-08-14). Both are sent rather than
+          only the Arabic: `units.name_ar` is `NOT NULL`, so the console needs nothing else, but
+          this projection is the staff view of a listing under review and the English name is part
+          of what is being reviewed.
+        */
         units: {
-          columns: { nameEn: true, maxGuests: true, basePrice: true, minNights: true },
+          columns: {
+            nameAr: true,
+            nameEn: true,
+            maxGuests: true,
+            basePrice: true,
+            minNights: true,
+          },
         },
       },
     });

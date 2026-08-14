@@ -232,6 +232,7 @@ test.describe('console navigation', () => {
     const sameScreen: string[] = [];
     const latin: string[] = [];
     const stretched: string[] = [];
+    const codes: string[] = [];
 
     for (const section of SECTIONS) {
       await page.goto(section);
@@ -255,6 +256,33 @@ test.describe('console navigation', () => {
           };
         }),
       );
+
+      /*
+        No snake_case ANYWHERE on the screen, not only inside a pill.
+
+        REGRESSION (Bashar, 2026-08-14). The pill check above has caught untranslated statuses
+        since 2026-08-06, and the same defect was sitting in plain text beside them: العقارات
+        printed «rural_house» down its النوع column and the detail screen's chips read «internet
+        business history». Neither is a pill, so neither was looked at.
+
+        The shape is the test. `a_b` is not a word in Arabic, English or German; every slug in the
+        database is hyphenated (asserted at zero rows on 2026-08-14) and every reference is
+        upper-case with digits. So a lower-case run joined by underscores, standing alone as an
+        element's entire text, is a code that reached a reader — there is nothing else it can be.
+
+        Single-word codes — «hotel», «internet» — are NOT caught by this and cannot be: they are
+        indistinguishable from English by shape. The pill check covers them where they are pills,
+        and beyond that the guard is the catalogue, not the sweep. Said out loud so the next person
+        does not read a green run as proof of more than it shows.
+      */
+      const leaked = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('body *'))
+          .filter((element) => element.children.length === 0)
+          .map((element) => (element.textContent ?? '').trim())
+          .filter((text) => /^[a-z]+(?:_[a-z]+)+$/.test(text)),
+      );
+
+      for (const text of new Set(leaked)) codes.push(`${section}: ${text}`);
 
       for (const pill of pills) {
         if (!pill.text) continue;
@@ -321,6 +349,7 @@ test.describe('console navigation', () => {
     expect(clashes).toStrictEqual([]);
     expect(sameScreen).toStrictEqual([]);
     expect(stretched).toStrictEqual([]);
+    expect(codes).toStrictEqual([]);
 
     // A sweep that found no pills would pass while proving nothing.
     expect(seen.size).toBeGreaterThan(5);

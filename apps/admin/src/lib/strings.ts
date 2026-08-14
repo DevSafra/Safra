@@ -128,6 +128,18 @@ export function auditAction(action: string): string {
   return t.auditAction[action] ?? action.replace(/[._]/g, ' ');
 }
 
+/**
+ * What an audit entry was about — `audit_log.subject_type`.
+ *
+ * Its own function rather than `label()` for one reason: `label` answers «—» for an absent value,
+ * which is right in a table CELL and wrong here, where the subject sits inline beside the action
+ * and an em dash would read as part of the sentence. An unnamed subject falls back to its key,
+ * the same contract `auditAction` has.
+ */
+export function auditSubject(subjectType: string): string {
+  return t.auditSubject[subjectType] ?? subjectType.replace(/_/g, ' ');
+}
+
 /** The Arabic name for a role, falling back to the raw value rather than blank. */
 export function roleName(role: string | undefined): string {
   if (!role) return '';
