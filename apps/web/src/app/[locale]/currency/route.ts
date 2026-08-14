@@ -43,6 +43,23 @@ export async function POST(
   const { locale } = await params;
   const home = isLocale(locale) ? `/${locale}` : '/';
 
+  /*
+    Same-origin only.
+
+    This endpoint takes no session, so `SameSite` on the session cookie does not protect it: a form
+    on another site could POST here and change a visitor's display currency. The impact is small —
+    it is a preference, not money — but a state-changing endpoint that accepts a cross-site
+    submission is the shape of a CSRF, and refusing one costs a header comparison.
+
+    `Origin` is sent on every cross-origin POST by every browser that matters, and same-origin
+    requests either send it or send none at all; a missing header is therefore accepted.
+  */
+  const origin = request.headers.get('origin');
+
+  if (origin && origin !== new URL(request.url).origin) {
+    return new Response('Cross-site request refused.', { status: 403 });
+  }
+
   const form = await request.formData();
   const chosen = form.get('currency');
   const next = form.get('next');

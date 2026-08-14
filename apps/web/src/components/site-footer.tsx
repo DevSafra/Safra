@@ -56,11 +56,23 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
   ]);
 
   /*
-    Set by the middleware, because a server component cannot ask Next for the pathname. The fallback
-    is the locale root — a switcher that loses the page is worse than the header's was, but a
-    switcher that throws is worse than both.
+    Set by the middleware, because a server component cannot ask Next for the pathname.
+
+    VALIDATED, because on some paths it is not the middleware's. The matcher excludes anything
+    containing a dot — `/((?!api|_next|_vercel|.*\..*).*)` — so a request for a slug with a dot in
+    it renders this footer with whatever header the CLIENT sent. Nothing exploitable was reachable
+    through it (the currency route re-validates `next`, and `swapLocale` cannot produce an
+    off-origin path), but a value that arrives from a request and is used to build a link is not
+    something to leave resting on two other functions being careful.
+
+    One leading slash, no second one, no backslash: the same shape the currency route enforces on
+    the way back in. Anything else falls back to the locale root.
   */
-  const pathname = requestHeaders.get('x-safra-pathname') ?? `/${locale}`;
+  const forwarded = requestHeaders.get('x-safra-pathname') ?? '';
+  const pathname =
+    forwarded.startsWith('/') && !forwarded.startsWith('//') && !forwarded.includes('\\')
+      ? forwarded
+      : `/${locale}`;
 
   const symbolOf = (code: string) =>
     currencies.find((currency) => currency.code === code)?.symbol ?? code;

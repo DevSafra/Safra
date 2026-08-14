@@ -287,7 +287,15 @@ export class StaffService {
 
     await this.tokens.revokeAllForUser(userId);
 
-    this.logger.log(`Staff ${target.email}: ${target.role} → ${role} by ${actor?.sub}.`);
+    /*
+      The user ID, not the email address.
+
+      Rule 1: never log full PII. Every other line in this codebase logs `user.id` and this one
+      logged an address — which puts a staff member's email into log aggregation, backups and
+      whatever ships them onward, for no operational gain. The id answers "who" for anybody who can
+      already query the table, and tells a log reader nothing about a person.
+    */
+    this.logger.log(`Staff ${userId}: ${target.role} → ${role} by ${actor?.sub}.`);
   }
 
   /** Suspends or reinstates an account. Suspension revokes sessions at once. */
