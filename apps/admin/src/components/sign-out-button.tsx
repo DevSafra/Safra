@@ -37,7 +37,16 @@ export function SignOutButton() {
       type="button"
       onClick={() => void signOut()}
       disabled={busy}
-      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-sm text-muted transition-colors hover:border-gold/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-60"
+      /*
+        `flex-1` and centred, so it fills the sidebar's width beside the 40px theme toggle — the
+        shape لوحة الشريك already had, and what Bashar asked the console to match (2026-08-14).
+
+        It was `inline-flex` with no grow, so it hugged its two words and left a ragged gap to the
+        end of the column: the one control at the foot of a full-width nav, not reaching either
+        edge of it. The button is the only place this lives, so the sizing is here rather than in
+        a wrapper — there is no second caller to surprise.
+      */
+      className="flex min-h-10 flex-1 cursor-pointer items-center justify-center rounded-lg border border-line px-4 py-2 text-sm text-muted transition-colors hover:border-gold/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-60"
     >
       {busy ? t.dashboard.signingOut : t.dashboard.signOut}
     </button>
