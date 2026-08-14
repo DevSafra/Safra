@@ -14,7 +14,7 @@ import {
 
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { redactContactDetails } from '../messaging/redaction.js';
+import { redactIncomingMessage } from '../messaging/redaction.js';
 import { badRequest, notFound, unauthorized } from '../common/errors/app-error.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -209,7 +209,7 @@ export class SupportService {
     body: string,
   ): Promise<SupportThread> {
     const asker = this.askerOf(claims);
-    const redacted = redactContactDetails(body);
+    const redacted = redactIncomingMessage(body);
 
     const created = await this.db.transaction(async (tx) => {
       const rows = await tx.execute<{ id: string; reference: string }>(sql`
@@ -269,7 +269,7 @@ export class SupportService {
     /* A closed thread is read-only. Reopening it silently would hide the fact that staff ended it. */
     if (row.closed_at !== null) throw badRequest(ERROR.SUPPORT_TICKET_CLOSED);
 
-    const redacted = redactContactDetails(body);
+    const redacted = redactIncomingMessage(body);
 
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`

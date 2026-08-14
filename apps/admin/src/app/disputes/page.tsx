@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { renderRedactions } from '@safra/i18n';
+
 import { getDisputes, type DisputeItem, type Disputes } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { amount, count, shortDateTime } from '@/lib/format';
@@ -194,7 +196,10 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
             ) : null}
           </div>
 
-          <p className="mt-1.5 text-[13px] font-semibold text-text">{dispute.title}</p>
+          {/* The title is redacted on the way in, so it is rendered on the way out. */}
+          <p className="mt-1.5 text-[13px] font-semibold text-text">
+            {renderRedactions(dispute.title, 'ar')}
+          </p>
 
           {/* Back from the booking returns to النزاعات, the list the reader is actually in. */}
           <p className="mt-1 text-[11.5px] text-faint">

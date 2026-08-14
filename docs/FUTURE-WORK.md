@@ -395,20 +395,49 @@ missing key; registering it in `admin.ts` and changing one line in `apps/admin/s
 completes it. Placeholder type-checking then hands over to the completeness tests —
 `docs/i18n.md` §6.
 
-### O-i18n-2 — The redaction mask cannot follow the reader's locale
+### O-i18n-2 — Closed: the redaction mask now follows the reader
 
-**What:** `contentMessages().redactionMask` (`⟨محجوب⟩`) is written INTO the stored message body
-when a phone number is removed, so a German customer reading a redacted thread sees Arabic.
+**Status:** FIXED 2026-08-14 · **Owner:** **Bashar** · **Recorded:** 2026-08-07
 
-**Why:** redaction happens on the way into the database, where "whose language" has no answer yet.
-There is one stored string and three possible readers.
+**What it was:** `contentMessages().redactionMask` (`⟨محجوب⟩`) was written INTO the stored message
+body when a phone number was removed, because redaction happens on the way into the database where
+"whose language" has no answer yet. One stored string, three possible readers — a German customer
+opening a thread a Syrian partner had written read Arabic.
 
-**What unblocks it:** a decision to store a marker token and substitute on read. The Arabic,
-English and German masks are already written, so this becomes a rendering change rather than also
-a translation one.
+**What was built,** exactly the design this entry proposed: the row stores `REDACTION_TOKEN`
+(`⟦…⟧`), and `renderRedactions(body, locale)` resolves it to the reader's own word at the point of
+display. Six surfaces call it — the customer's support thread and disputes, the partner's thread,
+the console's inbox, disputes and الاتصالات. Proven in a browser: one ticket carrying `0955123456`,
+opened once, read back in all three locales, each showing its own mask with neither the token nor
+the number recoverable.
 
-**Effort:** small — one substitution point in the message-rendering path, plus a decision about
-already-stored bodies.
+**Four things worth not rediscovering.**
+
+**The token is punctuation, and that is load-bearing.** `⟦…⟧` matches none of the redaction
+patterns, which is what keeps `redactContactDetails` idempotent. It is also the fallback rendering:
+a display path that forgets to call `renderRedactions` shows "something is missing here" in no
+language rather than the wrong one.
+
+**Old bodies are NOT migrated, and never will be.** `messages` is append-only — `deny_mutation`
+raises on UPDATE — so `LEGACY_MASKS` is permanent, not transitional. Those rows are evidence in a
+dispute, and rewriting them to render more nicely is what the append-only guarantee exists to
+refuse.
+
+**Stripping forged markers had to move OUT of the redactor.** A writer pasting the token would
+otherwise have it rendered as a mask the platform never wrote. Stripping inside
+`redactContactDetails` broke its idempotence — on a second pass the marker in the text is our own,
+so it un-redacted the message. Caught by the existing idempotence test. The strip lives in
+`redactIncomingMessage`, which is what a service calls at the boundary, exactly once.
+
+**The count is derived in SQL and had the old mask spelled out.** `dispute-request.service.ts`
+recomputes "how many spans were removed" from the text rather than storing a counter that could
+drift. It bound `'⟨محجوب⟩'` as a literal, so on the day the token arrived every dispute reported
+zero and the notice silently stopped appearing — the text redacted correctly, the sentence saying
+so gone. Now summed over `REDACTION_MARKERS` as bound parameters. **Caught by `pnpm e2e`, not by
+any unit test**, which is the argument for running it.
+
+**Tested:** 35 unit tests in `redaction.test.ts`, including the three-locale render, the legacy
+mask, the forged marker, and the idempotence property that caught the mistake above.
 
 ### O-test-1 — `fx-rate.integration.test.ts`: cause identified and fixed 2026-08-11
 
@@ -2682,6 +2711,9 @@ Kept because the reason something was blocked is often the reason it returns.
 
 | Date       | Item                                                                                         | Resolution                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-14 | **O-i18n-2** — a German customer read Arabic where a number was masked                       | The row now stores a language-neutral token and each surface renders the reader's own word. Three traps behind it, all found by tests rather than review: stripping forged markers inside the redactor un-redacted messages on a second pass; the dispute count is derived in SQL and had the Arabic mask as a literal, so every "N details masked" notice silently went to zero; and old bodies cannot be migrated at all, because `messages` is append-only by trigger. See §5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| 2026-08-14 | Codes reaching readers as words — property types, trip attributes, audit subjects, roles     | Bashar reported «rural_house» down العقارات and «internet business history» as chips. Four vocabularies were missing and one render site used `attribute.replace(/_/g, ' ')`, the expression the status rule names as forbidden. The staff INVITATION had the same defect in email: every language named the role in English. `navigation.spec.ts` now sweeps every leaf element on all nineteen sections for snake_case, which immediately found two more — `booking_export` on السجل and الموظفون — that no screenshot had caught                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 2026-08-14 | Status pills stretched to their whole column                                                 | `StatusPill` was `inline-block`, which a grid or flex parent overrides with `justify-self: stretch`; several cells wrap it in a `<div class="grid">` to stack a note under it, so the pill filled the الحالة column and read as an empty input. `w-fit` on the component, and the console sweep now measures every pill against its own text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 2026-08-13 | Background jobs ran in requests or on unretried crons                                        | **O-notify-2, phases 1–6.** Five queues declared, four live: `mail`, `media`, `scheduled` and `exports`. Image encoding and CSV building left the request path — which removed a 20,000-row export truncation that existed only because the file was built inline — the five recurring jobs became repeatable queue jobs with retries and a dead letter, and the `@Cron` decorators are gone. Three of those five had never written a `scheduled_job_runs` row, including the SLA sweep, so the job whose silence costs customers their §6.4 compensation was the one alerting could not see. `webhooks` is deliberately not built: nothing sends an outbound webhook                                                                                                                                                                                                                                                                                                                                                                                                      |
 | 2026-08-13 | A lost queue was detectable but not re-drivable                                              | The recovery half of **O-notify-2**, and a precondition of launch blocker 2 — a restore drill that cannot re-drive has been performed rather than passed. `booking.needs_action` is rebuilt in full from its `booking_id`; the other three templates cannot be, because a `notifications` row deliberately holds no recipient, subject or body, so they are re-driven as a notice saying something is waiting and linking to the screen it is on. Runs every five minutes on the `scheduled` queue. Verified against the 34 notices stranded by the phase-2 job-id defect: all 34 found, rebuilt and delivered                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 2026-08-13 | Remaining 11 of the 18 §9.3 admin sections                                                   | **The row was wrong, not the work.** All eighteen have been built for some time — each queries its own registry, pages it with `TablePagination` and paints its statuses through `statusTone`, and `navigation.spec.ts` sweeps every one of them. The register and a comment in `admin-sidebar.tsx` both still described a seven-built console, which is the kind of staleness that costs real time: it reads as a backlog and invites somebody to plan work that exists                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |

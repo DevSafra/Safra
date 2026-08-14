@@ -23,7 +23,7 @@
  * a rule, it is a different database column holding the same phone number.
  */
 
-import { contentMessages } from '@safra/i18n';
+import { REDACTION_TOKEN, stripRedactionMarkers } from '@safra/i18n';
 
 /**
  * Patterns, each anchored to something structural rather than to length alone.
@@ -74,13 +74,17 @@ const PATTERNS: readonly { readonly name: string; readonly pattern: RegExp }[] =
 ] as const;
 
 /**
- * What replaces a removed span. Visible on purpose: the recipient must see it happened.
+ * What replaces a removed span: a language-neutral TOKEN, not a word.
  *
- * Read from the `content` catalogue at `DEFAULT_LOCALE`, because this is baked into the stored
- * message rather than rendered per reader — see `@safra/i18n/content.ts` for why that is its own
- * category, and what it costs a German customer reading an Arabic thread.
+ * It used to be `contentMessages().redactionMask` — the Arabic «⟨محجوب⟩», because redaction happens
+ * on the way into the database, where there is no reader to have a language. One stored string,
+ * three possible readers, and a German customer opening a thread read Arabic (`O-i18n-2`).
+ *
+ * The token is stored; `renderRedactions` turns it into the reader's own word at the point of
+ * display. Nothing else here changes: the original is still discarded, and the count is still what
+ * the notice above a thread is built from.
  */
-const MASK = contentMessages().redactionMask;
+const MASK = REDACTION_TOKEN;
 
 export interface Redaction {
   /** The message as it will be stored and shown. */
@@ -92,8 +96,9 @@ export interface Redaction {
 /**
  * Removes contact details from a message body.
  *
- * Idempotent: running it on already-redacted text changes nothing and reports zero, because
- * `MASK` matches none of the patterns. That matters because a message can be re-rendered.
+ * Idempotent: running it on already-redacted text changes nothing and reports zero, because the
+ * token matches none of the patterns — which is why it is punctuation and carries no letters. That
+ * matters because a message can be re-rendered.
  */
 export function redactContactDetails(body: string): Redaction {
   let output = body;
@@ -112,7 +117,7 @@ export function redactContactDetails(body: string): Redaction {
 
       /*
         Leading whitespace in the handle pattern is preserved, so "call @ahmad now" does not
-        become "call⟨محجوب⟩ now". Only the matched contact detail is replaced.
+        become "call⟦…⟧ now". Only the matched contact detail is replaced.
       */
       const leading = /^\s/.test(match) ? match[0] : '';
 
@@ -121,6 +126,35 @@ export function redactContactDetails(body: string): Redaction {
   }
 
   return { body: output, redactedCount: count };
+}
+
+/**
+ * What a SERVICE calls on a body somebody just wrote: strip forged markers, then redact.
+ *
+ * ## Why this is a second function and not two lines inside the first
+ *
+ * They are different jobs and only one of them is idempotent.
+ *
+ * `redactContactDetails` is a pure transformation of text and running it on its own output must
+ * change nothing — that is a documented guarantee, and the test above holds it. Stripping markers
+ * cannot live inside it: on a second pass the marker in the text is OUR OWN, and removing it would
+ * silently un-redact the message. That is not hypothetical; it is what the first version of this
+ * change did, and the idempotence test caught it.
+ *
+ * Sanitising untrusted input, by contrast, is something you do EXACTLY ONCE, at the boundary — so
+ * it belongs to the function the boundary calls.
+ *
+ * ## What the strip is for
+ *
+ * A writer pasting `⟦…⟧` would otherwise have it rendered to the recipient as «⟨محجوب⟩»: the
+ * platform appearing to say it removed a phone number that was never there. Nothing leaks, but the
+ * notice above a thread — "N contact details were removed" — is the reader's only signal for the
+ * real thing, and a mask with no count behind it is what makes that signal worth less.
+ *
+ * Removed rather than counted: nothing was redacted, so `redactedCount` must not move.
+ */
+export function redactIncomingMessage(body: string): Redaction {
+  return redactContactDetails(stripRedactionMarkers(body));
 }
 
 /** True when a body carries anything this module would remove. Used for warnings, not blocking. */

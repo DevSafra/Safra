@@ -10,7 +10,7 @@ import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
 import { supportRepliedMail } from '../mail/mail.templates.js';
 import { NotificationService } from '../notifications/notification.service.js';
-import { redactContactDetails } from '../messaging/redaction.js';
+import { redactIncomingMessage } from '../messaging/redaction.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import { notFound } from '../common/errors/app-error.js';
@@ -260,7 +260,7 @@ export class MessagingService {
     if (!conversation) throw notFound(ERROR.CONVERSATION_NOT_FOUND_OR_CLOSED);
 
     // Staff are not exempt — see the class note.
-    const redacted = redactContactDetails(input.body);
+    const redacted = redactIncomingMessage(input.body);
 
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`

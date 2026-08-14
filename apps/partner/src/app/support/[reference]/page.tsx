@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { renderRedactions } from '@safra/i18n';
+
 import { getMyProfile, getSupportThread, sidebarBadges } from '@/lib/api';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
@@ -113,7 +115,11 @@ export default async function SupportThreadPage({
               </div>
 
               <p className="mt-2 text-[12.5px] leading-relaxed whitespace-pre-wrap text-text">
-                {message.body}
+                {/*
+                  `'ar'` explicitly: لوحة الشريك is Arabic-only, and the stored body carries a
+                  language-neutral token where a contact detail was removed — see `O-i18n-2`.
+                */}
+                {renderRedactions(message.body, 'ar')}
               </p>
 
               {/* Said out loud: a masked number is silent in the body, and the sender would otherwise

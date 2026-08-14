@@ -1,3 +1,5 @@
+import { renderRedactions } from '@safra/i18n';
+
 import { getThread, type ThreadMessage } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { count, shortDateTime } from '@/lib/format';
@@ -105,7 +107,10 @@ function Message({ message }: { message: ThreadMessage }) {
         </Ltr>
       </div>
 
-      <p className="mt-1.5 text-[12.5px] leading-relaxed text-text2">{message.body}</p>
+      {/* Arabic-only console; the body stores a token where a contact detail was removed. */}
+      <p className="mt-1.5 text-[12.5px] leading-relaxed text-text2">
+        {renderRedactions(message.body, 'ar')}
+      </p>
 
       {message.redactedCount > 0 ? (
         <p className="mt-1 text-[10.5px] text-warn">

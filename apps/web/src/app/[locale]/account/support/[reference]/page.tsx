@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
+import { renderRedactions } from '@safra/i18n';
+
 import { AccountShell } from '@/components/account-shell';
 import { BackLink } from '@/components/back-link';
 import { SupportForm } from '@/components/support-forms';
@@ -117,7 +119,12 @@ export default async function AccountSupportThreadPage({
                 </div>
 
                 <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-text">
-                  {message.body}
+                  {/*
+                    `renderRedactions`, so «⟨entfernt⟩» reads in German to a German customer. The
+                    body is stored with a language-neutral token where a phone number was removed —
+                    see `O-i18n-2`; before this it was stored in Arabic and every reader got Arabic.
+                  */}
+                  {renderRedactions(message.body, locale)}
                 </p>
 
                 {/*

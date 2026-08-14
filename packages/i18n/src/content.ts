@@ -5,40 +5,119 @@ import { en } from './messages/content/en.js';
 import type { Translated } from './shape.js';
 
 /**
- * Copy that is written INTO stored data, not rendered from it.
+ * What a reader sees where a message had contact details removed.
  *
- * ## Why this is its own surface
+ * ## This used to be baked into the row, and that was the bug
  *
- * Everything else in this package is resolved per request, against the locale of whoever is
- * reading. `redactionMask` cannot be: it replaces a phone number in a message body at the moment
- * the message is written, and what gets stored is the final text. A partner writes in Arabic, a
- * German customer reads the thread, and both see the same stored string — because there is only
- * one stored string.
+ * Redaction happens on the way INTO the database — a phone number is replaced before the message
+ * is stored, and the original is discarded on purpose. So the replacement was written in
+ * `DEFAULT_LOCALE`, one stored string for three possible readers, and a German customer opening a
+ * thread a Syrian partner had written read `⟨محجوب⟩`. That is the exact failure the project's
+ * i18n rule exists to prevent, and it was recorded as `O-i18n-2` rather than fixed, because
+ * fixing it needs the stored text and the rendered text to stop being the same thing.
  *
- * That makes it a different kind of copy, and lumping it in with the rest would imply a
- * per-reader guarantee this cannot offer. Naming the category is the honest option.
+ * ## So they are now two different things
  *
- * ## The consequence, stated
+ * `REDACTION_TOKEN` goes into the row. It carries no language. `redactionMask` is the word the
+ * reader sees, resolved against THEIR locale by `renderRedactions` at the point of display — the
+ * same shape as an error code travelling to the client and being resolved by `errorMessage`.
  *
- * Baked copy is written in `DEFAULT_LOCALE`. A German customer reading a redacted thread sees
- * `⟨محجوب⟩`. Rendering it per reader would mean storing a marker token and substituting on read —
- * which is the right design and a schema-and-render change well beyond moving copy out of code.
- * Recorded in `docs/FUTURE-WORK.md`; the other two locales are written here so that change is a
- * rendering change rather than also a translation one.
+ * The three masks were already written here in 2026-08-07, precisely so this day would be a
+ * rendering change rather than also a translation one. It was.
  */
 export type ContentMessages = Translated<typeof ar>;
 
 const CATALOGUES: Record<Locale, ContentMessages> = { ar, en, de };
 
 /**
- * Copy for embedding in stored content.
+ * The mask, in one language.
  *
- * Defaults to `DEFAULT_LOCALE` rather than requiring a locale, because the callers genuinely do
- * not have one — a redaction happens on the way into the database, where "whose language" has no
- * answer yet.
+ * Still defaults to `DEFAULT_LOCALE`, for the callers that genuinely have no reader — a console
+ * that is Arabic-only passes `'ar'` explicitly, and the customer app passes the route's locale.
  */
 export function contentMessages(locale: Locale = DEFAULT_LOCALE): ContentMessages {
   return CATALOGUES[locale];
+}
+
+/**
+ * What stands in the stored text where something was removed.
+ *
+ * ## Why these characters
+ *
+ * `⟦` and `⟧` (U+27E6/U+27E7) around an ellipsis: no letters, no digits, no `@`, no dot followed
+ * by a word. That is not decoration — it is what makes redaction IDEMPOTENT. A stored body is run
+ * through the redactor again whenever it is edited or re-checked, and a token that matched one of
+ * those patterns would be redacted into a token containing a token, forever.
+ *
+ * ## And why it is not a word
+ *
+ * It is the fallback rendering as well as the token. If a display path is ever added that forgets
+ * to call `renderRedactions`, the reader sees `⟦…⟧` — which says "something is missing here" in
+ * Arabic, German and English alike, because it says it in no language at all. A token reading
+ * `[REDACTED]` would fail that same test by being English at the one moment it is on screen.
+ */
+export const REDACTION_TOKEN = '⟦…⟧';
+
+/**
+ * The masks written into message bodies before 2026-08-14, when the token replaced them.
+ *
+ * Deliberately FROZEN LITERALS rather than read from the catalogues above. They are not copy any
+ * more — they are historical data, and the whole point of the change is that the catalogue entries
+ * are free to be reworded. Deriving this list from them would mean a translator improving the
+ * Arabic wording silently stopped older threads from rendering.
+ *
+ * `messages` is append-only — `deny_mutation` raises on UPDATE — so these rows cannot be migrated
+ * to the token, and there is no version of this fix in which the list goes away. That is the right
+ * outcome and not merely the available one: those bodies are evidence in a dispute, and rewriting
+ * them to render more nicely is exactly what the append-only guarantee is there to refuse.
+ */
+const LEGACY_MASKS: readonly string[] = ['⟨محجوب⟩', '⟨redacted⟩', '⟨entfernt⟩'];
+
+/**
+ * Everything a stored body might carry where a contact detail was removed.
+ *
+ * Exported because the count of removed spans is DERIVED FROM THE TEXT in one place — the disputes
+ * query recomputes it rather than storing a counter that could drift from what the reader sees —
+ * and that SQL has to know every marker it might meet. It bound `'⟨محجوب⟩'` as a literal until
+ * 2026-08-14, so the day the token arrived every notice silently read zero.
+ */
+export const REDACTION_MARKERS: readonly string[] = [REDACTION_TOKEN, ...LEGACY_MASKS];
+
+/** `RegExp`-safe: a marker is punctuation, and `[`, `]` and `.` all mean something in a pattern. */
+function escapeForPattern(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const MARKER_PATTERN = new RegExp(REDACTION_MARKERS.map(escapeForPattern).join('|'), 'g');
+
+/**
+ * Renders a stored body for one reader: every removed span reads in their language.
+ *
+ * Call this at the point of DISPLAY, on every surface that shows a message body, a dispute title
+ * or a delivery failure — the three places `redactContactDetails` writes to. The console and the
+ * partner portal pass `'ar'` because they are Arabic-only; the customer app passes the locale of
+ * the route it is rendering.
+ */
+export function renderRedactions(body: string, locale: Locale): string {
+  const mask = CATALOGUES[locale].redactionMask;
+
+  /* A fresh pattern per call: a module-level /g regex carries `lastIndex` between calls. */
+  return body.replace(new RegExp(MARKER_PATTERN.source, 'g'), mask);
+}
+
+/**
+ * Strips markers a WRITER typed, so nobody can forge a redaction.
+ *
+ * Without this, pasting `⟦…⟧` into a message renders to the recipient as «⟨محجوب⟩» — a claim that
+ * the platform removed a phone number that was never there. Small, but it is a lie told in the
+ * platform's own voice, and the notice above the thread ("N contact details were removed") is what
+ * the reader trusts to tell the difference.
+ *
+ * Removed rather than escaped: these markers have no legitimate use in a sentence, so there is
+ * nothing to preserve, and an escaping scheme would need its own reverse in every render path.
+ */
+export function stripRedactionMarkers(body: string): string {
+  return body.replace(new RegExp(MARKER_PATTERN.source, 'g'), '');
 }
 
 /** The content catalogues, for the completeness tests. */

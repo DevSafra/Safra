@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
+import { renderRedactions } from '@safra/i18n';
+
 import { AccountShell } from '@/components/account-shell';
 import { DisputeForm } from '@/components/dispute-form';
 import { getAccountSummary, getDisputableBookings, getMyDisputes } from '@/lib/account';
@@ -144,7 +146,10 @@ export default async function AccountDisputesPage({
                   </span>
                 </div>
 
-                <p className="mt-1.5 text-sm font-semibold text-text">{dispute.title}</p>
+                {/* Redacted on the way in, so rendered for this reader on the way out. */}
+                <p className="mt-1.5 text-sm font-semibold text-text">
+                  {renderRedactions(dispute.title, locale)}
+                </p>
                 <p className="mt-1 text-xs text-muted">{tKind(dispute.kind)}</p>
 
                 <p className="mt-2 text-xs text-faint">

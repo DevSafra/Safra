@@ -15,7 +15,9 @@ import {
 
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { redactContactDetails } from '../messaging/redaction.js';
+import { REDACTION_MARKERS } from '@safra/i18n';
+
+import { redactIncomingMessage } from '../messaging/redaction.js';
 import { badRequest, notFound, unauthorized } from '../common/errors/app-error.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -99,14 +101,43 @@ export class DisputeRequestService {
       /*
         Recomputed on READ rather than stored.
 
-        The redactor already ran on the way in and the original is gone, so this counts the masks
+        The redactor already ran on the way in and the original is gone, so this counts the markers
         that are in the text — which is the number the reader needs and cannot drift from what they
         are looking at. A stored counter could.
+
+        Summed over EVERY marker, bound as parameters from REDACTION_MARKERS rather than written
+        as a literal. The Arabic mask was spelled out here, so the day the token replaced it every
+        dispute reported zero masked details — the text was redacted correctly and the notice that
+        says so silently stopped appearing. Caught by customer-gifts.spec.ts, which raises a
+        dispute containing a phone number and reads the row back.
+
+        (No backticks in this comment: it is inside a sql template literal, and one would end it.)
+
+        The legacy masks stay in the sum for the rows written before the token, which are
+        append-only and cannot be migrated.
       */
-      (length(coalesce(d.title, '') || coalesce(d.description, '')) -
-       length(replace(coalesce(d.title, '') || coalesce(d.description, ''), '⟨محجوب⟩', '')))
-        / nullif(length('⟨محجوب⟩'), 0) AS redacted_count
+      ${this.markerCount()} AS redacted_count
     `;
+  }
+
+  /**
+   * How many markers appear in a dispute's title and description together.
+   *
+   * The standard "count occurrences of a substring" shape — the length lost to replacing it,
+   * divided by its own length — once per marker, added up. `::text` on each parameter because
+   * `length($1)` on an untyped bind leaves Postgres unable to infer the argument.
+   */
+  private markerCount() {
+    const haystack = sql`(coalesce(d.title, '') || coalesce(d.description, ''))`;
+
+    return sql.join(
+      REDACTION_MARKERS.map(
+        (marker) => sql`
+          ((length(${haystack}) - length(replace(${haystack}, ${marker}::text, '')))
+            / nullif(length(${marker}::text), 0))`,
+      ),
+      sql` + `,
+    );
   }
 
   private summaryOf(row: DisputeRow): DisputeSummary {
@@ -196,8 +227,8 @@ export class DisputeRequestService {
     if (existing.rows[0]) throw badRequest(ERROR.DISPUTE_ALREADY_OPEN);
 
     /* Both prose fields, masked the way every stored message is. The originals are not kept. */
-    const title = redactContactDetails(input.title);
-    const description = redactContactDetails(input.description);
+    const title = redactIncomingMessage(input.title);
+    const description = redactIncomingMessage(input.description);
 
     const created = await this.db.execute<{ reference: string }>(sql`
       INSERT INTO disputes

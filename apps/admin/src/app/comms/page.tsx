@@ -1,3 +1,5 @@
+import { renderRedactions } from '@safra/i18n';
+
 import { getNotifications, type NotificationItem, type Notifications } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { count, shortDateTime } from '@/lib/format';
@@ -231,7 +233,7 @@ const COLUMNS: readonly AdminColumn<NotificationItem>[] = [
         {row.status === 'failed' ? (
           <span className="text-[10px] leading-tight text-faint">
             {plural(t.sections.comms.attempts, { n: row.attempts })}
-            {row.failureReason ? ` · ${row.failureReason}` : ''}
+            {row.failureReason ? ` · ${renderRedactions(row.failureReason, 'ar')}` : ''}
           </span>
         ) : null}
       </div>

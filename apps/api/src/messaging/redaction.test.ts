@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { containsContactDetails, redactContactDetails } from './redaction.js';
+import { REDACTION_TOKEN, renderRedactions } from '@safra/i18n';
+
+import {
+  containsContactDetails,
+  redactContactDetails,
+  redactIncomingMessage,
+} from './redaction.js';
 
 /**
  * Contact-detail blocking in customer↔partner threads (SRS §10, design handoff §8).
@@ -34,7 +40,8 @@ describe('redacting contact details', () => {
         const result = redactContactDetails(body);
 
         expect(result.redactedCount).toBeGreaterThan(0);
-        expect(result.body).toContain('⟨محجوب⟩');
+        /* The TOKEN, not a word: the language is chosen by the reader, not by the writer. */
+        expect(result.body).toContain(REDACTION_TOKEN);
         expect(containsContactDetails(body)).toBe(true);
 
         /*
@@ -116,11 +123,109 @@ describe('redacting contact details', () => {
   it('preserves the space before a redacted handle', () => {
     const result = redactContactDetails('follow @safraofficial today');
 
-    // Not "follow⟨محجوب⟩ today" — only the handle is replaced.
-    expect(result.body).toBe('follow ⟨محجوب⟩ today');
+    // Not "follow⟦…⟧ today" — only the handle is replaced.
+    expect(result.body).toBe(`follow ${REDACTION_TOKEN} today`);
   });
 
   it('handles an empty body without throwing', () => {
     expect(redactContactDetails('')).toStrictEqual({ body: '', redactedCount: 0 });
+  });
+});
+
+/**
+ * `O-i18n-2`: the stored body carries no language, so every reader gets their own.
+ *
+ * The bug this closes: the mask was written INTO the row in `DEFAULT_LOCALE`, so a German customer
+ * opening a thread a Syrian partner had written read «⟨محجوب⟩». One stored string, three readers.
+ */
+describe('the mask follows the reader, not the writer', () => {
+  const redacted = (body: string) => redactContactDetails(body).body;
+
+  it('stores a token that names no language', () => {
+    const body = redacted('call 0944123456 please');
+
+    expect(body).toContain(REDACTION_TOKEN);
+    /* None of the three words is in the row — that is the whole change. */
+    expect(body).not.toContain('محجوب');
+    expect(body).not.toContain('redacted');
+    expect(body).not.toContain('entfernt');
+  });
+
+  it.each([
+    ['ar', '⟨محجوب⟩'],
+    ['en', '⟨redacted⟩'],
+    ['de', '⟨entfernt⟩'],
+  ] as const)('renders in %s for that reader', (locale, mask) => {
+    expect(renderRedactions(redacted('call 0944123456 please'), locale)).toBe(
+      `call ${mask} please`,
+    );
+  });
+
+  /**
+   * Bodies written BEFORE the token still render for their reader.
+   *
+   * `messages` is append-only — `deny_mutation` raises on UPDATE — so those rows cannot be
+   * migrated, and a renderer that only knew the token would leave every thread written before
+   * 2026-08-14 showing Arabic to a German customer. Which is the bug, still there, just older.
+   */
+  it.each([
+    ['ar', '⟨محجوب⟩'],
+    ['en', '⟨redacted⟩'],
+    ['de', '⟨entfernt⟩'],
+  ] as const)('renders a legacy Arabic mask in %s', (locale, mask) => {
+    expect(renderRedactions('call ⟨محجوب⟩ please', locale)).toBe(`call ${mask} please`);
+  });
+
+  it('leaves a body with nothing removed exactly as it is', () => {
+    expect(renderRedactions('a perfectly ordinary sentence', 'de')).toBe(
+      'a perfectly ordinary sentence',
+    );
+  });
+
+  /**
+   * A writer cannot forge a redaction.
+   *
+   * Pasting the token would otherwise render to the recipient as «⟨محجوب⟩» — the platform seeming
+   * to say it removed a phone number that was never there, which devalues the notice above the
+   * thread. The marker is stripped and the count does not move, because nothing was removed.
+   */
+  it('strips a marker the writer typed, and does not count it', () => {
+    const result = redactIncomingMessage(`I wrote ${REDACTION_TOKEN} myself`);
+
+    expect(result.redactedCount).toBe(0);
+    expect(result.body).toBe('I wrote  myself');
+    expect(renderRedactions(result.body, 'ar')).not.toContain('محجوب');
+  });
+
+  it('strips a legacy mask the writer typed', () => {
+    const result = redactIncomingMessage('I wrote ⟨محجوب⟩ myself');
+
+    expect(result.redactedCount).toBe(0);
+    expect(renderRedactions(result.body, 'en')).not.toContain('redacted');
+  });
+
+  /* And it still redacts, so the strip did not replace the job it sits in front of. */
+  it('redacts as well as strips', () => {
+    const result = redactIncomingMessage(`${REDACTION_TOKEN} call 0944123456`);
+
+    expect(result.redactedCount).toBe(1);
+    expect(result.body).toContain(REDACTION_TOKEN);
+    expect(result.body).not.toContain('0944123456');
+  });
+
+  /**
+   * The reason the strip is NOT inside `redactContactDetails`.
+   *
+   * On a second pass the marker in the text is our own, so a function that stripped it would
+   * silently un-redact the message. The first version of this change did exactly that, and this is
+   * the property that caught it.
+   */
+  it('leaves a body it has already redacted untouched', () => {
+    const once = redacted('email ahmad@x.com now');
+    const twice = redactContactDetails(once);
+
+    expect(twice.redactedCount).toBe(0);
+    expect(twice.body).toBe(once);
+    expect(twice.body).toContain(REDACTION_TOKEN);
   });
 });
