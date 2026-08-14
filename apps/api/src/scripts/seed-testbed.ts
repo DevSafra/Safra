@@ -549,6 +549,28 @@ async function build(db: Seeder): Promise<void> {
   await db.execute(sql`ALTER TABLE messages DISABLE TRIGGER USER`);
   await db.execute(sql`TRUNCATE TABLE messages, conversations RESTART IDENTITY`);
   await db.execute(sql`ALTER TABLE messages ENABLE TRIGGER USER`);
+  /*
+    Notifications go FIRST, before the four things they point at.
+
+    `notifications` carries a nullable foreign key to each of `bookings`, `disputes`,
+    `customer_profiles` and `partners`, so it pins all four — and it is the only table in this
+    cleanup that has to be cleared before `disputes` rather than after. Every row this deletes was
+    written BY the testbed: a fixture booking's confirmation, a fixture dispute's acknowledgement.
+
+    It was missing, and the failure it caused named none of this. `db:testbed` stopped on
+    «Failed query: DELETE FROM customer_profiles» — the same truncated, unhelpful message the gift
+    card tables produced when they were missed — and because the clear and the seed share one
+    transaction, the rollback left the database looking untouched. So the symptom was a reset that
+    reported an error and changed nothing, on a suite whose gift-card spec needs the reset to run.
+  */
+  await db.execute(sql`DELETE FROM notifications
+    WHERE customer_profile_id IN (${testbedProfiles})
+       OR booking_id IN (${testbedBookings})
+       OR partner_id IN (
+            SELECT pa.id FROM partners pa JOIN users u ON u.id = pa.user_id
+            WHERE lower(u.email) IN (${emailList}))
+       OR dispute_id IN (SELECT id FROM disputes WHERE booking_id IN (${testbedBookings}))`);
+
   await db.execute(sql`DELETE FROM dispute_evidence WHERE dispute_id IN (
     SELECT id FROM disputes WHERE booking_id IN (${testbedBookings}))`);
   await db.execute(sql`DELETE FROM disputes WHERE booking_id IN (${testbedBookings})`);
