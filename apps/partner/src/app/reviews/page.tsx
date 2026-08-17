@@ -117,13 +117,24 @@ export default async function ReviewsPage({
   );
 }
 
-/** One review, laid out as §7.3 draws it. */
+/**
+ * One review, laid out as §7.3 draws it — with one deviation, on the surface token.
+ *
+ * The handoff specifies `var(--field)` for a review row. Bashar asked for white on 2026-08-17,
+ * and `card` is that token: `#ffffff` in the light theme, against a `#f5f6fa` page. `field` sat
+ * four hundredths from the page behind it, so the row read as a slab rather than a card.
+ *
+ * `bg-card`, NOT `bg-white`. A literal white would stay white in the dark theme — a glaring
+ * panel on `#0c0a1c` — and the toggle Bashar asked for on 2026-08-04 would be the thing that
+ * broke. `card` is `#17142f` there, a raised surface, which is what this row is in both themes.
+ * It is also the truer token: `field` is the input surface everywhere else in this app.
+ */
 function Row({ review }: { readonly review: PartnerReview }) {
   const hidden = review.status === 'hidden';
 
   return (
     <article
-      className={`rounded-xl border bg-field p-3.5 ${hidden ? 'border-bad/40 opacity-80' : 'border-line'}`}
+      className={`rounded-xl border bg-card p-3.5 ${hidden ? 'border-bad/40 opacity-80' : 'border-line'}`}
     >
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
         <span className="text-[13px] font-bold text-text">{review.guestName}</span>
