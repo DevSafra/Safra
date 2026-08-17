@@ -218,14 +218,14 @@ export const ar = {
     exportsLink: 'الملفات المصدَّرة',
 
     /*
-      The bar under every table: صفحة ‹ [١] › من ١٠٢ — اعرض [٢٥] صفًا — ٢٥٣١ نتيجة.
+      The bar under every table: صفحة ‹ [1] › من 102 — اعرض [25] صفًا — 2531 نتيجة.
 
       Split into fragments rather than one interpolated sentence because the page number is an
       INPUT sitting inside the sentence, and a placeholder cannot hold a form control. The
       fragments are ordered by the JSX, which is the one place the visual order is decided.
     */
     page: 'صفحة',
-    /** Follows the page input: "من ١٠٢". */
+    /** Follows the page input: "من 102". */
     pageOf: 'من {n}',
     pageLabel: 'رقم الصفحة',
     /** Precedes the rows-per-page select. */
@@ -239,7 +239,7 @@ export const ar = {
      * Shown instead of `found` when the count was capped.
      *
      * A total over the cap is not counted exactly, because `count(*)` over a table the size of
-     * the audit log is a full scan on every page view. "أكثر من ١٠٠٠٠" is honest about that;
+     * the audit log is a full scan on every page view. "أكثر من 10000" is honest about that;
      * a precise-looking number nobody paid for would not be.
      */
     foundCapped:
@@ -269,7 +269,7 @@ export const ar = {
     colAmount: 'المبلغ',
     colDates: 'التواريخ',
     /**
-     * A stay, with the month and year the two dates share written once — «٠٤ ← ٠٨-٠٩-٢٠٢٦».
+     * A stay, with the month and year the two dates share written once — «04 ← 08-09-2026».
      *
      * A template rather than a formatter's own literal, because the arrow's SIDE is language:
      * this reads right-to-left, so «←» leads from the check-in on the right to the check-out on
@@ -903,9 +903,9 @@ export const ar = {
       recoveryCodesNote:
         'كل رمز يُستخدم مرة واحدة بدلاً من تطبيق المصادقة. تُخزَّن مُعمَّاة ولا يمكن عرضها مرة أخرى.',
       savedContinue: 'حفظتها — متابعة',
-      step1: '١. افتح تطبيق المصادقة وأضف حساباً يدوياً.',
-      step2: '٢. أدخل المفتاح أدناه.',
-      step3: '٣. اكتب الرمز المكوّن من ستة أرقام الذي يظهر.',
+      step1: '1. افتح تطبيق المصادقة وأضف حساباً يدوياً.',
+      step2: '2. أدخل المفتاح أدناه.',
+      step3: '3. اكتب الرمز المكوّن من ستة أرقام الذي يظهر.',
       setupKey: 'مفتاح التهيئة',
       sixDigitCode: 'الرمز المكوّن من ستة أرقام',
     },
@@ -1060,7 +1060,7 @@ export const ar = {
       unexpectedNote:
         'إذا لم تكن تتوقع هذه الدعوة، أغلق هذه الصفحة وأبلغ فريق سفرة. لا تعيّن كلمة مرور.',
       newPassword: 'كلمة المرور الجديدة',
-      passwordHint: '١٢ حرفًا على الأقل.',
+      passwordHint: '12 حرفًا على الأقل.',
       confirmPassword: 'تأكيد كلمة المرور',
       passwordSet: 'تم تعيين كلمة المرور.',
       signInNext:

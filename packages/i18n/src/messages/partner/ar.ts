@@ -103,7 +103,7 @@ export const ar = {
       person cannot tell whether it accepted the address they meant to type.
     */
     signingInAs: 'تسجيل الدخول باسم',
-    codeLabel: 'رمز المُصادِق المكوَّن من ٦ أرقام، أو أحد رموز الاسترداد.',
+    codeLabel: 'رمز المُصادِق المكوَّن من 6 أرقام، أو أحد رموز الاسترداد.',
     codeSubmit: 'تأكيد',
     codeChecking: 'جارٍ التحقق…',
     codeBack: 'رجوع',
@@ -117,10 +117,10 @@ export const ar = {
      * name the wait, because a person who knows to come back in a quarter of an hour stops
      * hammering the form.
      */
-    locked: 'أُقفل الحساب مؤقتًا بعد عدة محاولات فاشلة. حاول بعد ١٥ دقيقة.',
+    locked: 'أُقفل الحساب مؤقتًا بعد عدة محاولات فاشلة. حاول بعد 15 دقيقة.',
     tooMany: 'محاولات كثيرة خلال وقت قصير. انتظر دقيقة ثم حاول مرة أخرى.',
     codeFormat:
-      'صيغة الرمز غير صحيحة. أدخل ٦ أرقام أو رمز استرداد بالشكل XXXX-XXXX-XXXX.',
+      'صيغة الرمز غير صحيحة. أدخل 6 أرقام أو رمز استرداد بالشكل XXXX-XXXX-XXXX.',
   },
 
   /**
@@ -136,10 +136,10 @@ export const ar = {
     step1:
       'افتح تطبيق مُصادِق (Google Authenticator أو Microsoft Authenticator أو ما شابه).',
     step2: 'أضف حسابًا جديدًا يدويًا وألصق المفتاح أدناه.',
-    step3: 'أدخل الرمز المكوَّن من ٦ أرقام الذي يعرضه التطبيق.',
+    step3: 'أدخل الرمز المكوَّن من 6 أرقام الذي يعرضه التطبيق.',
     setupKey: 'مفتاح الإعداد',
     loading: 'جارٍ التحميل…',
-    sixDigitCode: 'الرمز المكوَّن من ٦ أرقام',
+    sixDigitCode: 'الرمز المكوَّن من 6 أرقام',
     submit: 'تفعيل المصادقة الثنائية',
     checking: 'جارٍ التحقق…',
     enabled: 'تم تفعيل المصادقة الثنائية على حسابك.',
@@ -163,7 +163,7 @@ export const ar = {
     /**
      * The four §7.1 KPI cards.
      *
-     * `noData` is «—» and not «٠». A partner with no units has not achieved zero occupancy, they
+     * `noData` is «—» and not «0». A partner with no units has not achieved zero occupancy, they
      * have no occupancy — and a confident zero on a card about somebody's business reads as a
      * verdict. The API returns null for exactly these cases; this is what null looks like.
      */
@@ -179,13 +179,13 @@ export const ar = {
     kpiOccupancyDetail: '{booked} من {available} ليلة',
     kpiResponse: 'متوسط سرعة الرد',
     kpiResponseMinutes: '{n} دقيقة',
-    kpiResponseSample: 'عن {n} حجزًا خلال ٩٠ يومًا',
+    kpiResponseSample: 'عن {n} حجزًا خلال 90 يومًا',
     noData: '—',
     noDataYet: 'لا بيانات بعد',
 
     /** طلبات حجز بانتظار ردك — the queue with the clock and the fine attached. */
     requestsTitle: 'طلبات حجز بانتظار ردك',
-    requestsRule: 'مهلة ساعتين — الغرامة ١٠$ عند عدم الرد',
+    requestsRule: 'مهلة ساعتين — الغرامة 10$ عند عدم الرد',
     requestsEmpty: 'لا طلبات بانتظار ردك.',
     requestsNights: '{n} ليلة',
     requestsGuests: '{n} ضيف',
@@ -450,7 +450,7 @@ export const ar = {
     fDescription: 'الوصف',
     attributesLabel:
       'صفات الرحلة — نفس صفات صفحة الإقامات؛ اختر حتى 4 لتظهر للزوار وتُستخدم في الفلترة',
-    attributesTooMany: 'اخترت أكثر من ٤ صفات. أزل واحدة قبل الإرسال.',
+    attributesTooMany: 'اخترت أكثر من 4 صفات. أزل واحدة قبل الإرسال.',
     submit: 'إرسال للمراجعة',
     submitting: 'جارٍ الإرسال…',
     cancelForm: 'إلغاء',
