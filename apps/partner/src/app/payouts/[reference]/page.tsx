@@ -126,10 +126,17 @@ export default async function PayoutPage({
             <p className="text-[12.5px] text-faint">{t.payouts.noBookings}</p>
           ) : (
             <ul className="grid gap-2">
+              {/*
+                `bg-card`, matching the summary tiles above and the review rows on التقييمات.
+                Bashar asked for white on 2026-08-17; `card` IS `#ffffff` in the light theme,
+                where `field` is `#f1f3f8` against a `#f5f6fa` page — near enough to vanish into
+                it. Not `bg-white`, which would stay white in the dark theme and glare off
+                `#0c0a1c`.
+              */}
               {covered.map((booking) => (
                 <li
                   key={booking.bookingReference}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-field px-3.5 py-3"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-card px-3.5 py-3"
                 >
                   <Ltr className="text-[12.5px] font-semibold text-sky">
                     {booking.bookingReference}
