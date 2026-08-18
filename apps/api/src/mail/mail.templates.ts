@@ -205,6 +205,45 @@ export function giftCardPurchasedMail(input: {
       amount: input.amount,
       url: input.url,
     }),
+    sensitive: true,
+  };
+}
+
+/**
+ * The gift itself, to the address the buyer named.
+ *
+ * ## Nobody's name appears in it
+ *
+ * The obvious version says "Rami has sent you a gift card". Both that name and the recipient's are
+ * FREE TEXT a caller chose, and this mail goes from SAFRA to an address a caller also chose — which
+ * is a content-injection page with postage. A profile called «سفرة: حسابك موقوف، اتصل بـ…» would
+ * arrive looking exactly like us. The platform already refuses to put user-authored text in outbound
+ * mail — a support reply carries a link and never the message — so this follows that, and the buyer
+ * can tell the recipient who it is from by any other means.
+ *
+ * The cost is a slightly colder gift. The alternative is a phishing primitive that costs the price
+ * of one card.
+ */
+export function giftCardReceivedMail(input: {
+  to: string;
+  locale: string;
+  code: string;
+  reference: string;
+  amount: string;
+  url: string;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).giftCardReceived;
+
+  return {
+    to: input.to,
+    subject: copy.subject,
+    text: fill(copy.body, {
+      code: input.code,
+      reference: input.reference,
+      amount: input.amount,
+      url: input.url,
+    }),
+    sensitive: true,
   };
 }
 

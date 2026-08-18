@@ -25,7 +25,7 @@ import { WalletService } from '../wallet/wallet.service.js';
 import { badRequest, notFound, unauthorized } from '../common/errors/app-error.js';
 import { ENV, type Env } from '../config/env.js';
 import { MailService } from '../mail/mail.service.js';
-import { giftCardPurchasedMail } from '../mail/mail.templates.js';
+import { giftCardPurchasedMail, giftCardReceivedMail } from '../mail/mail.templates.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -439,20 +439,35 @@ export class GiftCardService {
       `MailService.send` swallows delivery errors, so a mail server that refuses cannot fail a
       purchase that already succeeded.
     */
-    await this.notifyPurchaser(result, claims);
+    await this.deliver(result, claims);
 
     return result;
   }
 
   /**
-   * Emails the code to whoever BOUGHT the card — never to a recipient.
+   * Sends the code — to the buyer, and to the recipient when the card names one.
    *
-   * A card can name someone else (`recipient_email`), and delivering a gift to them is a separate
-   * decision about what a gift card DOES. This method looks up the purchaser's own address from
-   * their profile rather than taking one from the request, so there is no input that can redirect a
-   * spendable code to an inbox of a caller's choosing.
+   * ## The buyer is told even when it is a gift
+   *
+   * They paid for it, and they are the only one who can act if the recipient's address was mistyped
+   * — which cannot be repaired any other way, because we keep no copy of the code. A surprise that
+   * silently went nowhere is worse than a surprise the buyer can forward.
+   *
+   * ## The recipient's address comes from the request, and that is the point
+   *
+   * Everywhere else in this service an address from a caller would be a way to redirect cash. Here it
+   * IS the feature: a gift card is bought for somebody. It is bounded by what it costs — a card is
+   * paid for out of the buyer's own non-gift balance before this runs — and by the two mails carrying
+   * no user-authored text at all, so neither can be used to put a sentence in front of a stranger
+   * under SAFRA's name. See `giftCardReceivedMail`.
+   *
+   * ## Locale
+   *
+   * The recipient's language is unknown — they may have no account. The buyer's preference is the
+   * only signal available and a better guess than the default, since a gift is usually bought inside
+   * one market.
    */
-  private async notifyPurchaser(
+  private async deliver(
     result: GiftCardPurchaseResult,
     claims: AccessTokenClaims | undefined,
   ): Promise<void> {
@@ -466,20 +481,26 @@ export class GiftCardService {
 
     if (!buyer) return;
 
-    await this.mail.send(
-      giftCardPurchasedMail({
-        to: buyer.email,
-        locale: buyer.preferred_locale,
-        code: result.code,
-        reference: result.card.reference,
-        amount: `${result.card.originalAmount} ${result.card.currencyCode}`,
-        /* From configured `APP_URL`, never a request header — see `account-recovery.service.ts`. */
-        url: new URL(
-          `/${buyer.preferred_locale}/account/gifts`,
-          this.env.APP_URL,
-        ).toString(),
-      }),
-    );
+    const shared = {
+      locale: buyer.preferred_locale,
+      code: result.code,
+      reference: result.card.reference,
+      amount: `${result.card.originalAmount} ${result.card.currencyCode}`,
+      /* From configured `APP_URL`, never a request header — see `account-recovery.service.ts`. */
+      url: new URL(
+        `/${buyer.preferred_locale}/account/gifts`,
+        this.env.APP_URL,
+      ).toString(),
+    };
+
+    await this.mail.send(giftCardPurchasedMail({ to: buyer.email, ...shared }));
+
+    const recipient = result.card.recipientEmail;
+
+    /* Not to themselves twice: a buyer may name their own address. */
+    if (recipient && recipient.toLowerCase() !== buyer.email.toLowerCase()) {
+      await this.mail.send(giftCardReceivedMail({ to: recipient, ...shared }));
+    }
 
     /*
       Nothing logged here on purpose.

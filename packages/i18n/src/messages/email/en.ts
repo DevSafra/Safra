@@ -41,6 +41,10 @@ export const en = {
     subject: 'Your gift card {reference} — SAFRA',
     body: 'A gift card for {amount} has been issued.\n\nCard code:\n{code}\n\nCard number: {reference}\n\nKeep this code somewhere safe. Whoever holds it can add the balance to their wallet, and we cannot send it again — we do not keep a copy.\n\nTo redeem it: open «Gift cards» in your account and enter the code:\n{url}\n\nThe SAFRA team',
   },
+  giftCardReceived: {
+    subject: 'A SAFRA gift card is waiting for you',
+    body: 'Hello,\n\nSomeone has bought you a SAFRA gift card for {amount}.\n\nCard code:\n{code}\n\nCard number: {reference}\n\nKeep this code somewhere safe. Whoever holds it can add the balance to their wallet, and we cannot send it again — we do not keep a copy.\n\nTo add it to your wallet:\n{url}\n\nThe SAFRA team',
+  },
   supportReplied: {
     subject: 'The support team replied to your request — {reference}',
     body: 'The SAFRA support team has replied to your support request.\n\nReference: {reference}\n\nOpen the conversation to read the reply and continue it:\n{url}\n\nWe do not send message text by email; the whole conversation is in your account.\n\nThe SAFRA team',

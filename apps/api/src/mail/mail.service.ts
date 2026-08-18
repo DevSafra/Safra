@@ -9,6 +9,16 @@ export interface OutgoingMail {
   /** Plain text. Every SAFRA email must be readable without HTML (§10.3). */
   readonly text: string;
   readonly html?: string | undefined;
+  /**
+   * The body carries a SECRET that is worth more than the convenience of reading it in a log.
+   *
+   * With no SMTP transport configured the branch below prints whole bodies, which is right for a
+   * reset link a developer needs to click. It is not right for a gift card code: `gift_cards` stores
+   * only a hash precisely so a plaintext code exists nowhere at rest, and a dev log is somewhere.
+   * Nothing is lost by suppressing it either — the purchase RESPONSE carries the code, which is how
+   * a developer gets it anyway.
+   */
+  readonly sensitive?: boolean | undefined;
 }
 
 /**
@@ -64,7 +74,9 @@ export class MailService {
        * This branch cannot run in production — `loadEnv` sees to that.
        */
       this.logger.log(
-        `[mail:not-sent] to=${mail.to} subject="${mail.subject}"\n${mail.text}`,
+        mail.sensitive
+          ? `[mail:not-sent] to=${mail.to} subject="${mail.subject}" (body withheld: carries a secret)`
+          : `[mail:not-sent] to=${mail.to} subject="${mail.subject}"\n${mail.text}`,
       );
       return;
     }

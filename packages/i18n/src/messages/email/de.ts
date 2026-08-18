@@ -41,6 +41,10 @@ export const de = {
     subject: 'Ihre Geschenkkarte {reference} — SAFRA',
     body: 'Eine Geschenkkarte über {amount} wurde ausgestellt.\n\nKartencode:\n{code}\n\nKartennummer: {reference}\n\nBewahren Sie diesen Code sicher auf. Wer ihn besitzt, kann das Guthaben seiner Wallet hinzufügen, und wir können ihn nicht erneut senden — wir speichern keine Kopie.\n\nZum Einlösen: öffnen Sie «Geschenkkarten» in Ihrem Konto und geben Sie den Code ein:\n{url}\n\nIhr SAFRA-Team',
   },
+  giftCardReceived: {
+    subject: 'Eine SAFRA-Geschenkkarte wartet auf Sie',
+    body: 'Hallo,\n\njemand hat Ihnen eine SAFRA-Geschenkkarte über {amount} gekauft.\n\nKartencode:\n{code}\n\nKartennummer: {reference}\n\nBewahren Sie diesen Code sicher auf. Wer ihn besitzt, kann das Guthaben seiner Wallet hinzufügen, und wir können ihn nicht erneut senden — wir speichern keine Kopie.\n\nSo fügen Sie ihn Ihrer Wallet hinzu:\n{url}\n\nIhr SAFRA-Team',
+  },
   supportReplied: {
     subject: 'Das Support-Team hat auf Ihre Anfrage geantwortet — {reference}',
     body: 'Das SAFRA-Support-Team hat auf Ihre Support-Anfrage geantwortet.\n\nReferenz: {reference}\n\nÖffnen Sie das Gespräch, um die Antwort zu lesen und fortzusetzen:\n{url}\n\nWir versenden keine Nachrichtentexte per E-Mail; das vollständige Gespräch finden Sie in Ihrem Konto.\n\nIhr SAFRA-Team',

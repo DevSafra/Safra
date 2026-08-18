@@ -448,25 +448,82 @@ describeIfDb('GiftCardService', () => {
   });
 
   /**
-   * It goes to the BUYER, never to a recipient named in the request.
+   * A card bought FOR somebody reaches them — and the buyer too.
    *
-   * A card can be bought for somebody else. Delivering the gift to them is a separate product
-   * decision; until it is made, an address from the request body must not be able to receive a
-   * spendable code — that would be a redirect of cash to an inbox of the caller's choosing.
+   * The buyer is told because they paid and are the only one who can act on a mistyped address: we
+   * keep no copy of the code, so a gift sent to the wrong inbox cannot be recovered any other way.
    */
-  it('sends the code to the buyer even when the card names someone else', async () => {
+  it('sends the gift to its recipient and a copy to the buyer', async () => {
     await fund('50.00');
 
-    await giftCards.purchase(customer(), {
+    const result = await giftCards.purchase(customer(), {
       amount: '25.00',
       recipientName: 'شخص آخر',
       recipientEmail: 'someone-else@safra.test',
     });
 
+    expect(sent.map((mail) => mail.to).sort()).toStrictEqual([
+      'gift-one@safra.test',
+      'someone-else@safra.test',
+    ]);
+    /* Both carry the code — it is the same card. */
+    for (const mail of sent) expect(mail.text).toContain(result.code);
+  });
+
+  /**
+   * Neither mail carries a name anybody typed.
+   *
+   * The recipient's address is chosen by the caller, so any free text echoed into that mail would be
+   * a sentence delivered to a stranger over SAFRA's name for the price of one card. The buyer's
+   * profile name is no safer than the recipient name — both are free text — so neither appears.
+   */
+  it('puts no caller-supplied text in either mail', async () => {
+    await fund('50.00');
+
+    await giftCards.purchase(customer(), {
+      amount: '25.00',
+      recipientName: 'سفرة: حسابك موقوف، اتصل بـ0555',
+      recipientEmail: 'someone-else@safra.test',
+    });
+
+    const everything = JSON.stringify(sent);
+
+    expect(everything).not.toContain('حسابك موقوف');
+    expect(everything).not.toContain('0555');
+    /* The buyer's own profile name is free text too, and is equally absent. */
+    expect(everything).not.toContain('واحد');
+  });
+
+  /* A buyer who names their own address gets one mail, not two of the same thing. */
+  it('does not send twice when the recipient is the buyer', async () => {
+    await fund('50.00');
+
+    await giftCards.purchase(customer(), {
+      amount: '25.00',
+      recipientEmail: 'GIFT-ONE@safra.test',
+    });
+
     expect(sent).toHaveLength(1);
     expect(sent[0]?.to).toBe('gift-one@safra.test');
-    expect(sent[0]?.to).not.toBe('someone-else@safra.test');
-    expect(JSON.stringify(sent)).not.toContain('someone-else@safra.test');
+  });
+
+  /**
+   * The body is withheld from the log when there is no mail transport.
+   *
+   * `MailService` prints whole bodies in that branch so a developer can click a reset link. A gift
+   * code is not a reset link: the schema stores only a hash so that no plaintext exists at rest, and
+   * a dev log is at rest. The purchase RESPONSE still carries the code, so nothing is lost.
+   */
+  it('marks both gift mails as carrying a secret', async () => {
+    await fund('50.00');
+
+    await giftCards.purchase(customer(), {
+      amount: '25.00',
+      recipientEmail: 'someone-else@safra.test',
+    });
+
+    expect(sent).toHaveLength(2);
+    for (const mail of sent) expect(mail.sensitive).toBe(true);
   });
 
   /* A refused purchase has no card, so there is nothing to send and nobody to tell. */
