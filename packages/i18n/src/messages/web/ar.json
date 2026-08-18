@@ -313,7 +313,7 @@
     "status": {
       "draft": "مسودة",
       "pending_payment": "بانتظار الدفع",
-      "pending_confirmation": "بانتظار التأكيد",
+      "pending_confirmation": "قيد التأكيد",
       "confirmed": "مؤكد",
       "cancelled": "ملغى",
       "checked_in": "تم تسجيل الوصول",

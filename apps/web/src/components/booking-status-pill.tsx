@@ -35,6 +35,55 @@ const TONES: Record<Tone, string> = {
   stone: 'border-stone/40 bg-stone/10 text-stone',
 };
 
+/**
+ * The three states a CUSTOMER is shown, from the eight the database keeps.
+ *
+ * Bashar, 2026-08-18: حجوزاتي shows ملغى, قيد التأكيد and مؤكد, and nothing else. The eight-value
+ * enum is an operational vocabulary — `checked_in` and `disputed` are things SAFRA and the partner
+ * act on — and a customer looking at their own trip needs one question answered: is it on.
+ *
+ * ## Why this lives beside the pill rather than in each page
+ *
+ * The overview and حجوزاتي draw the same booking in the same row. Two collapses written separately
+ * drift, and the drift is silent: one screen says «مكتمل» and the other «مؤكد» about one booking,
+ * which is the fault the one-status-one-word rule exists to prevent. One function, both callers.
+ *
+ * ## It decides the COLOUR as well as the word
+ *
+ * The caller passes the mapped value to `StatusPill`, so `statusTone` colours what is actually
+ * written. Collapsing only the label would leave «مؤكد» green on a `confirmed` booking and teal on
+ * a `completed` one — one word in two colours, which reads as a rendering fault (§ status rule).
+ *
+ * ## `disputed` is مؤكد, deliberately
+ *
+ * A dispute is a complaint about a stay, not a change to whether the booking stands. It is visible
+ * on the booking itself and under النزاعات; showing it here as ملغى would tell somebody their
+ * booking was cancelled when it was not, on the screen about their own money.
+ */
+const CUSTOMER_STATES: Readonly<Record<string, string>> = {
+  cancelled: 'cancelled',
+
+  draft: 'pending_confirmation',
+  pending_payment: 'pending_confirmation',
+  pending_confirmation: 'pending_confirmation',
+
+  confirmed: 'confirmed',
+  checked_in: 'confirmed',
+  completed: 'confirmed',
+  disputed: 'confirmed',
+};
+
+export function customerBookingStatus(status: string): string {
+  /*
+    An unmapped status reads as «قيد التأكيد», not «مؤكد».
+
+    A ninth value added to the enum and not to this map must not tell a customer their booking is
+    confirmed — that is a claim about their trip we would be making without knowing. "Not settled
+    yet" is the honest fallback, and it is the same instinct as `statusTone`'s `faint`.
+  */
+  return CUSTOMER_STATES[status] ?? 'pending_confirmation';
+}
+
 export function StatusPill({
   status,
   label,

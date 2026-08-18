@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { AccountShell } from '@/components/account-shell';
 import { DateRange } from '@/components/date-range';
-import { StatusPill } from '@/components/booking-status-pill';
+import { StatusPill, customerBookingStatus } from '@/components/booking-status-pill';
 import {
   getAccountSummary,
   getMyBookings,
@@ -188,8 +188,12 @@ function BookingRow({
       </span>
       <span className="flex items-center gap-3">
         <StatusPill
-          status={booking.status}
-          label={dynamicMessage(t, `status.${booking.status}`, booking.status)}
+          status={customerBookingStatus(booking.status)}
+          label={dynamicMessage(
+            t,
+            `status.${customerBookingStatus(booking.status)}`,
+            booking.status,
+          )}
         />
         <span className="text-sm text-gold" dir="ltr">
           {booking.totalAmount}

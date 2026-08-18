@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { AccountShell } from '@/components/account-shell';
 import { DateRange } from '@/components/date-range';
-import { StatusPill } from '@/components/booking-status-pill';
+import { StatusPill, customerBookingStatus } from '@/components/booking-status-pill';
 import { getAccountSummary, getMyBookings } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -68,41 +68,42 @@ export default async function AccountBookingsPage({
       ) : (
         <>
           <ul className="space-y-3">
-            {bookings.items.map((booking) => (
-              <li key={booking.reference}>
-                <Link
-                  href={`/${locale}/booking/${booking.reference}?${returnParam('bookings')}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-card p-4 transition-colors hover:border-gold/50"
-                >
-                  <span>
-                    <span className="block font-mono text-sm text-text">
-                      {booking.reference}
+            {bookings.items.map((booking) => {
+              /* The three states a customer is shown — see `customerBookingStatus`. */
+              const shown = customerBookingStatus(booking.status);
+
+              return (
+                <li key={booking.reference}>
+                  <Link
+                    href={`/${locale}/booking/${booking.reference}?${returnParam('bookings')}`}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-card p-4 transition-colors hover:border-gold/50"
+                  >
+                    <span>
+                      <span className="block font-mono text-sm text-text">
+                        {booking.reference}
+                      </span>
+                      <span className="block text-xs text-faint">
+                        <DateRange
+                          from={booking.checkIn}
+                          to={booking.checkOut}
+                          locale={locale}
+                        />{' '}
+                        · {t('nights', { count: booking.nights })}
+                      </span>
                     </span>
-                    <span className="block text-xs text-faint">
-                      <DateRange
-                        from={booking.checkIn}
-                        to={booking.checkOut}
-                        locale={locale}
-                      />{' '}
-                      · {t('nights', { count: booking.nights })}
+                    <span className="flex items-center gap-3">
+                      <StatusPill
+                        status={shown}
+                        label={dynamicMessage(t, `status.${shown}`, shown)}
+                      />
+                      <span className="text-sm text-gold" dir="ltr">
+                        {booking.totalAmount}
+                      </span>
                     </span>
-                  </span>
-                  <span className="flex items-center gap-3">
-                    <StatusPill
-                      status={booking.status}
-                      label={dynamicMessage(
-                        t,
-                        `status.${booking.status}`,
-                        booking.status,
-                      )}
-                    />
-                    <span className="text-sm text-gold" dir="ltr">
-                      {booking.totalAmount}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
 
           {cursor || bookings.nextCursor ? (
