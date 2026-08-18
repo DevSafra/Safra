@@ -131,7 +131,6 @@ export default async function AccountInvoicePage({
             <span aria-hidden="true">⤓</span>
             {t('invoiceDownload')}
           </a>
-          <span className="text-xs text-faint">{t('invoicePrintNote')}</span>
         </div>
 
         {/* ── The stay this receipt is for ── */}

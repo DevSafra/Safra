@@ -414,7 +414,6 @@
     "passwordConfirm": "Confirm new password",
     "passwordMismatch": "The two passwords do not match.",
     "invoiceDownload": "Download PDF",
-    "invoicePrintNote": "Choose “Save as PDF” in the print dialog.",
     "giftsIntro": "Redeem a gift card code into your wallet balance, or buy a card to give away.",
     "giftRedeemTitle": "Redeem a code",
     "giftCodeLabel": "Card code",
