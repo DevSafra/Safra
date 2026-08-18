@@ -2329,8 +2329,10 @@ and would we find out?** Three changed status.
 | 10  | **`NEXT_PUBLIC_MEDIA_URL` and `S3_PUBLIC_URL` must agree, unchecked** | **Promoted to a deployment requirement**                          | Cannot be closed in code — different processes, different environments. A deployment-time assertion closes it, and it is now written down as such (`docs/media-integrity.md`)                                           |
 | 11  | **No retention policy; audit log is append-only**                     | **LAUNCH BLOCKER (legal)**                                        | Previously "compliance dependency". It is a direct conflict between a design decision we made and an obligation we have, and it needs a written reconciliation, not a note                                              |
 
+| 12 | **Phone validation costs +49 kB on two customer pages** | **Accepted, decided 2026-08-18** | `libphonenumber-js/max` reaches the browser because `phoneSchema` lives in `@safra/contracts`, which the client imports: register 177 → 226 kB, checkout 170 → 220 kB first load; the SHARED chunk is unchanged. Bashar chose to keep it. The alternative — moving the refinement behind an API-only schema — buys the bytes back and removes the client's ability to reject a bad number without a round trip. Since the cost is paid either way on those two routes, the field USES it: `auth-form` validates with the same `phoneSchema` object the API does, so the two cannot drift |
+
 **Summary of changes:** two deviations became launch blockers (9, 11), three became tasks or
-requirements (1, 7, 10), and six stand as accepted.
+requirements (1, 7, 10), six stand as accepted, and one (12) was added and accepted on 2026-08-18.
 
 ## 8. Known risks and traps
 
