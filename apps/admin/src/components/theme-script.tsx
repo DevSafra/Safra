@@ -1,6 +1,6 @@
 import { headers } from 'next/headers';
 
-import { SIDEBAR_SCRIPT, THEME_SCRIPT } from '@safra/ui';
+import { SIDEBAR_SCRIPT, themeScript } from '@safra/ui';
 
 /**
  * Applies the saved theme AND sidebar state BEFORE first paint.
@@ -31,7 +31,7 @@ export async function ThemeScript() {
   return (
     <script
       {...(nonce ? { nonce } : {})}
-      dangerouslySetInnerHTML={{ __html: `${THEME_SCRIPT}${SIDEBAR_SCRIPT}` }}
+      dangerouslySetInnerHTML={{ __html: `${themeScript('admin')}${SIDEBAR_SCRIPT}` }}
     />
   );
 }

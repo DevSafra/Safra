@@ -155,7 +155,7 @@
 /**
  * The OS preference is deliberately NOT honoured here.
  *
- * The customer app has a `prefers-color-scheme` block; this one does not, and the difference is
+ * Neither app follows `prefers-color-scheme`; the customer app dropped its block too, and that is
  * intentional. The console is designed dark (§9.1) and was dark-only until Bashar asked for the
  * toggle. Reacting to the OS would relight the console for every staff member on a light-mode
  * laptop the moment this shipped — a change to the tool they use all day that none of them asked

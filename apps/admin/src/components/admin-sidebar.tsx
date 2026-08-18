@@ -199,6 +199,7 @@ export function AdminSidebar({ counts }: { counts: SidebarCounts }) {
           `prefers-color-scheme` rule, so dark is what is actually on screen before anyone chooses.
         */}
         <ThemeToggle
+          surface="admin"
           toLightLabel={t.dashboard.themeToLight}
           toDarkLabel={t.dashboard.themeToDark}
           whenUnset="dark"

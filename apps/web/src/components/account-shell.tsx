@@ -244,13 +244,9 @@ export async function AccountShell({
           rule, both shapes, because the aside is a flex column.
 
           This is now the ONLY theme control in the customer app: Bashar had it removed from the navbar
-          (2026-08-12). A visitor who has not signed in therefore gets no manual switch and follows their
-          OS preference instead, which `whenUnset='system'` and the `prefers-color-scheme` block in
-          `globals.css` already handle between them.
-
-          `whenUnset='system'` — unlike the staff apps, this app's CSS HAS a `prefers-color-scheme`
-          rule, so with no explicit choice the screen follows the visitor's OS and the icon has to say
-          so. Passing `'dark'` here would show a crescent on a light page.
+          (2026-08-12). A visitor who has not signed in therefore gets no manual switch, and the page
+          they get is LIGHT — the customer CSS has no `prefers-color-scheme` rule any more, so nothing
+          follows the OS. The block below carries the consequence for this toggle.
         */}
         {/*
           The theme toggle lives HERE and in the two staff sidebars — the three dashboards — and
@@ -267,6 +263,7 @@ export async function AccountShell({
         */}
         <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-line pt-3">
           <ThemeToggle
+            surface="web"
             toLightLabel={tn('themeToLight')}
             toDarkLabel={tn('themeToDark')}
             whenUnset="light"

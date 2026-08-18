@@ -6,9 +6,8 @@
  * The customer app had all of this to itself. The staff console now needs the same thing, and
  * the two must agree on three details or the feature is subtly broken:
  *
- * 1. **The storage key.** Both apps are on the same origin in production, so one key means a
- *    person who picks light on the public site finds the console already light. Two keys would
- *    make that a coin toss.
+ * 1. **The storage key.** Namespaced PER APP — see `ThemeSurface`. Sharing one key made the
+ *    console's dark leak into the customer site through a port-blind cookie.
  * 2. **The attribute.** `data-theme` on `<html>`, read by the CSS in both apps.
  * 3. **The exact script bytes.** See `THEME_SCRIPT` below — this is the one that bites.
  *
@@ -18,8 +17,38 @@
 
 export type Theme = 'dark' | 'light';
 
-/** Where the choice is persisted. One key for both apps — see the note above. */
-export const THEME_STORAGE_KEY = 'safra-theme';
+/**
+ * Which app is asking. Every key below is namespaced by it.
+ *
+ * It used to be one key for all three, on the reasoning that somebody who picks light on the public
+ * site should find the console already light. That is wrong, and the bug it caused was reported as
+ * "I switch the language and it changes to dark" (Bashar, 2026-08-18).
+ *
+ * A cookie is scoped to a HOST and ignores the PORT, so `localhost:3000`, `:3001` and `:3002` shared
+ * one jar. The console and لوحة الشريك are designed DARK; the moment either toggle was used,
+ * `safra-theme=dark` was written for `localhost` and the CUSTOMER site read it. The language switch
+ * only appeared to be the cause — the customer layout reads the cookie during a SERVER render, so an
+ * inherited value lands on the next navigation, whichever one that happens to be.
+ *
+ * Sharing was never right in principle either: the console is dark by design and the customer site
+ * light by design, so one stored value cannot express both without being wrong for somebody.
+ *
+ * Consequence, accepted: an old `safra-theme` cookie is now ignored, so anyone who had chosen a
+ * theme gets their app's default once and chooses again. That is also what clears the leaked dark.
+ */
+export type ThemeSurface = 'web' | 'admin' | 'partner';
+
+/**
+ * Where the choice is persisted, per surface.
+ *
+ * `localStorage` is origin-scoped, so on separate ports or subdomains it never leaked. Namespaced
+ * anyway: if the apps are ever served from ONE host under different paths — a deployment somebody
+ * could reasonably choose — an unnamespaced key would leak exactly as the cookie did, and it would
+ * look like a fresh bug rather than this one returning.
+ */
+export function themeStorageKey(surface: ThemeSurface): string {
+  return `safra-theme-${surface}`;
+}
 
 /**
  * The same choice, as a COOKIE, so a server can render `data-theme` itself.
@@ -38,7 +67,9 @@ export const THEME_STORAGE_KEY = 'safra-theme';
  *
  * Not `HttpOnly` — it is a display preference, and `applyTheme` writes it from the browser.
  */
-export const THEME_COOKIE = 'safra-theme';
+export function themeCookie(surface: ThemeSurface): string {
+  return `safra-theme-${surface}`;
+}
 
 /**
  * The pre-paint theme script.
@@ -55,7 +86,9 @@ export const THEME_COOKIE = 'safra-theme';
  * error here is a blank screen rather than a degraded one. The `try` covers private browsing,
  * where reading `localStorage` throws.
  */
-export const THEME_SCRIPT = `try{var s=localStorage.getItem('${THEME_STORAGE_KEY}');if(s==='light'||s==='dark'){document.documentElement.dataset.theme=s}}catch(e){}`;
+export function themeScript(surface: ThemeSurface): string {
+  return `try{var s=localStorage.getItem('${themeStorageKey(surface)}');if(s==='light'||s==='dark'){document.documentElement.dataset.theme=s}}catch(e){}`;
+}
 
 /**
  * The theme currently on screen.
@@ -95,11 +128,11 @@ export function currentTheme(whenUnset: Theme | 'system' = 'system'): Theme {
  * best-effort — a failure means the preference does not survive a reload, which is worth
  * strictly less than the page continuing to work.
  */
-export function applyTheme(theme: Theme): void {
+export function applyTheme(theme: Theme, surface: ThemeSurface): void {
   document.documentElement.dataset['theme'] = theme;
 
   try {
-    localStorage.setItem(THEME_STORAGE_KEY, theme);
+    localStorage.setItem(themeStorageKey(surface), theme);
   } catch {
     // Private browsing. The choice holds for this page view and is not remembered.
   }
@@ -114,7 +147,7 @@ export function applyTheme(theme: Theme): void {
     */
     const secure = location.protocol === 'https:' ? '; Secure' : '';
 
-    document.cookie = `${THEME_COOKIE}=${theme}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+    document.cookie = `${themeCookie(surface)}=${theme}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
   } catch {
     // Nothing to do: the attribute and localStorage above already carry the choice.
   }

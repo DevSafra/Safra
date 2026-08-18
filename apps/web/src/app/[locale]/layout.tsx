@@ -6,11 +6,12 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 
 import { LOCALE_DIRECTION, isLocale, routing } from '@/i18n/routing';
-import { THEME_COOKIE } from '@safra/ui';
+import { themeCookie } from '@safra/ui';
 
 import { SiteFooter } from '@/components/site-footer';
 import { SiteHeader } from '@/components/site-header';
 import { ThemeScript } from '@/components/theme-script';
+import { ThemeKeeper } from '@/components/theme-keeper';
 
 import '../globals.css';
 
@@ -102,7 +103,9 @@ export default async function LocaleLayout({
     navigation. Only an explicit `dark` is emitted — the default is light and needs no attribute,
     and emitting one for it would mean two ways to say the same thing.
   */
-  const theme = (await cookies()).get(THEME_COOKIE)?.value;
+  /* This app's OWN cookie: a cookie ignores the port, so a shared name let the staff
+     dashboards' dark leak in here (Bashar, 2026-08-18). See `ThemeSurface`. */
+  const theme = (await cookies()).get(themeCookie('web'))?.value;
 
   return (
     <html
@@ -117,6 +120,7 @@ export default async function LocaleLayout({
       <body
         className={`${amiri.variable} ${cairo.variable} flex min-h-dvh flex-col bg-bg text-text`}
       >
+        <ThemeKeeper />
         <NextIntlClientProvider>
           {/* Keyboard users must be able to bypass the header on every page. */}
           <a

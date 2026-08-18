@@ -158,6 +158,7 @@ export function Shell({
             `prefers-color-scheme` rule, so dark is what is on screen before anyone chooses.
           */}
           <ThemeToggle
+            surface="partner"
             toLightLabel={t.nav.themeToLight}
             toDarkLabel={t.nav.themeToDark}
             whenUnset="dark"

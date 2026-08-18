@@ -352,9 +352,14 @@ test.describe('a Latin-valued field on an Arabic page', () => {
     /* And a visitor who DID choose dark keeps it — the same drop, from the other direction. */
     test('a dark page stays dark when the language changes', async ({ page }) => {
       await page.goto('/ar');
+      /*
+        `safra-theme-web`, namespaced. The name used to be `safra-theme` for all three apps, and a
+        cookie ignores the PORT — so the console and لوحة الشريك, which are designed dark, turned the
+        customer site dark through this very cookie (Bashar, 2026-08-18).
+      */
       await page.evaluate(() => {
-        document.cookie = 'safra-theme=dark; Path=/; Max-Age=3600; SameSite=Lax';
-        localStorage.setItem('safra-theme', 'dark');
+        document.cookie = 'safra-theme-web=dark; Path=/; Max-Age=3600; SameSite=Lax';
+        localStorage.setItem('safra-theme-web', 'dark');
       });
       await page.reload({ waitUntil: 'networkidle' });
 
@@ -372,6 +377,108 @@ test.describe('a Latin-valued field on an Arabic page', () => {
         await page.evaluate(() => getComputedStyle(document.body).backgroundColor),
         'the chosen theme survived the locale change',
       ).toBe(dark);
+    });
+
+    /**
+     * The choice survives even when the SERVER render could not carry it.
+     *
+     * `data-theme` is emitted by the layout from the cookie, so React owns it across the re-render a
+     * locale change causes. That holds only when the render being reconciled against actually read a
+     * cookie — and most of this app is statically prerendered (`●` in the build output), so a
+     * prefetched or cached payload carries no attribute and the theme reverts on navigation.
+     *
+     * Reproduced here the way it happens: a stored choice with NO cookie, which is exactly what a
+     * static payload sees. `ThemeKeeper` re-asserts it after each navigation.
+     */
+    test('keeps a stored theme a static payload could not carry', async ({ page }) => {
+      await page.goto('/ar');
+      await page.evaluate(() => localStorage.setItem('safra-theme-web', 'dark'));
+      await page.reload({ waitUntil: 'networkidle' });
+
+      const background = () =>
+        page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+      const dark = await background();
+
+      expect(dark, 'the stored choice applies on a cold load').not.toBe(
+        'rgb(245, 246, 250)',
+      );
+
+      /* Every hop, because the bug was reported as specific to some of them. */
+      for (const language of ['English', 'Deutsch', 'العربية']) {
+        await page.locator('footer details').first().click();
+        await page.locator('footer').getByRole('link', { name: language }).click();
+        await page.waitForTimeout(900);
+
+        expect(await background(), `${language} lost the stored theme`).toBe(dark);
+      }
+    });
+
+    /**
+     * Changing the language keeps the reader where they are — page AND query.
+     *
+     * The picker used to take the path as a prop, read by the footer from an `x-safra-pathname`
+     * header the middleware sets. When that header was missing or failed validation the fallback was
+     * `/${locale}` — the HOME page — so the control that exists to keep somebody in place sent them
+     * to the front door instead (Bashar, 2026-08-18). It reads `usePathname()` now, which cannot be
+     * stale, absent, or another request's.
+     *
+     * The search page is the case worth having: it carries a query, and the header only ever held a
+     * path, so a reader changing language mid-search kept their page and lost their search.
+     */
+    test('keeps the page and its query when the language changes', async ({ page }) => {
+      for (const [from, to] of [
+        ['/ar/city/damascus', '/en/city/damascus'],
+        ['/ar/search?city=damascus&adults=2', '/en/search?city=damascus&adults=2'],
+      ] as const) {
+        await page.goto(from);
+
+        await page.locator('footer details').first().click();
+        await page.locator('footer').getByRole('link', { name: 'English' }).click();
+        await page.waitForURL(`**${to}`);
+
+        const landed = await page.evaluate(() => location.pathname + location.search);
+
+        expect(landed, `${from} did not survive the language change`).toBe(to);
+      }
+    });
+
+    /**
+     * A staff dashboard's theme does not reach the customer site.
+     *
+     * The cookie was one name for all three apps, and a cookie is scoped to a HOST and ignores the
+     * PORT — so `localhost:3001` and `:3002`, both designed DARK, shared this jar. Using either
+     * toggle turned the public site dark, and because the layout reads the cookie during a SERVER
+     * render it surfaced on the next navigation, which made the language switcher look guilty.
+     *
+     * Both names are written here: the STALE shared one, which any pre-fix browser still carries,
+     * and the console's own. Neither may repaint this site.
+     */
+    test('a staff dashboard theme does not reach the customer site', async ({ page }) => {
+      await page.goto('/ar');
+
+      const background = () =>
+        page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+
+      const light = await background();
+
+      expect(light, 'the default is white').toBe('rgb(245, 246, 250)');
+
+      await page.evaluate(() => {
+        document.cookie = 'safra-theme=dark; Path=/; Max-Age=3600; SameSite=Lax';
+        document.cookie = 'safra-theme-admin=dark; Path=/; Max-Age=3600; SameSite=Lax';
+        document.cookie = 'safra-theme-partner=dark; Path=/; Max-Age=3600; SameSite=Lax';
+      });
+      await page.reload({ waitUntil: 'networkidle' });
+
+      expect(await background(), 'another app cannot repaint this one').toBe(light);
+
+      /* And the language change, which is where it was noticed. */
+      await page.locator('footer details').first().click();
+      await page.locator('footer').getByRole('link', { name: 'English' }).click();
+      await page.waitForURL('**/en');
+
+      expect(await background(), 'still not repainted after a locale change').toBe(light);
     });
   });
 

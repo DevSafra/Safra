@@ -2,10 +2,10 @@ import Link from 'next/link';
 import { headers } from 'next/headers';
 import { getTranslations } from 'next-intl/server';
 
-import { LOCALE_LABELS, type Locale, routing } from '@/i18n/routing';
+import type { Locale } from '@/i18n/routing';
+import { LanguagePicker } from '@/components/language-picker';
 import { getCurrencyCatalogue } from '@/lib/catalog';
 import { DISPLAY_CURRENCIES, displayCurrency } from '@/lib/currency';
-import { swapLocale } from '@/lib/locale-path';
 import { ORNAMENT_BRAND } from '@safra/ui';
 
 /**
@@ -173,7 +173,6 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
             <div className="flex flex-wrap items-center gap-2 sm:ms-auto">
               <LanguagePicker
                 locale={locale}
-                pathname={pathname}
                 label={t('language')}
                 help={t('languageApply')}
               />
@@ -214,75 +213,6 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
         </div>
       </div>
     </footer>
-  );
-}
-
-/**
- * The language control: one compact summary, three real anchors inside it.
- *
- * `<details>` because it needs no JavaScript and degrades to an always-readable list if CSS fails.
- * The options are anchors rather than form buttons for the reason the header's were: a crawler
- * follows them, and that is how the alternate-language version of a page gets indexed.
- */
-function LanguagePicker({
-  locale,
-  pathname,
-  label,
-  help,
-}: {
-  readonly locale: Locale;
-  readonly pathname: string;
-  readonly label: string;
-  readonly help: string;
-}) {
-  return (
-    /*
-      `name` makes the two pickers an exclusive group — opening one closes the other, with no
-      script. Without it both can be open at once, and on a phone the panels overlap because they
-      both open upward from the same row.
-
-      A browser that does not know the attribute simply allows both, which is what happened before
-      and is a cosmetic overlap rather than a broken control.
-    */
-    <details name="footer-picker" className="relative">
-      <summary
-        aria-label={label}
-        className="inline-flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-lg border border-line bg-card px-3 text-sm text-text2 transition-colors hover:border-gold/50 hover:text-gold"
-      >
-        <span aria-hidden>🌐</span>
-        {LOCALE_LABELS[locale]}
-      </summary>
-
-      {/*
-        `w-max`, not `min-w-*`. An absolutely positioned box shrinks to fit its CONTAINING BLOCK —
-        here the `<details>`, which is as wide as the little summary — so a minimum width let the
-        panel be narrower than its own help line and clip it («اعرض الموقع بهذه الل»). `max-w` keeps
-        the content-sized box from running off a phone.
-
-        `bottom-full` — it opens UPWARD. A menu at the very foot of the page that opened downward
-        would render below the viewport, and the reader would have to scroll to a place the page
-        does not go.
-      */}
-      <ul className="absolute bottom-full start-0 z-20 mb-2 w-max max-w-[min(16rem,80vw)] rounded-lg border border-line bg-card p-1 shadow-lg">
-        <li className="px-2 py-1 text-[11px] leading-snug text-faint">{help}</li>
-        {routing.locales.map((code) => (
-          <li key={code}>
-            <Link
-              href={swapLocale(pathname, code)}
-              hrefLang={code}
-              aria-current={code === locale ? 'true' : undefined}
-              className={`flex min-h-10 items-center rounded-md px-2 text-sm transition-colors lg:min-h-9 ${
-                code === locale
-                  ? 'bg-field font-semibold text-gold'
-                  : 'text-muted hover:bg-field hover:text-gold'
-              }`}
-            >
-              {LOCALE_LABELS[code]}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </details>
   );
 }
 

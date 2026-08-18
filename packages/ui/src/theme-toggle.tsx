@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { applyTheme, currentTheme, type Theme } from './theme.js';
+import { applyTheme, currentTheme, type Theme, type ThemeSurface } from './theme.js';
 
 /**
  * The two faces of the toggle, as drawings rather than as characters.
@@ -76,6 +76,14 @@ export interface ThemeToggleProps {
    * Guessing here would put the icon out of step with the page.
    */
   readonly whenUnset: Theme | 'system';
+  /**
+   * Which app this toggle belongs to, so the choice is stored under that app's own key.
+   *
+   * Required for the same reason `whenUnset` is: a default would be silently wrong for two of the
+   * three surfaces, and the symptom — one app inheriting another's theme — reads as a bug in
+   * whichever app you happened to be looking at.
+   */
+  readonly surface: ThemeSurface;
 }
 
 /**
@@ -96,7 +104,12 @@ export interface ThemeToggleProps {
  * identical on both sides; branching on anything client-only here is a hydration mismatch, and the
  * console has been broken by one of those before.
  */
-export function ThemeToggle({ toLightLabel, toDarkLabel, whenUnset }: ThemeToggleProps) {
+export function ThemeToggle({
+  toLightLabel,
+  toDarkLabel,
+  whenUnset,
+  surface,
+}: ThemeToggleProps) {
   const [theme, setTheme] = useState<Theme>('dark');
 
   useEffect(() => {
@@ -107,7 +120,7 @@ export function ThemeToggle({ toLightLabel, toDarkLabel, whenUnset }: ThemeToggl
     const next: Theme = theme === 'dark' ? 'light' : 'dark';
 
     setTheme(next);
-    applyTheme(next);
+    applyTheme(next, surface);
   }
 
   const label = theme === 'dark' ? toLightLabel : toDarkLabel;
