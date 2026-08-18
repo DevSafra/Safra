@@ -80,8 +80,18 @@ export default async function ReviewPage({
       {eligibility.review ? (
         <section className="mt-5 rounded-card border border-line bg-card p-4">
           <p className="text-xs text-faint">{t('yourReview')}</p>
-          <p className="mt-1 text-lg font-bold text-gold" dir="ltr">
-            <span aria-hidden>★</span> {eligibility.review.rating}
+          {/*
+            The `dir` moved from the <p> to an inline <span>.
+
+            On the BLOCK it also moved the element's start edge, so «★ 4.7» sat at the far end of
+            the card away from its label — the same fault as the receipt's date. On an inline run it
+            fixes the ORDER, which is all the star needs, and leaves the alignment to the document.
+            The star keeps its own `aria-hidden`: it is decoration beside a number that is read out.
+          */}
+          <p className="mt-1 text-lg font-bold text-gold">
+            <span dir="ltr">
+              <span aria-hidden>★</span> {eligibility.review.rating}
+            </span>
           </p>
           <p className="mt-2 leading-relaxed text-text">{eligibility.review.body}</p>
 

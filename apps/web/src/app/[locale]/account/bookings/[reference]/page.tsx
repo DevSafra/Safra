@@ -11,6 +11,7 @@ import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { isBookingReference } from '@/lib/booking-reference';
 import { ltrIsolate } from '@/lib/bidi';
+import { localisedName } from '@/lib/localise';
 import { returnTo } from '@/lib/return-to';
 
 /**
@@ -88,7 +89,9 @@ export default async function BookingDetailPage({
   /* The steps and the guarantee describe a wait. Past that, they would describe nothing. */
   const awaiting = shown === 'pending_confirmation';
 
-  const back = returnTo(locale, (await searchParams)['from'], 'bookings');
+  const query = await searchParams;
+  /* `ref` is what lets «رجوع» land on the RECEIPT a reader came from, not on الفواتير. */
+  const back = returnTo(locale, query['from'], 'bookings', query['ref']);
 
   return (
     <AccountShell
@@ -105,6 +108,11 @@ export default async function BookingDetailPage({
       <dl className="mt-6 divide-y divide-line rounded-card border border-line bg-card px-5">
         <Row label={t('bookingReference')}>
           <span className="font-mono">{ltrIsolate(booking.reference)}</span>
+        </Row>
+        <Row label={t('bookingProperty')}>
+          {localisedName(booking.property, locale)}
+          {' · '}
+          <span className="text-muted">{localisedName(booking.unit, locale)}</span>
         </Row>
         <Row label={t('bookingStay')}>
           <DateRange from={booking.checkIn} to={booking.checkOut} locale={locale} /> ·{' '}

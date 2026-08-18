@@ -119,3 +119,65 @@ describe('returnParam', () => {
     },
   );
 });
+
+/**
+ * Coming back to ONE record, not to its list.
+ *
+ * Bashar, 2026-08-18: «عرض الحجز» on a receipt, then «رجوع», landed on الفواتير rather than on the
+ * receipt he had been reading. An origin key names a SCREEN; a receipt is a screen plus a row, so
+ * the reference travels beside the key.
+ *
+ * That is the dangerous half of this change and the reason for the forged cases below: a value from
+ * the query string now contributes to a path. It contributes only by passing `isBookingReference`,
+ * so the path stays a literal from `return-to.ts` plus a value of a known shape.
+ */
+describe('returning to one record', () => {
+  const REFERENCE = 'BKG-2026-051496';
+
+  it('comes back to the receipt, not to the list', () => {
+    expect(returnTo('ar', 'invoice', 'bookings', REFERENCE)).toBe(
+      `/ar/account/invoices/${REFERENCE}`,
+    );
+  });
+
+  it('round-trips what the receipt writes', () => {
+    const query = new URLSearchParams(returnParam('invoice', REFERENCE));
+
+    expect(
+      returnTo(
+        'ar',
+        query.get(RETURN_PARAM) ?? undefined,
+        'bookings',
+        query.get('ref') ?? undefined,
+      ),
+    ).toBe(`/ar/account/invoices/${REFERENCE}`);
+  });
+
+  /* Wrong-but-harmless: the section, never a broken link and never a 404. */
+  it('falls back to the list when the reference is missing', () => {
+    expect(returnTo('ar', 'invoice', 'bookings')).toBe('/ar/account/invoices');
+  });
+
+  /**
+   * A crafted reference must not become a path, a host, or a scheme.
+   *
+   * Each of these is a way the old `?return=<path>` design would have been an open redirect on the
+   * one control a reader has no reason to distrust.
+   */
+  it.each([
+    '../../evil',
+    '/etc/passwd',
+    'https://evil.example',
+    '//evil.example',
+    'javascript:alert(1)',
+    `${'BKG-2026-000001'}?x=1`,
+    '',
+  ])('ignores the forged reference %j', (forged) => {
+    expect(returnTo('ar', 'invoice', 'bookings', forged)).toBe('/ar/account/invoices');
+  });
+
+  /* An origin that does NOT address a record ignores a reference entirely. */
+  it('appends nothing to a section origin', () => {
+    expect(returnTo('ar', 'bookings', 'home', REFERENCE)).toBe('/ar/account/bookings');
+  });
+});

@@ -6,14 +6,13 @@ import { getTranslations } from 'next-intl/server';
 import { AccountShell } from '@/components/account-shell';
 import { BackLink } from '@/components/back-link';
 import { DateRange } from '@/components/date-range';
-import { PrintButton } from '@/components/print-button';
-import { StatusPill } from '@/components/booking-status-pill';
+import { StatusPill, customerBookingStatus } from '@/components/booking-status-pill';
 import { getAccountSummary, getInvoice, type InvoiceLineRow } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { ltrIsolate } from '@/lib/bidi';
 import { formatMoney, localisedName } from '@/lib/localise';
-import { returnParam } from '@/lib/return-to';
+import { returnParam, returnTo } from '@/lib/return-to';
 import type { Locale } from '@/i18n/routing';
 
 /**
@@ -65,10 +64,14 @@ function Line({
 
 export default async function AccountInvoicePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; reference: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale: requested, reference } = await params;
+  /* Where the reader came from, so «رجوع» goes back there rather than to this section's list. */
+  const query = await searchParams;
   const { locale } = await requireAccount(
     requested,
     `/invoices/${encodeURIComponent(reference)}`,
@@ -89,7 +92,7 @@ export default async function AccountInvoicePage({
         locale={locale}
         active="invoices"
         summary={summary}
-        title={t('navInvoices')}
+        title={t('invoiceTitle')}
       >
         <p className="text-sm text-muted">{t('sessionExpired')}</p>
       </AccountShell>
@@ -104,12 +107,30 @@ export default async function AccountInvoicePage({
       locale={locale}
       active="invoices"
       summary={summary}
-      title={t('navInvoices')}
+      title={t('invoiceTitle')}
     >
       <div className="grid gap-6">
         <div className="flex flex-wrap items-center gap-3 print:hidden">
-          <BackLink href={`/${locale}/account/invoices`} locale={locale} />
-          <PrintButton label={t('invoiceDownload')} />
+          <BackLink
+            href={returnTo(locale, query['from'], 'invoices', query['ref'])}
+            locale={locale}
+          />
+          {/*
+            A LINK, not a button (Bashar, 2026-08-18: download it, do not open the print dialog).
+
+            There is a URL now — the route beside this page renders the receipt to a PDF and sends it
+            as an attachment — so an anchor is the honest element, and the whole control works with no
+            client JavaScript at all. `download` names the file after the reference; the header does
+            the forcing, so a browser that ignores the attribute still downloads rather than navigates.
+          */}
+          <a
+            href={`/${locale}/account/invoices/${encodeURIComponent(invoice.reference)}/pdf`}
+            download={`${invoice.reference}.pdf`}
+            className="inline-flex min-h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border border-gold px-4 text-sm text-gold transition-colors hover:bg-gold hover:text-bg print:hidden lg:min-h-0 lg:py-2"
+          >
+            <span aria-hidden="true">⤓</span>
+            {t('invoiceDownload')}
+          </a>
           <span className="text-xs text-faint">{t('invoicePrintNote')}</span>
         </div>
 
@@ -121,10 +142,10 @@ export default async function AccountInvoicePage({
               <p className="font-mono text-sm text-text">{invoice.reference}</p>
             </div>
             <StatusPill
-              status={invoice.bookingStatus}
+              status={customerBookingStatus(invoice.bookingStatus)}
               label={dynamicMessage(
                 t,
-                `status.${invoice.bookingStatus}`,
+                `status.${customerBookingStatus(invoice.bookingStatus)}`,
                 invoice.bookingStatus,
               )}
             />
@@ -148,14 +169,23 @@ export default async function AccountInvoicePage({
             </div>
             <div>
               <dt className="text-xs text-faint">{t('invoiceIssuedLabel')}</dt>
-              <dd className="mt-1 text-sm text-text" dir="ltr">
-                {invoice.issuedAt.slice(0, 10)}
+              {/*
+                ISOLATED, not `dir="ltr"` (Bashar, 2026-08-18).
+
+                `dir` on a BLOCK element also moves its start edge, so the date left-aligned inside
+                a full-width grid cell while «تاريخ الحجز» stayed on the right — the label and its
+                value at opposite ends of the row, which reads as two unrelated things. U+2066…U+2069
+                fix the ORDER of the digits and leave the alignment to the document, which is the
+                same call `profile` and `wallet` already make.
+              */}
+              <dd className="mt-1 text-sm text-text">
+                {ltrIsolate(invoice.issuedAt.slice(0, 10))}
               </dd>
             </div>
           </dl>
 
           <Link
-            href={`/${locale}/account/bookings/${encodeURIComponent(invoice.reference)}?${returnParam('invoices')}`}
+            href={`/${locale}/account/bookings/${encodeURIComponent(invoice.reference)}?${returnParam('invoice', invoice.reference)}`}
             className="mt-4 inline-flex min-h-10 w-fit items-center text-sm text-gold hover:underline print:hidden lg:min-h-0"
           >
             {t('invoiceBookingLink')}
@@ -243,7 +273,16 @@ export default async function AccountInvoicePage({
           )}
         </section>
 
-        <p className="text-xs leading-relaxed text-faint">{t('invoicesNotTax')}</p>
+        {/*
+          On screen, not on the document (Bashar, 2026-08-18).
+
+          It is the only line distinguishing a payment record from a tax invoice, so it stays where
+          the customer reads their receipts — `print:hidden` takes it out of the PDF and nothing
+          else. Deleting the key would take it off the list screen too, which was not the ask.
+        */}
+        <p className="text-xs leading-relaxed text-faint print:hidden">
+          {t('invoicesNotTax')}
+        </p>
       </div>
     </AccountShell>
   );

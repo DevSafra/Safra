@@ -94,17 +94,35 @@ test.describe('الفواتير', () => {
       expect(amount.trim()).toMatch(/\.\d{2}$/);
     }
 
-    // ── Out to the booking, and back to where we were ──
+    // ── Out to the booking, and back to THIS RECEIPT ──
     /*
+      Two corrections live in this block.
+
       `/account/bookings/…`, not `/booking/…`: the latter is the POST-PAYMENT holding page, which
-      looks nothing up and says the same thing about every booking. A receipt now links to the
-      booking's own screen (2026-08-18). What this asserts is unchanged — the trip out and back,
-      carrying `from=invoices`.
+      looks nothing up and says the same thing about every booking.
+
+      And back returns to the RECEIPT, not to الفواتير (Bashar, 2026-08-18). `from=invoice` names a
+      screen that addresses one record, so a `ref` travels beside it — asserted here by comparing
+      against the URL we actually left, rather than against a pattern that a fallback to the list
+      would also satisfy.
     */
+    const receipt = new URL(page.url()).pathname;
+
     await page.getByRole('link', { name: en.account.invoiceBookingLink }).click();
     await page.waitForURL(/\/account\/bookings\/BKG-/, { timeout: 20_000 });
-    expect(new URL(page.url()).searchParams.get('from')).toBe('invoices');
 
+    const trip = new URL(page.url()).searchParams;
+
+    expect(trip.get('from')).toBe('invoice');
+    expect(trip.get('ref')).toBe(receipt.split('/').pop());
+
+    await page
+      .getByRole('link', { name: new RegExp(en.common.back, 'i') })
+      .first()
+      .click();
+    await page.waitForURL((url) => url.pathname === receipt, { timeout: 20_000 });
+
+    /* …and from the receipt, back again reaches the list. */
     await page
       .getByRole('link', { name: new RegExp(en.common.back, 'i') })
       .first()
@@ -145,9 +163,19 @@ test.describe('الفواتير', () => {
       waitUntil: 'domcontentloaded',
     });
 
-    const download = page.getByRole('button', { name: en.account.invoiceDownload });
+    /*
+      A LINK now, not a button (Bashar, 2026-08-18: download the file, do not open the print dialog).
+      It points at the route beside this page, which renders the receipt and sends it as an
+      attachment — asserted here so a control that merely LOOKS right cannot pass.
+    */
+    const download = page.getByRole('link', { name: en.account.invoiceDownload });
 
     await expect(download).toBeVisible();
+    await expect(download).toHaveAttribute(
+      'href',
+      `/en/account/invoices/${encodeURIComponent(reference)}/pdf`,
+    );
+    await expect(download).toHaveAttribute('download', `${reference}.pdf`);
 
     await page.emulateMedia({ media: 'print' });
 
@@ -161,12 +189,23 @@ test.describe('الفواتير', () => {
       page.getByRole('link', { name: en.account.invoiceBookingLink }),
     ).toBeHidden();
 
-    /* The record itself stays, and so does the sentence saying what it is not. */
+    /* The record itself stays. */
     await expect(page.getByText(reference).first()).toBeVisible();
     await expect(
       page.getByText(en.account.invoiceLines.accommodation).first(),
     ).toBeVisible();
+
+    /*
+      The «not a tax invoice» sentence leaves the DOCUMENT and stays on the SCREEN (Bashar,
+      2026-08-18). Both halves are asserted, because either alone permits the wrong outcome:
+      removing the key entirely would also pass a print-only check, and it is the one line
+      distinguishing a payment record from a tax invoice.
+    */
+    await expect(page.getByText(en.account.invoicesNotTax)).toBeHidden();
+
+    await page.emulateMedia({ media: 'screen' });
     await expect(page.getByText(en.account.invoicesNotTax)).toBeVisible();
+    await page.emulateMedia({ media: 'print' });
 
     /* Paper is white. A dark card behind black text prints as a solid block of ink. */
     const paper = await page.evaluate(

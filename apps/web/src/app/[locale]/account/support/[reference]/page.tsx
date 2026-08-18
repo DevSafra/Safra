@@ -9,6 +9,7 @@ import { BackLink } from '@/components/back-link';
 import { SupportForm } from '@/components/support-forms';
 import { SupportClose } from '@/components/support-close';
 import { getAccountSummary, getSupportThread } from '@/lib/account';
+import { returnTo } from '@/lib/return-to';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { ltrIsolate } from '@/lib/bidi';
@@ -40,10 +41,14 @@ const SENDER_KEY = {
 
 export default async function AccountSupportThreadPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; reference: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale: requested, reference } = await params;
+  /* Where the reader came from, so «رجوع» goes back there rather than to this section's list. */
+  const query = await searchParams;
   const { locale } = await requireAccount(
     requested,
     `/support/${encodeURIComponent(reference)}`,
@@ -79,7 +84,10 @@ export default async function AccountSupportThreadPage({
       title={t('navSupport')}
     >
       <div className="grid gap-6">
-        <BackLink href={`/${locale}/account/support`} locale={locale} />
+        <BackLink
+          href={returnTo(locale, query['from'], 'support', query['ref'])}
+          locale={locale}
+        />
 
         <section className="rounded-card border border-line bg-card p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">

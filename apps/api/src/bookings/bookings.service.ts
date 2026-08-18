@@ -140,9 +140,25 @@ export class BookingsService {
       conditions.push(ownership);
     }
 
+    /*
+      The property and unit are joined HERE and not in `list`.
+
+      A detail screen has to say WHERE the stay is — a reference, a date range and a total describe
+      a transaction rather than a trip, and the customer's own screen was showing exactly that. A
+      list row has no space for it and would pay for the join on every page.
+
+      Nothing is widened by this: every caller that reaches a booking at all is already scoped to it
+      — a customer booked it, a partner owns the property, staff see everything — so the names add
+      no reach. Only the names, though: the `properties` row carries an address and a partner id,
+      and a detail screen needs neither.
+    */
     const booking = await this.db.query.bookings.findFirst({
       columns: BOOKING_COLUMNS,
       where: and(...conditions),
+      with: {
+        property: { columns: { nameAr: true, nameEn: true, nameDe: true } },
+        unit: { columns: { nameAr: true, nameEn: true, nameDe: true } },
+      },
     });
 
     if (!booking) {

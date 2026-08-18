@@ -88,6 +88,23 @@ export async function getMyBookings(cursor?: string) {
 }
 
 /**
+ * A name in all three languages, for `localisedName` to pick from.
+ *
+ * The API used to pre-pick with `coalesce(name_ar, name_en)`, which answered Arabic to every reader —
+ * so «شقق قصر الشرق المخدومة» appeared in the middle of the English and German account pages. Only the
+ * client knows which language the reader actually chose, because that is their URL locale and it may
+ * differ from the preference stored on their account.
+ *
+ * `nameAr` is not nullable: it is `NOT NULL` in the database and reached through an inner join, and
+ * it is the fallback every other locale relies on.
+ */
+const translatedNameSchema = z.object({
+  nameAr: z.string(),
+  nameEn: z.string().nullable(),
+  nameDe: z.string().nullable(),
+});
+
+/**
  * One booking, scoped to the caller by the API.
  *
  * A wider shape than the list's: a detail screen shows the guests and when the booking was placed,
@@ -101,6 +118,9 @@ export async function getMyBookings(cursor?: string) {
 const bookingDetailSchema = z.object({
   reference: z.string(),
   status: z.string(),
+  /* Where the stay is. A reference and a total describe a transaction, not a trip. */
+  property: translatedNameSchema,
+  unit: translatedNameSchema,
   checkIn: z.string(),
   checkOut: z.string(),
   nights: z.number(),
@@ -182,23 +202,6 @@ export async function getMyWalletTransactions(limit = 10, cursor?: string) {
 }
 
 // ─── Reviews (§7.3, P-006) ───────────────────────────────────────────────────
-
-/**
- * A name in all three languages, for `localisedName` to pick from.
- *
- * The API used to pre-pick with `coalesce(name_ar, name_en)`, which answered Arabic to every reader —
- * so «شقق قصر الشرق المخدومة» appeared in the middle of the English and German account pages. Only the
- * client knows which language the reader actually chose, because that is their URL locale and it may
- * differ from the preference stored on their account.
- *
- * `nameAr` is not nullable: it is `NOT NULL` in the database and reached through an inner join, and
- * it is the fallback every other locale relies on.
- */
-const translatedNameSchema = z.object({
-  nameAr: z.string(),
-  nameEn: z.string().nullable(),
-  nameDe: z.string().nullable(),
-});
 
 const pendingReviewSchema = z.object({
   bookingReference: z.string(),

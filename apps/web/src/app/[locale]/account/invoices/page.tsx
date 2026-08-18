@@ -4,7 +4,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { AccountShell } from '@/components/account-shell';
 import { DateRange } from '@/components/date-range';
-import { StatusPill } from '@/components/booking-status-pill';
+import { StatusPill, customerBookingStatus } from '@/components/booking-status-pill';
 import { getAccountSummary, getMyInvoices } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -101,10 +101,10 @@ export default async function AccountInvoicesPage({
                       })}
                     </span>
                     <StatusPill
-                      status={invoice.bookingStatus}
+                      status={customerBookingStatus(invoice.bookingStatus)}
                       label={dynamicMessage(
                         t,
-                        `status.${invoice.bookingStatus}`,
+                        `status.${customerBookingStatus(invoice.bookingStatus)}`,
                         invoice.bookingStatus,
                       )}
                     />

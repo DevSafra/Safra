@@ -1,4 +1,5 @@
 import type { Locale } from '@/i18n/routing';
+import { isBookingReference } from '@/lib/booking-reference';
 
 /**
  * Where a detail screen's «رجوع» sends the reader.
@@ -34,12 +35,34 @@ const ORIGINS = {
   wallet: '/account/wallet',
   /* الفواتير: a receipt links to the booking it describes, so the booking must be able to come back. */
   invoices: '/account/invoices',
+  /**
+   * ONE receipt, not the list.
+   *
+   * Bashar, 2026-08-18: «عرض الحجز» on a receipt, then back, landed on الفواتير rather than on the
+   * receipt he was reading. The origin key alone cannot express that — it names a SCREEN, and this
+   * screen needs a row. So this entry takes a reference, and `returnTo` appends it.
+   */
+  invoice: '/account/invoices',
+  support: '/account/support',
 } as const;
+
+/**
+ * Origins that address ONE record, and therefore need a reference to be complete.
+ *
+ * The reference travels in its own parameter and is checked against `isBookingReference` before it
+ * is appended — so the path is still a literal from this file plus a value of a known SHAPE, and a
+ * crafted `ref` cannot become a path segment of its own. Without a usable reference the origin
+ * degrades to its list, which is wrong-but-harmless rather than broken.
+ */
+const REFERENCED: ReadonlySet<string> = new Set(['invoice']);
 
 export type ReturnOrigin = keyof typeof ORIGINS;
 
 /** The parameter name, shared by whoever writes it and whoever reads it. */
 export const RETURN_PARAM = 'from';
+
+/** Which record to come back TO, for the origins that address one. */
+export const RETURN_REF_PARAM = 'ref';
 
 function isOrigin(value: string): value is ReturnOrigin {
   return Object.prototype.hasOwnProperty.call(ORIGINS, value);
@@ -56,10 +79,17 @@ export function returnTo(
   locale: Locale,
   from: string | string[] | undefined,
   fallback: ReturnOrigin,
+  reference?: string | string[],
 ): string {
   const key = typeof from === 'string' && isOrigin(from) ? from : fallback;
+  const base = `/${locale}${ORIGINS[key]}`;
 
-  return `/${locale}${ORIGINS[key]}`;
+  if (!REFERENCED.has(key)) return base;
+
+  /* A referenced origin without a usable reference falls back to its own list. */
+  return typeof reference === 'string' && isBookingReference(reference)
+    ? `${base}/${reference}`
+    : base;
 }
 
 /**
@@ -68,6 +98,10 @@ export function returnTo(
  * Written by the list because the list is the only thing that knows. A detail screen cannot work it
  * out — `Referer` is unreliable, strippable and not available during a server render.
  */
-export function returnParam(origin: ReturnOrigin): string {
-  return `${RETURN_PARAM}=${origin}`;
+export function returnParam(origin: ReturnOrigin, reference?: string): string {
+  const from = `${RETURN_PARAM}=${origin}`;
+
+  return reference
+    ? `${from}&${RETURN_REF_PARAM}=${encodeURIComponent(reference)}`
+    : from;
 }
