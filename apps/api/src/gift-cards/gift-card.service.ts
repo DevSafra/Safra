@@ -23,6 +23,9 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { badRequest, notFound, unauthorized } from '../common/errors/app-error.js';
+import { ENV, type Env } from '../config/env.js';
+import { MailService } from '../mail/mail.service.js';
+import { giftCardPurchasedMail } from '../mail/mail.templates.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -132,8 +135,10 @@ export class GiftCardService {
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
+    @Inject(ENV) private readonly env: Env,
     private readonly wallet: WalletService,
     private readonly audit: AuditService,
+    private readonly mail: MailService,
   ) {}
 
   /** The caller's own customer profile, or a refusal. No endpoint here accepts a customer id. */
@@ -307,7 +312,7 @@ export class GiftCardService {
   ): Promise<GiftCardPurchaseResult> {
     const profileId = this.profileOf(claims);
 
-    return this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx) => {
       /*
         Checked FIRST, so a refusal happens before a card exists — a live, spendable card behind a
         failed payment is the one outcome that must not be possible.
@@ -408,6 +413,83 @@ export class GiftCardService {
         walletCurrency: paid.currencyCode,
       };
     });
+
+    /*
+      The code, emailed to the buyer (Bashar, 2026-08-18).
+
+      ## After the transaction, never inside it
+
+      An SMTP call inside `db.transaction` holds a database transaction open across a network round
+      trip to a third party. The card is already committed by the time this runs, which is also the
+      right order for the failure case: a mail that does not go out must not un-buy a card the
+      customer has paid for.
+
+      ## Not through the queue, and this is the interesting part
+
+      Everything else notifies through BullMQ. A queued job carries its payload in REDIS, where
+      `DEFAULT_JOB_OPTIONS` keeps a completed job for a day and a FAILED one until somebody moves it.
+      A gift code is cash, so that payload would be cash sitting in a cache — indefinitely, on the
+      exact path where something already went wrong. `gift_cards` deliberately stores only a hash;
+      routing the plaintext through a queue would undo that decision from the side.
+
+      So it is sent here, in the request, from a value that never leaves the process. The cost is an
+      SMTP call on a purchase — the same trade `docs/FUTURE-WORK.md` §7b deviation 1 accepted for
+      low-volume notices, and a card purchase is one.
+
+      `MailService.send` swallows delivery errors, so a mail server that refuses cannot fail a
+      purchase that already succeeded.
+    */
+    await this.notifyPurchaser(result, claims);
+
+    return result;
+  }
+
+  /**
+   * Emails the code to whoever BOUGHT the card — never to a recipient.
+   *
+   * A card can name someone else (`recipient_email`), and delivering a gift to them is a separate
+   * decision about what a gift card DOES. This method looks up the purchaser's own address from
+   * their profile rather than taking one from the request, so there is no input that can redirect a
+   * spendable code to an inbox of a caller's choosing.
+   */
+  private async notifyPurchaser(
+    result: GiftCardPurchaseResult,
+    claims: AccessTokenClaims | undefined,
+  ): Promise<void> {
+    const profileId = this.profileOf(claims);
+
+    const rows = await this.db.execute<{ email: string; preferred_locale: string }>(sql`
+      SELECT email, preferred_locale FROM customer_profiles WHERE id = ${profileId}::uuid
+    `);
+
+    const buyer = rows.rows.at(0);
+
+    if (!buyer) return;
+
+    await this.mail.send(
+      giftCardPurchasedMail({
+        to: buyer.email,
+        locale: buyer.preferred_locale,
+        code: result.code,
+        reference: result.card.reference,
+        amount: `${result.card.originalAmount} ${result.card.currencyCode}`,
+        /* From configured `APP_URL`, never a request header — see `account-recovery.service.ts`. */
+        url: new URL(
+          `/${buyer.preferred_locale}/account/gifts`,
+          this.env.APP_URL,
+        ).toString(),
+      }),
+    );
+
+    /*
+      Nothing logged here on purpose.
+
+      `MailService` already records both outcomes with the subject and the recipient, and it SWALLOWS
+      delivery errors — so a line here saying the code was emailed would be written just as happily
+      when the mail server refused. Observed doing exactly that against a dev box with no SMTP on
+      1025. A log that asserts what it cannot know is worse than no log, and it would be the line an
+      investigation trusted while a customer sat holding an unusable card.
+    */
   }
 
   /** The cards this customer bought — never their codes. */

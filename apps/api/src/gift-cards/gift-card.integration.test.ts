@@ -5,6 +5,8 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { normaliseGiftCode } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import type { Env } from '../config/env.js';
+import type { MailService, OutgoingMail } from '../mail/mail.service.js';
 import type { FxRateService } from '../fx/fx-rate.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { GiftCardService } from './gift-card.service.js';
@@ -70,12 +72,23 @@ describeIfDb('GiftCardService', () => {
   let db: Database;
   let wallet: WalletService;
   let giftCards: GiftCardService;
+  let sent: OutgoingMail[];
 
   beforeEach(async () => {
     await harness.begin();
     db = harness.db;
     wallet = new WalletService(db, fxStub);
-    giftCards = new GiftCardService(db, wallet, new AuditService(db));
+    sent = [];
+    giftCards = new GiftCardService(
+      db,
+      { APP_URL: 'https://safra.test' } as unknown as Env,
+      wallet,
+      new AuditService(db),
+      /* Captures what would have been sent, so the CODE in the body can be asserted. */
+      {
+        send: (mail: OutgoingMail) => Promise.resolve(void sent.push(mail)),
+      } as unknown as MailService,
+    );
     await seed(db);
   });
 
@@ -412,6 +425,86 @@ describeIfDb('GiftCardService', () => {
     await expect(
       giftCards.purchase(customer(), { amount: '25.00' }),
     ).rejects.toMatchObject({ response: { code: 'wallet.insufficient_balance' } });
+  });
+
+  /**
+   * The code reaches the buyer's inbox, because it reaches nowhere else.
+   *
+   * `gift_cards` keeps `code_hash` and `code_last4`, so after this request the plaintext is gone —
+   * from us as much as from an attacker. If this email does not carry it, the customer's money is in
+   * a card nobody can open.
+   */
+  it('emails the code to the purchaser', async () => {
+    await fund('50.00');
+
+    const result = await giftCards.purchase(customer(), { amount: '25.00' });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.to).toBe('gift-one@safra.test');
+    /* The code itself, in the grouped form the response returned. */
+    expect(sent[0]?.text).toContain(result.code);
+    expect(sent[0]?.text).toContain(result.card.reference);
+    expect(sent[0]?.subject).toContain(result.card.reference);
+  });
+
+  /**
+   * It goes to the BUYER, never to a recipient named in the request.
+   *
+   * A card can be bought for somebody else. Delivering the gift to them is a separate product
+   * decision; until it is made, an address from the request body must not be able to receive a
+   * spendable code — that would be a redirect of cash to an inbox of the caller's choosing.
+   */
+  it('sends the code to the buyer even when the card names someone else', async () => {
+    await fund('50.00');
+
+    await giftCards.purchase(customer(), {
+      amount: '25.00',
+      recipientName: 'شخص آخر',
+      recipientEmail: 'someone-else@safra.test',
+    });
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.to).toBe('gift-one@safra.test');
+    expect(sent[0]?.to).not.toBe('someone-else@safra.test');
+    expect(JSON.stringify(sent)).not.toContain('someone-else@safra.test');
+  });
+
+  /* A refused purchase has no card, so there is nothing to send and nobody to tell. */
+  it('sends nothing when the purchase is refused', async () => {
+    await fund('10.00');
+
+    await expect(giftCards.purchase(customer(), { amount: '25.00' })).rejects.toThrow();
+    expect(sent).toStrictEqual([]);
+  });
+
+  /**
+   * A mail server that refuses must not un-buy a paid-for card.
+   *
+   * The real `MailService.send` swallows delivery errors, so this asserts the ORDER rather than the
+   * swallowing: the send happens after the transaction commits, so a throw from it cannot roll back
+   * a card the customer has already paid for.
+   */
+  it('keeps the card when the mail cannot be sent', async () => {
+    await fund('50.00');
+
+    const failing = new GiftCardService(
+      db,
+      { APP_URL: 'https://safra.test' } as unknown as Env,
+      wallet,
+      new AuditService(db),
+      {
+        send: () => Promise.reject(new Error('smtp refused')),
+      } as unknown as MailService,
+    );
+
+    await expect(failing.purchase(customer(), { amount: '25.00' })).rejects.toThrow();
+
+    /* The card is committed regardless — this is the point. */
+    const cards = await db.execute<{ count: string }>(sql`
+      SELECT count(*)::text AS count FROM gift_cards
+      WHERE purchased_by_customer_id = ${PROFILE_ID}::uuid`);
+
+    expect(cards.rows[0]?.count).toBe('1');
   });
 
   it('audits the purchase without recording the code', async () => {

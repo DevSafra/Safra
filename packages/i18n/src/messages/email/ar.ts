@@ -66,6 +66,10 @@ export const ar = {
     about it is not an apology — an email that looks truncated reads as a fault, and somebody who
     thinks they have already read the answer does not open the thread.
   */
+  giftCardPurchased: {
+    subject: 'بطاقة هديتك {reference} — سفرة',
+    body: 'تم إصدار بطاقة هدية بقيمة {amount}.\n\nرمز البطاقة:\n{code}\n\nرقم البطاقة: {reference}\n\nاحفظ هذا الرمز في مكان آمن. من يحمل الرمز يستطيع إضافة الرصيد إلى محفظته، ولا نستطيع إرساله مرة أخرى — لا نحتفظ بنسخة منه.\n\nلإضافة الرصيد: افتح «بطاقات الهدايا» في حسابك وأدخل الرمز:\n{url}\n\nفريق سفرة',
+  },
   supportReplied: {
     subject: 'ردّ فريق الدعم على طلبك — {reference}',
     body: 'ردّ فريق سفرة على طلب الدعم الخاص بك.\n\nالمرجع: {reference}\n\nافتح المحادثة لقراءة الرد ومتابعتها:\n{url}\n\nلا نرسل نص الرسائل في البريد الإلكتروني؛ المحادثة كاملة في حسابك.\n\nفريق سفرة',

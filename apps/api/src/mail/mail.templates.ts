@@ -169,6 +169,45 @@ export function reviewReceivedMail(input: {
   };
 }
 
+/**
+ * The gift card code, to the person who bought it (Bashar, 2026-08-18).
+ *
+ * ## This is the only copy
+ *
+ * `gift_cards` stores `code_hash` and `code_last4` and nothing else, so the plaintext exists for the
+ * length of one request and is then unrecoverable — by us as much as by anyone. The body says so
+ * plainly, because "we cannot send it again" is the difference between a customer filing it safely
+ * and a customer assuming they can ask.
+ *
+ * ## A code is cash, and this puts it in an inbox
+ *
+ * That is inherent to a gift card rather than a flaw in the delivery: a code nobody can read is not
+ * a gift. What follows from it is that this template must never be reused to send a code to anyone
+ * who did not buy it — the caller passes `to`, and the only correct value is the purchaser's own
+ * address. A card bought FOR somebody else is a separate decision about delivering a gift.
+ */
+export function giftCardPurchasedMail(input: {
+  to: string;
+  locale: string;
+  code: string;
+  reference: string;
+  amount: string;
+  url: string;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).giftCardPurchased;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { reference: input.reference }),
+    text: fill(copy.body, {
+      code: input.code,
+      reference: input.reference,
+      amount: input.amount,
+      url: input.url,
+    }),
+  };
+}
+
 /** The host has replied to a review the customer wrote. */
 export function reviewRepliedMail(input: {
   to: string;
