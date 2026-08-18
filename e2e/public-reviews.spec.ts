@@ -56,10 +56,11 @@ test.describe('reviews on a property page', () => {
     /*
       Asserted against the API PAYLOAD and the reviews SECTION, not the whole document.
 
-      A first attempt searched the entire HTML for a Syrian phone number and failed on
-      `+963933123456` — the example inside the checkout form's «بصيغة دولية، مثل …» hint, which
-      next-intl embeds along with every other message. Searching a page that carries its own
-      translation bundle finds the dictionary, not the data.
+      A first attempt searched the entire HTML for a Syrian phone number and failed on an EXAMPLE
+      number that the checkout hint used to quote, which next-intl embeds along with every other
+      message. That hint has since been replaced by a country picker, so this particular collision
+      is gone — but the lesson is not, and it is why the assertion still runs against the payload:
+      searching a page that carries its own translation bundle finds the dictionary, not the data.
     */
     const payload = await (
       await request.get(`http://localhost:4000/api/v1/properties/${SLUG}`)

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import type { Locale } from '@/i18n/routing';
+import { PhoneField } from '@/components/phone-field';
 import { PasswordField, passwordMismatch, passwordsMatch } from '@safra/ui';
 
 import { reloadInto } from '@/lib/session-navigation';
@@ -28,6 +30,7 @@ interface Labels {
   readonly editTitle: string;
   readonly fullName: string;
   readonly phone: string;
+  readonly phoneHint: string;
   readonly save: string;
   readonly saving: string;
   readonly saved: string;
@@ -39,7 +42,7 @@ export function ProfileForm({
   initial,
   labels,
 }: {
-  readonly locale: string;
+  readonly locale: Locale;
   readonly initial: { readonly fullName: string; readonly phone: string };
   readonly labels: Labels;
 }) {
@@ -132,21 +135,18 @@ export function ProfileForm({
         />
       </label>
 
-      <label className="grid gap-1">
-        <span className="text-sm text-muted">{labels.phone}</span>
-        {/*
-          `field-ltr`, not `dir="ltr"`: the number is laid out left to right, and it still sits at the
-          reader's start edge — the right, in Arabic. See the class in `globals.css`.
-        */}
-        <input
-          name="phone"
-          value={phone}
-          onChange={(event) => setPhone(event.target.value)}
-          inputMode="tel"
-          required
-          className="field-ltr min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-text lg:min-h-0"
-        />
-      </label>
+      {/*
+        The same field the register form uses, so a number is entered one way across the site — and
+        `defaultValue` is why it takes an E.164 string: this form EDITS a number already on record.
+        It keeps its value in state rather than in `FormData`, hence `onChange`.
+      */}
+      <PhoneField
+        locale={locale}
+        label={labels.phone}
+        hint={labels.phoneHint}
+        defaultValue={phone}
+        onChange={setPhone}
+      />
 
       <button
         type="submit"

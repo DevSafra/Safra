@@ -10,7 +10,7 @@ import type { Locale } from '@/i18n/routing';
 import { formatMoney } from '@/lib/localise';
 import { errorMessage } from '@safra/i18n';
 import { dynamicMessage } from '@/lib/dynamic-message';
-import { PHONE_EXAMPLE, ltrIsolate } from '@/lib/bidi';
+import { PhoneField } from '@/components/phone-field';
 
 interface FieldErrors {
   [field: string]: string | undefined;
@@ -180,28 +180,11 @@ export function CheckoutForm({
           error={fieldErrors['guest.email']}
           required
         />
-        <Field
-          name="phone"
-          type="tel"
+        <PhoneField
+          locale={locale}
           label={t('phone')}
-          placeholder={PHONE_EXAMPLE}
-          autoComplete="tel"
-          /*
-            `ltrIsolate` around the number, and it is what fixes «مثل ‎+963…» rendering as
-            «963…+».
-
-            The `+` is bidi-NEUTRAL: inside an Arabic sentence it takes the paragraph's direction
-            and lands after the digits, at the wrong end, so the hint quoted a format nobody could
-            type. U+2066…U+2069 make the number its own left-to-right run and leave the sentence
-            around it alone. Reported by Bashar (2026-08-13) against this hint.
-
-            The PLACEHOLDER above needs no isolation: the field is `field-ltr`, so the whole input
-            is already a left-to-right run — and control characters there would be real characters
-            in a real value.
-          */
-          hint={t('phoneHint', { example: ltrIsolate(PHONE_EXAMPLE) })}
+          hint={t('phoneHint')}
           error={fieldErrors['guest.phone']}
-          required
         />
       </div>
 

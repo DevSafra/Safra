@@ -174,8 +174,9 @@ test.describe('Arabic plurals on a real page', () => {
  *    the direction and takes the alignment from the DOCUMENT — the one thing a `dir` attribute
  *    cannot express.
  * 2. **Order.** `+` is bidi-NEUTRAL. Inside an Arabic sentence it takes the paragraph's direction
- *    and lands after the digits, so the hint quoted «963933123456+» — a format nobody could type.
- *    U+2066…U+2069 make the number its own left-to-right run.
+ *    and lands after the digits, so the checkout hint quoted «963933123456+» — a format nobody could
+ *    type. That hint has since been replaced by a country picker; the same hazard now applies to
+ *    the «+963» it displays, which is why the second test below follows it there.
  *
  * Both were reported by Bashar from a screenshot of the checkout form (2026-08-13), and neither is
  * visible to `pnpm verify`: the markup and the catalogue are both correct in each case. Only a
@@ -193,7 +194,12 @@ test.describe('a Latin-valued field on an Arabic page', () => {
   }) => {
     await page.goto(CHECKOUT);
 
-    const phone = page.locator('input[name="phone"]');
+    /*
+      `#field-phone`, not `input[name=phone]`: since the country picker landed, `name="phone"` is
+      the HIDDEN input carrying the composed E.164 value, and the visible input is the national
+      number. The property under test is unchanged — it is the visible one that a person reads.
+    */
+    const phone = page.locator('#field-phone');
 
     await expect(phone).toBeVisible();
 
@@ -209,24 +215,27 @@ test.describe('a Latin-valued field on an Arabic page', () => {
     expect(style.textAlign).toBe('right');
   });
 
-  test('keeps the + at the head of the example number', async ({ page }) => {
+  /**
+   * The `+` still leads its digits — now in the country picker rather than in a hint.
+   *
+   * The hint no longer quotes an example number: with a picker supplying `+963`, telling somebody
+   * to type «+963…» is an instruction they cannot follow, so that copy went. The BUG the old
+   * assertion guarded did not go anywhere — `+` is bidi-neutral, and in «+963» on an Arabic line it
+   * will migrate to the far end and render «963+» unless the run is forced left-to-right. It is now
+   * the picker's summary that has to hold, and it does so with `dir="ltr"` rather than with
+   * isolates, because there is no surrounding sentence to leave alone.
+   */
+  test('keeps the + at the head of the dial code in the picker', async ({ page }) => {
     await page.goto(CHECKOUT);
 
-    const hint = page.locator('#field-phone-hint');
+    const dial = page.getByText('+963', { exact: true });
 
-    await expect(hint).toBeVisible();
+    await expect(dial).toBeVisible();
 
-    const text = (await hint.textContent()) ?? '';
-
-    /*
-      Asserted on the ISOLATION rather than on the rendered pixels, because the characters are what
-      the code controls and the rendering is what the browser owes us for them. U+2066 is
-      LEFT-TO-RIGHT ISOLATE and U+2069 is POP DIRECTIONAL ISOLATE.
-    */
-    expect(text).toContain('⁦+963933123456⁩');
-
-    /* And the plus is never stranded after the digits, which is what the bug looked like. */
-    expect(text).not.toContain('963933123456+');
+    /* The characters, in order, as the code controls them… */
+    expect(await dial.textContent()).toBe('+963');
+    /* …and the direction that stops the browser reordering them. */
+    expect(await dial.evaluate((el) => getComputedStyle(el).direction)).toBe('ltr');
   });
 
   /**

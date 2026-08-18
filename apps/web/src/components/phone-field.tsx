@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react';
 
+import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
+
 import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
@@ -41,17 +43,40 @@ export function PhoneField({
   label,
   hint,
   error,
+  defaultValue,
+  onChange,
 }: {
   readonly locale: Locale;
   readonly label: string;
   readonly hint: string;
   readonly error?: string | undefined;
+  /**
+   * An E.164 number already on record, split back into its country and its national digits.
+   *
+   * The profile form edits a stored number, so the field has to be able to show one. Parsed with
+   * libphonenumber rather than by matching the longest dial code in the table: `+1` belongs to
+   * twenty-odd countries, and a Canadian opening their profile to a United States flag would be
+   * told, by the UI, something untrue about their own number.
+   */
+  readonly defaultValue?: string | undefined;
+  /** For a form that keeps its value in React state rather than reading `FormData`. */
+  readonly onChange?: ((e164: string) => void) | undefined;
 }) {
   const t = useTranslations('auth');
 
-  /* Syria: the primary market, and what the field's old placeholder already assumed. */
-  const [code, setCode] = useState('SY');
-  const [national, setNational] = useState('');
+  const initial = useMemo(() => {
+    const parsed = defaultValue ? parsePhoneNumberFromString(defaultValue) : undefined;
+
+    /* Syria: the primary market, and what this field's old placeholder already assumed. */
+    return {
+      code: parsed?.country ?? 'SY',
+      national: parsed?.nationalNumber ?? '',
+    };
+  }, [defaultValue]);
+
+  /* `string`, not libphonenumber's `CountryCode` union: the value comes from a `<select>`. */
+  const [code, setCode] = useState<string>(initial.code);
+  const [national, setNational] = useState(initial.national);
 
   const country = dialCountry(code) ?? DIAL_COUNTRIES[0]!;
 
@@ -83,6 +108,17 @@ export function PhoneField({
   }, [locale]);
 
   const typed = national.replace(/\D/g, '').replace(/^0+/, '');
+
+  /*
+    One place composes the value, and both consumers read it from there: the hidden input below for
+    a form that submits `FormData`, and this callback for one that holds state. Two separate
+    compositions would be two chances for them to disagree about the same field.
+  */
+  const emit = (nextCode: string, nextNational: string) => {
+    const country = dialCountry(nextCode);
+
+    onChange?.(country ? toE164(country.dial, nextNational) : '');
+  };
 
   const id = 'field-phone';
   const describedBy = [error ? `${id}-error` : null, `${id}-hint`]
@@ -139,7 +175,10 @@ export function PhoneField({
           <select
             aria-label={t('phoneCountry')}
             value={code}
-            onChange={(event) => setCode(event.target.value)}
+            onChange={(event) => {
+              setCode(event.target.value);
+              emit(event.target.value, national);
+            }}
             data-testid="phone-country"
             className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
           >
@@ -158,7 +197,10 @@ export function PhoneField({
           autoComplete="tel-national"
           placeholder={label}
           value={national}
-          onChange={(event) => setNational(event.target.value)}
+          onChange={(event) => {
+            setNational(event.target.value);
+            emit(code, event.target.value);
+          }}
           aria-invalid={error ? 'true' : undefined}
           aria-describedby={describedBy}
           /*

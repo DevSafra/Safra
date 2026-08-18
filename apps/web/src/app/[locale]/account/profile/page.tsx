@@ -77,6 +77,7 @@ export default async function AccountProfilePage({
               editTitle: t('profileEditTitle'),
               fullName: t('profileFullName'),
               phone: t('profilePhone'),
+              phoneHint: t('profilePhoneHint'),
               save: t('profileSave'),
               saving: t('profileSaving'),
               saved: t('profileSaved'),
