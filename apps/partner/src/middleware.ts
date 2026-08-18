@@ -69,7 +69,23 @@ export default async function middleware(request: NextRequest) {
         process.env['API_URL'] ?? 'http://localhost:4000',
       ]),
     ].join(' '),
-    upgradeInsecure: process.env.NODE_ENV === 'production',
+    /*
+      TLS, not the BUILD MODE.
+
+      This was `process.env.NODE_ENV === 'production'`, and `pnpm start` is production mode — so a
+      production build served over plain `http://localhost` sent `upgrade-insecure-requests` and
+      then broke itself with it. The directive rewrites every `http://` request as `https://`, so
+      Next's RSC payload fetches went to a port with no TLS, failed with `ERR_SSL_PROTOCOL_ERROR`,
+      and every link fell back to a full browser navigation. Reported as a language switch changing
+      the theme and losing the page (Bashar, 2026-08-18); the switch was only the trigger, because a
+      full navigation re-derives `data-theme` and the footer's pathname from scratch.
+
+      Keyed on the protocol of the request, so it is emitted exactly when there is TLS to keep and
+      omitted when there is none to upgrade to. Taken from `nextUrl` rather than a forwarded header
+      read by hand — a spoofed value could only ever remove the directive from the spoofer's own
+      response, and there is nothing to gain from that.
+    */
+    upgradeInsecure: request.nextUrl.protocol === 'https:',
   });
 
   request.headers.set('content-security-policy', csp);

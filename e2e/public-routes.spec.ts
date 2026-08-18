@@ -128,3 +128,56 @@ test.describe('public routes', () => {
     void baseURL;
   });
 });
+
+/**
+ * Client-side navigation actually works — no page may fall back to a full browser load.
+ *
+ * `upgrade-insecure-requests` was emitted whenever the BUILD was production, which `pnpm start` is.
+ * Served over plain `http://localhost` the directive rewrote Next's own RSC payload fetches to
+ * `https://`, where nothing listens: every fetch failed with `ERR_SSL_PROTOCOL_ERROR` and every
+ * link silently became a full page load. Reported as a language switch changing the theme and
+ * losing the page (Bashar, 2026-08-18) — a full navigation re-derives `data-theme` and the footer's
+ * pathname, so the switch was the trigger rather than the cause.
+ *
+ * Invisible to `pnpm verify` by construction: every page still returned 200 the whole time. Only a
+ * browser sees the console error and the lost client-side routing, which is why it lives here.
+ */
+test('navigates on the client, without falling back to a full page load', async ({
+  page,
+}) => {
+  const refused: string[] = [];
+
+  page.on('console', (message) => {
+    const text = message.text();
+
+    if (/ERR_SSL_PROTOCOL_ERROR|Failed to fetch RSC payload/i.test(text)) {
+      refused.push(text.slice(0, 120));
+    }
+  });
+
+  await page.goto('/ar', { waitUntil: 'networkidle' });
+
+  /* Follow a few in-app links, which is when the RSC fetches happen. */
+  for (const label of ['الإقامات', 'الرئيسية']) {
+    const link = page.getByRole('link', { name: label }).first();
+
+    if (await link.count()) {
+      await link.click();
+      await page.waitForTimeout(1200);
+    }
+  }
+
+  expect(refused, 'the browser refused Next’s own requests').toStrictEqual([]);
+
+  /*
+    And the directive itself: correct over TLS, wrong over plain http. Asserted on the RESPONSE
+    rather than on the middleware, because the bug was in the condition rather than in the policy.
+  */
+  const response = await page.goto('/ar', { waitUntil: 'domcontentloaded' });
+  const csp = response?.headers()['content-security-policy'] ?? '';
+
+  expect(csp, 'the policy is still applied').toContain("default-src 'self'");
+  expect(csp, 'nothing to upgrade to over http').not.toContain(
+    'upgrade-insecure-requests',
+  );
+});
