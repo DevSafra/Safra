@@ -75,7 +75,7 @@ export default async function AccountBookingsPage({
               return (
                 <li key={booking.reference}>
                   <Link
-                    href={`/${locale}/booking/${booking.reference}?${returnParam('bookings')}`}
+                    href={`/${locale}/account/bookings/${booking.reference}?${returnParam('bookings')}`}
                     className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-card p-4 transition-colors hover:border-gold/50"
                   >
                     <span>

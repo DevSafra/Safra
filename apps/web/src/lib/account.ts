@@ -87,6 +87,40 @@ export async function getMyBookings(cursor?: string) {
   return authedFetch(`/bookings?${query.toString()}`, bookingsSchema);
 }
 
+/**
+ * One booking, scoped to the caller by the API.
+ *
+ * A wider shape than the list's: a detail screen shows the guests and when the booking was placed,
+ * which a row has no space for. `confirmationDeadlineAt` is the one a customer most needs while a
+ * booking is pending — it is the two-hour promise, and a page that describes the promise without
+ * saying when it runs out is describing nothing.
+ *
+ * Somebody else's reference answers 404 here exactly as an unknown one does; the caller cannot tell
+ * the two apart, and references are sequential, so any difference would enumerate them.
+ */
+const bookingDetailSchema = z.object({
+  reference: z.string(),
+  status: z.string(),
+  checkIn: z.string(),
+  checkOut: z.string(),
+  nights: z.number(),
+  guestsAdults: z.number(),
+  guestsChildren: z.number().nullable().optional(),
+  guestsInfants: z.number().nullable().optional(),
+  totalAmount: z.string(),
+  confirmationDeadlineAt: z
+    .union([z.string(), z.date(), z.null()])
+    .optional()
+    .transform((v) => (v ? new Date(v).toISOString() : null)),
+  createdAt: z.union([z.string(), z.date()]).transform((v) => new Date(v).toISOString()),
+});
+
+export type CustomerBookingDetail = z.infer<typeof bookingDetailSchema>;
+
+export async function getMyBooking(reference: string) {
+  return authedFetch(`/bookings/${encodeURIComponent(reference)}`, bookingDetailSchema);
+}
+
 // ─── Wallet ──────────────────────────────────────────────────────────────────
 
 const walletSchema = z.object({

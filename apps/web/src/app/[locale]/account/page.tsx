@@ -176,7 +176,7 @@ function BookingRow({
 }) {
   return (
     <Link
-      href={`/${locale}/booking/${booking.reference}?${returnParam('account')}`}
+      href={`/${locale}/account/bookings/${booking.reference}?${returnParam('account')}`}
       className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-card p-4 transition-colors hover:border-gold/50"
     >
       <span>

@@ -155,7 +155,7 @@ export default async function AccountInvoicePage({
           </dl>
 
           <Link
-            href={`/${locale}/booking/${encodeURIComponent(invoice.reference)}?${returnParam('invoices')}`}
+            href={`/${locale}/account/bookings/${encodeURIComponent(invoice.reference)}?${returnParam('invoices')}`}
             className="mt-4 inline-flex min-h-10 w-fit items-center text-sm text-gold hover:underline print:hidden lg:min-h-0"
           >
             {t('invoiceBookingLink')}

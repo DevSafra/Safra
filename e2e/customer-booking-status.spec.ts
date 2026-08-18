@@ -3,28 +3,21 @@ import { expect, test } from '@playwright/test';
 import ar from '../packages/i18n/src/messages/web/ar.json' assert { type: 'json' };
 
 /**
- * حجوزاتي shows three states and no others (Bashar, 2026-08-18).
+ * حجوزاتي: three states, and a row that opens the booking it names.
  *
- * ## Why this needs a browser
+ * ## One test, one sign-in
  *
- * `booking-status-pill.test.ts` proves the MAPPING — eight statuses in, three out. What it cannot
- * prove is that the pages call it: both screens previously passed `booking.status` straight to the
- * pill, and a page that kept doing so would render «مكتمل» while every unit test stayed green.
+ * `POST /auth/login` is throttled per IP and this suite already runs at the ceiling, so everything
+ * here comes from a single session — the discipline `customer-invoices.spec.ts` keeps.
  *
- * The fixture customer is what makes this worth running: they hold four `completed` bookings, so a
- * screen that had not been collapsed would show a fourth word here rather than merely being
- * untested.
- *
- * ## One sign-in, deliberately
- *
- * `POST /auth/login` is throttled per IP and this suite already runs at the ceiling, so both
- * assertions come from a single session — the same discipline `customer-invoices.spec.ts` keeps,
- * and for the same reason.
+ * An earlier version of this spec split the colour checks into a second test that never signed in.
+ * It passed: the page redirected to the login form, the locator matched NOTHING, and every loop
+ * over an empty list was vacuously true. A spec that cannot fail is worse than no spec, so the
+ * non-empty guards below are load-bearing rather than defensive.
  */
 const PASSWORD = process.env['TESTBED_PASSWORD'] ?? 'a-testbed-password-1';
 const EMAIL = 'customer@safra.test';
 
-/** The three, and the fact there are exactly three, is the assertion. */
 const ALLOWED = [
   ar.account.status.cancelled,
   ar.account.status.pending_confirmation,
@@ -36,7 +29,7 @@ test.use({ baseURL: 'http://localhost:3000' });
 test.describe('حجوزاتي', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('shows only ملغى, قيد التأكيد and مؤكد — on both screens that draw a booking', async ({
+  test('shows three states, and opens the booking a row actually names', async ({
     page,
   }) => {
     await page.goto('/ar/login?next=%2Far%2Faccount%2Fbookings');
@@ -45,44 +38,7 @@ test.describe('حجوزاتي', () => {
     await page.getByRole('button', { name: ar.auth.signIn }).first().click();
     await page.waitForURL(/\/account\/bookings/, { timeout: 20_000 });
 
-    const pills = (await page.locator('[data-status-pill]').allTextContents()).map(
-      (text) => text.trim(),
-    );
-
-    /* Guards against asserting over an empty list, which would pass on a page that renders none. */
-    expect(pills.length).toBeGreaterThan(0);
-    expect([...new Set(pills)].filter((word) => !ALLOWED.includes(word))).toStrictEqual(
-      [],
-    );
-
-    /*
-      «مكتمل» named explicitly, because it is the word this change removed and the one a
-      regression would bring back: the fixture holds four `completed` bookings.
-    */
-    expect(pills).not.toContain(ar.account.status.completed);
-
-    /* The overview draws the same booking in the same row, so it must say the same word. */
-    await page.goto('/ar/account');
-
-    const overview = (await page.locator('[data-status-pill]').allTextContents()).map(
-      (text) => text.trim(),
-    );
-
-    expect(
-      [...new Set(overview)].filter((word) => !ALLOWED.includes(word)),
-    ).toStrictEqual([]);
-  });
-
-  /**
-   * Three words, three colours.
-   *
-   * The status rule cuts both ways: collapsing four statuses onto «مؤكد» while the pill still
-   * coloured them by the ORIGINAL value would print one word in three colours, which reads as a
-   * rendering fault rather than as one state.
-   */
-  test('gives each of the three its own colour', async ({ page }) => {
-    await page.goto('/ar/account/bookings');
-
+    // ─── the list says one of three words, in three colours ───────────────────
     const painted = await page.locator('[data-status-pill]').evaluateAll((pills) =>
       pills.map((pill) => ({
         word: (pill.textContent ?? '').trim(),
@@ -90,17 +46,74 @@ test.describe('حجوزاتي', () => {
       })),
     );
 
+    expect(painted.length).toBeGreaterThan(0);
+    expect(
+      [...new Set(painted.map((p) => p.word))].filter((w) => !ALLOWED.includes(w)),
+    ).toStrictEqual([]);
+    /* «مكتمل» named explicitly: it is the word this change removed, and the fixture still holds
+       `completed` bookings, so a regression would put it back here. */
+    expect(painted.map((p) => p.word)).not.toContain(ar.account.status.completed);
+
     const byWord = new Map<string, Set<string>>();
     for (const { word, colour } of painted) {
       byWord.set(word, (byWord.get(word) ?? new Set()).add(colour));
     }
-
-    /* No word in two colours… */
-    for (const [word, colours] of byWord) {
-      expect([...colours], word).toHaveLength(1);
-    }
-    /* …and no colour on two words. */
+    for (const [word, colours] of byWord) expect([...colours], word).toHaveLength(1);
     const colours = [...byWord.values()].map((set) => [...set][0]);
     expect(new Set(colours).size).toBe(colours.length);
+
+    // ─── a row opens ITS booking, not a fixed holding page ────────────────────
+    /*
+      The defect this covers: every row used to link to `/booking/[reference]`, the post-payment
+      page, which looks nothing up and always reads «تم الدفع — حجزك قيد التأكيد». Two bookings in
+      different states opened the same screen saying the same thing (Bashar, 2026-08-18).
+    */
+    const rows = page.locator('ul a[href*="/account/bookings/"]');
+    const total = await rows.count();
+
+    expect(total).toBeGreaterThan(1);
+
+    const seen: { reference: string; status: string }[] = [];
+
+    for (const index of [0, total - 1]) {
+      const href = await rows.nth(index).getAttribute('href');
+      await page.goto(href!);
+
+      const reference = href!.split('/').pop()!.split('?')[0]!;
+
+      /* The page names the booking it was asked for — not a fixed one, and not another. */
+      await expect(page.getByText(reference, { exact: false }).first()).toBeVisible();
+
+      seen.push({
+        reference,
+        status: (await page.locator('[data-status-pill]').first().textContent())!.trim(),
+      });
+
+      await page.goBack();
+    }
+
+    expect(seen[0]!.reference).not.toBe(seen[1]!.reference);
+
+    // ─── not yours reads exactly like not there ───────────────────────────────
+    /*
+      Both must be 404, and both must render the SAME page: references are sequential, so any
+      difference between the two answers walks the platform's bookings one request at a time.
+    */
+    const answers: { status: number; body: string }[] = [];
+
+    for (const reference of ['BKG-2026-046386', 'BKG-2026-999999']) {
+      const response = await page.goto(`/ar/account/bookings/${reference}`);
+
+      answers.push({
+        status: response!.status(),
+        body: (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim(),
+      });
+    }
+
+    expect(answers[0]!.status).toBe(404);
+    expect(answers[1]!.status).toBe(404);
+    expect(answers[0]!.body).toBe(answers[1]!.body);
+    /* And neither leaks a figure from the booking that does exist. */
+    expect(answers[0]!.body).not.toMatch(/\d+\.\d{2}/);
   });
 });

@@ -95,8 +95,14 @@ test.describe('الفواتير', () => {
     }
 
     // ── Out to the booking, and back to where we were ──
+    /*
+      `/account/bookings/…`, not `/booking/…`: the latter is the POST-PAYMENT holding page, which
+      looks nothing up and says the same thing about every booking. A receipt now links to the
+      booking's own screen (2026-08-18). What this asserts is unchanged — the trip out and back,
+      carrying `from=invoices`.
+    */
     await page.getByRole('link', { name: en.account.invoiceBookingLink }).click();
-    await page.waitForURL(/\/booking\/BKG-/, { timeout: 20_000 });
+    await page.waitForURL(/\/account\/bookings\/BKG-/, { timeout: 20_000 });
     expect(new URL(page.url()).searchParams.get('from')).toBe('invoices');
 
     await page
