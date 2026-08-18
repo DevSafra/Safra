@@ -125,7 +125,7 @@ describe('a password that echoes who you are', () => {
       email: 'bashar@example.test',
       password,
       fullName: 'Bashar Waez',
-      phone: '+963912345678',
+      phone: '+963933123456',
       /* Required since 2026-08-14 — the subject here is the password, not this field. */
       gender: 'undisclosed' as const,
     });

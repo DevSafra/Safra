@@ -269,7 +269,9 @@ export const de = {
     'Diese Kampagne ist abgelaufen. Bitte eine neue Kampagne für einen neuen Zeitraum anlegen.',
   'validation.password_too_long': 'Das Passwort darf höchstens {max} Zeichen lang sein.',
   'validation.phone_format':
-    'Die Telefonnummer muss im internationalen Format angegeben werden, z. B. +963912345678.',
+    'Die Telefonnummer muss im internationalen Format angegeben werden, z. B. +963933123456.',
+  'validation.phone_invalid':
+    'Diese Nummer ist im gewählten Land nicht gültig. Prüfen Sie sie oder wählen Sie ein anderes Land.',
   'validation.recovery_code_format':
     'Das Format des Wiederherstellungscodes ist XXXX-XXXX-XXXX.',
   'validation.decimal_string': 'Bitte einen Betrag wie 10.00 eingeben.',

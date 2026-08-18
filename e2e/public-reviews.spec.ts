@@ -57,7 +57,7 @@ test.describe('reviews on a property page', () => {
       Asserted against the API PAYLOAD and the reviews SECTION, not the whole document.
 
       A first attempt searched the entire HTML for a Syrian phone number and failed on
-      `+963912345678` — the example inside the checkout form's «بصيغة دولية، مثل …» hint, which
+      `+963933123456` — the example inside the checkout form's «بصيغة دولية، مثل …» hint, which
       next-intl embeds along with every other message. Searching a page that carries its own
       translation bundle finds the dictionary, not the data.
     */

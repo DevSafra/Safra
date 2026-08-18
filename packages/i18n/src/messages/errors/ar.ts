@@ -213,7 +213,9 @@ export const ar = {
     'قيمة {key} نسبة ويجب أن تكون رقماً بين 0 و 1 (نسبة 7٪ تُكتب 0.07).',
   'campaign.expired': 'انتهت مدة هذه الحملة. أنشئ حملة جديدة لمدة جديدة.',
   'validation.password_too_long': 'يجب ألا تتجاوز كلمة المرور {max} حرفاً.',
-  'validation.phone_format': 'أدخل رقم الهاتف بالصيغة الدولية، مثل ‎+963912345678.',
+  'validation.phone_format': 'أدخل رقم الهاتف بالصيغة الدولية، مثل ‎+963933123456.',
+  'validation.phone_invalid':
+    'هذا الرقم غير صالح في الدولة المختارة. تحقّق منه أو اختر دولة أخرى.',
   'validation.recovery_code_format': 'صيغة رمز الاسترداد هي XXXX-XXXX-XXXX.',
   'validation.decimal_string': 'أدخل مبلغاً بالصيغة 10.00.',
   'validation.currency_code': 'رمز العملة ثلاثة أحرف وفق ISO 4217.',

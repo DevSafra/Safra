@@ -67,4 +67,4 @@ export function ltrIsolate(value: string): string {
  * The SENTENCE around it stays in the catalogue with an `{example}` placeholder, because that
  * sentence is prose and its word order is the first casualty of translation.
  */
-export const PHONE_EXAMPLE = '+963912345678';
+export const PHONE_EXAMPLE = '+963933123456';

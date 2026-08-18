@@ -7,10 +7,10 @@ import { PasswordField, PasswordStrengthMeter, passwordsMatch } from '@safra/ui'
 import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
+import { PhoneField } from '@/components/phone-field';
 import { reloadInto } from '@/lib/session-navigation';
 import { errorMessage } from '@safra/i18n';
-import { isErrorCode } from '@safra/contracts';
-import { PHONE_EXAMPLE } from '@/lib/bidi';
+import { isErrorCode, phoneSchema } from '@safra/contracts';
 
 interface FieldErrors {
   [field: string]: string | undefined;
@@ -84,6 +84,43 @@ export function AuthForm({
       setSubmitting(false);
 
       return;
+    }
+
+    /*
+      The phone, checked against the SAME schema the API uses.
+
+      Not a copy of the rule — `phoneSchema` itself, so the client and the server can never
+      disagree about what a valid number is. That matters more than the round trip it saves: two
+      hand-written rules drift, and the one that drifts silently is the client's.
+
+      This form is `noValidate`, so `required` marks the field for assistive technology and does
+      not stop a submission — the same reason the password check above exists.
+
+      The API's own code is resolved to the reader's language rather than replaced with a generic
+      sentence: `phone_invalid` names the chosen country, which is the actionable part.
+    */
+    if (mode === 'register') {
+      const phone = text(form, 'phone');
+
+      if (phone === '') {
+        setFieldErrors({ phone: t('phoneIncomplete') });
+        setSubmitting(false);
+
+        return;
+      }
+
+      const checked = phoneSchema.safeParse(phone);
+
+      if (!checked.success) {
+        const code = checked.error.issues[0]?.message;
+
+        setFieldErrors({
+          phone: isErrorCode(code) ? errorMessage(code, locale) : t('phoneIncomplete'),
+        });
+        setSubmitting(false);
+
+        return;
+      }
     }
 
     const body =
@@ -236,15 +273,11 @@ export function AuthForm({
       ) : null}
 
       {mode === 'register' ? (
-        <Field
-          name="phone"
-          type="tel"
+        <PhoneField
+          locale={locale}
           label={t('phone')}
-          placeholder={PHONE_EXAMPLE}
-          autoComplete="tel"
           hint={t('phoneHint')}
           error={fieldErrors['phone']}
-          required
         />
       ) : null}
 

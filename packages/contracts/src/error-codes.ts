@@ -243,6 +243,8 @@ export const ERROR = {
   CAMPAIGN_EXPIRED: 'campaign.expired',
   VALIDATION_PASSWORD_TOO_LONG: 'validation.password_too_long',
   VALIDATION_PHONE_FORMAT: 'validation.phone_format',
+  /** Right SHAPE, not a real number — an unallocated range, or the wrong length for its country. */
+  VALIDATION_PHONE_INVALID: 'validation.phone_invalid',
   VALIDATION_RECOVERY_CODE_FORMAT: 'validation.recovery_code_format',
   VALIDATION_REVIEW_RATING_RANGE: 'validation.review_rating_range',
   VALIDATION_DECIMAL_STRING: 'validation.decimal_string',

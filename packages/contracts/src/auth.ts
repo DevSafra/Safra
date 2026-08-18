@@ -1,3 +1,4 @@
+import { isValidPhoneNumber } from 'libphonenumber-js/max';
 import { z } from 'zod';
 import { ERROR } from './error-codes.js';
 import {
@@ -93,13 +94,33 @@ export const emailSchema = z
   .max(254);
 
 /**
- * E.164. Syria, Jordan and Lebanon all use country codes, and WhatsApp
- * notifications (§10.2) require a normalised international number.
+ * E.164, and a number that actually EXISTS (Bashar, 2026-08-18: "must be correct").
+ *
+ * The regex alone accepted `+963912345678` — right shape, twelve digits, and no such Syrian
+ * range: 91x is not allocated. That matters beyond tidiness: this number is what a partner is given to
+ * reach a guest, and what WhatsApp notifications (§10.2) are sent to. A booking held against a
+ * number that cannot ring is a booking nobody can rescue.
+ *
+ * ## Two codes, because they are two different mistakes
+ *
+ * `phone_format` means the shape is wrong — no `+`, letters, far too long. `phone_invalid` means
+ * the shape is right and the NUMBER is not: an unallocated prefix, or the wrong length for that
+ * country. The second needs a different sentence, because "use international format" is useless
+ * advice to somebody who already did.
+ *
+ * ## Why `max` metadata and not `mobile`
+ *
+ * `mobile` would additionally reject every landline, and some customers have only a landline —
+ * refusing their registration to protect a WhatsApp channel is the wrong trade. `max` asks the
+ * narrower question this schema should ask: is this a real number in that country, of any type.
+ *
+ * `min` was not enough: it validates little more than length, and passed `+963912345678`.
  */
 export const phoneSchema = z
   .string()
   .trim()
-  .regex(/^\+[1-9]\d{7,14}$/, ERROR.VALIDATION_PHONE_FORMAT);
+  .regex(/^\+[1-9]\d{7,14}$/, ERROR.VALIDATION_PHONE_FORMAT)
+  .refine(isValidPhoneNumber, ERROR.VALIDATION_PHONE_INVALID);
 
 /**
  * Editing your own profile (handoff §6, الملف الشخصي).

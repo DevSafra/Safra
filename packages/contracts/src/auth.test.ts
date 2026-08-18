@@ -64,6 +64,52 @@ describe('profileUpdateSchema', () => {
       expect(profileUpdateSchema.safeParse({ phone }).success).toBe(false);
     },
   );
+
+  /**
+   * A number has to EXIST, not merely look like one (Bashar, 2026-08-18).
+   *
+   * Every value here passes `/^\+[1-9]\d{7,14}$/` — the shape the schema checked until now — and
+   * none of them can ring. `+963912345678` is the sharpest case: it was this project's own example
+   * number, printed in the checkout hint and in the phone error message, and Syria has no 91x
+   * range at all.
+   *
+   * `+963111111111` is deliberately NOT here. It looks equally fabricated and it is a real Syrian
+   * FIXED_LINE range, so the schema accepts it — which is the point of validating against a dial
+   * plan rather than against how invented a number looks.
+   */
+  it.each(['+963912345678', '+963911000001', '+491512345678', '+4930'])(
+    'refuses the well-formed but non-existent phone %j',
+    (phone) => {
+      expect(profileUpdateSchema.safeParse({ phone }).success).toBe(false);
+    },
+  );
+
+  /* Real ranges, of both types: rejecting a landline would refuse customers who only have one. */
+  it.each([
+    '+963933123456',
+    '+963955000001',
+    '+963900000001',
+    '+4915123456789',
+    '+4930123456',
+    '+12015550123',
+  ])('accepts the real number %j', (phone) => {
+    expect(profileUpdateSchema.safeParse({ phone }).success).toBe(true);
+  });
+
+  /* The two failures are told apart, because they need different advice. */
+  it('distinguishes a bad shape from a number that does not exist', () => {
+    const shape = profileUpdateSchema.safeParse({ phone: '963933123456' });
+    const invalid = profileUpdateSchema.safeParse({ phone: '+963912345678' });
+
+    expect(shape.success).toBe(false);
+    expect(invalid.success).toBe(false);
+    expect(!shape.success && shape.error.issues[0]?.message).toBe(
+      ERROR.VALIDATION_PHONE_FORMAT,
+    );
+    expect(!invalid.success && invalid.error.issues[0]?.message).toBe(
+      ERROR.VALIDATION_PHONE_INVALID,
+    );
+  });
 });
 
 describe('passwordChangeSchema', () => {

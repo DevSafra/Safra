@@ -57,7 +57,10 @@ async function submitBadEmail(page: Page, locale: 'ar' | 'de') {
   await page.goto(`/${locale}/register`);
   await page.locator('input[name=fullName]').fill('اختبار اللغة');
   await field(page, copy.email).fill('not-an-email');
-  await page.locator('input[name=phone]').fill('+963912345678');
+  /* The NATIONAL number: registration's field carries +963 in its country picker, and
+     `input[name=phone]` is now the hidden E.164 value it composes. Checkout still has the
+     plain field, which is why the test above fills it whole. */
+  await page.locator('#field-phone').fill('933123456');
   await page.locator('select[name=gender]').selectOption('undisclosed');
   await page.locator('input[name=password]').fill('A-Long-Passphrase-1!');
   await page.locator('input[name=confirm]').fill('A-Long-Passphrase-1!');
@@ -171,7 +174,7 @@ test.describe('Arabic plurals on a real page', () => {
  *    the direction and takes the alignment from the DOCUMENT — the one thing a `dir` attribute
  *    cannot express.
  * 2. **Order.** `+` is bidi-NEUTRAL. Inside an Arabic sentence it takes the paragraph's direction
- *    and lands after the digits, so the hint quoted «963912345678+» — a format nobody could type.
+ *    and lands after the digits, so the hint quoted «963933123456+» — a format nobody could type.
  *    U+2066…U+2069 make the number its own left-to-right run.
  *
  * Both were reported by Bashar from a screenshot of the checkout form (2026-08-13), and neither is
@@ -220,10 +223,10 @@ test.describe('a Latin-valued field on an Arabic page', () => {
       the code controls and the rendering is what the browser owes us for them. U+2066 is
       LEFT-TO-RIGHT ISOLATE and U+2069 is POP DIRECTIONAL ISOLATE.
     */
-    expect(text).toContain('⁦+963912345678⁩');
+    expect(text).toContain('⁦+963933123456⁩');
 
     /* And the plus is never stranded after the digits, which is what the bug looked like. */
-    expect(text).not.toContain('963912345678+');
+    expect(text).not.toContain('963933123456+');
   });
 
   /**
@@ -500,7 +503,7 @@ test.describe('a message that interpolates a value', () => {
       await page
         .locator('input[name=email]')
         .fill(`ph-${Math.random().toString(36).slice(2, 10)}@example.test`);
-      await page.locator('input[name=phone]').fill('+963912345678');
+      await page.locator('#field-phone').fill('933123456');
       await page.locator('select[name=gender]').selectOption('undisclosed');
       await page.locator('input[name=password]').fill('Shortpass1!');
       await page.locator('input[name=confirm]').fill('Shortpass1!');
@@ -561,7 +564,7 @@ test.describe('password strength', () => {
     await page
       .locator('input[name=email]')
       .fill(`pw-${Math.random().toString(36).slice(2, 10)}@example.test`);
-    await page.locator('input[name=phone]').fill('+963912345678');
+    await page.locator('#field-phone').fill('933123456');
     await page.locator('select[name=gender]').selectOption('undisclosed');
     await page.locator('input[name=password]').fill(password);
     await page.locator('input[name=confirm]').fill(password);
@@ -667,7 +670,7 @@ test.describe('the password strength meter', () => {
     await page
       .locator('input[name=email]')
       .fill(`m-${Math.random().toString(36).slice(2, 10)}@example.test`);
-    await page.locator('input[name=phone]').fill('+963912345678');
+    await page.locator('#field-phone').fill('933123456');
     await page.locator('select[name=gender]').selectOption('undisclosed');
     await page.locator('input[name=password]').fill('Password123!');
     await page.locator('input[name=confirm]').fill('Password123!');
@@ -710,7 +713,7 @@ test.describe('the gender field', () => {
     await page
       .locator('input[name=email]')
       .fill(`g-${Math.random().toString(36).slice(2, 10)}@example.test`);
-    await page.locator('input[name=phone]').fill('+963912345678');
+    await page.locator('#field-phone').fill('933123456');
     await page.locator('select[name=gender]').selectOption('undisclosed');
     await page.locator('input[name=password]').fill('A-Long-Passphrase-1!');
     await page.locator('input[name=confirm]').fill('A-Long-Passphrase-1!');

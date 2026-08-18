@@ -234,7 +234,9 @@ export const en = {
     'This campaign has expired. Create a new campaign for a new window.',
   'validation.password_too_long': 'Password must be at most {max} characters.',
   'validation.phone_format':
-    'Phone must be in international format, for example +963912345678.',
+    'Phone must be in international format, for example +963933123456.',
+  'validation.phone_invalid':
+    'That number is not valid in the country selected. Check it, or choose another country.',
   'validation.recovery_code_format': 'Recovery code format is XXXX-XXXX-XXXX.',
   'validation.decimal_string': 'Enter an amount such as 10.00.',
   'validation.currency_code': 'Must be a three-letter ISO 4217 currency code.',

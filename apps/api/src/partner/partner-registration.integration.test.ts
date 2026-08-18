@@ -52,7 +52,7 @@ describeIfDb('partner self-registration', () => {
       email: `partner-reg-${id}@safra.test`,
       /* Meets the composition checklist added 2026-08-14 — see `PASSWORD_RULES`. */
       password: 'A-Long-Enough-Password-9!',
-      phone: '+963912340000',
+      phone: '+963933123400',
       legalName: `Levant Stays ${id} LLC`,
       displayName: `Levant Stays ${id}`,
       partnerTypeCode: 'accommodation',
