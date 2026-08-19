@@ -159,7 +159,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
             onChange={(event) => setCompensationAmount(event.target.value)}
             inputMode="decimal"
             placeholder="10.00"
-            dir="ltr"
+            /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
             aria-invalid={!amountValid}
             className={`w-40 rounded-[9px] border bg-card px-3 py-2 text-[13px] text-text ${
               amountValid ? 'border-line' : 'border-bad'

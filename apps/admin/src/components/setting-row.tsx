@@ -257,7 +257,7 @@ function ValueInput({ setting }: { setting: EditableSetting }) {
         inputMode="decimal"
         defaultValue={scalarText(setting.value)}
         required
-        dir="ltr"
+        /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
         className={common}
       />
       <span className="text-[10.5px] text-faint2">{hint}</span>

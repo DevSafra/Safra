@@ -128,7 +128,7 @@ export function StaffAdmin({
             required
             placeholder={t.sections.staff.inviteEmailPlaceholder}
             aria-label={t.sections.staff.inviteEmail}
-            dir="ltr"
+            /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
             className="rounded-[9px] border border-line bg-field px-3 py-2.5 text-[12.5px] text-text"
           />
           <select

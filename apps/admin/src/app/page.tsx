@@ -289,7 +289,7 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
             name="reference"
             placeholder={t.dashboard.bookingReferencePlaceholder}
             aria-label={t.dashboard.findBookingLabel}
-            dir="ltr"
+            /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
             className="min-w-[260px] rounded-[9px] border border-line bg-field px-3.5 py-2 text-[12.5px] text-text placeholder:text-faint"
           />
           <button
