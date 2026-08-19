@@ -194,15 +194,17 @@ export function PropertyEditor({
           dir="rtl"
         />
         {/*
-          `dir="ltr"`: `A-12` is a Latin run, and a bidi-neutral hyphen on an Arabic line renders
-          it `12-A`. Editable here because a room number typed wrongly at creation would otherwise
-          be permanent.
+          Editable here because a room number typed wrongly at creation would otherwise be permanent.
+
+          No `dir` override: an input a person types into follows the page — see the standing rule in
+          `.claude/CLAUDE.md`. `dir="ltr"` put the caret and the value on the far left of a field
+          whose own label sat on the right.
         */}
         <Field
           label={t.properties.fRoomNumber}
           value={form.roomNumber}
           onChange={set('roomNumber')}
-          dir="ltr"
+          dir="rtl"
         />
         <Field
           label={t.editProperty.nameEn}

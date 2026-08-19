@@ -196,14 +196,20 @@ function UnitRow({
 
       {/*
         «رقم الوحدة» — the physical identifier used at check-in, which `units.unit_label` has always
-        carried and no screen has ever shown (Bashar, 2026-08-19). `dir="ltr"` because `204` and
-        `A-12` are Latin runs on an Arabic line, and a bidi-neutral hyphen reads `12-A` without it.
+        carried and no screen has ever shown (Bashar, 2026-08-19).
+
+        NO `dir` override. It had `dir="ltr"`, which sets the direction AND moves the start edge, so
+        the label sat on the right and the value somebody had just typed sat on the far left with
+        the caret there too. An input a person TYPES INTO follows the page (Bashar, 2026-08-19 — now
+        a standing rule in `.claude/CLAUDE.md`). The digits are still a left-to-right RUN inside it,
+        which the bidi algorithm handles without being told; isolation is for DISPLAYING a value on
+        a line of Arabic, not for a field.
       */}
       <Field
         label={t.editProperty.unitLabel}
         value={form.unitLabel}
         onChange={set('unitLabel')}
-        dir="ltr"
+        dir="rtl"
         id={`unit-label-${unit.id}`}
       />
 
