@@ -13,7 +13,13 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { foreignId, money, notDeleted, primaryId, timestamps } from './_shared.js';
-import { partnerTier, payoutStatus, verificationStatus, violationKind } from './enums.js';
+import {
+  partnerApplicationStatus,
+  partnerTier,
+  payoutStatus,
+  verificationStatus,
+  violationKind,
+} from './enums.js';
 import { cities, currencies } from './geo.js';
 import { users } from './identity.js';
 // `partner_payout_items` links a payout to the bookings it covers.
@@ -35,6 +41,108 @@ export const partnerTypes = pgTable('partner_types', {
   isActive: boolean('is_active').notNull().default(true),
   ...timestamps,
 });
+
+/**
+ * A request to become a partner — the step BEFORE there is a partner (Bashar, 2026-08-19).
+ *
+ * ## Why this is not a `partners` row in some early status
+ *
+ * A `partners` row is a business SAFRA has a relationship with: it owns listings, it is paid, it
+ * is screened against sanctions lists, and it hangs off a `users` row with partner permissions.
+ * An application is none of those. It is somebody who filled in a form and may never be heard
+ * from again, and the flow Bashar described puts a phone call and an acceptance between the two.
+ *
+ * Modelling it as a pending partner would mean every query that means "our partners" — the payout
+ * sweep, the sanctions re-screen, the tier recomputation, the admin registry — would have to
+ * remember to exclude applicants, and the one that forgot would be the bug. The types say it
+ * instead: an application has no `user_id`, because there is no account yet.
+ *
+ * ## What it holds
+ *
+ * What the applicant typed, and what SAFRA did about it. `partner_id` is written when the request
+ * is accepted, so the request keeps a pointer to what it became and the audit trail runs from a
+ * form on the public site to a verified business without a gap.
+ *
+ * ## `submitted_by_user_id` is the account, and it is not optional in practice
+ *
+ * Applying requires a session (Bashar, 2026-08-19), so every row written since carries the
+ * account that filed it — which is the account acceptance converts. The column stays NULLABLE
+ * because rows written before that rule exist, and `accept` refuses those rather than guessing
+ * which account they meant.
+ *
+ * `email` is still stored: it is the account's address AT THE TIME OF APPLYING, and a request
+ * should say where SAFRA wrote rather than where the account's address has since moved to.
+ */
+export const partnerApplications = pgTable(
+  'partner_applications',
+  {
+    id: primaryId(),
+    reference: text('reference')
+      .notNull()
+      .unique()
+      .default(
+        sql`'PRQ-' || reference_number(nextval('partner_application_reference_seq'))`,
+      ),
+    status: partnerApplicationStatus('status').notNull().default('submitted'),
+
+    /**
+     * The account the applicant was signed into, if any.
+     *
+     * Recorded because it is the ONE case where the email address is already proven: a signed-in
+     * customer applying is telling us about an account we can see. Most applicants are strangers
+     * and this is null.
+     */
+    submittedByUserId: foreignId('submitted_by_user_id').references(() => users.id),
+
+    /* ── What they told us ── */
+    contactName: text('contact_name').notNull(),
+    email: text('email').notNull(),
+    phone: text('phone').notNull(),
+    legalName: text('legal_name').notNull(),
+    displayName: text('display_name').notNull(),
+    partnerTypeId: foreignId('partner_type_id')
+      .notNull()
+      .references(() => partnerTypes.id),
+    cityId: foreignId('city_id')
+      .notNull()
+      .references(() => cities.id),
+    address: text('address').notNull(),
+    /** How many properties they say they have. A sizing hint for the call, never a promise. */
+    propertyCount: integer('property_count'),
+    website: text('website'),
+    /** Anything else they want the reviewer to know. */
+    message: text('message'),
+    /** Which language to write back in. The acknowledgement and the invitation both use it. */
+    preferredLocale: text('preferred_locale').notNull().default('ar'),
+
+    /* ── What we did about it ── */
+    contactedAt: timestamp('contacted_at', { withTimezone: true }),
+    contactedByUserId: foreignId('contacted_by_user_id').references(() => users.id),
+    contactNotes: text('contact_notes'),
+
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    decidedByUserId: foreignId('decided_by_user_id').references(() => users.id),
+    decisionNotes: text('decision_notes'),
+
+    /** What the request became. Written on acceptance, null forever otherwise. */
+    partnerId: foreignId('partner_id').references(() => partners.id),
+
+    ...timestamps,
+  },
+  (t) => [
+    /** The queue: open requests, oldest first. The only list this table has. */
+    index('partner_applications_status_idx').on(t.status, t.createdAt),
+    /**
+     * ONE open request per address.
+     *
+     * Partial, so a rejected applicant can apply again after fixing whatever was wrong — which
+     * is a real thing that happens and should not need a staff member to clear a row first.
+     */
+    uniqueIndex('partner_applications_open_email_unique')
+      .on(sql`lower(${t.email})`)
+      .where(sql`status IN ('submitted', 'contacted') AND deleted_at IS NULL`),
+  ],
+);
 
 export const partners = pgTable(
   'partners',

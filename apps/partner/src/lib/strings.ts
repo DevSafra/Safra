@@ -54,6 +54,26 @@ export function payoutStatus(status: string): string {
   return t.payoutStatus[status] ?? status.replace(/_/g, ' ');
 }
 
+/** A verification state in Arabic, falling back to the raw value rather than blank. */
+export function verificationStatus(status: string): string {
+  return t.verificationStatus[status] ?? status.replace(/_/g, ' ');
+}
+
+/** A contract's state in Arabic, falling back to the raw value rather than blank. */
+export function contractStatus(status: string): string {
+  return t.contractStatus[status] ?? status.replace(/_/g, ' ');
+}
+
+/** A contract KIND in Arabic — «عقد شراكة أساسي», not `base`. */
+export function contractKind(kind: string): string {
+  return t.contractKinds[kind] ?? kind.replace(/_/g, ' ');
+}
+
+/** A verification document's kind in Arabic, named for the person uploading it. */
+export function documentKind(kind: string): string {
+  return t.documentKinds[kind] ?? kind.replace(/_/g, ' ');
+}
+
 /** An availability day's state, in Arabic. Unknown values fall back to the raw value. */
 export function dayStatus(status: string): string {
   return partnerAr.dayStatus[status] ?? status;

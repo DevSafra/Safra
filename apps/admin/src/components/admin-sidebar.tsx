@@ -21,7 +21,8 @@ interface NavItem {
   readonly key: keyof typeof t.nav;
   readonly href?: string;
   /** Which counter, if any, drives the badge. */
-  readonly badge?: 'bookings' | 'partners' | 'properties' | 'staff';
+  readonly badge?:
+    'bookings' | 'partners' | 'properties' | 'staff' | 'partnerApplications';
   /**
    * Renders the badge red instead of blue (`badgeWarn` in the design handoff §8).
    *
@@ -33,7 +34,7 @@ interface NavItem {
 }
 
 /**
- * The eighteen sections from the approved design (SAFRA 29.07), in its order.
+ * The sections, in the approved design's order (SAFRA 29.07) — eighteen of them, plus one.
  *
  * The order is the design's, not alphabetical and not built-first: staff learn a spatial
  * habit for where things sit, and reordering as sections ship would break it every time.
@@ -42,6 +43,19 @@ const NAV: readonly NavItem[] = [
   { key: 'dashboard', href: '/' },
   { key: 'bookings', href: '/bookings', badge: 'bookings' },
   { key: 'partners', href: '/partners', badge: 'partners', warn: true },
+  /*
+    NINETEEN, and this is the one the approved design does not have (Bashar, 2026-08-19).
+
+    «انضم كشريك» gave the platform a queue it never had: people asking to join, before they are
+    partners. It sits directly under الشركاء because that is who works it and what a request
+    becomes, and it carries a badge because a request nobody looks at is a business SAFRA loses.
+  */
+  {
+    key: 'partnerApplications',
+    href: '/applications',
+    badge: 'partnerApplications',
+    warn: true,
+  },
   { key: 'properties', href: '/properties', badge: 'properties', warn: true },
   { key: 'customers', href: '/customers' },
   { key: 'staff', href: '/staff', badge: 'staff' },
@@ -72,6 +86,7 @@ export interface SidebarCounts {
   readonly partners?: number | undefined;
   readonly properties?: number | undefined;
   readonly staff?: number | undefined;
+  readonly partnerApplications?: number | undefined;
 }
 
 export function AdminSidebar({ counts }: { counts: SidebarCounts }) {

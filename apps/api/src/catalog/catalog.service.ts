@@ -150,6 +150,37 @@ export class CatalogService {
     }));
   }
 
+  /**
+   * The kinds of business that can apply to become a partner (Bashar, 2026-08-19).
+   *
+   * Public, because «انضم كشريك» is a page anybody may read and the form has to offer real
+   * choices. Rows rather than a hardcoded list for the reason the schema gives: adding Mobility
+   * is meant to be an INSERT, and a list frozen into the customer app would make it a deployment.
+   *
+   * The `id` is deliberately absent, as everywhere else in this file. A public form sends a CODE
+   * and the server resolves it — a client that could send an id could send any id.
+   */
+  async partnerTypes() {
+    const rows = await this.db.execute<{
+      code: string;
+      name_ar: string;
+      name_en: string;
+      name_de: string;
+    }>(sql`
+      SELECT code, name_ar, name_en, name_de
+      FROM partner_types
+      WHERE is_active = true AND deleted_at IS NULL
+      ORDER BY name_ar
+    `);
+
+    return rows.rows.map((row) => ({
+      code: row.code,
+      nameAr: row.name_ar,
+      nameEn: row.name_en,
+      nameDe: row.name_de,
+    }));
+  }
+
   async propertyTypes() {
     const rows = await this.db.execute<{
       code: string;

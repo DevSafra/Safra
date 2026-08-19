@@ -25,6 +25,33 @@ export const en = {
     body: 'You have been invited to the SAFRA admin console as: {roleLabel}.\n\nOpen this link to set your password:\n{url}\n\nThe link expires in {expiresInHours} hours and can be used once.\n\nAfter setting a password you will be required to enable two-factor authentication before the account can be used.\n\nIf you were not expecting this invitation, do not open the link and tell the SAFRA team.\n\nThe SAFRA team',
   },
 
+  /* ── Joining as a partner (Bashar, 2026-08-19) ── */
+
+  partnerApplicationReceived: {
+    subject: 'We have your partnership request — {reference}',
+    body: 'Thank you for your interest in partnering with SAFRA.\n\nYour request number: {reference}\n\nOur team will call you on the number you gave us to confirm the details of your business. After that call the request is reviewed, and if it is accepted we will send you the partnership contract and a link to create your partner account.\n\nKeep the request number — it is how we find your request if you contact us.\n\nThe steps and the documents we will ask for are set out here:\n{url}\n\nThe SAFRA team',
+  },
+  partnerApplicationRejected: {
+    subject: 'About your partnership request — {reference}',
+    body: 'Thank you for your time and for your interest in SAFRA.\n\nAfter reviewing request {reference} we are not able to proceed at this time.\n\nReason:\n{reason}\n\nIf any of that changes, you are welcome to apply again here:\n{url}\n\nThe SAFRA team',
+  },
+  partnerInvitation: {
+    subject: 'Your partnership request was accepted — create your partner account',
+    body: 'Partnership request {reference} has been accepted. Welcome to SAFRA.\n\nOpen the link below to set your account password:\n{url}\n\nThe link expires in {expiresInHours} hours and can be used once. After setting a password you will be asked to enrol in two-factor authentication, which is mandatory for partner accounts.\n\nWe will never send you a password in a message. If you receive one, it is not from us.\n\nYour account stays under review until our team has checked your documents and the signed contract. Until then you can prepare your property details; you cannot add prices, dates or images.\n\nIf you did not apply to become a partner, do not open the link and tell us.\n\nThe SAFRA team',
+  },
+
+  /** The contract KINDS, in the reader's language — `partner_contract_kind` in the schema. */
+  contractKinds: {
+    base: 'partnership agreement',
+    commission_annex: 'commission annex',
+    renewal: 'annual renewal',
+  } as Record<string, string>,
+
+  partnerContractReady: {
+    subject: 'Your partnership contract is ready to sign — {partner}',
+    body: 'Our team has uploaded your partnership contract ({kind}).\n\nYou can read and download it from your partner dashboard:\n{url}\n\nOnce you have signed it, return the signed copy to our team so the signature can be recorded and the contract becomes active.\n\nThe SAFRA team',
+  },
+
   reviewReceived: {
     subject: 'New review for {property} — SAFRA',
     body: 'A guest who stayed at {property} has left a review.\n\nRating: {rating} out of 5\n\nYou can read it and reply from your partner dashboard:\n{url}\n\nYour reply appears publicly beneath the review. A review cannot be deleted or edited — not by the guest and not by SAFRA (principle P-006) — so replying is the only way to put your side.\n\nThe SAFRA team',

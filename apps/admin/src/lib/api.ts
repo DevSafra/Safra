@@ -72,6 +72,7 @@ const attentionSchema = z.object({
   properties_pending_review: z.number(),
   partners_pending_verification: z.number(),
   partners_unscreened: z.number(),
+  partner_applications_open: z.number(),
   bookings_awaiting_confirmation: z.number(),
   bookings_sla_expiring_within_30m: z.number(),
 });
@@ -927,6 +928,64 @@ export type EmergencyMode = z.infer<typeof emergencyModeSchema>;
 
 export async function getEmergency() {
   return staffFetch('/admin/emergency', emergencySchema);
+}
+
+// ─── §8.1 partnership requests — «طلبات الشراكة» ──────────────────────────────
+
+/**
+ * One row of the join queue.
+ *
+ * Every field the console shows, and none it does not. `submittedByUserId` is deliberately absent
+ * from the API's own view too: whether the applicant happened to be signed in is an audit fact,
+ * not something a reviewer decides on.
+ */
+const partnerApplicationSchema = z.object({
+  reference: z.string(),
+  status: z.string(),
+  contactName: z.string(),
+  email: z.string(),
+  phone: z.string(),
+  legalName: z.string(),
+  displayName: z.string(),
+  partnerType: z.string(),
+  partnerTypeAr: z.string(),
+  city: z.string(),
+  cityAr: z.string(),
+  address: z.string(),
+  propertyCount: z.number().nullable(),
+  website: z.string().nullable(),
+  message: z.string().nullable(),
+  preferredLocale: z.string(),
+  contactedAt: z.string().nullable(),
+  contactedByEmail: z.string().nullable(),
+  contactNotes: z.string().nullable(),
+  decidedAt: z.string().nullable(),
+  decidedByEmail: z.string().nullable(),
+  decisionNotes: z.string().nullable(),
+  /** Set once the request has been accepted — this is what it became. */
+  partnerReference: z.string().nullable(),
+  partnerVerification: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+const partnerApplicationsSchema = offsetPage(partnerApplicationSchema);
+
+export type PartnerApplicationRow = z.infer<typeof partnerApplicationSchema>;
+
+export async function getPartnerApplications(
+  params: ListParams & { status?: string | undefined },
+) {
+  return staffFetch(
+    `/admin/partner-applications${listQuery(params)}`,
+    partnerApplicationsSchema,
+  );
+}
+
+export async function getPartnerApplication(reference: string) {
+  return staffFetch(
+    `/admin/partner-applications/${encodeURIComponent(reference)}`,
+    partnerApplicationSchema,
+  );
 }
 
 // ─── §8 disputes, conversations, comms and advertising ────────────────────────

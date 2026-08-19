@@ -32,6 +32,10 @@ CREATE SEQUENCE IF NOT EXISTS review_reference_seq       START 1;
 -- Added 2026-08-13 with BullMQ phase 5. An export is a FILE a person asked for and comes
 -- back to collect, so it needs a name they can quote to support when it is not there.
 CREATE SEQUENCE IF NOT EXISTS export_reference_seq       START 1;
+-- Added 2026-08-19 with «انضم كشريك». A partnership REQUEST is quoted back to the applicant in
+-- the acknowledgement mail and to the super admin on the phone, before any partner record exists
+-- to carry `PAR-`, so it needs a reference of its own.
+CREATE SEQUENCE IF NOT EXISTS partner_application_reference_seq START 1;
 
 -- ----------------------------------------------------------------------------
 -- The reference NUMBER, padded to six digits and never truncated.

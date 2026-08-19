@@ -526,6 +526,11 @@ export class ReviewService {
       SELECT 'partners_pending_verification', COUNT(*)::text
         FROM partners WHERE verification = 'pending' AND deleted_at IS NULL
       UNION ALL
+      -- Requests to JOIN, which nobody has decided yet (Bashar, 2026-08-19).
+      SELECT 'partner_applications_open', COUNT(*)::text
+        FROM partner_applications
+        WHERE status IN ('submitted', 'contacted') AND deleted_at IS NULL
+      UNION ALL
       SELECT 'partners_unscreened', COUNT(*)::text
         FROM partners WHERE sanctions_screened_at IS NULL AND deleted_at IS NULL
       UNION ALL

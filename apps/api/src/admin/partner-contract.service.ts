@@ -7,6 +7,9 @@ import type { Database } from '@safra/db';
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { StorageService } from '../storage/storage.service.js';
+import { MailService } from '../mail/mail.service.js';
+import { partnerContractReadyMail } from '../mail/mail.templates.js';
+import { ENV, type Env } from '../config/env.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR } from '@safra/contracts';
 import { badRequest, notFound } from '../common/errors/app-error.js';
@@ -75,6 +78,8 @@ export class PartnerContractService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly storage: StorageService,
     private readonly audit: AuditService,
+    private readonly mail: MailService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   /** Every contract, newest first. Not paginated: a partner has a handful, ever. */
@@ -151,13 +156,30 @@ export class PartnerContractService {
       throw badRequest(ERROR.CONTRACT_PDF_REQUIRED);
     }
 
-    const partner = await this.db.execute<{ id: string }>(sql`
-      SELECT id FROM partners WHERE reference = ${input.partnerReference} LIMIT 1
+    /*
+      The partner's own address and language, so the upload can TELL them (Bashar, 2026-08-19).
+
+      Step 4 of «انضم كشريك» is "send the new partner the contract to sign", and a contract that
+      appears in a dashboard nobody has been asked to open is not sent. `users.email` rather than
+      `partners.email`: the account is what receives platform mail, and the two can differ.
+    */
+    const partner = await this.db.execute<{
+      id: string;
+      display_name: string;
+      email: string;
+      locale: string;
+    }>(sql`
+      SELECT p.id, p.display_name, u.email, u.preferred_locale AS locale
+      FROM partners p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.reference = ${input.partnerReference} AND p.deleted_at IS NULL
+      LIMIT 1
     `);
 
-    const partnerId = partner.rows[0]?.id;
+    const partnerRow = partner.rows[0];
+    const partnerId = partnerRow?.id;
 
-    if (!partnerId) throw notFound(ERROR.PARTNER_NOT_FOUND);
+    if (!partnerRow || !partnerId) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
     /*
       The object key is derived from ids, never from the uploaded filename. A filename is
@@ -227,6 +249,21 @@ export class PartnerContractService {
         tx as unknown as Database,
       );
     });
+
+    /*
+      After the transaction. A partner told about a contract that then rolled back would open a
+      dashboard with nothing in it, and the mail cannot be un-sent.
+    */
+    await this.mail.send(
+      partnerContractReadyMail({
+        to: partnerRow.email,
+        partner: partnerRow.display_name,
+        kind: input.kind,
+        /* From the configured base, never from the request — the rule for every link we mail. */
+        url: new URL('/contracts', this.env.PARTNER_URL).toString(),
+        locale: partnerRow.locale,
+      }),
+    );
 
     return this.list(input.partnerReference);
   }

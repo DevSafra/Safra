@@ -61,6 +61,17 @@ export const PERMISSIONS = {
   PARTNER_APPROVE: 'partner.approve',
   PARTNER_SUSPEND: 'partner.suspend',
   PARTNER_DOCUMENT_REVIEW: 'partner.document_review',
+
+  /** Reading the «طلبات الشراكة» queue — who has asked to join. */
+  PARTNER_APPLICATION_READ: 'partner_application.read',
+  /**
+   * Acting on a request: recording the call, accepting it, rejecting it.
+   *
+   * Separate from reading, and granted to the super admin alone, because ACCEPTING creates an
+   * account and invites somebody into the platform (Bashar, 2026-08-19). Operations can see the
+   * queue — they inherit the partner the moment it exists — but who joins is one person's call.
+   */
+  PARTNER_APPLICATION_MANAGE: 'partner_application.manage',
   /**
    * The COMMERCIAL contract between SAFRA and a partner — distinct from the documents the
    * partner submits for verification.
@@ -243,6 +254,8 @@ const OPERATIONS_MANAGER: Permission[] = [
   P.PARTNER_APPROVE,
   P.PARTNER_SUSPEND,
   P.PARTNER_DOCUMENT_REVIEW,
+  /* The queue is visible to the team that inherits the partner; accepting is not theirs. */
+  P.PARTNER_APPLICATION_READ,
   /*
     Operations, not support. A partner who has lost their authenticator phones the people who
     already verify partner identity for a living; routing every lost phone through a super admin

@@ -539,7 +539,8 @@
     "languageApply": "Show the site in this language",
     "legal": "Legal",
     "terms": "Terms of use",
-    "privacy": "Privacy notice"
+    "privacy": "Privacy notice",
+    "becomePartner": "Become a partner"
   },
   "legal": {
     "updated": "Last updated: {date}",
@@ -588,5 +589,64 @@
       "contactHeading": "Contact us",
       "contactBody": "To be completed before launch: the contact address for privacy questions."
     }
+  },
+  "partner": {
+    "title": "Become a partner",
+    "subtitle": "List your place on SAFRA and reach travellers searching in Arabic.",
+    "intro": "SAFRA connects hosts with travellers across Syria and the region. Every partner is reviewed before anything is published, because trust is what makes booking from far away possible.",
+    "whyTitle": "Why SAFRA",
+    "why": {
+      "audience": "An audience that searches in Arabic, with prices and cancellation terms written down before payment.",
+      "payouts": "Clear earnings: a statement per booking, and a scheduled transfer you can see in your dashboard.",
+      "control": "You set the price and the dates for each unit, and close any night whenever you want.",
+      "support": "Support in Arabic, and a written record of every dispute and refund."
+    },
+    "stepsTitle": "How joining works",
+    "steps": {
+      "one": "You fill in this form. The request reaches our team with a number you keep.",
+      "two": "We telephone you to confirm the details of your business and answer your questions.",
+      "three": "The request is reviewed and decided — accepted or declined, with the reason either way.",
+      "four": "On acceptance we send the partnership contract and a link to set your account password. We never send a password in a message.",
+      "five": "The account stays under review until we have checked your documents. Meanwhile you can prepare your property details.",
+      "six": "Once the checks pass, the account is verified.",
+      "seven": "Then you can add prices, dates and images, and your place is ready to publish."
+    },
+    "documentsTitle": "What we ask for",
+    "documentsNote": "Do not send any document now. We will ask for them after the request is accepted, from inside your partner dashboard.",
+    "documents": {
+      "identity": "ID or passport of the signing person.",
+      "register": "Commercial register extract for the legal entity, if there is one.",
+      "ownership": "Proof of the right to let: a title deed or a management contract."
+    },
+    "formTitle": "Your request",
+    "formNote": "Every field is required unless marked otherwise.",
+    "sectionContact": "Contact details",
+    "sectionBusiness": "Your business",
+    "contactName": "Your name",
+    "email": "Your account email",
+    "emailHint": "The request is filed against your SAFRA account, and this is where we send your request number and the invitation to create your partner account. To change it, change your account email first.",
+    "phone": "Phone number",
+    "phoneHint": "Pick the country, then enter your number. This is what we will call.",
+    "legalName": "Legal name of the business",
+    "legalNameHint": "As it appears on the commercial register.",
+    "displayName": "Trading name",
+    "displayNameHint": "The name travellers will see.",
+    "partnerType": "Kind of business",
+    "city": "City",
+    "address": "Address",
+    "propertyCount": "How many units or properties (optional)",
+    "website": "Website or social page (optional)",
+    "message": "Anything you would like us to know (optional)",
+    "locale": "Language for our replies",
+    "submit": "Send the request",
+    "submitting": "Sending…",
+    "choose": "Choose",
+    "successTitle": "We have your request",
+    "successBody": "Your request number is {reference}. We have emailed you a copy, and our team will be in touch shortly.",
+    "successKeep": "Keep the request number — it is how we find your request if you contact us.",
+    "backHome": "Back to the home page",
+    "failed": "The request could not be sent. Please try again.",
+    "privacy": "We use these details only to assess your request and to contact you about it.",
+    "signedInNote": "Applying requires an account, because the request is filed in your account’s name."
   }
 }

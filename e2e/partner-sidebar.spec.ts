@@ -234,7 +234,7 @@ test('the sidebar is a dismissible drawer at 390px', async ({ page }) => {
 
     This caught a real defect. The nav is `flex-1` so it fills the drawer, and a GRID with free
     space distributes it across its rows — so لوحة الشريك's four items came out as four 180px slabs
-    in a full-height drawer, while the console's nineteen rows overflow and never showed it. Fixed
+    in a full-height drawer, while the console's twenty rows overflow and never showed it. Fixed
     with `content-start`; asserted here because it is invisible to every other kind of test and the
     partner nav will stay short.
 

@@ -179,7 +179,7 @@ test.describe('the command-center dashboard', () => {
    *
    * This test has been rewritten twice, and the history is the point. First it asserted that
    * unbuilt sections were `aria-disabled` and NOT links — right while eleven of the eighteen had
-   * no route. Then it asserted they navigated to a page explaining the gap. Now all nineteen are
+   * no route. Then it asserted they navigated to a page explaining the gap. Now all twenty are
    * implemented, so it asserts the strongest form: the destination shows data, not an apology.
    */
   test('the disputes section is reachable and shows real data', async ({ page }) => {

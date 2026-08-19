@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { emailSchema, localeSchema, passwordSchema, phoneSchema } from './auth.js';
 import { tripAttributeSchema } from './search.js';
 import { ERROR } from './error-codes.js';
 
@@ -181,26 +180,6 @@ export type PropertyReviewInput = z.infer<typeof propertyReviewSchema>;
  * rejects it if sent anyway, and the service never reads the payload for these
  * values. Mass assignment is the most common way a registration endpoint is broken.
  */
-export const partnerRegisterSchema = z
-  .object({
-    /** The sign-in account created alongside the partner record. */
-    email: emailSchema,
-    password: passwordSchema,
-    phone: phoneSchema,
-
-    /** The legal entity, as it appears on the commercial register (§8.1). */
-    legalName: z.string().trim().min(2).max(200),
-    /** What customers see. May differ from the legal name. */
-    displayName: z.string().trim().min(2).max(120),
-    /** `accommodation`, `mobility`, … — validated against `partner_types`. */
-    partnerTypeCode: z.string().trim().min(2).max(40),
-    citySlug: z.string().trim().min(2).max(80),
-    address: z.string().trim().min(4).max(300),
-    preferredLocale: localeSchema.default('ar'),
-  })
-  .strict();
-
-export type PartnerRegisterInput = z.infer<typeof partnerRegisterSchema>;
 
 /**
  * The documents §8.1 requires before a partner can be verified.

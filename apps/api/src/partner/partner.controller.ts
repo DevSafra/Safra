@@ -1,22 +1,9 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Put,
-  Query,
-  Req,
-} from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
-import type { Request } from 'express';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
 
 import {
   PERMISSIONS as P,
   type CalendarQuery,
   type CalendarRangeUpdate,
-  type PartnerRegisterInput,
   type PortfolioCalendarQuery,
   type PropertyCreateInput,
   type PropertyUpdateInput,
@@ -25,7 +12,6 @@ import {
   calendarQuerySchema,
   calendarRangeUpdateSchema,
   portfolioCalendarQuerySchema,
-  partnerRegisterSchema,
   propertyCreateSchema,
   propertyUpdateSchema,
   unitCreateSchema,
@@ -34,10 +20,10 @@ import {
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
-import { CurrentUser, Public, RequirePermissions } from '../rbac/decorators.js';
+import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
+import { RequireVerifiedPartner } from '../rbac/verified-partner.guard.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { CalendarService } from './calendar.service.js';
-import { PartnerRegistrationService } from './partner-registration.service.js';
 import { PartnerDashboardService } from './dashboard.service.js';
 import { PropertiesService } from './properties.service.js';
 
@@ -48,43 +34,25 @@ import { PropertiesService } from './properties.service.js';
  * partner id from the token before touching a row. Two layers on purpose: the
  * decorator answers "may this role act at all", the service answers "on whose
  * data" — and only the second prevents one partner reaching another's inventory.
+ *
+ * ## `POST /partner/register` is gone (Bashar, 2026-08-19)
+ *
+ * It was the one `@Public()` route here, and it created a partner ACCOUNT — anyone could self-
+ * register and land in `pending`. That was defensible while publication was the only thing being
+ * withheld, but it is not the flow Bashar specified: a request reaches the super admin, who
+ * telephones the applicant, accepts, and only then is an account created.
+ *
+ * Two doors into the same relationship would have meant two review queues that must agree, so
+ * this one is closed. `POST /partner/applications` is the way in — see
+ * `partner-application.controller.ts`. Nothing in this file is public any more.
  */
 @Controller('partner')
 export class PartnerController {
   constructor(
     private readonly properties: PropertiesService,
     private readonly calendar: CalendarService,
-    private readonly registration: PartnerRegistrationService,
     private readonly dashboardService: PartnerDashboardService,
   ) {}
-
-  /**
-   * Applying to become a partner (§8.1).
-   *
-   * `@Public()` — the applicant has no account yet, which is the point. That is safe
-   * only because of what registration does NOT grant: the partner lands in `pending`,
-   * item 116 blocks publication while unverified, and ADR 0002 makes sanctions
-   * screening a hard precondition for verifying them. Anyone may apply; nothing they
-   * create reaches a customer until a human and a screening check have both passed.
-   *
-   * Throttled like customer registration: five a minute per address. It writes two
-   * rows and runs an Argon2id hash, so it is both expensive and worth abusing.
-   */
-  @Public()
-  @Post('register')
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @AuditExempt(
-    'PartnerRegistrationService records partner.registered in the same transaction.',
-  )
-  async register(
-    @Body(new ZodValidationPipe(partnerRegisterSchema)) body: PartnerRegisterInput,
-    @Req() request: Request,
-  ) {
-    return this.registration.register(body, {
-      ipAddress: request.ip,
-      userAgent: request.get('user-agent'),
-    });
-  }
 
   /**
    * Who the signed-in partner IS — their business name, city, tier and score.
@@ -175,6 +143,14 @@ export class PartnerController {
     return this.properties.submitForReview(user, reference);
   }
 
+  /*
+    A unit carries a base price, so creating one IS setting a price — step 7 (Bashar, 2026-08-19).
+
+    The consequence is stated rather than hidden: an unverified partner can write their property's
+    address and description and nothing more. That is what «انضم كشريك» tells an applicant will
+    happen, and what لوحة الشريك repeats on العقود والمستندات while they wait.
+  */
+  @RequireVerifiedPartner()
   @Post('properties/:reference/units')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   async addUnit(
@@ -185,6 +161,8 @@ export class PartnerController {
     return this.properties.addUnit(user, reference, body);
   }
 
+  /* Changes the base price among other things — gated whole rather than per field. */
+  @RequireVerifiedPartner()
   @Patch('units/:unitId')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   async updateUnit(
@@ -225,6 +203,8 @@ export class PartnerController {
     return this.calendar.read(user, unitId, query);
   }
 
+  /* Dates AND nightly prices, which is two of the three things step 7 names. */
+  @RequireVerifiedPartner()
   @Put('units/:unitId/calendar')
   @RequirePermissions(P.CALENDAR_MANAGE_OWN)
   async updateCalendar(

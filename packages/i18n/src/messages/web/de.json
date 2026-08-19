@@ -539,7 +539,8 @@
     "languageApply": "Website in dieser Sprache anzeigen",
     "legal": "Rechtliches",
     "terms": "Nutzungsbedingungen",
-    "privacy": "Datenschutzhinweis"
+    "privacy": "Datenschutzhinweis",
+    "becomePartner": "Partner werden"
   },
   "legal": {
     "updated": "Zuletzt aktualisiert: {date}",
@@ -588,5 +589,64 @@
       "contactHeading": "Kontakt",
       "contactBody": "Wird vor dem Start ergänzt: die Kontaktadresse für Datenschutzfragen."
     }
+  },
+  "partner": {
+    "title": "Partner werden",
+    "subtitle": "Bieten Sie Ihre Unterkunft auf SAFRA an und erreichen Sie Reisende, die auf Arabisch suchen.",
+    "intro": "SAFRA verbindet Gastgeber mit Reisenden in Syrien und der Region. Jeder Partner wird geprüft, bevor etwas veröffentlicht wird — Vertrauen ist das, was eine Buchung aus der Ferne überhaupt möglich macht.",
+    "whyTitle": "Warum SAFRA",
+    "why": {
+      "audience": "Ein Publikum, das auf Arabisch sucht — mit Preisen und Stornobedingungen, die vor der Zahlung feststehen.",
+      "payouts": "Nachvollziehbare Erlöse: eine Abrechnung je Buchung und eine geplante Überweisung, die Sie in Ihrem Dashboard sehen.",
+      "control": "Sie legen Preis und Termine je Einheit fest und sperren jede Nacht, wann Sie möchten.",
+      "support": "Support auf Arabisch und eine schriftliche Aufzeichnung zu jedem Streitfall und jeder Erstattung."
+    },
+    "stepsTitle": "So läuft die Aufnahme ab",
+    "steps": {
+      "one": "Sie füllen dieses Formular aus. Die Anfrage erreicht unser Team mit einer Nummer, die Sie behalten.",
+      "two": "Wir rufen Sie an, um die Angaben zu Ihrem Betrieb zu bestätigen und Ihre Fragen zu beantworten.",
+      "three": "Die Anfrage wird geprüft und entschieden — Zusage oder Absage, in beiden Fällen mit Begründung.",
+      "four": "Bei einer Zusage senden wir den Partnervertrag und einen Link, um das Passwort für Ihr Konto zu setzen. Ein Passwort versenden wir niemals in einer Nachricht.",
+      "five": "Das Konto bleibt in Prüfung, bis wir Ihre Unterlagen geprüft haben. In dieser Zeit können Sie die Angaben zu Ihren Objekten vorbereiten.",
+      "six": "Sind die Prüfungen bestanden, wird das Konto verifiziert.",
+      "seven": "Danach können Sie Preise, Termine und Bilder hinzufügen — Ihre Unterkunft ist bereit zur Veröffentlichung."
+    },
+    "documentsTitle": "Was wir für die Prüfung benötigen",
+    "documentsNote": "Senden Sie jetzt keine Unterlagen. Wir fragen sie nach der Zusage direkt im Partner-Dashboard ab.",
+    "documents": {
+      "identity": "Ausweis oder Reisepass der unterzeichnenden Person.",
+      "register": "Handelsregisterauszug des Rechtsträgers, sofern vorhanden.",
+      "ownership": "Nachweis der Vermietungsberechtigung: Eigentumsnachweis oder Verwaltungsvertrag."
+    },
+    "formTitle": "Ihre Anfrage",
+    "formNote": "Alle Felder sind erforderlich, sofern nicht anders angegeben.",
+    "sectionContact": "Kontaktdaten",
+    "sectionBusiness": "Ihr Betrieb",
+    "contactName": "Ihr Name",
+    "email": "E-Mail Ihres Kontos",
+    "emailHint": "Die Anfrage wird Ihrem SAFRA-Konto zugeordnet; hierhin senden wir Ihre Anfragenummer und die Einladung für Ihr Partnerkonto. Zum Ändern passen Sie zuerst die E-Mail Ihres Kontos an.",
+    "phone": "Telefonnummer",
+    "phoneHint": "Land auswählen, dann Ihre Nummer eingeben. Unter dieser Nummer rufen wir an.",
+    "legalName": "Rechtlicher Name des Betriebs",
+    "legalNameHint": "Wie im Handelsregister eingetragen.",
+    "displayName": "Handelsname",
+    "displayNameHint": "Der Name, den Reisende sehen.",
+    "partnerType": "Art des Betriebs",
+    "city": "Stadt",
+    "address": "Adresse",
+    "propertyCount": "Anzahl der Einheiten oder Objekte (optional)",
+    "website": "Website oder Social-Media-Seite (optional)",
+    "message": "Was wir sonst wissen sollten (optional)",
+    "locale": "Sprache für unsere Antworten",
+    "submit": "Anfrage senden",
+    "submitting": "Wird gesendet…",
+    "choose": "Bitte wählen",
+    "successTitle": "Ihre Anfrage ist eingegangen",
+    "successBody": "Ihre Anfragenummer lautet {reference}. Eine Kopie haben wir Ihnen per E-Mail geschickt; unser Team meldet sich in Kürze.",
+    "successKeep": "Bewahren Sie die Anfragenummer auf — damit finden wir Ihre Anfrage, wenn Sie sich bei uns melden.",
+    "backHome": "Zurück zur Startseite",
+    "failed": "Die Anfrage konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+    "privacy": "Wir verwenden diese Angaben ausschließlich, um Ihre Anfrage zu prüfen und Sie dazu zu kontaktieren.",
+    "signedInNote": "Eine Anfrage kann nur mit Konto gestellt werden, denn sie wird im Namen Ihres Kontos erfasst."
   }
 }

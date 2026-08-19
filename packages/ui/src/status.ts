@@ -97,6 +97,22 @@ const STATUS_TONES: Record<string, Tone> = {
   paid: 'teal',
 
   // ── Waiting on somebody ───────────────────────────────────────────────────
+  /**
+   * A partnership REQUEST nobody has rung yet (Bashar, 2026-08-19).
+   *
+   * Amber, with the rest of "waiting on somebody": an unanswered request is work for SAFRA, not
+   * a state of the applicant's. `accepted` takes green and `contacted` indigo, so the queue's
+   * four values are four colours.
+   */
+  submitted: 'warn',
+  /**
+   * Rung, and awaiting the decision. Indigo rather than `in_review`'s sky, because the
+   * application's own detail screen shows the partner's VERIFICATION beside it once accepted —
+   * and `in_review` is one of the values that screen can paint.
+   */
+  contacted: 'indigo',
+  /** A request that became a partner. Green: the outcome the applicant was waiting for. */
+  accepted: 'ok',
   pending_payment: 'warn',
   pending_review: 'warn',
   requires_action: 'warn',
@@ -168,6 +184,13 @@ export const VOCABULARIES: Readonly<Record<string, readonly string[]>> = {
     'archived',
   ],
   verification: ['pending', 'in_review', 'approved', 'rejected'],
+  /**
+   * «طلبات الشراكة» — a request to join, before there is a partner.
+   *
+   * Four values on one registry, so four tones. `rejected` keeps its red from everywhere else:
+   * the same status is the same colour, which is rule 1.
+   */
+  partnerApplication: ['submitted', 'contacted', 'accepted', 'rejected'],
   payments: [
     'initiated',
     'requires_action',

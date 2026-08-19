@@ -22,5 +22,6 @@ export async function sidebarCounts(): Promise<SidebarCounts> {
     bookings: attention.bookings_awaiting_confirmation,
     partners: attention.partners_pending_verification,
     properties: attention.properties_pending_review,
+    partnerApplications: attention.partner_applications_open,
   };
 }

@@ -16,11 +16,11 @@ import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
  * on the dashboard had been missing it since it was written, along with seventeen other controls
  * in the console.
  *
- * ## Sampled across three pages, not all nineteen
+ * ## Sampled across three pages, not all twenty
  *
  * The dashboard, a `ConsoleShell` section and a form-heavy screen between them cover every button
  * treatment in the console — the bordered secondary, the gold primary, the destructive, and the
- * role `<select>`. Walking all nineteen would triple the runtime to re-check the same components.
+ * role `<select>`. Walking all twenty would triple the runtime to re-check the same components.
  */
 test.skip(MISSING_CREDENTIALS, SKIP_REASON);
 

@@ -166,6 +166,7 @@ export const de = {
   'validation.nights_min_max':
     'Die maximale Anzahl Nächte darf nicht unter der minimalen liegen.',
   'validation.booking_reference': 'Ungültige Buchungsnummer.',
+  'validation.url_invalid': 'Geben Sie eine gültige URL ein, die mit https:// beginnt.',
   'validation.token_malformed': 'Ungültiger Link.',
   'validation.access_token_malformed': 'Ungültiges Zugriffstoken.',
   'validation.scope_all_cities_conflict':
@@ -228,6 +229,17 @@ export const de = {
     'Bitte melden Sie sich mit dem Konto an, zu dem diese Buchung gehört, um Ihr Guthaben zu verwenden.',
   'wallet.balance_changed':
     'Ihr Guthaben hat sich während der Vorbereitung dieser Zahlung geändert. Bitte erneut versuchen.',
+  'partner_application.not_found': 'Diese Partnerschaftsanfrage wurde nicht gefunden.',
+  'partner_application.already_open':
+    'Zu dieser E-Mail-Adresse liegt bereits eine offene Anfrage vor. Wir melden uns.',
+  'partner_application.already_decided': 'Über diese Anfrage wurde bereits entschieden.',
+  'partner_application.no_account':
+    'Zu dieser Anfrage gehört kein Konto; sie kann nicht angenommen werden.',
+  'partner_application.email_is_staff':
+    'Diese E-Mail-Adresse gehört zu einem Mitarbeiterkonto und kann nicht in ein Partnerkonto umgewandelt werden.',
+  'partner_application.email_is_partner': 'Diese E-Mail-Adresse ist bereits Partner.',
+  'partner.invitation_invalid':
+    'Dieser Einladungslink ist ungültig oder wurde bereits verwendet.',
   'partner.not_verified':
     'Dieser Partner ist noch nicht verifiziert. Bitte den Partner verifizieren, bevor seine Objekte veröffentlicht werden.',
   'partner.sanctions_screening_required':

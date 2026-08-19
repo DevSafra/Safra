@@ -23,6 +23,7 @@ import {
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
+import { RequireVerifiedPartner } from '../rbac/verified-partner.guard.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { PropertyImageService } from './property-images.service.js';
 
@@ -40,6 +41,14 @@ import { PropertyImageService } from './property-images.service.js';
  * for another partner's reference so it cannot be probed. The logic lives in
  * `PropertyImageService`; this file is the HTTP surface.
  */
+/*
+  Every write here is an IMAGE, and step 7 puts images behind verification (Bashar, 2026-08-19).
+
+  On the CLASS rather than on five handlers: a decorator that has to be remembered five times is a
+  decorator that will be missing from the sixth. There is no read route on this controller — the
+  partner's own listing images are returned with the property — so nothing is over-gated by this.
+*/
+@RequireVerifiedPartner()
 @Controller('partner/properties/:reference/images')
 export class PartnerImagesController {
   constructor(private readonly images: PropertyImageService) {}

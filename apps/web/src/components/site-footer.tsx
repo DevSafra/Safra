@@ -83,6 +83,14 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
       links: [
         { href: `/${locale}`, label: nav('home') },
         { href: `/${locale}/search`, label: nav('stays') },
+        /*
+          «انضم كشريك», in تصفّح rather than قانوني (Bashar, 2026-08-19).
+
+          It is an invitation, not a document. A host who is going to list a building arrives as an
+          ordinary visitor and finds this the way they find anything else on the site — and the
+          footer is on every page, which is the only place that is true.
+        */
+        { href: `/${locale}/partners/join`, label: t('becomePartner') },
       ],
     },
     {

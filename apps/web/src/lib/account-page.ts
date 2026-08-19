@@ -24,15 +24,34 @@ export async function requireAccount(
   session: NonNullable<Awaited<ReturnType<typeof getSession>>>;
   locale: Locale;
 }> {
+  return requireSignedIn(locale, `/account${section}`);
+}
+
+/**
+ * The same guard for a signed-in page that is NOT under `/account`.
+ *
+ * «انضم كشريك» is the first of them (Bashar, 2026-08-19): applying is only for people who already
+ * have an account, but the page itself is not one of the customer's own records and does not live
+ * in that section.
+ *
+ * @param path The destination BELOW the locale, e.g. `/partners/join`. A literal from the caller,
+ *   never anything from a request — it is interpolated into the `next` parameter, and a path taken
+ *   from the URL would make the sign-in redirect an open redirect.
+ */
+export async function requireSignedIn(
+  locale: string,
+  path: string,
+): Promise<{
+  session: NonNullable<Awaited<ReturnType<typeof getSession>>>;
+  locale: Locale;
+}> {
   if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
 
   const session = await getSession();
 
   if (!session) {
-    const target = `/${locale}/account${section}`;
-
-    redirect(`/${locale}/login?next=${encodeURIComponent(target)}`);
+    redirect(`/${locale}/login?next=${encodeURIComponent(`/${locale}${path}`)}`);
   }
 
   /*

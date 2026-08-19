@@ -1258,6 +1258,142 @@ async function bulk(
 
   await conversation(db, ctx.profileId);
   await reviews(db);
+  await partnershipRequests(db);
+}
+
+/**
+ * «طلبات الشراكة» — one request in each state (Bashar, 2026-08-19).
+ *
+ * Four rows, because the queue's whole point is that its four statuses are four colours and four
+ * words, and `navigation.spec.ts` sweeps every section asserting exactly that. A section seeded
+ * with only `submitted` rows would pass the sweep by having nothing to collide with.
+ *
+ * The accepted one is linked to a REAL partner, so the detail screen's «أصبح الشريك» line has
+ * something to point at and the return trip from it can be tested.
+ */
+async function partnershipRequests(db: Seeder): Promise<void> {
+  /* The platform's own hasher, so a fixture account is hashed exactly like a real one. */
+  const passwordHash = await new PasswordService().hash(PASSWORD);
+
+  const [partnerType] = await db.select().from(schema.partnerTypes).limit(1);
+  const [city] = await db.select().from(schema.cities).limit(1);
+  const [partner] = await db.select().from(schema.partners).limit(1);
+
+  if (!partnerType || !city) return;
+
+  const base = {
+    partnerTypeId: partnerType.id,
+    cityId: city.id,
+    address: 'شارع الاختبار، بناء 12',
+    phone: '+963116414444',
+    preferredLocale: 'ar',
+  };
+
+  const emails = [
+    'request-new@safra.test',
+    'request-called@safra.test',
+    'request-accepted@safra.test',
+    'request-rejected@safra.test',
+  ];
+
+  /*
+    Cleared first, so `db:testbed` can be run twice.
+
+    `partner_applications_open_email_unique` allows ONE open request per address, which is the
+    right rule and makes a plain re-insert fail — and this script is re-run constantly. There is
+    no natural key to `ON CONFLICT` on either: the index is PARTIAL, so it only covers the two
+    open statuses. Deleting these four fixture addresses is unambiguous, and it also resets a
+    request that somebody accepted by hand while testing the screen.
+  */
+  /* `IN ${array}` — drizzle expands a JS array to a TUPLE, never to an array literal. */
+  await db.execute(sql`DELETE FROM partner_applications WHERE email IN ${emails}`);
+
+  /*
+    And the PARTNER a previous run may have created from one of them.
+
+    A tester who accepts the seeded request in the console turns that applicant into a partner —
+    correctly. Re-seeding would then produce a fixture the console refuses with «هذا البريد شريك
+    بالفعل», because an account cannot apply twice, and the queue would look broken.
+
+    Soft-deleted, never dropped: P-003 forbids hard deletes and every scoping query already reads
+    `deleted_at IS NULL`, so this is the same disappearance the rest of the platform means by it.
+  */
+  await db.execute(sql`
+    UPDATE partners SET deleted_at = now()
+    WHERE deleted_at IS NULL
+      AND user_id IN (SELECT id FROM users WHERE email IN ${emails})
+  `);
+
+  /*
+    Every request needs an ACCOUNT behind it (Bashar, 2026-08-19).
+
+    Applying requires a session, so a fixture with `submitted_by_user_id` null would be a row the
+    console cannot accept — the screen would offer a button that always fails. One customer per
+    request, with the shared testbed password, so a tester can also sign in as one and watch their
+    own account become a partner.
+  */
+  const applicants = await Promise.all(
+    emails.map((email) =>
+      upsertUser(db, {
+        email,
+        phone: '+963116414444',
+        passwordHash,
+        role: 'customer',
+      }),
+    ),
+  );
+
+  await db.insert(schema.partnerApplications).values([
+    {
+      ...base,
+      status: 'submitted' as const,
+      submittedByUserId: applicants[0]?.id,
+      contactName: 'سامر الحلبي',
+      email: 'request-new@safra.test',
+      legalName: 'شركة الحلبي للضيافة',
+      displayName: 'نُزل الحلبي',
+      propertyCount: 3,
+      message: 'لدينا ثلاثة مبانٍ في وسط المدينة ونرغب بعرضها على سفرة.',
+    },
+    {
+      ...base,
+      status: 'contacted' as const,
+      submittedByUserId: applicants[1]?.id,
+      contactName: 'ريم العطار',
+      email: 'request-called@safra.test',
+      legalName: 'مؤسسة العطار السياحية',
+      displayName: 'شقق العطار',
+      contactedAt: new Date(),
+      contactNotes: 'اتصلنا اليوم. النشاط قائم منذ 2019 والسجل التجاري جاهز.',
+    },
+    {
+      ...base,
+      status: 'accepted' as const,
+      submittedByUserId: applicants[2]?.id,
+      contactName: 'وليد بركات',
+      email: 'request-accepted@safra.test',
+      legalName: 'وليد بركات',
+      displayName: 'شقق الميناء',
+      contactedAt: new Date(),
+      contactNotes: 'مكالمة تمهيدية، كل شيء واضح.',
+      decidedAt: new Date(),
+      decisionNotes: 'قُبل. أُرسلت الدعوة والعقد.',
+      ...(partner ? { partnerId: partner.id } : {}),
+    },
+    {
+      ...base,
+      status: 'rejected' as const,
+      submittedByUserId: applicants[3]?.id,
+      contactName: 'خالد ن.',
+      email: 'request-rejected@safra.test',
+      legalName: 'غير محدد',
+      displayName: 'استضافة خاصة',
+      decidedAt: new Date(),
+      decisionNotes: 'لا يوجد ما يثبت حق التأجير، والمدينة خارج نطاق التغطية حالياً.',
+    },
+  ]);
+
+  console.log('  4 partnership requests, one in each state');
 }
 
 /**

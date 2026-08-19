@@ -51,6 +51,7 @@ describe('no two statuses on one screen share a word', () => {
     ['paymentStatus', t.enums.paymentStatus],
     ['propertyStatus', t.enums.propertyStatus],
     ['verification', t.enums.verification],
+    ['partnerApplicationStatus', t.enums.partnerApplicationStatus],
     ['disputeStatus', t.enums.disputeStatus],
     ['payoutStatus', t.enums.payoutStatus],
   ])('%s', (_name, map) => {

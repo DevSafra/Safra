@@ -1430,6 +1430,59 @@ ever approaches it.
 
 **Owner:** engineering.
 
+### O-partner-6 — «انضم كشريك» is built; three of its limits are deliberate
+
+**Shipped 2026-08-19.** Bashar specified a seven-step joining flow: a public page with information
+and a form, the request reaching the super admin, a phone call, an acceptance, a contract and
+account hand-over, an account that stays pending while documents are checked, verification, and
+only then the ability to set prices, dates and images. All seven are built.
+
+**Three decisions were taken WITH Bashar rather than assumed**, because each conflicted with a rule
+already in this repository:
+
+1. **The applicant's customer account is CONVERTED, not deleted.** Step 4 as first described said
+   to delete it. That account owns bookings, invoices, a wallet balance, reviews and disputes, and
+   `.claude/CLAUDE.md` records P-003 «suspension, never deletion». The role changes
+   `customer → partner` instead, so nothing is orphaned and the person keeps their own history.
+2. **The account is handed over by a single-use INVITATION, never a password.** Step 4 said "email
+   - password". A password in an inbox is a credential that outlives its usefulness and is readable
+     by anybody who ever reaches that mailbox. The link expires in 72 hours and can be re-sent.
+3. **Self-registration is closed.** `POST /partner/register` created a partner account outright.
+   Two doors into the same relationship would have meant two review queues that must agree.
+
+**Applying requires a SESSION** (Bashar, 2026-08-19). The page and the endpoint both refuse an
+anonymous visitor, and the request is filed against the signed-in account: the address, the
+eligibility check and the account that eventually becomes a partner are all read from the verified
+token. That deleted a whole class of problem rather than defending against it — an earlier version
+took an anonymous form carrying a typed address, which is a CLAIM about a mailbox nobody had
+checked, and every later step had to be built so that a forged one cost the real owner nothing.
+"Apply as somebody else" is now unexpressible.
+
+**The conversion still happens at REDEMPTION, not at acceptance,** for two reasons that survive
+the session requirement: a partner account is privileged, so its password is re-established rather
+than inherited, and a live mailbox is confirmed before somebody is handed a business relationship.
+A staff account and one that is already a partner are refused — when the request is FILED, so
+nobody is telephoned about a request that could never be accepted, and AGAIN at acceptance,
+because days pass in between and an ordinary customer on Monday can be staff by Thursday.
+
+**Deliberate limits, recorded rather than hidden:**
+
+- **No email reaches the super admin when a request arrives.** The queue and its sidebar badge are
+  the notification, which is how every other staff queue in this console works. An address to
+  notify would be the first piece of configuration; there is no staff-alert address in `env.ts`
+  today. **Unblocks:** nothing. **Owner:** engineering, if the queue is ever worked by somebody who
+  does not open the console daily.
+- **Signing is offline.** SAFRA uploads the contract, the partner downloads it, signs it and
+  returns it, and staff record the signature — `awaiting_partner_signature → active`. There is no
+  e-signature integration and the schema never assumed one. A partner asserting their own signature
+  is not a signature, so a self-service "I have signed this" button is not the missing piece.
+- **The verification gate blocks unit CREATION too.** A unit carries a base price, so creating one
+  is setting a price. The consequence — an unverified partner can write a property's address and
+  description and nothing else — is stated on the public page, in the invitation email and on the
+  partner's own العقود والمستندات screen, so it is expected rather than discovered.
+
+**Owner:** engineering. **Status:** complete.
+
 ### O-partner-4 — Partner 2FA is mandatory and enforced; what remains is operational
 
 **Decided and shipped 2026-08-07.** Bashar's decision was **mandatory, not optional**. Partner

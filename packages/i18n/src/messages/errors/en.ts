@@ -142,6 +142,7 @@ export const en = {
   'validation.longitude_format': 'Longitude must be decimal degrees.',
   'validation.nights_min_max': 'Maximum nights cannot be lower than minimum nights.',
   'validation.booking_reference': 'Malformed booking reference.',
+  'validation.url_invalid': 'Enter a valid URL beginning with https://',
   'validation.token_malformed': 'Malformed link token.',
   'validation.access_token_malformed': 'Malformed access token.',
   'validation.scope_all_cities_conflict': 'An all-cities scope cannot carry a city list.',
@@ -196,6 +197,17 @@ export const en = {
     'Sign in to the account that holds this booking to use your balance.',
   'wallet.balance_changed':
     'Your balance changed while this payment was being prepared. Please try again.',
+  'partner_application.not_found': 'That partnership request was not found.',
+  'partner_application.already_open':
+    'We already have an open request from this email address. We will be in touch.',
+  'partner_application.already_decided': 'This request has already been decided.',
+  'partner_application.no_account':
+    'This request has no account behind it and cannot be accepted.',
+  'partner_application.email_is_staff':
+    'That email address belongs to a staff account and cannot be turned into a partner account.',
+  'partner_application.email_is_partner': 'That email address is already a partner.',
+  'partner.invitation_invalid':
+    'That invitation link is invalid or has already been used.',
   'partner.not_verified':
     'This partner is not verified yet. Verify the partner before publishing their listings.',
   'partner.sanctions_screening_required':

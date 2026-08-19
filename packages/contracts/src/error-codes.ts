@@ -175,6 +175,7 @@ export const ERROR = {
   VALIDATION_LONGITUDE_FORMAT: 'validation.longitude_format',
   VALIDATION_NIGHTS_MIN_MAX: 'validation.nights_min_max',
   VALIDATION_BOOKING_REFERENCE: 'validation.booking_reference',
+  VALIDATION_URL_INVALID: 'validation.url_invalid',
   VALIDATION_TOKEN_MALFORMED: 'validation.token_malformed',
   VALIDATION_ACCESS_TOKEN_MALFORMED: 'validation.access_token_malformed',
   VALIDATION_SCOPE_ALL_CITIES_CONFLICT: 'validation.scope_all_cities_conflict',
@@ -222,6 +223,31 @@ export const ERROR = {
   WALLET_WRONG_ACCOUNT: 'wallet.wrong_account',
   WALLET_BALANCE_CHANGED: 'wallet.balance_changed',
   PARTNER_NOT_VERIFIED: 'partner.not_verified',
+
+  /* ── Applying to become a partner (§8.1, Bashar 2026-08-19) ── */
+  PARTNER_APPLICATION_NOT_FOUND: 'partner_application.not_found',
+  /** One open request per address. A rejected applicant may apply again. */
+  PARTNER_APPLICATION_ALREADY_OPEN: 'partner_application.already_open',
+  /** Accepting or rejecting something already accepted or rejected. */
+  PARTNER_APPLICATION_ALREADY_DECIDED: 'partner_application.already_decided',
+  /**
+   * The address belongs to a STAFF account.
+   *
+   * Refused rather than converted: accepting an application would otherwise demote an
+   * operations manager to a partner, through a screen whose audit entry reads «قُبل الطلب».
+   */
+  /**
+   * The request has no account behind it.
+   *
+   * Unreachable for anything filed since applying required a session (2026-08-19), and kept
+   * because rows written before that exist and must fail loudly rather than pick an account.
+   */
+  PARTNER_APPLICATION_NO_ACCOUNT: 'partner_application.no_account',
+  PARTNER_APPLICATION_EMAIL_IS_STAFF: 'partner_application.email_is_staff',
+  /** The address is already a partner. Nothing to accept; find them in الشركاء. */
+  PARTNER_APPLICATION_EMAIL_IS_PARTNER: 'partner_application.email_is_partner',
+  /** The invitation link is expired, spent, or was never issued. Deliberately one code. */
+  PARTNER_INVITATION_INVALID: 'partner.invitation_invalid',
   PARTNER_SANCTIONS_SCREENING_REQUIRED: 'partner.sanctions_screening_required',
   PROPERTY_UNIT_REQUIRED: 'property.unit_required',
   PROPERTY_NOT_STRUCTURALLY_EDITABLE: 'property.not_structurally_editable',

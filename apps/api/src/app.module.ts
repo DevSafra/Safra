@@ -42,6 +42,7 @@ import { ENV, type Env } from './config/env.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
 import { PermissionsGuard } from './rbac/permissions.guard.js';
 import { TwoFactorGuard } from './rbac/two-factor.guard.js';
+import { VerifiedPartnerGuard } from './rbac/verified-partner.guard.js';
 
 @Module({
   imports: [
@@ -134,6 +135,14 @@ import { TwoFactorGuard } from './rbac/two-factor.guard.js';
     // it may well hold.
     { provide: APP_GUARD, useClass: TwoFactorGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    /*
+      Last, and only on the routes that ask for it (Bashar, 2026-08-19).
+
+      After PermissionsGuard because "you may not do this at all" is a better answer than "your
+      account is not verified yet" for somebody who is not a partner — and because this one costs
+      a database round trip, which a request that was going to be refused anyway should not spend.
+    */
+    { provide: APP_GUARD, useClass: VerifiedPartnerGuard },
     // Runs after the guards, so an unauthorised request is never audited as an
     // action. Also warns about mutating routes with no audit declaration (§15).
     AuditService,

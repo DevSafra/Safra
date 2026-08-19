@@ -225,7 +225,7 @@ test.describe('the staff console', () => {
    * A phone opens on the CONTENT, with the navigation collapsed.
    *
    * This assertion has been strengthened twice. First the sidebar rendered above the content, so
-   * nineteen nav links pushed every section below the fold. Then it moved below the content in the
+   * twenty nav links pushed every section below the fold. Then it moved below the content in the
    * DOM. Now it is collapsed by default and reached through the hamburger, which is better than
    * either — so what is asserted is that the content starts near the top and the nav is not
    * occupying the screen.

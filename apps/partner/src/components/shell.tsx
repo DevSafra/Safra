@@ -39,7 +39,13 @@ export function Shell({
   readonly title: string;
   readonly partnerName: string;
   readonly active:
-    'dashboard' | 'properties' | 'calendars' | 'payouts' | 'reviews' | 'support';
+    | 'dashboard'
+    | 'properties'
+    | 'calendars'
+    | 'payouts'
+    | 'reviews'
+    | 'contracts'
+    | 'support';
   /**
    * The §7 sidebar badges — `عقاراتي 3` and `التقييمات ★ 4.7`.
    *
@@ -123,6 +129,17 @@ export function Shell({
             current={active === 'calendars'}
           />
           <Item href="/payouts" label={t.nav.payouts} current={active === 'payouts'} />
+          {/*
+            العقود والمستندات — what SAFRA sent and what SAFRA is waiting for (Bashar, 2026-08-19).
+
+            Above الدعم and below مستحقاتي: it is an obligation with a deadline, not a place to ask
+            a question, and a partner who has just been accepted comes here first.
+          */}
+          <Item
+            href="/contracts"
+            label={t.nav.contracts}
+            current={active === 'contracts'}
+          />
           <Item
             href="/reviews"
             label={t.nav.reviews}

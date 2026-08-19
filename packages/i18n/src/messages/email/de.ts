@@ -25,6 +25,33 @@ export const de = {
     body: 'Sie wurden zur SAFRA-Administrationskonsole eingeladen als: {roleLabel}.\n\nÖffnen Sie diesen Link, um Ihr Passwort festzulegen:\n{url}\n\nDer Link läuft in {expiresInHours} Stunden ab und ist einmal verwendbar.\n\nNach dem Festlegen des Passworts müssen Sie die Zwei-Faktor-Authentifizierung aktivieren, bevor das Konto genutzt werden kann.\n\nFalls Sie diese Einladung nicht erwartet haben, öffnen Sie den Link nicht und informieren Sie das SAFRA-Team.\n\nIhr SAFRA-Team',
   },
 
+  /* ── Partner werden (Bashar, 2026-08-19) ── */
+
+  partnerApplicationReceived: {
+    subject: 'Ihre Partneranfrage ist eingegangen — {reference}',
+    body: 'Vielen Dank für Ihr Interesse an einer Partnerschaft mit SAFRA.\n\nIhre Anfragenummer: {reference}\n\nUnser Team ruft Sie unter der angegebenen Nummer an, um die Angaben zu Ihrem Betrieb zu bestätigen. Nach diesem Gespräch wird die Anfrage geprüft; bei einer Zusage senden wir Ihnen den Partnervertrag und einen Link, um Ihr Partnerkonto anzulegen.\n\nBewahren Sie die Anfragenummer auf — damit finden wir Ihre Anfrage, wenn Sie sich bei uns melden.\n\nDie Schritte und die benötigten Unterlagen finden Sie hier:\n{url}\n\nIhr SAFRA-Team',
+  },
+  partnerApplicationRejected: {
+    subject: 'Zu Ihrer Partneranfrage — {reference}',
+    body: 'Vielen Dank für Ihre Zeit und Ihr Interesse an SAFRA.\n\nNach Prüfung der Anfrage {reference} können wir derzeit nicht fortfahren.\n\nGrund:\n{reason}\n\nSollte sich daran etwas ändern, können Sie sich hier gerne erneut bewerben:\n{url}\n\nIhr SAFRA-Team',
+  },
+  partnerInvitation: {
+    subject: 'Ihre Partneranfrage wurde angenommen — Partnerkonto anlegen',
+    body: 'Die Partneranfrage {reference} wurde angenommen. Willkommen bei SAFRA.\n\nÖffnen Sie den folgenden Link, um das Passwort für Ihr Konto zu setzen:\n{url}\n\nDer Link läuft in {expiresInHours} Stunden ab und kann nur einmal verwendet werden. Nach dem Setzen des Passworts werden Sie zur Einrichtung der Zwei-Faktor-Authentifizierung aufgefordert — für Partnerkonten ist sie verpflichtend.\n\nWir senden Ihnen niemals ein Passwort per Nachricht. Erhalten Sie eines, stammt es nicht von uns.\n\nIhr Konto bleibt in Prüfung, bis unser Team Ihre Unterlagen und den unterzeichneten Vertrag geprüft hat. Bis dahin können Sie die Angaben zu Ihren Objekten vorbereiten; Preise, Termine und Bilder können Sie noch nicht hinzufügen.\n\nWenn Sie sich nicht als Partner beworben haben, öffnen Sie den Link nicht und informieren Sie uns.\n\nIhr SAFRA-Team',
+  },
+
+  /** The contract KINDS, in the reader's language — `partner_contract_kind` in the schema. */
+  contractKinds: {
+    base: 'Partnerschaftsvertrag',
+    commission_annex: 'Provisionsnachtrag',
+    renewal: 'Jahresverlängerung',
+  } as Record<string, string>,
+
+  partnerContractReady: {
+    subject: 'Ihr Partnervertrag liegt zur Unterschrift bereit — {partner}',
+    body: 'Unser Team hat Ihren Partnervertrag hochgeladen ({kind}).\n\nSie können ihn in Ihrem Partner-Dashboard lesen und herunterladen:\n{url}\n\nSenden Sie die unterschriebene Fassung anschließend an unser Team zurück, damit die Unterschrift erfasst wird und der Vertrag in Kraft tritt.\n\nIhr SAFRA-Team',
+  },
+
   reviewReceived: {
     subject: 'Neue Bewertung für {property} — SAFRA',
     body: 'Ein Gast, der in {property} übernachtet hat, hat eine Bewertung hinterlassen.\n\nBewertung: {rating} von 5\n\nSie können sie in Ihrem Partner-Dashboard lesen und beantworten:\n{url}\n\nIhre Antwort erscheint öffentlich unter der Bewertung. Eine Bewertung kann weder gelöscht noch geändert werden — weder vom Gast noch von SAFRA (Grundsatz P-006) — eine Antwort ist daher die einzige Möglichkeit, Ihre Sicht darzustellen.\n\nIhr SAFRA-Team',

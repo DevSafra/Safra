@@ -8,7 +8,7 @@ import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
  *
  * ## Why a crawl rather than a list of routes
  *
- * `admin-sections.spec.ts` already asserts that the nineteen sections the design specifies exist
+ * `admin-sections.spec.ts` already asserts that every section the design specifies exists
  * and render. That checks the routes somebody remembered to write down. This follows the links the
  * pages ACTUALLY render, which is where the rot appears: a row link built from a reference the API
  * stopped returning, a section renamed without its cross-links, a detail screen that renders but
@@ -31,6 +31,8 @@ const SECTIONS = [
   '/',
   '/bookings',
   '/partners',
+  /* «طلبات الشراكة» — the twentieth, added with «انضم كشريك» (Bashar, 2026-08-19). */
+  '/applications',
   '/properties',
   '/customers',
   '/staff',
@@ -132,6 +134,7 @@ test.describe('console navigation', () => {
     for (const [section, pattern] of [
       ['/bookings', /\/bookings\/BKG/],
       ['/partners', /\/partners\/PAR/],
+      ['/applications', /\/applications\/PRQ/],
       ['/properties', /\/properties\/PRO/],
     ] as const) {
       await page.goto(`${section}?size=5`);
@@ -221,7 +224,7 @@ test.describe('console navigation', () => {
    * Bashar's instruction (2026-08-06). Before it, eleven tone functions and four hand-rolled pills
    * disagreed — `expired` was red in الدفع, grey in الإعلانات and amber in بطاقات الهدايا.
    *
-   * Collected across all nineteen sections and asserted at the end, so one run names every
+   * Collected across every section and asserted at the end, so one run names every
    * disagreement rather than stopping at the first. The comparison is the PAINTED colour, because
    * a class name can match while the paint does not.
    */

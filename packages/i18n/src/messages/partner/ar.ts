@@ -15,6 +15,87 @@ export const ar = {
   brand: 'سفرة | لوحة الشريك',
 
   /** الدعم — a partner asking SAFRA for help (Bashar, 2026-08-12). */
+  /**
+   * العقود والمستندات — what SAFRA sent, and what SAFRA needs back (Bashar, 2026-08-19).
+   *
+   * Two halves of one obligation, on one screen, because they are the two things standing between
+   * an accepted application and a verified account: read and sign the contract, send the documents.
+   */
+  /** `PARTNER_DOCUMENT_KINDS` in @safra/contracts, named for the person uploading them. */
+  documentKinds: {
+    identity: 'هوية أو جواز سفر',
+    commercial_register: 'سجل تجاري',
+    ownership_proof: 'إثبات ملكية',
+    management_contract: 'عقد إدارة',
+    bank_confirmation: 'تأكيد بنكي',
+  } as Record<string, string>,
+
+  /** `partner_contract_kind` in the schema. */
+  contractKinds: {
+    base: 'عقد شراكة أساسي',
+    commission_annex: 'ملحق تعديل عمولة',
+    renewal: 'تجديد سنوي',
+  } as Record<string, string>,
+
+  /**
+   * `verification_status`, as the PARTNER reads it about their own account.
+   *
+   * «موثّق» rather than the console's «معتمد»: a partner is being told their account is trusted,
+   * not that a reviewer approved a form. Four values, four words — the same rule the console holds
+   * itself to, checked there per vocabulary.
+   */
+  verificationStatus: {
+    pending: 'قيد الانتظار',
+    in_review: 'قيد المراجعة',
+    approved: 'موثّق',
+    rejected: 'مرفوض',
+  } as Record<string, string>,
+
+  /** `partner_contract_status`. «بانتظار توقيعك» names who has to act, which is the whole point. */
+  contractStatus: {
+    awaiting_partner_signature: 'بانتظار توقيعك',
+    active: 'ساري',
+    superseded: 'مُستبدل',
+    terminated: 'منتهٍ',
+  } as Record<string, string>,
+
+  contracts: {
+    title: 'العقود والمستندات',
+    intro: 'هنا عقد الشراكة الذي أرسلته سفرة، والمستندات المطلوبة للتحقق من حسابك.',
+
+    contractsTitle: 'عقود الشراكة',
+    contractsEmpty: 'لم يصلك عقد بعد. يُرفع العقد بعد قبول طلب الشراكة.',
+    contractKind: 'نوع العقد',
+    contractUploaded: 'تاريخ الرفع',
+    contractSigned: 'تاريخ التوقيع',
+    contractExpires: 'ينتهي في',
+    download: 'تنزيل العقد',
+    signHint:
+      'وقّع النسخة وأعدها إلى فريق سفرة. يسجّل الفريق التوقيع فيصبح العقد ساريًا — لا يمكنك تسجيله من هنا.',
+
+    documentsTitle: 'مستندات التحقق',
+    documentsIntro: 'ارفع المستندات التي يحتاجها فريق سفرة للتحقق من نشاطك.',
+    documentsEmpty: 'لم ترفع أي مستند بعد.',
+    documentKind: 'نوع المستند',
+    documentStatus: 'الحالة',
+    documentUploaded: 'تاريخ الرفع',
+    documentNotes: 'ملاحظات المراجع',
+    upload: 'رفع مستند',
+    uploading: 'جارٍ الرفع…',
+    file: 'الملف',
+    uploadFailed: 'تعذّر رفع المستند. حاول مرة أخرى.',
+    loadFailed: 'تعذّر تحميل الصفحة.',
+
+    /** What the reader is waiting for, said where they are waiting. */
+    pendingTitle: 'حسابك قيد المراجعة',
+    pendingBody:
+      'يراجع فريق سفرة مستنداتك وعقدك. قبل التحقق يمكنك تجهيز بيانات عقاراتك — العنوان والوصف — ولا يمكنك إضافة الوحدات أو الأسعار أو التواريخ أو الصور.',
+    verifiedTitle: 'تم التحقق من حسابك',
+    verifiedBody: 'يمكنك الآن ضبط الأسعار والتواريخ ورفع الصور.',
+    rejectedTitle: 'لم يكتمل التحقق',
+    rejectedBody: 'تواصل مع فريق سفرة من صفحة الدعم لمعرفة ما ينقص.',
+  },
+
   support: {
     title: 'الدعم',
     intro: 'اطرح مشكلتك وسيتابعها فريق سفرة معك هنا.',
@@ -50,6 +131,7 @@ export const ar = {
     calendars: 'التقويمات',
     reviews: 'التقييمات',
     payouts: 'مستحقاتي',
+    contracts: 'العقود والمستندات',
     supportPage: 'الدعم',
     showSidebar: 'إظهار قائمة التنقل',
     hideSidebar: 'إخفاء قائمة التنقل',

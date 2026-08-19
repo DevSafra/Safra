@@ -556,6 +556,53 @@ export async function getPropertyImages(reference: string) {
   );
 }
 
+// ─── العقود والمستندات (Bashar, 2026-08-19) ──────────────────────────────────
+
+/**
+ * A contract as its partner may see it.
+ *
+ * No `fileKey` and no `uploadedBy`. The storage key is an internal address and the staff member
+ * who filed it is SAFRA's business, not the partner's — a schema that accepted either would make a
+ * leak upstream invisible here rather than loud.
+ */
+const partnerContractSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  status: z.string(),
+  fileName: z.string(),
+  sizeBytes: z.number(),
+  uploadedAt: z.string(),
+  signedAt: z.string().nullable(),
+  expiresAt: z.string().nullable(),
+});
+
+export type PartnerContract = z.infer<typeof partnerContractSchema>;
+
+export async function getMyContracts() {
+  return partnerFetch(
+    '/partner/contracts',
+    z.object({ contracts: z.array(partnerContractSchema) }),
+  );
+}
+
+const partnerDocumentSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  status: z.string(),
+  fileName: z.string(),
+  reviewNotes: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type PartnerDocument = z.infer<typeof partnerDocumentSchema>;
+
+export async function getMyDocuments() {
+  return partnerFetch(
+    '/partner/documents',
+    z.object({ documents: z.array(partnerDocumentSchema) }),
+  );
+}
+
 // ─── الدعم (Bashar, 2026-08-12) ───────────────────────────────────────────────
 
 /**

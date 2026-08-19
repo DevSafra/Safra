@@ -45,6 +45,26 @@ export async function getCities(): Promise<City[]> {
   return read('/cities', z.array(citySchema), []);
 }
 
+/**
+ * The kinds of business «انضم كشريك» offers (Bashar, 2026-08-19).
+ *
+ * Rows rather than a constant in this app: `partner_types` is a table precisely so that adding
+ * Mobility is an INSERT — a list frozen here would make it a deployment of the customer site.
+ * Empty on failure, like every other reader in this file, so the page still renders its form.
+ */
+const partnerTypeSchema = z.object({
+  code: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string(),
+  nameDe: z.string(),
+});
+
+export type PartnerType = z.infer<typeof partnerTypeSchema>;
+
+export async function getPartnerTypes(): Promise<PartnerType[]> {
+  return read('/partner-types', z.array(partnerTypeSchema), []);
+}
+
 const cityDetailSchema = z.object({
   slug: z.string(),
   nameAr: z.string(),

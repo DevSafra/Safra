@@ -120,6 +120,8 @@ export async function AccountShell({
   const t = await getTranslations('account');
   /* The theme labels live in `nav`, shared with the header that used to carry this control. */
   const tn = await getTranslations('nav');
+  /* The footer owns this label — one word for one destination, wherever it is offered. */
+  const tf = await getTranslations('footer');
 
   /*
     §6 marks exactly three items. Each is omitted rather than shown as «0»: an absent badge says
@@ -233,6 +235,24 @@ export async function AccountShell({
               </Link>
             );
           })}
+
+          {/*
+            «انضم كشريك», at the foot of the nav and OUTSIDE `SECTIONS` (Bashar, 2026-08-19).
+
+            Not a section: every other row is a record of this customer's own — their bookings,
+            their wallet — and this one leaves the account area entirely for a public page. Kept in
+            the list because the customer dashboard is where somebody who already uses SAFRA
+            discovers they can list a place, and a footer link is not where they would look.
+
+            Separated by a rule and given no `aria-current`, so it never reads as the section you
+            are in.
+          */}
+          <Link
+            href={`/${locale}/partners/join`}
+            className="mt-2 inline-flex min-h-10 items-center border-t border-line px-3 pt-3 text-sm text-muted transition-colors hover:bg-line/40 hover:text-gold lg:min-h-0 lg:py-2"
+          >
+            {tf('becomePartner')}
+          </Link>
         </nav>
 
         {/*

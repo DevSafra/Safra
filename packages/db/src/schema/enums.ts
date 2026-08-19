@@ -274,6 +274,33 @@ export const authTokenPurpose = pgEnum('auth_token_purpose', [
    * usable to activate an invitation that was never accepted.
    */
   'staff_invitation',
+  /**
+   * A PARTNER invitation, issued when a super admin accepts an application (§8.1).
+   *
+   * Distinct from `staff_invitation` for the reason above and one more: redeeming this one
+   * CHANGES A ROLE. The applicant already holds a customer account — applying requires a session
+   * — and acceptance deliberately leaves it alone. Redemption is what converts it, which both
+   * re-establishes the password for a privileged role and confirms the mailbox is live.
+   */
+  'partner_invitation',
+]);
+
+/**
+ * A request to become a partner, before there is a partner (Bashar, 2026-08-19).
+ *
+ * `submitted` → `contacted` → `accepted` | `rejected`, and `contacted` is a real state rather
+ * than a note: step 2 of the flow is a human phoning the applicant, and a queue that cannot show
+ * which requests have already been called makes two people call the same one.
+ *
+ * There is no `withdrawn`. An applicant who changes their mind tells the person who called them,
+ * and that is a `rejected` with a reason — inventing a status nobody can set from a screen would
+ * be a value the registry has to paint and nobody can produce.
+ */
+export const partnerApplicationStatus = pgEnum('partner_application_status', [
+  'submitted',
+  'contacted',
+  'accepted',
+  'rejected',
 ]);
 
 export const giftCardStatus = pgEnum('gift_card_status', [

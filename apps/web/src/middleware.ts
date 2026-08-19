@@ -201,13 +201,17 @@ async function rotateIfStale(request: NextRequest): Promise<string | null | unde
 /**
  * Paths that need a session, matched after the locale segment.
  *
+ * `/partners/join` is here because applying to become a partner requires an account (Bashar,
+ * 2026-08-19) — the request is filed AGAINST the signed-in account, so there is nothing for an
+ * anonymous visitor to submit.
+ *
  * `/review` is here because writing about a stay is something only the person who took it may do.
  * Without it an anonymous visitor reached the page and got a "session expired" panel rendered with
  * a 200 — which is not wrong, but it is a worse answer than the sign-in redirect every other
  * account page gives, and it makes a booking reference in the URL look like it might mean
  * something to somebody who is not signed in.
  */
-const PROTECTED = ['/account', '/review'];
+const PROTECTED = ['/account', '/review', '/partners/join'];
 
 function isProtected(pathname: string): boolean {
   // Strip a leading locale segment so `/ar/account` and `/account` both match.

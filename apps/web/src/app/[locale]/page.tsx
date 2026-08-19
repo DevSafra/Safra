@@ -175,8 +175,15 @@ export default async function HomePage({
               rate: formatCustomerFee(settings, 'partnerRate', locale),
             })}
           </p>
+          {/*
+            `/partners/join`, not `/partner`.
+
+            This CTA pointed at a route that never existed, so «سجّل كشريك» answered 404 from the
+            day the section was written — the recruitment panel was the one part of the home page
+            with nowhere to go. «انضم كشريك» is that page (Bashar, 2026-08-19).
+          */}
           <Link
-            href={`/${locale}/partner`}
+            href={`/${locale}/partners/join`}
             className="mt-6 inline-block rounded-lg bg-gold px-5 py-2.5 font-semibold text-bg transition-opacity hover:opacity-90"
           >
             {t('partnersCta')}

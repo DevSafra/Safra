@@ -15,7 +15,8 @@ export type AuthTokenPurpose =
    * token that turns an account with no password into a usable one — the two must not
    * be interchangeable, and `redeem` filters on purpose so they cannot be.
    */
-  | 'staff_invitation';
+  | 'staff_invitation'
+  | 'partner_invitation';
 
 export interface IssuedAuthToken {
   /** The clear token. Returned ONCE, goes into an email, never stored. */

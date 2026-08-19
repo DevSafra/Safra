@@ -51,6 +51,8 @@ export const TABLE_SECTIONS = [
    * That is the whole reason a section is not simply "the path": one route, two tables.
    */
   'staffScope',
+  /* «طلبات الشراكة» — the join-request queue, its own sidebar section (Bashar, 2026-08-19). */
+  'partnerApplications',
 ] as const;
 
 export type TableSection = (typeof TABLE_SECTIONS)[number];
@@ -81,6 +83,7 @@ export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   reviews: '/reviews',
   exports: '/bookings/exports',
   staffScope: '/staff',
+  partnerApplications: '/applications',
 };
 
 /**

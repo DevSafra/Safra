@@ -140,6 +140,7 @@ export const ar = {
   'validation.longitude_format': 'خط الطول بالدرجات العشرية.',
   'validation.nights_min_max': 'الحد الأقصى للليالي لا يمكن أن يقل عن الحد الأدنى.',
   'validation.booking_reference': 'رقم الحجز غير صالح.',
+  'validation.url_invalid': 'أدخل رابطًا صحيحًا يبدأ بـ https://',
   'validation.token_malformed': 'الرابط غير صالح.',
   'validation.access_token_malformed': 'رمز الوصول غير صالح.',
   'validation.scope_all_cities_conflict': 'نطاق «كل المدن» لا يمكن أن يحمل قائمة مدن.',
@@ -182,6 +183,15 @@ export const ar = {
   'pricing.unavailable': 'تعذّر حساب السعر مؤقتاً. أعد المحاولة بعد قليل.',
   'wallet.wrong_account': 'سجّل الدخول إلى الحساب صاحب الحجز لاستخدام رصيدك.',
   'wallet.balance_changed': 'تغيّر رصيدك أثناء تجهيز هذه الدفعة. حاول مرة أخرى.',
+  'partner_application.not_found': 'لم يُعثر على هذا الطلب.',
+  'partner_application.already_open':
+    'لدينا طلب مفتوح من هذا البريد الإلكتروني. سنتواصل معك قريبًا.',
+  'partner_application.already_decided': 'صدر قرار في هذا الطلب بالفعل.',
+  'partner_application.no_account': 'هذا الطلب لا يرتبط بحساب، فلا يمكن قبوله.',
+  'partner_application.email_is_staff':
+    'هذا البريد الإلكتروني يخص حساب موظف. لا يمكن تحويله إلى حساب شريك.',
+  'partner_application.email_is_partner': 'هذا البريد الإلكتروني شريك بالفعل.',
+  'partner.invitation_invalid': 'رابط الدعوة غير صالح أو استُخدم بالفعل.',
   'partner.not_verified': 'لم يتم التحقق من هذا الشريك بعد. تحقق منه قبل نشر عقاراته.',
   'partner.sanctions_screening_required': 'يجب تسجيل فحص العقوبات قبل التحقق من الشريك.',
   'property.unit_required': 'أضف وحدة واحدة على الأقل قبل الإرسال للمراجعة.',

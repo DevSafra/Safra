@@ -143,6 +143,121 @@ export function staffInvitationMail(input: {
 }
 
 /**
+ * We have your partnership request — the acknowledgement for step 1.
+ *
+ * Carries the REFERENCE and nothing about the queue. An applicant who is told where they sit in a
+ * review order will chase that position; what they actually need is the number to quote and the
+ * knowledge that a phone call is the next thing to happen.
+ */
+export function partnerApplicationReceivedMail(input: {
+  to: string;
+  reference: string;
+  url: string;
+  locale: string;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).partnerApplicationReceived;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { reference: input.reference }),
+    text: fill(copy.body, { reference: input.reference, url: input.url }),
+  };
+}
+
+/**
+ * A request that will not proceed, with the reason the reviewer gave.
+ *
+ * The reason is the staff member's own words, so it is `sensitive: false` but still worth naming:
+ * it is written on a console screen and read by the applicant, which is exactly the kind of text
+ * that gets used to say more than it should. The screen says so above the field.
+ */
+export function partnerApplicationRejectedMail(input: {
+  to: string;
+  reference: string;
+  reason: string;
+  url: string;
+  locale: string;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).partnerApplicationRejected;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { reference: input.reference }),
+    text: fill(copy.body, {
+      reference: input.reference,
+      reason: input.reason,
+      url: input.url,
+    }),
+  };
+}
+
+/**
+ * The account hand-over — step 4, and the one message in the flow that carries authority.
+ *
+ * A LINK, never a password. Bashar's step 4 said "email + password"; a password in an inbox is a
+ * credential that outlives its usefulness and is readable by anybody who ever reaches that
+ * mailbox, which §1 forbids. A single-use link that expires does the same job and can be revoked.
+ *
+ * ## NOT `sensitive`, and that is deliberate
+ *
+ * It was, briefly. `sensitive` withholds the body from the no-transport branch — which is the only
+ * branch that can run without SMTP, i.e. every development machine — and that made the one flow
+ * nobody can test without a mail server. `MailService` states the rule it is applying there: the
+ * body is logged because a developer needs the link and the branch cannot run in production.
+ *
+ * The three templates that DO set it carry a gift-card code, which is spendable cash and is a
+ * secret relative to its own inbox. An invitation is not: it is single-use, it expires in 72
+ * hours, and it goes to the same mailbox as the password reset — which is not marked either.
+ */
+export function partnerInvitationMail(input: {
+  to: string;
+  reference: string;
+  url: string;
+  locale: string;
+  expiresInHours: number;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).partnerInvitation;
+
+  return {
+    to: input.to,
+    subject: copy.subject,
+    text: fill(copy.body, {
+      reference: input.reference,
+      url: input.url,
+      expiresInHours: input.expiresInHours,
+    }),
+  };
+}
+
+/**
+ * The partnership contract is uploaded and waiting to be signed — the other half of step 4.
+ *
+ * A LINK to the dashboard, not the PDF. An attachment would put a commercial agreement in an
+ * inbox that may be shared, and the dashboard already authenticates the reader and keeps every
+ * superseded version — which is the record that answers "which terms were in force that day".
+ */
+export function partnerContractReadyMail(input: {
+  to: string;
+  partner: string;
+  kind: string;
+  url: string;
+  locale: string;
+}): OutgoingMail {
+  const messages = emailMessages(resolveLocale(input.locale));
+  const copy = messages.partnerContractReady;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { partner: input.partner }),
+    text: fill(copy.body, {
+      /* The KIND in the reader's language, for the same reason the staff role is — see above. */
+      kind: messages.contractKinds[input.kind] ?? input.kind,
+      url: input.url,
+    }),
+  };
+}
+
+/**
  * A guest has reviewed one of the partner's listings.
  *
  * The email says P-006 out loud. A partner learning about a review by email and finding no delete

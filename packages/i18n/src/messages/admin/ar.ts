@@ -102,6 +102,7 @@ export const ar = {
     dashboard: 'لوحة الإدارة',
     bookings: 'الحجوزات',
     partners: 'الشركاء',
+    partnerApplications: 'طلبات الشراكة',
     properties: 'العقارات',
     customers: 'العملاء',
     staff: 'الموظفون',
@@ -210,6 +211,9 @@ export const ar = {
       disputes: 'النزاعات',
       dashboard: 'لوحة الإدارة',
     } as Record<string, string>,
+    /** The submit and the busy label on an inline action form, shared across sections. */
+    confirm: 'تأكيد',
+    working: 'جارٍ التنفيذ…',
     search: 'بحث',
     pageSizeLabel: 'عدد الصفوف في الصفحة',
     /** Submits the pagination bar's form — see the note in `table-pagination.tsx`. */
@@ -290,6 +294,69 @@ export const ar = {
    * quoted exactly and must not be paraphrased.
    */
   sections: {
+    /**
+     * طلبات الشراكة — who has asked to join, and what was done about it.
+     *
+     * The seven steps Bashar specified on 2026-08-19 are the structure of this screen: a request
+     * arrives, somebody telephones the applicant, somebody accepts, and the account is handed over
+     * by an invitation. Every word here exists to make the NEXT action obvious on a queue that one
+     * person works through.
+     */
+    partnerApplications: {
+      title: 'طلبات الشراكة',
+      note: 'طلبات الانضمام من صفحة «انضم كشريك». اتصل بمقدّم الطلب أولاً، ثم اقبل الطلب أو ارفضه.',
+      searchPlaceholder: 'ابحث برقم الطلب أو اسم النشاط أو البريد',
+      allStatuses: 'كل الحالات',
+      empty: 'لا توجد طلبات.',
+      /* The row */
+      colBusiness: 'النشاط',
+      colContact: 'مقدّم الطلب',
+      colCity: 'المدينة',
+      colType: 'النوع',
+      colSubmitted: 'تاريخ الطلب',
+      /* The detail screen */
+      back: 'رجوع إلى طلبات الشراكة',
+      applicant: 'بيانات مقدّم الطلب',
+      business: 'بيانات النشاط',
+      legalName: 'الاسم القانوني',
+      displayName: 'الاسم التجاري',
+      partnerType: 'نوع النشاط',
+      city: 'المدينة',
+      address: 'العنوان',
+      propertyCount: 'عدد العقارات المعلَنة',
+      website: 'الموقع الإلكتروني',
+      message: 'رسالة مقدّم الطلب',
+      contactName: 'الاسم',
+      email: 'البريد الإلكتروني',
+      phone: 'الهاتف',
+      locale: 'لغة التواصل',
+      /* What we did */
+      history: 'سجل الطلب',
+      submittedAt: 'وصل الطلب',
+      contactedAt: 'تم الاتصال',
+      contactedBy: 'بواسطة',
+      decidedAt: 'صدر القرار',
+      decidedBy: 'بواسطة',
+      notes: 'الملاحظات',
+      becamePartner: 'أصبح الشريك',
+      partnerVerification: 'حالة التحقق',
+      /* The actions */
+      contactAction: 'تسجيل الاتصال',
+      contactHint: 'اكتب ما جرى في المكالمة. يظهر لفريق سفرة فقط.',
+      acceptAction: 'قبول الطلب وإنشاء الحساب',
+      acceptHint:
+        'يُنشئ سجل شريك بحالة «قيد الانتظار» ويُرسل رابط دعوة لتعيين كلمة المرور. لا نرسل كلمة مرور في رسالة أبدًا.',
+      rejectAction: 'رفض الطلب',
+      rejectHint:
+        'السبب يُرسل إلى مقدّم الطلب بالبريد الإلكتروني، فاكتبه كما تريد أن يقرأه.',
+      resendAction: 'إعادة إرسال الدعوة',
+      resendHint: 'للدعوة التي انتهت صلاحيتها أو لم تصل.',
+      actionFailed: 'تعذّر تنفيذ الإجراء. حاول مرة أخرى.',
+      notesRequired: 'اكتب ملاحظة أولاً.',
+      /* The one thing an operator must understand about this screen */
+      afterAccept:
+        'بعد القبول: ارفع عقد الشراكة من صفحة الشريك، وتبقى حالة الحساب «قيد الانتظار» حتى تتحقق من المستندات. لا يمكن للشريك إضافة الأسعار أو التواريخ أو الصور قبل التحقق.',
+    },
     /**
      * الملفات المصدَّرة — where a requested CSV is collected.
      *
@@ -1120,6 +1187,7 @@ export const ar = {
    * evidence, so it is translated HERE and never at the source.
    */
   auditSubject: {
+    partner_application: 'طلب شراكة',
     booking: 'حجز',
     booking_export: 'تصدير حجوزات',
     customer_profile: 'ملف عميل',
@@ -1283,6 +1351,27 @@ export const ar = {
       bank_confirmation: 'تأكيد مصرفي',
     } as Record<string, string>,
 
+    /**
+     * The three languages, named in ARABIC rather than as endonyms.
+     *
+     * The console is Arabic-only and this is a FACT about an applicant — "write to them in
+     * German" — read by an Arabic-speaking operator. Endonyms («Deutsch») belong on the language
+     * picker, where the reader is choosing their own language and has to recognise their own
+     * name for it.
+     */
+    locales: {
+      ar: 'العربية',
+      en: 'الإنجليزية',
+      de: 'الألمانية',
+    },
+
+    /** «طلبات الشراكة». Four values, four colours — see `VOCABULARIES` in @safra/ui. */
+    partnerApplicationStatus: {
+      submitted: 'جديد',
+      contacted: 'تم الاتصال',
+      accepted: 'مقبول',
+      rejected: 'مرفوض',
+    },
     verification: {
       pending: 'بانتظار التحقق',
       in_review: 'قيد المراجعة',

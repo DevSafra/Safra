@@ -34,6 +34,15 @@ class CatalogController {
     return this.properties.bySlug(slug);
   }
 
+  /** The business kinds «انضم كشريك» offers. See the service for why these are rows. */
+  @Public()
+  @Get('partner-types')
+  async partnerTypes() {
+    return this.catalog.partnerTypes();
+  }
+
+  @Public()
+  @Get('property-types')
   @Public()
   @Get('property-types')
   async propertyTypes() {

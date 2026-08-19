@@ -7,7 +7,7 @@ import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
- * The nineteen admin sections, against the design handoff.
+ * The admin sections, against the design handoff — its eighteen, plus «طلبات الشراكة».
  *
  * ## What these assert, and what they deliberately do not
  *
@@ -20,7 +20,7 @@ import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
  *
  * They share one session and one navigation pattern, and the interesting failures are the ones
  * that hit every section at once — a broken shell, a missing token, an expired cookie. Nineteen
- * files would hide that behind nineteen identical setups.
+ * files would hide that behind twenty identical setups.
  */
 test.skip(MISSING_CREDENTIALS, SKIP_REASON);
 
@@ -31,6 +31,13 @@ const SECTIONS = [
   { path: '/', title: t.admin.title, built: true },
   { path: '/bookings', title: t.nav.bookings, built: true },
   { path: '/partners', title: t.nav.partners, built: true },
+  /*
+    The one section the approved design does not have.
+
+    «انضم كشريك» gave the console a queue of people who are not partners yet (Bashar,
+    2026-08-19), and it needed somewhere to live that was not the registry of partners.
+  */
+  { path: '/applications', title: t.nav.partnerApplications, built: true },
   { path: '/properties', title: t.nav.properties, built: true },
   { path: '/customers', title: t.nav.customers, built: true },
   { path: '/staff', title: t.nav.staff, built: true },
@@ -45,8 +52,8 @@ const SECTIONS = [
   { path: '/emergency', title: t.admin.emergencyMode, built: true },
   /*
     These four were `built: false` until 2026-08-04, when the schema they needed landed —
-    `disputes`, `conversations`/`messages`, `notifications`, `advertisers`/`ad_campaigns`. All
-    nineteen sections are now backed by real tables, so nothing on this list is a placeholder.
+    `disputes`, `conversations`/`messages`, `notifications`, `advertisers`/`ad_campaigns`. Every
+    section is now backed by a real table, so nothing on this list is a placeholder.
   */
   { path: '/ads', title: t.nav.ads, built: true },
   { path: '/disputes', title: t.nav.disputes, built: true },
@@ -101,8 +108,15 @@ test.describe('every admin section the design specifies', () => {
       .locator('aside a[href]')
       .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''));
 
-    // Eighteen rows in the design's nav; Emergency Mode is reached from the header.
-    expect(hrefs.length).toBe(18);
+    /*
+      Nineteen rows: the design's eighteen plus «طلبات الشراكة» (Bashar, 2026-08-19). Emergency
+      Mode is not among them — it is reached from the header.
+
+      A literal rather than `SECTIONS.length`, deliberately: this assertion exists to fail when
+      somebody adds a nav entry, and a count derived from the same list would agree with any
+      change made to it.
+    */
+    expect(hrefs.length).toBe(19);
 
     for (const href of hrefs) {
       const response = await page.goto(href);
