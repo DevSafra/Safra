@@ -120,14 +120,32 @@ export const calendarMonthSchema = z
  * belong to: a cursor over units could split a hotel's rooms across a page boundary, and a group
  * header with three of its five rooms under it is a worse answer than a second page.
  *
- * `limit` is overridden down to a default of 3 and a ceiling of 10, well below the shared
- * `cursorQuerySchema` default of 20. A page here is not a row, it is a property and every unit it
- * owns and every day of the month for each — so the unit of cost is much larger than a list item.
+ * `limit` and `expand` are two different questions: how many properties to LIST, and which single
+ * one to EXPAND. Separating them is what keeps the cost of the screen flat — the list is four
+ * columns per property, and only the open property pays for its units times every day of the month.
  */
 export const portfolioCalendarQuerySchema = cursorQuerySchema
   .extend({
     month: calendarMonthSchema,
-    limit: z.coerce.number().int().min(1).max(10).default(3),
+    /**
+     * How many properties to LIST. Not how many to expand — see `expand`.
+     *
+     * The ceiling was 10 because a page used to expand every day of every unit of every property it
+     * returned, so the unit of cost was enormous. Listing a property is four columns and one indexed
+     * seek, so the list can hold a whole portfolio: 200 is a bound rather than a budget, and a
+     * partner with more properties than that has a conversation coming anyway.
+     */
+    limit: z.coerce.number().int().min(1).max(200).default(200),
+    /**
+     * Which property's month to EXPAND — the one the reader has open.
+     *
+     * Days are the expensive part: one property times its units times every day of the month. Only
+     * the open one is expanded, so the cost of the screen stops growing with the portfolio, and the
+     * ceiling that used to hide a partner's eleventh property is gone (Bashar, 2026-08-19).
+     *
+     * Absent means the first property in the page, so the screen still opens on a calendar.
+     */
+    expand: z.string().trim().max(40).optional(),
   })
   .strict();
 
@@ -162,6 +180,12 @@ export interface PortfolioCalendarUnit {
 export interface PortfolioCalendarProperty {
   reference: string;
   nameAr: string;
+  /**
+   * Every unit of the property, always — but `days` is filled only for the EXPANDED property.
+   *
+   * The metadata is cheap and the folder needs it closed: a summary that could not say «5 وحدة»
+   * until it was opened would make the reader open every folder to find out where anything is.
+   */
   units: PortfolioCalendarUnit[];
 }
 

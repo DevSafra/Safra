@@ -216,6 +216,36 @@ test('a day on the dashboard opens التقويمات at that date', async ({ pa
   /* Saturday-first, the week as it is read in Syria. */
   expect(shape.header?.[0]).toBe('السبت');
   expect(shape.header).toHaveLength(7);
+
+  /*
+    ONE عقار open, the rest listed as links — the shape that removed the ten-property ceiling
+    (Bashar, 2026-08-19).
+
+    Asserted here rather than in a fourth test because of the throttle noted at the top of this
+    file, and it costs one navigation. What it is worth: the API expands only the property named by
+    `?expand=`, so if the page ever went back to rendering every folder open, the units of the other
+    four would draw as EMPTY grids — a month of blank days on a room that is actually booked. The
+    unit count is the assertion that catches that, because it is the one thing an over-eager render
+    cannot fake.
+  */
+  const shut = page.locator('a[data-property]');
+  const folder = page.locator('details[data-property]');
+
+  await expect(folder).toHaveCount(1);
+  expect(await shut.count()).toBeGreaterThan(0);
+  await expect(folder.locator('[data-unit]')).toHaveCount(await units.count());
+
+  const wasOpen = await folder.getAttribute('data-property');
+  const target = await shut.last().getAttribute('data-property');
+
+  await shut.last().click();
+  await page.waitForURL(new RegExp(`expand=${target}`));
+
+  await expect(page.locator(`details[data-property="${target}"]`)).toBeVisible();
+  await expect(page.locator(`a[data-property="${wasOpen}"]`)).toBeVisible();
+  await expect(page.locator('details[data-property]')).toHaveCount(1);
+  /* The month rides along, so opening a property never drops the reader back on today. */
+  expect(page.url()).toContain('month=2026-09');
 });
 
 /**

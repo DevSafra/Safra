@@ -17,22 +17,25 @@ import { fill, t } from '@/lib/strings';
  *
  * Each عقار is a folder (Bashar, 2026-08-19). Everything expanded made two units 1600px of wall, so
  * a property opens on request, its range editors open on request, and its own search box narrows it
- * to one room number. There is no pager: the whole portfolio is fetched at the API's ceiling of ten
- * properties, because a «عرض عقارات أخرى» button was the thing being removed rather than the thing
- * being paged. A partner with more than ten properties would not see the rest — recorded honestly
- * here because the fix is lazy day-expansion, not a bigger number.
+ * to one room number.
+ *
+ * There is no pager, because «عرض عقارات أخرى» was the thing being removed. What makes a pager
+ * unnecessary is that opening a folder is a REQUEST: every property is listed, and only the open
+ * one has its days expanded. The whole portfolio therefore fits on the page whatever its size,
+ * while the expensive part — a property times its units times every day of the month — stays the
+ * cost of exactly one property.
  *
  * ## Why this is not the per-unit screen in a loop
  *
  * تقويم الإتاحة answers one unit at a time and makes the partner pick a property, then a unit, then
  * a month. Somebody closing a weekend across a hotel did that once per room. This screen is one
- * request for the whole page — the API expands a page of properties in two queries — and one range
- * editor per unit, so the actual task takes one visit.
+ * request for the whole page — the API lists the portfolio and expands the open property in two
+ * queries — and one range editor per unit, so the actual task takes one visit.
  *
  * ## What lives in the URL, and what is clamped
  *
- * `?month=` owns the view, with `?unit=` and `?for=` when a property's search box is filled in, so
- * a filtered month is shareable and survives a reload. The month is
+ * `?month=` owns the view, `?expand=` which عقار is open, and `?unit=` what its search box holds,
+ * so a filtered month is shareable and survives a reload. The month is
  * CLAMPED to a real `YYYY-MM` rather than trusted: the API answers an out-of-range month with a
  * 400, and an unclamped `?month=13` would turn a typo into an error page instead of a calendar —
  * the same reasoning the console's page and size clamps are written down for.
@@ -104,20 +107,22 @@ export default async function CalendarsPage({
   /*
     «ابحث برقم الوحدة», and WHICH عقار it belongs to (Bashar, 2026-08-19).
 
-    The box lives inside each property, so a search is scoped to one building and `for` names it.
-    Both are trimmed and capped, so a pasted essay is a short search rather than an error page.
+    The box lives inside the OPEN property, so a search is scoped to one building and `expand`
+    names it. Both are trimmed and capped, so a pasted essay is a short search rather than an
+    error page.
 
     Filtering happens HERE rather than in SQL, and that is sound BECAUSE it is scoped: the API
-    expands every unit of every property it returns, so one property's units are all present and
-    filtering them is a complete answer. The objection to page-side filtering — that it silently
-    searches only what is on screen — is about searching ACROSS properties, which this does not do.
+    returns every unit of that property, so filtering them is a complete answer. The objection to
+    page-side filtering — that it silently searches only what is on screen — is about searching
+    ACROSS properties, which this does not do.
   */
   const search = one(query['unit']).trim().slice(0, 20);
-  const searchIn = one(query['for']).trim().slice(0, 40);
+  /** Which عقار is open. Its month is the only one the API expands — see `getPortfolioCalendar`. */
+  const expand = one(query['expand']).trim().slice(0, 40);
 
   const [profile, calendar] = await Promise.all([
     getMyProfile(),
-    getPortfolioCalendar(month),
+    getPortfolioCalendar(month, expand || undefined),
   ]);
 
   const name =
@@ -162,14 +167,31 @@ export default async function CalendarsPage({
     const next = new URLSearchParams({ month: target });
 
     if (search) next.set('unit', search);
-    if (searchIn) next.set('for', searchIn);
+    if (openReference) next.set('expand', openReference);
 
     return `/calendars?${next.toString()}`;
   };
 
-  /** Which units of a property to draw — all of them, unless its own search box is filled in. */
+  /*
+    The عقار whose month is expanded: the one asked for, else the first.
+
+    Mirrors what the API did with `expand`, so the page opens the same property the days belong to.
+  */
+  const openReference =
+    calendar.properties.find((property) => property.reference === expand)?.reference ??
+    calendar.properties[0]?.reference ??
+    '';
+
+  /** Opening a different عقار is a NAVIGATION, because that is when its month is fetched. */
+  const openHref = (reference: string) => {
+    const next = new URLSearchParams({ month, expand: reference });
+
+    return `/calendars?${next.toString()}`;
+  };
+
+  /** Which units to draw — all of them, unless the search box is filled in. */
   const unitsOf = (property: (typeof calendar.properties)[number]) =>
-    searchIn === property.reference && search
+    search
       ? property.units.filter((unit) =>
           (unit.unitLabel ?? '').toLowerCase().includes(search.toLowerCase()),
         )
@@ -207,24 +229,55 @@ export default async function CalendarsPage({
         One FOLDER per عقار, not one wall of calendars (Bashar, 2026-08-19).
 
         Every unit used to render its month grid AND a full range editor, expanded — two units
-        filled 1600px and a hotel was unreadable. A `<details>` per property lets a partner open the
+        filled 1600px and a hotel was unreadable. A folder per property lets a partner open the
         building they came for and leave the rest shut.
 
-        The FIRST is open, and so is whichever one is being searched: a result the reader has to
-        click to see is a result they will think they did not get.
+        A shut folder is a LINK, not a `<details>`, because opening it is what FETCHES its month:
+        the API expands one property's days and lists the others (see `getPortfolioCalendar`). That
+        is what lets this page hold a portfolio of any size — the previous version expanded every
+        property at once, so it had to stop at ten and silently cut off the eleventh.
 
-        `<details>` rather than state: no JavaScript, keyboard-operable, announced as a disclosure,
-        and the browser's own find-in-page can open it.
+        The open one stays a `<details open>`, so the reader can fold it away without a trip to the
+        server. Still no JavaScript: a link and a disclosure, both keyboard-operable.
       */}
-      {calendar.properties.map((property, index) => {
+      {calendar.properties.map((property) => {
+        /* The عقار's own line — name, reference, how many rooms. The same open or shut. */
+        const title = (
+          <>
+            <h2 className="text-[14.5px] font-extrabold text-gold">{property.nameAr}</h2>
+            <span className="text-[11px] text-faint" dir="ltr">
+              {property.reference}
+            </span>
+            <span className="ms-auto text-[11px] text-faint">
+              {fill(t.calendars.unitsInside, { n: count(property.units.length) })}
+            </span>
+          </>
+        );
+
+        if (property.reference !== openReference) {
+          return (
+            <Link
+              key={property.reference}
+              data-property={property.reference}
+              href={openHref(property.reference)}
+              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4"
+            >
+              <span aria-hidden className="text-[11px] text-faint">
+                ‹
+              </span>
+              {title}
+            </Link>
+          );
+        }
+
         const units = unitsOf(property);
-        const searching = searchIn === property.reference && Boolean(search);
+        const searching = Boolean(search);
 
         return (
           <details
             key={property.reference}
             data-property={property.reference}
-            open={index === 0 || searching}
+            open
             className="group rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4"
           >
             <summary className="flex list-none cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -234,15 +287,7 @@ export default async function CalendarsPage({
               >
                 ‹
               </span>
-              <h2 className="text-[14.5px] font-extrabold text-gold">
-                {property.nameAr}
-              </h2>
-              <span className="text-[11px] text-faint" dir="ltr">
-                {property.reference}
-              </span>
-              <span className="ms-auto text-[11px] text-faint">
-                {fill(t.calendars.unitsInside, { n: count(property.units.length) })}
-              </span>
+              {title}
             </summary>
 
             <div className="grid gap-3.5 pt-3.5">
@@ -250,9 +295,9 @@ export default async function CalendarsPage({
                 This عقار's own search, over its own rooms.
 
                 A GET form so the query lives in the URL beside `month` — shareable, reload-safe and
-                needs no JavaScript. `for` carries WHICH property the box belongs to, so two
-                buildings' boxes cannot fight over one parameter, and `month` rides along because a
-                search must never move the reader to a different month.
+                needs no JavaScript. It searches the OPEN عقار, and `expand` says which that is, so
+                submitting cannot fold the folder the reader is looking at. `month` rides along
+                because a search must never move the reader to a different month.
 
                 The input is NOT `dir="ltr"`. It was, on the reasoning that a room number is a Latin
                 run — but this is a place a person TYPES, on an Arabic-only dashboard, and a caret
@@ -266,7 +311,7 @@ export default async function CalendarsPage({
                 className="flex flex-wrap items-end gap-2"
               >
                 <input type="hidden" name="month" value={month} />
-                <input type="hidden" name="for" value={property.reference} />
+                <input type="hidden" name="expand" value={property.reference} />
                 {highlight ? <input type="hidden" name="date" value={highlight} /> : null}
 
                 <label className="grid gap-1">
@@ -275,7 +320,7 @@ export default async function CalendarsPage({
                   </span>
                   <input
                     name="unit"
-                    defaultValue={searching ? search : ''}
+                    defaultValue={search}
                     maxLength={20}
                     placeholder={t.calendars.searchPlaceholder}
                     className="min-h-10 w-44 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text lg:min-h-0"
@@ -291,7 +336,7 @@ export default async function CalendarsPage({
 
                 {searching ? (
                   <Link
-                    href={`/calendars?month=${month}`}
+                    href={openHref(property.reference)}
                     className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 text-[12.5px] text-muted lg:min-h-0 lg:py-2"
                   >
                     {t.calendars.searchClear}

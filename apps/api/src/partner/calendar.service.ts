@@ -13,6 +13,7 @@ import {
   type CalendarRangeUpdate,
   type PortfolioCalendar,
   type PortfolioCalendarProperty,
+  type PortfolioCalendarUnit,
   type PortfolioCalendarQuery,
 } from '@safra/contracts';
 
@@ -203,7 +204,28 @@ export class CalendarService {
 
     const first = `${query.month}-01`;
 
-    const days = await this.db.execute<{
+    /*
+      Which property's month to EXPAND — the one the reader has open.
+
+      Days are the expensive part of this screen: one property times its units times every day of
+      the month. Expanding every listed property is what forced a ceiling of ten and put a partner's
+      eleventh property out of reach (Bashar, 2026-08-19). Expanding ONE keeps the cost flat however
+      large the portfolio, so the list no longer has to be short.
+
+      An `expand` naming a property this partner does not own simply does not match, and the first
+      of their own is expanded instead — the scoping is the page query above, not a check here.
+    */
+    const expanded =
+      page.find((property) => property.reference === query.expand) ?? page[0];
+
+    /*
+      Unit METADATA for every listed property, with no days.
+
+      Cheap — one indexed read per property, no date series — and the folder needs it while closed:
+      a summary that could not say «5 وحدة» until it was opened would make the reader open every
+      folder to find out where anything is.
+    */
+    const units = await this.db.execute<{
       property_id: string;
       unit_id: string;
       unit_name: string;
@@ -212,6 +234,19 @@ export class CalendarService {
       base_price: string;
       currency_code: string;
       unit_min_nights: number;
+    }>(sql`
+      SELECT u.property_id, u.id AS unit_id, u.name_ar AS unit_name, u.unit_label,
+             u.is_active, u.base_price::text AS base_price, c.code AS currency_code,
+             u.min_nights AS unit_min_nights
+      FROM units u
+      JOIN currencies c ON c.id = u.currency_id
+      WHERE u.property_id IN ${page.map((property) => property.id)}
+        AND u.deleted_at IS NULL
+      ORDER BY u.created_at, u.id
+    `);
+
+    const days = await this.db.execute<{
+      unit_id: string;
       date: string;
       status: CalendarDay['status'];
       price: string;
@@ -220,14 +255,7 @@ export class CalendarService {
       note: string | null;
     }>(sql`
       SELECT
-        u.property_id                                 AS property_id,
         u.id                                          AS unit_id,
-        u.name_ar                                     AS unit_name,
-        u.unit_label                                  AS unit_label,
-        u.is_active                                   AS is_active,
-        u.base_price::text                            AS base_price,
-        c.code                                        AS currency_code,
-        u.min_nights                                  AS unit_min_nights,
         d.day::date::text                             AS date,
         -- A live booking always wins over the partner's declared state, as the per-unit read does.
         CASE WHEN b.id IS NOT NULL THEN 'booked'
@@ -238,7 +266,6 @@ export class CalendarService {
         COALESCE(ad.min_nights, u.min_nights)         AS min_nights,
         ad.note                                       AS note
       FROM units u
-      JOIN currencies c ON c.id = u.currency_id
       /*
         The month derived in SQL rather than in TypeScript: plus one month minus one day is right
         for February and for a leap year without either side knowing which month it was handed.
@@ -255,13 +282,13 @@ export class CalendarService {
        AND b.status IN ${OCCUPYING_STATUSES}
        AND d.day::date >= b.check_in
        AND d.day::date <  b.check_out
-      WHERE u.property_id IN ${page.map((p) => p.id)}
+      WHERE u.property_id = ${expanded?.id ?? null}
         AND u.deleted_at IS NULL
       ORDER BY u.created_at, u.id, d.day
     `);
 
     /*
-      Seeded from the property PAGE, not from the day rows, so a property with no units yet still
+      Seeded from the property PAGE, not from the unit rows, so a property with no units yet still
       appears — as itself, with an empty list. Building the map from the rows instead would make an
       empty property vanish, which reads as the page having lost it rather than as a property having
       no rooms.
@@ -270,29 +297,31 @@ export class CalendarService {
       page.map((p) => [p.id, { reference: p.reference, nameAr: p.name_ar, units: [] }]),
     );
 
-    for (const row of days.rows) {
+    const byUnit = new Map<string, PortfolioCalendarUnit>();
+
+    for (const row of units.rows) {
       const property = byProperty.get(row.property_id);
 
       if (!property) continue;
 
-      let unit = property.units.find((candidate) => candidate.unitId === row.unit_id);
+      const unit: PortfolioCalendarUnit = {
+        unitId: row.unit_id,
+        nameAr: row.unit_name,
+        unitLabel: row.unit_label,
+        basePrice: row.base_price,
+        currencyCode: row.currency_code,
+        minNights: row.unit_min_nights,
+        isActive: row.is_active,
+        /* Empty on every property but the expanded one — see `expand` in the query contract. */
+        days: [],
+      };
 
-      if (!unit) {
-        unit = {
-          unitId: row.unit_id,
-          nameAr: row.unit_name,
-          unitLabel: row.unit_label,
-          basePrice: row.base_price,
-          currencyCode: row.currency_code,
-          minNights: row.unit_min_nights,
-          isActive: row.is_active,
-          days: [],
-        };
+      property.units.push(unit);
+      byUnit.set(row.unit_id, unit);
+    }
 
-        property.units.push(unit);
-      }
-
-      unit.days.push({
+    for (const row of days.rows) {
+      byUnit.get(row.unit_id)?.days.push({
         date: row.date,
         status: row.status,
         price: row.price,
@@ -302,7 +331,6 @@ export class CalendarService {
       });
     }
 
-    // Insertion order is the page's order, which is `created_at, id` — the portfolio as it grew.
     return { month: query.month, properties: [...byProperty.values()], nextCursor };
   }
 

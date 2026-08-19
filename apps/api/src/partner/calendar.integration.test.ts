@@ -387,6 +387,82 @@ describeIfDb(
     });
 
     /**
+     * ONE property's days, and the rest listed without them.
+     *
+     * This is the whole shape of the screen: days are the expensive part — a property times its
+     * units times every day of the month — so expanding every listed property forced a ceiling of
+     * ten and put a partner's eleventh property out of reach (Bashar, 2026-08-19).
+     *
+     * The unexpanded properties keep their UNITS, and that is deliberate rather than incidental: a
+     * folder has to say «٥ وحدة» while it is still shut, or the reader must open every one to find
+     * out where anything is.
+     */
+    it('expands only the property named by expand, and lists the rest with their units', async () => {
+      const listed = await service.readPortfolio(claims, { month: '2030-01', limit: 10 });
+      const second = listed.properties.find(
+        (property) =>
+          property.units.length > 0 &&
+          property.reference !== listed.properties[0]?.reference,
+      );
+
+      expect(second, 'the fixture has a second property with units').toBeDefined();
+
+      const result = await service.readPortfolio(claims, {
+        month: '2030-01',
+        limit: 10,
+        expand: second?.reference ?? '',
+      });
+
+      const opened = result.properties.find((p) => p.reference === second?.reference);
+      const others = result.properties.filter((p) => p.reference !== second?.reference);
+
+      expect(opened?.units.every((unit) => unit.days.length === 31)).toBe(true);
+      expect(others.every((p) => p.units.every((unit) => unit.days.length === 0))).toBe(
+        true,
+      );
+      /* Listed, with everything the shut folder shows — the name, the number, the nightly price. */
+      expect(others.some((p) => p.units.length > 0)).toBe(true);
+      expect(result.properties).toHaveLength(listed.properties.length);
+    });
+
+    /** Absent `expand` opens the first property, so the screen never arrives without a calendar. */
+    it('expands the first property when expand is absent', async () => {
+      const result = await service.readPortfolio(claims, { month: '2030-01', limit: 10 });
+
+      expect(result.properties[0]?.units[0]?.days).toHaveLength(31);
+    });
+
+    /**
+     * `expand` is a caller-supplied string, and the answer to a hostile one is the ordinary answer.
+     *
+     * The scoping is the page query, not a check on this parameter: a reference belonging to another
+     * partner simply does not match any row the caller was given, so it falls back to the first of
+     * their OWN properties. "Not yours" and "not there" are therefore the same answer, and neither
+     * confirms that the reference exists.
+     */
+    it("falls back to the reader's own first property when expand is not one of theirs", async () => {
+      const rival = await db.execute<{ reference: string }>(
+        sql`SELECT reference FROM properties WHERE id = ${RIVAL_PROPERTY_ID}::uuid`,
+      );
+
+      for (const expand of [
+        rival.rows[0]?.reference ?? 'PRO-000000',
+        'not-a-reference',
+      ]) {
+        const result = await service.readPortfolio(claims, {
+          month: '2030-01',
+          limit: 10,
+          expand,
+        });
+
+        expect(result.properties.map((p) => p.reference)).not.toContain(
+          rival.rows[0]?.reference,
+        );
+        expect(result.properties[0]?.units[0]?.days).toHaveLength(31);
+      }
+    });
+
+    /**
      * The cursor walks the portfolio without repeating or skipping a property.
      *
      * The repeat is the failure mode worth naming: `created_at` is a `timestamptz` with microsecond

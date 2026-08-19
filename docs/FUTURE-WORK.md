@@ -1410,6 +1410,24 @@ bug rather than one-off slips:
   accepts a free night that the UI cannot send. Left alone: rejecting a zero price is the safer
   behaviour of the two, and changing it is a pricing decision rather than a bug fix.
 
+**التقويمات re-shaped 2026-08-19, and the ten-property ceiling with it.** Bashar asked for the page
+to be split by عقار with a unit-number search, and the pager («عرض عقارات أخرى») removed. Removing a
+pager from a page that expanded every listed property would have put a partner's eleventh property
+out of reach, so the read was split in two: the API LISTS every property with its units, and expands
+the DAYS of only the one named by `?expand=` — the folder the reader has open. Days are the whole
+cost of the screen (a property × its units × every day of the month), so the cost is now flat in the
+size of the portfolio. An `expand` naming somebody else's property does not match a row the caller
+was given and falls back to their own first one; the scoping is still the page query and not a check
+on the parameter. `calendar.integration.test.ts` covers all three cases and
+`partner-calendars.spec.ts` asserts one open folder in the browser.
+
+**What is still bounded, and deliberately:** the LIST stops at 200 properties, and the page draws no
+pager, so a partner with more than 200 would not see the rest. 200 is a bound rather than a budget —
+listing a property is four columns and one indexed seek — and a portfolio past it is a conversation
+before it is a paging problem. The cursor is still returned by the API, so restoring a control is a
+page change and not a service change. **Unblocks:** nothing. **Owner:** engineering, if a partner
+ever approaches it.
+
 **Owner:** engineering.
 
 ### O-partner-4 — Partner 2FA is mandatory and enforced; what remains is operational
