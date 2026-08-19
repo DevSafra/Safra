@@ -420,6 +420,18 @@ export const ar = {
     gridCaption: 'تقويم {unit} لشهر {month}',
     today: 'اليوم',
     unitCount: 'وحدة',
+    /* «بحث برقم الوحدة» — the search runs in SQL over the whole portfolio, not over this page. */
+    searchLabel: 'ابحث برقم الوحدة',
+    searchPlaceholder: 'مثل 101',
+    searchAction: 'بحث',
+    searchClear: 'إزالة البحث',
+    /** Shown INSTEAD of the list when a search matched nothing — never an empty page. */
+    searchNothing: 'لا توجد وحدة رقمها «{query}».',
+    searchSummary: 'الوحدات التي رقمها يطابق «{query}»',
+    /* The range editor is folded away per unit: the calendar is what a partner came to read. */
+    editRange: 'تعديل مدة',
+    /* A property is a folder here, so it says how much is inside before it is opened. */
+    unitsInside: '{n} وحدة',
   },
 
   properties: {

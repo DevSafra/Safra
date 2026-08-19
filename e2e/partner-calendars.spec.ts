@@ -243,6 +243,17 @@ test('an edit applies to that unit only, and is put back', async ({ page }) => {
   await expect(dayOf(neighbour)).toHaveAttribute('data-day-status', 'available');
 
   async function setStatus(value: string) {
+    /*
+      The range editor is folded away per unit (2026-08-19) — a partner reads a month far more often
+      than they change one, and a seven-field form under every unit made the calendars the thing you
+      scrolled past. So it has to be OPENED before it can be filled, exactly as a partner does.
+    */
+    const editor = target.locator('details').first();
+
+    if (!(await editor.evaluate((element: HTMLDetailsElement) => element.open))) {
+      await editor.locator('summary').click();
+    }
+
     const form = target.locator('form');
 
     await form.getByLabel(t.unitCalendar.from).fill(EDIT_DAY);

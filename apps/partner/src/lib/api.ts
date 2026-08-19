@@ -531,10 +531,19 @@ const portfolioCalendarSchema = z.object({
 
 export type PortfolioCalendar = z.infer<typeof portfolioCalendarSchema>;
 
-export async function getPortfolioCalendar(month: string, cursor?: string) {
-  const query = new URLSearchParams({ month });
-
-  if (cursor) query.set('cursor', cursor);
+/**
+ * @param limit How many properties to expand, defaulted UP from the API's 3.
+ *
+ * التقويمات no longer offers «عرض عقارات أخرى» (Bashar, 2026-08-19), and a page that still stopped
+ * at three would put a partner's fourth property out of reach with no control to get there — the
+ * pager was the thing being removed, not the portfolio. 10 is the API's ceiling, and that ceiling
+ * exists because one page is a property times every unit times every day of the month.
+ *
+ * A portfolio larger than ten is therefore CUT OFF, which is recorded on the page rather than
+ * hidden: the honest fix is expanding a property's days when it is opened, not a bigger number.
+ */
+export async function getPortfolioCalendar(month: string, limit = 10) {
+  const query = new URLSearchParams({ month, limit: String(limit) });
 
   return partnerFetch(`/partner/calendars?${query.toString()}`, portfolioCalendarSchema);
 }
