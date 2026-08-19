@@ -207,6 +207,7 @@ export class CalendarService {
       property_id: string;
       unit_id: string;
       unit_name: string;
+      unit_label: string | null;
       is_active: boolean;
       base_price: string;
       currency_code: string;
@@ -222,6 +223,7 @@ export class CalendarService {
         u.property_id                                 AS property_id,
         u.id                                          AS unit_id,
         u.name_ar                                     AS unit_name,
+        u.unit_label                                  AS unit_label,
         u.is_active                                   AS is_active,
         u.base_price::text                            AS base_price,
         c.code                                        AS currency_code,
@@ -279,6 +281,7 @@ export class CalendarService {
         unit = {
           unitId: row.unit_id,
           nameAr: row.unit_name,
+          unitLabel: row.unit_label,
           basePrice: row.base_price,
           currencyCode: row.currency_code,
           minNights: row.unit_min_nights,

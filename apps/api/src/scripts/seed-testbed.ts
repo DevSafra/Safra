@@ -885,7 +885,21 @@ async function build(db: Seeder): Promise<void> {
 
       const units: { id: string; price: number }[] = [];
 
+      /*
+        Room numbers that look like room numbers: 101, 102 … then 201 on the next floor.
+
+        The testbed exists to show the screens as an operator will meet them, and «رقم الوحدة» on
+        every row of التقويمات is one of those screens. Sequential 1, 2, 3 would technically fill
+        the column while teaching nothing about how it reads against real labels.
+      */
+      let unitIndex = 0;
+
       for (const unit of property.units) {
+        const floor = Math.floor(unitIndex / 4) + 1;
+        const room = `${floor}0${(unitIndex % 4) + 1}`;
+
+        unitIndex += 1;
+
         const [made] = await db
           .insert(schema.units)
           .values({
@@ -896,6 +910,7 @@ async function build(db: Seeder): Promise<void> {
             maxGuests: unit.maxGuests,
             basePrice: money(unit.price),
             currencyId: usd.id,
+            unitLabel: room,
           })
           .returning();
 

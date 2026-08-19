@@ -331,6 +331,7 @@ export const ar = {
     openUnitCalendar: 'تقويم هذه الوحدة',
     /* The unit editor. Every unit on one screen, each saved on its own. */
     unitName: 'اسم الوحدة',
+    unitLabel: 'رقم الوحدة',
     unitGuestsField: 'عدد الضيوف',
     unitBedrooms: 'غرف النوم',
     unitBeds: 'الأسرّة',
@@ -446,6 +447,9 @@ export const ar = {
     fUnits: 'عدد الوحدات',
     fGuests: 'عدد الضيوف لكل وحدة',
     fPolicy: 'سياسة الإلغاء',
+    roomNumberBadge: 'وحدة',
+    fRoomNumber: 'رقم الغرفة/الوحدة',
+    fRoomNumberHint: 'اختياري — مثل 101 أو A-12',
     fAddress: 'العنوان',
     fDescription: 'الوصف',
     attributesLabel:

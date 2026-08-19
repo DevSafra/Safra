@@ -98,6 +98,20 @@ export const properties = pgTable(
     descriptionEn: text('description_en'),
     descriptionDe: text('description_de'),
     address: text('address').notNull(),
+    /**
+     * The room or unit number this listing occupies — «رقم الغرفة/الوحدة» (Bashar, 2026-08-19).
+     *
+     * On the PROPERTY rather than on `units`: a partner gives it once when creating the listing,
+     * and one listing is one addressable place. A hotel that genuinely numbers each room separately
+     * has that on `units`, which is where a per-room number would belong.
+     *
+     * Nullable, because 2,700 listings already exist without one and a partner may have nothing to
+     * put here — a villa has no room number.
+     *
+     * TEXT, not an integer: real room numbers are `A-12`, `3ب`, `PH1` as often as `101`. Storing a
+     * number would refuse those, and the value is a LABEL — nothing sorts, sums or compares it.
+     */
+    roomNumber: text('room_number'),
     latitude: text('latitude'),
     longitude: text('longitude'),
 

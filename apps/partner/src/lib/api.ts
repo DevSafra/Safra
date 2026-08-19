@@ -73,6 +73,8 @@ const propertySchema = z.object({
   slug: z.string(),
   nameAr: z.string(),
   nameEn: z.string().nullable(),
+  /** «رقم الغرفة/الوحدة». Null on every listing created before 2026-08-19, and on any villa. */
+  roomNumber: z.string().nullable(),
   status: z.string(),
   rating: z.string().nullable(),
   reviewsCount: z.number(),
@@ -426,6 +428,8 @@ const partnerPropertySchema = z.object({
     de: z.string().nullable(),
   }),
   address: z.string(),
+  /** «رقم الغرفة/الوحدة». Null where the partner had nothing to put. */
+  roomNumber: z.string().nullable(),
   latitude: z.string().nullable(),
   longitude: z.string().nullable(),
   attributes: z.array(z.string()),
@@ -502,6 +506,8 @@ export async function getUnitCalendar(unitId: string, from: string, to: string) 
 const portfolioCalendarUnitSchema = z.object({
   unitId: z.string(),
   nameAr: z.string(),
+  /** «رقم الوحدة» — the physical identifier used at check-in. Null where none was given. */
+  unitLabel: z.string().nullable(),
   basePrice: z.string(),
   currencyCode: z.string(),
   minNights: z.number(),

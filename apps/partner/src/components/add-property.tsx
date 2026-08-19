@@ -81,6 +81,8 @@ export function AddProperty({
           name: { ar: text('name') },
           ...(text('description') ? { description: { ar: text('description') } } : {}),
           address: text('address'),
+          /* Omitted entirely when blank, so the API stores null rather than an empty label. */
+          ...(text('roomNumber') ? { roomNumber: text('roomNumber') } : {}),
           attributes: picked,
           initialUnits: {
             count: number('unitCount'),
@@ -200,6 +202,16 @@ export function AddProperty({
               label: policy.nameAr,
             }))}
           />
+          {/*
+            «رقم الغرفة/الوحدة» (Bashar, 2026-08-19). Optional, and free text rather than a number:
+            real ones read `A-12` or `3ب` as often as `101`, and nothing sorts or sums it.
+          */}
+          <Field
+            name="roomNumber"
+            label={t.properties.fRoomNumber}
+            maxLength={20}
+            placeholder={t.properties.fRoomNumberHint}
+          />
           <Field name="address" label={t.properties.fAddress} required />
         </div>
 
@@ -274,6 +286,8 @@ function Field({
   required,
   min,
   max,
+  maxLength,
+  placeholder,
   defaultValue,
 }: {
   readonly name: string;
@@ -282,6 +296,9 @@ function Field({
   readonly required?: boolean;
   readonly min?: number;
   readonly max?: number;
+  /** Matches the contract's own cap, so the browser refuses before the API has to. */
+  readonly maxLength?: number;
+  readonly placeholder?: string;
   readonly defaultValue?: string;
 }) {
   return (
@@ -293,6 +310,8 @@ function Field({
         required={required}
         {...(min === undefined ? {} : { min })}
         {...(max === undefined ? {} : { max })}
+        {...(maxLength === undefined ? {} : { maxLength })}
+        {...(placeholder === undefined ? {} : { placeholder })}
         {...(defaultValue === undefined ? {} : { defaultValue })}
         className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
       />

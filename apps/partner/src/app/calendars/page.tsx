@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { getMyProfile, getPortfolioCalendar, sidebarBadges } from '@/lib/api';
 import { DayLegend, MonthGrid } from '@/components/month-grid';
+import { Ltr } from '@/components/ltr';
 import { RangeEditor } from '@/components/range-editor';
 import { Shell } from '@/components/shell';
 import { amount, count, marketToday } from '@/lib/format';
@@ -198,7 +199,15 @@ export default async function CalendarsPage({
               className="grid gap-3 border-t border-line2 pt-3.5"
             >
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <h3 className="text-[13px] font-bold text-text">{unit.nameAr}</h3>
+                <h3 className="text-[13px] font-bold text-text">
+                  {unit.nameAr}
+                  {/* The room this actually is, where the partner picks which room to manage. */}
+                  {unit.unitLabel ? (
+                    <span className="ms-2 whitespace-nowrap text-[11.5px] font-semibold text-muted">
+                      {t.editProperty.unitLabel} <Ltr>{unit.unitLabel}</Ltr>
+                    </span>
+                  ) : null}
+                </h3>
                 <span className="text-[11.5px] text-faint" dir="ltr">
                   {amount(unit.basePrice, unit.currencyCode)} {t.unitCalendar.perNight}
                 </span>

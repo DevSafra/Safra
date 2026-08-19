@@ -73,6 +73,7 @@ function UnitRow({
 
   const [form, setForm] = useState({
     nameAr: unit.nameAr,
+    unitLabel: unit.unitLabel ?? '',
     maxGuests: String(unit.maxGuests),
     bedrooms: String(unit.bedrooms),
     beds: String(unit.beds),
@@ -100,6 +101,14 @@ function UnitRow({
     */
     const patch: Record<string, unknown> = {};
 
+    /*
+      `null` when cleared, not `''`. The update contract types this as `string | null`, and null is
+      what removes a number — an empty string would be a unit whose physical label is nothing, which
+      the check-in list would then print as a blank cell rather than skip.
+    */
+    if (form.unitLabel.trim() !== (unit.unitLabel ?? '')) {
+      patch['unitLabel'] = form.unitLabel.trim() || null;
+    }
     if (form.nameAr.trim() !== unit.nameAr) {
       patch['name'] = { ar: form.nameAr.trim() };
     }
@@ -183,6 +192,19 @@ function UnitRow({
         onChange={set('nameAr')}
         dir="rtl"
         id={`unit-name-${unit.id}`}
+      />
+
+      {/*
+        «رقم الوحدة» — the physical identifier used at check-in, which `units.unit_label` has always
+        carried and no screen has ever shown (Bashar, 2026-08-19). `dir="ltr"` because `204` and
+        `A-12` are Latin runs on an Arabic line, and a bidi-neutral hyphen reads `12-A` without it.
+      */}
+      <Field
+        label={t.editProperty.unitLabel}
+        value={form.unitLabel}
+        onChange={set('unitLabel')}
+        dir="ltr"
+        id={`unit-label-${unit.id}`}
       />
 
       <div className="grid gap-3 sm:grid-cols-4">

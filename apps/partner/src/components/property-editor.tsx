@@ -47,6 +47,7 @@ export function PropertyEditor({
     descriptionEn: property.description.en ?? '',
     descriptionDe: property.description.de ?? '',
     address: property.address,
+    roomNumber: property.roomNumber ?? '',
     citySlug: property.citySlug,
     propertyTypeCode: property.propertyTypeCode,
     cancellationPolicyCode: property.cancellationPolicyCode,
@@ -94,6 +95,13 @@ export function PropertyEditor({
     }
 
     if (form.address.trim() !== property.address) patch['address'] = form.address.trim();
+    /*
+      Sent whenever it CHANGED, including to empty — that is how a partner clears a room number they
+      typed by mistake. `?? ''` on both sides so "was null, still blank" is not a change.
+    */
+    if (form.roomNumber.trim() !== (property.roomNumber ?? '')) {
+      patch['roomNumber'] = form.roomNumber.trim();
+    }
     if (form.citySlug !== property.citySlug) patch['citySlug'] = form.citySlug;
     if (form.propertyTypeCode !== property.propertyTypeCode) {
       patch['propertyTypeCode'] = form.propertyTypeCode;
@@ -184,6 +192,17 @@ export function PropertyEditor({
           onChange={set('address')}
           required
           dir="rtl"
+        />
+        {/*
+          `dir="ltr"`: `A-12` is a Latin run, and a bidi-neutral hyphen on an Arabic line renders
+          it `12-A`. Editable here because a room number typed wrongly at creation would otherwise
+          be permanent.
+        */}
+        <Field
+          label={t.properties.fRoomNumber}
+          value={form.roomNumber}
+          onChange={set('roomNumber')}
+          dir="ltr"
         />
         <Field
           label={t.editProperty.nameEn}

@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
@@ -291,6 +292,39 @@ describeIfDb(
         'وحدة ٢',
         'وحدة ٣',
       ]);
+    });
+
+    /**
+     * The unit's own number, carried to the screen where a partner picks a room.
+     *
+     * `units.unit_label` has existed since the schema was written — "the physical identifier the
+     * partner uses at check-in" — and no screen ever showed it (Bashar, 2026-08-19). This is the
+     * screen that most needs it: «غرفة مزدوجة» is shared by every double room in the building, so
+     * the name alone cannot tell a partner which room they are about to close for a week.
+     *
+     * Null is asserted alongside, because most units have no number and the heading must simply
+     * omit it rather than print an empty label.
+     */
+    it('carries each unit number, and null where there is none', async () => {
+      /* The unit this partner's portfolio actually returns first — not whichever row the table
+         happens to hold, which in a shared fixture belongs to somebody else. */
+      const before = await service.readPortfolio(claims, { month: '2030-01', limit: 10 });
+      const target = before.properties.flatMap((property) => property.units)[0]?.unitId;
+
+      expect(target, 'the fixture has a unit to number').toBeDefined();
+
+      await db.execute(
+        sql`UPDATE units SET unit_label = '204' WHERE id = ${target}::uuid`,
+      );
+
+      const result = await service.readPortfolio(claims, { month: '2030-01', limit: 10 });
+      const labels = result.properties.flatMap((property) =>
+        property.units.map((unit) => unit.unitLabel),
+      );
+
+      expect(labels[0]).toBe('204');
+      /* The rest were never given one, and arrive as null rather than as an empty string. */
+      expect(labels.slice(1).every((label) => label === null)).toBe(true);
     });
 
     /**

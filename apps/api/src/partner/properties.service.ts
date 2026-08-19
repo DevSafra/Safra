@@ -151,6 +151,7 @@ export class PropertiesService {
       description_en: string | null;
       description_de: string | null;
       address: string;
+      room_number: string | null;
       latitude: string | null;
       longitude: string | null;
       attributes: string[] | null;
@@ -163,7 +164,7 @@ export class PropertiesService {
       SELECT pr.id, pr.reference, pr.slug, pr.status::text AS status,
              pr.name_ar, pr.name_en, pr.name_de,
              pr.description_ar, pr.description_en, pr.description_de,
-             pr.address, pr.latitude, pr.longitude, pr.attributes,
+             pr.address, pr.room_number, pr.latitude, pr.longitude, pr.attributes,
              ci.slug AS city_slug, ci.name_ar AS city_name_ar,
              pt.code AS property_type_code,
              cp.code AS cancellation_policy_code,
@@ -223,6 +224,7 @@ export class PropertiesService {
         de: row.description_de,
       },
       address: row.address,
+      roomNumber: row.room_number,
       latitude: row.latitude,
       longitude: row.longitude,
       attributes: row.attributes ?? [],
@@ -260,6 +262,7 @@ export class PropertiesService {
       slug: string;
       name_ar: string;
       name_en: string | null;
+      room_number: string | null;
       status: string;
       rating: string | null;
       reviews_count: number;
@@ -274,7 +277,8 @@ export class PropertiesService {
       currency_code: string | null;
       created_at: string;
     }>(sql`
-      SELECT pr.reference, pr.slug, pr.name_ar, pr.name_en, pr.status::text AS status,
+      SELECT pr.reference, pr.slug, pr.name_ar, pr.name_en, pr.room_number,
+             pr.status::text AS status,
              pr.rating::text AS rating, pr.reviews_count, pr.attributes, pr.badges,
              ci.name_ar AS city_name_ar,
              pt.code    AS property_type,
@@ -310,6 +314,7 @@ export class PropertiesService {
       slug: row.slug,
       nameAr: row.name_ar,
       nameEn: row.name_en,
+      roomNumber: row.room_number,
       status: row.status,
       rating: row.rating,
       reviewsCount: row.reviews_count,
@@ -379,6 +384,8 @@ export class PropertiesService {
           descriptionEn: input.description?.en ?? null,
           descriptionDe: input.description?.de ?? null,
           address: input.address,
+          /* Empty means none: the field is optional, and `''` would be a room called nothing. */
+          roomNumber: input.roomNumber?.trim() || null,
           latitude: input.latitude ?? null,
           longitude: input.longitude ?? null,
           attributes: input.attributes,
@@ -419,6 +426,14 @@ export class PropertiesService {
             maxGuests: input.initialUnits.maxGuests,
             basePrice: input.initialUnits.basePrice.toFixed(2),
             currencyId,
+            /*
+              Every unit starts numbered, so التقويمات can name a room rather than repeat one name
+              per row (Bashar, 2026-08-19). The index is a STARTING POINT, not a claim: a partner
+              whose rooms are 204 and 205 edits them, which is why the field is on the unit editor.
+              Without a default, «رقم الوحدة» would be blank on every unit until somebody typed one,
+              which is what made this look unimplemented.
+            */
+            unitLabel: String(index),
           });
         }
       }
@@ -470,6 +485,12 @@ export class PropertiesService {
       if (input.description.de) patch['descriptionDe'] = input.description.de;
     }
     if (input.address !== undefined) patch['address'] = input.address;
+    /*
+      An empty string CLEARS it, which is how a partner removes a room number typed by mistake —
+      `|| null` rather than `?? null`, so `''` becomes null instead of a room called nothing.
+    */
+    if (input.roomNumber !== undefined)
+      patch['roomNumber'] = input.roomNumber.trim() || null;
     if (input.attributes !== undefined) patch['attributes'] = input.attributes;
     if (input.latitude !== undefined) patch['latitude'] = input.latitude;
     if (input.longitude !== undefined) patch['longitude'] = input.longitude;

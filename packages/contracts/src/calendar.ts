@@ -136,6 +136,13 @@ export type PortfolioCalendarQuery = z.infer<typeof portfolioCalendarQuerySchema
 export interface PortfolioCalendarUnit {
   unitId: string;
   nameAr: string;
+  /**
+   * «رقم الوحدة» — the physical identifier the partner uses at check-in, e.g. `204` or `A-12`.
+   *
+   * Carried on this screen because it is where a partner picks WHICH room to work on, and a name
+   * like «غرفة مزدوجة» is shared by every double room in the building. Null where none was given.
+   */
+  unitLabel: string | null;
   /** The unit's own base price, for the editor's "unchanged" placeholder. */
   basePrice: string;
   currencyCode: string;

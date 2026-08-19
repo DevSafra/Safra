@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
-import { PERMISSIONS as P } from '@safra/contracts';
+import { PERMISSIONS as P, propertyCreateSchema } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { PropertiesService } from './properties.service.js';
@@ -150,6 +150,103 @@ describeIfDb('PropertiesService.readOwn', () => {
 
   afterAll(async () => {
     await harness.close();
+  });
+
+  /**
+   * «رقم الغرفة/الوحدة» — the room number a partner gives when creating a listing.
+   *
+   * On the PROPERTY, optional, and a LABEL rather than a number (Bashar, 2026-08-19). The cases
+   * that matter are the empty ones: a blank field must store NULL rather than a room called `''`,
+   * because a card renders the number whenever it is truthy and an empty string would print an
+   * empty badge on every listing that skipped the field.
+   */
+  describe('the room number', () => {
+    /*
+      `create()` takes the codes a form submits, not ids, so they are read from the reference data
+      the fixture already relies on rather than hard-coded — a seeded slug changing should not
+      silently turn these into a different test.
+    */
+    let codes = { citySlug: '', propertyTypeCode: '', cancellationPolicyCode: '' };
+
+    beforeEach(async () => {
+      const row = await db.execute<{ city: string; type: string; policy: string }>(sql`
+        SELECT (SELECT slug FROM cities LIMIT 1)                    AS city,
+               (SELECT code FROM property_types LIMIT 1)            AS type,
+               (SELECT code FROM cancellation_policies LIMIT 1)     AS policy
+      `);
+
+      const found = row.rows[0];
+
+      codes = {
+        citySlug: found?.city ?? '',
+        propertyTypeCode: found?.type ?? '',
+        cancellationPolicyCode: found?.policy ?? '',
+      };
+    });
+
+    const draftInput = (roomNumber?: string) => ({
+      ...codes,
+      name: { ar: `عقار ${Math.random().toString(36).slice(2, 8)}` },
+      address: 'شارع الاختبار ٣',
+      attributes: [],
+      ...(roomNumber === undefined ? {} : { roomNumber }),
+    });
+
+    it('stores what the partner typed, and reads it back', async () => {
+      const { reference } = await service.create(partner(), draftInput('A-12'));
+
+      expect((await service.readOwn(partner(), reference)).roomNumber).toBe('A-12');
+    });
+
+    it('stores nothing when the field was left out', async () => {
+      const { reference } = await service.create(partner(), draftInput());
+
+      expect((await service.readOwn(partner(), reference)).roomNumber).toBeNull();
+    });
+
+    /* A field submitted with only spaces is empty, not a room whose name is a space. */
+    it.each(['', '   '])(
+      'stores null for %j rather than an empty label',
+      async (blank) => {
+        const { reference } = await service.create(partner(), draftInput(blank));
+
+        expect((await service.readOwn(partner(), reference)).roomNumber).toBeNull();
+      },
+    );
+
+    it('can be changed, and CLEARED, after creation', async () => {
+      const { reference } = await service.create(partner(), draftInput('101'));
+
+      await service.update(partner(), reference, { roomNumber: '3ب' });
+      expect((await service.readOwn(partner(), reference)).roomNumber).toBe('3ب');
+
+      /* Clearing is how a partner removes a number typed by mistake. */
+      await service.update(partner(), reference, { roomNumber: '' });
+      expect((await service.readOwn(partner(), reference)).roomNumber).toBeNull();
+    });
+
+    /* Untouched by a patch that does not mention it — PATCH semantics, not replace. */
+    it('survives an edit that changes something else', async () => {
+      const { reference } = await service.create(partner(), draftInput('A-12'));
+
+      await service.update(partner(), reference, { address: 'شارع آخر ٩' });
+
+      expect((await service.readOwn(partner(), reference)).roomNumber).toBe('A-12');
+    });
+
+    /* It is printed beside the listing name, so the cap is what keeps a card a card. */
+    it('refuses a value too long to sit beside a name', () => {
+      const parsed = propertyCreateSchema.safeParse(draftInput('X'.repeat(21)));
+
+      expect(parsed.success).toBe(false);
+    });
+
+    it('appears in the listing card query', async () => {
+      const { reference } = await service.create(partner(), draftInput('A-12'));
+      const listed = await service.listOwn(partner());
+
+      expect(listed.find((row) => row.reference === reference)?.roomNumber).toBe('A-12');
+    });
   });
 
   describe('what the form prefills from', () => {

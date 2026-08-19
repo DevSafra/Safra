@@ -133,7 +133,22 @@ function Card({ property }: { readonly property: PartnerProperty }) {
 
       <div className="flex flex-1 flex-col p-3.5">
         <div className="flex items-start justify-between gap-2">
-          <h2 className="min-w-0 text-[14px] font-bold text-text">{property.nameAr}</h2>
+          <h2 className="min-w-0 text-[14px] font-bold text-text">
+            {property.nameAr}
+            {/*
+              The room number beside the name, and only when there is one (Bashar, 2026-08-19).
+
+              Only the VALUE is isolated. Wrapping the whole thing in `dir="ltr"` put the Arabic
+              label «وحدة» inside a left-to-right run, so it laid out after the number and the value
+              collided with the listing name — «فندق اختبار 08351A-12 وحدة». `A-12` still needs the
+              isolation on its own: the hyphen is bidi-neutral, so an unisolated value reads `12-A`.
+            */}
+            {property.roomNumber ? (
+              <span className="ms-2 whitespace-nowrap text-[11.5px] font-semibold text-muted">
+                {t.properties.roomNumberBadge} <Ltr>{property.roomNumber}</Ltr>
+              </span>
+            ) : null}
+          </h2>
           {property.rating ? (
             <span className="shrink-0 text-[12.5px] font-extrabold text-gold">
               ★ {property.rating}

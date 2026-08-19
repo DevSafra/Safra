@@ -45,6 +45,17 @@ export const propertyCreateSchema = z
     name: translatedText(160),
     description: translatedText(4000).partial({ ar: true }).optional(),
     address: z.string().trim().min(3).max(300),
+    /**
+     * «رقم الغرفة/الوحدة» — the room or unit this listing occupies (Bashar, 2026-08-19).
+     *
+     * Optional, and a LABEL rather than a number: real ones are `A-12`, `3ب`, `PH1` as often as
+     * `101`. Nothing sorts or compares it, so a numeric type would only refuse valid answers.
+     *
+     * Capped at 20 because it is printed beside the listing name in عقاراتي and in the console's
+     * registry — a value long enough to wrap is a value that breaks a row rather than describes a
+     * room. `.trim()` so a field submitted with only spaces is empty, not a room called " ".
+     */
+    roomNumber: z.string().trim().max(20).optional(),
     latitude: latitudeSchema.optional(),
     longitude: longitudeSchema.optional(),
     /**
