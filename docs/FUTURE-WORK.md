@@ -1946,6 +1946,58 @@ protect a bystander. An attacker willing to be loud — five failed sign-ins a s
 starve an address. The answer to that residual is rate limiting at the EDGE, and it is now a
 **required deliverable of `M-1`** rather than a note here: see `O-sec-5`.
 
+### O-sec-10 — FIXED: two gaps in the emailed sign-in code, found by reviewing it
+
+**Status:** **FIXED** 2026-08-20, before either shipped anywhere · **Severity:** one High, one
+Medium · **Found by** a security pass over `O-sec-9` at Bashar's request
+
+Both were introduced by the emailed-code work earlier the same day, and neither would have been
+caught by a test that only asked "can a partner sign in".
+
+**1 · The resend endpoint bypassed the account lockout. (High.)**
+`POST /auth/login/resend-code` verifies a password and — by design, so it cannot be used to
+enumerate accounts — answers `{ ok: true }` whatever the outcome. It did not count a failure. So it
+was a password oracle the five-failure lockout could not see: an attacker could guess there for
+ever while `/auth/login`, the route the lockout watches, stayed untouched. That control is the one
+`docs/auth-rate-limiting.md` calls the heavy lifting against a targeted attack.
+
+The original reasoning — "a resend button should not lock somebody out of their own account" — was
+backwards. A legitimate resend is pressed from step two by somebody whose password has ALREADY been
+accepted; a wrong password there is never a real partner. Failures now count, and a locked account
+is issued no code. Held by two tests in `account-lockout.integration.test.ts`.
+
+**2 · The same endpoint had `SignInRefundInterceptor` on it. (Medium.)**
+The interceptor gives the per-IP hit back when a handler SUCCEEDS — and this handler succeeds every
+time, including for a wrong password. That is the per-IP ceiling switched off on a route that
+spends an Argon2id verify per call: one address could drive password checks across as many accounts
+as it had addresses for, bounded only by the per-(IP, account) ten a minute. Removed, with a note
+on the route saying why it must not come back.
+
+**3 · The sign-in code was logged in clear where no SMTP is configured. (Also fixed.)**
+`MailService` writes a whole mail body to the log when there is no transport, deliberately, so a
+developer can follow the link inside it — safe for a link, not for a mail whose body IS the secret.
+`partnerLoginCodeMail` now sets `sensitive: true`, the flag the two gift-card mails already use for
+exactly this. Held by `mail.templates.test.ts`.
+
+**What the same pass checked and found clean**, so the result is a statement rather than a shrug:
+every `sql.raw` call site (all take literals or module constants; the one that takes a parameter is
+regex-guarded AND passed literals by every caller); parameterisation of every new query;
+the invitation token's lifecycle (hashed at rest, single-use and expiry checked in one atomic
+`UPDATE`, purpose-scoped, one error code for every failure); the ordering of the sign-in checks (a
+code is never emailed on a wrong password, a locked account or a suspended one); and that nothing
+logs a code or a token.
+
+### O-sec-11 — `login_codes` has no expiry sweep
+
+**Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-20
+
+The same gap as `O-sec-6` and it should be closed by the same job: rows accumulate, one per
+sign-in attempt, and nothing deletes a spent or expired one. They carry `ip_address` and
+`user_agent`, so this is a retention question as well as a capacity one.
+
+Consumed and expired rows are harmless — `verify` reads only the newest unconsumed, unexpired code
+— so nothing is wrong today; the table simply grows for ever, which rule 2 forbids.
+
 ### O-partner-8 — FIXED: the partner joining process could not be completed by anybody
 
 **Status:** **FIXED** 2026-08-20 · **Severity:** **High** — the entire partner onboarding, dead ·
