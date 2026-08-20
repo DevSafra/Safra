@@ -315,8 +315,7 @@ async function main(): Promise<void> {
         `INSERT INTO partner_applications (status, submitted_by_user_id, contact_name, email, phone,
                                            legal_name, display_name, partner_type_id, city_id,
                                            address, property_count, website, message,
-                                           preferred_locale, contacted_at, contacted_by_user_id,
-                                           contact_notes, decided_at, decided_by_user_id,
+                                           preferred_locale, decided_at, decided_by_user_id,
                                            decision_notes, partner_id, created_at)
          SELECT st.status,
                 u.id,
@@ -330,10 +329,6 @@ async function main(): Promise<void> {
                 CASE WHEN n % 3 = 0 THEN 'https://load-' || n || '.example' ELSE NULL END,
                 CASE WHEN n % 7 = 0 THEN NULL ELSE 'Load application message ' || n END,
                 (ARRAY['ar','en','de'])[1 + (n % 3)],
-                CASE WHEN st.status <> 'submitted'
-                     THEN now() - ((n % 700) || ' days')::interval + interval '2 days' END,
-                CASE WHEN st.status <> 'submitted' THEN u.id END,
-                CASE WHEN st.status <> 'submitted' THEN 'Load call note ' || n END,
                 CASE WHEN st.status IN ('accepted','rejected')
                      THEN now() - ((n % 700) || ' days')::interval + interval '3 days' END,
                 CASE WHEN st.status IN ('accepted','rejected') THEN u.id END,
@@ -366,6 +361,34 @@ async function main(): Promise<void> {
            OFFSET (n % $2) LIMIT 1
          ) pa`,
         [applicationCount, partnerCount],
+      ),
+    );
+
+    /*
+      The call log, generated separately because a call is a repeating EVENT.
+
+      It used to be three columns on `partner_applications` holding only the most recent call, so
+      generating it was one more value in the INSERT above. Since 2026-08-20 each call is its own
+      row, and load data has to reflect that or the registry's "most recent call" subqueries are
+      measured against an empty table — which is the one shape that is fast for the wrong reason.
+
+      A SECOND call on every third contacted request, so the history has depth rather than exactly
+      one row per application. Dates are spread the same way the applications are, for the same
+      reason: a column that is constant is not the column the console sorts.
+    */
+    await step('partner_application_contacts', () =>
+      exec(
+        `INSERT INTO partner_application_contacts
+           (application_id, contacted_by_user_id, notes, created_at)
+         SELECT a.id, a.submitted_by_user_id,
+                'Load call note ' || c.pass || ' for ' || a.reference,
+                a.created_at + (c.pass || ' days')::interval
+         FROM partner_applications a
+         CROSS JOIN LATERAL (
+           SELECT generate_series(1, CASE WHEN a.property_count % 3 = 0 THEN 2 ELSE 1 END) AS pass
+         ) c
+         WHERE a.status <> 'submitted'
+           AND a.email LIKE 'load-app-%@safra.test'`,
       ),
     );
 

@@ -989,9 +989,15 @@ const partnerApplicationSchema = z.object({
   website: z.string().nullable(),
   message: z.string().nullable(),
   preferredLocale: z.string(),
+  /**
+   * The MOST RECENT call, derived from the call log rather than stored.
+   *
+   * There is no `contactNotes` beside it any more: a request is telephoned as many times as it
+   * takes, and one note field could only hold the last of them — which is what it did, silently,
+   * until 2026-08-20. The notes live in `contacts` on the detail response.
+   */
   contactedAt: z.string().nullable(),
   contactedByEmail: z.string().nullable(),
-  contactNotes: z.string().nullable(),
   decidedAt: z.string().nullable(),
   decidedByEmail: z.string().nullable(),
   decisionNotes: z.string().nullable(),
@@ -1003,7 +1009,25 @@ const partnerApplicationSchema = z.object({
 
 const partnerApplicationsSchema = offsetPage(partnerApplicationSchema);
 
+/**
+ * One telephone call, and the detail response carries every one of them.
+ *
+ * Only the detail: a registry row shows a single «تم الاتصال» date, so fetching a history per row
+ * would be work nobody reads. That is why this extends the shared schema rather than joining it.
+ */
+const applicationContactSchema = z.object({
+  at: z.string(),
+  byEmail: z.string().nullable(),
+  notes: z.string(),
+});
+
+const partnerApplicationDetailSchema = partnerApplicationSchema.extend({
+  contacts: z.array(applicationContactSchema),
+});
+
 export type PartnerApplicationRow = z.infer<typeof partnerApplicationSchema>;
+export type PartnerApplicationDetail = z.infer<typeof partnerApplicationDetailSchema>;
+export type PartnerApplicationContact = z.infer<typeof applicationContactSchema>;
 
 export async function getPartnerApplications(
   params: ListParams & { status?: string | undefined },
@@ -1017,7 +1041,7 @@ export async function getPartnerApplications(
 export async function getPartnerApplication(reference: string) {
   return staffFetch(
     `/admin/partner-applications/${encodeURIComponent(reference)}`,
-    partnerApplicationSchema,
+    partnerApplicationDetailSchema,
   );
 }
 

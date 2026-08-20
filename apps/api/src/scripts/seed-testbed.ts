@@ -1305,7 +1305,20 @@ async function partnershipRequests(db: Seeder): Promise<void> {
     open statuses. Deleting these four fixture addresses is unambiguous, and it also resets a
     request that somebody accepted by hand while testing the screen.
   */
+  /*
+    The call log FIRST, because the applications below cannot go while it references them.
+
+    `partner_application_contacts` has a plain foreign key, NOT `ON DELETE CASCADE`, and that is
+    deliberate: P-003 forbids hard deletes, so the only thing that ever removes an application is
+    this fixture reset. A cascade would exist solely to serve this line while quietly arranging for
+    any future accidental `DELETE` to take a call history with it. Better that such a delete fails
+    loudly and that the one place allowed to do it says so.
+  */
   /* `IN ${array}` — drizzle expands a JS array to a TUPLE, never to an array literal. */
+  await db.execute(sql`
+    DELETE FROM partner_application_contacts
+    WHERE application_id IN (SELECT id FROM partner_applications WHERE email IN ${emails})
+  `);
   await db.execute(sql`DELETE FROM partner_applications WHERE email IN ${emails}`);
 
   /*
@@ -1343,57 +1356,118 @@ async function partnershipRequests(db: Seeder): Promise<void> {
     ),
   );
 
-  await db.insert(schema.partnerApplications).values([
-    {
-      ...base,
-      status: 'submitted' as const,
-      submittedByUserId: applicants[0]?.id,
-      contactName: 'سامر الحلبي',
-      email: 'request-new@safra.test',
-      legalName: 'شركة الحلبي للضيافة',
-      displayName: 'نُزل الحلبي',
-      propertyCount: 3,
-      message: 'لدينا ثلاثة مبانٍ في وسط المدينة ونرغب بعرضها على سفرة.',
-    },
-    {
-      ...base,
-      status: 'contacted' as const,
-      submittedByUserId: applicants[1]?.id,
-      contactName: 'ريم العطار',
-      email: 'request-called@safra.test',
-      legalName: 'مؤسسة العطار السياحية',
-      displayName: 'شقق العطار',
-      contactedAt: new Date(),
-      contactNotes: 'اتصلنا اليوم. النشاط قائم منذ 2019 والسجل التجاري جاهز.',
-    },
-    {
-      ...base,
-      status: 'accepted' as const,
-      submittedByUserId: applicants[2]?.id,
-      contactName: 'وليد بركات',
-      email: 'request-accepted@safra.test',
-      legalName: 'وليد بركات',
-      displayName: 'شقق الميناء',
-      contactedAt: new Date(),
-      contactNotes: 'مكالمة تمهيدية، كل شيء واضح.',
-      decidedAt: new Date(),
-      decisionNotes: 'قُبل. أُرسلت الدعوة والعقد.',
-      ...(partner ? { partnerId: partner.id } : {}),
-    },
-    {
-      ...base,
-      status: 'rejected' as const,
-      submittedByUserId: applicants[3]?.id,
-      contactName: 'خالد ن.',
-      email: 'request-rejected@safra.test',
-      legalName: 'غير محدد',
-      displayName: 'استضافة خاصة',
-      decidedAt: new Date(),
-      decisionNotes: 'لا يوجد ما يثبت حق التأجير، والمدينة خارج نطاق التغطية حالياً.',
-    },
-  ]);
+  /**
+   * A moment N days ago.
+   *
+   * Requests that have been WORKED are back-dated, because a call cannot precede the request it is
+   * about. Seeded straight at `now()` the history read «وصل الطلب 20-08» above «تم الاتصال 14-08»,
+   * a fixture describing something impossible — which this seed is explicit elsewhere about
+   * refusing to do.
+   */
+  const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-  console.log('  4 partnership requests, one in each state');
+  const requests = await db
+    .insert(schema.partnerApplications)
+    .values([
+      {
+        ...base,
+        status: 'submitted' as const,
+        submittedByUserId: applicants[0]?.id,
+        contactName: 'سامر الحلبي',
+        email: 'request-new@safra.test',
+        legalName: 'شركة الحلبي للضيافة',
+        displayName: 'نُزل الحلبي',
+        propertyCount: 3,
+        message: 'لدينا ثلاثة مبانٍ في وسط المدينة ونرغب بعرضها على سفرة.',
+      },
+      {
+        ...base,
+        status: 'contacted' as const,
+        submittedByUserId: applicants[1]?.id,
+        contactName: 'ريم العطار',
+        email: 'request-called@safra.test',
+        legalName: 'مؤسسة العطار السياحية',
+        displayName: 'شقق العطار',
+        createdAt: daysAgo(9),
+      },
+      {
+        ...base,
+        status: 'accepted' as const,
+        submittedByUserId: applicants[2]?.id,
+        contactName: 'وليد بركات',
+        email: 'request-accepted@safra.test',
+        legalName: 'وليد بركات',
+        displayName: 'شقق الميناء',
+        createdAt: daysAgo(12),
+        decidedAt: new Date(),
+        decisionNotes: 'قُبل. أُرسلت الدعوة والعقد.',
+        ...(partner ? { partnerId: partner.id } : {}),
+      },
+      {
+        ...base,
+        status: 'rejected' as const,
+        submittedByUserId: applicants[3]?.id,
+        contactName: 'خالد ن.',
+        email: 'request-rejected@safra.test',
+        legalName: 'غير محدد',
+        displayName: 'استضافة خاصة',
+        createdAt: daysAgo(5),
+        decidedAt: new Date(),
+        decisionNotes: 'لا يوجد ما يثبت حق التأجير، والمدينة خارج نطاق التغطية حالياً.',
+      },
+    ])
+    .returning({
+      id: schema.partnerApplications.id,
+      email: schema.partnerApplications.email,
+    });
+
+  /*
+    The call log, and one request deliberately has TWO calls on it.
+
+    A partnership request is telephoned as many times as it takes, and each call leaves its own
+    note — the thing the old single `contact_notes` column silently overwrote (Bashar, 2026-08-20).
+    A fixture with one call each would render identically whether or not that is fixed, so
+    `request-called@safra.test` carries two: the first learns the register is with the accountant,
+    the second is the follow-up that got it. Opening «سجل الطلب» on that request is what shows the
+    behaviour.
+  */
+  const idFor = (email: string) => requests.find((row) => row.email === email)?.id;
+  const called = idFor('request-called@safra.test');
+  const accepted = idFor('request-accepted@safra.test');
+
+  const calls = [
+    called
+      ? {
+          applicationId: called,
+          notes:
+            'اتصلنا اليوم. النشاط قائم منذ 2019، والسجل التجاري عند المحاسب وسيُرسل خلال أيام.',
+          createdAt: daysAgo(6),
+        }
+      : null,
+    called
+      ? {
+          applicationId: called,
+          notes:
+            'متابعة: وصل السجل التجاري وهو ساري حتى 2027. بقي عقد الإيجار للمبنى الثاني.',
+          createdAt: daysAgo(1),
+        }
+      : null,
+    accepted
+      ? {
+          applicationId: accepted,
+          notes: 'مكالمة تمهيدية، كل شيء واضح.',
+          createdAt: daysAgo(2),
+        }
+      : null,
+  ].filter((call): call is NonNullable<typeof call> => call !== null);
+
+  if (calls.length > 0) {
+    await db.insert(schema.partnerApplicationContacts).values(calls);
+  }
+
+  console.log(
+    `  4 partnership requests, one in each state, with ${calls.length} logged calls`,
+  );
 }
 
 /**

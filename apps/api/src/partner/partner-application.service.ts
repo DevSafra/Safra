@@ -58,9 +58,9 @@ type ApplicationRow = {
   website: string | null;
   message: string | null;
   preferred_locale: string;
+  /** Derived: the most recent call, or null if nobody has rung yet. See `LAST_CONTACT`. */
   contacted_at: string | null;
   contacted_by_email: string | null;
-  contact_notes: string | null;
   decided_at: string | null;
   decided_by_email: string | null;
   decision_notes: string | null;
@@ -113,6 +113,62 @@ type ApplicationRow = {
  * FILED as well as when it is accepted, so an ineligible account is told immediately instead of
  * after a phone call.
  */
+/**
+ * The most recent call on an application, as two SELECT-list scalars.
+ *
+ * ## Why derived rather than cached on the row
+ *
+ * `partner_applications` used to carry `contacted_at`, `contacted_by_user_id` and `contact_notes`,
+ * and every call overwrote all three — which is the defect Bashar reported on 2026-08-20: a second
+ * telephone call destroyed the first one's note. Calls now live in `partner_application_contacts`,
+ * one row each, and "when did we last reach them" is COMPUTED from them. A column kept in step by
+ * hand is a second source of truth, and the version of that column this replaces was wrong.
+ *
+ * ## Why two subqueries and not a `LEFT JOIN LATERAL`
+ *
+ * The registry's count and its list must share one `FROM … WHERE` fragment — the house rule, so a
+ * total can never describe a different set from the rows above it. A join belongs to that
+ * fragment; a SELECT-list scalar does not, so the count is not made to pay for a value it does not
+ * use. Each is an equality on `application_id` and one backward step through
+ * `partner_application_contacts_application_idx`, bounded by the page size.
+ */
+const LAST_CONTACT_AT = sql`(
+  SELECT ac.created_at::text
+  FROM partner_application_contacts ac
+  WHERE ac.application_id = a.id
+  ORDER BY ac.created_at DESC
+  LIMIT 1
+) AS contacted_at`;
+
+const LAST_CONTACT_BY = sql`(
+  SELECT u.email
+  FROM partner_application_contacts ac
+  LEFT JOIN users u ON u.id = ac.contacted_by_user_id
+  WHERE ac.application_id = a.id
+  ORDER BY ac.created_at DESC
+  LIMIT 1
+) AS contacted_by_email`;
+
+/**
+ * How many calls the detail screen will carry.
+ *
+ * Rule 2 forbids an unbounded list in a response, and `contacts` is one: nothing stops a staff
+ * account logging calls all afternoon, and each note is up to 2,000 characters. This is a CEILING
+ * rather than pagination on purpose — a request with two hundred telephone calls on it is a data
+ * problem, not a reader who needs a second page — and the newest are the ones kept, because the
+ * oldest are the ones a reader can afford to lose.
+ *
+ * Reaching it is logged rather than passed over in silence.
+ */
+const MAX_CONTACTS_SHOWN = 200;
+
+/** One logged call, as the console reads it. */
+export interface ApplicationContact {
+  at: string;
+  byEmail: string | null;
+  notes: string;
+}
+
 @Injectable()
 export class PartnerApplicationService {
   private readonly logger = new Logger(PartnerApplicationService.name);
@@ -242,7 +298,6 @@ export class PartnerApplicationService {
       FROM partner_applications a
       JOIN partner_types pt ON pt.id = a.partner_type_id
       JOIN cities c ON c.id = a.city_id
-      LEFT JOIN users cb ON cb.id = a.contacted_by_user_id
       LEFT JOIN users db ON db.id = a.decided_by_user_id
       LEFT JOIN partners p ON p.id = a.partner_id
       WHERE a.deleted_at IS NULL
@@ -261,7 +316,7 @@ export class PartnerApplicationService {
              a.legal_name, a.display_name, pt.code AS partner_type, pt.name_ar AS partner_type_ar,
              c.slug AS city, c.name_ar AS city_ar, a.address, a.property_count, a.website,
              a.message, a.preferred_locale,
-             a.contacted_at::text, cb.email AS contacted_by_email, a.contact_notes,
+             ${LAST_CONTACT_AT}, ${LAST_CONTACT_BY},
              a.decided_at::text, db.email AS decided_by_email, a.decision_notes,
              p.reference AS partner_reference, p.verification::text AS partner_verification,
              a.created_at::text
@@ -290,13 +345,87 @@ export class PartnerApplicationService {
     return Number(rows.rows[0]?.n ?? 0);
   }
 
+  /**
+   * One request, with EVERY call on it.
+   *
+   * The list deliberately carries only the most recent call — a registry row has one line for it,
+   * and fetching a history per row would be work nobody reads. The detail screen is where «سجل
+   * الطلب» is drawn, so it is the one that asks for all of them.
+   */
   async detail(reference: string) {
     const row = await this.rowOf(reference);
 
-    return this.viewOf(row);
+    return { ...this.viewOf(row), contacts: await this.contactsOf(row.id) };
   }
 
-  /** Step 2 — the super admin telephoned them, and says so on the record. */
+  /**
+   * Every logged call on one request, OLDEST first.
+   *
+   * Oldest first because «سجل الطلب» is a history and reads downwards: the request arriving, then
+   * each call, then the decision. Newest-first would put the decision above the calls that led to
+   * it.
+   */
+  private async contactsOf(applicationId: string): Promise<ApplicationContact[]> {
+    /*
+      Newest first INSIDE, oldest first OUTSIDE.
+
+      The cap has to keep the most recent calls, and the screen has to read downwards — so the
+      limit is applied descending and the order reversed afterwards. Taking `LIMIT` off an
+      ascending scan would silently hide the newest calls, which are the ones somebody opened the
+      screen for.
+    */
+    const rows = await this.db.execute<{
+      at: string;
+      by_email: string | null;
+      notes: string;
+    }>(sql`
+      SELECT at::text AS at, by_email, notes FROM (
+        SELECT ac.created_at AS at, u.email AS by_email, ac.notes
+        FROM partner_application_contacts ac
+        LEFT JOIN users u ON u.id = ac.contacted_by_user_id
+        WHERE ac.application_id = ${applicationId}
+        ORDER BY ac.created_at DESC
+        LIMIT ${MAX_CONTACTS_SHOWN}
+      ) recent
+      ORDER BY at ASC
+    `);
+
+    if (rows.rows.length === MAX_CONTACTS_SHOWN) {
+      this.logger.warn(
+        `Application ${applicationId} has at least ${MAX_CONTACTS_SHOWN} logged calls; ` +
+          `the screen is showing the most recent ${MAX_CONTACTS_SHOWN}.`,
+      );
+    }
+
+    /*
+      Cast to text in the OUTER select, so the ordering above still uses the timestamp while the
+      value leaving here is the same rendering `contacted_at::text` produces elsewhere. Two date
+      formats in one response is how a screen ends up comparing them and getting it wrong.
+    */
+    return rows.rows.map((row) => ({
+      at: row.at,
+      byEmail: row.by_email,
+      notes: row.notes,
+    }));
+  }
+
+  /**
+   * Step 2 — the super admin telephoned them, and says so on the record.
+   *
+   * ## Every call is kept, and that is the point (Bashar, 2026-08-20)
+   *
+   * This used to be `SET … contact_notes = $1` against `partner_applications`, so ringing an
+   * applicant a second time OVERWROTE what the first call had learned — along with when it
+   * happened and who made it. «سجل الطلب» could only ever show one «تم الاتصال» line however many
+   * times somebody had rung, and the note that got lost was usually the one that explained why
+   * they were being rung again.
+   *
+   * Reviewing a request is a conversation. So a call is now an INSERT into an append-only table,
+   * and nothing this method does can amend an earlier one.
+   *
+   * The status still moves to `contacted`, and moving it a second time is a no-op rather than an
+   * error: the second call is exactly the case this exists to support.
+   */
   async markContacted(
     claims: AccessTokenClaims | undefined,
     reference: string,
@@ -308,13 +437,39 @@ export class PartnerApplicationService {
       throw badRequest(ERROR.PARTNER_APPLICATION_ALREADY_DECIDED);
     }
 
-    await this.db.execute(sql`
-      UPDATE partner_applications
-      SET status = 'contacted'::partner_application_status,
-          contacted_at = now(), contacted_by_user_id = ${claims?.sub ?? null},
-          contact_notes = ${notes}, updated_at = now()
-      WHERE reference = ${reference}
-    `);
+    /*
+      One transaction, because the note and the status are one fact about the request. A note
+      written against a request that never left `submitted` would leave the queue lying about what
+      has been done to it.
+    */
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        INSERT INTO partner_application_contacts
+          (application_id, contacted_by_user_id, notes)
+        VALUES (${row.id}, ${claims?.sub ?? null}, ${notes})
+      `);
+
+      await tx.execute(sql`
+        UPDATE partner_applications
+        SET status = 'contacted'::partner_application_status, updated_at = now()
+        WHERE reference = ${reference}
+      `);
+    });
+
+    /*
+      The payload records the STATUS TRANSITION, and only when there is one.
+
+      A second call does not move the status — it is already `contacted` — so writing
+      `before: {status: 'contacted'}, after: {status: 'contacted'}` produced an audit entry whose
+      entire content was that nothing had changed. Bashar saw it on سجل التدقيق on 2026-08-20,
+      the first day a second call was possible at all.
+
+      The action itself is the record of the call: `partner_application.contacted` by this actor at
+      this time. The NOTE is deliberately not copied here — it is free prose about a named person,
+      it already lives in `partner_application_contacts`, and duplicating it into an append-only
+      table nobody can redact is the opposite of what §14 asks for.
+    */
+    const moved = row.status !== 'contacted';
 
     await this.audit.record({
       actorUserId: claims?.sub,
@@ -322,8 +477,9 @@ export class PartnerApplicationService {
       action: 'partner_application.contacted',
       subjectType: 'partner_application',
       subjectId: row.id,
-      before: { status: row.status },
-      after: { status: 'contacted' },
+      ...(moved
+        ? { before: { status: row.status }, after: { status: 'contacted' } }
+        : {}),
     });
 
     return this.detail(reference);
@@ -647,14 +803,13 @@ export class PartnerApplicationService {
              a.legal_name, a.display_name, pt.code AS partner_type, pt.name_ar AS partner_type_ar,
              c.slug AS city, c.name_ar AS city_ar, a.address, a.property_count, a.website,
              a.message, a.preferred_locale,
-             a.contacted_at::text, cb.email AS contacted_by_email, a.contact_notes,
+             ${LAST_CONTACT_AT}, ${LAST_CONTACT_BY},
              a.decided_at::text, db.email AS decided_by_email, a.decision_notes,
              p.reference AS partner_reference, p.verification::text AS partner_verification,
              a.created_at::text
       FROM partner_applications a
       JOIN partner_types pt ON pt.id = a.partner_type_id
       JOIN cities c ON c.id = a.city_id
-      LEFT JOIN users cb ON cb.id = a.contacted_by_user_id
       LEFT JOIN users db ON db.id = a.decided_by_user_id
       LEFT JOIN partners p ON p.id = a.partner_id
       WHERE a.reference = ${reference} AND a.deleted_at IS NULL
@@ -696,7 +851,6 @@ export class PartnerApplicationService {
       preferredLocale: row.preferred_locale,
       contactedAt: row.contacted_at,
       contactedByEmail: row.contacted_by_email,
-      contactNotes: row.contact_notes,
       decidedAt: row.decided_at,
       decidedByEmail: row.decided_by_email,
       decisionNotes: row.decision_notes,

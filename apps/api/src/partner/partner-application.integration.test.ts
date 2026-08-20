@@ -285,6 +285,100 @@ describeIfDb('PartnerApplicationService', () => {
       expect(searched.total).toBe(1);
     });
 
+    /**
+     * THE regression this table exists for (Bashar, 2026-08-20).
+     *
+     * `markContacted` used to `SET … contact_notes = $1` on `partner_applications`, so a second
+     * telephone call overwrote the first one's note, its timestamp and whoever made it. «سجل
+     * الطلب» could only ever show one «تم الاتصال» line however many times somebody had rung —
+     * and the note that got lost was usually the one explaining why they were being rung again.
+     */
+    it('keeps every call, and never overwrites an earlier note', async () => {
+      const request = await service.submit(application(), { userId: CUSTOMER_USER_ID });
+
+      await service.markContacted(
+        reviewer,
+        request.reference,
+        'السجل التجاري عند المحاسب.',
+      );
+      await service.markContacted(
+        reviewer,
+        request.reference,
+        'وصل السجل، بقي عقد الإيجار.',
+      );
+      await service.markContacted(reviewer, request.reference, 'اكتمل الملف.');
+
+      const detail = await service.detail(request.reference);
+
+      expect(detail.contacts.map((contact) => contact.notes)).toStrictEqual([
+        'السجل التجاري عند المحاسب.',
+        'وصل السجل، بقي عقد الإيجار.',
+        'اكتمل الملف.',
+      ]);
+    });
+
+    /** Oldest first, so «سجل الطلب» reads downwards: arrival, each call, the decision. */
+    it('returns the calls in the order they happened', async () => {
+      const request = await service.submit(application(), { userId: CUSTOMER_USER_ID });
+
+      await service.markContacted(reviewer, request.reference, 'الأولى');
+      await service.markContacted(reviewer, request.reference, 'الثانية');
+
+      const times = (await service.detail(request.reference)).contacts.map((c) =>
+        Date.parse(c.at),
+      );
+
+      expect(times[0]).toBeLessThanOrEqual(times[1] as number);
+    });
+
+    /** Each call records who made it, so a history of four notes is not four anonymous ones. */
+    it('records the caller on every call', async () => {
+      const request = await service.submit(application(), { userId: CUSTOMER_USER_ID });
+
+      await service.markContacted(reviewer, request.reference, 'مرة');
+      await service.markContacted(reviewer, request.reference, 'مرتان');
+
+      const detail = await service.detail(request.reference);
+
+      expect(detail.contacts).toHaveLength(2);
+      expect(detail.contacts.every((contact) => contact.byEmail !== null)).toBe(true);
+    });
+
+    /**
+     * The registry shows one date per row, and it must be the LATEST call rather than the first —
+     * "when did we last reach them" is the question a queue answers. Derived from the call log, so
+     * it cannot drift from the notes the way the column it replaces did.
+     */
+    it('reports the most recent call on the registry row', async () => {
+      const request = await service.submit(application(), { userId: CUSTOMER_USER_ID });
+
+      await service.markContacted(reviewer, request.reference, 'الأولى');
+      const afterFirst = await service.detail(request.reference);
+
+      await service.markContacted(reviewer, request.reference, 'الثانية');
+      const afterSecond = await service.detail(request.reference);
+
+      expect(afterFirst.contactedAt).not.toBeNull();
+      expect(Date.parse(afterSecond.contactedAt as string)).toBeGreaterThanOrEqual(
+        Date.parse(afterFirst.contactedAt as string),
+      );
+
+      /* And it is the last call's time, not the first's. */
+      const last = afterSecond.contacts.at(-1);
+
+      expect(afterSecond.contactedAt).toBe(last?.at);
+    });
+
+    /** A request nobody has rung has no calls and no date — not an empty-string placeholder. */
+    it('reports no contact at all before anybody rings', async () => {
+      const request = await service.submit(application(), { userId: CUSTOMER_USER_ID });
+      const detail = await service.detail(request.reference);
+
+      expect(detail.contacts).toStrictEqual([]);
+      expect(detail.contactedAt).toBeNull();
+      expect(detail.contactedByEmail).toBeNull();
+    });
+
     /** The badge counts what somebody still has to do — decided requests are not work. */
     it('counts only requests nobody has decided', async () => {
       const before = await service.openCount();

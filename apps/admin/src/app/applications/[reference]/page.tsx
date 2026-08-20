@@ -137,14 +137,29 @@ export default async function PartnerApplicationPage({
             by={null}
             notes={null}
           />
-          {application.contactedAt ? (
+          {/*
+            One line per CALL, not one line for "contacted".
+
+            A request is telephoned as many times as it takes, and each call is its own note —
+            which is what the previous shape could not hold: it kept a single note field and every
+            call overwrote it, so this list showed one «تم الاتصال» however many times somebody had
+            rung (Bashar, 2026-08-20). Ordered oldest first by the API, so the history reads
+            downwards: arrival, each call, the decision.
+          */}
+          {application.contacts.map((contact, index) => (
             <Event
-              when={application.contactedAt}
+              /*
+                The index, and it is the right key here: the list is append-only and ordered by the
+                server, so a call's position never changes. `at` would read better and is not
+                unique by construction — two calls logged in the same transaction share `now()`.
+              */
+              key={index}
+              when={contact.at}
               title={c.contactedAt}
-              by={application.contactedByEmail}
-              notes={application.contactNotes}
+              by={contact.byEmail}
+              notes={contact.notes}
             />
-          ) : null}
+          ))}
           {application.decidedAt ? (
             <Event
               when={application.decidedAt}

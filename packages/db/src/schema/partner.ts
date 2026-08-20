@@ -12,7 +12,14 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
-import { foreignId, money, notDeleted, primaryId, timestamps } from './_shared.js';
+import {
+  createdAt,
+  foreignId,
+  money,
+  notDeleted,
+  primaryId,
+  timestamps,
+} from './_shared.js';
 import {
   partnerApplicationStatus,
   partnerTier,
@@ -116,9 +123,17 @@ export const partnerApplications = pgTable(
     preferredLocale: text('preferred_locale').notNull().default('ar'),
 
     /* ── What we did about it ── */
-    contactedAt: timestamp('contacted_at', { withTimezone: true }),
-    contactedByUserId: foreignId('contacted_by_user_id').references(() => users.id),
-    contactNotes: text('contact_notes'),
+    /*
+      There is no `contacted_at`/`contact_notes` here, and the absence is the fix.
+
+      They used to live on this row and were OVERWRITTEN by every call: a second telephone call
+      destroyed the first one's note, its timestamp and the name of whoever made it. Reported by
+      Bashar (2026-08-20) from the screen where it shows — «سجل الطلب» could only ever display one
+      «تم الاتصال» line, however many times somebody had rung.
+
+      A call is a repeating EVENT, so it is a row in `partner_application_contacts`, and "when did
+      we last reach them" is derived from those rows rather than cached here. See that table.
+    */
 
     decidedAt: timestamp('decided_at', { withTimezone: true }),
     decidedByUserId: foreignId('decided_by_user_id').references(() => users.id),
@@ -151,6 +166,67 @@ export const partnerApplications = pgTable(
     uniqueIndex('partner_applications_open_email_unique')
       .on(sql`lower(${t.email})`)
       .where(sql`status IN ('submitted', 'contacted') AND deleted_at IS NULL`),
+  ],
+);
+
+/**
+ * Every telephone call to an applicant, one row each.
+ *
+ * ## Why this table exists
+ *
+ * Reviewing a partner request is a CONVERSATION, not a single event. An operator rings, learns
+ * that the commercial register is with the accountant, rings again a week later, learns something
+ * else. Each call produces a note worth keeping, and the previous note is exactly the context that
+ * makes the next call useful.
+ *
+ * The three columns this replaces (`contacted_at`, `contacted_by_user_id`, `contact_notes`) lived
+ * on `partner_applications` and were overwritten by `SET … contact_notes = $1` on every call, so
+ * the record kept only the most recent one and silently discarded the rest. Bashar reported it
+ * from «سجل الطلب» on 2026-08-20.
+ *
+ * ## Append-only, deliberately
+ *
+ * `createdAt` rather than `...timestamps`, which is this codebase's marker for a table nobody may
+ * amend — "a row that can be amended is not an audit trail" (`_shared.ts`). That is the whole
+ * point here: the defect being fixed was an amendment nobody asked for. A note that was wrong is
+ * corrected by writing another one, the way a call log works on paper.
+ *
+ * ## No separate `contacted_at`
+ *
+ * `created_at` IS when the call was logged, and the console has no field for back-dating one. A
+ * second column would be a second thing to keep true, and the first time they disagreed nobody
+ * would know which was the call. Add it the day the screen grows a date picker, not before.
+ */
+export const partnerApplicationContacts = pgTable(
+  'partner_application_contacts',
+  {
+    id: primaryId(),
+    applicationId: foreignId('application_id')
+      .notNull()
+      .references(() => partnerApplications.id),
+    /**
+     * Who made the call. Nullable for the same reason the column it replaces was: a staff account
+     * can be removed, and losing the note because we lost the caller would be the worse trade.
+     */
+    contactedByUserId: foreignId('contacted_by_user_id').references(() => users.id),
+    /** What was said. Never empty — the endpoint rejects a blank note before it reaches here. */
+    notes: text('notes').notNull(),
+    ...createdAt,
+  },
+  (t) => [
+    /**
+     * The history of one request, and the newest call on it.
+     *
+     * ASCENDING on purpose, though the newest is what the registry asks for. `application_id` is
+     * an equality predicate, so the remaining order is `created_at DESC` alone and PostgreSQL
+     * reads this index BACKWARD to serve it. Writing it `.desc()` would emit `DESC NULLS LAST`,
+     * which does not match PostgreSQL's own `ORDER BY … DESC` (`NULLS FIRST`) — the mismatch that
+     * cost this very file a sequential scan at 765 buffers on 2026-08-20, recorded a few lines up.
+     */
+    index('partner_application_contacts_application_idx').on(
+      t.applicationId,
+      t.createdAt,
+    ),
   ],
 );
 

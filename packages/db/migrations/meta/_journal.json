@@ -239,6 +239,13 @@
       "when": 1787217956379,
       "tag": "0033_young_patriot",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1787234379846,
+      "tag": "0034_oval_elektra",
+      "breakpoints": true
     }
   ]
 }
