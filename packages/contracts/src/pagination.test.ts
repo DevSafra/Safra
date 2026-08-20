@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { COUNT_CAP, offsetPage, pageQuerySchema } from './pagination.js';
+import { COUNT_CAP, MAX_PAGE_NUMBER, offsetPage, pageQuerySchema } from './pagination.js';
 
 /**
  * The page arithmetic, which is the whole of what `offsetPage` is for.
@@ -103,8 +103,28 @@ describe('pageQuerySchema', () => {
     expect(pageQuerySchema.safeParse({ limit: 101 }).success).toBe(false);
   });
 
+  /**
+   * Lowered from 100,000 to 1,000 on 2026-08-20 (`O-page-1`), on a measurement rather than a
+   * guess: at 100,000 one request read 2.5 million rows to return 25 — about 20 GB of page
+   * accesses, repeatable by any authenticated staff account. 1,000 is where the sort starts
+   * spilling to disk.
+   */
+  it('accepts the last page it will serve', () => {
+    expect(pageQuerySchema.safeParse({ page: MAX_PAGE_NUMBER }).success).toBe(true);
+  });
+
   it('rejects a page past the ceiling', () => {
+    expect(pageQuerySchema.safeParse({ page: MAX_PAGE_NUMBER + 1 }).success).toBe(false);
     expect(pageQuerySchema.safeParse({ page: 100_001 }).success).toBe(false);
+  });
+
+  /**
+   * The console clamps to this same constant before calling. Two literals named "the ceiling"
+   * would drift, and the failure is silent in the direction that matters — a console clamping to
+   * a number the API refuses turns every over-range URL into the 400 the clamp exists to prevent.
+   */
+  it('is the ceiling the console clamps to', () => {
+    expect(MAX_PAGE_NUMBER).toBe(1_000);
   });
 
   it('rejects page zero and negative pages', () => {

@@ -9,7 +9,7 @@
  * its `.strict()` schema would reject with a 400 and turn a stray submit into an error page.
  */
 
-import { DEFAULT_TABLE_PAGE_SIZE } from '@safra/contracts';
+import { DEFAULT_TABLE_PAGE_SIZE, MAX_PAGE_NUMBER } from '@safra/contracts';
 
 /**
  * Rows per page when nobody has chosen — ten, everywhere (Bashar, 2026-08-06).
@@ -34,13 +34,18 @@ export const MIN_PAGE_SIZE = 1;
 export const MAX_PAGE_SIZE = 100;
 
 /**
- * The highest page number a URL may ask for, matching the contract.
+ * The highest page number a URL may ask for — the contract's own constant, re-exported.
  *
  * The ceiling is what stops `?page=1e9` from being a cheap way to make the database scan a
  * billion rows and throw them away — an OFFSET is paid for in full before the first row is
  * returned, so a page number is an expensive thing to accept unbounded.
+ *
+ * It used to be a second literal here, kept in step by hand. It is not any more: the clamp only
+ * turns a bad URL into a table while it agrees with the schema that would otherwise answer 400,
+ * and 2026-08-20 lowered the ceiling from 100,000 to 1,000 — the exact kind of change that leaves
+ * a hand-copied number behind. See `MAX_PAGE_NUMBER` in `@safra/contracts`.
  */
-export const MAX_PAGE = 100_000;
+export const MAX_PAGE = MAX_PAGE_NUMBER;
 
 export interface ListParams {
   readonly q: string | undefined;

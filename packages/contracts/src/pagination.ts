@@ -122,16 +122,55 @@ export function decodeCursor(
  * The customer-facing lists — booking history, wallet statement — stay on the cursor. They are
  * "load more" surfaces where nobody asks for page 40, so they pay none of this.
  */
+/**
+ * The highest page number the API will accept, and the value the console clamps to.
+ *
+ * Exported rather than written twice. The console clamps BEFORE calling so a hand-edited `?page=`
+ * shows a table rather than an error page — which only works while the clamp and the schema agree.
+ * Two constants named "the ceiling" in two packages is one more than can stay in step, and the
+ * failure is silent in the direction that matters: a console clamping to a number the API refuses
+ * turns every over-range URL into the 400 the clamp exists to prevent.
+ *
+ * Lowered from 100,000 to 1,000 on 2026-08-20 — the reasoning, and the measurement it came from,
+ * are on `page` below.
+ */
+export const MAX_PAGE_NUMBER = 1_000;
+
 export const pageQuerySchema = z
   .object({
     /**
      * 1-based, because a person reads it.
      *
-     * Capped at 100,000: past there the OFFSET cost is not worth serving, and nobody reaches page
-     * 100,000 by intent. A refusal rather than a clamp, so a wrong URL is visible instead of
-     * quietly showing page 1.
+     * A refusal rather than a clamp, so a wrong URL is visible instead of quietly showing page 1.
+     *
+     * ## Capped at 1,000 since 2026-08-20, down from 100,000 (Bashar, `O-page-1`)
+     *
+     * The original 100,000 was a guess at "nobody reaches this by intent". Scenario 3 of the load
+     * test measured what it actually costs, over 5,000,061 bookings — buffers the database had to
+     * read, which is a property of the plan rather than of the hardware:
+     *
+     * | Page    | Rows read | Returned | Buffers                 |
+     * | ------- | --------- | -------- | ----------------------- |
+     * | 1       | 27        | 25       | 144                     |
+     * | 100     | 2,500     | 25       | 9,914                   |
+     * | 1,000   | 25,000    | 25       | 87,069 + 5,254 written  |
+     * | 100,000 | 2,500,000 | 25       | 2,663,104               |
+     *
+     * The plan is the right plan at every depth — an index scan feeding an incremental sort, no
+     * sequential scan and no missing index — so there is nothing to optimise: the cost is inherent
+     * to `OFFSET` and linear in `page × limit`. The only dial is the ceiling, and at 100,000 a
+     * single request read 2.5 million rows to return 25, roughly 20 GB of page accesses, which any
+     * authenticated staff account could ask for repeatedly.
+     *
+     * 1,000 is where the sort begins spilling to disk, and it is 40× past anything a person
+     * reaches by hand. It bounds the worst case at ~87,000 buffers, a 30× reduction in the cap.
+     *
+     * **What it breaks, deliberately:** a script walking pages to enumerate a registry now gets a
+     * 400 at page 1,001. That was always the wrong instrument — such a caller should use the
+     * keyset endpoints or narrow with a date filter, which is what `O-page-1` says the real fix
+     * for depth is.
      */
-    page: z.coerce.number().int().min(1).max(100_000).default(1),
+    page: z.coerce.number().int().min(1).max(MAX_PAGE_NUMBER).default(1),
     /** Same ceiling as the cursor query — an unbounded list endpoint is a DoS vector. */
     limit: z.coerce.number().int().min(1).max(100).default(25),
   })
