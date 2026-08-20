@@ -14,6 +14,7 @@ export const en = {
   'request.upstream_unreachable': 'Could not reach the server. Please try again.',
   'request.unknown': 'Something went wrong. Please try again.',
   'request.too_many': 'Too many requests. Please wait a moment and try again.',
+  'request.capacity': 'The service is busy right now. Please try again in a moment.',
   'auth.required': 'Authentication required.',
   'auth.credentials_invalid': 'Invalid email or password.',
   'auth.password_incorrect': 'Password is incorrect.',

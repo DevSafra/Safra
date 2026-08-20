@@ -15,6 +15,8 @@ export const de = {
   'request.unknown': 'Etwas ist schiefgelaufen. Bitte erneut versuchen.',
   'request.too_many':
     'Zu viele Anfragen. Bitte einen Moment warten und erneut versuchen.',
+  'request.capacity':
+    'Der Dienst ist derzeit ausgelastet. Bitte in einem Moment erneut versuchen.',
   'auth.required': 'Anmeldung erforderlich.',
   'auth.credentials_invalid': 'E-Mail-Adresse oder Passwort ist falsch.',
   'auth.password_incorrect': 'Das Passwort ist falsch.',

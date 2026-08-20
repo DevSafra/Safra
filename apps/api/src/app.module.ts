@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 
@@ -38,6 +38,7 @@ import {
   accountTracker,
   skipUnlessAccountNamed,
 } from './common/throttle/account-tracker.js';
+import { AppExceptionFilter } from './common/errors/app-exception.filter.js';
 import { CodedThrottlerGuard } from './common/throttle/coded-throttler.guard.js';
 import { ENV, type Env } from './config/env.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
@@ -126,6 +127,15 @@ import { VerifiedPartnerGuard } from './rbac/verified-partner.guard.js';
     MetricsModule,
   ],
   providers: [
+    /*
+      The global exception filter (`O-api-1`).
+
+      First in the list because it is the only provider here that acts on the way OUT, and reading
+      it first is the shortest route to "what does a client actually receive". It maps a database
+      pool acquisition timeout to a coded 503 with `Retry-After`, gives every other unhandled error
+      the translatable `request.unknown`, and leaves every `HttpException` exactly as it was.
+    */
+    { provide: APP_FILTER, useClass: AppExceptionFilter },
     // Order matters: throttling runs first (cheapest rejection), then
     // authentication, then authorization. Never spend a database round trip on a
     // request that a rate limiter was going to reject anyway.

@@ -41,6 +41,21 @@ export const ERROR = {
    * rather than `auth.` because the global throttler covers every route, not only sign-in.
    */
   REQUEST_TOO_MANY: 'request.too_many',
+  /**
+   * The platform is at capacity — not broken, and worth retrying.
+   *
+   * Answers a 503 with `Retry-After` where the request never reached the database because no
+   * connection could be acquired within `connectionTimeoutMillis`. Measured on 2026-08-20: 1,680
+   * of 12,231 requests under scenario 2's deliberate lock concentration answered a bare 500, which
+   * is the wrong answer twice over — a client is told not to retry something that would have
+   * worked a second later, and the 5xx alert in `docs/alerting.md` pages somebody for load.
+   *
+   * Distinct from `request.upstream_unreachable`, which is a THIRD party we could not reach, and
+   * from every other 503 in this catalogue, which name a specific dependency that is down. This
+   * one says the work never started, so retrying it is safe even for a write. See
+   * `AppExceptionFilter` for the exact set of conditions that qualify.
+   */
+  REQUEST_CAPACITY: 'request.capacity',
   AUTH_REQUIRED: 'auth.required',
   AUTH_CREDENTIALS_INVALID: 'auth.credentials_invalid',
   AUTH_PASSWORD_INCORRECT: 'auth.password_incorrect',

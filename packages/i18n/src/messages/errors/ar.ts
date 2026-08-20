@@ -13,6 +13,7 @@ export const ar = {
   'request.upstream_unreachable': 'تعذّر الوصول إلى الخادم. حاول مرة أخرى.',
   'request.unknown': 'حدث خطأ ما. حاول مرة أخرى.',
   'request.too_many': 'طلبات كثيرة جداً. انتظر قليلاً ثم حاول مرة أخرى.',
+  'request.capacity': 'الخدمة مشغولة حالياً. أعد المحاولة بعد لحظات.',
   'auth.required': 'يجب تسجيل الدخول.',
   'auth.credentials_invalid': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
   'auth.password_incorrect': 'كلمة المرور غير صحيحة.',

@@ -1,6 +1,10 @@
 import { Logger } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 
+import { ERROR } from '@safra/contracts';
+
+import { responseErrorCode } from './response-error-code.js';
+
 /**
  * Probes run every few seconds per replica and would drown everything else. They
  * are the one thing genuinely not worth a line each.
@@ -40,8 +44,12 @@ const logger = new Logger('Request');
  * partner references are identifiers rather than secrets, and an access log without
  * them cannot answer what it exists for.
  *
- * Level follows the status. Logging every rejected request at `error` would make the
- * level meaningless; a 4xx is a warning worth counting, a 5xx is a real error.
+ * Level follows the status, with ONE exception. Logging every rejected request at `error` would
+ * make the level meaningless; a 4xx is a warning worth counting, a 5xx is a real error. The
+ * exception is `request.capacity` — a 503 that says the pool was full and the request never
+ * started. That is the platform reporting its own load, not breakage, and at `error` it would be
+ * indistinguishable from the 500s that must page somebody (`O-api-1`, and signal 12 in
+ * `docs/alerting.md`). The code is left on the response by `AppExceptionFilter`.
  */
 export function requestLogMiddleware(
   request: Request,
@@ -63,10 +71,18 @@ export function requestLogMiddleware(
     const ms = Number(process.hrtime.bigint() - started) / 1_000_000;
     const { statusCode } = response;
 
-    // `request.path` only — never `originalUrl`, which carries the query string.
-    const line = `${request.method} ${request.path} ${statusCode} ${ms.toFixed(1)}ms`;
+    const code = responseErrorCode(response);
 
-    if (statusCode >= 500) logger.error(line);
+    /*
+      `request.path` only — never `originalUrl`, which carries the query string. The error code is
+      appended because it is what makes the line QUERYABLE: "5xx that are not request.capacity" is
+      the alert, and deriving it from prose is how alerting rules rot.
+    */
+    const line =
+      `${request.method} ${request.path} ${statusCode} ${ms.toFixed(1)}ms` +
+      (code ? ` ${code}` : '');
+
+    if (statusCode >= 500 && code !== ERROR.REQUEST_CAPACITY) logger.error(line);
     else if (statusCode >= 400) logger.warn(line);
     else logger.log(line);
   });
