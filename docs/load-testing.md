@@ -1,9 +1,14 @@
 # Load testing plan
 
-Ready to execute the day a deployment target exists. Nothing here needs further design.
+Ready to execute the day a deployment target exists. Nothing here needs further design — and as of
+2026-08-20 the scenarios have been run rather than only written, which is not the same claim.
 
-**Status: the harness is BUILT; no capacity run has happened.** Since 2026-08-12 the generator and
-all six k6 scenarios exist, so the day infrastructure appears the test runs rather than starts.
+**Status: scenarios 1–4 have been EXECUTED for their locally-honest half; no capacity run has
+happened.** Since 2026-08-12 the generator and all six k6 scenarios exist. On 2026-08-20 scenarios 2,
+3 and 4 were run against `safra_load` at the documented volumes — see
+**`docs/load-test-results-2026-08-20.md`** — which found **fifteen defects, twelve fixed**, and
+corrected three scenarios that could not have produced a result at all. Scenarios 5 and 6 need
+infrastructure.
 
 **No capacity number has been claimed anywhere in this repository, and none should be** until this
 has been executed against real infrastructure — a figure measured on a laptop is worse than no
@@ -24,10 +29,22 @@ does NOT cover the two things a local run answers honestly, and both are worth h
   unfiltered search and **39.7 s → 166 ms** for a city, via four plan-preserving query changes, three
   partial indexes, and choosing the page before pricing it where the ranking allows. One case is left
   at 2.75 s — `price_asc` with no filters, which cannot know its page without pricing everything.
+- **Thirteen more on 2026-08-20**, from scenarios 2, 3 and 4. Two uncapped full scans on console
+  request paths (239,855 buffers on every page view of the bookings registry, 765 on «طلبات الشراكة»);
+  a per-account rate limiter bypassable _and aimable_ with a forged `X-Forwarded-For`; an idempotency
+  claim held for 24 hours after a failure while masking the real error; four customer-facing refusals
+  carrying English sentences with no error code. Full record in the results document.
 
-Both were invisible to every test, every review and every environment, and visible immediately to a
-million rows. That is the argument for building this harness before the hosting decision rather than
-after.
+All of them were invisible to every test, every review and every environment, and visible immediately
+to a million rows. That is the argument for building this harness before the hosting decision rather
+than after.
+
+**And three of the scenarios could not produce a result at all**, which is the second argument: a
+harness nobody has run is a harness nobody has tested. Scenario 2 was silently capped at ten booking
+attempts a minute by a route-level `@Throttle` that `THROTTLE_DEFAULT_LIMIT` cannot reach, and
+reported every threshold green. Scenario 3 asked for a route that does not exist. Scenario 4's
+bystander starved itself. See "Raise the throttle first" below, which is necessary and was not
+sufficient.
 
 ## Running it
 
@@ -56,11 +73,42 @@ excellent because refusing a request is fast. Start the API under test with
 any run that did not do so as void. The limiter deserves
 its own measurement, which is scenario 4's job and nobody else's.
 
+**That is necessary and NOT sufficient, learned 2026-08-20.** A route-level `@Throttle` decorator
+overrides the named throttler for its handler, and the environment variable cannot reach it. Two of
+them matter here: `POST /bookings` allows **ten a minute** and `POST /auth/login` **forty**. Run
+exactly as documented above, scenario 2 got ten booking attempts a minute through and refused
+2,259,751 requests — **and passed every threshold**, because refusing a request is fast and a 409 is
+expected by design. `grep -rn "@Throttle" apps/api/src` before trusting a run, and check the routes
+the scenario actually calls. Scenario 2 now presents each attempt as a distinct source address, which
+models 200 customers rather than evading the control; the limitation is stated in the script, and it
+only works where the generator is the direct client.
+
+**Two prerequisites the scenarios cannot create for themselves**, both added 2026-08-20 because three
+of the six could not start without them:
+
+```bash
+pnpm load:accounts          # the FX rate, a staff account with TOTP enrolled, the bystander,
+                            # and scenario 4's victim accounts. Re-runnable: it clears lockouts
+export LOAD_STAFF_TOKEN="$(pnpm -s load:token)"   # scenario 3's registries are authorised per request
+```
+
+`db:seed` deliberately seeds no FX rate, so without `load:accounts` every booking quote answers 503
+and scenario 2 reads as a booking defect.
+
+**The default credentials are published, and refuse to leave localhost.** `load:accounts` writes a
+`super_admin` whose password is in this repository — deliberately, because a harness whose passwords
+have to be discovered is a harness that does not run. It refuses any database whose name lacks `load`,
+and off localhost it refuses the published defaults entirely: `LOAD_STAFF_PASSWORD`,
+`LOAD_BYSTANDER_PASSWORD`, `LOAD_VICTIM_PASSWORD` and `LOAD_STAFF_TOTP_SECRET` must all be supplied,
+and the banner stops echoing them. `load:token` likewise refuses to send the fixed password anywhere
+but a local API. **The capacity run against provisioned infrastructure must set all four.**
+
 ---
 
-## Why it cannot be run now, precisely
+## Why the CAPACITY numbers cannot be produced yet, precisely
 
-Not because the tooling is missing. Because **the numbers would describe the wrong system**:
+Not because the tooling is missing, and no longer because nothing has been run. Because **the
+numbers would describe the wrong system**:
 
 - A laptop's PostgreSQL has different IO, different `shared_buffers`, and no network latency to the
   application.
@@ -187,6 +235,13 @@ Four things about it are decisions rather than details:
   append-only tables reject TRUNCATE by trigger, so there is no cleaning up after a partial run.
 - **`availability_days` stays 365 days per unit at every scale.** A unit with four days of calendar is
   not a smaller version of a real unit; scale reduces the NUMBER of units instead.
+- **`created_at` is spread WITHIN each statement, added 2026-08-20.** `now()` is the transaction
+  timestamp, so one statement per rung gave one timestamp per rung: 5,000,061 bookings across 86
+  distinct values, all 200,000 `confirmed` rows sharing exactly one. That does not merely look untidy,
+  it invalidates measurements — the console's default order is `created_at DESC, id DESC`, so every
+  plan measured over that data was a sort over a nearly constant column, and one query read 236,526
+  buffers for a reason that had nothing to do with the query. Fixed for `bookings`, `audit_log` and
+  `ledger_entries`, from a deterministic per-row offset so a regenerated database stays comparable.
 
 Measured throughput on a development laptop: ~150,000 availability rows/second, so the full 73M rows
 take about eight minutes and the whole set roughly 25 GB.
@@ -211,6 +266,16 @@ zero orphaned payments, `notifications` all terminal. **`pnpm load:invariants` r
 exits non-zero on a violation, so it can gate a run in CI. It reads only, so it is safe to point at a
 real environment after a run there — and it prints the row counts it checked over, because "all
 invariants hold" over an empty database is not a result.
+
+**That last sentence earned itself twice.** On 2026-08-20 the printed counts showed `payments=0` and
+`notifications=0`, so two of the four invariants passed over nothing — the generator writes neither,
+and that is outstanding work. And the double-booking check itself could not see a double booking: it
+tested `GROUP BY unit_id, check_in`, which finds only two live bookings sharing an IDENTICAL check-in
+date, while the constraint forbids any OVERLAP. Aug 1–5 against Aug 3–7 on one unit printed `ok`. The
+queries now live in `packages/db/src/scripts/load-invariants.ts` so they can be TESTED, and
+`load-invariants.integration.test.ts` drops the exclusion constraint inside a rolled-back transaction,
+writes the overlap it would have refused, and requires the check to find it. **An invariant nobody has
+watched fail is an invariant nobody has tested.**
 
 ---
 

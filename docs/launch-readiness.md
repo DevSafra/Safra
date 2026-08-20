@@ -79,12 +79,35 @@ list without his agreement, and nothing leaves it without evidence.
 | 7   | **WhatsApp provider selection**                        | Bashar (vendor)     | —          | roadmap 192                       |
 | 8   | **Fine-deduction policy decision**                     | Bashar              | —          | `D-fine-1`                        |
 | 9   | **Monitoring deployment and on-call ownership**        | Infrastructure      | 1          | `docs/alerting.md` — **contract** |
-| 10  | **Load-testing execution and validation**              | Engineering         | 1          | `docs/load-testing.md`            |
+| 10  | **Load-testing execution and validation**              | Engineering         | 1 ¹        | `docs/load-testing.md`            |
 
 **Item 1 gates five others** (2, 4, 5, 9, 10). It is the single highest-leverage decision available
 and everything downstream of it is already specified.
 
 **Items 3, 6, 7 and 8 do not depend on hosting** and can proceed in parallel today.
+
+**¹ Item 10 is partly discharged, 2026-08-20.** The capacity run still needs the deployment target and
+**no capacity figure has been produced or should be quoted**. What was executed is the half
+`docs/load-testing.md` says is honest without infrastructure — query plans and business invariants —
+for scenarios 2 (booking contention), 3 (deep pagination) and 4 (authentication under attack), against
+`safra_load` at the documented volumes.
+
+**Fifteen defects, twelve fixed.** Full record: **`docs/load-test-results-2026-08-20.md`**. The three
+that change the launch picture:
+
+|                                       |                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Confirmed sound**                   | The `daterange` exclusion constraint held under 10,550 contended attempts on 20 units — zero double bookings. The five-attempt account lockout fires and holds under a distributed attack. Every auth refusal is generic, so the endpoint is not an enumeration oracle under load. Zero 5xx across 2.4M auth requests                                                                                                                                       |
+| **New, needs a decision from Bashar** | `O-sec-3` — a legitimate customer on an attacked egress address signed in **0 times out of 30**. The per-IP ceiling of 40/min on `/auth/login` is shared by everyone behind one address, and 40/min is 0.67/s: an attacker at one request per second denies sign-in to that address about a third of the time. For a market behind carrier-grade NAT that is live availability risk. Recommended fix: count only FAILED sign-ins against the per-IP ceiling |
+| **New, engineering**                  | `O-api-1` — pool exhaustion answers 500 rather than a coded 503, so a capacity condition will page whoever owns the 5xx signal in `docs/alerting.md`. The body is generic, verified: no SQL, no parameters, no PII                                                                                                                                                                                                                                          |
+
+Two security defects were found and **fixed**: the per-account rate limiter could be bypassed _and
+aimed_ with a forged `X-Forwarded-For` (16 of 16 attempts got through), and a failed idempotency
+release left a booking claim held for 24 hours while masking the real error. Neither was reachable at
+fixture volumes.
+
+**Scenarios 5 (media/CDN) and 6 (12-hour soak) remain deferred** — both need infrastructure rather
+than a decision.
 
 ### What is NOT on this list, and why
 
@@ -217,7 +240,9 @@ Full specification with thresholds in `docs/alerting.md`. **Sixteen signals, six
 2. Provision, deploy, verify TLS/HSTS/CSP.
 3. Backups **and a restore drill**.
 4. Point a scraper at `/internal/metrics`, load the rule file, arm an on-call rota.
-5. Write the data generator; run the load test; fix what it finds.
+5. ~~Write the data generator~~ (done 2026-08-12); ~~run the scenarios that do not need
+   infrastructure~~ (done 2026-08-20, 12 of 15 defects fixed); **run the capacity test on the
+   provisioned environment and fix what it finds.**
 6. Activate the sanctions feed.
 7. Payment gateway with a reconciled test transaction.
 8. Penetration test.

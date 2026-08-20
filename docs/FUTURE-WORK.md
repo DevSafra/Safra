@@ -6,7 +6,14 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for who must act
 > on what, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-04 — **the Super Admin console is complete against the design handoff.**
+**Last updated:** 2026-08-20 — **the locally-honest half of launch blocker #10 has been executed.**
+Scenarios 2, 3 and 4 of `docs/load-testing.md` ran against `safra_load` at the documented volumes for
+the first time: **fifteen defects, twelve fixed**, and no capacity figure produced or claimed. The
+exclusion constraint held under real contention; the account lockout holds; `O-sec-1`'s bystander
+property does not. Full record: `docs/load-test-results-2026-08-20.md`. New items needing a decision
+from Bashar: **`O-sec-3`** (an attacked address cannot sign in) and the **`O-page-1` ceiling**.
+
+**Previously, 2026-08-04 — the Super Admin console is complete against the design handoff.**
 All 19 sections implemented and verified over three passes, with **no backend work outstanding**.
 Staff scope is enforced server-side in both modes and booking exports are audited. The only
 remaining gaps are externally blocked and neither is console work. Full gap analysis, the four
@@ -115,27 +122,37 @@ difference.
 | 7   | WhatsApp provider selection                        | Bashar              | no         |
 | 8   | Fine-deduction policy decision                     | Bashar              | no         |
 | 9   | Monitoring deployment and on-call ownership        | Infrastructure      | yes        |
-| 10  | Load-testing execution and validation              | Engineering         | yes        |
+| 10  | Load-testing execution and validation              | Engineering         | yes ¹      |
 
 Full detail, ownership and specification pointers in **`docs/launch-readiness.md` §4**. Items 3, 6,
 7 and 8 need no infrastructure and can start today.
+
+**¹ Blocker 10 is partly discharged.** The capacity run still needs the deployment target and no
+capacity figure has been produced. But the half `docs/load-testing.md` says is honest without
+infrastructure — query plans and business invariants — was executed on 2026-08-20 for scenarios 2, 3
+and 4, and found **fifteen defects, twelve now fixed**, including two uncapped full scans on console
+request paths, a per-account rate limiter that could be bypassed and aimed with a forged header, and an
+idempotency claim that stayed held for 24 hours after a failure. See
+`docs/load-test-results-2026-08-20.md` and `S-3`. **It also produced one new item needing Bashar's
+decision: `O-sec-3`** — an attacked egress address cannot sign in at all.
 
 ## 1b. Where the remaining work is written down
 
 **Engineering is complete. Everything below this line is operational, and every item now has a
 document that makes it executable without further discovery.**
 
-| Document                         | What it settles                                                                                                            |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `docs/launch-readiness.md`       | The whole picture: components, risks, blockers, security, DR, monitoring, infrastructure, vendors, legal. **Start here.**  |
-| `docs/alerting.md`               | 16 signals with thresholds and severities; the 4 integration points; the one endpoint still to build                       |
-| `docs/load-testing.md`           | 6 scenarios, success criteria, production-shaped data volumes, k6, what to do when it fails                                |
-| `docs/malware-scanning.md`       | Four options weighed; ClamAV sidecar recommended for identity documents only, with the reasoning for excluding photographs |
-| `docs/media-integrity.md`        | What is closed, and the one invariant only a deployment can enforce                                                        |
-| `docs/background-jobs-design.md` | BullMQ: 5 queues, retries, dead letters, scheduler migration, backup implications, 6-phase rollout, ~14 days               |
-| `docs/notifications.md`          | What is sent, to whom, and how to prove it                                                                                 |
-| `docs/runbook-scheduled-jobs.md` | On-call procedure for the two cron jobs                                                                                    |
-| `docs/auth-rate-limiting.md`     | The throttling design and its honest residual                                                                              |
+| Document                               | What it settles                                                                                                            |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `docs/launch-readiness.md`             | The whole picture: components, risks, blockers, security, DR, monitoring, infrastructure, vendors, legal. **Start here.**  |
+| `docs/alerting.md`                     | 16 signals with thresholds and severities; the 4 integration points; the one endpoint still to build                       |
+| `docs/load-testing.md`                 | 6 scenarios, success criteria, production-shaped data volumes, k6, what to do when it fails                                |
+| `docs/load-test-results-2026-08-20.md` | **Scenarios 2, 3 and 4 executed.** 15 defects, 12 fixed. The `O-page-1` curve. No capacity figure, and why                 |
+| `docs/malware-scanning.md`             | Four options weighed; ClamAV sidecar recommended for identity documents only, with the reasoning for excluding photographs |
+| `docs/media-integrity.md`              | What is closed, and the one invariant only a deployment can enforce                                                        |
+| `docs/background-jobs-design.md`       | BullMQ: 5 queues, retries, dead letters, scheduler migration, backup implications, 6-phase rollout, ~14 days               |
+| `docs/notifications.md`                | What is sent, to whom, and how to prove it                                                                                 |
+| `docs/runbook-scheduled-jobs.md`       | On-call procedure for the two cron jobs                                                                                    |
+| `docs/auth-rate-limiting.md`           | The throttling design and its honest residual                                                                              |
 
 ## 2. Standing decisions that constrain all future work
 
@@ -224,6 +241,13 @@ perfection — §10 records the residual security risk honestly.
 | **Media address checked at boot** — probes a key that cannot exist; 404 passes, 403 fails, reported on readiness and fatal under `MEDIA_REQUIRE_PUBLIC`                                                                                                                                                                                                                                     | 2026-08-08    |
 | **Batch image upload and a units editor** — a gallery is filled in one go, sequentially so cover and order stay deterministic; every unit editable on one screen even after publication                                                                                                                                                                                                     | 2026-08-08    |
 | **The seed refuses to describe something impossible** — five assertions at seed time, proven against the exact regression that cost an hour                                                                                                                                                                                                                                                 | 2026-08-08    |
+
+### 🔬 Load testing — the half that needed no infrastructure is done
+
+**2026-08-20.** Scenarios 2, 3 and 4 executed against production-shaped volumes. Twelve of fifteen
+defects fixed; `pnpm verify` 1,836 green and `pnpm e2e` 244 green after them. What remains on blocker
+#10 is the capacity run itself, which still needs the deployment target. Two items came out of it for
+**Bashar**: `O-sec-3` and the `O-page-1` page ceiling. One for engineering: `O-api-1`. See `S-3`.
 
 ### 🏗 Hosting-dependent — waiting on roadmap item 193
 
@@ -1649,6 +1673,75 @@ is how the thirteenth would arrive.
 and every environment, and visible immediately to a million rows. It is the argument for building the
 generator before the hosting decision rather than after.
 
+### O-sec-3 — An attacked address cannot sign in at all, and that is the per-IP ceiling
+
+**Status:** open, needs a DECISION · **Severity:** High for the Syrian market · **Owner:** **Bashar**
+· **Recorded:** 2026-08-20 · **Measured by** scenario 4 of the load test
+
+**What.** A legitimate customer with correct credentials, on the same egress address as an attack,
+pacing themselves well inside their own per-account allowance, signed in **0 times out of 30**. The
+cause is the per-IP `@Throttle({limit: 40, ttl: 60_000})` on `/auth/login`, which everybody behind one
+address shares.
+
+**This is not a regression.** Forty per IP on auth routes is the deliberate stuffing bound agreed with
+Bashar on 2026-08-07 and recorded in §2. The finding is that the mitigation recorded under `O-sec-1`
+closed the collateral damage in only ONE of the two limiters: keying the `account` throttler on
+(IP, account) removed its share, and the per-IP ceiling still starves the address. Nobody had measured
+it, because only load can — which is precisely what the plan said scenario 4 was for.
+
+**The threshold is the problem, and this part is arithmetic, not a laptop measurement.** Forty a
+minute is 0.67 a second. An attacker making ONE request a second — unremarkable in any log — consumes
+sixty a minute and denies sign-in to that address about a third of the time; at two a second, two
+thirds. Behind carrier-grade NAT, where thousands of Syrian subscribers share an address, that is live
+availability risk.
+
+**What the same run proves still works,** so the fix does not have to trade it away:
+
+|                                          | Single source                  | Distributed (one address per attempt) |
+| ---------------------------------------- | ------------------------------ | ------------------------------------- |
+| Password checks reaching `AuthService`   | ~200 of 2,412,503              | 11,477 of 11,477                      |
+| Accounts locked after five attempts      | 0 of 5,000 — nothing needed to | **40 of 40**                          |
+| Bystander on an UNRELATED address        | —                              | **5 of 5**                            |
+| Refusals generic (no enumeration oracle) | pass                           | pass                                  |
+| 5xx                                      | 0                              | 0                                     |
+
+**Recommended fix: count only FAILED sign-ins against the per-IP ceiling.** A stuffing run produces
+failures; a legitimate customer produces a success. That keeps the bound exactly where it is and makes
+the bystander unreachable by it. Raising the ceiling instead weakens the bound; a CAPTCHA is new
+scope. **To unblock:** Bashar's decision on which.
+
+**One thing WAS fixed, because it was a defect rather than a trade-off.** `accountTracker` read
+`x-forwarded-for` and took the left-most entry — the value a client writes, since a proxy appends.
+Sixteen of sixteen attempts bypassed the per-account limit under the header shape a correct single
+proxy produces, and forging the header to somebody else's address spent THEIR budget, reintroducing
+the targeted lockout the file's own header says it eliminated. Now `req.ip`, which Express computes
+under `trust proxy`. See `O-sec-1` and the results document, F-11.
+
+### O-api-1 — Pool exhaustion answers 500, and a 500 carries no code
+
+**Status:** open · **Severity:** Medium · **Owner:** engineering · **Recorded:** 2026-08-20
+
+**What.** Under scenario 2's deliberate concentration — 200 concurrent booking transactions against 20
+units, each holding a pool connection while it waits on a row lock held by another — the pool of
+`DATABASE_POOL_MAX=20` is exhausted and `connectionTimeoutMillis` fires. 1,680 of 12,231 requests
+answered **500**. A lock queue becomes a connection queue, which is inherent: the exclusion constraint
+IS the reservation mechanism, deliberately.
+
+**Why it matters even though the concentration is artificial.** 500 is the wrong answer for a capacity
+condition — unretryable to a client, and it will page whoever owns the 5xx signal in
+`docs/alerting.md` for something that is load rather than breakage. A coded **503 with `Retry-After`**
+is the honest answer.
+
+**Verified sound while measuring it:** the body is generic — `{"statusCode":500,"message":"Internal
+server error"}` — with no SQL, no parameters and no guest email. Rule 1 holds.
+
+**Second, smaller half:** a 500 carries no error `code`, although `request.unknown` exists and is
+translated in all three locales. A client cannot render it in the reader's language.
+
+**Why it was not fixed in the load-test pass:** both halves want one global exception filter, and that
+touches every error response the API produces. That is deliberate work with its own verification, not
+a side effect. **To unblock:** nothing external — it is scheduling.
+
 ### O-page-1 — What numbered pages cost, and when it stops being affordable
 
 **What:** The console's fifteen registries moved from keyset cursors to `OFFSET` + `count(*)` on
@@ -1675,7 +1768,41 @@ capped count starts hiding something an operator needs. **The fix is not "make O
 it is to narrow the set (a mandatory date range on the audit screen) so the reader never needs a
 deep page. Measure first: the numbers above are row counts, not timings.
 
-**Owner:** whoever next reports a slow registry. Not blocking; recorded so the decision is visible.
+### MEASURED, 2026-08-20 — and the ceiling should come down to 1,000
+
+Scenario 3 of the load test supplied the measurement this item asked for, over 5,000,061 bookings.
+Buffers touched by the console's own query, which is a page the database had to read and does not
+vary with hardware:
+
+| Page    | OFFSET    | Rows read | Returned | Buffers                 | vs page 1   |
+| ------- | --------- | --------- | -------- | ----------------------- | ----------- |
+| 1       | 0         | 27        | 25       | 144                     | 1×          |
+| 10      | 225       | 250       | 25       | 1,044                   | 7×          |
+| 100     | 2,475     | 2,500     | 25       | 9,914                   | 69×         |
+| 1,000   | 24,975    | 25,000    | 25       | 87,069 + 5,254 written  | 605×        |
+| 10,000  | 249,975   | 250,000   | 25       | 401,578 + 5,237 written | 2,789×      |
+| 100,000 | 2,499,975 | 2,500,000 | 25       | 2,663,104               | **18,494×** |
+
+**The plan is the RIGHT plan at every depth** — `Index Scan Backward using bookings_created_idx`
+feeding an `Incremental Sort`, no sequential scan, no missing index. So there is nothing to optimise:
+the cost is inherent to `OFFSET` and linear in `page × limit`, exactly as `pagination.ts` says. The
+only decision left is the ceiling.
+
+**Two thresholds are visible.** From page 1,000 the sort spills to disk. At the ceiling of 100,000 a
+single request reads 2.5 million rows to return 25 — roughly 20 GB of page accesses, which any
+authenticated staff account can ask for repeatedly.
+
+**Recommendation: lower `page` from 100,000 to 1,000 in `pageQuerySchema`.** That is where the spill
+starts and it is 40× past anything a person reaches by hand. **Not applied** — the ceiling is shared
+by every registry, so it is Bashar's call rather than a load-test side effect.
+
+**Two uncapped scans were found next door and are fixed** (see `docs/load-test-results-2026-08-20.md`
+F-7 and F-8): the bookings registry's per-status counts were an uncapped `GROUP BY` costing 239,855
+buffers on every page view — now 93 — and the console SUMMED them into an exact «٥٠٠٠٠٦١ حجزًا»
+printed directly above a bar correctly saying «أكثر من ١٠٠٠٠ نتيجة». «طلبات الشراكة» had no index for
+its own sort order: 765 buffers → 50.
+
+**Owner:** Bashar, for the ceiling. The measurement is done.
 
 ### O-page-2 — The pagination bar needs a تطبيق button because there is no JavaScript
 
@@ -1830,16 +1957,37 @@ the first migration with nothing ever writing to it. See `docs/notifications.md`
 is the channel today and the console shows that per channel rather than claiming the template works
 everywhere. And sends happen IN THE REQUEST — see the accepted deviation under `O-notify-1`.
 
-### S-3 — Load testing has never been run
+### S-3 — Load testing: the locally-honest half is DONE; capacity still needs infrastructure
 
-**Status:** blocked on M-1 · **Owner:** Backend
+**Status:** scenarios 1–4 executed · capacity still blocked on M-1 · **Owner:** Backend
 
-The project rules require load-testing critical paths before claiming a capacity number,
-and require stating the measurement rather than guessing. **No capacity number should be
-quoted until this runs.** The schema is indexed and paginated for it, but that is a
-design property, not a measurement.
+The project rules require load-testing critical paths before claiming a capacity number, and require
+stating the measurement rather than guessing. **No capacity number should be quoted until this runs
+against real infrastructure, and none has been.** That part is unchanged and still gated on the
+deployment target.
 
-**Targets:** search, booking creation, the partner queue.
+**What HAS been done** — the two things `docs/load-testing.md` says a local run answers honestly,
+query plans and business invariants:
+
+| Date       | Scenario                        | Result                                                                                     |
+| ---------- | ------------------------------- | ------------------------------------------------------------------------------------------ |
+| 2026-08-12 | 1 — search and browse           | `O-scale-1` and `O-scale-2`. Search 144 s → 0.59 s                                         |
+| 2026-08-20 | 2 — booking contention          | The exclusion constraint HELD: 10,550 contended attempts, 20 winners, zero double bookings |
+| 2026-08-20 | 3 — deep pagination             | The `O-page-1` curve, measured. Two uncapped scans found and closed                        |
+| 2026-08-20 | 4 — authentication under attack | The account lockout holds; `O-sec-1`'s bystander property does NOT. See `O-sec-3`          |
+
+**Fifteen defects, twelve fixed.** Full record: **`docs/load-test-results-2026-08-20.md`**. Three of
+them meant a scenario could not produce its own result at all — a route throttle the documented
+procedure could not reach, a 404 route, and an invariant that could not detect the violation it was
+named after. That is the same class as `O-scale-1`, for the same reason: nothing had ever been run.
+
+**Scenarios 5 (media/CDN) and 6 (12-hour soak) remain deferred** — both need infrastructure rather
+than a decision.
+
+**What is owed before the capacity run:** regenerate `safra_load` so the append-only tables carry
+spread timestamps; teach the generator to write `payments` and `notifications` so two invariants stop
+passing over empty tables; distributed load generation for scenario 2, since behind a real balancer a
+forged `X-Forwarded-For` is correctly ignored and the booking route's ten-a-minute limit binds again.
 
 ### S-4 — No retention policy, and erasure conflicts with the audit log
 
@@ -2421,6 +2569,36 @@ the image audit trail.
 time-ordered by construction. Ordering by a timestamp is fine when only one row is wanted, which is
 what the other suites doing it are after.
 
+**And it caught the load-data generator, 2026-08-20.** One statement per rung meant one `created_at`
+per rung: 5,000,061 bookings across 86 distinct values, all 200,000 `confirmed` rows sharing exactly
+one. That is not untidy, it invalidates measurements — the console's default order is
+`created_at DESC, id DESC`, so every plan measured over that data was a sort over a nearly constant
+column. A first reading of `?status=confirmed` came out at 236,526 buffers and looked like a missing
+index; with realistic timestamps the same query is 46 and the planner had been right. Fixed in the
+generator, and fixed in place for `bookings` (86 → 1,948,386 distinct values). `audit_log` and
+`ledger_entries` are append-only by trigger, so they cannot be corrected in place and need the next
+regeneration. **Any generator writing many rows per statement has this bug until it is spread
+explicitly.**
+
+### Drizzle's `.desc()` emits `DESC NULLS LAST`, which no plain `ORDER BY … DESC` can use
+
+Found 2026-08-20 while indexing «طلبات الشراكة». PostgreSQL's `ORDER BY x DESC` means
+`DESC NULLS FIRST`; drizzle's `index(…).on(t.col.desc())` emits `DESC NULLS LAST`. Different
+orderings, so the index cannot remove the sort — and **the failure is completely silent**: the index
+is created, it is valid, `\di` lists it, and the plan does not change.
+
+| Same query, same data                   | Result                              |
+| --------------------------------------- | ----------------------------------- |
+| No index                                | 765 buffers, Seq Scan + Sort        |
+| Index built with drizzle `.desc()`      | **765 buffers, Seq Scan + Sort**    |
+| Same columns with PostgreSQL's defaults | **27 buffers, Index Scan, no sort** |
+
+A prefix of the sort key is not enough either: a single-column `(created_at DESC)` changed nothing,
+because the query's tiebreaker is `reference DESC`. **Write an index intended to remove a sort as raw
+SQL in `migrations/post/`,** where the ordering can be stated exactly —
+`post/0007_registry_order_indexes.sql` is the worked example. `.desc()` is still fine for an index
+whose job is a range scan on an equality predicate, which is what `bookings_status_created_idx` does.
+
 ### The footer is on every page, so a loose selector is now ambiguous
 
 Added 2026-08-13 with the site footer. Two specs broke the moment it shipped, both for the same
@@ -2784,6 +2962,12 @@ Kept because the reason something was blocked is often the reason it returns.
 
 | Date       | Item                                                                                         | Resolution                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-20 | **Three load-test scenarios could not produce their own result**                             | Scenario 2 was capped at ten booking attempts a minute by a ROUTE-level `@Throttle` that `THROTTLE_DEFAULT_LIMIT` cannot reach — 2,259,751 of 2,259,812 requests refused, and **every k6 threshold passed**, because refusing a request is fast and a 409 is expected by design. Scenario 3 asked for `/admin/registries/bookings?…&size=`, which is neither the route nor the parameter name, so `setup()` threw on a 404 and there was no output at all. Scenario 4's bystander looped with no think time — 205 sign-ins a second against an allowance of ten a minute — so it starved itself and its threshold could never pass. All three fixed; the shape of the failure is the same as `O-scale-1`, and for the same reason: nothing had ever been run                                                                                                                                                                                                                                                                                                               |
+| 2026-08-20 | **The double-booking invariant could not detect a double booking**                           | `pnpm load:invariants` tested `GROUP BY unit_id, check_in HAVING count(*) > 1` — only two live bookings sharing an IDENTICAL check-in date. The constraint it stands for forbids any OVERLAP, so Aug 1–5 against Aug 3–7 on one unit returned no rows and printed `ok`. It was scenario 2's entire verdict. Replaced with a window-function check over adjacent stays per unit — deliberately not a self-join on `&&`, which would lean on the gist index the constraint itself creates and so degrade exactly when it is needed. Three tests drop the constraint inside a rolled-back transaction, write the overlap it would have refused, and require the check to find it                                                                                                                                                                                                                                                                                                                                                                                              |
+| 2026-08-20 | **Two uncapped scans on console request paths**                                              | The bookings registry's per-status counts were an uncapped `GROUP BY status` — no index leads on `status`, so the only plan is reading the whole table: **239,855 buffers on every page view**, and the console SUMMED them into an exact «٥٠٠٠٠٦١ حجزًا» printed above a bar correctly saying «أكثر من ١٠٠٠٠ نتيجة». The service's comment claimed it ran "over the `(status, created_at)` index", which did not exist. Now one capped count per status over a real index: **93 buffers**, with `capped` travelling alongside so the console prints «أكثر من N». «طلبات الشراكة» had no index for its own sort order — 765 buffers → 50                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 2026-08-20 | **The per-account rate limiter could be bypassed, and aimed, with a forged header**          | `accountTracker` read `x-forwarded-for` and took the LEFT-MOST entry. A proxy appends, so that entry is client-controlled in every deployment: sixteen of sixteen wrong-password attempts against one account got through under the header shape a correct single proxy produces, against ten without it. Worse, it was aimable — forge the header to a victim's address, name their email, and their next real sign-in is refused, which is the targeted lockout the file's own header says keying on IP + email had eliminated. Now `req.ip`, which Express computes under `trust proxy`. The existing test asserted the OPPOSITE and now asserts the header is ignored                                                                                                                                                                                                                                                                                                                                                                                                  |
+| 2026-08-20 | **A failed idempotency release masked the real error and held the claim for 24 hours**       | `IdempotencyService` released a claim with a bare `await … DELETE` before `throw error`. When the release failed — 487 times in one run — `throw error` was never reached, the release's error replaced the real cause, and the claim stayed `in_progress` until `expires_at`. All three happen together because the reason the release fails is the reason the handler failed. The checkout form keeps ONE key per mounted form, so the customer's retry answered «الطلب قيد المعالجة» until they reloaded the page. Release is now best-effort and logged, the original error always propagates, and a claim abandoned past two minutes is reclaimed atomically                                                                                                                                                                                                                                                                                                                                                                                                          |
+| 2026-08-20 | **Four customer-facing refusals carried English sentences instead of error codes**           | A 429 answered `{"statusCode":429,"message":"ThrottlerException: Too Many Requests"}` — no code, English, and the framework's class name in a body anybody can read; `safra/no-hardcoded-text` cannot see it because the string is in a dependency. Losing the race for the last room threw an English `ConflictException` twelve lines below a correct `conflict(ERROR.…)`. The same-day cutoff and past-arrival refusals were two English sentences chosen by a ternary, and the customer app's fallback wrote the API's `message` straight onto an Arabic checkout form. Four new codes, translated in ar/en/de; the checkout form now resolves the code and never prints `message`                                                                                                                                                                                                                                                                                                                                                                                     |
 | 2026-08-14 | **O-i18n-2** — a German customer read Arabic where a number was masked                       | The row now stores a language-neutral token and each surface renders the reader's own word. Three traps behind it, all found by tests rather than review: stripping forged markers inside the redactor un-redacted messages on a second pass; the dispute count is derived in SQL and had the Arabic mask as a literal, so every "N details masked" notice silently went to zero; and old bodies cannot be migrated at all, because `messages` is append-only by trigger. See §5                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | 2026-08-14 | Codes reaching readers as words — property types, trip attributes, audit subjects, roles     | Bashar reported «rural_house» down العقارات and «internet business history» as chips. Four vocabularies were missing and one render site used `attribute.replace(/_/g, ' ')`, the expression the status rule names as forbidden. The staff INVITATION had the same defect in email: every language named the role in English. `navigation.spec.ts` now sweeps every leaf element on all nineteen sections for snake_case, which immediately found two more — `booking_export` on السجل and الموظفون — that no screenshot had caught                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 2026-08-14 | Status pills stretched to their whole column                                                 | `StatusPill` was `inline-block`, which a grid or flex parent overrides with `justify-self: stretch`; several cells wrap it in a `<div class="grid">` to stack a note under it, so the pill filled the الحالة column and read as an empty input. `w-fit` on the component, and the console sweep now measures every pill against its own text                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
