@@ -9,22 +9,28 @@ discovery. Where something is undecided, it says who decides it.
 
 ## 1. Completed components
 
-| Component                                                                                     | State                             | Evidence                                                         |
-| --------------------------------------------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------- |
-| **Customer app** — search, property, checkout, payment, account, wallet, reviews              | Complete                          | `e2e/`, 191 browser tests                                        |
-| **Staff console** — 19 sections, registries, finance, disputes, emergency mode, audit         | Complete                          | `e2e/navigation.spec.ts` sweeps all 19                           |
-| **Partner portal** — dashboard, listings, media, calendar, edit, units, payouts, reviews, 2FA | Complete                          | `e2e/partner*.spec.ts`                                           |
-| **Booking lifecycle**                                                                         | Complete                          | Exclusion constraint proven under contention                     |
-| **Payments and ledger**                                                                       | Complete                          | Four-leg balanced groups; balance enforced by trigger            |
-| **Payouts**                                                                                   | Complete                          | Accrual → close → release → paid, immutable once paid            |
-| **Reviews (P-006)**                                                                           | Complete                          | Enforced by database trigger, not convention                     |
-| **Media pipeline**                                                                            | Complete                          | EXIF stripped, variants, cover invariant by partial unique index |
-| **Notifications**                                                                             | Complete for 3 events, email only | `docs/notifications.md`                                          |
-| **Auth** — 2FA, lockout, rotation, throttling                                                 | Complete                          | `docs/auth-rate-limiting.md`                                     |
-| **i18n** — ar/en/de, ICU plurals, error codes                                                 | Complete                          | 1,088 tests incl. plural boundaries                              |
-| **RBAC and staff scope**                                                                      | Complete                          | Server-enforced, matrix derived from the guard                   |
-| **Audit log**                                                                                 | Complete                          | Append-only by trigger, survives TRUNCATE                        |
-| **Scheduled jobs**                                                                            | Complete                          | Advisory-locked, telemetry in `scheduled_job_runs`               |
+| Component                                                                                     | State                             | Evidence                                                                                                    |
+| --------------------------------------------------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Customer app** — search, property, checkout, payment, account, wallet, reviews              | Complete                          | `e2e/`, 191 browser tests                                                                                   |
+| **Staff console** — 19 sections, registries, finance, disputes, emergency mode, audit         | Complete                          | `e2e/navigation.spec.ts` sweeps all 19                                                                      |
+| **Partner portal** — dashboard, listings, media, calendar, edit, units, payouts, reviews, 2FA | Complete                          | `e2e/partner*.spec.ts`                                                                                      |
+| **Booking lifecycle**                                                                         | Complete                          | Exclusion constraint proven under contention                                                                |
+| **Payments and ledger**                                                                       | Complete                          | Four-leg balanced groups; balance enforced by trigger                                                       |
+| **Payouts**                                                                                   | Complete                          | Accrual → close → release → paid, immutable once paid                                                       |
+| **Reviews (P-006)**                                                                           | Complete                          | Enforced by database trigger, not convention                                                                |
+| **Media pipeline**                                                                            | Complete                          | EXIF stripped, variants, cover invariant by partial unique index                                            |
+| **Notifications**                                                                             | Complete for 3 events, email only | `docs/notifications.md`                                                                                     |
+| **Auth** — second factor, lockout, rotation, throttling                                       | Complete                          | `docs/auth-rate-limiting.md`. Staff prove TOTP; partners prove a code emailed at every sign-in (2026-08-20) |
+| **i18n** — ar/en/de, ICU plurals, error codes                                                 | Complete                          | 1,088 tests incl. plural boundaries                                                                         |
+| **RBAC and staff scope**                                                                      | Complete                          | Server-enforced, matrix derived from the guard                                                              |
+| **Audit log**                                                                                 | Complete                          | Append-only by trigger, survives TRUNCATE                                                                   |
+| **Scheduled jobs**                                                                            | Complete                          | Advisory-locked, telemetry in `scheduled_job_runs`                                                          |
+
+**Also 2026-08-20 — the partner joining process was completable for the first time.** Accepting a
+request emailed a link to `/invitation/{token}`, a page that had never been built, so every
+accepted partner was stranded and every partner on the platform had come from the seed. The page
+exists now and the journey was walked end to end in a browser. See `O-partner-8`, and `O-sec-9` for
+the second factor that changed with it.
 
 **Three unblocked engineering items remain**, all opened on 2026-08-20 and none of them planned
 scope — every one came out of a security pass rather than a test:

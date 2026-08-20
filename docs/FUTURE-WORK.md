@@ -288,6 +288,13 @@ defects fixed; `pnpm verify` 1,836 green and `pnpm e2e` 244 green after them. Wh
 from the load test is now waiting on a decision; what remains of blocker #10 is the capacity run
 itself, which still needs the deployment target.
 
+**Later still on 2026-08-20 — the partner joining process, and how partners sign in.** Bashar
+accepted a partner and asked what to do next; the answer was that there was nothing to do, because
+the invitation email pointed at a page that had never been built (`O-partner-8`). Built, and the
+whole journey walked in a browser. He also asked for partner 2FA to become a code emailed at every
+sign-in instead of an authenticator (`O-sec-9`) — done, with the 78 enrolled partners migrated
+across. Accepting a fixture partner had also broken `db:testbed` permanently (`O-partner-9`).
+
 **Four items came out of doing the work**, none of them a launch blocker and all of them found by
 the security pass rather than by a test: `O-api-2`, `O-sec-5`, `O-sec-6`, and — the one worth
 reading first — **`O-sec-7`**, a failed query's bound parameters reaching the logs, and in one place
@@ -1553,6 +1560,11 @@ because days pass in between and an ordinary customer on Monday can be staff by 
 
 ### O-partner-4 — Partner 2FA is mandatory and enforced; what remains is operational
 
+> **SUPERSEDED 2026-08-20 for partners — see `O-sec-9`.** Partners no longer enrol an
+> authenticator; they prove a six-digit code emailed at every sign-in, and an authenticator is an
+> upgrade they may choose. STAFF are unchanged, so everything below still describes them. This item
+> is left in place as the record of the decision it made, not as a description of today.
+
 **Decided and shipped 2026-08-07.** Bashar's decision was **mandatory, not optional**. Partner
 accounts now require a second factor exactly as staff accounts do.
 
@@ -1933,6 +1945,91 @@ an address that strangers share cannot be both low enough to bound guessing and 
 protect a bystander. An attacker willing to be loud — five failed sign-ins a second — can still
 starve an address. The answer to that residual is rate limiting at the EDGE, and it is now a
 **required deliverable of `M-1`** rather than a note here: see `O-sec-5`.
+
+### O-partner-8 — FIXED: the partner joining process could not be completed by anybody
+
+**Status:** **FIXED** 2026-08-20 · **Severity:** **High** — the entire partner onboarding, dead ·
+**Reported by:** Bashar, who accepted a partner and asked what to do next
+
+**There was nothing to do next.** Accepting a partnership request creates the partner record,
+leaves the applicant's account as a CUSTOMER account, and emails a link to `/invitation/{token}`.
+Redeeming that token is the only thing that promotes the role — `acceptInvitation` sets the
+password and the role in one statement.
+
+**The endpoint existed and worked. The page the mail pointed at had never been built.** The portal
+answered the link with a 307 to `/login`, and the sign-in refuses a customer account with «هذا
+الحساب ليس حساب شريك». So every accepted partner was stranded, in silence, with a correct-looking
+email in their inbox.
+
+That is why every partner in the database came from the seed: the flow had never been walked end to
+end by anyone, and nothing failed loudly enough to say so.
+
+**Built:** `apps/partner/src/app/invitation/[token]/page.tsx`, `invitation-form.tsx`, the proxy
+route at `api/auth/invitation`, Arabic copy, and `/invitation` added to the middleware's
+`PUBLIC_PATHS`. That last part is the fix as much as the page is — the whole point of the page is
+that the account cannot sign in yet, which is exactly why the middleware was bouncing it.
+
+**Two deliberate choices.** The page never says whether a token is real, before or after
+submission: a page that answers "expired" rather than "never existed" tells somebody probing links
+which guesses were close. And success issues no session — the partner signs in normally, so one
+code path mints partner sessions.
+
+**Demonstrated end to end in a browser**, from the console accepting the request through the
+invitation page, the first sign-in and the emailed code, to the dashboard.
+
+### O-partner-9 — FIXED: accepting a fixture partner broke `db:testbed` for good
+
+**Status:** **FIXED** 2026-08-20 · **Severity:** Medium — a developer-facing dead end · **Found by**
+running the seed after Bashar accepted `customer@safra.test`
+
+`partner_applications.partner_id` points at what a request became, so a testbed partner created by
+ACCEPTING a request could not be deleted while the request survived. `db:testbed` died on
+`DELETE FROM partners` with a truncated `Failed query` naming nothing useful, and stayed dead —
+re-running it could not clear the row that was blocking it.
+
+Anybody who accepted the seeded request in the console — which is the obvious thing to do when
+testing the queue — could never seed again. The seed already anticipated that acceptance a few
+lines further down, where it soft-deletes the partner a previous run created; this was the same
+event, one foreign key earlier.
+
+**Fixed** by deleting the requests that produced a testbed partner, and their logged calls, before
+the partners themselves.
+
+### O-sec-9 — Partners prove a code emailed at sign-in, not an authenticator
+
+**Status:** **DONE** 2026-08-20, Bashar's decision · **Severity:** a posture change, recorded rather
+than a defect · **Owner:** closed
+
+**What.** Partner 2FA was mandatory TOTP enrolment (`O-partner-4`, 2026-08-07). Partners now prove
+a **six-digit code emailed at every sign-in**; an authenticator is an upgrade they may choose.
+Staff are unchanged. Full mechanics in `docs/auth-rate-limiting.md`.
+
+**Why it was asked for:** to make joining simple. A hotel owner finishing onboarding should not
+have to install an app first.
+
+**The trade, accepted with the decision:** a mailbox is a weaker second factor than an
+authenticator — whoever reads the partner's email can complete a sign-in — and a mail outage stops
+every partner signing in, with no bypass by design, so it is an incident rather than a hole. Staff
+were kept on TOTP because the console holds every registry, the ledger, payouts and emergency mode.
+
+**Migration `0035`** created `login_codes` and cleared the authenticator from all **78** enrolled
+partners in the same transaction. Nobody was locked out: the next sign-in emails a code.
+
+**Three things this changed that were not obvious:**
+
+- **`TwoFactorGuard` stopped holding partners**, and the portal's middleware stopped redirecting
+  them to `/enrol-2fa`. Left in place either would have trapped every partner on an enrolment
+  screen they were never asked to complete — the 78 whose enrolments the migration had just
+  cleared most of all.
+- **The seed stopped enrolling fixture partners.** Otherwise the browser suite would have kept
+  exercising the TOTP form while the emailed-code form, which is what every partner meets, went
+  untested.
+- **The resend limit was retuned from 3-per-15-minutes to 5-per-5.** The counter cannot tell a
+  resend from an ordinary sign-in, because both send a mail, so the first shape locked out anybody
+  who signed in on a phone and then a laptop. The browser suite hit it on the first run.
+
+**What `O-partner-4` said is now history rather than current** — it is left in place as the record
+of the decision it described.
 
 ### O-ui-3 — FIXED: طلبات الشراكة lost its badge on the dashboard, and the audit log printed JSON
 

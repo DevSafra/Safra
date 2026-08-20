@@ -14,6 +14,7 @@ different attacks and they fail in different ways.
 | -------------------- | ------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------- |
 | **Account throttle** | IP + SHA-256(email) | 10 / minute                                                                               | One person brute-forcing one account from one network | `app.module.ts`, `account-tracker.ts`                          |
 | **IP ceiling**       | IP                  | 300 **failed sign-ins** / minute on `/auth/login`; 40 or tighter on the other auth routes | Credential stuffing: many accounts, one host          | `@Throttle` on each auth route, plus `SignInRefundInterceptor` |
+| **Sign-in code**     | the user row        | 5 codes / 5 min, 5 guesses each, 10-minute life                                           | Signing in on a stolen PASSWORD alone — partners only | `login-code.service.ts`                                        |
 | **Account lockout**  | the user row        | 5 failures → 15 minutes                                                                   | A **distributed** attack on one account               | `AuthService.registerFailedAttempt`                            |
 
 The lockout is the one that does the heavy lifting against a targeted attack. It lives in the
