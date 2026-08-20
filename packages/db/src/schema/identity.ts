@@ -153,6 +153,57 @@ export const refreshTokens = pgTable(
 );
 
 /**
+ * The one-time code emailed to a partner at every sign-in (Bashar, 2026-08-20).
+ *
+ * ## Why a table and not Redis
+ *
+ * Redis holds this platform's rate-limit counters, and the note on `RedisThrottlerStorage` is
+ * explicit that losing them costs a few minutes of throttling — it is a store the design is allowed
+ * to lose. A sign-in code is not: losing it mid-flight means a partner who has already typed their
+ * password is told their code is wrong, with no way to tell that from an attack. It is also a
+ * CREDENTIAL, and §15 wants credentials to leave evidence.
+ *
+ * ## Hashed, like every other credential here
+ *
+ * Argon2id rather than the SHA-256 `refresh_tokens` uses, and the difference is the entropy. A
+ * refresh token is 256 random bits, so a fast digest is fine; this is six digits, and a fast digest
+ * over a leaked table is a million guesses a second. The verify costs ~11 ms, which is nothing
+ * against a code that is attempted at most five times.
+ *
+ * ## `consumedAt` rather than a delete
+ *
+ * The same reasoning as the tokens below: a code that was used leaves the fact that it was used,
+ * and "this code was redeemed at 14:02 from this address" is what an account-takeover investigation
+ * asks for. `attempts` is here for the same reason — a code with four failures against it is a
+ * story even after it expires.
+ */
+export const loginCodes = pgTable(
+  'login_codes',
+  {
+    id: primaryId(),
+    userId: foreignId('user_id')
+      .notNull()
+      .references(() => users.id),
+    codeHash: text('code_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    /** Wrong guesses against THIS code. Five and it is dead, whatever the clock says. */
+    attempts: integer('attempts').notNull().default(0),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    ...createdAt,
+  },
+  (t) => [
+    /**
+     * "The newest live code for this person", which is the only question asked of this table on
+     * the sign-in path. ASCENDING on `created_at` so PostgreSQL reads it backward — see the note
+     * on `partner_application_contacts_application_idx` for why `.desc()` is the wrong instrument.
+     */
+    index('login_codes_user_idx').on(t.userId, t.createdAt),
+  ],
+);
+
+/**
  * Single-use tokens for password reset and email verification (SRS §4).
  *
  * Stored as a digest, never in clear — same reasoning as `refreshTokens`. A password

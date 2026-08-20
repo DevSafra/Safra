@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { Database } from '@safra/db';
 
+import type { LoginCodeService } from './login-code.service.js';
 import { AuthService } from './auth.service.js';
 import type { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import type { PasswordService } from '../common/crypto/password.service.js';
@@ -76,6 +77,11 @@ describe('AuthService.login when the TOTP secret cannot be decrypted', () => {
       {} as unknown as TokenService,
       encryption,
       {} as unknown as TwoFactorService,
+      /*
+      Never reached: every path here either has no second factor or has an authenticator enrolled,
+      and a partner without one is what `login-code.service` covers in its own suite.
+    */
+      {} as unknown as LoginCodeService,
     );
   }
 

@@ -46,36 +46,46 @@ describe('TwoFactorGuard', () => {
   });
 
   /*
-    Partners, mandatory since 2026-08-07.
+    Partners are NOT held here any more (Bashar, 2026-08-20).
 
-    This is requirement 3 — "no partner should be able to use sensitive partner functionality
-    without completed 2FA" — asserted at the only layer where it counts. The portal's middleware
-    gate is a convenience; a partner calling the API directly with a valid session must be refused
-    here, and this test is what proves the refusal is not merely a redirect in a browser.
+    This used to be the mandatory-enrolment gate: a partner without an authenticator was refused
+    every route but `/auth/2fa/setup`. Their second factor is now a code emailed at every sign-in
+    and proved in `AuthService.login` — BEFORE a session exists — so by the time a request reaches
+    this guard that proof has already happened. Holding them would demand an authenticator they
+    were never asked to enrol, which is the whole portal locked against every partner.
+
+    The requirement it used to serve is unchanged and is asserted where it now lives: a partner
+    still cannot get in on a password alone.
   */
-  it('refuses a partner that has not enrolled', () => {
-    expect(() => guard.canActivate(contextFor(claims('partner', false)))).toThrow(
-      ForbiddenException,
-    );
+  it('admits a partner that has not enrolled an authenticator', () => {
+    expect(guard.canActivate(contextFor(claims('partner', false)))).toBe(true);
   });
 
-  it('admits a partner that has enrolled', () => {
+  it('admits a partner that has enrolled one', () => {
     expect(guard.canActivate(contextFor(claims('partner', true)))).toBe(true);
   });
 
   /*
-    An EXISTING partner account — one created before 2FA was mandatory — is exactly the unenrolled
-    case above, which is requirement 1: it holds a session and can reach only enrolment. Asserted
-    separately because the migration behaviour is a requirement in its own right and would
-    otherwise be covered only by implication.
+    And STAFF are still held, which is the half that did not move.
+
+    Written as its own test rather than left to the `super_admin` case above, because the two
+    outcomes now differ by ROLE and a change that collapsed them again would otherwise pass: the
+    console holds every registry, the ledger, payouts and emergency mode, and a mailbox is a weaker
+    thing to put in front of that than an authenticator.
   */
-  it('lets an unenrolled partner reach enrolment and nothing else', () => {
-    const enrolment = contextFor(claims('partner', false), {
+  it('refuses a staff member that has not enrolled', () => {
+    expect(() => guard.canActivate(contextFor(claims('support_agent', false)))).toThrow(
+      ForbiddenException,
+    );
+  });
+
+  it('lets an unenrolled staff member reach enrolment and nothing else', () => {
+    const enrolment = contextFor(claims('support_agent', false), {
       [ALLOWS_UNENROLLED_KEY]: true,
     });
 
     expect(guard.canActivate(enrolment)).toBe(true);
-    expect(() => guard.canActivate(contextFor(claims('partner', false)))).toThrow(
+    expect(() => guard.canActivate(contextFor(claims('support_agent', false)))).toThrow(
       ForbiddenException,
     );
   });

@@ -39,7 +39,14 @@ export interface AuthOutcome {
  * writes a second, subtly different copy of it.
  */
 export async function callAuth(
-  path: '/auth/login' | '/auth/register' | '/auth/refresh',
+  /*
+    A closed union, not a string. Every caller of this helper is a route handler forwarding a body
+    to the API, and an open parameter would make it a general-purpose proxy — one typo away from
+    pointing a public route at an endpoint nobody meant to expose.
+
+    `/auth/login/resend-code` joined it on 2026-08-20 with the partner sign-in code.
+  */
+  path: '/auth/login' | '/auth/login/resend-code' | '/auth/register' | '/auth/refresh',
   init: { body?: unknown; refreshToken?: string; headers?: Record<string, string> },
 ): Promise<AuthOutcome> {
   let response: Response;

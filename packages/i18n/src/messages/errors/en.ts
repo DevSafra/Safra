@@ -21,6 +21,11 @@ export const en = {
   'auth.locked':
     'Account temporarily locked after repeated failed attempts. Try again later.',
   'auth.too_many_attempts': 'Too many attempts. Please wait and try again.',
+  'auth.email_code_sent':
+    'We have emailed you a six-digit code. Enter it to finish signing in.',
+  'auth.email_code_invalid': 'That code is wrong or has expired. Ask for a new one.',
+  'auth.email_code_too_many':
+    'Too many codes requested in a short time. Please wait and try again.',
   'auth.code_required': 'Authenticator code required.',
   'auth.code_invalid': 'Invalid authenticator code.',
   'auth.code_malformed': 'That code is not valid.',

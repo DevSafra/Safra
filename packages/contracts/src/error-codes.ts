@@ -63,6 +63,20 @@ export const ERROR = {
   AUTH_TOO_MANY_ATTEMPTS: 'auth.too_many_attempts',
   AUTH_CODE_REQUIRED: 'auth.code_required',
   AUTH_CODE_INVALID: 'auth.code_invalid',
+  /**
+   * The password was right and a code has been EMAILED — the partner's second factor since
+   * 2026-08-20 (Bashar).
+   *
+   * Distinct from `auth.code_required`, which asks for an authenticator app, because the two send
+   * the reader somewhere completely different: one to their phone, one to their inbox. A single
+   * code would make the sign-in form guess, and it would guess wrong for whichever partner is not
+   * the majority.
+   */
+  AUTH_EMAIL_CODE_SENT: 'auth.email_code_sent',
+  /** Wrong, already used, or past its ten minutes — deliberately not distinguished to the caller. */
+  AUTH_EMAIL_CODE_INVALID: 'auth.email_code_invalid',
+  /** Too many codes asked for in too short a time. Separate so the form can say to wait. */
+  AUTH_EMAIL_CODE_TOO_MANY: 'auth.email_code_too_many',
   AUTH_CODE_MALFORMED: 'auth.code_malformed',
   AUTH_RECOVERY_CODE_INVALID: 'auth.recovery_code_invalid',
   AUTH_NO_AUTHENTICATOR: 'auth.no_authenticator',

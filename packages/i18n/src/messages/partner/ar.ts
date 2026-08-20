@@ -210,6 +210,21 @@ export const ar = {
     codeSubmit: 'تأكيد',
     codeChecking: 'جارٍ التحقق…',
     codeBack: 'رجوع',
+
+    /*
+      Step two when the code came by EMAIL — the ordinary case since 2026-08-20 (Bashar).
+
+      Its own wording because the reader has to be sent to the right place. «افتح تطبيق المصادقة»
+      to somebody whose code is sitting in their inbox is a person searching their phone for an app
+      they never installed.
+    */
+    codeTitleEmail: 'رمز الدخول',
+    codeLabelEmail: 'أرسلنا رمزًا من 6 أرقام إلى بريدك الإلكتروني. ينتهي خلال 10 دقائق.',
+    codeResend: 'إعادة إرسال الرمز',
+    codeResending: 'جارٍ الإرسال…',
+    codeResent: 'أرسلنا رمزًا جديدًا. تحقّق من بريدك.',
+    codeResendFailed: 'تعذّر إرسال رمز جديد. حاول بعد قليل.',
+
     codeFailed: 'الرمز غير مقبول. تحقّق من تطبيق المُصادِق وحاول مرة أخرى.',
 
     /**

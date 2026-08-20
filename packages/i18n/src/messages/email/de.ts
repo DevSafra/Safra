@@ -35,9 +35,14 @@ export const de = {
     subject: 'Zu Ihrer Partneranfrage — {reference}',
     body: 'Vielen Dank für Ihre Zeit und Ihr Interesse an SAFRA.\n\nNach Prüfung der Anfrage {reference} können wir derzeit nicht fortfahren.\n\nGrund:\n{reason}\n\nSollte sich daran etwas ändern, können Sie sich hier gerne erneut bewerben:\n{url}\n\nIhr SAFRA-Team',
   },
+  partnerLoginCode: {
+    subject: 'Ihr Anmeldecode — SAFRA',
+    body: 'Ihr Code für das Partnerportal:\n\n{code}\n\nEr läuft in {expiresInMinutes} Minuten ab und kann einmal verwendet werden.\n\nWenn Sie sich nicht anmelden wollten, ignorieren Sie diese Nachricht und ändern Sie Ihr Passwort — wer diesen Code angefordert hat, kennt Ihr aktuelles.\n\nDas SAFRA-Team fragt Sie niemals nach diesem Code, weder telefonisch noch per Nachricht.\n\nIhr SAFRA-Team',
+  },
+
   partnerInvitation: {
     subject: 'Ihre Partneranfrage wurde angenommen — Partnerkonto anlegen',
-    body: 'Die Partneranfrage {reference} wurde angenommen. Willkommen bei SAFRA.\n\nÖffnen Sie den folgenden Link, um das Passwort für Ihr Konto zu setzen:\n{url}\n\nDer Link läuft in {expiresInHours} Stunden ab und kann nur einmal verwendet werden. Nach dem Setzen des Passworts werden Sie zur Einrichtung der Zwei-Faktor-Authentifizierung aufgefordert — für Partnerkonten ist sie verpflichtend.\n\nWir senden Ihnen niemals ein Passwort per Nachricht. Erhalten Sie eines, stammt es nicht von uns.\n\nIhr Konto bleibt in Prüfung, bis unser Team Ihre Unterlagen und den unterzeichneten Vertrag geprüft hat. Bis dahin können Sie die Angaben zu Ihren Objekten vorbereiten; Preise, Termine und Bilder können Sie noch nicht hinzufügen.\n\nWenn Sie sich nicht als Partner beworben haben, öffnen Sie den Link nicht und informieren Sie uns.\n\nIhr SAFRA-Team',
+    body: 'Die Partneranfrage {reference} wurde angenommen. Willkommen bei SAFRA.\n\nÖffnen Sie den folgenden Link, um das Passwort für Ihr Konto zu setzen:\n{url}\n\nDer Link läuft in {expiresInHours} Stunden ab und kann nur einmal verwendet werden. Nach dem Setzen des Passworts können Sie sich sofort anmelden. Bei jeder Anmeldung senden wir einen sechsstelligen Code an diese Adresse, den Sie zum Abschluss eingeben.\n\nWir senden Ihnen niemals ein Passwort per Nachricht. Erhalten Sie eines, stammt es nicht von uns.\n\nIhr Konto bleibt in Prüfung, bis unser Team Ihre Unterlagen und den unterzeichneten Vertrag geprüft hat. Bis dahin können Sie die Angaben zu Ihren Objekten vorbereiten; Preise, Termine und Bilder können Sie noch nicht hinzufügen.\n\nWenn Sie sich nicht als Partner beworben haben, öffnen Sie den Link nicht und informieren Sie uns.\n\nIhr SAFRA-Team',
   },
 
   /** The contract KINDS, in the reader's language — `partner_contract_kind` in the schema. */

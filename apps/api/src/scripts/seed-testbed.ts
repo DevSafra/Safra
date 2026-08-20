@@ -176,7 +176,7 @@ const PARTNERS: readonly PartnerSpec[] = [
     address: 'شارع بغداد، دمشق',
     score: 92,
     tier: 'gold',
-    twoFactorEnrolled: true,
+    twoFactorEnrolled: false,
     properties: [
       {
         nameAr: 'فندق قصر الشرق — المالكي',
@@ -265,7 +265,7 @@ const PARTNERS: readonly PartnerSpec[] = [
     address: 'الكورنيش الجنوبي، اللاذقية',
     score: 78,
     tier: 'silver',
-    twoFactorEnrolled: true,
+    twoFactorEnrolled: false,
     properties: [
       {
         nameAr: 'شاليهات الساحل — بلوران',
@@ -817,6 +817,17 @@ async function build(db: Seeder): Promise<void> {
     */
     const [partner] = await db
       .insert(schema.partners)
+    /*
+      Every fixture partner is UNENROLLED since 2026-08-20 (Bashar).
+
+      A partner's second factor is a code emailed at every sign-in; an authenticator is an upgrade
+      they may choose. Seeding one would put the fixtures on a path almost no real partner takes,
+      and — worse — the browser suite would silently keep exercising the TOTP form while the
+      emailed-code form, which is what every partner actually meets, went untested.
+
+      `twoFactorEnrolled` survives as a flag because a fixture that DOES enrol is still worth
+      having the day somebody tests the opt-in. Nothing sets it today.
+    */
       .values({
         id: spec.id,
         userId: user.id,
@@ -1679,8 +1690,8 @@ async function report(db: Seeder): Promise<void> {
   console.log('\n  Sign in with:');
   for (const partner of PARTNERS) {
     const second = partner.twoFactorEnrolled
-      ? '2FA enrolled'
-      : '2FA NOT enrolled — lands on /enrol-2fa';
+      ? 'authenticator enrolled'
+      : 'code by email at every sign-in';
 
     console.log(
       `    ${partner.email.padEnd(24)} ${partner.displayName.padEnd(18)} ${second}`,
@@ -1689,9 +1700,13 @@ async function report(db: Seeder): Promise<void> {
   console.log(`    ${CUSTOMER.email.padEnd(24)} ${CUSTOMER.fullName}`);
   console.log(`\n  Password for all of them: ${PASSWORD}`);
   console.log('  (override with TESTBED_PASSWORD)');
-  console.log(`\n  Partner authenticator secret: ${PARTNER_TOTP_SECRET}`);
-  console.log('  Current code:  pnpm partner:code');
-  console.log('  (override with TESTBED_PARTNER_TOTP_SECRET)\n');
+  /*
+    No authenticator secret is printed any more: no fixture partner has one. The sign-in code is
+    emailed, so the way to read it is the mail catcher rather than a generator.
+  */
+  console.log(
+    '\n  Partner sign-in codes arrive by email — read them at http://localhost:8025\n',
+  );
 
   await selfCheck(db);
 }

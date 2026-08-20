@@ -9,14 +9,14 @@ import {
   mediaOrigins,
   decodeSession,
   encodeSession,
-  hasTwoFactor,
   needsRefresh,
   sessionCookieOptions,
   type Session,
 } from '@safra/session';
 
 /** The only path reachable without a partner session. */
-const PUBLIC_PATHS = ['/login'];
+/*
+  Reachable without a session.
 
 /** Reachable with a session that has not yet enrolled in 2FA — and nothing else. */
 const ENROLMENT_PATHS = ['/enrol-2fa'];
@@ -31,8 +31,11 @@ const ENROLMENT_PATHS = ['/enrol-2fa'];
  *
  * ## The 2FA gate, mandatory since 2026-08-07
  *
- * Bashar decided partner 2FA is mandatory rather than optional, so an unenrolled partner reaches
- * `/enrol-2fa` and nothing else. Unlike the console's gate, this one is not a posture the app
+ * Bashar decided partner 2FA is mandatory rather than optional, so an unenrolled partner reached
+ * `/enrol-2fa` and nothing else. THAT ENDED ON 2026-08-20: a partner's second factor is now a code
+ * emailed at every sign-in, proved before the session exists, and enrolling an authenticator is an
+ * upgrade they may choose. The paragraphs below describe the gate as it was. Unlike the console's
+ * gate, this one is not a posture the app
  * adopts on its own: `TwoFactorGuard` on the API already refuses every partner call except
  * enrolment, so this redirect is the honest face of a refusal the server is making anyway. A
  * partner who skips the portal and calls the API directly gets the same answer.
@@ -113,7 +116,6 @@ export default async function middleware(request: NextRequest) {
 function route(request: NextRequest, session: Session | null): NextResponse {
   const { pathname } = request.nextUrl;
   const onPublic = matches(pathname, PUBLIC_PATHS);
-  const onEnrolment = matches(pathname, ENROLMENT_PATHS);
 
   if (!session) {
     if (onPublic) return NextResponse.next();
@@ -130,15 +132,21 @@ function route(request: NextRequest, session: Session | null): NextResponse {
     return NextResponse.redirect(target);
   }
 
-  if (!hasTwoFactor(session)) {
-    // Enrolment is the ONLY thing an unenrolled partner may reach.
-    return onEnrolment
-      ? NextResponse.next()
-      : NextResponse.redirect(new URL('/enrol-2fa', request.url));
-  }
+  /*
+    Enrolment is OFFERED, never forced (Bashar, 2026-08-20).
 
-  // Fully authenticated: the sign-in and enrolment pages have nothing left to offer.
-  if (onPublic || onEnrolment) {
+    This used to redirect every unenrolled partner to `/enrol-2fa` and let them reach nothing else.
+    That was right while an authenticator was the partner's only second factor; it is wrong now
+    that the second factor is a code emailed at every sign-in and already proved before this
+    session existed. Left in place it would trap every partner on the platform on an enrolment
+    screen they were never asked to complete — the 78 whose enrolments the 0035 migration cleared
+    most of all.
+
+    A partner who WANTS an authenticator can still open `/enrol-2fa` and set one up, which is why
+    the route stays and why an enrolled partner is no longer bounced away from it: it is where they
+    would go to look at it.
+  */
+  if (onPublic) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 

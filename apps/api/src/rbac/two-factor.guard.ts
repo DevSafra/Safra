@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import { requiresTwoFactor } from '@safra/contracts';
+import { requiresAuthenticator } from '@safra/contracts';
 
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ALLOWS_UNENROLLED_KEY, PUBLIC_KEY } from './decorators.js';
@@ -53,9 +53,20 @@ export class TwoFactorGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<{ user?: AccessTokenClaims }>();
     const user = request.user;
 
-    // Anonymous or a customer: not this guard's concern. JwtAuthGuard has already
-    // decided whether a session was required at all.
-    if (!user || !requiresTwoFactor(user.role) || user.totpEnabled) {
+    /*
+      Anonymous, a customer, or a PARTNER: not this guard's concern. JwtAuthGuard has already
+      decided whether a session was required at all.
+
+      `requiresAuthenticator`, not `requiresTwoFactor`, since 2026-08-20 (Bashar). The two used to
+      be the same list and are now different questions. A partner still proves a second factor at
+      every sign-in — a code emailed to them, checked in `AuthService.login` before any session
+      exists — so by the time a request reaches this guard that proof has already happened. Holding
+      them here would demand an authenticator they were never asked to enrol, which is the portal
+      locked against every partner on the platform.
+
+      Staff are unchanged: they must enrol, and this is what makes them.
+    */
+    if (!user || !requiresAuthenticator(user.role) || user.totpEnabled) {
       return true;
     }
 

@@ -24,6 +24,12 @@ export const de = {
     'Konto nach mehreren Fehlversuchen vorübergehend gesperrt. Bitte später erneut versuchen.',
   'auth.too_many_attempts':
     'Zu viele Versuche. Bitte einen Moment warten und erneut versuchen.',
+  'auth.email_code_sent':
+    'Wir haben Ihnen einen sechsstelligen Code per E-Mail gesendet. Geben Sie ihn ein, um die Anmeldung abzuschließen.',
+  'auth.email_code_invalid':
+    'Dieser Code ist falsch oder abgelaufen. Fordern Sie einen neuen an.',
+  'auth.email_code_too_many':
+    'Zu viele Codes in kurzer Zeit angefordert. Bitte warten Sie und versuchen Sie es erneut.',
   'auth.code_required':
     'Bitte den Code aus Ihrer Authenticator-App eingeben. Falls Sie kein Gerät haben, können Sie einen Wiederherstellungscode verwenden.',
   'auth.code_invalid': 'Der Authenticator-Code ist falsch.',

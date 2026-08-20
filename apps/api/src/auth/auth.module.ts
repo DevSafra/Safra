@@ -11,6 +11,7 @@ import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { AuthTokenService } from './auth-token.service.js';
 import { CustomerAccountService } from './customer-account.service.js';
+import { LoginCodeService } from './login-code.service.js';
 import { TokenService } from './token.service.js';
 import { TwoFactorController } from './two-factor.controller.js';
 import { TwoFactorService } from './two-factor.service.js';
@@ -27,6 +28,7 @@ import { TwoFactorService } from './two-factor.service.js';
     AccountRecoveryService,
     CustomerAccountService,
     TwoFactorService,
+    LoginCodeService,
     PasswordService,
     FieldEncryptionService,
     MailService,

@@ -241,9 +241,33 @@ export const loginSchema = z
       .toUpperCase()
       .regex(/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/)
       .optional(),
+    /**
+     * The code EMAILED to a partner, since 2026-08-20 (Bashar).
+     *
+     * Six digits like `totpCode` and validated the same way, but a separate field: the two are
+     * different secrets from different places, and one field would mean the server guessing which
+     * the caller meant — the wrong guess being an attacker feeding a stale email code where an
+     * authenticator was expected.
+     */
+    emailCode: z
+      .string()
+      .regex(/^\d{6}$/, ERROR.VALIDATION_CODE_SIX_DIGITS)
+      .optional(),
   })
   .strict();
 export type LoginInput = z.infer<typeof loginSchema>;
+
+/**
+ * Asking for another emailed code.
+ *
+ * It carries the PASSWORD, not just the address, and that is deliberate: a body with only an email
+ * would let anybody post codes at a stranger's inbox all day. Proving the password first makes the
+ * resend available to exactly the person who is already halfway through signing in.
+ */
+export const loginCodeResendSchema = z
+  .object({ email: emailSchema, password: z.string().min(1).max(256) })
+  .strict();
+export type LoginCodeResendInput = z.infer<typeof loginCodeResendSchema>;
 
 /**
  * The refresh token itself travels in an HttpOnly cookie, never in the body — a

@@ -341,6 +341,28 @@ export function requiresTwoFactor(role: Role): boolean {
 }
 
 /**
+ * Roles that must ENROL AN AUTHENTICATOR — staff only since 2026-08-20 (Bashar).
+ *
+ * A third list, and the third question. The two above ask "may this person open the staff tooling"
+ * and "must this person prove a second factor"; this one asks "must that factor be a TOTP app".
+ *
+ * They separated when partners stopped being made to enrol one. A partner still proves a second
+ * factor at every sign-in — `requiresTwoFactor` is unchanged and still includes them — but the
+ * factor is a code emailed to them, so there is nothing to enrol and nothing to set up before they
+ * can work. Partners MAY still enrol an authenticator, and one who does is asked for that instead;
+ * it is an upgrade they choose, not a gate they pass.
+ *
+ * Staff are not offered the choice. The console holds every registry, the ledger, payouts and
+ * emergency mode, it is used by a handful of people who can be asked to install an app, and a
+ * mailbox is a weaker thing to stand between an attacker and all of that.
+ */
+export const AUTHENTICATOR_ROLES: Role[] = [...STAFF_ROLES];
+
+export function requiresAuthenticator(role: Role): boolean {
+  return AUTHENTICATOR_ROLES.includes(role);
+}
+
+/**
  * Grants a role can be given at RUNTIME, without a deploy.
  *
  * Deliberately a tiny, closed list rather than a general "edit any role" facility.

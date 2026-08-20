@@ -16,12 +16,14 @@ import {
   type AuthUser,
   type LoginInput,
   type RegisterInput,
+  requiresAuthenticator,
   requiresTwoFactor,
 } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import { PasswordService } from '../common/crypto/password.service.js';
+import { LoginCodeService } from './login-code.service.js';
 import { TokenService, type IssuedTokens } from './token.service.js';
 import { TwoFactorService } from './two-factor.service.js';
 import { unauthorized, unavailable } from '../common/errors/app-error.js';
@@ -50,6 +52,24 @@ export class SecondFactorRequiredException extends UnauthorizedException {
       statusCode: HttpStatus.UNAUTHORIZED,
       code: ERROR.AUTH_CODE_REQUIRED,
       message: errorMessage(ERROR.AUTH_CODE_REQUIRED, 'en'),
+    });
+  }
+}
+
+/**
+ * Thrown when the password was accepted and a code has been EMAILED (Bashar, 2026-08-20).
+ *
+ * A sibling of `SecondFactorRequiredException`, not a reuse of it, because the two send the reader
+ * to completely different places: one to an authenticator app, one to their inbox. A single
+ * exception would make the sign-in form guess, and it would guess wrong for whichever kind of
+ * partner is not the majority.
+ */
+export class EmailCodeSentException extends UnauthorizedException {
+  constructor() {
+    super({
+      statusCode: HttpStatus.UNAUTHORIZED,
+      code: ERROR.AUTH_EMAIL_CODE_SENT,
+      message: errorMessage(ERROR.AUTH_EMAIL_CODE_SENT, 'en'),
     });
   }
 }
@@ -91,6 +111,7 @@ export class AuthService {
     private readonly tokens: TokenService,
     private readonly encryption: FieldEncryptionService,
     private readonly twoFactor: TwoFactorService,
+    private readonly loginCodes: LoginCodeService,
   ) {}
 
   /**
@@ -258,6 +279,41 @@ export class AuthService {
       `TwoFactorGuard` down to enrolment and nothing else, so "may sign in" and "may act" are two
       different questions with two different answers.
     */
+    /**
+     * A second factor the account did NOT have to enrol (Bashar, 2026-08-20).
+     *
+     * Reached by anyone who must prove a second factor and has no authenticator — in practice
+     * every partner, since staff are still made to enrol one and customers are not asked for a
+     * factor at all. A six-digit code goes to their inbox and the sign-in pauses exactly where it
+     * pauses for TOTP.
+     *
+     * BELOW the password check and the lock check, so a code is never sent to an address on the
+     * strength of a wrong password. That is not politeness — an endpoint that emails on a failed
+     * guess is a way to post mail at anybody whose address you know.
+     *
+     * The branch is skipped once `emailCode` is present, because that request is the second half
+     * of a sign-in already in progress; re-issuing here would invalidate the code being submitted.
+     */
+    if (
+      requiresTwoFactor(user.role) &&
+      !requiresAuthenticator(user.role) &&
+      !user.totpEnabledAt
+    ) {
+      if (!input.emailCode) {
+        await this.loginCodes.issue(
+          user.id,
+          user.email,
+          user.preferredLocale ?? 'ar',
+          context,
+        );
+
+        throw new EmailCodeSentException();
+      }
+
+      /* Throws on a wrong, spent or expired code — and counts the attempt against that code. */
+      await this.loginCodes.verify(user.id, input.emailCode);
+    }
+
     if (requiresTwoFactor(user.role) && user.totpEnabledAt && user.totpSecretEncrypted) {
       if (!input.totpCode && !input.recoveryCode) {
         throw new SecondFactorRequiredException();
@@ -334,6 +390,61 @@ export class AuthService {
       .where(eq(schema.users.id, user.id));
 
     return this.completeLogin(user, context);
+  }
+
+  /**
+   * Issues another sign-in code, or quietly does nothing.
+   *
+   * ## Every refusal is silent
+   *
+   * A wrong password, an unknown address, a customer, a partner with an authenticator — all return
+   * without sending anything and without saying why. The caller learns nothing about who has an
+   * account, which is the property `O-sec-2` established on registration and this endpoint would
+   * otherwise give straight back.
+   *
+   * The one thing a caller CAN observe is the rate limit inside `LoginCodeService`, and that is
+   * counted per ACCOUNT — so it only ever fires for somebody who has already proved the password.
+   *
+   * ## A failed attempt here does NOT count toward the lockout
+   *
+   * Deliberately. The lockout is about guessing a password, and this route cannot be used to
+   * guess one faster than `/auth/login` already allows; charging it twice would let a resend
+   * button lock somebody out of their own account.
+   */
+  async resendLoginCode(
+    input: { email: string; password: string },
+    context: RequestContext,
+  ): Promise<void> {
+    const user = await this.db.query.users.findFirst({
+      where: and(eq(schema.users.email, input.email), isNull(schema.users.deletedAt)),
+    });
+
+    if (!user?.passwordHash) {
+      /* Same CPU as a real verification, so the silence is silent to a stopwatch too. */
+      await this.passwords.verifyDummy(input.password);
+
+      return;
+    }
+
+    if (!(await this.passwords.verify(user.passwordHash, input.password))) return;
+
+    if (user.status !== 'active') return;
+
+    /* Only the accounts whose second factor IS an emailed code. */
+    if (
+      !requiresTwoFactor(user.role) ||
+      requiresAuthenticator(user.role) ||
+      user.totpEnabledAt
+    ) {
+      return;
+    }
+
+    await this.loginCodes.issue(
+      user.id,
+      user.email,
+      user.preferredLocale ?? 'ar',
+      context,
+    );
   }
 
   async refresh(refreshToken: string, context: RequestContext): Promise<AuthResult> {

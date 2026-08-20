@@ -39,6 +39,14 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [awaitingCode, setAwaitingCode] = useState(false);
+  /**
+   * Whether the code was EMAILED rather than produced by an authenticator.
+   *
+   * Drives the wording of step two and whether the resend button is there at all — an
+   * authenticator needs no resending, and offering it would be a button that does nothing.
+   */
+  const [byEmail, setByEmail] = useState(false);
+  const [resent, setResent] = useState(false);
 
   /*
     Held in state across the two steps because the API's login is a single call that takes all
@@ -111,6 +119,14 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
       }
 
       if (status === 401 && needsSecondFactor(payload)) {
+        /*
+          Which kind of code, so step two can say where to look. The API answers
+          `auth.email_code_sent` for a partner who has no authenticator — the ordinary case since
+          2026-08-20 — and `auth.code_required` for one who chose to enrol. Telling somebody to
+          "open your authenticator app" when the code is sitting in their inbox is the whole reason
+          these are two error codes rather than one.
+        */
+        setByEmail(codeOf(payload) === ERROR.AUTH_EMAIL_CODE_SENT);
         setAwaitingCode(true);
         setBusy(false);
         return;
@@ -120,6 +136,39 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
       setBusy(false);
     } catch {
       setError(t.login.unreachable);
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Asks for another code.
+   *
+   * The password goes with it, because the endpoint requires one — a resend that took only an
+   * address would be a way to post mail at any inbox whose owner had an account here. It is
+   * already in state from step one, so the partner is not asked for it twice.
+   *
+   * The answer is always `ok`, whatever the server decided, so there is nothing to distinguish and
+   * nothing to leak. The message says a code was sent because from here it always was.
+   */
+  async function resendCode() {
+    if (busy) return;
+
+    setBusy(true);
+    setError(null);
+    setResent(false);
+
+    try {
+      const response = await fetch('/api/auth/login/resend-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (response.ok) setResent(true);
+      else setError(t.login.codeResendFailed);
+    } catch {
+      setError(t.login.unreachable);
+    } finally {
       setBusy(false);
     }
   }
@@ -142,9 +191,12 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
       const { ok, status } = await attempt({
         email,
         password,
-        ...(TOTP_PATTERN.test(entered)
-          ? { totpCode: entered }
-          : { recoveryCode: entered.toUpperCase() }),
+        ...(byEmail
+          ? /* An emailed code is always six digits — there is no recovery form of it. */
+            { emailCode: entered }
+          : TOTP_PATTERN.test(entered)
+            ? { totpCode: entered }
+            : { recoveryCode: entered.toUpperCase() }),
       });
 
       if (ok) {
@@ -196,13 +248,33 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
           */}
           <Field
             name="code"
-            label={t.login.codeTitle}
-            hint={t.login.codeLabel}
+            label={byEmail ? t.login.codeTitleEmail : t.login.codeTitle}
+            hint={byEmail ? t.login.codeLabelEmail : t.login.codeLabel}
             dir="ltr"
-            inputMode="text"
+            inputMode={byEmail ? 'numeric' : 'text'}
             autoComplete="one-time-code"
             required
           />
+
+          {/*
+            Resending only makes sense for a code somebody is WAITING for. An authenticator
+            produces its own, so the button would do nothing but invite a press.
+          */}
+          {byEmail ? (
+            <div className="grid gap-1">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  void resendCode();
+                }}
+                className="w-fit cursor-pointer text-sm text-muted underline-offset-4 hover:text-gold hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {busy ? t.login.codeResending : t.login.codeResend}
+              </button>
+              {resent ? <p className="text-xs text-ok">{t.login.codeResent}</p> : null}
+            </div>
+          ) : null}
 
           <button
             type="submit"
@@ -337,5 +409,14 @@ function needsSecondFactor(body: unknown): boolean {
 
   const { code } = body;
 
-  return code === ERROR.AUTH_CODE_REQUIRED;
+  return code === ERROR.AUTH_CODE_REQUIRED || code === ERROR.AUTH_EMAIL_CODE_SENT;
+}
+
+/** The error code in a response body, if it carries one. */
+function codeOf(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null || !('code' in body)) return null;
+
+  const { code } = body;
+
+  return typeof code === 'string' ? code : null;
 }

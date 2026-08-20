@@ -6,6 +6,7 @@ import type { Database } from '@safra/db';
 import { AuthService, SecondFactorRequiredException } from './auth.service.js';
 import type { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import type { PasswordService } from '../common/crypto/password.service.js';
+import type { LoginCodeService } from './login-code.service.js';
 import type { TokenService } from './token.service.js';
 import type { TwoFactorService } from './two-factor.service.js';
 
@@ -63,6 +64,11 @@ describe('AuthService.login — second factor outstanding', () => {
         encrypt: (v: string) => v,
       } as unknown as FieldEncryptionService,
       {} as unknown as TwoFactorService,
+      /*
+      Never reached: every path here either has no second factor or has an authenticator enrolled,
+      and a partner without one is what `login-code.service` covers in its own suite.
+    */
+      {} as unknown as LoginCodeService,
     );
   }
 

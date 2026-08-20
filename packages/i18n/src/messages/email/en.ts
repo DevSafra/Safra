@@ -35,9 +35,14 @@ export const en = {
     subject: 'About your partnership request — {reference}',
     body: 'Thank you for your time and for your interest in SAFRA.\n\nAfter reviewing request {reference} we are not able to proceed at this time.\n\nReason:\n{reason}\n\nIf any of that changes, you are welcome to apply again here:\n{url}\n\nThe SAFRA team',
   },
+  partnerLoginCode: {
+    subject: 'Your sign-in code — SAFRA',
+    body: 'Your code for the partner portal:\n\n{code}\n\nIt expires in {expiresInMinutes} minutes and can be used once.\n\nIf you did not try to sign in, ignore this message and change your password — whoever asked for this code knows your current one.\n\nThe SAFRA team will never ask you for this code, by phone or by message.\n\nThe SAFRA team',
+  },
+
   partnerInvitation: {
     subject: 'Your partnership request was accepted — create your partner account',
-    body: 'Partnership request {reference} has been accepted. Welcome to SAFRA.\n\nOpen the link below to set your account password:\n{url}\n\nThe link expires in {expiresInHours} hours and can be used once. After setting a password you will be asked to enrol in two-factor authentication, which is mandatory for partner accounts.\n\nWe will never send you a password in a message. If you receive one, it is not from us.\n\nYour account stays under review until our team has checked your documents and the signed contract. Until then you can prepare your property details; you cannot add prices, dates or images.\n\nIf you did not apply to become a partner, do not open the link and tell us.\n\nThe SAFRA team',
+    body: 'Partnership request {reference} has been accepted. Welcome to SAFRA.\n\nOpen the link below to set your account password:\n{url}\n\nThe link expires in {expiresInHours} hours and can be used once. After setting a password you can sign in straight away. Each time you sign in we email a six-digit code to this address, and you enter it to finish signing in.\n\nWe will never send you a password in a message. If you receive one, it is not from us.\n\nYour account stays under review until our team has checked your documents and the signed contract. Until then you can prepare your property details; you cannot add prices, dates or images.\n\nIf you did not apply to become a partner, do not open the link and tell us.\n\nThe SAFRA team',
   },
 
   /** The contract KINDS, in the reader's language — `partner_contract_kind` in the schema. */

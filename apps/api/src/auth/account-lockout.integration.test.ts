@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
 
+import type { LoginCodeService } from './login-code.service.js';
 import { AuthService } from './auth.service.js';
 import { PasswordService } from '../common/crypto/password.service.js';
 import type { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
@@ -45,6 +46,11 @@ describeIfDb('the account lockout', () => {
       decryptForRotation: () => ({ plaintext: '', needsReEncryption: false }),
     } as unknown as FieldEncryptionService,
     {} as unknown as TwoFactorService,
+    /*
+      Never reached: every path here either has no second factor or has an authenticator enrolled,
+      and a partner without one is what `login-code.service` covers in its own suite.
+    */
+    {} as unknown as LoginCodeService,
   );
 
   const PASSWORD = 'a-correct-password-1';

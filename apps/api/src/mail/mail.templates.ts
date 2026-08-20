@@ -209,6 +209,30 @@ export function partnerApplicationRejectedMail(input: {
  * secret relative to its own inbox. An invitation is not: it is single-use, it expires in 72
  * hours, and it goes to the same mailbox as the password reset — which is not marked either.
  */
+/**
+ * The six-digit code a partner needs to finish signing in (Bashar, 2026-08-20).
+ *
+ * No link, deliberately — see `LINKLESS` in `completeness.test.ts`. A code mail that also carries
+ * a link is the exact shape of the phishing mail impersonating it.
+ */
+export function partnerLoginCodeMail(input: {
+  to: string;
+  code: string;
+  locale: string;
+  expiresInMinutes: number;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).partnerLoginCode;
+
+  return {
+    to: input.to,
+    subject: copy.subject,
+    text: fill(copy.body, {
+      code: input.code,
+      expiresInMinutes: input.expiresInMinutes,
+    }),
+  };
+}
+
 export function partnerInvitationMail(input: {
   to: string;
   reference: string;

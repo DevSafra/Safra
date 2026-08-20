@@ -17,6 +17,7 @@ import type { Request, Response } from 'express';
 import {
   ERROR,
   type EmailVerificationConfirmInput,
+  type LoginCodeResendInput,
   type LoginInput,
   type LoginResponse,
   type PasswordChangeInput,
@@ -25,6 +26,7 @@ import {
   type ProfileUpdateInput,
   type RegisterInput,
   emailVerificationConfirmSchema,
+  loginCodeResendSchema,
   loginSchema,
   passwordChangeSchema,
   passwordResetConfirmSchema,
@@ -222,6 +224,40 @@ export class AuthController {
       });
       throw error;
     }
+  }
+
+  /**
+   * «إعادة إرسال الرمز» — another sign-in code, for a partner whose mail was slow or lost.
+   *
+   * ## It takes the PASSWORD, not just an address
+   *
+   * A body carrying only an email would let anybody post codes at a stranger's inbox all day, and
+   * would confirm which addresses have accounts while doing it. Proving the password first makes
+   * this reachable by exactly one person: the one already halfway through signing in.
+   *
+   * ## The answer is the same whatever happened
+   *
+   * `{ ok: true }` for a wrong password, an unknown address, a customer, or a partner who has an
+   * authenticator and gets no email at all. Anything else turns this into the enumeration oracle
+   * that `O-sec-2` closed on registration. The refusal a caller CAN see is the rate limit, which
+   * says nothing about whether the account exists.
+   */
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @UseInterceptors(SignInRefundInterceptor)
+  @Post('login/resend-code')
+  @HttpCode(HttpStatus.OK)
+  @AuditExempt(
+    'The issue itself is logged by LoginCodeService; a refusal reveals nothing.',
+  )
+  @UsePipes(new ZodValidationPipe(loginCodeResendSchema))
+  async resendLoginCode(
+    @Body() body: LoginCodeResendInput,
+    @Req() request: Request,
+  ): Promise<{ ok: true }> {
+    await this.auth.resendLoginCode(body, contextOf(request));
+
+    return { ok: true };
   }
 
   /**
