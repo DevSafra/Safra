@@ -1,4 +1,3 @@
-import { authenticator } from 'otplib';
 import { test as setup } from '@playwright/test';
 
 import { partnerAr as t } from '../packages/i18n/src/partner.js';
@@ -25,7 +24,7 @@ import {
   PARTNER_EMAIL as EMAIL,
   PARTNER_PASSWORD as PASSWORD,
   PARTNER_STATE,
-  PARTNER_TOTP_SECRET as SECRET,
+  signInCodeFor,
 } from './partner-session.js';
 
 /*
@@ -42,23 +41,29 @@ import {
   The projects still run in order — see `playwright.config.ts` — because staff and partner specs
   share a database, not a rate limit.
 */
-setup('capture a partner session', async ({ page, context }) => {
+setup('capture a partner session', async ({ page, context, request }) => {
+  /* Before the password goes in, so a mail that arrives mid-request is still inside the window. */
+  const since = new Date();
+
   await page.goto(`${BASE}/login`);
   await page.getByLabel(t.login.email).fill(EMAIL);
   await page.getByLabel(t.login.password, { exact: true }).fill(PASSWORD);
   await page.getByRole('button', { name: t.login.submit }).click();
 
-  /* A code with only a moment left would expire between generation and submission. */
-  if (authenticator.timeRemaining() < 5) {
-    await new Promise((resolve) => setTimeout(resolve, 6000));
-  }
-
   /*
-    `codeTitle`, not `codeLabel`. The sign-in form was rebuilt to the console's shape on 2026-08-13,
-    where a field has a short LABEL and a longer HINT — so the label is «رمز التحقق» and the sentence
-    about six digits or a recovery code is the hint, which `getByLabel` does not match.
+    The code comes from the INBOX now (Bashar, 2026-08-20).
+
+    It used to be generated from a shared TOTP secret — offline, instant, and provable without any
+    mail moving at all. A partner's second factor is emailed since that date, so reading it is the
+    only way to finish a sign-in, and reading it also proves the mail is genuinely sent and
+    genuinely carries a code. `signInCodeFor` polls, because delivery goes through the queue.
+
+    `codeTitleEmail`, not `codeTitle`: step two words itself for whichever factor was asked for,
+    and a partner with no authenticator is asked for the emailed one.
   */
-  await page.getByLabel(t.login.codeTitle).fill(authenticator.generate(SECRET));
+  await page
+    .getByLabel(t.login.codeTitleEmail)
+    .fill(await signInCodeFor(request, EMAIL, since));
   await page.getByRole('button', { name: t.login.codeSubmit }).click();
 
   await page.waitForURL(`${BASE}/`);

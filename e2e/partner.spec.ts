@@ -1,4 +1,3 @@
-import { authenticator } from 'otplib';
 import { expect, test } from '@playwright/test';
 
 import { partnerAr as t } from '../packages/i18n/src/partner.js';
@@ -7,8 +6,9 @@ import {
   PARTNER_EMAIL,
   PARTNER_PASSWORD as PASSWORD,
   PARTNER_STATE,
-  PARTNER_TOTP_SECRET,
-  UNENROLLED_PARTNER_EMAIL as UNENROLLED_EMAIL,
+  SECOND_PARTNER_EMAIL,
+  THIRD_PARTNER_EMAIL,
+  signInCodeFor,
 } from './partner-session.js';
 
 /**
@@ -27,15 +27,6 @@ import {
  * `partner1` owns three of the six seeded listings. The API scopes `listOwn` to the `partnerId` in
  * the verified token, so a partner seeing four would mean that scoping had broken — which is the
  * one bug in this app that would matter to somebody other than the person looking at it.
- */
-
-/**
- * The fixture partners' shared authenticator secret, and the one partner deliberately without it.
- *
- * `db:testbed` enrols partner1 and partner2 and leaves partner3 unenrolled — see the note on
- * `twoFactorEnrolled` in the seed. partner3 is the FORCED-ENROLMENT fixture: an account that
- * existed before 2FA was mandatory, which is the migration behaviour this suite has to keep
- * proving rather than assume.
  */
 
 /** Skipped rather than failed where the testbed has not been seeded — see `pnpm db:testbed`. */
@@ -72,26 +63,23 @@ test.describe('the partner dashboard', () => {
    * and arrived at the dashboard. The assertion above proved the parameter was SET; nothing proved it
    * was USED, which is exactly the gap a parameter gets dropped through.
    *
-   * It has to be the ENROLLED partner and a real code: an unenrolled one is held at `/enrol-2fa` by
-   * middleware whatever the form does, so testing with them would pass against the bug. That costs one
-   * sign-in from the budget, and it is the only path that can catch this.
+   * It signs in for real, through both steps, because that is the only path that can catch this —
+   * a stored session never visits the login form. It costs one sign-in from the budget.
    */
-  test('returns a partner to where they were going', async ({ page }) => {
+  test('returns a partner to where they were going', async ({ page, request }) => {
     await page.context().clearCookies();
+
+    /* Taken before the password goes in, so a mail arriving mid-request is inside the window. */
+    const since = new Date();
 
     await page.goto(`${BASE}/login?next=%2Fproperties`);
     await page.getByLabel(t.login.email).fill(PARTNER_EMAIL);
     await page.getByLabel(t.login.password, { exact: true }).fill(PASSWORD);
     await page.getByRole('button', { name: t.login.submit }).click();
 
-    /* A code with only a moment left would expire between generation and submission. */
-    if (authenticator.timeRemaining() < 5) {
-      await new Promise((resolve) => setTimeout(resolve, 6_000));
-    }
-
     await page
-      .getByLabel(t.login.codeTitle)
-      .fill(authenticator.generate(PARTNER_TOTP_SECRET));
+      .getByLabel(t.login.codeTitleEmail)
+      .fill(await signInCodeFor(request, PARTNER_EMAIL, since));
     await page.getByRole('button', { name: t.login.codeSubmit }).click();
 
     /* `/properties`, not `/` — the whole assertion. */
@@ -307,64 +295,83 @@ test.describe('the partner dashboard', () => {
 });
 
 /**
- * Mandatory two-factor authentication for partners (Bashar, 2026-08-07).
+ * A partner's second factor, which is a code emailed at every sign-in (Bashar, 2026-08-20).
  *
- * ## Why this is a browser test and not only an integration one
+ * ## What this replaced
  *
- * The refusal that MATTERS is `TwoFactorGuard`'s, and that is covered by unit and integration
- * tests. What those cannot see is the journey: whether a partner who signs in actually arrives
- * somewhere they can act on, or at a dashboard that renders empty because every call behind it was
- * refused. A gate enforced perfectly on the server and forgotten in the app is a partner staring
- * at a broken screen with no idea what to do — which is how the console's own 2FA gap stayed
- * invisible for months, in the opposite direction.
+ * Until that date partners had to enrol a TOTP app, and this block asserted the gate: an
+ * unenrolled partner was held at `/enrol-2fa` and could reach nothing else. That requirement is
+ * gone — a partner proves a code sent to their inbox, so there is nothing to enrol and nobody to
+ * hold. The tests were rewritten rather than deleted, because the REQUIREMENT moved rather than
+ * disappeared: a partner still cannot get in on a password alone.
  *
- * ## One sign-in per test, and why there are only two
+ * ## Why a browser test and not only an integration one
  *
- * `POST /auth/login` allows five calls a minute per IP and the staff specs already spend most of
- * them. These two are the smallest set that covers the requirement: an unenrolled partner is held
- * at enrolment, and an enrolled one is asked for a code. The rest — recovery codes, the reset path,
- * what the API refuses — is proven in `partner-two-factor.integration.test.ts`, without a browser
- * and without the limiter.
+ * The refusal that matters is the API's, and that is covered without a browser. What those tests
+ * cannot see is the journey: whether somebody who signs in actually arrives somewhere they can act
+ * on. A second factor enforced perfectly on the server and forgotten in the app is a partner
+ * staring at a screen they cannot pass — which is exactly the shape of the bug this change was
+ * made to fix, where the invitation page did not exist and every accepted partner was stranded.
+ *
+ * ## Two tests, and why so few
+ *
+ * `POST /auth/login` is rate limited per (IP, account) and the suite has a budget. These are the
+ * smallest pair that covers the requirement: a password alone does not get in, and the emailed
+ * code does. The rest — expiry, reuse, attempt limits, the resend throttle — is proven in
+ * `login-code.service` territory without a browser and without the limiter.
  */
-test.describe('partner two-factor authentication', () => {
+test.describe('the partner sign-in code', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   /**
-   * Requirement 1: an existing partner is forced into enrolment on their next sign-in.
+   * A password alone is not enough, and the form says where to look.
    *
-   * partner3 has a password and no second factor, which is exactly the state every partner was in
-   * the day before this shipped. They must be able to SIGN IN — refusing them would lock out every
-   * existing partner with no way back, since enrolling needs a session — and must then be able to
-   * reach nothing but enrolment.
+   * The wording is asserted, not just the pause. «افتح تطبيق المصادقة» to somebody whose code is
+   * sitting in their inbox is a person hunting their phone for an app they never installed — which
+   * is why the API answers with two different codes and the form reads them.
    */
-  test('holds an unenrolled partner at enrolment and nowhere else', async ({ page }) => {
+  test('stops at a code step and points at the inbox', async ({ page }) => {
+    /* Its own account — see `THIRD_PARTNER_EMAIL` on why these two must not share an inbox. */
     await page.goto(`${BASE}/login`);
-    await page.getByLabel(t.login.email).fill(UNENROLLED_EMAIL);
+    await page.getByLabel(t.login.email).fill(THIRD_PARTNER_EMAIL);
     await page.getByLabel(t.login.password, { exact: true }).fill(PASSWORD);
     await page.getByRole('button', { name: t.login.submit }).click();
 
-    // No code step: the API asks only accounts that have already enrolled.
-    await page.waitForURL(/\/enrol-2fa/);
+    await expect(page.getByLabel(t.login.codeTitleEmail)).toBeVisible();
+    await expect(page.getByText(t.login.codeLabelEmail)).toBeVisible();
 
-    // The screen says WHY, not merely what to type.
-    await expect(page.getByRole('heading', { name: t.twoFactor.title })).toBeVisible();
-    await expect(page.getByText(t.twoFactor.why)).toBeVisible();
+    /* Still on the sign-in page: no session was issued on the password alone. */
+    await expect(page).toHaveURL(/\/login/);
 
-    /*
-      The setup key is really there — the enrolment call reached the API and came back. An empty
-      box here is the failure this test exists for: the gate would redirect correctly and the
-      partner would have nothing to scan.
-    */
-    await expect(page.getByText(t.twoFactor.loading)).toHaveCount(0);
+    /* And a way to ask again, for the mail that never arrives. */
+    await expect(page.getByRole('button', { name: t.login.codeResend })).toBeVisible();
+  });
 
-    // Every other section bounces straight back. Asserted per route, not once.
-    for (const path of ['/', '/properties', '/reviews']) {
-      await page.goto(`${BASE}${path}`);
-      await expect(page).toHaveURL(/\/enrol-2fa/);
-    }
+  /**
+   * The code from the inbox completes the sign-in — and lands on the DASHBOARD.
+   *
+   * `/enrol-2fa` is asserted against explicitly. Until 2026-08-20 middleware sent every unenrolled
+   * partner there and let them reach nothing else; leaving that in place after the second factor
+   * moved would have trapped every partner on the platform on a screen they were never asked to
+   * complete. This is the assertion that would have caught it.
+   */
+  test('completes the sign-in with the code from the inbox', async ({
+    page,
+    request,
+  }) => {
+    const since = new Date();
 
-    // And the dead end has a way out.
-    await page.getByRole('button', { name: t.twoFactor.signOut }).click();
-    await page.waitForURL(/\/login/);
+    await page.goto(`${BASE}/login`);
+    await page.getByLabel(t.login.email).fill(SECOND_PARTNER_EMAIL);
+    await page.getByLabel(t.login.password, { exact: true }).fill(PASSWORD);
+    await page.getByRole('button', { name: t.login.submit }).click();
+
+    await page
+      .getByLabel(t.login.codeTitleEmail)
+      .fill(await signInCodeFor(request, SECOND_PARTNER_EMAIL, since));
+    await page.getByRole('button', { name: t.login.codeSubmit }).click();
+
+    await page.waitForURL(`${BASE}/`, { timeout: 20_000 });
+    expect(new URL(page.url()).pathname).toBe('/');
   });
 });
