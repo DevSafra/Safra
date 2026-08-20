@@ -736,6 +736,30 @@ async function build(db: Seeder): Promise<void> {
     sql`DELETE FROM wallets WHERE customer_profile_id IN (${testbedProfiles})`,
   );
   await db.execute(sql`DELETE FROM customer_profiles WHERE id IN (${testbedProfiles})`);
+
+  /*
+    Any partnership REQUEST that produced one of these partners, and the calls logged on it.
+
+    A request keeps `partner_id` pointing at what it became, so a testbed partner that was created
+    by ACCEPTING a request cannot be deleted while the request survives — and the seed died on
+    exactly that with a truncated `Failed query: DELETE FROM partners`.
+
+    It is not hypothetical: a tester who accepts the seeded request in the console turns
+    `customer@safra.test` into a partner, and from that moment `db:testbed` could not be run again
+    (Bashar, 2026-08-20). The seed already anticipates that acceptance a few lines further down,
+    where it soft-deletes the partner a previous run created; this is the same event, one foreign
+    key earlier.
+
+    Deleted rather than unlinked. A request whose partner is being removed describes something that
+    no longer exists, and leaving it would put a row in «طلبات الشراكة» pointing at nothing.
+  */
+  await db.execute(sql`DELETE FROM partner_application_contacts
+    WHERE application_id IN (
+      SELECT id FROM partner_applications WHERE partner_id IN (${testbedPartners}))`);
+  await db.execute(
+    sql`DELETE FROM partner_applications WHERE partner_id IN (${testbedPartners})`,
+  );
+
   await db.execute(sql`DELETE FROM partners WHERE id IN (${testbedPartners})`);
   /*
     Users are REUSED, not deleted.
@@ -793,6 +817,17 @@ async function build(db: Seeder): Promise<void> {
       somewhere; the recovery path is covered by `partner-two-factor.integration.test.ts`, which
       generates and consumes real ones.
     */
+    /*
+      Every fixture partner is UNENROLLED since 2026-08-20 (Bashar).
+
+      A partner's second factor is a code emailed at every sign-in; an authenticator is an upgrade
+      they may choose. Seeding one would put the fixtures on a path almost no real partner takes,
+      and — worse — the browser suite would silently keep exercising the TOTP form while the
+      emailed-code form, which is what every partner actually meets, went untested.
+
+      `twoFactorEnrolled` survives as a flag because a fixture that DOES enrol is still worth
+      having the day somebody tests the opt-in. Nothing sets it today.
+    */
     await db.execute(sql`
       UPDATE users
       SET totp_secret_encrypted = ${spec.twoFactorEnrolled ? encryptedPartnerSecret() : null},
@@ -817,17 +852,6 @@ async function build(db: Seeder): Promise<void> {
     */
     const [partner] = await db
       .insert(schema.partners)
-    /*
-      Every fixture partner is UNENROLLED since 2026-08-20 (Bashar).
-
-      A partner's second factor is a code emailed at every sign-in; an authenticator is an upgrade
-      they may choose. Seeding one would put the fixtures on a path almost no real partner takes,
-      and — worse — the browser suite would silently keep exercising the TOTP form while the
-      emailed-code form, which is what every partner actually meets, went untested.
-
-      `twoFactorEnrolled` survives as a flag because a fixture that DOES enrol is still worth
-      having the day somebody tests the opt-in. Nothing sets it today.
-    */
       .values({
         id: spec.id,
         userId: user.id,
