@@ -3,14 +3,29 @@ import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
-import type { PartnerVerifyInput, PropertyReviewInput } from '@safra/contracts';
+import type {
+  PageQuery,
+  PartnerVerifyInput,
+  PropertyReviewInput,
+} from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { SanctionsService } from '../sanctions/sanctions.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { ERROR, SLA_EXPIRY_WARNING_MINUTES } from '@safra/contracts';
+import {
+  COUNT_CAP,
+  ERROR,
+  SLA_EXPIRY_WARNING_MINUTES,
+  offsetPage,
+} from '@safra/contracts';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
+import {
+  assertCanRead,
+  assertCanWrite,
+  scopeCondition,
+  scopeFilter,
+} from '../rbac/scope.sql.js';
 
 /**
  * Staff verification of partners and listings (SRS §8.1, §9.2).
@@ -27,58 +42,137 @@ export class ReviewService {
     private readonly sanctions: SanctionsService,
   ) {}
 
-  /** §9.2's "properties awaiting approval" queue, oldest first so nothing rots. */
-  async pendingProperties(limit = 50) {
-    return this.db.query.properties.findMany({
-      where: and(
-        eq(schema.properties.status, 'pending_review'),
-        isNull(schema.properties.deletedAt),
-      ),
-      columns: {
-        reference: true,
-        slug: true,
-        nameAr: true,
-        nameEn: true,
-        address: true,
-        latitude: true,
-        longitude: true,
-        descriptionAr: true,
-        createdAt: true,
-        reviewNotes: true,
-      },
-      with: {
-        partner: { columns: { reference: true, displayName: true, verification: true } },
-        city: { columns: { slug: true, nameAr: true } },
-      },
-      orderBy: (p, { asc }) => [asc(p.createdAt)],
-      limit,
-    });
+  /**
+   * §9.2's "properties awaiting approval" queue, oldest first so nothing rots.
+   *
+   * PAGED since 2026-08-20 — see `pendingPartners` for what the unpaged version cost.
+   */
+  async pendingProperties(query: PageQuery, actor?: AccessTokenClaims) {
+    /*
+      ONE predicate, used by the page and by the count.
+
+      The house rule is "a count and its list must share one `FROM … WHERE` fragment", and the
+      relational query builder has no fragment to share — so the shared thing is this variable. A
+      second predicate written out for the count is the drift the rule exists to prevent: «٥٢٧» over
+      a list that runs out at fifty is worse than no total at all.
+    */
+    const where = and(
+      eq(schema.properties.status, 'pending_review'),
+      isNull(schema.properties.deletedAt),
+      /* Staff scope, as a drizzle condition — see `scopeCondition`. */
+      scopeCondition(actor, schema.properties.cityId),
+    );
+
+    const [items, counted] = await Promise.all([
+      this.db.query.properties.findMany({
+        where,
+        columns: {
+          reference: true,
+          slug: true,
+          nameAr: true,
+          nameEn: true,
+          address: true,
+          latitude: true,
+          longitude: true,
+          descriptionAr: true,
+          createdAt: true,
+          reviewNotes: true,
+        },
+        with: {
+          partner: {
+            columns: { reference: true, displayName: true, verification: true },
+          },
+          city: { columns: { slug: true, nameAr: true } },
+        },
+        orderBy: (p, { asc }) => [asc(p.createdAt)],
+        limit: query.limit,
+        offset: (query.page - 1) * query.limit,
+      }),
+      /*
+        The SAME scope, in the count.
+
+        A count that ignored it would print «٥٢٧ نتيجة» over a list of nothing — the exact drift the
+        pagination rule forbids ("a count built from a separately written predicate DRIFTS from the
+        list it describes"). The two are different SQL dialects here because the list uses the
+        relational builder and the count needs a LIMIT subquery, so the guarantee is a test:
+        `review-queues.integration.test.ts` asserts the total equals what a scoped actor can page.
+      */
+      this.cappedCount(sql`
+        SELECT 1 FROM properties
+         WHERE status = 'pending_review' AND deleted_at IS NULL
+           AND ${scopeFilter(actor, 'city_id')}
+      `),
+    ]);
+
+    return offsetPage(items, counted, query);
   }
 
-  /** §9.2's "partners awaiting approval". */
-  async pendingPartners(limit = 50) {
-    return this.db.query.partners.findMany({
-      where: and(
-        eq(schema.partners.verification, 'pending'),
-        isNull(schema.partners.deletedAt),
-      ),
-      columns: {
-        reference: true,
-        displayName: true,
-        legalName: true,
-        email: true,
-        phone: true,
-        verification: true,
-        sanctionsScreenedAt: true,
-        createdAt: true,
-      },
-      with: {
-        documents: { columns: { kind: true, status: true, fileName: true } },
-        city: { columns: { slug: true, nameAr: true } },
-      },
-      orderBy: (p, { asc }) => [asc(p.createdAt)],
-      limit,
-    });
+  /**
+   * §9.2's "partners awaiting approval".
+   *
+   * ## Paged since 2026-08-20, and it was not before
+   *
+   * It took `limit = 50` and the screen rendered whatever came back — no page, no size, no total.
+   * With 527 partners awaiting verification, 477 of them were unreachable through the console and
+   * nothing on the screen said so, so the queue looked fifty deep. The sidebar badge beside it
+   * counted the real figure, which is the shape of the bug: two numbers on one screen, one of them
+   * describing a set the reader could not get to.
+   *
+   * This is a WORK queue, so oldest-first is kept — paging it does not change the order somebody
+   * drains it in, it just stops the bottom of the backlog being invisible.
+   */
+  async pendingPartners(query: PageQuery, actor?: AccessTokenClaims) {
+    const where = and(
+      eq(schema.partners.verification, 'pending'),
+      isNull(schema.partners.deletedAt),
+      scopeCondition(actor, schema.partners.cityId),
+    );
+
+    const [items, counted] = await Promise.all([
+      this.db.query.partners.findMany({
+        where,
+        columns: {
+          reference: true,
+          displayName: true,
+          legalName: true,
+          email: true,
+          phone: true,
+          verification: true,
+          sanctionsScreenedAt: true,
+          createdAt: true,
+        },
+        with: {
+          documents: { columns: { kind: true, status: true, fileName: true } },
+          city: { columns: { slug: true, nameAr: true } },
+        },
+        orderBy: (p, { asc }) => [asc(p.createdAt)],
+        limit: query.limit,
+        offset: (query.page - 1) * query.limit,
+      }),
+      /* The same scope, in the count — see `pendingProperties`. */
+      this.cappedCount(sql`
+        SELECT 1 FROM partners
+         WHERE verification = 'pending' AND deleted_at IS NULL
+           AND ${scopeFilter(actor, 'city_id')}
+      `),
+    ]);
+
+    return offsetPage(items, counted, query);
+  }
+
+  /**
+   * `count(*)` over a `LIMIT COUNT_CAP + 1` subquery, so the database stops reading.
+   *
+   * The same shape every registry uses. An uncapped `count(*)` on a queue that grows with the
+   * business is unbounded work on every page view, which rule 2 forbids — and past the cap the bar
+   * prints «أكثر من ١٠٠٠٠» rather than a figure nobody paid for.
+   */
+  private async cappedCount(fromWhere: ReturnType<typeof sql>): Promise<number> {
+    const rows = await this.db.execute<{ n: string }>(
+      sql`SELECT count(*)::text AS n FROM (${fromWhere} LIMIT ${COUNT_CAP + 1}) capped`,
+    );
+
+    return Number(rows.rows[0]?.n ?? 0);
   }
 
   /**
@@ -89,7 +183,7 @@ export class ReviewService {
    * verified, so a reviewer who cannot see that would approve and get a conflict they
    * have no way to explain.
    */
-  async propertyDetail(reference: string) {
+  async propertyDetail(reference: string, actor?: AccessTokenClaims) {
     const property = await this.db.query.properties.findFirst({
       where: and(
         eq(schema.properties.reference, reference),
@@ -109,6 +203,13 @@ export class ReviewService {
         reviewNotes: true,
         attributes: true,
         createdAt: true,
+        /*
+          Selected for the SCOPE CHECK and stripped before returning.
+
+          Every admin route keys on the §13.2 reference and deliberately returns no internal uuids,
+          so this leaves in the same object it arrived in — see the destructure below.
+        */
+        cityId: true,
       },
       with: {
         partner: {
@@ -149,7 +250,20 @@ export class ReviewService {
 
     if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);
 
-    return property;
+    /*
+      Scope, on the ROW, because there is no list to filter.
+
+      `scopeFilter` covers the registries; a detail screen is fetched by reference, so the row
+      arrives before it can be refused. That difference is why these two screens went unscoped while
+      nine registries did not — the predicate looked like it covered everything. Answers 404 rather
+      than 403 under `none`: "not yours" reads the same as "not there".
+    */
+    assertCanRead(actor, property.cityId);
+
+    /* `cityId` was for the check above; it does not belong in the response. */
+    const { cityId: _cityId, ...visible } = property;
+
+    return visible;
   }
 
   /**
@@ -170,10 +284,23 @@ export class ReviewService {
         eq(schema.properties.reference, reference),
         isNull(schema.properties.deletedAt),
       ),
-      columns: { id: true, status: true, partnerId: true },
+      columns: { id: true, status: true, partnerId: true, cityId: true },
     });
 
     if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);
+
+    /*
+      A WRITE outside scope is refused in BOTH modes.
+
+      `read_only` widens reads and nothing else — "you may look at the rest of the country, you may
+      not change it" — so this is `assertCanWrite`, not `assertCanRead`. It was missing entirely
+      until 2026-08-20: `assertCanWrite` was called in `dispute.service.ts` and
+      `advertising.service.ts` and nowhere else, so a city-scoped operations manager could approve or
+      reject a listing anywhere in the country. Nobody is scoped today — every staff row is
+      `all_cities` — which is why it had never been reachable, and why the console's scope map would
+      have been the feature that exposed it.
+    */
+    assertCanWrite(claims, property.cityId);
 
     if (property.status !== 'pending_review') {
       throw conflict(ERROR.PROPERTY_NOT_REVIEWABLE);
@@ -253,7 +380,7 @@ export class ReviewService {
    * isolated act; item 116 means their submitted listings become publishable, so a
    * reviewer who cannot see what they are about to unlock is deciding half-blind.
    */
-  async partnerDetail(reference: string) {
+  async partnerDetail(reference: string, actor?: AccessTokenClaims) {
     const partner = await this.db.query.partners.findFirst({
       where: and(
         eq(schema.partners.reference, reference),
@@ -266,6 +393,8 @@ export class ReviewService {
         email: true,
         phone: true,
         address: true,
+        /* For the scope check, stripped before returning — see `propertyDetail`. */
+        cityId: true,
         verification: true,
         verifiedAt: true,
         sanctionsScreenedAt: true,
@@ -298,6 +427,9 @@ export class ReviewService {
     });
 
     if (!partner) throw notFound(ERROR.PARTNER_NOT_FOUND);
+
+    /* Scope on the row — see `propertyDetail`. */
+    assertCanRead(actor, partner.cityId);
 
     /**
      * Their listings, so the reviewer sees the consequence of approving.
@@ -338,8 +470,11 @@ export class ReviewService {
       WHERE p.reference = ${reference}
     `);
 
+    /* `cityId` was for the scope check; it does not belong in the response. */
+    const { cityId: _cityId, ...visible } = partner;
+
     return {
-      ...partner,
+      ...visible,
       /* No user account behind the partner reads as "not enrolled", which it is. */
       twoFactorEnabled: account.rows[0]?.two_factor_enabled ?? false,
       properties: properties.rows.map((row) => ({
@@ -369,10 +504,18 @@ export class ReviewService {
         eq(schema.partners.reference, reference),
         isNull(schema.partners.deletedAt),
       ),
-      columns: { id: true, verification: true, sanctionsScreenedAt: true },
+      columns: {
+        id: true,
+        verification: true,
+        sanctionsScreenedAt: true,
+        cityId: true,
+      },
     });
 
     if (!partner) throw notFound(ERROR.PARTNER_NOT_FOUND);
+
+    /* A write outside scope is refused in both modes — see `reviewProperty`. */
+    assertCanWrite(claims, partner.cityId);
 
     if (partner.verification === 'approved' && input.decision === 'approve') {
       throw conflict(ERROR.PARTNER_ALREADY_VERIFIED);

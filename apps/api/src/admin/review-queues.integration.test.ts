@@ -66,20 +66,33 @@ describeIfDb('verification queues', () => {
    * was broken.
    */
   it('lists pending partners with their documents and city resolved', async () => {
-    const queue = await review.pendingPartners(50);
+    const queue = await review.pendingPartners({ page: 1, limit: 50 });
 
-    expect(queue.length).toBeGreaterThan(0);
+    expect(queue.items.length).toBeGreaterThan(0);
 
-    for (const partner of queue) {
+    for (const partner of queue.items) {
       expect(Array.isArray(partner.documents)).toBe(true);
       expect(typeof partner.city.slug).toBe('string');
     }
   });
 
-  /** And the seeded partner's document resolves through the relation. */
+  /**
+   * And the seeded partner's document resolves through the relation.
+   *
+   * Walks the PAGES rather than asking for one big one. The queue became paged on 2026-08-20 and
+   * `limit` is capped at 100 by `pageQuerySchema`, so the old `pendingPartners(5000)` is no longer
+   * expressible — which is the point of the change: nothing can ask for the whole queue at once.
+   */
   it('resolves a partner’s uploaded documents', async () => {
-    const queue = await review.pendingPartners(5000);
-    const mine = queue.find((p) => p.reference === reference);
+    let mine: { documents: { kind: string }[]; city: { slug: string } } | undefined;
+
+    for (let page = 1; page <= 40 && !mine; page += 1) {
+      const queue = await review.pendingPartners({ page, limit: 100 });
+
+      if (queue.items.length === 0) break;
+
+      mine = queue.items.find((p) => p.reference === reference);
+    }
 
     expect(mine?.documents).toHaveLength(1);
     expect(mine?.documents[0]?.kind).toBe('commercial_register');
@@ -87,7 +100,40 @@ describeIfDb('verification queues', () => {
   });
 
   it('lists pending properties without throwing', async () => {
-    await expect(review.pendingProperties(10)).resolves.toBeInstanceOf(Array);
+    const queue = await review.pendingProperties({ page: 1, limit: 10 });
+
+    expect(Array.isArray(queue.items)).toBe(true);
+  });
+
+  /**
+   * The queue is PAGED, and the total describes the whole queue rather than the page.
+   *
+   * The regression this suite now guards: `pendingPartners` took `limit = 50` and returned a bare
+   * array, so 477 of 527 pending partners were unreachable through the console and no number on the
+   * screen admitted it.
+   */
+  it('pages the partner queue and reports a total beyond the page', async () => {
+    const first = await review.pendingPartners({ page: 1, limit: 5 });
+
+    expect(first.items).toHaveLength(5);
+    expect(first.page).toBe(1);
+    expect(first.total).toBeGreaterThan(5);
+    expect(first.pages).toBeGreaterThan(1);
+
+    const second = await review.pendingPartners({ page: 2, limit: 5 });
+    const overlap = second.items.filter((row) =>
+      first.items.some((other) => other.reference === row.reference),
+    );
+
+    expect(overlap, 'page 2 must not repeat page 1').toEqual([]);
+  });
+
+  /** A page past the end is an empty queue, not an error — the reader types the number. */
+  it('answers a page past the end with an empty page', async () => {
+    const far = await review.pendingPartners({ page: 90_000, limit: 25 });
+
+    expect(far.items).toEqual([]);
+    expect(far.total).toBeGreaterThan(0);
   });
 
   /** The §9.2 counters the dashboard renders. */

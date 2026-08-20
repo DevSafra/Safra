@@ -1,4 +1,5 @@
-import { sql, type SQL } from 'drizzle-orm';
+import { inArray, sql, type SQL } from 'drizzle-orm';
+import type { PgColumn } from 'drizzle-orm/pg-core';
 
 import {
   ERROR,
@@ -126,4 +127,69 @@ export function assertCanWrite(
   }
 
   throw notFound(ERROR.REQUEST_NOT_FOUND);
+}
+
+/**
+ * Refuses a READ of a row outside the actor's scope.
+ *
+ * ## Why it is not `assertCanWrite`
+ *
+ * `read_only` is the whole difference. That mode means "you may look at the rest of the country, you
+ * may not change it", so a read outside scope is exactly what it permits and a write outside scope
+ * is exactly what it forbids. Reusing the write guard for reads would break the mode it exists for.
+ *
+ * With `none` the row is not supposed to exist for this member, so the answer is 404 — the register's
+ * rule that "not yours" answers the same as "not there". There is no `read_only` branch because
+ * `read_only` never reaches the throw.
+ *
+ * ## Why a row-level check and not only a predicate
+ *
+ * `scopeFilter` handles LISTS: the row never leaves the database. A DETAIL screen is fetched by
+ * reference, so there is no list to filter — the row arrives and then has to be refused. Both are
+ * needed, and the reason the detail screens went unscoped for so long is that the predicate looked
+ * like it covered everything.
+ */
+export function assertCanRead(
+  actor: AccessTokenClaims | undefined,
+  cityId: string | null,
+): void {
+  const scope = scopeOf(actor);
+
+  if (!isRestricted(scope)) return;
+  /* `read_only` widens READS to everything; that is what the mode means. */
+  if (scope.outside === 'read_only') return;
+  if (cityId !== null && scope.cityIds.includes(cityId)) return;
+
+  throw notFound(ERROR.REQUEST_NOT_FOUND);
+}
+
+/**
+ * The scope as a DRIZZLE condition, for a query built with the relational builder.
+ *
+ * `scopeFilter` returns a `sql` fragment, which `db.query.x.findMany({ where })` cannot take. The two
+ * P-002 verification queues are built that way, and that mismatch is why they were the queries that
+ * never got scoped: adding the predicate looked like it needed the query rewritten.
+ *
+ * Returns `undefined` when the scope is unrestricted, so a caller can spread it into an `and(...)`
+ * without branching and an unscoped member's query is unchanged.
+ */
+export function scopeCondition(
+  actor: AccessTokenClaims | undefined,
+  cityColumn: PgColumn,
+): SQL | undefined {
+  const scope = scopeOf(actor);
+
+  if (!isRestricted(scope)) return undefined;
+  if (scope.outside === 'read_only') return undefined;
+
+  /*
+    An empty scope matches NOTHING, and says so explicitly.
+
+    `inArray(column, [])` is an error in some drivers and `IN ()` is invalid SQL, so a member scoped
+    to no cities has to be answered with a false predicate rather than an empty list. It is a real
+    state: the console can save a scope before any city is chosen.
+  */
+  if (scope.cityIds.length === 0) return sql`FALSE`;
+
+  return inArray(cityColumn, scope.cityIds);
 }

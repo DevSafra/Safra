@@ -74,8 +74,6 @@ export async function ScopePanel({
             total={result.total}
             capped={result.capped}
             size={size}
-            pageParam="scopePage"
-            sizeParam="scopeSize"
             label={fill(t.table.paginationLabelOf, {
               section: t.sections.staff.scopeTitle,
             })}
