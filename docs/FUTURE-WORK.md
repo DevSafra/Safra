@@ -2038,9 +2038,27 @@ line each. They are engineering defaults awaiting a policy answer, not the polic
 invitations are single-use and short-lived like the codes, but they are also the evidence that an
 account was recovered. Pruning them belongs with the retention decision rather than ahead of it.
 
-**What remains of `O-sec-6`** is the half that was never about growth: nothing caps how many
-concurrent sessions one account may hold. That is a product question — how many devices a partner
-may stay signed in on — and it is recorded here rather than answered.
+**And the other half of `O-sec-6` is closed too.** Ten concurrent sessions per account, oldest
+retired on the eleventh sign-in (`MAX_CONCURRENT_SESSIONS` in `token.service.ts`, Bashar's call to
+pick a number). A person with a phone, a laptop, a desktop and a tablet is at four; add a second
+browser and a private window and they are at six. Ten leaves room and still bounds the tail. It is
+a product judgement, not a security threshold — nothing breaks at eleven — so it is one named
+constant.
+
+The point is not the table. It is that every stale session — a shared machine, an old phone, a
+browser somebody forgot — was a live way in for as long as its token lived, and nobody could see
+it.
+
+**Sessions are retired as FAMILIES**, ordered by when each STARTED. A family is one sign-in and
+every rotation descended from it, so revoking a family ends a session while revoking a row would
+end one fifteen-minute slice and leave the rest usable. Ordering by start rather than last use
+retires a session that is merely old before one that is merely quiet — the alternative would retire
+the tablet somebody uses monthly ahead of a browser an attacker refreshes hourly.
+
+**A rotation is not a new session**, which is the assertion that matters most: `issue` runs on every
+refresh, so counting those would retire somebody's oldest session four times an hour until only the
+busiest survived. Four of the five tests in `session-cap.integration.test.ts` are about what the cap
+must NOT touch.
 
 ### O-partner-8 — FIXED: the partner joining process could not be completed by anybody
 
