@@ -46,7 +46,8 @@ export type DashboardCounterName =
   | 'cancelled_today'
   | 'cancelled_today_with_fine'
   | 'partners_pending_verification'
-  | 'properties_pending_review';
+  | 'properties_pending_review'
+  | 'partner_applications_open';
 
 @Injectable()
 export class DashboardService {
@@ -158,6 +159,21 @@ export class DashboardService {
       SELECT 'properties_pending_review', COUNT(*)::text
         FROM properties pr WHERE pr.status = 'pending_review' AND pr.deleted_at IS NULL
           AND ${inScope('pr')}
+      UNION ALL
+      -- Requests to JOIN that nobody has decided yet.
+      --
+      -- Here because the DASHBOARD renders the sidebar itself rather than through ConsoleShell,
+      -- and so has to supply every badge from this payload. It did not supply this one, so طلبات
+      -- الشراكة lost its number on the one screen a super admin opens first (Bashar, 2026-08-20).
+      -- Scoped like every counter above: partner_applications carries a city_id, and a badge
+      -- counting cities somebody cannot open is a number they can do nothing about.
+      --
+      -- No backticks anywhere in this string: it is inside a tagged SQL template, and one
+      -- would close it. Removing a pair of them is what fixed this comment.
+      SELECT 'partner_applications_open', COUNT(*)::text
+        FROM partner_applications pap
+        WHERE pap.status IN ('submitted', 'contacted') AND pap.deleted_at IS NULL
+          AND ${inScope('pap')}
     `);
 
     /*

@@ -382,3 +382,65 @@ test.describe('the account controls', () => {
     ).toBeVisible();
   });
 });
+
+/**
+ * The badges say the same thing on every screen.
+ *
+ * ## The bug this exists for (Bashar, 2026-08-20)
+ *
+ * The dashboard renders `AdminSidebar` itself, from the dashboard payload; every other section
+ * goes through `ConsoleShell`, which fetches `/admin/attention`. Two builders for one list of
+ * badges — and the dashboard's was missing `partnerApplications`, so طلبات الشراكة showed its
+ * number on eighteen screens and lost it on the one a super admin opens first.
+ *
+ * Nothing failed. The count was simply absent, and an absent badge renders as no badge.
+ *
+ * `SidebarCounts` now requires every key, so the omission cannot be silent again — but the type
+ * cannot see that the two sources AGREE, which is what this checks. Compared against a section
+ * rather than against a fixed number: the point is that the screens do not disagree, whatever the
+ * queue happens to hold when the suite runs.
+ */
+test.describe('the sidebar badges', () => {
+  /**
+   * Every nav link's badge, keyed by href, as the reader sees it.
+   *
+   * Locators rather than one `page.evaluate`: `evaluate` returns `any`, and a helper the whole
+   * assertion rests on should not be the one place types stop.
+   */
+  async function badges(page: Page, at: string): Promise<Record<string, string>> {
+    await page.goto(at);
+
+    const links = page.locator('.console-sidebar nav a');
+    await links.first().waitFor();
+
+    const found: Record<string, string> = {};
+
+    for (const link of await links.all()) {
+      const href = (await link.getAttribute('href')) ?? '';
+      /* `span.rounded-full` is the count pill; a link without one has no badge at all. */
+      const badge = link.locator('span.rounded-full');
+
+      found[href] =
+        (await badge.count()) > 0 ? ((await badge.textContent()) ?? '').trim() : '';
+    }
+
+    return found;
+  }
+
+  test('are identical on لوحة الإدارة and on a section', async ({ page }) => {
+    const onSection = await badges(page, '/bookings');
+    const onDashboard = await badges(page, '/');
+
+    expect(onDashboard).toStrictEqual(onSection);
+  });
+
+  /**
+   * And the one that went missing, named. `toStrictEqual` above would also pass if BOTH screens
+   * lost the badge, which is the failure this was originally.
+   */
+  test('include طلبات الشراكة on the dashboard', async ({ page }) => {
+    const onDashboard = await badges(page, '/');
+
+    expect(onDashboard['/applications']).toMatch(/[٠-٩\d]/);
+  });
+});

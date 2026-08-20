@@ -4,10 +4,10 @@ import {
   getDashboard,
   getPendingPartners,
   type DashboardOverview,
-  type PendingPartner,
+  type PendingPartnerPage,
 } from '@/lib/api';
 import { amount, count } from '@/lib/format';
-import { AdminSidebar } from '@/components/admin-sidebar';
+import { AdminSidebar, NO_COUNTS } from '@/components/admin-sidebar';
 import { RevenueChart } from '@/components/revenue-chart';
 import { ConsoleHeader } from '@/components/console-header';
 import { t, auditAction, bookingStatus } from '@/lib/strings';
@@ -36,8 +36,22 @@ import { ORNAMENT_BRAND, SidebarBackdrop } from '@safra/ui';
  */
 export const dynamic = 'force-dynamic';
 
+/** How many waiting partners the dashboard glance shows. الشركاء has the pager. */
+const DASHBOARD_QUEUE_ROWS = 4;
+
 export default async function DashboardPage() {
-  const [overview, partners] = await Promise.all([getDashboard(), getPendingPartners()]);
+  /*
+    Four rows, because this is a DASHBOARD panel and not the queue.
+
+    الشركاء owns the full queue with its own pager; what belongs here is a glance — "somebody is
+    waiting" — with «كل الطلبات» beside it for the rest. Asking for a page rather than everything is
+    also what stopped this panel silently growing: `getPendingPartners()` used to return whatever the
+    API's fifty-row default gave it.
+  */
+  const [overview, partners] = await Promise.all([
+    getDashboard(),
+    getPendingPartners({ page: 1, limit: DASHBOARD_QUEUE_ROWS }),
+  ]);
 
   const loaded = overview !== 'failed' && overview !== 'unauthenticated';
 
@@ -77,14 +91,26 @@ export default async function DashboardPage() {
       </main>
 
       <AdminSidebar
+        /*
+          Every badge the sidebar can show, from this one payload.
+
+          The dashboard renders `AdminSidebar` directly — `ConsoleShell` exists for the other
+          eighteen sections and fetches `/admin/attention` for them — so anything missing here is
+          missing on this screen alone. طلبات الشراكة was, which is why its number vanished the
+          moment somebody opened لوحة الإدارة (Bashar, 2026-08-20). `SidebarCounts` marks its keys
+          required so the next badge added cannot be forgotten the same way.
+        */
         counts={
           loaded
             ? {
                 bookings: overview.counters.pending_confirmation,
                 partners: overview.counters.partners_pending_verification,
                 properties: overview.counters.properties_pending_review,
+                partnerApplications: overview.counters.partner_applications_open,
+                /* Never produced by anything — see the note in `lib/console.ts`. */
+                staff: undefined,
               }
-            : {}
+            : NO_COUNTS
         }
       />
       <SidebarBackdrop label={t.nav.hideSidebar} className="console-backdrop" />
@@ -97,7 +123,7 @@ function Overview({
   partners,
 }: {
   overview: DashboardOverview;
-  partners: PendingPartner[] | 'unauthenticated' | 'failed';
+  partners: PendingPartnerPage | 'unauthenticated' | 'failed';
 }) {
   const { counters } = overview;
   const delta = counters.bookings_today - counters.bookings_yesterday;
@@ -360,7 +386,7 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
 function PartnerQueue({
   partners,
 }: {
-  partners: PendingPartner[] | 'unauthenticated' | 'failed';
+  partners: PendingPartnerPage | 'unauthenticated' | 'failed';
 }) {
   return (
     <section className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
@@ -372,16 +398,20 @@ function PartnerQueue({
         <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
       ) : partners === 'unauthenticated' ? (
         <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
-      ) : partners.length === 0 ? (
+      ) : partners.items.length === 0 ? (
         <p className="text-[12.5px] text-faint">{t.dashboard.nothingWaiting}</p>
       ) : (
         <ul className="grid gap-2.5">
           {/*
-            Capped at four. The design shows three; the real queue can hold thousands, and
-            a dashboard panel that grows without bound stops being a dashboard. The full
-            list lives on /partners.
+            Capped at four, and now capped by the REQUEST rather than by a slice.
+
+            The design shows three; the real queue can hold thousands, and a dashboard panel that
+            grows without bound stops being a dashboard. Asking the API for four is better than
+            asking for its fifty-row default and throwing forty-six away — and it is what made the
+            unpaged queue on الشركاء visible, because this panel was the only thing bounding it.
+            The full list lives on /partners, which has a pager now.
           */}
-          {partners.slice(0, QUEUE_PREVIEW).map((partner) => (
+          {partners.items.slice(0, QUEUE_PREVIEW).map((partner) => (
             <li key={partner.reference}>
               <Link
                 href={`/partners/${partner.reference}?from=dashboard`}

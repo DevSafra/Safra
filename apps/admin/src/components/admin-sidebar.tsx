@@ -81,13 +81,47 @@ const NAV: readonly NavItem[] = [
   { key: 'audit', href: '/audit' },
 ];
 
+/**
+ * Every badge the sidebar can draw — and every key is REQUIRED.
+ *
+ * ## Why required, when most of them are `undefined` in practice
+ *
+ * Two places build this: `sidebarCounts()` for the eighteen sections that go through
+ * `ConsoleShell`, and the dashboard, which renders the sidebar itself from its own payload. They
+ * are the same list of badges assembled twice, and on 2026-08-20 the dashboard's copy was missing
+ * `partnerApplications` — so طلبات الشراكة showed its number on every screen except the one a
+ * super admin opens first. Nothing failed: the key was optional, so leaving it out was legal.
+ *
+ * Optional keys make "I have no number for this" and "I forgot this exists" the same expression.
+ * Required ones force the choice to be made — the same reasoning `Field` uses for `dir` — so
+ * adding a badge to `NAV` breaks every builder until each has said what it wants there.
+ *
+ * `undefined` remains a legitimate answer, and `NO_COUNTS` below is the shorthand for "none of
+ * them", which is what a failed counter fetch means.
+ */
 export interface SidebarCounts {
-  readonly bookings?: number | undefined;
-  readonly partners?: number | undefined;
-  readonly properties?: number | undefined;
-  readonly staff?: number | undefined;
-  readonly partnerApplications?: number | undefined;
+  readonly bookings: number | undefined;
+  readonly partners: number | undefined;
+  readonly properties: number | undefined;
+  readonly staff: number | undefined;
+  readonly partnerApplications: number | undefined;
 }
+
+/**
+ * No badges at all.
+ *
+ * A counter fetch that fails must not take a screen down with it — a missing badge is a cosmetic
+ * loss and the section below it is what the reader came for. Named rather than written as an
+ * object literal at each call site, because the whole point of the required keys above is that
+ * writing this out by hand is where one gets dropped.
+ */
+export const NO_COUNTS: SidebarCounts = {
+  bookings: undefined,
+  partners: undefined,
+  properties: undefined,
+  staff: undefined,
+  partnerApplications: undefined,
+};
 
 export function AdminSidebar({ counts }: { counts: SidebarCounts }) {
   const pathname = usePathname();

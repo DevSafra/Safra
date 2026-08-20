@@ -510,6 +510,7 @@ const dashboardSchema = z.object({
     cancelled_today_with_fine: z.number(),
     partners_pending_verification: z.number(),
     properties_pending_review: z.number(),
+    partner_applications_open: z.number(),
     revenue_today_usd: z.string(),
     revenue_today_syp: z.string(),
   }),

@@ -1,5 +1,5 @@
 import { getAttention } from '@/lib/api';
-import type { SidebarCounts } from '@/components/admin-sidebar';
+import { NO_COUNTS, type SidebarCounts } from '@/components/admin-sidebar';
 
 /**
  * Sidebar badge counts, for the sections that do not already load them.
@@ -16,12 +16,20 @@ import type { SidebarCounts } from '@/components/admin-sidebar';
 export async function sidebarCounts(): Promise<SidebarCounts> {
   const attention = await getAttention();
 
-  if (attention === 'failed' || attention === 'unauthenticated') return {};
+  if (attention === 'failed' || attention === 'unauthenticated') return NO_COUNTS;
 
   return {
     bookings: attention.bookings_awaiting_confirmation,
     partners: attention.partners_pending_verification,
     properties: attention.properties_pending_review,
     partnerApplications: attention.partner_applications_open,
+    /*
+      `NAV` declares a badge for الموظفون and NOTHING has ever produced the number — not this
+      endpoint, not the dashboard. So the badge has never rendered anywhere, which is why nobody
+      noticed. Left explicitly undefined rather than quietly omitted, because the required key is
+      what turned "never implemented" from invisible into a line somebody has to look at. See
+      `O-ui-2`; what a staff badge should even COUNT is a product question, not a missing query.
+    */
+    staff: undefined,
   };
 }
