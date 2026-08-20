@@ -1250,9 +1250,23 @@ export const ar = {
    * Audit actions, so the activity panel is not a list of English identifiers.
    *
    * Keyed on the value stored in `audit_log.action`, which is a machine identifier and part
-   * of the record — it is deliberately NOT translated at the source. Every action present in
-   * the database is listed here; an action added later falls back to its raw key, which is
-   * ugly but never wrong, and reads as a prompt to add it.
+   * of the record — it is deliberately NOT translated at the source.
+   *
+   * ## This list used to claim it was complete, and was not
+   *
+   * It said "every action present in the database is listed here; an action added later falls back
+   * to its raw key, which is ugly but never wrong, and reads as a prompt to add it". By 2026-08-20
+   * it covered THIRTY of the seventy-three actions the code can emit — and neither half of the
+   * safety net was true. `label()` fell back to `value.replace(/_/g, ' ')`, not to the raw key, so
+   * «booking.export_requested» reached السجل as "booking export requested": English prose, on an
+   * Arabic-only console, that reads as a deliberate label rather than a prompt. That is why
+   * forty-three of them survived the sweep which greps for snake_case — there was no underscore
+   * left to find.
+   *
+   * Both halves are fixed: the list is now the UNION of what the code emits and what the database
+   * holds, and `label()` marks a miss instead of dressing it up. `audit-catalogue.integration.test.ts`
+   * fails when the database holds an action this map does not cover, so the claim is enforced rather
+   * than repeated.
    */
   auditAction: {
     'auth.registered': 'تسجيل حساب جديد',
@@ -1286,6 +1300,67 @@ export const ar = {
     'ad_campaign.resumed': 'تشغيل حملة إعلانية',
     'partner_contract.uploaded': 'رفع عقد شراكة',
     'partner_contract.signed': 'تسجيل توقيع عقد شراكة',
+    // ── Added 2026-08-20, closing the gap described above ──────────────────
+    /*
+      The two REJECTION halves, which were missing while their approvals were present.
+
+      Both are built with a template literal — `partner.${nextStatus}` and
+      `property.${decision === 'approve' ? 'approved' : 'rejected'}` — so a reader of the source sees
+      one action where there are two, and only the happy half got translated. They are the outcome of
+      the two verification queues this console exists to work, so a rejected listing wrote an
+      untranslatable row into an append-only table.
+    */
+    'partner.rejected': 'رفض شريك',
+    'property.rejected': 'رفض عقار',
+    'auth.password_changed': 'تغيير كلمة المرور',
+    'auth.password_change_refused': 'محاولة تغيير كلمة مرور مرفوضة',
+    'auth.recovery_code_used': 'استخدام رمز استرداد',
+    'auth.register_existing_email': 'تسجيل ببريد مسجَّل مسبقاً',
+    'auth.two_factor_disabled': 'تعطيل المصادقة الثنائية',
+    'booking.created': 'إنشاء حجز',
+    'booking.cancelled': 'إلغاء حجز',
+    'booking.payment_captured': 'تحصيل دفعة حجز',
+    'booking.exported': 'تصدير حجوزات',
+    'booking.export_requested': 'طلب تصدير حجوزات',
+    'calendar.range_updated': 'تعديل مدى في التقويم',
+    'city_image.uploaded': 'رفع صورة مدينة',
+    'city_image.archived': 'أرشفة صورة مدينة',
+    'customer.profile_updated': 'تعديل ملف عميل',
+    'gift_card.purchase': 'شراء بطاقة هدية',
+    'gift_card.redeem': 'استخدام بطاقة هدية',
+    'partner.invitation_accepted': 'قبول دعوة شريك',
+    'partner.two_factor_reset': 'إعادة تعيين المصادقة الثنائية لشريك',
+    'partner_application.submitted': 'تقديم طلب شراكة',
+    'partner_application.contacted': 'تسجيل مكالمة طلب شراكة',
+    'partner_application.accepted': 'قبول طلب شراكة',
+    'partner_application.rejected': 'رفض طلب شراكة',
+    'partner_application.invitation_resent': 'إعادة إرسال دعوة شريك',
+    'partner_contract.viewed': 'عرض عقد شراكة',
+    'partner_payout.released': 'الإفراج عن مستحقات شريك',
+    'partner_payout.paid': 'دفع مستحقات شريك',
+    'partner_payout.cancelled': 'إلغاء مستحقات شريك',
+    'partner_payout.closed': 'إغلاق دورة مستحقات',
+    'payment.started': 'بدء عملية دفع',
+    'payment.failed': 'فشل عملية دفع',
+    'refund.created': 'إنشاء استرداد',
+    'property.created': 'إنشاء عقار',
+    'property.updated': 'تعديل عقار',
+    'property.submitted_for_review': 'إرسال عقار للمراجعة',
+    'property_image.uploaded': 'رفع صورة عقار',
+    'property_image.archived': 'أرشفة صورة عقار',
+    'property_image.cover_set': 'تعيين صورة غلاف',
+    'property_image.reordered': 'إعادة ترتيب صور عقار',
+    'rbac.grant_toggled': 'تعديل منح صلاحية',
+    'review.created': 'إضافة تقييم',
+    'review.replied': 'رد على تقييم',
+    'review.reported': 'الإبلاغ عن تقييم',
+    'review.hidden': 'إخفاء تقييم',
+    'review.report_dismissed': 'رفض بلاغ تقييم',
+    'staff.invitation_resent': 'إعادة إرسال دعوة موظف',
+    'staff.reinstated': 'إعادة تنشيط موظف',
+    'staff.scope_changed': 'تعديل نطاق موظف',
+    'unit.created': 'إنشاء وحدة',
+    'unit.updated': 'تعديل وحدة',
   } as Record<string, string>,
 
   /**
