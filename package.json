@@ -34,6 +34,8 @@
     "media:bootstrap": "pnpm --filter @safra/api media:bootstrap",
     "load:reset": "pnpm --filter @safra/db load:reset",
     "load:invariants": "pnpm --filter @safra/db load:invariants",
+    "load:accounts": "pnpm --filter @safra/api load:accounts",
+    "load:token": "pnpm --filter @safra/api load:token",
     "worker": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api start:worker'"
   },
   "devDependencies": {

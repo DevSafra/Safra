@@ -1,5 +1,5 @@
 import http from 'k6/http';
-import { check } from 'k6';
+import { check, sleep } from 'k6';
 import { Counter, Rate } from 'k6/metrics';
 
 import { API, FRACTION } from './config.js';
@@ -23,8 +23,21 @@ import { API, FRACTION } from './config.js';
  * ## Two populations, one address
  *
  * The attacker VUs hammer 5,000 accounts with wrong passwords. The bystander VU signs in to its own
- * real account, repeatedly, from the same source. `bystander_success` must stay at 1.0 — if it dips,
- * the limiter is punishing the wrong person and that is a finding regardless of any latency.
+ * real account from the same source. `bystander_success` must stay at 1.0 — if it dips, the limiter
+ * is punishing the wrong person and that is a finding regardless of any latency.
+ *
+ * ## The bystander WAITS between sign-ins, and that is what makes the result mean anything
+ *
+ * It used to loop with no think time. A person signs in once; a VU with no sleep signed in 61,631
+ * times in five minutes — 205 a second — and the `account` throttler allows ten a minute per
+ * (address, account). So the bystander exhausted its OWN budget inside the first second and reported
+ * 0.02% success, which was then indistinguishable from the attack starving it. Measured 2026-08-20:
+ * a bystander on a completely UNRELATED address, with no attack against it at all, scored 10 out of
+ * 83,215 for exactly this reason.
+ *
+ * A threshold that cannot pass proves nothing. `BYSTANDER_INTERVAL_SECONDS` keeps this VU inside its
+ * own per-account allowance, so the only thing left that can refuse it is the per-IP ceiling it
+ * shares with the attackers — which is the property `O-sec-1` is about.
  *
  * ## Run this against a THROWAWAY database
  *
@@ -38,6 +51,15 @@ const attackRejected = new Counter('attack_rejected');
 
 /** Wrong-password attempts spread over this many accounts. The plan says 5,000. */
 const ACCOUNTS = Math.max(10, Math.round(5_000 * FRACTION));
+
+/**
+ * Seconds between the bystander's sign-ins.
+ *
+ * Ten, against an `account` throttler that allows ten a minute for this (address, account) pair: six
+ * a minute leaves headroom for the run's own jitter. Faster than a person, slower than the limit,
+ * which is the only band where the measurement is about somebody else's traffic.
+ */
+const BYSTANDER_INTERVAL_SECONDS = 10;
 
 /** A real account, unrelated to the attacked ones, signing in from the same address. */
 const BYSTANDER_EMAIL = __ENV.LOAD_BYSTANDER_EMAIL || '';
@@ -135,4 +157,7 @@ export function bystander() {
   check(response, {
     'an unrelated account still signs in from the attacked address': () => allowed,
   });
+
+  /* See BYSTANDER_INTERVAL_SECONDS: without this the VU measures its own throttle, not the attack. */
+  sleep(BYSTANDER_INTERVAL_SECONDS);
 }

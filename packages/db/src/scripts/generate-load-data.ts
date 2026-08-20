@@ -126,6 +126,7 @@ async function assertEmpty(pool: Pool): Promise<void> {
   const used = await pool.query<{ table_name: string; n: string }>(
     `SELECT t AS table_name, n::text FROM (
        SELECT 'users' t, count(*) n FROM users WHERE email LIKE 'load-%'
+       UNION ALL SELECT 'partner_applications', count(*) FROM partner_applications
        UNION ALL SELECT 'availability_days', count(*) FROM availability_days
        UNION ALL SELECT 'bookings', count(*) FROM bookings
        UNION ALL SELECT 'audit_log', count(*) FROM audit_log
@@ -227,8 +228,24 @@ async function main(): Promise<void> {
     */
     await step('customer_profiles', () =>
       exec(
-        `INSERT INTO customer_profiles (user_id, full_name, email, phone, is_guest, preferred_locale)
-         SELECT u.id, 'Load Customer ' || u.email, u.email, u.phone, false, u.preferred_locale
+        `INSERT INTO customer_profiles (user_id, full_name, email, phone, is_guest, preferred_locale,
+                                        gender)
+         SELECT u.id, 'Load Customer ' || u.email, u.email, u.phone, false, u.preferred_locale,
+                -- Spread rather than left on the column default.
+                --
+                -- \`gender\` arrived with migration 0030 defaulting to 'undisclosed' NOT NULL, so a
+                -- generator that ignores it produces a million rows with one value. Nothing filters
+                -- on it on a request path today, which is exactly why it would go unnoticed until
+                -- something did — a report grouped by a constant column reads as a working report
+                -- over a population that does not exist.
+                --
+                -- The spread is taken from the email's own counter rather than from
+                -- \`preferred_locale\`, which already encodes n % 3: reusing it would make gender and
+                -- locale perfectly correlated, and a correlated pair in generated data is worse than
+                -- a constant one because it looks like a finding.
+                (ARRAY['male','female','undisclosed']::gender[])[
+                  1 + (split_part(split_part(u.email, '-', 2), '@', 1)::bigint % 3)
+                ]
          FROM users u
          WHERE u.email LIKE 'load-%@safra.test'`,
       ),
@@ -274,15 +291,98 @@ async function main(): Promise<void> {
       ),
     );
 
+    /*
+      Partner applications — «طلبات الشراكة», the registry that shipped with O-partner-6.
+
+      It is not in the plan's volume table because it did not exist when the table was written, and a
+      registry with no rows cannot be measured: scenario 3 would page an empty list and report that
+      paging is free. Three per partner is the shape the flow implies — every partner arrived through
+      an accepted application, and the rejected and still-open ones stay in the table forever.
+
+      Deliberately ABOVE `COUNT_CAP` (10,000) at full scale, because the capped count is a code path:
+      past the cap the bar must print «أكثر من ١٠٠٠٠ نتيجة» rather than a figure, and a table that
+      never crosses it never exercises that.
+
+      `created_at` is spread explicitly. `now()` is the TRANSACTION timestamp (§8, "rows written in
+      one test all tie"), so without this every row would carry one instant and
+      `ORDER BY created_at DESC, reference DESC` would be decided entirely by the tiebreaker — a sort
+      over a constant column, which is not the sort the console runs.
+    */
+    const applicationCount = partnerCount * 3;
+
+    await step('partner_applications', () =>
+      exec(
+        `INSERT INTO partner_applications (status, submitted_by_user_id, contact_name, email, phone,
+                                           legal_name, display_name, partner_type_id, city_id,
+                                           address, property_count, website, message,
+                                           preferred_locale, contacted_at, contacted_by_user_id,
+                                           contact_notes, decided_at, decided_by_user_id,
+                                           decision_notes, partner_id, created_at)
+         SELECT st.status,
+                u.id,
+                'Load Applicant ' || n,
+                'load-app-' || n || '@safra.test',
+                '+96312' || lpad(n::text, 7, '0'),
+                'Load Applicant Legal ' || n, 'مقدم طلب ' || n,
+                pt.id, ci.id,
+                'Load applicant address ' || n,
+                CASE WHEN n % 5 = 0 THEN NULL ELSE 1 + (n % 12) END,
+                CASE WHEN n % 3 = 0 THEN 'https://load-' || n || '.example' ELSE NULL END,
+                CASE WHEN n % 7 = 0 THEN NULL ELSE 'Load application message ' || n END,
+                (ARRAY['ar','en','de'])[1 + (n % 3)],
+                CASE WHEN st.status <> 'submitted'
+                     THEN now() - ((n % 700) || ' days')::interval + interval '2 days' END,
+                CASE WHEN st.status <> 'submitted' THEN u.id END,
+                CASE WHEN st.status <> 'submitted' THEN 'Load call note ' || n END,
+                CASE WHEN st.status IN ('accepted','rejected')
+                     THEN now() - ((n % 700) || ' days')::interval + interval '3 days' END,
+                CASE WHEN st.status IN ('accepted','rejected') THEN u.id END,
+                CASE WHEN st.status IN ('accepted','rejected') THEN 'Load decision note ' || n END,
+                -- Only an accepted application owns a partner row. The others must be NULL: an
+                -- application that was rejected and still points at a partner is a state the
+                -- console renders and the flow cannot produce.
+                CASE WHEN st.status = 'accepted' THEN pa.id END,
+                now() - ((n % 700) || ' days')::interval
+         FROM generate_series(1, $1) AS n
+         CROSS JOIN LATERAL (
+           SELECT (CASE
+                     WHEN n % 10 IN (0, 1) THEN 'submitted'
+                     WHEN n % 10 = 2       THEN 'contacted'
+                     WHEN n % 10 = 9       THEN 'rejected'
+                     ELSE 'accepted'
+                   END)::partner_application_status AS status
+         ) st
+         CROSS JOIN LATERAL (
+           SELECT id FROM users WHERE email LIKE 'load-%@safra.test' ORDER BY id
+           OFFSET (n % 500) LIMIT 1
+         ) u
+         CROSS JOIN LATERAL (SELECT id FROM partner_types ORDER BY (n % 4) LIMIT 1) pt
+         CROSS JOIN LATERAL (
+           SELECT id FROM cities WHERE deleted_at IS NULL ORDER BY slug
+           OFFSET (n % (SELECT count(*) FROM cities WHERE deleted_at IS NULL)) LIMIT 1
+         ) ci
+         CROSS JOIN LATERAL (
+           SELECT id FROM partners WHERE email LIKE 'load-partner-%' ORDER BY id
+           OFFSET (n % $2) LIMIT 1
+         ) pa`,
+        [applicationCount, partnerCount],
+      ),
+    );
+
     await step('properties', () =>
       exec(
         `INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
-                                 slug, name_ar, name_en, name_de, address, status,
+                                 slug, name_ar, name_en, name_de, address, room_number, status,
                                  rating, reviews_count, recommendation_score, attributes, badges)
          SELECT pa.id, pa.city_id, pt.id, cp.id,
                 'load-property-' || n,
                 'عقار ' || n, 'Property ' || n, 'Unterkunft ' || n,
                 'Load street ' || n,
+                -- Nullable, and MOSTLY null on purpose: a room number is a hotel-shaped
+                -- property's detail and an apartment has none. A column that is null in
+                -- every row and a column that is set in every row are both unrealistic, and
+                -- the second is the one that hides a missing null check.
+                CASE WHEN n % 4 = 0 THEN 'A-' || (100 + (n % 900)) ELSE NULL END,
                 'published'::property_status,
                 -- A spread of ratings, so ORDER BY rating is not a constant.
                 round((3 + (n % 21) / 10.0)::numeric, 1),
@@ -377,6 +477,25 @@ async function main(): Promise<void> {
         `units × perUnit`. The gist exclusion constraint is checked per row against the index, and a
         single five-million-row transaction holds every one of those checks open at once.
       */
+
+      /*
+        ## `created_at` is spread WITHIN the rung, and that is not cosmetic
+
+        `now()` is the TRANSACTION timestamp, so one statement per rung meant one `created_at` per
+        rung: 5,000,061 bookings across 86 distinct values, and all 200,000 `confirmed` rows sharing
+        exactly ONE. It is the trap `docs/FUTURE-WORK.md` §8 already records — "rows written in one
+        test all tie" — walked into by the generator itself.
+
+        What it cost, found on 2026-08-20: the console's default order is
+        `created_at DESC, id DESC`, so every measurement of it was a sort over a column that barely
+        varied, decided entirely by the tiebreaker. `?status=confirmed` page 1 read 236,526 buffers
+        not because the plan was bad but because 200,000 rows tied on the sort key and the top 25 of
+        that tie had to be found by sorting all of them. A plan measured over that data says nothing
+        about the plan over real data, which is the one thing a load database exists to avoid.
+
+        The offset is derived from the unit id rather than from `random()`, so a regenerated database
+        is comparable with the one before it.
+      */
       for (let rung = 0; rung < perUnit; rung += 1) {
         await exec(
           `INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
@@ -393,8 +512,8 @@ async function main(): Promise<void> {
                   (CASE WHEN $1::int = 0 THEN 'confirmed' ELSE 'completed' END)::booking_status,
                   '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
                   cur.id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb,
-                  now() - ($1::int || ' days')::interval,
-                  now() - ($1::int || ' days')::interval
+                  now() - ($1::int || ' days')::interval - spread.offset_seconds,
+                  now() - ($1::int || ' days')::interval - spread.offset_seconds
            FROM units u
            JOIN properties p ON p.id = u.property_id
            CROSS JOIN LATERAL (SELECT id FROM currencies WHERE code = 'USD' LIMIT 1) cur
@@ -402,6 +521,11 @@ async function main(): Promise<void> {
              SELECT id FROM customer_profiles
              WHERE email LIKE 'load-%' ORDER BY id OFFSET ($1::int % 1000) LIMIT 1
            ) cp
+           -- Seconds within the rung's day, deterministic per unit. See the note above the rung loop.
+           CROSS JOIN LATERAL (
+             SELECT ((('x' || substr(md5(u.id::text), 1, 8))::bit(32)::bigint & 2147483647)
+                     % 86400) * interval '1 second' AS offset_seconds
+           ) spread
            WHERE p.slug LIKE 'load-property-%'`,
           [rung, Math.floor((perUnit * spacing) / 2), spacing],
         );
@@ -422,7 +546,9 @@ async function main(): Promise<void> {
                 'booking', NULL,
                 '{"status":"pending_confirmation"}'::jsonb,
                 '{"status":"confirmed"}'::jsonb,
-                now() - ((n % 900) || ' days')::interval
+                -- Days AND seconds from the counter: 900 distinct timestamps over twenty million
+                -- rows is 22,000 rows tied on the audit log's own sort key.
+                now() - ((n % 900) || ' days')::interval - ((n % 86400) * interval '1 second')
          FROM generate_series(1, $1) AS n
          CROSS JOIN LATERAL (
            SELECT id FROM users WHERE email LIKE 'load-%' ORDER BY id OFFSET (n % 500) LIMIT 1
@@ -469,6 +595,7 @@ async function main(): Promise<void> {
                   '100.00', cur.id, '13000.00000000', '1300000.00',
                   'Load-test leg ' || leg,
                   now() - ((g.n % 900) || ' days')::interval
+                    - ((g.n % 86400) * interval '1 second')
            FROM (
              SELECT n, gen_random_uuid() AS group_id FROM generate_series(1, $1) AS n
            ) g
@@ -493,6 +620,7 @@ async function main(): Promise<void> {
          SELECT 'users' t, count(*) n FROM users
          UNION ALL SELECT 'customer_profiles', count(*) FROM customer_profiles
          UNION ALL SELECT 'partners', count(*) FROM partners
+         UNION ALL SELECT 'partner_applications', count(*) FROM partner_applications
          UNION ALL SELECT 'properties', count(*) FROM properties
          UNION ALL SELECT 'units', count(*) FROM units
          UNION ALL SELECT 'availability_days', count(*) FROM availability_days

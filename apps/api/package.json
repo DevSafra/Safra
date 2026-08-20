@@ -16,6 +16,8 @@
     "db:testbed": "tsx src/scripts/seed-testbed.ts",
     "partner:code": "tsx src/scripts/partner-totp.ts",
     "media:bootstrap": "tsx src/scripts/bootstrap-media.ts",
+    "load:accounts": "tsx src/scripts/prepare-load-accounts.ts",
+    "load:token": "tsx src/scripts/load-staff-token.ts",
     "start:worker": "node dist/worker.js",
     "dev:worker": "node --watch --import @swc-node/register/esm-register src/worker.ts"
   },

@@ -29,65 +29,7 @@
  */
 import { Pool } from 'pg';
 
-type Invariant = {
-  readonly name: string;
-  /** Why a violation matters, printed when one is found. */
-  readonly consequence: string;
-  readonly sql: string;
-};
-
-const INVARIANTS: readonly Invariant[] = [
-  {
-    name: 'no double-booked nights',
-    consequence:
-      'Two live bookings share a unit and an overlapping stay. The exclusion constraint ' +
-      'bookings_no_overlapping_stays_v2 did not hold, and two customers have been sold one room.',
-    sql: `SELECT b.unit_id::text AS unit, b.check_in::text AS from_date, count(*)::text AS n
-          FROM bookings b
-          WHERE b.status IN ('pending_payment','pending_confirmation','confirmed','checked_in')
-          GROUP BY b.unit_id, b.check_in
-          HAVING count(*) > 1
-          LIMIT 20`,
-  },
-  {
-    name: 'every ledger group balances',
-    consequence:
-      'A ledger entry group has debits <> credits. Money has been recorded arriving from nowhere ' +
-      'or going nowhere, and §13.3 no longer holds.',
-    sql: `SELECT entry_group_id::text AS entry_group,
-                 sum(CASE WHEN direction = 'debit'  THEN amount_syp ELSE 0 END)::text AS debits,
-                 sum(CASE WHEN direction = 'credit' THEN amount_syp ELSE 0 END)::text AS credits
-          FROM ledger_entries
-          GROUP BY entry_group_id
-          HAVING sum(CASE WHEN direction = 'debit'  THEN amount_syp ELSE 0 END)
-              <> sum(CASE WHEN direction = 'credit' THEN amount_syp ELSE 0 END)
-          LIMIT 20`,
-  },
-  {
-    name: 'no orphaned payments',
-    consequence:
-      'A payment references a booking that does not exist, or is captured against a booking that ' +
-      'was never paid. Reconciliation against the acquirer would not balance.',
-    sql: `SELECT p.id::text AS payment, p.status::text AS status
-          FROM payments p
-          LEFT JOIN bookings b ON b.id = p.booking_id
-          WHERE b.id IS NULL
-             OR (p.status = 'captured' AND b.paid_at IS NULL)
-          LIMIT 20`,
-  },
-  {
-    name: 'notifications all terminal',
-    consequence:
-      'A notification is still queued after the run. Either a send is stuck, or the delivery log is ' +
-      'recording attempts that never resolve — and "was the partner told?" becomes unanswerable.',
-    sql: `SELECT n.template_key, n.status::text AS status, count(*)::text AS n
-          FROM notifications n
-          WHERE n.status = 'queued'
-            AND n.created_at < now() - interval '5 minutes'
-          GROUP BY n.template_key, n.status
-          LIMIT 20`,
-  },
-];
+import { INVARIANTS } from './load-invariants.js';
 
 async function main(): Promise<void> {
   /*

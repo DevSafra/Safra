@@ -27,7 +27,16 @@ import { API, FRACTION } from './config.js';
  *
  * Requires a staff token: `LOAD_STAFF_TOKEN`. The console's registries are authorised per request,
  * and they should be — a scenario that could read them without one would be reporting a security
- * failure, not a latency.
+ * failure, not a latency. `pnpm load:accounts` creates the account and `pnpm load:token` mints the
+ * token; before those existed there was no way to satisfy this and the scenario could not start.
+ *
+ * ## The route, and how it was wrong
+ *
+ * This asked for a path under `admin/registries/`. The controller is `@Controller('admin')` with
+ * `@Get('bookings')`, and `pageQuerySchema` is `.strict()` with a field called `limit` rather than
+ * `size` — so the route is `/admin/bookings?page=1&limit=25`. The old URL answered 404, `setup()`
+ * threw on it, and the scenario had therefore never run: no output, no result, and nothing in the
+ * register saying so. Corrected 2026-08-20.
  */
 const DEPTHS = [1, 10, 100, 1_000];
 
@@ -63,7 +72,7 @@ export function setup() {
     );
   }
 
-  const probe = http.get(`${API}/admin/registries/bookings?page=1&size=25`, {
+  const probe = http.get(`${API}/admin/bookings?page=1&limit=25`, {
     headers: { Authorization: `Bearer ${TOKEN}` },
   });
 
@@ -75,15 +84,21 @@ export function setup() {
   }
 
   const total = probe.json('total');
+  const capped = probe.json('capped');
 
   /*
     A million rows is the premise. Below that the deep pages do not exist and the curve is flat for
     the wrong reason — which would read as "OFFSET is fine".
+
+    `capped` is what answers the question, not `total`. Every registry count stops at `COUNT_CAP`
+    (10,000), so a big table reports `total: 10000, capped: true` — and a check reading `total` alone
+    would warn on every correctly-loaded database and stay silent about nothing.
   */
-  if (typeof total === 'number' && total < 100_000) {
+  if (capped !== true && typeof total === 'number' && total < 100_000) {
     console.warn(
-      `WARNING: the bookings registry reports ${total} rows. The plan specifies 1M — this run ` +
-        'measures a table small enough to sit in cache and its numbers do not transfer.',
+      `WARNING: the bookings registry reports ${total} rows and the count was not capped, so the ` +
+        'table really is that small. The plan specifies 1M — this run measures a table that fits ' +
+        'in cache and its numbers do not transfer. Run pnpm load:generate.',
     );
   }
 
@@ -92,7 +107,7 @@ export function setup() {
 
 export default function () {
   for (const page of DEPTHS) {
-    const response = http.get(`${API}/admin/registries/bookings?page=${page}&size=25`, {
+    const response = http.get(`${API}/admin/bookings?page=${page}&limit=25`, {
       headers: { Authorization: `Bearer ${TOKEN}` },
       tags: { endpoint: 'registry', page: String(page) },
     });
@@ -120,10 +135,31 @@ export function handleSummary(data) {
     );
   };
 
+  /*
+    The checks and the error rate are printed HERE because returning a `stdout` key REPLACES k6's
+    default summary. Without them the run showed a latency curve and nothing else: whether any page
+    answered something other than 200 — the correctness half of this scenario, and the half that is
+    honest on a laptop — was invisible in the output. Threshold breaches still appear on k6's own
+    error line, but a passing run said nothing about the checks at all.
+  */
+  const checks = data.metrics['checks'];
+  const failed = data.metrics['http_req_failed'];
+  const requests = data.metrics['http_reqs'];
+
+  const rate = (metric) =>
+    metric && typeof metric.values.rate === 'number'
+      ? `${(metric.values.rate * 100).toFixed(2)}%`
+      : 'no samples';
+
   return {
     stdout:
       '\nOFFSET cost by page depth — the curve O-page-1 needs:\n' +
       DEPTHS.map(line).join('\n') +
-      '\n\nThe shallowest page that exceeds 200 ms is the ceiling worth documenting.\n',
+      '\n\nThe shallowest page that exceeds 200 ms is the ceiling worth documenting.\n' +
+      '\nCorrectness, which is the half that transfers off this hardware:\n' +
+      `  requests           ${requests ? requests.values.count : 0}\n` +
+      `  checks passing     ${rate(checks)}\n` +
+      `  5xx / failed rate  ${rate(failed)}\n` +
+      '  Every page must answer 200 — a page past the end is an empty table, never a 400.\n',
   };
 }

@@ -29,6 +29,29 @@ import { API, FRACTION, isoDate } from './config.js';
  * failure, which would fail the error-budget threshold on a perfectly correct run — so the response
  * callback below treats everything under 500 as expected, and only a 5xx counts against the budget.
  *
+ * ## Why every request claims a different source address
+ *
+ * `POST /bookings` carries a ROUTE-level `@Throttle({default: {limit: 10, ttl: 60_000}})` — ten
+ * booking attempts a minute per client address. `THROTTLE_DEFAULT_LIMIT` cannot reach it: the
+ * decorator overrides the named throttler for that handler, so the documented "start the API with
+ * THROTTLE_DEFAULT_LIMIT=100000" does nothing here.
+ *
+ * Run without this, from one source address, the scenario is capped at ten attempts a minute. On
+ * 2026-08-20 that produced 2,259,751 × 429, 39 × 409 and 21 × 201 in five minutes — and every k6
+ * threshold PASSED, because refusing a request is fast and a 409 is expected by design. The scenario
+ * had never been able to contend anything, on any hardware.
+ *
+ * So each iteration presents itself as a distinct client, which is what "200 concurrent bookings"
+ * means: two hundred different customers, each inside their own ten-a-minute budget. It models the
+ * traffic rather than evading the control — the control is scenario 4's subject and that scenario
+ * deliberately does NOT do this.
+ *
+ * **It only works where k6 is the direct client.** `main.ts` sets `trust proxy` to 1, so with no real
+ * proxy in front the header IS the address. Behind a load balancer the balancer appends the true
+ * source and this header is correctly ignored — at which point the route limit binds again and the
+ * only honest way to run this scenario is to generate load from many source addresses. Say so in the
+ * results rather than reporting a contended run that was not one.
+ *
  * ## What k6 cannot check, and does not pretend to
  *
  * Whether two bookings actually landed on one night is a question only the database can answer, and
@@ -97,6 +120,26 @@ export function setup() {
   return { units };
 }
 
+/**
+ * A different source address for every attempt in the run.
+ *
+ * Inside `10.0.0.0/8` so a line in a log can never be mistaken for real traffic, and derived from
+ * (iteration, VU) rather than randomly so a run is reproducible.
+ *
+ * The three octets are base-254 digits of one counter, which keeps addresses unique for the first
+ * ~16.4M attempts — more than a five-minute run reaches, and the ceiling matters: an address reused
+ * inside a minute is an address back under the ten-a-minute route limit, which is the whole thing
+ * this is here to stay clear of.
+ */
+function clientAddress() {
+  const n = (__ITER * 256 + __VU) % (254 * 254 * 254);
+
+  return (
+    `10.${1 + (Math.floor(n / (254 * 254)) % 254)}` +
+    `.${1 + (Math.floor(n / 254) % 254)}.${1 + (n % 254)}`
+  );
+}
+
 export default function () {
   const data = arguments[0];
 
@@ -126,7 +169,11 @@ export default function () {
   };
 
   const response = http.post(`${API}/bookings`, JSON.stringify(body), {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      /* A distinct customer per attempt — see the class note. */
+      'X-Forwarded-For': clientAddress(),
+    },
     tags: { endpoint: 'booking_create' },
   });
 
