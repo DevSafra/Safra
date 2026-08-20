@@ -101,10 +101,41 @@ export default async function CityPage({
    * `cached: true` keeps this page statically renderable — see searchForDisplay.
    * This block is a teaser; /search is the live, authoritative query.
    */
-  const results = await searchSafely(
+  const today = await searchSafely(
     { checkIn, checkOut, adults: 2, citySlug: slug, limit: 6 },
     { cached: true },
   );
+
+  /**
+   * After the same-day cutoff, ask again for the first day that IS bookable.
+   *
+   * `booking.same_day_cutoff_hour` is 17, and past it the API refuses an arrival of today —
+   * correctly, and it says so with the first bookable date attached. But this block asks "what can
+   * somebody stay in", not "can somebody arrive tonight", so a refusal is an answer to a question
+   * it did not mean to ask: every city page in the product went empty at 17:00 Damascus and stayed
+   * empty until midnight. Found 2026-08-20, by the test above failing for the first time in the
+   * evening.
+   *
+   * `/search` keeps the refusal and shows the notice, which is right there — a customer who TYPED
+   * today's date has to be told why it cannot be today.
+   *
+   * The retry costs a second request only after the cutoff, and the date comes from the API's own
+   * answer rather than from arithmetic repeated here over a setting this app does not read.
+   */
+  const reopened = today.notice?.firstBookableDate;
+
+  const results = reopened
+    ? await searchSafely(
+        {
+          checkIn: reopened,
+          checkOut: addDays(reopened, 2),
+          adults: 2,
+          citySlug: slug,
+          limit: 6,
+        },
+        { cached: true },
+      )
+    : today;
 
   const name = localisedName(city, locale);
   const description = localisedDescription(city, locale);
