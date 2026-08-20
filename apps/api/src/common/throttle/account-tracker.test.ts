@@ -86,14 +86,45 @@ describe('accountTracker', () => {
     expect(key).toContain('5.5.5.5');
   });
 
-  /** Behind a proxy the left-most forwarded entry is the client; the rest appended themselves. */
-  it('uses the forwarded client address rather than the proxy', () => {
-    const key = accountTracker(
+  /**
+   * The regression, and the reason the header is not read at all any more.
+   *
+   * This test used to assert the OPPOSITE — that the left-most `x-forwarded-for` entry won. That is
+   * the entry a client can write, because a proxy appends rather than replaces, so the key it
+   * produced was chosen by the caller: twenty wrong-password attempts against one account with a
+   * varying header drew twenty 401s where ten drew a 429 without it (measured 2026-08-20).
+   *
+   * Aiming it is the worse half: forge the header to somebody else's address, name their email, and
+   * their next real sign-in from that address is refused — the targeted lockout this file's header
+   * says IP + email eliminated.
+   *
+   * `req.ip` is Express' answer under `trust proxy`, which walks the header from the right and
+   * ignores anything a client prepended. So the key must come from `req.ip` and the header must not
+   * move it.
+   */
+  it('ignores a client-supplied forwarded header', () => {
+    const forged = accountTracker(
       request({ email: 'a@safra.test' }, '10.0.0.1', '203.0.113.9, 10.0.0.5'),
     );
+    const plain = accountTracker(request({ email: 'a@safra.test' }, '10.0.0.1'));
 
-    expect(key).toContain('203.0.113.9');
-    expect(key).not.toContain('10.0.0.1');
+    expect(forged).toBe(plain);
+    expect(forged).toContain('10.0.0.1');
+    expect(forged).not.toContain('203.0.113.9');
+  });
+
+  /**
+   * And the header cannot be used to escape a bucket either — the same account from the same address
+   * is one key however many addresses the caller claims to be.
+   */
+  it('gives one key however the forwarded header varies', () => {
+    const keys = new Set(
+      ['203.0.113.1', '203.0.113.2', '198.51.100.7'].map((claimed) =>
+        accountTracker(request({ email: 'a@safra.test' }, '10.0.0.1', claimed)),
+      ),
+    );
+
+    expect(keys.size).toBe(1);
   });
 
   it('still produces a key when no account is named', () => {

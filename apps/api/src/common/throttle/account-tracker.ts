@@ -20,7 +20,8 @@ import type { ExecutionContext } from '@nestjs/common';
  * targeted denial of service against one person's ability to sign in, available to a stranger.
  *
  * IP + email gives each (person, network) pair its own budget. One NAT user cannot starve another,
- * and a stranger cannot starve anybody.
+ * and a stranger cannot starve anybody — provided the IP half cannot be chosen by the caller, which
+ * is what `clientIp` below is about.
  *
  * ## What still protects against credential stuffing
  *
@@ -45,18 +46,41 @@ import type { ExecutionContext } from '@nestjs/common';
  * carry a readable one — a truncated SHA-256 distinguishes accounts just as well.
  */
 
-/** Where the client actually is, honouring the proxy header the API already trusts. */
+/**
+ * Where the client actually is — `req.ip`, and never the raw header.
+ *
+ * ## What this used to do, and why it was wrong
+ *
+ * It read `x-forwarded-for` and took the LEFT-MOST entry, on the reasoning that behind a proxy the
+ * left-most entry is the original client. True, and unusable: a proxy APPENDS, so whatever the client
+ * sent is still sitting on the left. The left-most entry is therefore client-controlled in every
+ * deployment, including a correctly configured one.
+ *
+ * Two consequences, both measured against a running instance on 2026-08-20:
+ *
+ * 1. **The limit was bypassable.** Twenty wrong-password attempts against one account with a varying
+ *    `X-Forwarded-For` drew twenty 401s and not one 429; the same twenty without the header were
+ *    refused after ten.
+ * 2. **Worse, it was aimable.** Forging the header to a VICTIM's address and naming their email
+ *    spends *their* (person, network) budget, so the next real sign-in from that address is refused.
+ *    That is the targeted denial of service this file's own header says keying on IP + email
+ *    eliminated — "a stranger cannot starve anybody" — reintroduced by the one line that decided
+ *    which IP.
+ *
+ * ## Why `req.ip` is the right answer
+ *
+ * Express computes it under `trust proxy`, which `main.ts` sets to `1` — exactly the number of hops
+ * we terminate through. It walks XFF from the RIGHT and stops at the first address a trusted hop did
+ * not vouch for, so entries a client prepended are ignored. Behind the documented single proxy that
+ * is the real client address and a forged prefix changes nothing.
+ *
+ * The residual is unchanged and already recorded: `trust proxy` must match the actual number of
+ * proxies. Two hops with the setting left at 1 makes `req.ip` forgeable again — for the rate limiter
+ * and for everything else that asks where a request came from, which is the point of keeping one
+ * answer rather than two.
+ */
 function clientIp(req: Record<string, unknown>): string {
-  const forwarded = (req['headers'] as Record<string, string> | undefined)?.[
-    'x-forwarded-for'
-  ];
-
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    /* The left-most entry is the original client; the rest are proxies that appended themselves. */
-    return forwarded.split(',')[0]?.trim() ?? 'unknown';
-  }
-
-  return typeof req['ip'] === 'string' ? req['ip'] : 'unknown';
+  return typeof req['ip'] === 'string' && req['ip'].length > 0 ? req['ip'] : 'unknown';
 }
 
 /**
