@@ -1749,6 +1749,26 @@ export const ar = {
     'wallet.compensation': 'تعويض المحفظة',
     'partner.deadline_reminder': 'تذكير الشريك بالمهلة',
     'ad.single_offer': 'عرض إعلاني (رسالة واحدة)',
+    /*
+      The three the platform actually SENDS, added 2026-08-20.
+
+      The six above come from design handoff §8 and describe what is planned. The delivery log
+      contains none of them: what `notify()` writes is these three, and all three were missing — so
+      every row of سجل واتساب والبريد printed a raw `booking.needs_action`. The planned six are kept
+      because the template INVENTORY on the same screen lists them.
+    */
+    'booking.needs_action': 'حجز بانتظار رد الشريك',
+    'review.received': 'تقييم جديد على عقار',
+    'review.replied': 'رد على تقييم',
+    /*
+      Found by the guard rather than by reading the code, which is the point of having it.
+
+      `support.replied` appeared in the delivery log during a browser run the same afternoon the
+      other three were added — one row, written by the support spec — and
+      `audit-catalogue.integration.test.ts` failed on it. Four templates is now the complete set the
+      platform sends, confirmed against every `templateKey` literal in the API.
+    */
+    'support.replied': 'رد على طلب دعم',
   } as Record<string, string>,
 
   /** Booking statuses, so the table does not show raw enum values. */

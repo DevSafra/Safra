@@ -199,9 +199,16 @@ const COLUMNS: readonly AdminColumn<NotificationItem>[] = [
   {
     key: 'template',
     header: t.sections.comms.colTemplate,
+    /*
+      `label()`, not the raw key.
+
+      This printed `row.templateKey` verbatim, so every row of the delivery log said
+      «booking.needs_action» — while the template INVENTORY twenty lines above already resolved its
+      own keys through the catalogue. Found 2026-08-20 by sweeping the console for snake_case.
+    */
     render: (row) => (
       <span className="text-text">
-        {row.templateKey}
+        {label(t.notificationTemplate, row.templateKey)}
         <span className="ms-1.5 text-[10px] text-faint">({row.locale})</span>
       </span>
     ),
