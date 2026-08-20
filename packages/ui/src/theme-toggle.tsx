@@ -27,6 +27,15 @@ function SunIcon() {
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden
       focusable="false"
+      /*
+        `data-theme-icon` so a browser test can say WHICH icon is drawn.
+
+        There is nothing else to assert on: both icons are an `<svg>` with one `<path>`, and a
+        test that matched on path data would fail the next time the drawing is redrawn rather than
+        when the RULE is broken. The rule is "the icon names the destination", and this attribute
+        is the only thing that states which icon this is.
+      */
+      data-theme-icon="sun"
       className="size-[18px]"
     >
       <path
@@ -46,6 +55,7 @@ function MoonIcon() {
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden
       focusable="false"
+      data-theme-icon="moon"
       className="size-[18px]"
     >
       <path
@@ -97,12 +107,21 @@ export interface ThemeToggleProps {
  * The pre-paint theme script has already applied the saved value before this mounts, so
  * initialising from anything else means the icon can disagree with the screen.
  *
- * ## Why the first render is deliberately the dark icon
+ * ## The icon names the DESTINATION, not the current state (Bashar, 2026-08-19)
+ *
+ * Light shows a MOON, dark shows a SUN — press it and you get what you see.
+ *
+ * It was the other way round, and that put the icon at odds with its own label: in dark mode the
+ * button said «الوضع الفاتح» — go to light — beside a moon. One control cannot answer "where am
+ * I" and "where will this take me" at once, and the label had already chosen, for the reason
+ * recorded on `toLightLabel`: a state read aloud is ambiguous, an action is not.
+ *
+ * ## Why the first render is a fixed choice
  *
  * There is no theme to read during server rendering — the choice lives in `localStorage`, which
- * only exists in the browser. Rendering the moon and correcting it in the effect keeps the markup
- * identical on both sides; branching on anything client-only here is a hydration mismatch, and the
- * console has been broken by one of those before.
+ * only exists in the browser. Rendering one icon unconditionally and correcting it in the effect
+ * keeps the markup identical on both sides; branching on anything client-only here is a hydration
+ * mismatch, and the console has been broken by one of those before.
  */
 export function ThemeToggle({
   toLightLabel,
@@ -133,7 +152,8 @@ export function ThemeToggle({
       title={label}
       className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-[9px] border border-line bg-field text-sm text-muted transition-colors hover:border-gold hover:text-gold"
     >
-      {theme === 'dark' ? <MoonIcon /> : <SunIcon />}
+      {/* The destination: a moon offers dark, a sun offers light — matching the label above. */}
+      {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
     </button>
   );
 }

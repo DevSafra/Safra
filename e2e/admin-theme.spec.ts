@@ -94,6 +94,33 @@ test.describe('the console theme toggle', () => {
   });
 
   /**
+   * The ICON names the destination too, and agrees with the label (Bashar, 2026-08-19).
+   *
+   * It used to name the current state, which put a moon beside «الوضع الفاتح» — a control saying
+   * two different things at once. Asserted in both directions, because a swap that fixed one and
+   * broke the other would look right in whichever screenshot somebody happened to take.
+   */
+  test('shows the icon of the mode it will switch to', async ({ page }) => {
+    await page.goto('/');
+
+    /*
+      Located by the ICON, not by the label.
+
+      `toggle()` finds the button by its accessible name, and that name CHANGES when it is pressed
+      — so re-using it after the click looks for a button that no longer exists, which is how the
+      first version of this test failed. The icon is the thing under test and it is always there.
+    */
+    const icon = page.locator('aside [data-theme-icon]');
+
+    /* The console starts dark, so the button offers the sun. */
+    await expect(icon).toHaveAttribute('data-theme-icon', 'sun');
+
+    await toggle(page).click();
+
+    await expect(icon).toHaveAttribute('data-theme-icon', 'moon');
+  });
+
+  /**
    * The choice survives a reload, applied BEFORE paint.
    *
    * If the inline script were CSP-blocked, or moved into an effect, this would still end up

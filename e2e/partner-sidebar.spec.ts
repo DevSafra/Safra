@@ -380,12 +380,23 @@ test('the theme toggle switches, relabels, and is remembered', async ({ page }) 
 
   // Dark despite `colorScheme: 'light'` above — the dashboard is opt-in, not OS-driven.
   await expect(bodyBackground(page)).resolves.toBe(DARK_BG);
+  /*
+    The icon names the DESTINATION, like the label — dark offers the sun (Bashar, 2026-08-19).
+
+    Held by the icon rather than through `themeToggle()`, whose locator is the button's accessible
+    NAME: that name changes when the button is pressed, so the same handle would stop matching
+    exactly when the second assertion needs it.
+  */
+  const themeIcon = page.locator('aside [data-theme-icon]');
+
+  await expect(themeIcon).toHaveAttribute('data-theme-icon', 'sun');
 
   await themeToggle(page).click();
 
   await expect(bodyBackground(page)).resolves.toBe(LIGHT_BG);
   // The button reports where it goes, so its name changes with the state.
   await expect(page.getByRole('button', { name: t.nav.themeToDark })).toBeVisible();
+  await expect(themeIcon).toHaveAttribute('data-theme-icon', 'moon');
 
   await page.reload();
 
