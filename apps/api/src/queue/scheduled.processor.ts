@@ -5,6 +5,7 @@ import { SlaService } from '../bookings/sla.service.js';
 import { PayoutScheduler } from '../payouts/payout.scheduler.js';
 import { RankingScheduler } from '../ranking/ranking.scheduler.js';
 import { SanctionsRefreshService } from '../sanctions/sanctions-refresh.service.js';
+import { CredentialRetentionService } from '../auth/credential-retention.service.js';
 import { WebhookRetentionService } from '../payments/webhook-retention.service.js';
 import { NotificationRedriveService } from '../notifications/notification-redrive.service.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
@@ -57,6 +58,7 @@ export class ScheduledProcessor {
     private readonly ranking: RankingScheduler,
     private readonly sanctions: SanctionsRefreshService,
     private readonly retention: WebhookRetentionService,
+    private readonly credentials: CredentialRetentionService,
     private readonly redrive: NotificationRedriveService,
     private readonly runs: JobRunService,
     private readonly deadLetters: DeadLetterService,
@@ -92,6 +94,8 @@ export class ScheduledProcessor {
         return this.sanctions.refresh();
       case 'webhook-retention':
         return this.retention.prune();
+      case 'credential-retention':
+        return this.credentials.prune();
       case 'notification-redrive':
         /*
           Wrapped HERE rather than inside the service, unlike the other five.

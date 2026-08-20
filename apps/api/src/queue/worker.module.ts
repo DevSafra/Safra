@@ -11,6 +11,7 @@ import { NotificationRedriveService } from '../notifications/notification-redriv
 import { DeadLetterService } from './dead-letter.service.js';
 import { MailProcessor } from './mail.processor.js';
 import { MediaProcessor } from './media.processor.js';
+import { AuthModule } from '../auth/auth.module.js';
 import { ScheduledProcessor } from './scheduled.processor.js';
 import { ScheduledRegistrar } from './scheduled.registrar.js';
 import { ExportProcessor } from './export.processor.js';
@@ -50,6 +51,8 @@ import { AdminModule } from '../admin/admin.module.js';
     RankingModule,
     SanctionsModule,
     PaymentsModule,
+    /* For `CredentialRetentionService` — the nightly sweep of dead codes and tokens. */
+    AuthModule,
     /* For `BookingExportService` — the one query that decides what an export contains. */
     AdminModule,
   ],

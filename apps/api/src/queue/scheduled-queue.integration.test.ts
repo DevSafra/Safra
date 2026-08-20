@@ -97,7 +97,16 @@ describeIfReady('the scheduled queue', () => {
             return Promise.resolve({ deleted: 0 });
           }),
       } as never,
-      /* The sixth job, and the only one whose recording lives at the call site. */
+      /* The seventh job, recorded for real like the retention pass above it. */
+      {
+        prune: () =>
+          runs.runExclusively('credential-retention', 8_421_005, () => {
+            called.push('credential-retention');
+
+            return Promise.resolve({ codes: 0, tokens: 0 });
+          }),
+      } as never,
+      /* The one whose recording lives at the call site rather than in its service. */
       { run: () => stub('notification-redrive').run() } as never,
       runs,
       new DeadLetterService(db),

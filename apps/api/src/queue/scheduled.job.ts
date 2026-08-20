@@ -24,6 +24,14 @@ export const SCHEDULED_JOBS = {
   'payout-accrual': '0 * * * *',
   'ranking-recompute': '0 3 * * *',
   'webhook-retention': '0 3 * * *',
+  /**
+   * Removing credentials that have stopped being credentials — `O-sec-6` and `O-sec-11`.
+   *
+   * 03:30 rather than 03:00, so it does not start while `ranking-recompute` and
+   * `webhook-retention` are both already running: all three are batch deletes or large reads
+   * against the primary, and stacking them puts the heaviest half-hour of the night on one minute.
+   */
+  'credential-retention': '30 3 * * *',
   'sanctions-refresh': '0 4 * * *',
   /**
    * Re-driving notifications whose jobs were lost — the recovery half of `O-notify-2`.

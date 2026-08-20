@@ -10,6 +10,8 @@ import { AccountRecoveryService } from './account-recovery.service.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { AuthTokenService } from './auth-token.service.js';
+import { JobRunService } from '../common/jobs/job-run.service.js';
+import { CredentialRetentionService } from './credential-retention.service.js';
 import { CustomerAccountService } from './customer-account.service.js';
 import { LoginCodeService } from './login-code.service.js';
 import { TokenService } from './token.service.js';
@@ -29,6 +31,9 @@ import { TwoFactorService } from './two-factor.service.js';
     CustomerAccountService,
     TwoFactorService,
     LoginCodeService,
+    /* Its nightly pass is driven by `ScheduledProcessor`; see `credential-retention.service.ts`. */
+    CredentialRetentionService,
+    JobRunService,
     PasswordService,
     FieldEncryptionService,
     MailService,
@@ -49,6 +54,8 @@ import { TwoFactorService } from './two-factor.service.js';
   // and one token-issuing path, so a change to either cannot apply in one place
   // and not the other.
   exports: [
+    /* For `ScheduledProcessor`, which owns the 03:30 pass. */
+    CredentialRetentionService,
     TokenService,
     AuditService,
     PasswordService,
