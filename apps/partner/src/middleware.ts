@@ -18,8 +18,12 @@ import {
 /*
   Reachable without a session.
 
-/** Reachable with a session that has not yet enrolled in 2FA — and nothing else. */
-const ENROLMENT_PATHS = ['/enrol-2fa'];
+  `/invitation` joined `/login` on 2026-08-20 with the page that redeems a partner invitation. It
+  HAS to be public: the whole point of the page is that the account is not yet a partner account
+  and cannot sign in, which is exactly why the middleware bouncing it to `/login` left every
+  accepted partner stranded.
+*/
+const PUBLIC_PATHS = ['/login', '/invitation'];
 
 /**
  * Everything that guards لوحة الشريك, in one place.

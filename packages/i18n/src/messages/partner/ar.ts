@@ -242,6 +242,41 @@ export const ar = {
   },
 
   /**
+   * «أنشئ حساب الشريك» — the page the invitation email links to (Bashar, 2026-08-20).
+   *
+   * It did not exist until then. The mail had always pointed at `/invitation/{token}`, the route
+   * was never built, and the partner portal answered it with a redirect to a sign-in they could not
+   * pass — their account is still a customer account until this page is submitted. So an accepted
+   * partner had nowhere to go, and the joining process could not be completed by anybody.
+   */
+  invitation: {
+    title: 'أنشئ حساب الشريك',
+    intro: 'قُبل طلب الشراكة. اختر كلمة مرور لحسابك لتتمكّن من الدخول إلى لوحة الشريك.',
+    password: 'كلمة المرور',
+    confirm: 'تأكيد كلمة المرور',
+    submit: 'إنشاء الحساب',
+    submitting: 'جارٍ الإنشاء…',
+    mismatch: 'كلمتا المرور غير متطابقتين.',
+    weak: 'كلمة المرور لا تحقّق الشروط أعلاه.',
+    /* The token is single-use and time-limited, so this is an ordinary outcome, not a fault. */
+    invalidLink:
+      'هذا الرابط غير صالح أو انتهت صلاحيته. اطلب من فريق سفرة إعادة إرسال الدعوة.',
+    failed: 'تعذّر إنشاء الحساب. حاول مرة أخرى.',
+    done: 'تم إنشاء الحساب. سجّل الدخول للمتابعة.',
+    signIn: 'الذهاب إلى تسجيل الدخول',
+    /* One line per rule of `passwordSchema`, shown live by the strength meter. */
+    ruleLength: '12 حرفًا على الأقل',
+    ruleUppercase: 'حرف كبير واحد على الأقل',
+    ruleLowercase: 'حرف صغير واحد على الأقل',
+    ruleDigit: 'رقم واحد على الأقل',
+    ruleSymbol: 'رمز واحد على الأقل',
+    strengthLabel: 'قوة كلمة المرور',
+    /* What happens next, so nobody waits for an email that is not coming. */
+    afterNote:
+      'بعد الدخول نرسل لك رمزًا من 6 أرقام على بريدك في كل مرة تسجّل فيها الدخول. لا حاجة لتطبيق مصادقة.',
+  },
+
+  /**
    * المصادقة الثنائية — mandatory for every partner (Bashar, 2026-08-07).
    *
    * The copy leads with WHY rather than with the instruction, because a partner meeting this
