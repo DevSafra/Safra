@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { NextResponse } from 'next/server';
+import { seeOther } from '@safra/session';
 
 import { getStaffSession } from '@/lib/session-server';
 
@@ -58,5 +58,6 @@ export async function POST(request: Request): Promise<Response> {
   */
   const target = response.ok ? '/bookings/exports' : '/bookings/exports?failed=1';
 
-  return NextResponse.redirect(new URL(target, request.url), 303);
+  /* Relative, so the host the standalone server is bound to cannot become the redirect target. */
+  return seeOther(target);
 }

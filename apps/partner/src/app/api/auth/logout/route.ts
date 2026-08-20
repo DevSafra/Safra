@@ -15,8 +15,18 @@ import { PARTNER_SESSION_COOKIE, sessionCookieOptions } from '@safra/session';
  * The refresh token is not revoked upstream, so this ends the SESSION rather than every session —
  * the same limitation the console's logout carries.
  */
-export function POST(request: Request): NextResponse {
-  const response = NextResponse.redirect(new URL('/login', request.url), 303);
+export function POST(): NextResponse {
+  /*
+    A RELATIVE `Location`, and a NextResponse because this clears the session cookie.
+
+    An absolute URL built from `request.url` is `http://0.0.0.0:3002` on the standalone runtime the
+    container ships — a different origin, so signing out would land the partner on a page their
+    (now cleared) cookie never reached anyway. See `seeOther` in `@safra/session`.
+  */
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: { Location: '/login' },
+  });
 
   response.cookies.set(PARTNER_SESSION_COOKIE, '', sessionCookieOptions(0));
 

@@ -9,6 +9,7 @@
 export * from './session.js';
 export * from './auth-api.js';
 export * from './redirect.js';
+export * from './request-origin.js';
 export * from './csp.js';
 
 /* Where a browser fetches listing photography — shared so the two apps cannot drift. */

@@ -2,6 +2,8 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 
+import { isSameOrigin } from '@safra/session';
+
 import {
   CURRENCY_COOKIE,
   DEFAULT_DISPLAY_CURRENCY,
@@ -54,9 +56,17 @@ export async function POST(
     `Origin` is sent on every cross-origin POST by every browser that matters, and same-origin
     requests either send it or send none at all; a missing header is therefore accepted.
   */
-  const origin = request.headers.get('origin');
+  /*
+    Compared against the `Host` HEADER, not against `request.url`.
 
-  if (origin && origin !== new URL(request.url).origin) {
+    It was `origin !== new URL(request.url).origin`, and on the standalone runtime the container
+    actually ships, `request.url` carries the address the server is BOUND to — `0.0.0.0`. So the
+    comparison was `http://safra.example` against `http://0.0.0.0:3000` and never matched: every
+    real browser sends `Origin` on a POST, so this guard answered **403 to everybody**. Measured
+    2026-08-20: 403 with a correct same-origin header, 303 with the header removed. A check that
+    refuses everyone is an outage wearing a security check's clothes.
+  */
+  if (!isSameOrigin(request)) {
     return new Response('Cross-site request refused.', { status: 403 });
   }
 
@@ -75,7 +85,18 @@ export async function POST(
       ? next
       : home;
 
-  const response = NextResponse.redirect(new URL(target, request.url), 303);
+  /*
+    A NextResponse, because this sets a cookie — but with a RELATIVE `Location`.
+
+    `NextResponse.redirect()` insists on an absolute URL and would build it from `request.url`, which
+    is `http://0.0.0.0:3000` on the runtime the container ships. Constructing the response directly
+    keeps the cookie API and lets the browser resolve the target against the URL it already asked
+    for. Same reasoning as `seeOther` in `@safra/session`, which the routes that set no cookie use.
+  */
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: { Location: target },
+  });
 
   response.cookies.set(CURRENCY_COOKIE, currency, {
     path: '/',

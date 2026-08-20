@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { seeOther } from '@safra/session';
+
 import {
   TABLE_SECTION_PARAMS,
   TABLE_SECTION_PATHS,
@@ -31,7 +33,7 @@ import { MAX_PAGE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from '@/lib/search-params';
  * The filters travel as ordinary form fields and are re-encoded through `URLSearchParams`, so a
  * `q` containing `&` or `#` cannot break out of its own parameter.
  */
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(request: Request): Promise<Response> {
   const form = await request.formData().catch(() => null);
 
   if (form === null) {
@@ -65,7 +67,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     body: { section, size },
   }).catch(() => null);
 
-  return NextResponse.redirect(listUrl(request, section, size, field), 303);
+  /*
+    A RELATIVE Location. `NextResponse.redirect` needs an absolute URL and would build it from
+    `request.url`, which the standalone server derives from the address it is BOUND to — so in a
+    container every one of these sent the operator to `http://0.0.0.0:3001/…`, a different origin
+    the session cookie does not reach. See `seeOther`.
+  */
+  const target = listUrl(request, section, size, field);
+
+  return seeOther(`${target.pathname}${target.search}`);
 }
 
 /**
