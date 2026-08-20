@@ -4,6 +4,7 @@ import { LOCALES } from '@safra/i18n';
 
 import {
   emailVerificationMail,
+  partnerLoginCodeMail,
   passwordResetMail,
   staffInvitationMail,
   supportRepliedMail,
@@ -183,5 +184,42 @@ describe('transactional email', () => {
     );
 
     expect(new Set(subjects).size).toBe(LOCALES.length);
+  });
+});
+
+/**
+ * A mail whose BODY is a credential must say so.
+ *
+ * With no SMTP transport configured — every environment without one — `MailService` writes the
+ * whole body to the log so a developer can follow the link inside it. That is a deliberate
+ * convenience and it is safe for a link, which is single-use and expiring. It is NOT safe for a
+ * mail whose body IS the secret: a live sign-in code in a log file is a credential in a log file,
+ * which rule 1 forbids outright.
+ *
+ * `sensitive` is the flag that withholds it, and this is what keeps somebody from adding another
+ * code-bearing mail without it.
+ */
+describe('mails that carry a secret', () => {
+  it('withholds the partner sign-in code from the log', () => {
+    const mail = partnerLoginCodeMail({
+      to: 'partner@safra.test',
+      code: '123456',
+      locale: 'ar',
+      expiresInMinutes: 10,
+    });
+
+    expect(mail.sensitive).toBe(true);
+  });
+
+  /** The code is still in the body — withholding it from a LOG is not withholding it from the mail. */
+  it('still sends the code to the partner', () => {
+    const mail = partnerLoginCodeMail({
+      to: 'partner@safra.test',
+      code: '123456',
+      locale: 'ar',
+      expiresInMinutes: 10,
+    });
+
+    expect(mail.text).toContain('123456');
   });
 });

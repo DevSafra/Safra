@@ -230,6 +230,15 @@ export function partnerLoginCodeMail(input: {
       code: input.code,
       expiresInMinutes: input.expiresInMinutes,
     }),
+    /**
+     * The body is a CREDENTIAL, so it is withheld from the log.
+     *
+     * With no SMTP transport configured — every local environment — `MailService` writes the whole
+     * body to the log so a developer can follow the link. For this mail that would put a live
+     * sign-in code in a log file, which is the one thing rule 1 says a log must never carry. The
+     * code is read from the mail catcher instead.
+     */
+    sensitive: true,
   };
 }
 
