@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { SignJWT, jwtVerify } from 'jose';
 import { v7 as uuidv7 } from 'uuid';
 
@@ -85,6 +85,13 @@ export interface IssuedTokens {
  * A fast keyed hash is correct here, unlike for passwords: there is no
  * low-entropy space to protect, and lookup happens on every refresh.
  */
+/**
+ * How many sessions one account may hold at once (`O-sec-6`, Bashar 2026-08-20).
+ *
+ * See `retireOldestSessions` for the reasoning and for why the number is soft.
+ */
+const MAX_CONCURRENT_SESSIONS = 10;
+
 @Injectable()
 export class TokenService {
   private readonly accessSecret: Uint8Array;
@@ -152,6 +159,8 @@ export class TokenService {
 
     // A family spans one login session across every rotation, so detecting reuse
     // lets us revoke the whole lineage rather than a single token.
+    /* Absent on a sign-in, present on a rotation — which is what makes this a NEW session. */
+    const isNewSession = !context.familyId;
     const familyId = context.familyId ?? uuidv7();
 
     await this.db.insert(schema.refreshTokens).values({
@@ -163,12 +172,66 @@ export class TokenService {
       userAgent: context.userAgent ?? null,
     });
 
+    /*
+      Retire the oldest sessions past the cap — but only when this IS a new one.
+
+      A rotation carries its family forward, so counting it would retire a session every fifteen
+      minutes for anybody signed in.
+    */
+    if (isNewSession) await this.retireOldestSessions(claims.sub);
+
     return {
       accessToken,
       expiresIn: this.accessTtlSeconds,
       refreshToken,
       refreshExpiresAt,
     };
+  }
+
+  /**
+   * Keeps at most `MAX_CONCURRENT_SESSIONS` live sessions per account, newest kept.
+   *
+   * ## Why there is a cap at all
+   *
+   * `refresh_tokens` had no ceiling of any kind: an account could hold unlimited live sessions, and
+   * nothing ever ended one except its own expiry (`O-sec-6`). Two consequences, and the second is
+   * the one that matters. A table that only grows is what `CredentialRetentionService` now bounds.
+   * A session list that only grows is a blast radius — every stale session on a shared machine, an
+   * old phone, or a browser somebody forgot about is a live way in, for as long as the refresh
+   * token lives, and nobody can see it.
+   *
+   * ## Ten, and why the number is soft
+   *
+   * A person with a phone, a laptop, an office desktop and a tablet is at four; add a second
+   * browser and a private window and they are at six. Ten leaves room for that and still bounds
+   * the tail. It is a product judgement rather than a security threshold — nothing breaks at
+   * eleven — so it is one named constant, and moving it is a one-line decision rather than a
+   * redesign.
+   *
+   * ## The oldest go, and they go as FAMILIES
+   *
+   * A family is one sign-in and every rotation descended from it, so revoking a family ends a
+   * session; revoking a single row would end one fifteen-minute slice of it and leave the rest
+   * usable. Ordered by when each family STARTED, so a session that is merely old is retired before
+   * one that is merely quiet — the alternative, ordering by last use, would retire the tablet
+   * somebody uses monthly ahead of a browser an attacker refreshes hourly.
+   */
+  private async retireOldestSessions(userId: string): Promise<void> {
+    await this.db.execute(sql`
+      UPDATE refresh_tokens
+      SET revoked_at = now()
+      WHERE family_id IN (
+        SELECT family_id
+        FROM refresh_tokens
+        WHERE user_id = ${userId}::uuid
+          AND revoked_at IS NULL
+          AND expires_at > now()
+        GROUP BY family_id
+        ORDER BY min(created_at) DESC
+        OFFSET ${MAX_CONCURRENT_SESSIONS}
+      )
+        AND revoked_at IS NULL
+    `);
   }
 
   async verifyAccessToken(token: string): Promise<AccessTokenClaims> {
