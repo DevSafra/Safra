@@ -115,6 +115,22 @@ export function conflict(code: ErrorCode, params?: ErrorParams): HttpException {
   return new ConflictException(body(HttpStatus.CONFLICT, code, params));
 }
 
+/**
+ * 429 — refused by the rate limiter.
+ *
+ * Exists because `@nestjs/throttler` does not use these helpers: its `ThrottlerGuard` throws its own
+ * `ThrottlerException`, whose body is `{statusCode, message: 'ThrottlerException: Too Many Requests'}`
+ * — no code, an English sentence, and the framework's class name in a client-facing response.
+ * `CodedThrottlerGuard` throws this instead so a throttled request answers in the same shape as
+ * every other refusal.
+ */
+export function tooManyRequests(code: ErrorCode, params?: ErrorParams): HttpException {
+  return new HttpException(
+    body(HttpStatus.TOO_MANY_REQUESTS, code, params),
+    HttpStatus.TOO_MANY_REQUESTS,
+  );
+}
+
 /** 503 — a dependency is unavailable and the client should retry. */
 export function unavailable(code: ErrorCode, params?: ErrorParams): HttpException {
   return new ServiceUnavailableException(

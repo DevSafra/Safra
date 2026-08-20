@@ -32,6 +32,15 @@ export const ERROR = {
   REQUEST_NOT_FOUND: 'request.not_found',
   REQUEST_UPSTREAM_UNREACHABLE: 'request.upstream_unreachable',
   REQUEST_UNKNOWN: 'request.unknown',
+  /**
+   * The rate limiter's refusal.
+   *
+   * `@nestjs/throttler` answers a 429 with `{statusCode, message: 'ThrottlerException: Too
+   * Many Requests'}` — no code, an English sentence, and the framework's class name in a
+   * client-facing body. `CodedThrottlerGuard` replaces it with this. Namespaced `request.`
+   * rather than `auth.` because the global throttler covers every route, not only sign-in.
+   */
+  REQUEST_TOO_MANY: 'request.too_many',
   AUTH_REQUIRED: 'auth.required',
   AUTH_CREDENTIALS_INVALID: 'auth.credentials_invalid',
   AUTH_PASSWORD_INCORRECT: 'auth.password_incorrect',
@@ -64,6 +73,14 @@ export const ERROR = {
   BOOKING_STAY_TOO_LONG: 'booking.stay_too_long',
   BOOKING_NO_REFUNDABLE_AMOUNT: 'booking.no_refundable_amount',
   BOOKING_DRAFT_NOT_REFUNDABLE: 'booking.draft_not_refundable',
+  /**
+   * Lost the race for the last room (EC-005).
+   *
+   * Distinct from `unit.unavailable_on`, which is the calendar saying no BEFORE the attempt.
+   * This is the exclusion constraint saying no during it: the dates were free when the
+   * customer asked and somebody else committed first, so there is no single date to name.
+   */
+  BOOKING_DATES_JUST_TAKEN: 'booking.dates_just_taken',
   PAYMENT_UNAVAILABLE: 'payment.unavailable',
   PARTNER_NOT_FOUND: 'partner.not_found',
 
@@ -216,6 +233,15 @@ export const ERROR = {
   STAFF_CANNOT_CHANGE_OWN_ROLE: 'staff.cannot_change_own_role',
   BOOKING_DEPARTURE_AFTER_ARRIVAL: 'booking.departure_after_arrival',
   BOOKING_ARRIVAL_MINIMUM_NIGHTS: 'booking.arrival_minimum_nights',
+  /**
+   * The same-day cutoff has passed for this city (§5.3), and the arrival date is behind us.
+   *
+   * Both carry `{date}` — the first date that CAN be booked — because a refusal that does not
+   * say what would work leaves the customer guessing. They were two English sentences chosen by
+   * a ternary until 2026-08-20.
+   */
+  BOOKING_SAME_DAY_CLOSED: 'booking.same_day_closed',
+  BOOKING_ARRIVAL_IN_PAST: 'booking.arrival_in_past',
   BOOKING_NO_CAPTURED_PAYMENT: 'booking.no_captured_payment',
   BOOKING_NOT_PAYABLE_IN_STATUS: 'booking.not_payable_in_status',
   PAYMENT_REFUND_UNAVAILABLE: 'payment.refund_unavailable',

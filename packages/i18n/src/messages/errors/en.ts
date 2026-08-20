@@ -13,6 +13,7 @@ export const en = {
   'request.not_found': 'Not found.',
   'request.upstream_unreachable': 'Could not reach the server. Please try again.',
   'request.unknown': 'Something went wrong. Please try again.',
+  'request.too_many': 'Too many requests. Please wait a moment and try again.',
   'auth.required': 'Authentication required.',
   'auth.credentials_invalid': 'Invalid email or password.',
   'auth.password_incorrect': 'Password is incorrect.',
@@ -47,6 +48,12 @@ export const en = {
   'booking.stay_too_long': 'A stay may not exceed {maxNights} nights.',
   'booking.no_refundable_amount': 'No refundable amount remains on this booking.',
   'booking.draft_not_refundable': 'A draft booking has no payment to refund.',
+  'booking.dates_just_taken':
+    'Those dates were just taken. Please choose different dates.',
+  'booking.same_day_closed':
+    "Today's bookings have closed for this city. The first available date is {date}.",
+  'booking.arrival_in_past':
+    'The arrival date is in the past. The first available date is {date}.',
   'payment.unavailable': 'Payment is temporarily unavailable. Please retry.',
   'partner.not_found': 'Partner not found.',
 

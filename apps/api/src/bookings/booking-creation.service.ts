@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -131,14 +126,21 @@ export class BookingCreationService {
     const verdict = evaluateArrival(input.checkIn, now, unit.city_timezone, cutoffHour);
 
     if (!verdict.allowed) {
-      throw new BadRequestException({
-        message:
-          verdict.reason === 'same_day_closed'
-            ? "Today's bookings have closed for this city."
-            : 'The arrival date is in the past.',
-        reason: verdict.reason,
-        firstBookableDate: verdict.firstBookableDate,
-      });
+      /*
+        A CODE with the date as a PARAM, not one of two English sentences.
+
+        `firstBookableDate` travelled as a top-level field and the wording as `message`; the customer
+        app read `reason` for the cutoff case and translated it itself, but had no branch for a past
+        arrival — so that one fell through to a fallback that printed the API's English `message`
+        verbatim, on an Arabic checkout form. `params` is the mechanism that already exists for
+        exactly this: the client resolves the code in the reader's language and fills `{date}` itself.
+      */
+      throw badRequest(
+        verdict.reason === 'same_day_closed'
+          ? ERROR.BOOKING_SAME_DAY_CLOSED
+          : ERROR.BOOKING_ARRIVAL_IN_PAST,
+        { date: verdict.firstBookableDate },
+      );
     }
 
     // ── Party size and stay length ──────────────────────────────────────────
@@ -356,10 +358,20 @@ export class BookingCreationService {
        * working, not failing. It becomes a 409 and the UI offers alternatives.
        */
       if (isExclusionViolation(error)) {
-        throw new ConflictException({
-          message: 'Those dates were just taken. Please choose different dates.',
-          reason: 'dates_unavailable',
-        });
+        /*
+          A CODE, not the sentence this used to carry.
+
+          It answered `{message: 'Those dates were just taken…', reason: 'dates_unavailable'}` — an
+          English sentence with no error code, twelve lines below a `conflict(ERROR.UNIT_UNAVAILABLE_ON)`
+          that does it correctly. This is the response a customer gets for losing the race on the last
+          room, so it is a refusal a real person reads, and on an Arabic screen there was nothing to
+          render but English.
+
+          Distinct from `unit.unavailable_on`: that one names the blocked DATE, because the calendar
+          said no before the attempt. Here the dates were free when the customer asked, so there is no
+          single date to name — only the fact that somebody committed first.
+        */
+        throw conflict(ERROR.BOOKING_DATES_JUST_TAKEN);
       }
 
       throw error;

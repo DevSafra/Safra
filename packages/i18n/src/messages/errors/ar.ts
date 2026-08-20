@@ -12,6 +12,7 @@ export const ar = {
   'request.not_found': 'غير موجود.',
   'request.upstream_unreachable': 'تعذّر الوصول إلى الخادم. حاول مرة أخرى.',
   'request.unknown': 'حدث خطأ ما. حاول مرة أخرى.',
+  'request.too_many': 'طلبات كثيرة جداً. انتظر قليلاً ثم حاول مرة أخرى.',
   'auth.required': 'يجب تسجيل الدخول.',
   'auth.credentials_invalid': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
   'auth.password_incorrect': 'كلمة المرور غير صحيحة.',
@@ -46,6 +47,11 @@ export const ar = {
   'booking.stay_too_long': 'لا يمكن أن تتجاوز الإقامة {maxNights} ليلة.',
   'booking.no_refundable_amount': 'لا يوجد مبلغ قابل للاسترداد على هذا الحجز.',
   'booking.draft_not_refundable': 'الحجز المسودة لا يحتوي دفعة قابلة للاسترداد.',
+  'booking.dates_just_taken':
+    'حُجزت هذه التواريخ قبل لحظات. اختر تواريخ أخرى أو وحدة أخرى.',
+  'booking.same_day_closed':
+    'حجوزات اليوم أُغلقت لهذه المدينة. أول تاريخ متاح هو {date}.',
+  'booking.arrival_in_past': 'تاريخ الوصول قد مضى. أول تاريخ متاح هو {date}.',
   'payment.unavailable': 'الدفع غير متاح مؤقتاً. حاول مرة أخرى.',
   'partner.not_found': 'لم يُعثر على هذا الشريك.',
 

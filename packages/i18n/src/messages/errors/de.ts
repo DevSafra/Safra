@@ -13,6 +13,8 @@ export const de = {
   'request.upstream_unreachable':
     'Der Server ist nicht erreichbar. Bitte erneut versuchen.',
   'request.unknown': 'Etwas ist schiefgelaufen. Bitte erneut versuchen.',
+  'request.too_many':
+    'Zu viele Anfragen. Bitte einen Moment warten und erneut versuchen.',
   'auth.required': 'Anmeldung erforderlich.',
   'auth.credentials_invalid': 'E-Mail-Adresse oder Passwort ist falsch.',
   'auth.password_incorrect': 'Das Passwort ist falsch.',
@@ -54,6 +56,12 @@ export const de = {
     'Für diese Buchung ist kein erstattungsfähiger Betrag vorhanden.',
   'booking.draft_not_refundable':
     'Eine Buchung im Entwurf hat keine Zahlung zum Erstatten.',
+  'booking.dates_just_taken':
+    'Diese Daten wurden gerade vergeben. Bitte andere Daten wählen.',
+  'booking.same_day_closed':
+    'Buchungen für heute sind in dieser Stadt geschlossen. Erstes verfügbares Datum: {date}.',
+  'booking.arrival_in_past':
+    'Das Anreisedatum liegt in der Vergangenheit. Erstes verfügbares Datum: {date}.',
   'payment.unavailable':
     'Die Zahlung ist vorübergehend nicht verfügbar. Bitte erneut versuchen.',
   'partner.not_found': 'Partner nicht gefunden.',

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 import { AuditInterceptor } from './common/audit/audit.interceptor.js';
 import { AuditService } from './common/audit/audit.service.js';
@@ -38,6 +38,7 @@ import {
   accountTracker,
   skipUnlessAccountNamed,
 } from './common/throttle/account-tracker.js';
+import { CodedThrottlerGuard } from './common/throttle/coded-throttler.guard.js';
 import { ENV, type Env } from './config/env.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
 import { PermissionsGuard } from './rbac/permissions.guard.js';
@@ -128,7 +129,7 @@ import { VerifiedPartnerGuard } from './rbac/verified-partner.guard.js';
     // Order matters: throttling runs first (cheapest rejection), then
     // authentication, then authorization. Never spend a database round trip on a
     // request that a rate limiter was going to reject anyway.
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: CodedThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     // After JwtAuthGuard (it needs request.user) and before PermissionsGuard: an
     // unenrolled staff account is refused on enrolment grounds, not on a permission

@@ -494,6 +494,24 @@ function Field({
 }
 
 /**
+ * The interpolation values from an error body, if they are the shape `errorMessage` accepts.
+ *
+ * `params` crosses the network as `unknown`. Passing it through unchecked would put whatever a
+ * response happened to contain into a string the customer reads.
+ */
+function asParams(value: unknown): Record<string, string | number> | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+
+  const clean: Record<string, string | number> = {};
+
+  for (const [key, item] of Object.entries(value)) {
+    if (typeof item === 'string' || typeof item === 'number') clean[key] = item;
+  }
+
+  return Object.keys(clean).length > 0 ? clean : undefined;
+}
+
+/**
  * Turns an API error into something the customer can act on.
  *
  * The two cases that matter are the ones the SRS defines: a 409 means the dates were
@@ -553,16 +571,38 @@ function applyError(
       return;
     }
 
-    if (
-      record['reason'] === 'same_day_closed' &&
-      typeof record['firstBookableDate'] === 'string'
-    ) {
-      setFormError(t('cutoffClosed', { date: record['firstBookableDate'] }));
+    const code = typeof record['code'] === 'string' ? record['code'] : null;
+    const params = record['params'];
+    const firstBookable =
+      typeof params === 'object' && params !== null
+        ? (params as Record<string, unknown>)['date']
+        : undefined;
+
+    /*
+      Keyed on the CODE, not on a `reason` field.
+
+      The API answered this with `{reason: 'same_day_closed', firstBookableDate}` and an English
+      `message`; it now answers `{code: 'booking.same_day_closed', params: {date}}` like every other
+      refusal. The checkout keeps its own wording for this one case because the form has room to say
+      more than the generic catalogue entry does.
+    */
+    if (code === 'booking.same_day_closed' && typeof firstBookable === 'string') {
+      setFormError(t('cutoffClosed', { date: firstBookable }));
       return;
     }
 
-    if (typeof record['message'] === 'string') {
-      setFormError(record['message']);
+    /*
+      Resolve the CODE, never print `message`.
+
+      This was `setFormError(record['message'])` — the API's English sentence written straight onto
+      an Arabic checkout form. It is the same mistake `error-codes.ts` was written to end, and it
+      survived here because the two cases above covered the errors anybody tested by hand; a past
+      arrival date, or any newly added booking refusal, fell through to it. Resolving the code closes
+      the whole class rather than the instance: `errorMessage` falls back to the generic entry in the
+      reader's own language when the code is absent or unknown.
+    */
+    if (code) {
+      setFormError(errorMessage(code, locale, asParams(params)));
       return;
     }
   }
