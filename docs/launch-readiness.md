@@ -26,7 +26,18 @@ discovery. Where something is undecided, it says who decides it.
 | **Audit log**                                                                                 | Complete                          | Append-only by trigger, survives TRUNCATE                        |
 | **Scheduled jobs**                                                                            | Complete                          | Advisory-locked, telemetry in `scheduled_job_runs`               |
 
-**No unblocked engineering item remains.**
+**Three unblocked engineering items remain**, all opened on 2026-08-20 and none of them planned
+scope — every one came out of a security pass rather than a test:
+
+| Item      | What                                                                              | Severity                 |
+| --------- | --------------------------------------------------------------------------------- | ------------------------ |
+| `O-sec-7` | A failed query's bound parameters reach the logs; one path writes them to a table | **High** (§14 / GDPR)    |
+| `O-sec-6` | `refresh_tokens` is never swept, and nothing caps sessions per account            | Low now, Medium at scale |
+| `O-api-2` | Seven refusals answer an English sentence with no error code                      | Low–Medium               |
+
+None of them blocks a launch and none needs anything external. They are listed here rather than
+folded away because this line read "No unblocked engineering item remains" until they were found,
+and that sentence is what a reader trusts.
 
 ---
 
@@ -100,6 +111,36 @@ that change the launch picture:
 | **Confirmed sound**                   | The `daterange` exclusion constraint held under 10,550 contended attempts on 20 units — zero double bookings. The five-attempt account lockout fires and holds under a distributed attack. Every auth refusal is generic, so the endpoint is not an enumeration oracle under load. Zero 5xx across 2.4M auth requests                                                                                                                                       |
 | **New, needs a decision from Bashar** | `O-sec-3` — a legitimate customer on an attacked egress address signed in **0 times out of 30**. The per-IP ceiling of 40/min on `/auth/login` is shared by everyone behind one address, and 40/min is 0.67/s: an attacker at one request per second denies sign-in to that address about a third of the time. For a market behind carrier-grade NAT that is live availability risk. Recommended fix: count only FAILED sign-ins against the per-IP ceiling |
 | **New, engineering**                  | `O-api-1` — pool exhaustion answers 500 rather than a coded 503, so a capacity condition will page whoever owns the 5xx signal in `docs/alerting.md`. The body is generic, verified: no SQL, no parameters, no PII                                                                                                                                                                                                                                          |
+
+### Both resolved, 2026-08-20 — and one number is still open
+
+Bashar approved both changes the same day. What shipped:
+
+- **`O-api-1` is closed.** `AppExceptionFilter` answers a pool-acquisition timeout with a coded
+  **503 and a jittered `Retry-After`**, and gives every other unhandled error the translatable
+  `request.unknown` instead of a bare 500. The 503 set is deliberately narrow — only conditions
+  where no statement ever reached the database, so a retry cannot duplicate a non-idempotent write.
+  **This changes an alerting rule that is not yet armed:** signal 12 must exclude
+  `request.capacity` or it will page for load, and new signals 12b/12c count capacity separately.
+  See `docs/alerting.md`, "Capacity refusals".
+- **`O-sec-3` is closed**, in two parts, because the first does not work without the second. A
+  successful sign-in no longer spends the per-IP ceiling, so legitimate traffic cannot exhaust an
+  address's budget — but that alone would not have helped the customer in the measurement, since an
+  attacker's traffic IS failures. So the ceiling also moved from **40 to 300 failed sign-ins a
+  minute** (Bashar). An attacker must now sustain five failed sign-ins a second from one address to
+  starve it, against 0.67 before. The accepted cost: one address can drive 60 accounts to lockout a
+  minute rather than 8. The account lockout and the per-(IP, account) budget are untouched.
+- **`O-page-1` is closed.** The `page` ceiling is **1,000**, down from 100,000 — a 30× reduction in
+  the worst-case cost of a single request, from 2.5 million rows read to return 25 down to 25,000.
+- **Two items came out of the work, neither a blocker:** `O-api-2` — seven refusals still answer a
+  hand-written English sentence with no error code, two of which a customer or a partner can reach.
+  And `O-sec-5` — the residual of `O-sec-3` is a shared-IP problem no in-application limiter can
+  solve, so an edge rate-limit rule on `POST /auth/login` is now a **required deliverable of
+  `M-1`** rather than a suggestion.
+
+**None of these is a launch blocker.** The alerting-rule edit is, however, a **prerequisite of
+arming alerting at all** — it belongs with `S-1`, not after it. And `M-1` has gained one line of
+scope it did not have this morning: `O-sec-5`.
 
 Two security defects were found and **fixed**: the per-account rate limiter could be bypassed _and
 aimed_ with a forged `X-Forwarded-For` (16 of 16 attempts got through), and a failed idempotency

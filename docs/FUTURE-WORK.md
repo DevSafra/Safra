@@ -6,12 +6,29 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for who must act
 > on what, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-20 — **the locally-honest half of launch blocker #10 has been executed.**
+**Last updated:** 2026-08-20 — **the console audit, and the locally-honest half of blocker #10.**
+Bashar asked for every page of the super admin console to be walked and made production-ready. Ten
+findings, all fixed: an English 404 under RTL, 43 untranslated audit actions, all four notification
+templates missing, 477 partners unreachable behind an unpaginated queue, a CSRF guard that answered
+403 to every real browser on the runtime the containers run, and staff scope missing from the two
+verification screens. **`pnpm e2e` now runs against that runtime** — it never had. See `O-ui-1` and
+`O-sec-4`. `pnpm verify` 1,866 · `pnpm e2e` 250.
+
+**Also 2026-08-20 — the locally-honest half of launch blocker #10 has been executed.**
 Scenarios 2, 3 and 4 of `docs/load-testing.md` ran against `safra_load` at the documented volumes for
 the first time: **fifteen defects, twelve fixed**, and no capacity figure produced or claimed. The
 exclusion constraint held under real contention; the account lockout holds; `O-sec-1`'s bystander
 property does not. Full record: `docs/load-test-results-2026-08-20.md`. New items needing a decision
 from Bashar: **`O-sec-3`** (an attacked address cannot sign in) and the **`O-page-1` ceiling**.
+
+**Then, later on 2026-08-20 — `O-sec-3`, `O-api-1` and `O-page-1` are all CLOSED.** Bashar approved
+both changes and set both thresholds the same day. `AppExceptionFilter` answers a pool-acquisition
+timeout with a coded 503 and a jittered `Retry-After`; a successful sign-in no longer spends the
+per-IP ceiling and that ceiling is now **300 failed sign-ins a minute**, up from 40; the `page`
+ceiling is **1,000**, down from 100,000. Two items came out of the work: `O-api-2` (seven refusals
+still answer an English sentence with no code) and `O-sec-5` (the per-IP residual belongs at the
+edge, and `M-1` now owns it). **One alerting rule must be edited before alerting is armed** —
+signal 12 has to exclude `request.capacity`, or it pages for load.
 
 **Previously, 2026-08-04 — the Super Admin console is complete against the design handoff.**
 All 19 sections implemented and verified over three passes, with **no backend work outstanding**.
@@ -110,6 +127,23 @@ treat "engineering complete" as a statement about planned scope, not about corre
 **Agreed with Bashar, 2026-08-08.** SAFRA is engineering-complete; these ten are what stand between
 that and a launch. **Engineering-complete does not mean launch-ready**, and this list is the
 difference.
+
+**Amended 2026-08-20.** The ten are unchanged, and none of the work done since has added or removed
+one. But "engineering-complete" is now carrying three unblocked items it did not have — `O-sec-7`,
+`O-sec-6` and `O-api-2` — so the phrase is doing what the note above §1a warns about: describing
+planned SCOPE, not correctness. All three were found by a security pass rather than by a test,
+which is the third time that has been the source (`O-ui-1`, `O-sec-4`, now these). None blocks a
+launch; `O-sec-7` should not wait for one either.
+
+**Classification of today's items:**
+
+| Item                            | Classification                                             |
+| ------------------------------- | ---------------------------------------------------------- |
+| `O-sec-3`                       | **Completed** — approved, built, ceiling set to 300        |
+| `O-api-1`                       | **Completed** — approved, built                            |
+| `O-page-1`                      | **Completed** — ceiling set to 1,000                       |
+| `O-sec-5`                       | **External dependency** — needs an edge, so it needs `M-1` |
+| `O-sec-7`, `O-sec-6`, `O-api-2` | **Engineering work remains**, all unblocked                |
 
 | #   | Blocker                                            | Owner               | Gated by 1 |
 | --- | -------------------------------------------------- | ------------------- | ---------- |
@@ -249,18 +283,28 @@ defects fixed; `pnpm verify` 1,836 green and `pnpm e2e` 244 green after them. Wh
 #10 is the capacity run itself, which still needs the deployment target. Two items came out of it for
 **Bashar**: `O-sec-3` and the `O-page-1` page ceiling. One for engineering: `O-api-1`. See `S-3`.
 
+**Later the same day, all three were closed.** `O-api-1` is resolved by a global exception filter.
+`O-sec-3` is implemented and its ceiling set to 300. `O-page-1`'s ceiling is set to 1,000. Nothing
+from the load test is now waiting on a decision; what remains of blocker #10 is the capacity run
+itself, which still needs the deployment target.
+
+**Four items came out of doing the work**, none of them a launch blocker and all of them found by
+the security pass rather than by a test: `O-api-2`, `O-sec-5`, `O-sec-6`, and — the one worth
+reading first — **`O-sec-7`**, a failed query's bound parameters reaching the logs, and in one place
+a database column.
+
 ### 🏗 Hosting-dependent — waiting on roadmap item 193
 
 Nothing here can start until a provider and region are chosen. **This one decision
 unblocks four items and is the highest-leverage action available.**
 
-| Item                                                 | Note                                                             |
-| ---------------------------------------------------- | ---------------------------------------------------------------- |
-| **M-1** Deploy pipeline                              | The image is built and verified; the pipeline needs the provider |
-| **M-3** Backups + rehearsed restore                  | **Highest severity on the whole list** — see below               |
-| **S-1** Error tracking, metrics, alerting            | Logs are ready to ingest; the sink is missing                    |
-| **S-3** Load testing                                 | No capacity number should be quoted until this runs              |
-| **S-7** Rehearsing the destructive-migration restore | Fold into the M-3 rehearsal                                      |
+| Item                                                 | Note                                                                                                                                                                                                                      |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M-1** Deploy pipeline                              | The image is built and verified; the pipeline needs the provider. **Also owns `O-sec-5`** — an edge rate-limit rule on `POST /auth/login`, which is the only place the shared-address residual of `O-sec-3` can be closed |
+| **M-3** Backups + rehearsed restore                  | **Highest severity on the whole list** — see below                                                                                                                                                                        |
+| **S-1** Error tracking, metrics, alerting            | Logs are ready to ingest; the sink is missing                                                                                                                                                                             |
+| **S-3** Load testing                                 | No capacity number should be quoted until this runs                                                                                                                                                                       |
+| **S-7** Rehearsing the destructive-migration restore | Fold into the M-3 rehearsal                                                                                                                                                                                               |
 
 ### ⚖️ Compliance and legal dependencies
 
@@ -1673,10 +1717,114 @@ is how the thirteenth would arrive.
 and every environment, and visible immediately to a million rows. It is the argument for building the
 generator before the hosting decision rather than after.
 
+### O-ui-1 — FIXED: the console audit Bashar asked for, 2026-08-20
+
+**Status:** fixed · **Found by** walking every console route in a browser rather than reading it
+
+Bashar asked for every page of the super admin console to be gone through and made
+production-ready, and reported one symptom to start from: _"The partner page is written on the left,
+while the current language is Arabic."_ Both halves of that were literally true, and it turned out to
+be the visible end of four unrelated defects.
+
+**Ten findings. Every one of them was invisible to `pnpm verify`, and six were invisible to
+`pnpm e2e` as it was being run.**
+
+| #   | Finding                                                                                                                                                                                                                                                                                                                                                             | Severity           |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 1   | **Neither the console nor the partner portal had a `not-found.tsx`**, so a wrong URL rendered Next's English `404 / This page could not be found.` — and under `dir="rtl"` the full stop moved to the start of the sentence. That is the report, exactly. `/partners/PAR-999999` reached it too, which is a stale bookmark rather than a typo                       | Medium             |
+| 2   | **43 of 73 audit actions had no Arabic label**, so السجل, الموظفون and the dashboard's activity panel printed English prose — "auth password changed", "booking export requested". Survived every guard because `auditAction()` fell back to `replace(/[._]/g, ' ')` and `navigation.spec.ts` greps for SNAKE_CASE: the fallback had already removed the underscore | High               |
+| 3   | **All four notification templates the platform actually sends were missing** from the catalogue, which listed six planned ones with zero overlap — so every row of سجل واتساب والبريد printed `booking.needs_action`. The render site printed the raw key anyway, twenty lines below an inventory that resolves its own                                             | High               |
+| 4   | **The partner verification queue was unpaginated**, capped at fifty by an API default. With 527 partners awaiting verification, **477 were unreachable through the console** and the sidebar badge counted the real figure beside a list that could not show it                                                                                                     | High               |
+| 5   | **`request.url` is `0.0.0.0` on the runtime the containers run**, and four routes built redirects from it — so every POST-then-redirect sent the operator to a different origin. The customer app's currency switcher was worse: its CSRF guard compared `Origin` against the same value and **answered 403 to every real browser**                                 | High               |
+| 6   | **`pnpm e2e` had never run against the runtime the product ships.** All three apps build `output: 'standalone'` and were being served with `next start`, which prints a warning saying it does not work. Five specs failed the first time the suite met the real runtime; finding 5 is what they were failing on                                                    | High               |
+| 7   | Staff scope forgot the verification screens — see `O-sec-4`                                                                                                                                                                                                                                                                                                         | High (unreachable) |
+| 8   | **No app had an `error.tsx`**, so an unhandled render error showed Next's English error page: the same defect as finding 1, one boundary over                                                                                                                                                                                                                       | Medium             |
+| 9   | `listParamsFor` took a section and then ignored it for the parameter names, so `/staff`'s scope map read the query string by hand — and in doing so used `pageSize()` instead of `resolvePageSize()`, silently **not honouring that table's saved rows-per-page**                                                                                                   | Low                |
+| 10  | `TablePagination` took its parameter names as PROPS defaulting to `page`/`size`, so namespacing was something each call site had to remember. The first two callers to forget were the queues added the same afternoon, whose bars would have paged the registry beside them                                                                                        | Low                |
+
+**What the fixes are, structurally, rather than one at a time:**
+
+- **A missing translation now looks like one.** Every fallback returns the key VERBATIM instead of
+  spacing its underscores out. That is the change that matters most, because it puts the existing
+  snake_case sweep back in charge of catching the next one — 43 labels went missing precisely because
+  the fallback disguised them as chosen English.
+- **`AUDIT_ACTIONS` in `@safra/contracts`** is the canonical list, with two tests holding both ends:
+  one that every declared action has an Arabic label AND that no label is orphaned, one that every
+  action in the DATABASE is declared. The second caught a fourth notification template
+  (`support.replied`) written by a browser run the same afternoon.
+- **Parameter names come from `TABLE_SECTION_PARAMS`** — in the bar, in the page reading the query
+  string, and in the endpoint writing the preference. One answer to "what is this table's page
+  parameter".
+- **Redirects are RELATIVE and the origin check reads the `Host` header** (`seeOther`, `isSameOrigin`
+  in `@safra/session`). There is no host for a deployment to get wrong, and no `HOSTNAME` to remember.
+- **`pnpm e2e` now runs against the standalone servers.** 250 tests, up from 244.
+
+**Two residuals, both recorded rather than hidden:**
+
+1. **A runtime `notFound()` renders blank without JavaScript.** An unmatched path is
+   server-rendered and fine; `notFound()` thrown from a page makes Next serve an error shell and
+   deliver the UI in the RSC payload. Closing it means detail screens rendering their own "no such
+   record" panel inside the console shell instead of calling `notFound()` — which keeps the nav and
+   works without JS, at the cost of answering 200. Reasonable for an internal tool behind auth with
+   `robots: noindex`, and it touches every detail screen, so it is its own change.
+2. **`AuditEntry.action` is still `string`.** `AUDIT_ACTIONS` should be its type, which would make a
+   typo a build failure rather than a permanent row in an append-only table. Five call sites build the
+   action with a template literal — `partner.${nextStatus}`, `property.${…}`, and three more — so the
+   union needs those narrowed by hand. Those five are exactly why the two REJECTION actions were
+   missing while their approvals were present: a reader of the source sees one action where there are
+   two.
+
+**Not defects, checked and left alone:** the permission matrix on الموظفون shows permission KEYS
+(that is the audit surface — a translated label could not be matched against the guard); الإعدادات
+shows setting keys, and geography's three bounded tables are the documented pagination exception;
+Latin digits in the pagination bar are the "Arabic copy, western digits" decision of 2026-08-06; and
+the redaction that keeps email addresses out of `notifications.failure_reason` works on every SMTP
+error shape probed — one unredacted row survives from 2026-08-08, before it existed.
+
+### O-sec-4 — FIXED: staff scope reached nine registries and not the verification screens
+
+**Status:** fixed 2026-08-20 · **Severity:** High as a design gap, **unreachable in practice** ·
+**Found by** the console audit Bashar asked for
+
+**What.** `scope.sql.ts` carries this warning in its own comment: _"Duplicating the predicate per
+service is how a scope ends up enforced on eight resources and forgotten on the ninth — and the ninth
+is the one somebody finds."_ `review.service.ts` was the ninth. It serves both P-002 verification
+queues, both detail screens and both decision endpoints, and **none of its methods took an actor at
+all** — `pendingPartners.length > 1` was false, so there was nothing to scope by.
+
+A city-scoped operations manager could therefore see every partner in the country awaiting
+verification, open any partner or listing by reference, and — the serious half — **approve or reject
+either of them, anywhere.** `assertCanWrite` existed and was called in exactly two other services;
+§8.2's rule is that a write outside scope is refused in BOTH modes.
+
+**Why it had never bitten.** Every staff row in the database is `all_cities`. The gap needed somebody
+to use the console's own scope map first, so the feature that would have exposed it is the feature
+that describes it. Nothing was exposed.
+
+**Fixed** — `assertCanRead` and `scopeCondition` added beside `assertCanWrite`, and all six paths now
+take the actor:
+
+| Path                     | Enforcement                                                                                                                                                                                               |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Both verification queues | `scopeCondition` in the predicate, and the **capped count carries the same scope** — a count that ignored it would print «٥٢٧ نتيجة» over an empty list                                                   |
+| Both detail screens      | `assertCanRead` on the row, answering 404: "not yours" reads the same as "not there". The city uuid is selected for the check and stripped from the response, because no admin route returns internal ids |
+| Both decisions           | `assertCanWrite`, which refuses in both modes — 404 under `none`, 403 under `read_only`                                                                                                                   |
+
+**Two helpers rather than one, and that is the point.** `read_only` means "look at the country, change
+your cities", so a read outside scope is exactly what it permits and a write outside scope is exactly
+what it forbids. Reusing the write guard for reads would break the mode it exists for.
+`scopeCondition` exists because the queues are built with the relational query builder, which cannot
+take a `sql` fragment — that mismatch is why they were the two queries nobody scoped.
+
+**Held by `review-scope.integration.test.ts`** — 11 tests, including that the count agrees with the
+list for a scoped member, that `read_only` sees what an unscoped member sees, and that a `read_only`
+write is refused as 403 rather than 404.
+
 ### O-sec-3 — An attacked address cannot sign in at all, and that is the per-IP ceiling
 
-**Status:** open, needs a DECISION · **Severity:** High for the Syrian market · **Owner:** **Bashar**
-· **Recorded:** 2026-08-20 · **Measured by** scenario 4 of the load test
+**Status:** **RESOLVED** 2026-08-20 — change approved and built, ceiling set to 300 by Bashar the
+same day · **Severity:** High for the Syrian market · **Owner:** closed · **Recorded:** 2026-08-20
+· **Measured by** scenario 4 of the load test
 
 **What.** A legitimate customer with correct credentials, on the same egress address as an attack,
 pacing themselves well inside their own per-account allowance, signed in **0 times out of 30**. The
@@ -1706,9 +1854,284 @@ availability risk.
 | 5xx                                      | 0                              | 0                                     |
 
 **Recommended fix: count only FAILED sign-ins against the per-IP ceiling.** A stuffing run produces
-failures; a legitimate customer produces a success. That keeps the bound exactly where it is and makes
-the bystander unreachable by it. Raising the ceiling instead weakens the bound; a CAPTCHA is new
-scope. **To unblock:** Bashar's decision on which.
+failures; a legitimate customer produces a success. That keeps the bound exactly where it is.
+Raising the ceiling instead weakens the bound; a CAPTCHA is new scope.
+
+### APPROVED and BUILT, 2026-08-20
+
+Bashar approved counting only failed sign-ins. Implemented as a REFUND rather than a deferred
+count, because a throttler decides before the handler runs and "did this sign-in succeed" is only
+knowable afterwards:
+
+| Piece                             | What it does                                                                                                                                                         |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `RedisThrottlerStorage.refund`    | One Lua script. Gives a hit back, never creates the key, never goes below zero, never touches the TTL or the block. Fails CLOSED — the opposite of `increment`       |
+| `CodedThrottlerGuard.generateKey` | Records the key it is about to increment. Reconstructing a `sha256` over class, handler, throttler and tracker downstream would drift from the dependency in silence |
+| `SignInRefundInterceptor`         | On `POST /auth/login` only. Refunds the per-IP hit on success, and on `auth.code_required` — the password was right and only the code is outstanding                 |
+
+**Preserved, and each of them is asserted rather than argued:**
+
+- **The account lockout is untouched.** Five failures locks the account for fifteen minutes, in
+  `AuthService` against the user row. It is what stops a DISTRIBUTED attack, measured at 40 of 40.
+- **The per-(IP, account) throttler is NEVER refunded.** Ten a minute still counts every attempt,
+  successes included. That is what bounds the Argon2id verifications one address can force for one
+  account — without it, anybody holding a single valid credential could drive password checks
+  without limit. `sign-in-refund.integration.test.ts` asserts the account counter is untouched by a
+  refund.
+- **A refund cannot mint budget.** Not below zero, not on an expired window, not on another
+  throttler, and not a way to lift a block.
+- **A failed refund never fails the sign-in.** Detached from the response and caught — an unawaited
+  rejection would terminate the process under Node's default.
+
+**Held by 20 tests**: 9 unit (`sign-in-refund.interceptor.test.ts`), 5 against real Redis proving
+the guard's key and the refund's key are the same (`sign-in-refund.integration.test.ts` — a
+one-character drift would refund nothing and report success), and 8 storage properties
+(`redis-throttler.storage.integration.test.ts`).
+
+### What this does NOT fix, and the number that is still Bashar's
+
+**The bystander is not yet safe, and the recommendation above overstated it.** "Makes the bystander
+unreachable by it" does not follow from the change, and the same run's numbers say why: **2,412,273
+of 2,412,503 attempts were 429s** — the attacker's traffic is FAILURES, and failures still count. An
+attacker filling the ceiling with failures still starves the address, so scenario 4 re-run today
+would still measure 0 of 30.
+
+What the refund does deliver is real but different: **legitimate traffic no longer spends the
+ceiling at all.** The NAT'd office of partners signing in at the start of a shift — the case that
+moved this limit from 10 to 40 on 2026-08-07 — now costs nothing. The ceiling has become a pure
+budget for FAILED sign-ins, which is what makes the remaining question answerable.
+
+**The remaining question is the number.** At 40 a minute the budget is 0.67 failures a second, so
+an attacker at ONE request a second still exhausts it. Arithmetic, not a measurement:
+
+| Per-IP failure budget | Attacker rate needed to starve the address | Accounts a single address can drive to lockout, per minute |
+| --------------------- | ------------------------------------------ | ---------------------------------------------------------- |
+| 40/min (today)        | 0.67/s — unremarkable in any log           | 8                                                          |
+| 120/min               | 2/s                                        | 24                                                         |
+| **300/min**           | **5/s**                                    | **60**                                                     |
+
+**Recommendation: 300 a minute — and Bashar chose it, 2026-08-20.** An attacker must sustain five
+FAILED sign-ins a second from one address, 7.5× louder than what starved it in the measurement and
+a trivially alertable signature. The cost is bounded and was measured rather than guessed: Argon2id
+verify is **11.2 ms** at the configured parameters (19 MiB, t=2, p=1) on this hardware, ~250/s
+throughput, so 5/s from one address is about 5 % of one machine's hashing capacity; memory is
+bounded by the libuv threadpool rather than by the request rate.
+
+**The accepted cost is the third column** — a single address can now drive 60 accounts to lockout a
+minute rather than 8. That is a genuine trade and it is why the number was Bashar's. It is bounded
+by the fact that a DISTRIBUTED attacker already bypasses the per-IP ceiling entirely (measured: 40
+of 40 accounts locked, zero 429s), so what this slows is the single-source case — which is also the
+case an edge rule blocks most easily.
+
+`@Throttle({ default: { limit: 300, ttl: 60_000 } })` on `/auth/login`. `e2e/auth-throttle.spec.ts`
+pins both halves: 300 wrong passwords are refused as wrong passwords and the 301st as too many
+requests, and one failure plus three successful sign-ins charges the address twice rather than five
+times — asserted through `X-RateLimit-Remaining`, so it is the real counter being read.
+
+**The honest limit of the whole approach, and the one thing still outstanding.** A limiter keyed on
+an address that strangers share cannot be both low enough to bound guessing and high enough to
+protect a bystander. An attacker willing to be loud — five failed sign-ins a second — can still
+starve an address. The answer to that residual is rate limiting at the EDGE, and it is now a
+**required deliverable of `M-1`** rather than a note here: see `O-sec-5`.
+
+### O-ui-3 — FIXED: طلبات الشراكة lost its badge on the dashboard, and the audit log printed JSON
+
+**Status:** **FIXED** 2026-08-20 · **Severity:** Low each, and both on screens a super admin uses
+constantly · **Reported by:** Bashar
+
+**The badge.** The dashboard renders `AdminSidebar` ITSELF, from the dashboard payload; the other
+eighteen sections go through `ConsoleShell`, which fetches `/admin/attention`. Two builders for one
+list of badges, and the dashboard's was missing `partnerApplications` — so طلبات الشراكة showed its
+number everywhere except لوحة الإدارة, the screen a super admin opens first. Nothing failed: the
+key was optional, so leaving it out was legal.
+
+Fixed by adding `partner_applications_open` to the dashboard counters — **scoped**, like every
+other counter in that query, because `partner_applications` carries a `city_id` and a badge
+counting cities somebody cannot open is a number they can do nothing about.
+
+**And the recurrence closed structurally:** `SidebarCounts` now REQUIRES every key. Optional keys
+made "I have no number for this" and "I forgot this exists" the same expression; required ones
+force the choice, the way `Field` does for `dir`. The type change immediately found a second
+instance — see `O-ui-2`. `e2e/sidebar.spec.ts` asserts the two screens agree, because a type cannot
+see that two sources produce the same VALUES.
+
+**The audit payload.** سجل التدقيق rendered `JSON.stringify({ before, after })` on one line in an
+`overflow-x-auto` box. In a column that narrow the reader met the middle of it —
+`e":{"status":"contacted"},"after":…` — scrolled away from both ends, in a machine format, in the
+column that is supposed to answer "what exactly changed".
+
+Now a small `الحقل / قبل / بعد` grid: one line per field, values wrapped rather than scrolled,
+`قبل` omitted entirely for a creation, and **fields whose two sides are equal dropped**. The module
+note's rule that the payload is shown VERBATIM rather than summarised still holds — every field and
+both values are there. What is gone is the JSON punctuation and the horizontal scroll.
+
+Values are wrapped in `<bdi>`, not `Ltr`: they are arbitrary — a reference, an amount, an Arabic
+address — and forcing `dir="ltr"` is right for `BKG-2026-074038` and wrong for «باب توما، دمشق».
+
+**And then the words themselves, because the first version printed identifiers** (Bashar, same
+day). The grid was readable and entirely in English: `status`, `basePrice`,
+`confirmationWindowMinutes` under «الحقل», `pending_payment` under «قبل». `payloadKey` and
+`payloadValue` already existed — built for the booking timeline — and held **eighteen keys and one
+value** against the seventy-four keys and twenty-two codes the platform actually writes. The
+resolution now lives in `payloadChanges` in `strings.ts`, beside `payloadEntries`, so the two
+renderings of the same jsonb cannot drift into two vocabularies. Booleans read «نعم»/«لا» rather
+than `true`/`false`.
+
+**The value list is deliberate rather than merged from the status vocabularies**, and that is worth
+recording: those disagree with each other ON PURPOSE — `active` is «نشطة» for a gift card and «نشط»
+for a coupon, `rejected` is «مرفوض» in three maps and «مغلق — مرفوض» in disputes. A merged lookup
+would print whichever map came first, which is how a screen ends up with the wrong agreement.
+
+**Held by two new checks in `audit-catalogue.integration.test.ts`**, read from the DATABASE rather
+than the source — a payload is built from a spread at several call sites, so grepping under-reports
+what reaches the column. They pass over 26,141 real rows. The coded-value check matches only
+lower snake_case, so a `reason` somebody typed still falls through as their own words.
+
+**The entry in the screenshot was also a no-op**, and that half was mine: `markContacted` wrote
+`before: {status: 'contacted'}, after: {status: 'contacted'}` on a second call, because the status
+does not move twice. It now records the transition only when there IS one; the action itself is the
+record of the call. The note is deliberately NOT copied into the audit log — free prose about a
+named person, already stored, and `audit_log` is append-only and unredactable.
+
+### O-web-6 — FIXED: every city page went empty at 17:00 Damascus and stayed empty
+
+**Status:** **FIXED** 2026-08-20 · **Severity:** **High** — the browse surface, dark for seven
+hours a day · **Found by** `customer-locale.spec.ts` failing for the first time in the evening
+
+**What.** `/{locale}/city/{slug}` opens with a teaser search whose own comment reads "A
+representative sample of what is bookable, **so the page is never empty**". It searched with
+`checkIn = todayInDamascus()`. `booking.same_day_cutoff_hour` is **17**, and past it the search API
+refuses an arrival of today — correctly, and with `firstBookableDate` attached.
+
+`searchSafely` turns that refusal into `items: []` plus a notice. `/search` reads the notice and
+tells the customer why. The city page did not: it rendered the empty list. So from 17:00 Damascus
+until midnight, **every city page in the product showed no listings at all** — no error, no
+explanation, just a city with nothing in it.
+
+**Why nothing caught it for so long.** The whole suite has to run after 17:00 Damascus to see it,
+and it never had. It failed today at 16:34 CEST — 17:34 in Damascus — on the first evening run.
+That is the entire reason it surfaced, and it is worth stating: a bug that is invisible before
+tea-time is invisible to every test schedule that finishes before tea-time.
+
+**The fix.** When the teaser comes back refused, ask again for the first day that IS bookable —
+using the date the API itself supplied, not arithmetic repeated in the web app over a setting it
+does not read. One extra request, only after the cutoff. `/search` keeps the refusal and the
+notice, which is right: a customer who TYPED today's date has to be told why it cannot be today.
+
+**What this does NOT cover.** The home page builds property-type links with `checkIn=today`
+(`page.tsx`), so after the cutoff those land on `/search` with a date the API will refuse. `/search`
+handles it — it shows the notice and offers the first bookable date — so the customer is told
+rather than shown an empty page. Worse than it should be, better than the city page was, and left
+alone here because changing it means deciding what a category link should mean after hours.
+
+### O-ui-2 — The الموظفون badge is declared and has never been produced
+
+**Status:** open · **Severity:** Low · **Owner:** product, then engineering · **Recorded:**
+2026-08-20, found by the type change in `O-ui-3`
+
+`NAV` in `admin-sidebar.tsx` declares `badge: 'staff'` for الموظفون. Nothing has ever supplied the
+number — not `/admin/attention`, not the dashboard payload — so the badge has never rendered, on
+any screen, since the section was built. It went unnoticed for the same reason `O-ui-3` did: the
+key was optional, so an absent count and an absent feature looked identical.
+
+Making `SidebarCounts` require every key turned it into a line somebody has to write, and both
+builders now say `staff: undefined` with a note pointing here.
+
+**What is unresolved is the product question, not the query.** Every other badge counts a QUEUE —
+something waiting on SAFRA, where the number is a backlog somebody works down. Staff is a registry,
+not a queue. Candidates: accounts awaiting first sign-in, accounts locked out, accounts with no
+second factor enrolled. "How many staff exist" is information, and the sidebar's own note says the
+warn-coloured badges are for backlogs — so the honest options are to pick one of those meanings or
+to drop `badge: 'staff'` from `NAV`.
+
+**To unblock:** Bashar, on what the number should mean — or a decision to remove it.
+
+### O-partner-7 — FIXED: a second telephone call used to erase the first one's note
+
+**Status:** **FIXED** 2026-08-20 · **Severity:** Medium — silent data loss on a screen an operator
+works from daily · **Reported by:** Bashar, from «سجل الطلب» on the request detail
+
+**What.** `markContacted` was `UPDATE partner_applications SET … contact_notes = $1`. The note, the
+timestamp and the name of whoever rang lived in three columns on the request row, so calling an
+applicant a second time OVERWROTE all three. «سجل الطلب» could only ever draw one «تم الاتصال»
+line, however many times somebody had rung, and the note that disappeared was usually the one that
+explained why they were being rung again — "the commercial register is with the accountant" is
+exactly the context that makes the follow-up call useful.
+
+Nothing surfaced it: no error, no warning, and the screen looked correct because it had only ever
+been asked to show one call.
+
+**The fix.** A call is a repeating EVENT, so it is a row. `partner_application_contacts` —
+append-only (`createdAt` only, this codebase's marker for a table nobody may amend), one row per
+call, indexed on `(application_id, created_at)`. `markContacted` INSERTs, in a transaction with the
+status change, and cannot touch an earlier row.
+
+**The three columns are GONE, not left in step.** `contacted_at`, `contacted_by_user_id` and
+`contact_notes` were dropped in `0034_oval_elektra.sql` and the registry's "most recent call" is
+now derived from the call log by two SELECT-list subqueries — kept out of the shared `FROM … WHERE`
+so the count is not made to pay for a value it does not use. A cached column would be a second
+source of truth, and the version of it being replaced was the bug.
+
+**The migration BACKFILLS before it drops.** The single surviving call on each request was real
+data an operator wrote; it is carried into the new table with its original timestamp and author
+first. Verified on the dev database: two rows preserved, including a note Bashar had typed while
+testing.
+
+**Held by** five integration tests — three calls produce three notes in order, each records its
+caller, the registry reports the LATEST call, and a request nobody has rung reports no contact at
+all rather than an empty string. Verified in a browser as well: the fixture request now renders two
+«تم الاتصال» entries, each with its own date and note.
+
+**Two things came out of doing it:**
+
+- The testbed fixture dated its calls BEFORE the request arrived, because the requests were seeded
+  at `now()` while the calls were back-dated. A fixture describing something impossible — which
+  this seed is explicit elsewhere about refusing to do. Worked requests are now back-dated too.
+- `contacts` is capped at 200 in the response (`MAX_CONTACTS_SHOWN`), because rule 2 forbids an
+  unbounded list and nothing stops a staff account logging calls all afternoon. The newest are
+  kept, and reaching the cap is logged rather than passed over in silence.
+
+### O-sec-8 — The call log is append-only, and erasure has no answer for it
+
+**Status:** open · **Severity:** Medium — a §14 / GDPR obligation, not a defect · **Owner:** Legal
+
+- engineering, with blocker #6 · **Recorded:** 2026-08-20, during `O-partner-7`'s security pass
+
+`partner_application_contacts` carries `createdAt` and nothing else — no `deletedAt` — because a
+call log that can be amended is not a log. That is the right shape for the defect it fixes and it
+collides with the right to erasure: the rows are staff prose ABOUT a named applicant, attached by
+foreign key to a request that carries their name, address, telephone number and email.
+
+`partner_applications` is soft-deletable, so erasing an applicant today leaves their call notes
+behind, reachable by anybody who can read the table.
+
+**This is not new and it is not only this table** — `audit_log` is append-only by trigger and holds
+the same tension, deliberately. What is new is one more place that has to appear in the retention
+and erasure reconciliation, and it is better recorded now than discovered during it.
+
+**To unblock:** blocker #6. The engineering question that follows the legal answer is narrow —
+whether erasure REDACTS the note text in place (keeping the fact that a call happened, and when)
+or removes the row. Redaction is the shape that preserves the log's purpose, and it is a mutation
+an append-only table has to be given deliberately rather than by adding `deletedAt`.
+
+### O-sec-5 — The per-IP residual belongs at the edge, and `M-1` owns it
+
+**Status:** open, blocked on `M-1` · **Severity:** Medium · **Owner:** whoever does `M-1` ·
+**Recorded:** 2026-08-20
+
+`O-sec-3` moved the per-IP ceiling to 300 failed sign-ins a minute, which raises the rate an
+attacker must sustain to starve a shared address from 0.67/s to 5/s. It does not remove the
+property, and no in-application limiter can: the application sees one address and cannot tell two
+strangers behind it apart.
+
+**What closes it:** a rate-limit rule on `POST /auth/login` at the CDN or WAF, above the
+application — where a request can be dropped before it costs a process anything, and where the
+provider's own reputation and challenge signals are available. It is the same control the
+application is emulating, applied at the layer that can actually afford it.
+
+**Why it is `M-1`'s and not schedulable now:** there is no edge until a provider and region are
+chosen. Recorded here so the hosting work inherits it rather than rediscovering it, and so
+`O-sec-3` is not left reading as though the problem were fully solved.
 
 **One thing WAS fixed, because it was a defect rather than a trade-off.** `accountTracker` read
 `x-forwarded-for` and took the left-most entry — the value a client writes, since a proxy appends.
@@ -1717,9 +2140,78 @@ proxy produces, and forging the header to somebody else's address spent THEIR bu
 the targeted lockout the file's own header says it eliminated. Now `req.ip`, which Express computes
 under `trust proxy`. See `O-sec-1` and the results document, F-11.
 
+### O-sec-6 — `refresh_tokens` has no expiry sweep, and nothing caps sessions per account
+
+**Status:** open · **Severity:** Low now, Medium at scale · **Owner:** engineering ·
+**Recorded:** 2026-08-20, during `O-sec-3`'s security pass
+
+Every successful sign-in inserts a row into `refresh_tokens` and **nothing ever deletes one**.
+There is no scheduled sweep of expired or revoked rows, and no cap on concurrent sessions per
+account. The table therefore grows monotonically with sign-ins, for ever, and rule 2 forbids
+exactly that shape.
+
+**Why it surfaced now.** `O-sec-3` changed what bounds the insert rate from ONE address. It used to
+be the per-IP ceiling — 40 logins a minute whatever the accounts. It is now the per-(IP, account)
+throttler, because a success no longer spends the per-IP budget: 10 a minute per credential held.
+For a caller holding one valid credential that is **stricter** than before (14,400 rows a day
+rather than 57,600); it only becomes looser above six credentials from one address, which is a
+caller who has bigger levers than a growing table. So this is not a regression — but it is the
+question `O-sec-3` made worth asking, and the answer was "nothing bounds it at all", which is worth
+recording whichever way the arithmetic went.
+
+**What closes it:** a nightly job deleting rows past `expiresAt` (and revoked rows past a retention
+window — they are forensic evidence for a while, not for ever), plus a decision on whether an
+account may hold unlimited concurrent sessions. `JobRunService.runExclusively` and the existing
+scheduler are the mechanism; this is one more job, not new infrastructure.
+
+**To unblock:** nothing external. It needs a retention answer, which is a §14/GDPR question as much
+as a capacity one — `ipAddress` and `userAgent` are stored on every row.
+
+### O-sec-7 — A failed query's BOUND PARAMETERS reach the logs, and one path writes them to a table
+
+**Status:** open — one instance fixed, the sweep is not done · **Severity:** **High** (§14 / GDPR:
+personal data in logs, and in one case at rest) · **Owner:** engineering · **Recorded:** 2026-08-20,
+found live while proving `O-api-1`'s 503 path
+
+**What.** `drizzle-orm@0.45.2` builds `DrizzleQueryError`'s message as
+
+```
+Failed query: <sql>
+params: <the bound VALUES>
+```
+
+— the values, not the placeholders (`drizzle-orm/errors.js`, `DrizzleQueryError`). Any code that
+logs `error.message` from a database failure therefore writes them out. **Verified against the
+running API on 2026-08-20**, not inferred: a failing sign-in produced
+`params: someone@safra.test,1`. On the paths that write a `users` row the same line carries the
+**Argon2id hash** and the **encrypted TOTP secret** — the exact values `JsonLogger`'s
+`REDACTED_KEYS` exists to stop, which it cannot see here because redaction works on object KEYS and
+this is one flat string. The stack re-introduces it too: `Error.prototype.stack` begins with
+`name: message`.
+
+**Fixed in one place.** `AppExceptionFilter` logs the SQL and replaces the values with a count —
+`— 2 bound parameter(s), NOT logged` — and logs only the stack FRAMES. Re-verified live: the
+address appears zero times in the log. `safeMessage` and `framesOnly` in
+`apps/api/src/common/errors/app-exception.filter.ts` are the shape the fix takes and should be
+lifted into a shared module when the sweep happens.
+
+**Not fixed: 25 other files log a raw `error.message`.** The ones on paths a database error reaches
+are what matter — `job-run.service.ts`, `audit.service.ts`, `sla.service.ts`, `booking-state.ts`,
+`payment-webhook.service.ts`, `export-request.service.ts`, `property-images.service.ts`, and the
+four queue processors.
+
+**One of them is worse than a log line.** `JobRunService.runExclusively` writes the raw message into
+**`scheduled_job_runs.error`** — a database column, read by the staff console and by alerting. So a
+failing scheduled query puts bound parameters at rest and on screen, not merely in a log stream
+somebody could rotate. That is the instance to fix first.
+
+**To unblock:** nothing external. The work is one shared helper plus 25 call sites, and a decision
+on whether `scheduled_job_runs.error` should be truncated or structured rather than free text.
+
 ### O-api-1 — Pool exhaustion answers 500, and a 500 carries no code
 
-**Status:** open · **Severity:** Medium · **Owner:** engineering · **Recorded:** 2026-08-20
+**Status:** approved by Bashar and **RESOLVED** 2026-08-20 · **Severity:** Medium · **Owner:**
+engineering · **Recorded:** 2026-08-20
 
 **What.** Under scenario 2's deliberate concentration — 200 concurrent booking transactions against 20
 units, each holding a pool connection while it waits on a row lock held by another — the pool of
@@ -1741,6 +2233,76 @@ translated in all three locales. A client cannot render it in the reader's langu
 **Why it was not fixed in the load-test pass:** both halves want one global exception filter, and that
 touches every error response the API produces. That is deliberate work with its own verification, not
 a side effect. **To unblock:** nothing external — it is scheduling.
+
+### RESOLVED, 2026-08-20 — `AppExceptionFilter`
+
+Registered globally in `app.module.ts`, and it is the only thing that shapes an error the
+application did not raise deliberately.
+
+| Condition                                                                                                                           | Answer                                                                   |
+| ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| The request never reached the database — `pg-pool` acquisition or connect timeout; SQLSTATE `53300`/`53400`/`57P03`/`08001`/`08004` | **503**, `code: request.capacity`, `Retry-After` jittered over **1–5 s** |
+| Any other unhandled error                                                                                                           | **500**, `code: request.unknown` — the second half of this item          |
+| Any `HttpException`                                                                                                                 | **Unchanged, byte for byte**                                             |
+
+**The 503 set is deliberately narrow, and that is the security argument.** `Retry-After` is an
+INSTRUCTION to send the request again, and this API accepts non-idempotent writes — telling a
+client to repeat a booking that may already exist is worse than the 500 it replaces. So only
+conditions where no statement was ever written to a socket qualify. A statement timeout (`57014`),
+a deadlock (`40P01`), a full disk (`53100`), an out-of-memory (`53200`) and an outright
+`ECONNREFUSED` all stay **500**: they are ambiguous about what happened, or they are breakage that
+must page.
+
+**The jitter is not decoration.** A fixed `Retry-After` synchronises everybody refused in the same
+instant into one retry, and the second wave exhausts the pool on schedule.
+
+**`HttpException` passes through untouched** on purpose. Every deliberate refusal is built by
+`app-error.ts` and already carries a code; re-shaping the few that do not would change response
+bodies this filter has no mandate to change. Those are recorded separately as `O-api-2`.
+
+**Monitoring, and the rules this changes** — full detail in `docs/alerting.md`, new section
+"Capacity refusals":
+
+- **Signal 12 (error rate) now EXCLUDES `request.capacity`** and must be edited before it is armed,
+  or it pages for load. New **12b** (ticket at >1 % over 5 min) and **12c** (page at >5 %) count
+  capacity separately.
+- **The access log carries the error code**, and logs a capacity 503 at `warn` rather than `error`,
+  so a level-based rule does not page either.
+- **Status alone is not the discriminator** — 503 is already the answer for `auth.unavailable`,
+  `pricing.unavailable` and `payment.unavailable`. Match on the CODE.
+- **Signal 13 (latency) interacts**: a refused request is FAST, so pool exhaustion IMPROVES p95. A
+  platform refusing a third of its traffic can post healthier latency than one serving all of it.
+  12b is what finds that; latency will not.
+- Nothing new to build — it comes from the log stream that already exists.
+
+**Held by 17 tests** in `app-exception.filter.test.ts`, including that the body leaks no SQL and no
+address, that `Retry-After` is spread, and that the excluded conditions stay 500.
+
+### O-api-2 — Seven refusals still answer an English sentence with no code
+
+**Status:** open · **Severity:** Low–Medium · **Owner:** engineering · **Recorded:** 2026-08-20
+
+Found while scoping `O-api-1`'s filter and deliberately NOT fixed there — the filter's mandate was
+the errors that were not `HttpException`s, and quietly re-shaping these would have changed response
+bodies under cover of a different change.
+
+Each throws an `HttpException` with a hand-written English string, so a client cannot resolve it
+into the reader's language. This is the standing i18n rule ("the API answers with an error CODE, not
+a sentence"), and `safra/no-hardcoded-text` cannot see them because the prose is an argument to a
+constructor.
+
+| File                           | Reaches                                          |
+| ------------------------------ | ------------------------------------------------ |
+| `wallet.service.ts:203`        | **A customer** — an insufficient-balance 409     |
+| `rbac/two-factor.guard.ts:88`  | **Staff and partners** — the enrolment 403       |
+| `settings-admin.service.ts` ×2 | Staff — the settings editor's two refusals       |
+| `admin.controller.ts:207`      | Staff — the sanctions import                     |
+| `staff.service.ts:450`         | Staff — "this is the last active super admin"    |
+| `metrics.controller.ts` ×2     | A scraper. Harmless, and listed for completeness |
+
+**The work:** one error code each, three translations each, and for the wallet one the balance and
+currency must travel in `params` rather than in the sentence — the same shape the arrival-date fix
+used on 2026-08-20. **To unblock:** nothing external.
 
 ### O-page-1 — What numbered pages cost, and when it stops being affordable
 
@@ -1793,8 +2355,31 @@ single request reads 2.5 million rows to return 25 — roughly 20 GB of page acc
 authenticated staff account can ask for repeatedly.
 
 **Recommendation: lower `page` from 100,000 to 1,000 in `pageQuerySchema`.** That is where the spill
-starts and it is 40× past anything a person reaches by hand. **Not applied** — the ceiling is shared
-by every registry, so it is Bashar's call rather than a load-test side effect.
+starts and it is 40× past anything a person reaches by hand.
+
+### APPLIED, 2026-08-20 — Bashar chose 1,000
+
+`MAX_PAGE_NUMBER = 1_000` in `packages/contracts/src/pagination.ts`, and `pageQuerySchema` reads it.
+
+|                                  | Before                                                 | After                                  |
+| -------------------------------- | ------------------------------------------------------ | -------------------------------------- |
+| Worst-case page                  | 2,663,104 buffers ≈ 20 GB, 2.5M rows read to return 25 | ~87,069 buffers + 5,254 written        |
+| Reduction in the cap             | —                                                      | **30×**                                |
+| Rows reachable per filtered view | 2.5M at size 25                                        | 25,000 at size 25; 100,000 at size 100 |
+
+**The console no longer keeps its own copy.** `MAX_PAGE` in `apps/admin/src/lib/search-params.ts`
+was a second literal, kept in step by hand, and this change is exactly the kind that leaves one
+behind. It now re-exports `MAX_PAGE_NUMBER`, the same way `DEFAULT_PAGE_SIZE` re-exports
+`DEFAULT_TABLE_PAGE_SIZE` and for the same reason: the clamp only turns a bad URL into a table
+while it agrees with the schema that would otherwise answer 400, so a stale copy would produce
+precisely the error page the clamp exists to prevent.
+
+**What it breaks, deliberately:** a script walking pages to enumerate a registry now gets a 400 at
+page 1,001. That was always the wrong instrument — such a caller should use the keyset endpoints or
+narrow with a date filter, which is what this item already said the real fix for depth is.
+
+**Held by** three assertions in `pagination.test.ts`, including that the constant IS 1,000, so a
+future edit that changes it has to change a test that says why.
 
 **Two uncapped scans were found next door and are fixed** (see `docs/load-test-results-2026-08-20.md`
 F-7 and F-8): the bookings registry's per-status counts were an uncapped `GROUP BY` costing 239,855
@@ -1802,7 +2387,7 @@ buffers on every page view — now 93 — and the console SUMMED them into an ex
 printed directly above a bar correctly saying «أكثر من ١٠٠٠٠ نتيجة». «طلبات الشراكة» had no index for
 its own sort order: 765 buffers → 50.
 
-**Owner:** Bashar, for the ceiling. The measurement is done.
+**Owner:** closed 2026-08-20. The measurement was done, the ceiling is set.
 
 ### O-page-2 — The pagination bar needs a تطبيق button because there is no JavaScript
 
@@ -2579,6 +3164,34 @@ generator, and fixed in place for `bookings` (86 → 1,948,386 distinct values).
 `ledger_entries` are append-only by trigger, so they cannot be corrected in place and need the next
 regeneration. **Any generator writing many rows per statement has this bug until it is spread
 explicitly.**
+
+### `next start` is NOT the runtime the apps ship, and it hides real bugs
+
+All three apps build `output: 'standalone'`, which is what the container images run. `next start`
+prints a warning saying it does not work with that setting, and it had been how the apps were started
+for every `pnpm e2e` run in the project's history.
+
+The two differ in one way that matters: the standalone server binds to `0.0.0.0`, and Next derives
+`request.url` from the bound address rather than from the `Host` header. Under `next start` it binds
+to `localhost` and the two happen to agree. Measured 2026-08-20, the first time the suite met the real
+runtime:
+
+- The customer app's currency switcher **answered 403 to every real browser** — its CSRF guard
+  compared `Origin` against `new URL(request.url).origin`, which is `http://0.0.0.0:3000`.
+- Every POST-then-redirect sent the browser to `http://0.0.0.0:PORT/…` — a different origin, so the
+  session cookie did not travel.
+- A runtime `notFound()` renders a blank body without JavaScript.
+
+**Start the apps the way the container does** before trusting a browser run:
+
+```bash
+cp -r apps/<app>/.next/static apps/<app>/.next/standalone/apps/<app>/.next/
+(cd apps/<app>/.next/standalone/apps/<app> && PORT=<port> node server.js)
+```
+
+**Build redirects with `seeOther` and check origins with `isSameOrigin`** — both in `@safra/session`.
+A relative `Location` has no host to get wrong; comparing `Origin` to `Host` compares two values the
+browser set.
 
 ### Drizzle's `.desc()` emits `DESC NULLS LAST`, which no plain `ORDER BY … DESC` can use
 
