@@ -180,6 +180,42 @@ describeIfDb('the account lockout', () => {
   });
 
   /** An unknown address must not be distinguishable from a wrong password. */
+  /**
+   * The resend endpoint must not be a way AROUND the lockout.
+   *
+   * `POST /auth/login/resend-code` verifies a password, so if a wrong one there did not count, an
+   * attacker could sit on it guessing for ever while `/auth/login` — the route the lockout
+   * watches — stayed untouched. That is what the first version of it did (found 2026-08-20 in a
+   * security pass over the emailed sign-in code, before it ever ran in anger).
+   *
+   * It cannot lock a real partner out: a legitimate resend is pressed from step two, by somebody
+   * whose password has ALREADY been accepted. A wrong password here is always somebody guessing.
+   */
+  it('counts a wrong password at the resend endpoint toward the lockout', async () => {
+    const resendWrong = () => service.resendLoginCode({ email, password: 'not-it' }, {});
+
+    for (let i = 0; i < 5; i += 1) await resendWrong();
+
+    const after = await state();
+
+    expect(after?.attempts).toBe(5);
+    expect(after?.locked_until).not.toBeNull();
+  });
+
+  /**
+   * And a CORRECT password there never counts, so the button cannot lock its own user out.
+   *
+   * The fixture is a customer, so this account also returns early on the role check — a customer
+   * has no second factor to resend. The assertion is therefore the narrow one it claims: the
+   * counter does not move for a password that was right. That a partner with the right password
+   * gets a code instead is proven in the browser, in `partner.spec.ts`.
+   */
+  it('never counts a correct password at the resend endpoint', async () => {
+    await service.resendLoginCode({ email, password: PASSWORD }, {});
+
+    expect((await state())?.attempts).toBe(0);
+  });
+
   it('answers a wrong password and an unknown account identically', async () => {
     const unknown = await service
       .login({ email: 'nobody-here@safra.test', password: 'x' }, {})

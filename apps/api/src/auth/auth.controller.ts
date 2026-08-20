@@ -242,9 +242,21 @@ export class AuthController {
    * that `O-sec-2` closed on registration. The refusal a caller CAN see is the rate limit, which
    * says nothing about whether the account exists.
    */
+  /*
+    NO `SignInRefundInterceptor` here, and that absence is load-bearing.
+
+    The interceptor gives the per-IP hit back when a handler SUCCEEDS, and this handler succeeds
+    every time by design — a wrong password, an unknown address and a real resend all answer
+    `{ ok: true }` so the endpoint cannot be used to enumerate accounts. Refunding on that would
+    hand the budget back for every wrong-password attempt too, which is the per-IP ceiling switched
+    off on a route that spends an Argon2id verify per call. One address could then drive password
+    checks across as many accounts as it had addresses for, bounded only by the per-(IP, account)
+    ten a minute.
+
+    So this route keeps its five a minute, spent whatever the answer was.
+  */
   @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @UseInterceptors(SignInRefundInterceptor)
   @Post('login/resend-code')
   @HttpCode(HttpStatus.OK)
   @AuditExempt(

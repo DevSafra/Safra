@@ -405,11 +405,10 @@ export class AuthService {
    * The one thing a caller CAN observe is the rate limit inside `LoginCodeService`, and that is
    * counted per ACCOUNT — so it only ever fires for somebody who has already proved the password.
    *
-   * ## A failed attempt here does NOT count toward the lockout
+   * ## A failed attempt here counts toward the lockout
    *
-   * Deliberately. The lockout is about guessing a password, and this route cannot be used to
-   * guess one faster than `/auth/login` already allows; charging it twice would let a resend
-   * button lock somebody out of their own account.
+   * It must. See the note on the check itself: without it this route is a password oracle the
+   * lockout cannot see.
    */
   async resendLoginCode(
     input: { email: string; password: string },
@@ -426,7 +425,27 @@ export class AuthService {
       return;
     }
 
-    if (!(await this.passwords.verify(user.passwordHash, input.password))) return;
+    /**
+     * A wrong password here COUNTS toward the lockout, exactly as it does on `/auth/login`.
+     *
+     * The first version of this did not, reasoned as "a resend button should not be able to lock
+     * somebody out of their own account". That reasoning was backwards, and it left a hole: this
+     * endpoint verifies a password, so without the counter it is a password oracle that the
+     * five-failure lockout — the control that does the heavy lifting against a targeted attack —
+     * cannot see. An attacker could sit here guessing for ever.
+     *
+     * The button cannot lock anybody out, because a legitimate resend is pressed from step two by
+     * somebody whose password was ALREADY accepted. A wrong password at this endpoint is never a
+     * real partner; it is somebody guessing.
+     */
+    if (!(await this.passwords.verify(user.passwordHash, input.password))) {
+      await this.registerFailedAttempt(user.id);
+
+      return;
+    }
+
+    /* A locked account gets no code — the sign-in it would finish is refused anyway. */
+    if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) return;
 
     if (user.status !== 'active') return;
 
