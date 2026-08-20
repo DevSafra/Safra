@@ -61,6 +61,11 @@ Each of those is a query against a table this application already writes.
 | 16  | Disk / bucket growth      | infrastructure            | >80 % capacity                                                    | ticket   |                                                                                            |
 | 17  | Dead-letter jobs          | `dead_letter_jobs`        | any unresolved row                                                | **page** | A job exhausted every retry. Built 2026-08-13 with BullMQ phase 2                          |
 
+**The scheduled jobs signal 3 watches** are now seven, not five: `credential-retention` joined at
+03:30 on 2026-08-20 (`O-sec-11`). It needs no signal of its own — a job that stops is caught by 3,
+and the consequence of it stopping is two tables growing slowly, which signal 16 sees long before
+anybody is harmed.
+
 **"Page" means wake somebody.** With three engineers and no rota yet, that is one on-call phone.
 If the rota does not exist at launch, every `page` above becomes a ticket **and the launch
 checklist must say so out loud** — an alert nobody receives is worse than no alert, because it

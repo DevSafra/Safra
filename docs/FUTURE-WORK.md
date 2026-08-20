@@ -1987,16 +1987,60 @@ the invitation token's lifecycle (hashed at rest, single-use and expiry checked 
 code is never emailed on a wrong password, a locked account or a suspended one); and that nothing
 logs a code or a token.
 
-### O-sec-11 — `login_codes` has no expiry sweep
+### O-ops-3 — FIXED: two scheduled jobs shared an advisory lock, so one could skip in silence
 
-**Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-20
+**Status:** **FIXED** 2026-08-20 · **Severity:** Medium — invisible by construction · **Found by**
+writing the runbook's job table while adding `credential-retention`
 
-The same gap as `O-sec-6` and it should be closed by the same job: rows accumulate, one per
-sign-in attempt, and nothing deletes a spent or expired one. They carry `ip_address` and
-`user_agent`, so this is a retention question as well as a capacity one.
+Every scheduler carries a comment reading "distinct advisory-lock key per job". Two of them said
+`8_421_002`: `payout-accrual` and `booking-sla-sweep`.
 
-Consumed and expired rows are harmless — `verify` reads only the newest unconsumed, unexpired code
-— so nothing is wrong today; the table simply grows for ever, which rule 2 forbids.
+`pg_try_advisory_lock` returns immediately rather than queueing, so the second job to ask did not
+stall — it **skipped**, and recorded `skipped`, which is precisely the status `JobRunService`
+documents as meaning "another replica did this one" and which alerting is therefore told to ignore.
+The sweep runs every MINUTE and the accrual hourly, so across replicas the accrual could be skipped
+at the top of an hour with nothing saying so until signal 1 fired two hours later — if the next
+hour did not simply succeed and reset the clock.
+
+**One process could never show it.** The `scheduled` queue runs at concurrency 1, so the two never
+overlap in a single worker; it needs more than one replica, which is the production topology and
+the one nobody is watching a debug log in.
+
+Fixed by moving the sweep to `8_421_006`. The runbook now lists all seven jobs with their keys, and
+the mechanism paragraph no longer claims they are `@Cron` decorators — untrue since the queue
+landed.
+
+### O-sec-11 — FIXED: dead credentials are swept nightly (closes `O-sec-6` too)
+
+**Status:** **FIXED** 2026-08-20 · **Severity:** Low · **Owner:** closed
+
+`login_codes` gained a row per partner sign-in attempt and `refresh_tokens` one per sign-in and per
+rotation — every fifteen minutes, per active session — and nothing deleted a row from either.
+Nothing was wrong: an expired token is refused on its expiry and a spent code is invisible to
+`verify`. It was unbounded growth, which is the shape rule 2 exists to catch before it becomes
+something worse.
+
+`CredentialRetentionService` runs at **03:30** through the scheduled queue, batched at 5,000 like
+`WebhookRetentionService`, and records a `scheduled_job_runs` row so alerting can see it stop.
+
+**The predicate asks about LIFECYCLE, never about age alone**, and that is the whole safety of the
+job. A session refreshed this morning on a token issued in January is a person who is signed in;
+deleting it to save a few bytes signs them out — everybody at once, silently, at half past three in
+the morning. Four of the nine tests assert the rows it must NOT touch.
+
+**It is a retention job as much as a capacity one.** Both tables carry `ip_address` and
+`user_agent` against a user id — personal data kept for a purpose (investigating account takeover),
+which §14 says should stop being kept when the purpose has passed. **Seven days for spent codes,
+ninety for dead tokens**, chosen for that reason and named as constants so blocker #6 changes one
+line each. They are engineering defaults awaiting a policy answer, not the policy.
+
+**`auth_tokens` is deliberately out of scope** — password resets, email verifications and partner
+invitations are single-use and short-lived like the codes, but they are also the evidence that an
+account was recovered. Pruning them belongs with the retention decision rather than ahead of it.
+
+**What remains of `O-sec-6`** is the half that was never about growth: nothing caps how many
+concurrent sessions one account may hold. That is a product question — how many devices a partner
+may stay signed in on — and it is recorded here rather than answered.
 
 ### O-partner-8 — FIXED: the partner joining process could not be completed by anybody
 

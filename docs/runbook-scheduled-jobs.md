@@ -9,14 +9,32 @@ on production unless it says otherwise.
 
 ## What runs
 
-| Job                 | Schedule       | Lock key  | What it does                                                   |
-| ------------------- | -------------- | --------- | -------------------------------------------------------------- |
-| `payout-accrual`    | Every hour     | `8421002` | Sweeps newly-payable bookings into their partner's open period |
-| `ranking-recompute` | Daily at 03:00 | `8421001` | Recomputes `recommendation_score` and the «سفرة تُرشّح» badges |
+| Job                    | Schedule        | Lock key    | What it does                                                     |
+| ---------------------- | --------------- | ----------- | ---------------------------------------------------------------- |
+| `booking-sla-sweep`    | Every minute    | `8421006`   | Expires `pending_confirmation` bookings past their §6.4 deadline |
+| `payout-accrual`       | Every hour      | `8421002`   | Sweeps newly-payable bookings into their partner's open period   |
+| `notification-redrive` | Every 5 minutes | `771120045` | Re-drives notifications whose queue jobs were lost               |
+| `ranking-recompute`    | Daily at 03:00  | `8421001`   | Recomputes `recommendation_score` and the «سفرة تُرشّح» badges   |
+| `webhook-retention`    | Daily at 03:00  | `8421004`   | Prunes unverified webhook payloads older than 30 days            |
+| `credential-retention` | Daily at 03:30  | `8421005`   | Prunes spent sign-in codes and dead refresh tokens               |
+| `sanctions-refresh`    | Daily at 04:00  | `8421003`   | Refetches the consolidated sanctions list                        |
 
-Both are `@Cron` decorators inside the API process. There is no separate worker yet — §14 calls for
-a background queue and `docs/FUTURE-WORK.md` carries it; until then these run in-process and are
-kept to one replica by a PostgreSQL advisory lock.
+**They run through the BullMQ `scheduled` queue**, registered once in Redis and processed at
+concurrency 1 — not as `@Cron` decorators in the API process, which is what this table said until
+2026-08-20 and had not been true since the queue landed. The advisory locks are still in the
+bodies, and still earn their place: the queue guarantees one RUNNER, the lock guarantees one
+runner even if somebody starts a second worker or falls back to a decorator.
+
+**The lock keys must stay distinct**, and on 2026-08-20 two were not: `booking-sla-sweep` and
+`payout-accrual` both held `8421002`. `pg_try_advisory_lock` returns immediately rather than
+queueing, so the loser SKIPPED — recorded as `skipped`, the status alerting is told to ignore
+because it normally means "another replica did it". Across replicas the hourly accrual could
+therefore be silently skipped by a sweep that runs every minute. The sweep moved to `8421006`.
+
+`SCHEDULED_JOBS` in `apps/api/src/queue/scheduled.job.ts` is the list this table describes, and the
+names are the ones written to `scheduled_job_runs` and read by
+`safra_job_last_success_age_seconds`. **They must not change** — a renamed job looks to alerting
+exactly like a job that stopped.
 
 ### What accrual deliberately does NOT do
 
