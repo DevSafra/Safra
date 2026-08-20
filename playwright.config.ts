@@ -41,11 +41,19 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
+  /*
+    A note on WHICH limit binds here, because 2026-08-20 changed the other one and the two are easy
+    to confuse. The per-IP ceiling on `/auth/login` went from 40 to 300 and now counts only FAILED
+    sign-ins (`O-sec-3`), so it is no longer anywhere near this suite's budget. What binds is the
+    per-(IP, ACCOUNT) throttler at ten a minute — unchanged, never refunded, and the reason the
+    signing-in specs are still sequenced out of the crowded window below. Raising the per-IP number
+    did not buy this suite a single extra sign-in.
+  */
   projects: [
     /**
      * Signs in once and saves the session (`e2e/auth.setup.ts`).
      *
-     * `POST /auth/login` allows five calls a minute per IP and a two-step sign-in spends
+     * `POST /auth/login` allows ten calls a minute per (IP, ACCOUNT) and a two-step sign-in spends
      * two, so tests that live behind the login replay this session instead of signing in
      * again. Doing it here rather than in a `beforeAll` matters: Playwright restarts the
      * worker after a failing test and re-runs file hooks, so a hook-based sign-in gets
@@ -68,8 +76,8 @@ export default defineConfig({
     /**
      * Everything that SIGNS IN, run after everything else.
      *
-     * Not a style preference — a budget one. `POST /auth/login` allows ten calls a minute per IP,
-     * and this suite makes FOURTEEN: two for the staff session, eight in `staff-login.spec.ts`
+     * Not a style preference — a budget one. `POST /auth/login` allows ten calls a minute per
+     * (IP, ACCOUNT), and this suite makes FOURTEEN against the SAME few accounts: two for the staff session, eight in `staff-login.spec.ts`
      * which tests the form itself, three on the partner side since 2FA made that sign-in two
      * steps, and one for the customer review flow. Fourteen does not fit in a two-minute run
      * however they are ordered, so everything that signs in is moved out of the crowded window
@@ -84,7 +92,8 @@ export default defineConfig({
      * The partner sign-in, captured after everything else has finished signing in.
      *
      * Its own project rather than part of `setup` because of a hard budget: `POST /auth/login`
-     * allows ten calls a minute per IP, and this suite makes THIRTEEN — two for the staff session,
+     * allows ten calls a minute per (IP, ACCOUNT), and this suite makes THIRTEEN — two for the
+     * staff session,
      * eight in `staff-login.spec.ts` which tests the form itself, and three on the partner side
      * since 2FA made that sign-in two steps. Thirteen in a seventy-second run does not fit however
      * they are ordered, so the partner ones are moved out of the crowded window rather than

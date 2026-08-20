@@ -8,6 +8,7 @@ import {
   Post,
   Req,
   Res,
+  UseInterceptors,
   UsePipes,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -33,6 +34,7 @@ import {
 } from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
+import { SignInRefundInterceptor } from '../common/throttle/sign-in-refund.interceptor.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { REFRESH_COOKIE_NAME, REFRESH_COOKIE_PATH } from '../config/constants.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
@@ -126,17 +128,46 @@ export class AuthController {
    * (measured 2026-08-03). It is registered globally in `app.module.ts` and applies here because
    * this body names an account.
    *
-   * The `default` throttler is the per-IP ceiling and is what an attacker meets. Forty a minute:
-   * loose enough that a NAT'd office of partners signing in at the start of a shift is unaffected,
-   * tight enough that cycling a thousand addresses from one host is bounded — which is the shape
-   * of a credential-stuffing run. Before 2026-08-07 this was TEN per IP and there was no account
-   * dimension, so one person's typo consumed the budget for everyone behind their carrier.
+   * The `default` throttler is the per-IP ceiling and is what an attacker meets. Before 2026-08-07
+   * it was TEN per IP with no account dimension, so one person's typo consumed the budget for
+   * everyone behind their carrier; it went to forty then, and to three hundred on 2026-08-20 when
+   * it stopped counting successes — see below.
    *
    * Neither is the primary defence against targeted brute force. That is unchanged and lives in
    * `AuthService`: five failed attempts locks the ACCOUNT for fifteen minutes, wherever they came
    * from, and a missing second factor does not count toward it.
+   *
+   * ## Since 2026-08-20 the per-IP ceiling counts only FAILURES, and it is 300 (`O-sec-3`)
+   *
+   * Scenario 4 of the load test measured what the paragraph above quietly assumed away: a
+   * legitimate customer on an attacked egress address, with correct credentials and well inside
+   * their own per-account allowance, signed in **0 times out of 30**. Forty a minute is 0.67 a
+   * second, and it is shared by everybody behind one carrier-grade NAT address — thousands of
+   * subscribers in the Syrian market.
+   *
+   * Two changes, and they only work together:
+   *
+   * 1. **A success costs nothing.** `SignInRefundInterceptor` gives the per-IP hit back when the
+   *    sign-in succeeds, or when the password was right and only the code is outstanding. So the
+   *    ceiling stopped being a request limit and became a budget for FAILED sign-ins, and
+   *    legitimate traffic no longer spends it at all.
+   * 2. **The budget is three hundred, not forty** (Bashar). Counting only failures does not on its
+   *    own help the customer in that measurement — an attacker's traffic IS failures — so the
+   *    number had to move too. At 300 an attacker must sustain five failed sign-ins a second from
+   *    one address to starve it, against 0.67 before: 7.5× louder, and a signature worth alerting
+   *    on. Argon2id verify was measured at 11.2 ms with the configured parameters, so five a
+   *    second from one address is about 5 % of one machine's hashing capacity.
+   *
+   * The accepted cost is the third column of `O-sec-3`'s table: a single address can now drive
+   * sixty accounts to lockout a minute rather than eight. A DISTRIBUTED attacker already bypasses
+   * this ceiling entirely, so what it slows is the single-source case — the one that is easiest to
+   * stop at the edge, which is where the residual belongs.
+   *
+   * The `account` throttler is unchanged at ten a minute per (IP, account) and is never refunded.
+   * That is what keeps the password checks one address can force for one account bounded.
    */
-  @Throttle({ default: { limit: 40, ttl: 60_000 } })
+  @Throttle({ default: { limit: 300, ttl: 60_000 } })
+  @UseInterceptors(SignInRefundInterceptor)
   @Post('login')
   @HttpCode(HttpStatus.OK)
   /**

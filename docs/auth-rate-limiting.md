@@ -10,16 +10,20 @@ from IP-only throttling to IP + account.
 They are often confused because all three produce "you cannot try again". They defend against
 different attacks and they fail in different ways.
 
-| Control              | Keyed on            | Budget                     | Stops                                                 | Where                                 |
-| -------------------- | ------------------- | -------------------------- | ----------------------------------------------------- | ------------------------------------- |
-| **Account throttle** | IP + SHA-256(email) | 10 / minute                | One person brute-forcing one account from one network | `app.module.ts`, `account-tracker.ts` |
-| **IP ceiling**       | IP                  | 40 / minute on auth routes | Credential stuffing: many accounts, one host          | `@Throttle` on each auth route        |
-| **Account lockout**  | the user row        | 5 failures → 15 minutes    | A **distributed** attack on one account               | `AuthService.registerFailedAttempt`   |
+| Control              | Keyed on            | Budget                                                                                    | Stops                                                 | Where                                                          |
+| -------------------- | ------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------------- |
+| **Account throttle** | IP + SHA-256(email) | 10 / minute                                                                               | One person brute-forcing one account from one network | `app.module.ts`, `account-tracker.ts`                          |
+| **IP ceiling**       | IP                  | 300 **failed sign-ins** / minute on `/auth/login`; 40 or tighter on the other auth routes | Credential stuffing: many accounts, one host          | `@Throttle` on each auth route, plus `SignInRefundInterceptor` |
+| **Account lockout**  | the user row        | 5 failures → 15 minutes                                                                   | A **distributed** attack on one account               | `AuthService.registerFailedAttempt`                            |
 
 The lockout is the one that does the heavy lifting against a targeted attack. It lives in the
 database rather than in Redis, so it does not care how many addresses the attempts came from — a
 botnet still hits it on the fifth guess per account. The two throttles bound REQUEST RATE; the
 lockout bounds GUESSES.
+
+**On `/auth/login` the IP ceiling bounds FAILURE rate, not request rate** — see "The IP ceiling
+counts failures" below. That is the 2026-08-20 change, and it is the only place the three controls
+above are not simply "requests per window".
 
 ---
 
@@ -70,7 +74,8 @@ Raising the IP ceiling made an existing oracle roughly four times faster from a 
 2. A locked account used to answer `auth.locked`, while an unregistered address answered the
    generic `auth.credentials_invalid`.
 3. So six requests confirmed anybody's registration, at the cost of denying them service. At 10
-   requests/minute/IP that was ~1.6 accounts a minute from one host; at 40 it would have been ~6.
+   requests/minute/IP that was ~1.6 accounts a minute from one host; at 40 it would have been ~6,
+   and at today's 300 it would be ~50.
 
 **Fixed by checking the password BEFORE the lock.** `auth.locked` is still returned — a person who
 cannot get in has to be told to wait rather than left retyping — but only to a caller who has
@@ -137,7 +142,49 @@ somebody later moved the hash back inside the create branch.
   locked real account and an unregistered address rather than as "returns X".
 - **Shared networks no longer penalised.** Asserted end to end in `auth-throttle.spec.ts`: account
   A is refused at its eleventh attempt while account B **on the same address** is still served.
-- **Stuffing still bounded.** Same file: 45 different accounts from one address stop at 40.
+- **Stuffing still bounded.** Same file: 300 different accounts from one address are all refused as
+  wrong passwords, and the 301st is refused as too many requests.
+- **A success costs the address nothing.** Same file, and asserted through `X-RateLimit-Remaining`
+  so it is the real counter being read: one failure, three successful sign-ins, and the address has
+  been charged twice rather than five times.
+
+---
+
+## The IP ceiling counts failures (2026-08-20, `O-sec-3`)
+
+**What was measured.** Scenario 4 of the load test put a legitimate customer with correct
+credentials on the same egress address as a credential-stuffing run, pacing themselves well inside
+their own per-account allowance. They signed in **0 times out of 30**. The per-IP ceiling is shared
+by everybody behind one address, and carrier-grade NAT puts thousands of Syrian subscribers behind
+one.
+
+**Two changes, and neither works without the other.**
+
+1. **A successful sign-in no longer spends the ceiling.** `SignInRefundInterceptor` gives the
+   per-IP hit back when the sign-in succeeds — or when the password was right and only the second
+   factor is outstanding, which is half of every staff sign-in. So the ceiling stopped being a
+   request limit and became a budget for FAILED sign-ins, and legitimate traffic no longer touches
+   it at all. That alone fixes the case that moved this limit from 10 to 40 in the first place: a
+   NAT'd office signing in at the start of a shift.
+2. **The budget went from 40 to 300** (Bashar, 2026-08-20). Counting only failures does not on its
+   own help the customer in that measurement, because an attacker's traffic IS failures. Forty a
+   minute is 0.67 a second, so an attacker at one request a second — unremarkable in any log —
+   exhausted it. At 300 they must sustain **five failed sign-ins a second** from one address.
+
+**What it cost, stated rather than glossed.** A single address can now drive sixty accounts to
+lockout a minute instead of eight. That is real. It is bounded by the fact that a DISTRIBUTED
+attacker bypasses the per-IP ceiling entirely — measured: 40 of 40 accounts locked, zero 429s — so
+this only slows the single-source case, which is also the one an edge rule blocks most easily.
+
+**The refund cannot be used to mint budget.** It never creates a counter, never goes below zero,
+never resets a TTL, never lifts a block, and never touches the `account` throttler. Held by 20
+tests, five of which run the real guard and the real Redis storage together — a key that drifted by
+one character would refund nothing and report success.
+
+**The residual, and where it belongs.** A limiter keyed on an address that strangers share cannot
+be both low enough to bound guessing and high enough to protect a bystander. An attacker willing to
+be loud can still starve an address. The answer to that is rate limiting at the EDGE — a WAF or CDN
+rule on `POST /auth/login` — which is hosting work under `M-1`, not application work.
 
 ---
 
@@ -158,6 +205,13 @@ Stated so nobody assumes otherwise:
 Counters live in Redis (`RedisThrottlerStorage`) and are shared across replicas — with the default
 in-memory store the effective limit was N × the configured one and every counter reset on deploy.
 
-Redis being unavailable **fails closed to the request**, not open: the guard throws and the request
-is refused. That is the correct direction for an auth endpoint, and it means a Redis outage stops
-sign-ins. Worth an alert once **S-1** lands.
+Redis being unavailable **fails OPEN** — the request is allowed and an error is logged. This
+paragraph said the opposite until 2026-08-20 and was wrong: `RedisThrottlerStorage.increment`
+catches, logs `Rate limiting is DEGRADED`, and returns `isBlocked: false`, so a Redis outage
+removes the throttling rather than stopping sign-ins. That is a deliberate
+availability-over-enforcement trade, argued in the class note, and it is why signal 11 in
+`docs/alerting.md` treats `redis: degraded` as a security control being off. Worth an alert once
+**S-1** lands.
+
+The REFUND fails the other way — closed. If Redis is unreachable the hit simply stays counted,
+because failing open there would hand back budget that was never spent.

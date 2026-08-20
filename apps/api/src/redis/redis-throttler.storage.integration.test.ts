@@ -149,6 +149,113 @@ describeIfRedis('RedisThrottlerStorage', () => {
     });
   });
 
+  /**
+   * The half of `O-sec-3` that lives in storage: a successful sign-in gives its per-IP hit back.
+   *
+   * Every property here is a security property rather than a nicety — a refund that creates a key,
+   * goes negative, or resets a TTL is a way to mint rate-limit budget.
+   */
+  describe('refunding', () => {
+    it('gives one hit back', async () => {
+      await replicaA.increment(key, 60_000, 5, 60_000, 'default');
+      await replicaA.increment(key, 60_000, 5, 60_000, 'default');
+
+      await replicaA.refund(key, 'default');
+
+      expect(await client.get(`throttle:default:${key}`)).toBe('1');
+    });
+
+    /** One replica must be able to refund a hit another one took. */
+    it('refunds across replicas', async () => {
+      await replicaA.increment(key, 60_000, 5, 60_000, 'default');
+      await replicaB.refund(key, 'default');
+
+      expect(await client.get(`throttle:default:${key}`)).toBe('0');
+    });
+
+    /**
+     * A refund arriving after the window rolled over must not start a fresh counter at -1 — that
+     * is budget nobody paid for, handed to whoever holds the address next.
+     */
+    it('does not create a counter that had already expired', async () => {
+      await replicaA.refund(key, 'default');
+
+      expect(await client.exists(`throttle:default:${key}`)).toBe(0);
+    });
+
+    /** Two refunds for one hit must not go below zero, for the same reason. */
+    it('never goes negative', async () => {
+      await replicaA.increment(key, 60_000, 5, 60_000, 'default');
+
+      await replicaA.refund(key, 'default');
+      await replicaA.refund(key, 'default');
+      await replicaA.refund(key, 'default');
+
+      expect(await client.get(`throttle:default:${key}`)).toBe('0');
+    });
+
+    /**
+     * The window must keep expiring when it was always going to. Resetting the TTL here would let
+     * a caller alternating success and failure hold one window open indefinitely.
+     */
+    it('leaves the TTL alone', async () => {
+      await replicaA.increment(key, 60_000, 5, 60_000, 'default');
+      const before = await client.pttl(`throttle:default:${key}`);
+
+      await replicaA.refund(key, 'default');
+      const after = await client.pttl(`throttle:default:${key}`);
+
+      expect(after).toBeGreaterThan(0);
+      expect(after).toBeLessThanOrEqual(before);
+    });
+
+    /** Refunding one throttler must never touch another's counter. */
+    it('refunds only the named throttler', async () => {
+      await replicaA.increment(key, 60_000, 5, 60_000, 'default');
+      await replicaA.increment(key, 60_000, 5, 60_000, 'account');
+
+      await replicaA.refund(key, 'default');
+
+      expect(await client.get(`throttle:account:${key}`)).toBe('1');
+    });
+
+    /**
+     * A caller who was BLOCKED never reached the handler, so there is nothing to refund — and a
+     * refund must not be a way to lift a block early.
+     */
+    it('does not lift a block', async () => {
+      for (let i = 0; i < 4; i += 1) {
+        await replicaA.increment(key, 60_000, 3, 60_000, 'default');
+      }
+
+      await replicaA.refund(key, 'default');
+
+      expect(
+        (await replicaA.increment(key, 60_000, 3, 60_000, 'default')).isBlocked,
+      ).toBe(true);
+    });
+
+    /**
+     * Fails CLOSED, which is the opposite of `increment` and deliberate: failing open here would
+     * hand back budget that was never spent. The cost of the closed failure is one wasted slot.
+     */
+    it('leaves the hit counted when Redis is unreachable', async () => {
+      const dead = new Redis('redis://127.0.0.1:1', {
+        maxRetriesPerRequest: 0,
+        retryStrategy: () => null,
+        lazyConnect: true,
+        enableOfflineQueue: false,
+      });
+      dead.on('error', () => undefined);
+
+      await expect(
+        new RedisThrottlerStorage(dead).refund(key, 'default'),
+      ).resolves.toBeUndefined();
+
+      dead.disconnect();
+    });
+  });
+
   describe('when Redis is unreachable', () => {
     /**
      * Fails OPEN, deliberately. Failing closed would turn a cache outage into a total

@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, type ExecutionContext } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 
 import { ERROR } from '@safra/contracts';
 
 import { tooManyRequests } from '../errors/app-error.js';
+import { recordThrottleKey } from './throttle-keys.js';
 
 /**
  * `ThrottlerGuard`, refusing in the shape this API refuses everything else.
@@ -47,5 +48,33 @@ export class CodedThrottlerGuard extends ThrottlerGuard {
    */
   protected override throwThrottlingException(): Promise<void> {
     throw tooManyRequests(ERROR.REQUEST_TOO_MANY);
+  }
+
+  /**
+   * Unchanged in what it RETURNS. It records the key on the way past, and that is all.
+   *
+   * ## Why here
+   *
+   * `handleRequest` calls this immediately before `storage.increment`, and only for a throttler
+   * that is actually going to count the request — a skipped one (`skipUnlessAccountNamed`) never
+   * reaches it. So "was `generateKey` called" and "was a hit recorded" are the same question, which
+   * is exactly the fact the refund in `O-sec-3` needs.
+   *
+   * The alternative was to recompute the key downstream, which means copying
+   * `ThrottlerGuard.generateKey` — a `sha256` over the class name, the handler name, the throttler
+   * name and the tracker — and keeping the copy in step with the dependency for ever. A key that
+   * drifts by one character refunds nothing and reports success, which is the failure mode worth
+   * designing out rather than testing for.
+   */
+  protected override generateKey(
+    context: ExecutionContext,
+    suffix: string,
+    name: string,
+  ): string {
+    const key = super.generateKey(context, suffix, name);
+
+    recordThrottleKey(context.switchToHttp().getRequest<object>(), name, key);
+
+    return key;
   }
 }

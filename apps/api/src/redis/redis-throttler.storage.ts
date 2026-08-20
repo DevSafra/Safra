@@ -96,6 +96,29 @@ end
 return { hits, redis.call('PTTL', hitsKey), isBlocked, blockTtl }
 `;
 
+/**
+ * Give one hit back, and never do anything else.
+ *
+ * Used to keep a SUCCESSFUL sign-in from spending the per-IP ceiling shared by everyone behind one
+ * carrier-grade NAT address (`O-sec-3`). Three properties matter, and each is one line here:
+ *
+ * - **It never creates the key.** A refund arriving after the window rolled over must not start a
+ *   fresh counter at -1; the window it belonged to is gone, and there is nothing to give back.
+ * - **It never goes below zero**, so a double refund cannot mint budget.
+ * - **It never touches the TTL or the block key.** `DECR` leaves an existing expiry alone, and a
+ *   caller who was blocked never reached the handler, so there is no refund to consider.
+ */
+const REFUND_SCRIPT = `
+local hitsKey = KEYS[1]
+
+local current = tonumber(redis.call('GET', hitsKey))
+if current == nil or current <= 0 then
+  return 0
+end
+
+return redis.call('DECR', hitsKey)
+`;
+
 @Injectable()
 export class RedisThrottlerStorage implements ThrottlerStorage {
   private readonly logger = new Logger(RedisThrottlerStorage.name);
@@ -150,6 +173,36 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
         isBlocked: false,
         timeToBlockExpire: 0,
       };
+    }
+  }
+
+  /**
+   * Undoes one `increment` against the same key.
+   *
+   * Callers are outcome-dependent by nature — a throttler cannot know whether a sign-in worked
+   * until after the handler has run — so this is the only way to express "that request should not
+   * have counted" without moving the limiter behind the expensive work it exists to bound.
+   *
+   * ## Fails CLOSED, unlike `increment`
+   *
+   * If Redis is unreachable the hit simply stays counted and this logs a warning. That is the
+   * opposite trade from `increment` on purpose: failing open there keeps the platform usable
+   * during a cache outage, while failing open HERE would mean handing back budget that was never
+   * spent. The cost of the closed failure is one wasted slot in one caller's window.
+   *
+   * `warn`, not `error`: the request it belongs to succeeded, and nothing is broken for the person
+   * who made it.
+   */
+  async refund(key: string, throttlerName: string): Promise<void> {
+    const hitsKey = `throttle:${throttlerName}:${key}`;
+
+    try {
+      await this.redis.eval(REFUND_SCRIPT, 1, hitsKey);
+    } catch (error) {
+      this.logger.warn(
+        `Could not refund a rate-limit hit; it stays counted. ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { AuditService } from '../common/audit/audit.service.js';
 import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import { PasswordService } from '../common/crypto/password.service.js';
+import { SignInRefundInterceptor } from '../common/throttle/sign-in-refund.interceptor.js';
 import { MailService } from '../mail/mail.service.js';
 import { WalletModule } from '../wallet/wallet.module.js';
 import { AccountRecoveryService } from './account-recovery.service.js';
@@ -30,6 +31,14 @@ import { TwoFactorService } from './two-factor.service.js';
     FieldEncryptionService,
     MailService,
     AuditService,
+    /*
+      Route-scoped rather than global (`O-sec-3`). It only makes sense where "did this succeed" is a
+      question about a CREDENTIAL, and applying it everywhere would quietly refund the per-IP hit of
+      every successful request in the API — which is the throttler switched off, not softened.
+
+      Its dependency resolves from the global RedisModule, so AuthModule imports nothing new.
+    */
+    SignInRefundInterceptor,
   ],
   // TokenService is exported because JwtAuthGuard is registered globally and
   // resolves it from the root injector. AuthTokenService and MailService are
