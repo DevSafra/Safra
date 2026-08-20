@@ -1,0 +1,40 @@
+-- ============================================================================
+-- The index for «طلبات الشراكة»'s default order, written where the ordering can be exact.
+--
+-- Measured against `safra_load` on 2026-08-20 (15,000 applications, 5M bookings) during the
+-- scenario-3 pass. Every figure below was taken, not estimated.
+--
+-- ## Why the registry needed one at all
+--
+-- `partner-application.service.ts` lists with `ORDER BY a.created_at DESC, a.reference DESC` and
+-- no status filter. The table's only index was `(status, created_at)`, which leads on the wrong
+-- column for that, so every page view was a sequential scan plus a top-N heapsort: 765 buffers at
+-- 15,000 rows, growing with the table. Nothing ever deletes from this table — a rejected
+-- application is kept, and an accepted one becomes history — so the scan only gets longer.
+--
+-- Cheap today. It is here because rule 2 asks for an index on a request path, not for a scan that
+-- is currently affordable, and because the equivalent page of `bookings` costs 44 buffers.
+--
+-- ## Why raw SQL rather than the drizzle schema, which is where indexes normally live
+--
+-- Drizzle's `.desc()` emits `DESC NULLS LAST`. PostgreSQL's plain `ORDER BY x DESC` means
+-- `DESC NULLS FIRST`. Those are different orderings, so an index built by the DSL cannot satisfy
+-- this query's sort — and the failure is silent: the index is created, it is valid, `\di` shows it,
+-- and the plan does not change.
+--
+-- Measured, all three on the same query and the same data:
+--
+--   no index at all                                            765 buffers, Seq Scan + Sort
+--   index built with drizzle `.desc()` (DESC NULLS LAST)        765 buffers, Seq Scan + Sort
+--   the same columns with PostgreSQL's defaults (below)          27 buffers, Index Scan, no sort
+--
+-- The ordering has to be stated in SQL to be stated exactly. `created_at` is NOT NULL, so the NULLS
+-- clause changes no result — only whether the planner considers the index usable, which is the
+-- whole point.
+--
+-- If a future ORDER BY on this table adds or changes a column, this index has to change with it:
+-- a prefix match is not enough to remove the sort, as the single-column attempt showed.
+-- ============================================================================
+
+CREATE INDEX IF NOT EXISTS partner_applications_created_idx
+  ON partner_applications (created_at DESC, reference DESC);

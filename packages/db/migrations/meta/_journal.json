@@ -232,6 +232,13 @@
       "when": 1787150203202,
       "tag": "0032_acoustic_surge",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1787217956379,
+      "tag": "0033_young_patriot",
+      "breakpoints": true
     }
   ]
 }

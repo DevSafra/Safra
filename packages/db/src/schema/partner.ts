@@ -130,8 +130,18 @@ export const partnerApplications = pgTable(
     ...timestamps,
   },
   (t) => [
-    /** The queue: open requests, oldest first. The only list this table has. */
+    /** The queue: open requests, oldest first. */
     index('partner_applications_status_idx').on(t.status, t.createdAt),
+    /*
+      The registry's default order is indexed in `migrations/post/0007_registry_order_indexes.sql`,
+      as raw SQL rather than here.
+
+      Drizzle's `.desc()` emits `DESC NULLS LAST`; PostgreSQL's plain `ORDER BY … DESC` means
+      `NULLS FIRST`. The orderings therefore do not match and the index cannot remove the sort —
+      measured, 2026-08-20: with the DSL-built index the plan stayed a sequential scan at 765
+      buffers, and the same index written with PostgreSQL's own defaults turned it into an index
+      scan at 27. Written where the ordering can be stated exactly.
+    */
     /**
      * ONE open request per address.
      *

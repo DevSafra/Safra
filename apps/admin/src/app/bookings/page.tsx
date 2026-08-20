@@ -117,7 +117,12 @@ export default async function BookingsPage({
             result === 'failed' || result === 'unauthenticated' ? null : (
               <>
                 <ToolbarNote>
-                  {fill(t.sections.bookings.count, { n: count(total(result.counts)) })}
+                  {fill(
+                    result.counts.capped
+                      ? t.sections.bookings.countAtLeast
+                      : t.sections.bookings.count,
+                    { n: count(total(result.counts.byStatus)) },
+                  )}
                 </ToolbarNote>
                 {/*
                   The export carries the CURRENT filters, so what is built is what is on screen. An
@@ -304,6 +309,13 @@ const columns = (back: string): readonly AdminColumn<BookingListItem>[] => [
   },
 ];
 
-function total(counts: Record<string, number>): number {
-  return Object.values(counts).reduce((sum, value) => sum + value, 0);
+/**
+ * The floor under the number of bookings, summed from the per-status counts.
+ *
+ * Each of those is capped at `COUNT_CAP`, so this is "at least this many" rather than a total
+ * whenever `counts.capped` is set — which is why the caller picks a different sentence for that
+ * case rather than printing this figure as exact.
+ */
+function total(byStatus: Record<string, number>): number {
+  return Object.values(byStatus).reduce((sum, value) => sum + value, 0);
 }

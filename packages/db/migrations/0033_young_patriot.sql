@@ -1,0 +1,1 @@
+CREATE INDEX "bookings_status_created_idx" ON "bookings" USING btree ("status","created_at" DESC NULLS LAST);

@@ -196,6 +196,33 @@ export const bookings = pgTable(
       .on(t.status, t.confirmationDeadlineAt)
       .where(sql`status = 'pending_confirmation'`),
     index('bookings_partner_status_idx').on(t.partnerId, t.status),
+    /**
+     * The registry's per-status COUNTS, and nothing else — see the last paragraph.
+     *
+     * `booking-list.service.ts` described its counts as "one grouped query over the
+     * `(status, created_at)` index", an index that did not exist. Grouping by a column no index
+     * leads on has one plan available: read the whole table. Measured against 5,000,061 rows on
+     * 2026-08-20:
+     *
+     *   - the unfiltered status counts read **239,855 buffers, on every page view** of the registry;
+     *   - a capped count for a status with NO rows still read 5,058 buffers, because proving an
+     *     absence without a range means scanning for it — so `COUNT_CAP` alone did not bound them.
+     *
+     * With this index and the counts capped per status, the whole set costs **93 buffers** and stays
+     * bounded however large the table grows.
+     *
+     * ## What it does NOT do, so nobody adds a second one expecting it to
+     *
+     * It does not serve `?status=…&` ORDER BY. Two reasons, both measured: the planner prefers a
+     * backward scan of `bookings_created_idx` with a filter (46 buffers for page 1 of `confirmed`,
+     * which is cheaper than this index plus heap fetches), and drizzle's `.desc()` emits
+     * `DESC NULLS LAST` while a plain `ORDER BY … DESC` means `NULLS FIRST` — so the orderings do
+     * not match and no sort could be removed even if the planner wanted to. See §8 of
+     * `docs/FUTURE-WORK.md`.
+     *
+     * Cost, stated: one more btree on the busiest write table in the schema, 34 MB at 5M rows.
+     */
+    index('bookings_status_created_idx').on(t.status, t.createdAt.desc()),
     index('bookings_customer_idx').on(t.customerProfileId, t.createdAt),
     index('bookings_city_dates_idx').on(t.cityId, t.checkIn),
     index('bookings_unit_dates_idx').on(t.unitId, t.checkIn, t.checkOut),

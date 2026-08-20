@@ -580,7 +580,17 @@ const bookingListItemSchema = z.object({
 });
 
 const bookingListSchema = offsetPage(bookingListItemSchema).extend({
-  counts: z.record(z.string(), z.number()),
+  /*
+    `capped` travels with the numbers, not beside them.
+
+    Each per-status figure stops at `COUNT_CAP`, so their sum is a floor rather than a total and must
+    be rendered as «أكثر من…». A boolean in a sibling field would be one more thing to remember to
+    read; inside the object the type makes it awkward to ignore.
+  */
+  counts: z.object({
+    byStatus: z.record(z.string(), z.number()),
+    capped: z.boolean(),
+  }),
 });
 
 export type BookingListItem = z.infer<typeof bookingListItemSchema>;

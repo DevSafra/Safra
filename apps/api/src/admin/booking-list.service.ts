@@ -63,6 +63,18 @@ export interface BookingListQuery {
  * bounded by the keyset page rather than by a full scan — `q` is only ever applied together
  * with `LIMIT`, and the ordering index carries the scan.
  */
+/**
+ * How many bookings sit in each status, and whether any of those figures hit the cap.
+ *
+ * `capped` is part of the answer rather than something a reader infers, for the same reason
+ * `offsetPage` carries it: a total that stopped counting at `COUNT_CAP` must be rendered as
+ * «أكثر من…» and never as an exact number.
+ */
+export interface BookingCounts {
+  readonly byStatus: Record<string, number>;
+  readonly capped: boolean;
+}
+
 @Injectable()
 export class BookingListService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
@@ -200,20 +212,50 @@ export class BookingListService {
   }
 
   /**
-   * Counts per status, for the filter's context line.
+   * Counts per status, for the filter's context line — each CAPPED at `COUNT_CAP`.
    *
-   * One grouped query over the `(status, created_at)` index rather than a COUNT per status.
-   * Deliberately NOT filtered by the search term: the point of the line is to say how much
-   * work exists in each state, which a search would misreport.
+   * Deliberately NOT filtered by the search term: the point of the line is to say how much work
+   * exists in each state, which a search would misreport.
+   *
+   * ## Why this is a count per status rather than one GROUP BY
+   *
+   * It was `GROUP BY b.status` with no cap, and its comment claimed it ran "over the
+   * `(status, created_at)` index" — an index that did not exist. Grouping by a non-leading column
+   * has only one plan available: read the whole table. Measured against 5,000,061 rows on
+   * 2026-08-20 it touched 239,855 buffers, on every page view of the registry, and returned exact
+   * figures the console then summed and printed — beside a pagination bar that correctly said
+   * «أكثر من ١٠٠٠٠». Two totals on one screen, one of them paid for by a full scan.
+   *
+   * `enum_range` gives the statuses from the type rather than a list here, so a status added to the
+   * enum appears without anybody remembering this file. Each count runs over its own
+   * `LIMIT COUNT_CAP + 1` subquery on `bookings_status_created_idx`, which makes every one of them a
+   * bounded range scan — including a status with no rows, which previously cost a full index scan to
+   * prove.
+   *
+   * `capped` travels with the numbers because a capped figure must never be printed as an exact one.
    */
-  async counts(actor?: AccessTokenClaims): Promise<Record<string, number>> {
+  async counts(actor?: AccessTokenClaims): Promise<BookingCounts> {
     const result = await this.db.execute<{ status: string; n: string }>(sql`
-      SELECT b.status::text AS status, count(*)::text AS n
-      FROM bookings b
-      WHERE ${scopeFilter(actor, 'b.city_id')}
-      GROUP BY b.status
+      SELECT s.status::text AS status, c.n::text AS n
+      FROM unnest(enum_range(NULL::booking_status)) AS s(status)
+      CROSS JOIN LATERAL (
+        SELECT count(*) AS n FROM (
+          SELECT 1 FROM bookings b
+          WHERE b.status = s.status
+            AND ${scopeFilter(actor, 'b.city_id')}
+          LIMIT ${COUNT_CAP + 1}
+        ) capped
+      ) c
+      WHERE c.n > 0
     `);
 
-    return Object.fromEntries(result.rows.map((row) => [row.status, Number(row.n)]));
+    const byStatus = Object.fromEntries(
+      result.rows.map((row) => [row.status, Number(row.n)]),
+    );
+
+    return {
+      byStatus,
+      capped: Object.values(byStatus).some((n) => n > COUNT_CAP),
+    };
   }
 }

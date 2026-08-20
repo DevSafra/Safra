@@ -388,6 +388,15 @@ export const ar = {
       */
       expiringOnly: 'تنتهي مهلتها قريباً',
       count: '{n} حجز · كل حجز له خط زمني وسجل تدقيق ورقم مرجعي (P-004)',
+      /**
+       * Shown instead of `count` when the per-status counts hit `COUNT_CAP`.
+       *
+       * The figure is a sum of capped counts, so it is a floor and not a total. Printing it as an
+       * exact number would be the thing `foundCapped` exists to prevent, one line higher up the
+       * same screen — and next to a pagination bar already saying «أكثر من ١٠٠٠٠ نتيجة» it would
+       * read as two answers to one question.
+       */
+      countAtLeast: 'أكثر من {n} حجز · كل حجز له خط زمني وسجل تدقيق ورقم مرجعي (P-004)',
       note: 'فتح أي حجز يعرض: بيانات العميل والشريك والعقار والدفع والرسائل والواتساب والبريد والخط الزمني، مع ملاحظات داخلية لا يراها العميل أو الشريك. تغيير الحالة بصلاحيات محددة فقط ويسجَّل في سجل التدقيق.',
     },
 
