@@ -94,6 +94,68 @@ describeIfDb('what the platform has written, the console can name', () => {
   });
 
   /**
+   * The FIELD NAMES inside the payload, which the console prints under «الحقل».
+   *
+   * سجل التدقيق draws `before`/`after` through `payloadKey`, and that map held eighteen entries
+   * written for the booking timeline while the platform writes seventy-four keys. Everything not
+   * in it printed as the stored identifier — `basePrice`, `confirmationWindowMinutes`,
+   * `ledgerEntryGroup` — English, on a console that is Arabic-only (Bashar, 2026-08-20).
+   *
+   * Read from the database rather than from the code for the reason this whole file exists: a
+   * payload is built from a spread at several call sites, so grepping the source under-reports
+   * what actually reaches the column.
+   */
+  it('names every payload field present in audit_log', async () => {
+    const catalogue = adminMessages('ar').enums.payloadKey;
+    const rows = await db.execute<{ k: string }>(sql`
+      SELECT DISTINCT k
+      FROM audit_log,
+           LATERAL jsonb_object_keys(
+             coalesce(before, '{}'::jsonb) || coalesce(after, '{}'::jsonb)
+           ) AS k
+      ORDER BY 1
+    `);
+
+    const unknown = rows.rows.map((row) => row.k).filter((key) => !(key in catalogue));
+
+    expect(
+      unknown,
+      'These keys appear in an audit payload and have no Arabic name, so سجل التدقيق prints the ' +
+        'identifier. Add them to `enums.payloadKey` in messages/admin/ar.ts.',
+    ).toEqual([]);
+  });
+
+  /**
+   * And the enum-shaped VALUES, which the console prints under «قبل» and «بعد».
+   *
+   * Only values that LOOK like codes — lower snake_case, no spaces. A `reason` somebody typed is
+   * their own words and must fall through untranslated; a `status` of `pending_confirmation` is an
+   * identifier and must not reach a reader. The pattern is what separates the two, and it is why
+   * this cannot simply demand a translation for every string in the table.
+   */
+  it('names every coded payload value present in audit_log', async () => {
+    const catalogue = adminMessages('ar').enums.payloadValue;
+    const rows = await db.execute<{ v: string }>(sql`
+      SELECT DISTINCT e.value AS v
+      FROM audit_log,
+           LATERAL jsonb_each_text(
+             coalesce(before, '{}'::jsonb) || coalesce(after, '{}'::jsonb)
+           ) AS e(key, value)
+      WHERE e.value ~ '^[a-z][a-z0-9]*(_[a-z0-9]+)+$'
+      ORDER BY 1
+    `);
+
+    const unknown = rows.rows.map((row) => row.v).filter((code) => !(code in catalogue));
+
+    expect(
+      unknown,
+      'These coded values appear in an audit payload with no Arabic word, so سجل التدقيق prints ' +
+        'the code. Add them to `enums.payloadValue` in messages/admin/ar.ts — and pick the ' +
+        'wording deliberately: the status vocabularies disagree with each other on purpose.',
+    ).toEqual([]);
+  });
+
+  /**
    * The same class of gap, one table over.
    *
    * The catalogue listed the six templates from design handoff §8 and the platform sends three

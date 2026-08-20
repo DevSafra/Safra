@@ -1,3 +1,5 @@
+import { Fragment } from 'react';
+
 import { getAuditActions, getAuditLog, type AuditEntry } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { clock, shortDate } from '@/lib/format';
@@ -5,7 +7,7 @@ import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import { AdminTable, Ltr, type AdminColumn } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { t, auditAction, auditSubject, roleName } from '@/lib/strings';
+import { t, auditAction, auditSubject, payloadChanges, roleName } from '@/lib/strings';
 import { pageNumber } from '@/lib/search-params';
 import { resolvePageSize } from '@/lib/table-size';
 
@@ -40,6 +42,74 @@ export const dynamic = 'force-dynamic';
 
 /** The design's `grid-template-columns`, verbatim. */
 const TEMPLATE = '.7fr 1fr 2fr 1fr .9fr';
+
+/**
+ * The `before`/`after` payload, rendered as what changed — in Arabic.
+ *
+ * ## What it replaces
+ *
+ * `JSON.stringify({ before, after })` inside a one-line `overflow-x-auto` box. On a column this
+ * narrow the reader met the middle of it — `e":{"status":"contacted"},"after":…` — scrolled away
+ * from both ends, in a machine format, in the column that is supposed to answer "what exactly
+ * changed" (Bashar, 2026-08-20).
+ *
+ * The module note above says the payload is shown VERBATIM rather than summarised, and that still
+ * holds: every field and both of its values are here. What is gone is the JSON punctuation, the
+ * key names repeated on every row, and the horizontal scroll.
+ *
+ * ## The words come from the catalogue, not from the database
+ *
+ * `payloadChanges` resolves both the field name and the value — `status` → «الحقل: الحالة»,
+ * `pending_confirmation` → «قيد التأكيد», `true` → «نعم». The first version of this component did
+ * none of that and printed the stored identifiers, which on an Arabic-only console is the same
+ * defect as hardcoding English (Bashar, again, the same day). An unknown key or code still falls
+ * through as itself: a missing translation has to LOOK like one.
+ *
+ * ## `bdi`, not `Ltr`
+ *
+ * What falls through is arbitrary — a reference, an amount, an Arabic address. `Ltr` forces
+ * `dir="ltr"`, which is right for `BKG-2026-073297` and wrong for «باب توما، دمشق». `<bdi>`
+ * isolates the run without deciding its direction, so each value is laid out on its own merits and
+ * cannot reorder the line around it.
+ */
+function Changes({ before, after }: { before: unknown; after: unknown }) {
+  const changes = payloadChanges(before, after);
+
+  if (changes.length === 0) return null;
+
+  /* A creation has no "before" worth a column of dashes. */
+  const showBefore = changes.some((change) => change.before !== undefined);
+
+  return (
+    <dl
+      className={`mt-1 grid gap-x-3 gap-y-0.5 rounded border border-line bg-field p-1.5 text-[10px] ${
+        showBefore ? 'grid-cols-[auto_1fr_1fr]' : 'grid-cols-[auto_1fr]'
+      }`}
+    >
+      <span className="font-semibold text-faint">{t.sections.audit.changeField}</span>
+      {showBefore ? (
+        <span className="font-semibold text-faint">{t.sections.audit.changeBefore}</span>
+      ) : null}
+      <span className="font-semibold text-faint">{t.sections.audit.changeAfter}</span>
+
+      {changes.map((change) => (
+        <Fragment key={change.key}>
+          <dt className="text-faint">
+            <bdi>{change.label}</bdi>
+          </dt>
+          {showBefore ? (
+            <dd className="break-words text-faint">
+              <bdi>{change.before ?? t.sections.audit.changeAbsent}</bdi>
+            </dd>
+          ) : null}
+          <dd className="break-words text-text2">
+            <bdi>{change.after ?? t.sections.audit.changeAbsent}</bdi>
+          </dd>
+        </Fragment>
+      ))}
+    </dl>
+  );
+}
 
 export default async function AuditPage({
   searchParams,
@@ -180,11 +250,7 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
         ) : null}
 
         {/* Verbatim payload — see the module note on why it is not summarised. */}
-        {row.before !== null || row.after !== null ? (
-          <pre className="mt-1 overflow-x-auto rounded border border-line bg-field p-1.5 text-[10px] text-faint">
-            {JSON.stringify({ before: row.before, after: row.after })}
-          </pre>
-        ) : null}
+        <Changes before={row.before} after={row.after} />
       </div>
     ),
   },

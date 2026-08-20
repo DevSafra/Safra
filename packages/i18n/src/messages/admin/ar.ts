@@ -191,6 +191,12 @@ export const ar = {
     recentActivity: 'سجل التدقيق — آخر العمليات',
     noData: '—',
     today: 'اليوم',
+    /*
+      A boolean in a payload. `String(value)` printed `true`/`false` under «قبل» and «بعد» on سجل
+      التدقيق — English, and the kind a reader has to translate in their head (Bashar, 2026-08-20).
+    */
+    yes: 'نعم',
+    no: 'لا',
   },
 
   partners: {
@@ -718,6 +724,19 @@ export const ar = {
       colAction: 'العملية',
       colEntity: 'الكيان',
       colIp: 'IP',
+      /*
+        The `before`/`after` payload, shown as WHAT CHANGED rather than as JSON.
+
+        It used to be `JSON.stringify({ before, after })` on one line inside a narrow scrolling
+        box, so the reader met `e":{"status":"contacted"},"after":…` — a machine format, cut off
+        mid-key, in the column that is supposed to answer "what exactly changed" (Bashar,
+        2026-08-20).
+      */
+      changeField: 'الحقل',
+      changeBefore: 'قبل',
+      changeAfter: 'بعد',
+      /** No value on that side — a field that was added, or one that was cleared. */
+      changeAbsent: '—',
     },
 
     disputes: {
@@ -1579,6 +1598,77 @@ export const ar = {
       creditedAmount: 'المبلغ المضاف',
       creditedCurrency: 'عملة الإضافة',
       walletBalance: 'رصيد المحفظة',
+
+      /*
+        ── The audit log's own vocabulary (Bashar, 2026-08-20) ──────────────────────────────────
+        سجل التدقيق draws its before/after payload through this map, and everything below was
+        printing in English under «الحقل» because only the timeline's eighteen keys were here.
+        Taken from the DISTINCT keys the platform has actually written, not from a reading of the
+        code — five call sites build a payload from a spread, so the source under-reports what
+        reaches the column. `audit-catalogue.integration.test.ts` holds it to the database.
+      */
+      status: 'الحالة',
+      value: 'القيمة',
+      key: 'المفتاح',
+      note: 'ملاحظة',
+      role: 'الدور',
+      kind: 'النوع',
+      source: 'المصدر',
+      format: 'الصيغة',
+      direction: 'الاتجاه',
+      order: 'الترتيب',
+      rating: 'التقييم',
+      slug: 'المعرّف',
+      email: 'البريد الإلكتروني',
+      recipientEmail: 'بريد المستلم',
+      fullName: 'الاسم الكامل',
+      legalName: 'الاسم القانوني',
+      address: 'العنوان',
+      partner: 'الشريك',
+      partnerType: 'نوع النشاط',
+      partnerReference: 'مرجع الشريك',
+      bookingReference: 'مرجع الحجز',
+      paidReference: 'مرجع الدفعة',
+      unitLabel: 'الوحدة',
+      nights: 'عدد الليالي',
+      basePrice: 'السعر الأساسي',
+      price: 'السعر',
+      net: 'الصافي',
+      balance: 'الرصيد',
+      rate: 'سعر الصرف',
+      currencyCode: 'رمز العملة',
+      quoteCurrency: 'عملة التسعير',
+      requestedAmount: 'المبلغ المطلوب',
+      requestedCurrency: 'عملة الطلب',
+      appliedAmount: 'المبلغ المطبَّق',
+      remainingAmount: 'المبلغ المتبقي',
+      remainingCodes: 'الرموز المتبقية',
+      recoveryCodesIssued: 'رموز الاسترداد الصادرة',
+      sessionsRevoked: 'الجلسات المُلغاة',
+      claimedBookings: 'الحجوزات المنقولة',
+      matchedCount: 'عدد التطابقات',
+      rowCount: 'عدد الصفوف',
+      daysAffected: 'الأيام المتأثرة',
+      confirmationWindowMinutes: 'مهلة التأكيد (دقائق)',
+      scheduledFor: 'موعد التنفيذ',
+      effectiveFrom: 'ساري من',
+      from: 'من',
+      to: 'إلى',
+      filters: 'عوامل التصفية',
+      scoped: 'مقيَّد بنطاق',
+      truncated: 'مقتطَع',
+      attributes: 'الخصائص',
+      documentId: 'معرّف المستند',
+      imageId: 'معرّف الصورة',
+      fileKey: 'مسار الملف',
+      uploadedAs: 'اسم الملف المرفوع',
+      contentType: 'نوع الملف',
+      bytes: 'الحجم (بايت)',
+      width: 'العرض',
+      height: 'الارتفاع',
+      wasCover: 'كانت صورة الغلاف',
+      wasEnrolled: 'كان مفعّلاً',
+      ledgerEntryGroup: 'مجموعة القيد المحاسبي',
     } as Record<string, string>,
 
     /**
@@ -1594,6 +1684,37 @@ export const ar = {
      */
     payloadValue: {
       'EC-001': 'أُغلقت صفحة الدفع قبل إتمامه، فانتهت مهلة الحجز وأُعيدت التواريخ',
+
+      /*
+        ── Statuses and codes as they appear in an audit payload (Bashar, 2026-08-20) ───────────
+        These are written out here rather than resolved through the status vocabularies above, and
+        the reason is that those DISAGREE with each other on purpose: `active` is «نشطة» for a gift
+        card and «نشط» for a coupon, `rejected` is «مرفوض» in three maps and «مغلق — مرفوض» in
+        disputes. A merged lookup would pick whichever map came first and print the wrong
+        agreement. The audit log is one column with one voice, so it gets one deliberate list.
+      */
+      pending_payment: 'بانتظار الدفع',
+      pending_confirmation: 'قيد التأكيد',
+      contacted: 'تم الاتصال',
+      accepted: 'مقبول',
+      rejected: 'مرفوض',
+      approved: 'معتمد',
+      active: 'نشط',
+      suspended: 'موقوف',
+      draft: 'مسودة',
+      closed: 'مغلق',
+      available: 'متاح',
+      used: 'مستخدم',
+      credit: 'دائن',
+      debit: 'مدين',
+      manual: 'يدوي',
+      central_bank: 'المصرف المركزي',
+      commercial_register: 'سجل تجاري',
+      identity: 'وثيقة هوية',
+      accommodation: 'إقامة',
+      finance_officer: 'مسؤول مالي',
+      support_agent: 'موظف دعم',
+      csv: 'CSV',
     } as Record<string, string>,
 
     /**

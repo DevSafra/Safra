@@ -41,16 +41,35 @@ export const SIDEBAR_ID = 'console-nav';
 /** Re-exported so components interpolate copy without also importing the package. */
 export { fill };
 
-/** The booking status in Arabic, falling back to the raw value rather than blank. */
+/**
+ * The booking status in Arabic, falling back to the raw value rather than blank.
+ *
+ * The fallback returns the key UNCHANGED — see `label()` for why spacing the underscores out was
+ * the thing that hid forty-three missing translations.
+ */
 export function bookingStatus(status: string): string {
-  return t.bookingStatus[status] ?? status.replace(/_/g, ' ');
+  return t.bookingStatus[status] ?? status;
 }
 
 /**
  * Looks a value up in one of the enum maps.
  *
- * Falls back to the raw key with underscores spaced out, which is deliberately ugly: an
- * untranslated status should look like a missing translation, not like a design choice.
+ * ## The fallback returns the key VERBATIM, and that is the whole point
+ *
+ * It used to return `value.replace(/_/g, ' ')`, on the reasoning quoted here: "deliberately ugly —
+ * an untranslated status should look like a missing translation, not like a design choice". The
+ * reasoning was right and the implementation did the opposite. Spacing the underscores out of
+ * `booking.export_requested` produces "booking.export requested"; `auditAction` also stripped the
+ * dot, producing "auth password changed" — which does not look like a missing translation at all.
+ * It looks like a label somebody chose.
+ *
+ * The cost was measured on 2026-08-20: **forty-three** of the seventy-three audit actions the code
+ * emits had no Arabic label, and all three notification templates the platform actually sends had
+ * none either. None of it was caught, because `navigation.spec.ts` sweeps every console section for
+ * snake_case — and this function had already removed the underscore it greps for.
+ *
+ * So a miss now surfaces as the identifier itself. It is uglier on screen, which is the intent, and
+ * it puts the existing sweep back in charge of catching the next one.
  */
 export function label(
   map: Record<string, string>,
@@ -58,7 +77,7 @@ export function label(
 ): string {
   if (!value) return t.admin.noData;
 
-  return map[value] ?? value.replace(/_/g, ' ');
+  return map[value] ?? value;
 }
 
 /** A city's `categories` array arrives pre-joined; translate each part. */
@@ -72,10 +91,9 @@ export function cityCategories(joined: string): string {
 /**
  * A cancellation reason, which is EITHER a `system.*` code or a person's own sentence.
  *
- * Deliberately not `label()`: that falls back to `value.replace(/_/g, ' ')`, which is right for an
- * enum key and wrong for prose — it would quietly rewrite a reason somebody typed. So an unknown
- * value is returned exactly as stored, which covers both a human's words and the English
- * sentences written into rows before the codes existed.
+ * Its own function rather than `label()` because `label` answers «—» for an absent value, which is
+ * right in a table cell and wrong for prose. An unknown value is returned exactly as stored, which
+ * covers both a human's words and the English sentences written into rows before the codes existed.
  */
 export function cancellationReason(reason: string): string {
   return t.enums.cancellationReason[reason] ?? reason;
@@ -118,14 +136,90 @@ function payloadValue(value: unknown): string {
   // Only a string can be a code, so only a string is looked up.
   if (typeof value === 'string') return t.enums.payloadValue[value] ?? value;
 
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  /*
+    A boolean is a WORD, not a literal. `String(value)` printed `true`/`false` — English, on an
+    Arabic screen, in a column that exists to be read (Bashar, 2026-08-20).
+  */
+  if (typeof value === 'boolean') return value ? t.admin.yes : t.admin.no;
+
+  if (typeof value === 'number') return String(value);
 
   return JSON.stringify(value) ?? t.admin.noData;
 }
 
+/** One field that differs between two payloads, already resolved into the reader's language. */
+export interface PayloadChange {
+  readonly key: string;
+  readonly label: string;
+  readonly before: string | undefined;
+  readonly after: string | undefined;
+}
+
+/**
+ * What CHANGED between two payloads, named and worded in Arabic.
+ *
+ * ## Why the diff lives here rather than in the page
+ *
+ * Because the labelling does. سجل التدقيق rendered its own grid and looked up nothing, so every
+ * field name and every status value printed in English under «الحقل», «قبل» and «بعد» — `status`,
+ * `basePrice`, `pending_confirmation` — on a console that is Arabic-only (Bashar, 2026-08-20).
+ * Putting the resolution next to `payloadEntries` is what stops the two renderings of the same
+ * jsonb drifting into two vocabularies.
+ *
+ * Keys are unioned with `after`'s order first: an update's payload is written in the order its
+ * author thought about the fields, and that is the order a reader follows.
+ *
+ * A field whose two sides are EQUAL is dropped. That is not tidying — the console was showing
+ * `{"before":{"status":"contacted"},"after":{"status":"contacted"}}`, an entry whose whole content
+ * was that nothing had changed. Compared before resolution, on the stored values, so two different
+ * codes that happen to share a translation still count as a change.
+ *
+ * `undefined` on a side means that side had no such field — rendered by the caller, because "no
+ * value" and "the value «—»" are the same glyph and only the caller knows whether a column of them
+ * is worth drawing at all.
+ */
+export function payloadChanges(
+  before: unknown,
+  after: unknown,
+): readonly PayloadChange[] {
+  const from = plainObject(before);
+  const to = plainObject(after);
+
+  if (!from && !to) return [];
+
+  const changes: PayloadChange[] = [];
+  const seen = new Set<string>();
+
+  for (const key of [...Object.keys(to ?? {}), ...Object.keys(from ?? {})]) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const left = from?.[key];
+    const right = to?.[key];
+
+    if (JSON.stringify(left) === JSON.stringify(right)) continue;
+
+    changes.push({
+      key,
+      label: t.enums.payloadKey[key] ?? key,
+      before: from && key in from ? payloadValue(left) : undefined,
+      after: to && key in to ? payloadValue(right) : undefined,
+    });
+  }
+
+  return changes;
+}
+
+/** A jsonb payload as it actually arrives: an object of scalars, or nothing usable. */
+function plainObject(value: unknown): Record<string, unknown> | null {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
 /** The Arabic name for an audit action, falling back to the raw key rather than blank. */
 export function auditAction(action: string): string {
-  return t.auditAction[action] ?? action.replace(/[._]/g, ' ');
+  return t.auditAction[action] ?? action;
 }
 
 /**
@@ -137,14 +231,14 @@ export function auditAction(action: string): string {
  * the same contract `auditAction` has.
  */
 export function auditSubject(subjectType: string): string {
-  return t.auditSubject[subjectType] ?? subjectType.replace(/_/g, ' ');
+  return t.auditSubject[subjectType] ?? subjectType;
 }
 
 /** The Arabic name for a role, falling back to the raw value rather than blank. */
 export function roleName(role: string | undefined): string {
   if (!role) return '';
 
-  return t.roles[role] ?? role.replace(/_/g, ' ');
+  return t.roles[role] ?? role;
 }
 
 /**
