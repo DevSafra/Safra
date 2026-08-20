@@ -11,7 +11,24 @@ import { WalletService } from '../wallet/wallet.service.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
-const SLA_LOCK_KEY = 8_421_002;
+/**
+ * Its OWN advisory-lock key — it shared `payout-accrual`'s until 2026-08-20.
+ *
+ * Every service here carries a comment saying "distinct advisory-lock key per job", and two of
+ * them said `8_421_002`. `pg_try_advisory_lock` returns immediately rather than queueing, so the
+ * consequence was not a stall: whichever job asked second SIMPLY SKIPPED, recorded as `skipped`,
+ * which is the value alerting is told to ignore because it means "another replica did it".
+ *
+ * That made the failure invisible by construction. This sweep runs every MINUTE and the accrual
+ * hourly, so across replicas the accrual could be skipped at the top of an hour and nothing would
+ * say so until signal 1 fired two hours later — if the next hour's attempt did not simply succeed
+ * and reset the clock.
+ *
+ * One process could never show it: the `scheduled` queue runs at concurrency 1, so the two never
+ * overlap in a single worker. It needs the production topology, which is exactly where nobody is
+ * watching a debug log.
+ */
+const SLA_LOCK_KEY = 8_421_006;
 
 /**
  * The two deadlines that expire bookings, swept once a minute.
