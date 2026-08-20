@@ -124,6 +124,27 @@ export const ar = {
     closeFailed: 'تعذّر إغلاق الطلب. يرجى المحاولة مرة أخرى.',
   },
 
+  /**
+   * The 404. Next's English default rendered here until 2026-08-20 — see the console's own
+   * `notFound` for the report and why a wrong reference is ordinary rather than exceptional.
+   *
+   * A partner reaching this has usually followed a link to a listing that was archived, or a payout
+   * reference from an old email.
+   */
+  /** See the console's `errorPage` — same reasoning, same restraint about the detail. */
+  errorPage: {
+    title: 'حدث خطأ غير متوقع',
+    body: 'تعذّر إتمام هذا الطلب. قد تكون المشكلة مؤقتة — أعد المحاولة، وإن تكررت تواصل مع الدعم بالرقم أدناه.',
+    retry: 'إعادة المحاولة',
+    home: 'العودة إلى لوحة التحكم',
+  },
+
+  notFound: {
+    title: 'هذه الصفحة غير موجودة',
+    body: 'قد يكون الرابط قديماً، أو أن العقار أو المستند لم يعد متاحاً. ابدأ من لوحة التحكم.',
+    home: 'العودة إلى لوحة التحكم',
+  },
+
   nav: {
     heading: 'لوحة الشريك',
     dashboard: 'لوحة التحكم',

@@ -48,6 +48,39 @@ export const ar = {
     title: 'سفرة | مركز القيادة',
   },
 
+  /**
+   * The 404, which was Next's English default until 2026-08-20.
+   *
+   * Reported by Bashar: the page "is written on the left, while the current language is Arabic".
+   * Both halves of that were true — the copy was `404 / This page could not be found.`, and under
+   * the document's `dir="rtl"` the full stop rendered at the START of the sentence, which is what a
+   * mis-ordered line looks like.
+   *
+   * It is not only a typo'd URL that lands here. `/partners/PAR-999999` does too: a reference from
+   * a stale bookmark, a deleted record, or a reference somebody pasted one digit wrong. That is an
+   * ORDINARY thing for a staff member to do, and the answer to it should say what happened and
+   * offer a way back rather than look like the console has broken.
+   */
+  /**
+   * The error boundary's copy, added 2026-08-20 with `error.tsx`.
+   *
+   * Says what happened, offers the two things a person can do, and names NOTHING about the error
+   * itself — rule 1 keeps the detail in the server log. The digest the page prints is Next's own
+   * correlation id, which is what makes a report findable without carrying any of its content.
+   */
+  errorPage: {
+    title: 'حدث خطأ غير متوقع',
+    body: 'تعذّر إتمام هذا الطلب. قد تكون المشكلة مؤقتة — أعد المحاولة، وإن تكررت أبلغ الفريق التقني بالرقم أدناه.',
+    retry: 'إعادة المحاولة',
+    home: 'العودة إلى لوحة الإدارة',
+  },
+
+  notFound: {
+    title: 'هذه الصفحة غير موجودة',
+    body: 'قد يكون الرابط قديماً، أو أن السجل حُذف، أو أن المرجع مكتوب بشكل خاطئ. تحقّق من الرابط أو ابدأ من لوحة الإدارة.',
+    home: 'العودة إلى لوحة الإدارة',
+  },
+
   login: {
     title: 'مركز القيادة',
     subtitle: 'الدخول مخصص لموظفي سفرة فقط.',
