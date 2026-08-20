@@ -16,7 +16,7 @@ import {
   type Tone,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { t, label } from '@/lib/strings';
+import { fill, label, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { returnQuery } from '@/lib/search-params';
 import { listParamsFor } from '@/lib/table-size';
@@ -47,13 +47,21 @@ export default async function PartnersPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { q, page, size } = await listParamsFor('partners', searchParams);
+  /*
+    The QUEUE's own place in its own list, read from its own parameters.
+
+    Two paged lists on one route, so the queue namespaces to `?queuePage=`/`?queueSize=` — sharing
+    `?page=` would make paging the registry move the queue underneath the reader. Same arrangement
+    as the scope map on /staff.
+  */
+  const queue = await listParamsFor('partnersPending', searchParams);
 
   // Carried into every row link, so «رجوع» on the detail screen comes back here.
   const back = returnQuery({ page, size, q });
 
   const [registry, pending, counts] = await Promise.all([
     getPartnerRegistry({ q, page, limit: size }),
-    getPendingPartners(),
+    getPendingPartners({ page: queue.page, limit: queue.size }),
     sidebarCounts(),
   ]);
 
@@ -149,6 +157,31 @@ export default async function PartnersPage({
               ))
             }
           </QueueState>
+
+          {pending === 'failed' || pending === 'unauthenticated' ? null : (
+            <TablePagination
+              basePath="/partners"
+              section="partnersPending"
+              query={{ q }}
+              page={pending.page}
+              pages={pending.pages}
+              total={pending.total}
+              capped={pending.capped}
+              size={queue.size}
+              /*
+                NAMED, because الشركاء now carries two paged lists.
+
+                Two navigation landmarks with the same accessible name is the defect
+                `paginationLabelOf` exists for — a screen-reader user listing the page's regions
+                hears «تنقّل بين الصفحات» twice and cannot tell which table either one moves. The
+                registry's bar keeps the plain name; the second one names itself, exactly as the
+                scope map on /staff does.
+              */
+              label={fill(t.table.paginationLabelOf, {
+                section: t.sections.partners.pendingTitle,
+              })}
+            />
+          )}
 
           <FootNote>{t.admin.pendingPartnersNote}</FootNote>
         </ConsolePanel>

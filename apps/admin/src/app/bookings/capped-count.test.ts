@@ -57,9 +57,22 @@ describe('the الحجوزات toolbar note', () => {
     }
   });
 
-  /** Arabic-Indic digits either way — the console never shows Latin numerals in a sentence. */
-  it('renders the figure in the reader’s digits', () => {
-    expect(note({ confirmed: COUNT_CAP + 1 }, true)).toContain(count(COUNT_CAP + 1));
-    expect(note({ confirmed: COUNT_CAP + 1 }, true)).not.toContain('10001');
+  /**
+   * GROUPED western digits, which is the console's documented locale decision.
+   *
+   * "Arabic copy, western digits" was settled on 2026-08-06 and lives in `ARABIC_WESTERN_DIGITS`,
+   * shared with لوحة الشريك — every figure on this console reconciles against a ledger, a bank
+   * statement or a provider, and none of those render Arabic-Indic digits. So this asserts the
+   * grouping `count()` applies, not a change of script: an ungrouped `10001` on screen is the
+   * regression, because it means the figure bypassed the formatter.
+   */
+  it('renders the figure through the console’s number formatter', () => {
+    const rendered = note({ confirmed: COUNT_CAP + 1 }, true);
+
+    expect(rendered).toContain(count(COUNT_CAP + 1));
+    expect(count(COUNT_CAP + 1), 'grouped, western').toBe('10,001');
+    expect(rendered, 'an ungrouped figure means the formatter was skipped').not.toMatch(
+      /(^|\D)10001(\D|$)/,
+    );
   });
 });

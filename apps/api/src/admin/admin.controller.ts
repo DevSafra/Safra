@@ -1,8 +1,18 @@
-import { BadRequestException, Body, Controller, Get, Param, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
 import {
+  pageQuerySchema,
   PERMISSIONS as P,
+  type PageQuery,
   type PartnerTwoFactorResetInput,
   type PartnerVerifyInput,
   type PropertyReviewInput,
@@ -60,17 +70,26 @@ export class AdminController {
     return this.dashboard.overview(user);
   }
 
+  /**
+   * PAGED since 2026-08-20 — see `pendingPartners` below for what the unpaged version cost.
+   */
   @Get('properties/pending')
   @RequirePermissions(P.PROPERTY_APPROVE)
-  async pendingProperties() {
-    return this.review.pendingProperties();
+  async pendingProperties(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Query(new ZodValidationPipe(pageQuerySchema)) query: PageQuery,
+  ) {
+    return this.review.pendingProperties(query, user);
   }
 
   /** One listing's full submission (§8.1). `PROPERTY_READ`, held by support too. */
   @Get('properties/:reference')
   @RequirePermissions(P.PROPERTY_READ)
-  async propertyDetail(@Param('reference') reference: string) {
-    return this.review.propertyDetail(reference);
+  async propertyDetail(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.review.propertyDetail(reference, user);
   }
 
   @Post('properties/:reference/review')
@@ -83,10 +102,20 @@ export class AdminController {
     return this.review.reviewProperty(user, reference, body);
   }
 
+  /**
+   * The P-002 verification queue, PAGED since 2026-08-20.
+   *
+   * It took no parameters and the service defaulted to fifty rows, so with 527 partners awaiting
+   * verification the console could reach fifty of them and said nothing about the rest. The sidebar
+   * badge counted the real figure beside a list that could not show it.
+   */
   @Get('partners/pending')
   @RequirePermissions(P.PARTNER_APPROVE)
-  async pendingPartners() {
-    return this.review.pendingPartners();
+  async pendingPartners(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Query(new ZodValidationPipe(pageQuerySchema)) query: PageQuery,
+  ) {
+    return this.review.pendingPartners(query, user);
   }
 
   /**
@@ -99,8 +128,11 @@ export class AdminController {
    */
   @Get('partners/:reference')
   @RequirePermissions(P.PARTNER_READ)
-  async partnerDetail(@Param('reference') reference: string) {
-    return this.review.partnerDetail(reference);
+  async partnerDetail(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.review.partnerDetail(reference, user);
   }
 
   /**

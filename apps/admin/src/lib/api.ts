@@ -105,8 +105,27 @@ const pendingPartnerSchema = z.object({
 
 export type PendingPartner = z.infer<typeof pendingPartnerSchema>;
 
-export async function getPendingPartners() {
-  return staffFetch('/admin/partners/pending', z.array(pendingPartnerSchema));
+/**
+ * A page of the verification queue — what `getPendingPartners` answers since 2026-08-20.
+ *
+ * `offsetPage` is a hoisted function declaration further down this file, so calling it here is fine
+ * and keeps the schema and its type in one place.
+ */
+const pendingPartnerPageSchema = offsetPage(pendingPartnerSchema);
+
+export type PendingPartnerPage = z.infer<typeof pendingPartnerPageSchema>;
+
+/**
+ * The P-002 verification queue, PAGED since 2026-08-20.
+ *
+ * It returned a bare array and the API defaulted to fifty rows, so with 527 partners awaiting
+ * verification the console could reach fifty of them and nothing on the screen said so.
+ */
+export async function getPendingPartners(params: ListParams) {
+  return staffFetch(
+    `/admin/partners/pending${listQuery(params)}`,
+    pendingPartnerPageSchema,
+  );
 }
 
 // ─── Partner detail (§8.1) ────────────────────────────────────────────────────
@@ -216,8 +235,12 @@ export type PendingProperty = z.infer<typeof pendingPropertySchema>;
 /** Exported for the schema test, which asserts against a captured response. */
 export const pendingPropertyContract = pendingPropertySchema;
 
-export async function getPendingProperties() {
-  return staffFetch('/admin/properties/pending', z.array(pendingPropertySchema));
+/** The listing half of the same queue, paged for the same reason. */
+export async function getPendingProperties(params: ListParams) {
+  return staffFetch(
+    `/admin/properties/pending${listQuery(params)}`,
+    offsetPage(pendingPropertySchema),
+  );
 }
 
 // ─── Property detail (§8.1, P-002) ────────────────────────────────────────────

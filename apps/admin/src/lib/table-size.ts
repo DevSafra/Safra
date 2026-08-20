@@ -1,6 +1,7 @@
 import 'server-only';
 
 import {
+  TABLE_SECTION_PARAMS,
   DEFAULT_TABLE_PAGE_SIZE,
   storedPageSize,
   type TableSection,
@@ -62,9 +63,22 @@ export async function listParamsFor(
 ): Promise<{ q: string | undefined; page: number; size: number }> {
   const params = await searchParams;
 
+  /*
+    The section's OWN parameter names, not `page` and `size`.
+    
+    Three routes carry two tables — `/staff`, `/partners` and `/properties` — and the second on each
+    namespaces its parameters so paging one does not move the other. This function already took a
+    section and then ignored it for the parameter names, so a namespaced table had to read the query
+    string by hand: `/staff` did exactly that, and in doing so it used `pageSize()` instead of
+    `resolvePageSize()` and silently stopped honouring the reader's SAVED size for that table.
+    Reading the names from the same map the save endpoint redirects through means one answer to
+    "what is this table's page parameter".
+  */
+  const names = TABLE_SECTION_PARAMS[section];
+
   return {
     q: first(params, 'q'),
-    page: pageNumber(first(params, 'page')),
-    size: await resolvePageSize(section, first(params, 'size')),
+    page: pageNumber(first(params, names.page)),
+    size: await resolvePageSize(section, first(params, names.size)),
   };
 }

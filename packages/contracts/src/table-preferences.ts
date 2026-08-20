@@ -53,6 +53,19 @@ export const TABLE_SECTIONS = [
   'staffScope',
   /* «طلبات الشراكة» — the join-request queue, its own sidebar section (Bashar, 2026-08-19). */
   'partnerApplications',
+  /**
+   * The two P-002 VERIFICATION QUEUES, each a second paged list on its section's screen.
+   *
+   * They were not paged at all until 2026-08-20: the service took `limit = 50` and the screen
+   * rendered whatever came back. With 527 partners awaiting verification that meant 477 of them were
+   * unreachable through the console — and nothing said so, so the queue looked fifty deep. The
+   * sidebar badge counted the real figure beside a list that could not show it.
+   *
+   * Own keys for the same reason as `staffScope`: they share a route with a registry that already
+   * owns `?page=`, so their parameters are namespaced and their rows-per-page must not overwrite it.
+   */
+  'partnersPending',
+  'propertiesPending',
 ] as const;
 
 export type TableSection = (typeof TABLE_SECTIONS)[number];
@@ -84,23 +97,34 @@ export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   exports: '/bookings/exports',
   staffScope: '/staff',
   partnerApplications: '/applications',
+  partnersPending: '/partners',
+  propertiesPending: '/properties',
 };
 
 /**
  * The URL parameter names each section pages with.
  *
- * `/staff` carries two tables, so the second namespaces its parameters — sharing `?page=` would
- * move both at once. Derived from the section on the SERVER rather than sent with the request, so
- * a form cannot ask the redirect to write a parameter of its choosing.
+ * Three routes carry TWO tables — `/staff`, `/partners` and `/properties` — so the second one on
+ * each namespaces its parameters. Sharing `?page=` would move both at once, which is not a
+ * cosmetic problem: the reader would page the registry and watch the queue jump.
+ *
+ * Derived from the section on the SERVER rather than sent with the request, so a form cannot ask
+ * the redirect to write a parameter of its choosing.
  */
+const NAMESPACED: Readonly<
+  Partial<Record<TableSection, { page: string; size: string }>>
+> = {
+  staffScope: { page: 'scopePage', size: 'scopeSize' },
+  partnersPending: { page: 'queuePage', size: 'queueSize' },
+  propertiesPending: { page: 'queuePage', size: 'queueSize' },
+};
+
 export const TABLE_SECTION_PARAMS: Readonly<
   Record<TableSection, { page: string; size: string }>
 > = Object.fromEntries(
   TABLE_SECTIONS.map((section) => [
     section,
-    section === 'staffScope'
-      ? { page: 'scopePage', size: 'scopeSize' }
-      : { page: 'page', size: 'size' },
+    NAMESPACED[section] ?? { page: 'page', size: 'size' },
   ]),
 ) as Readonly<Record<TableSection, { page: string; size: string }>>;
 

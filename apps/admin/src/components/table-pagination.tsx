@@ -1,4 +1,4 @@
-import type { TableSection } from '@safra/contracts';
+import { TABLE_SECTION_PARAMS, type TableSection } from '@safra/contracts';
 
 import { count } from '@/lib/format';
 import { MAX_PAGE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from '@/lib/search-params';
@@ -45,8 +45,6 @@ export function TablePagination({
   total,
   capped,
   size,
-  pageParam = 'page',
-  sizeParam = 'size',
   label = t.table.paginationLabel,
 }: {
   readonly basePath: string;
@@ -68,16 +66,27 @@ export function TablePagination({
   /**
    * The URL parameter names, for a route with TWO paged tables.
    *
-   * `/staff` is that route: the accounts registry and the scope map are both paged lists on one
-   * screen. Sharing `?page=` would move them together, so the second one namespaces its
-   * parameters — and the first one keeps the plain names, because that is what a URL somebody
-   * types or shares should look like.
+   * Three routes are like that — `/staff`, `/partners` and `/properties` — each carrying a registry
+   * and a second paged list. Sharing `?page=` would move them together, so the second one
+   * namespaces its parameters and the first keeps the plain names, because that is what a URL
+   * somebody types or shares should look like.
    */
-  readonly pageParam?: string;
-  readonly sizeParam?: string;
   /** Overridden on a route with two bars, so the two landmarks are distinguishable. */
   readonly label?: string;
 }) {
+  /*
+    The parameter names come from the SECTION, not from a prop.
+    
+    They were `pageParam`/`sizeParam` props defaulting to `page`/`size`, and `scope-panel.tsx` was
+    the only caller that passed them. That made the namespacing a thing each call site had to
+    remember — and the first two callers to forget it were the verification queues added on
+    2026-08-20, whose bars would have paged the REGISTRY they sit beside rather than themselves.
+    
+    `TABLE_SECTION_PARAMS` is the same map the save endpoint derives its redirect from, so the bar,
+    the page that reads the query string, and the endpoint that writes the preference now all answer
+    "what is this table's page parameter" from one place.
+  */
+  const { page: pageParam, size: sizeParam } = TABLE_SECTION_PARAMS[section];
   const href = (target: number): string => {
     const params = new URLSearchParams();
 

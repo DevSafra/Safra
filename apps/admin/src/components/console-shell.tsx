@@ -133,8 +133,16 @@ export function QueueState<T>({
   state,
   children,
 }: {
-  state: T[] | 'unauthenticated' | 'failed';
-  children: (rows: T[]) => React.ReactNode;
+  /*
+    A bare array OR a page of them.
+
+    The dashboard's queue panels are short, fixed lists and stay arrays. The two P-002 queues on
+    `/partners` and `/properties` became PAGED on 2026-08-20, so they arrive as `{items, total, …}`.
+    Unwrapping here rather than at each call site keeps the empty and failed states in one place —
+    they are the same three sentences whatever shape the rows came in.
+  */
+  state: T[] | { readonly items: readonly T[] } | 'unauthenticated' | 'failed';
+  children: (rows: readonly T[]) => React.ReactNode;
 }) {
   if (state === 'failed') {
     return <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>;
@@ -144,9 +152,11 @@ export function QueueState<T>({
     return <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>;
   }
 
-  if (state.length === 0) {
+  const rows = Array.isArray(state) ? state : state.items;
+
+  if (rows.length === 0) {
     return <p className="text-[12.5px] text-faint">{t.dashboard.nothingWaiting}</p>;
   }
 
-  return <ul className="grid gap-2.5">{children(state)}</ul>;
+  return <ul className="grid gap-2.5">{children(rows)}</ul>;
 }

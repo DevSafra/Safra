@@ -17,7 +17,7 @@ import {
   type AdminColumn,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { t, label } from '@/lib/strings';
+import { fill, label, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { returnQuery } from '@/lib/search-params';
 import { listParamsFor } from '@/lib/table-size';
@@ -40,13 +40,15 @@ export default async function PropertiesPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { q, page, size } = await listParamsFor('properties', searchParams);
+  /* The review queue's own parameters — two paged lists on one route. See /partners. */
+  const queue = await listParamsFor('propertiesPending', searchParams);
 
   // Carried into every row link, so «رجوع» on the detail screen comes back here.
   const back = returnQuery({ page, size, q });
 
   const [registry, pending, counts] = await Promise.all([
     getPropertyRegistry({ q, page, limit: size }),
-    getPendingProperties(),
+    getPendingProperties({ page: queue.page, limit: queue.size }),
     sidebarCounts(),
   ]);
 
@@ -128,6 +130,23 @@ export default async function PropertiesPage({
               ))
             }
           </QueueState>
+
+          {pending === 'failed' || pending === 'unauthenticated' ? null : (
+            <TablePagination
+              basePath="/properties"
+              section="propertiesPending"
+              query={{ q }}
+              page={pending.page}
+              pages={pending.pages}
+              total={pending.total}
+              capped={pending.capped}
+              size={queue.size}
+              /* Named — two paged lists on this route too. See /partners. */
+              label={fill(t.table.paginationLabelOf, {
+                section: t.dashboard.propertiesPending,
+              })}
+            />
+          )}
         </ConsolePanel>
       </div>
     </ConsoleShell>
