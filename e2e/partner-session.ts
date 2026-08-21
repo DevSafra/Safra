@@ -10,7 +10,18 @@
 export const PARTNER_STATE = 'test-results/.partner-session.json';
 
 export const PARTNER_BASE = process.env['PARTNER_URL'] ?? 'http://localhost:3002';
-export const PARTNER_EMAIL = process.env['DEV_PARTNER_EMAIL'] ?? 'partner1@safra.test';
+
+/**
+ * The main fixture partner — five listings, forty-four bookings, what most of this suite drives.
+ *
+ * It was `partner1@safra.test` until 2026-08-21, when that address was freed to be the APPLICANT
+ * fixture: a customer who has never been a partner, so the joining journey can be walked from its
+ * first screen. The partner org itself was not deleted — it owns too much of the seeded data —
+ * it was handed to its own account, and this default followed it. `seed-testbed.ts` is where the
+ * pair is defined; these two must not drift.
+ */
+export const PARTNER_EMAIL =
+  process.env['DEV_PARTNER_EMAIL'] ?? 'partner1-legacy@safra.test';
 export const PARTNER_PASSWORD = process.env['TESTBED_PASSWORD'] ?? 'a-testbed-password-1';
 
 /**

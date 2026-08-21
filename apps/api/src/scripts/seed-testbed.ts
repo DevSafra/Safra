@@ -167,7 +167,18 @@ interface PartnerSpec {
 const PARTNERS: readonly PartnerSpec[] = [
   {
     id: '5afe0000-0000-4000-8000-000000000011',
-    email: 'partner1@safra.test',
+    /*
+      NOT `partner1@safra.test`, since 2026-08-21 (Bashar).
+
+      That address is now the applicant fixture — a CUSTOMER who has never been a partner, kept
+      free so the partner-joining journey can be walked by hand from its first screen. See
+      `APPLICANT` below.
+
+      This partner owns five listings and forty-four bookings and is what most of the partner
+      browser suite signs in as, so it could not simply be deleted to free the address. It was
+      handed to its own account instead: same password, same everything, different email.
+    */
+    email: 'partner1-legacy@safra.test',
     legalName: 'شركة قصر الشرق للفنادق',
     displayName: 'فندق قصر الشرق',
     citySlug: 'damascus',
@@ -331,6 +342,33 @@ const CUSTOMER = {
   email: 'customer@safra.test',
   fullName: 'ليلى الحمصي',
   phone: '+963955000001',
+} as const;
+
+/**
+ * An account that is a CUSTOMER and has never been a partner (Bashar, 2026-08-21).
+ *
+ * Every other fixture arrives already approved, which is the state the console screens need — and
+ * it means the one journey nobody could rehearse was the one a real partner actually takes: apply,
+ * be contacted, be invited, set a password, upload documents, be verified. Walking it needed an
+ * address that is not already on the far side of it, and creating one by hand each time is how a
+ * test ends up depending on whatever happened to be in the database.
+ *
+ * ## It gets a PROFILE and a WALLET, like any registration
+ *
+ * The first version of this fixture deliberately had neither, reasoning that applying does not
+ * require them — `partner_applications.submitted_by_user_id` is nullable and the form collects its
+ * own contact details. That reasoning was too narrow and it was wrong: the account is a CUSTOMER
+ * account, so the reader signs in on the customer site, and حسابي and محفظتي both refuse an
+ * account with no profile. Bashar hit it within minutes (2026-08-21).
+ *
+ * A fixture has to be the state it claims to be. `AuthService.register` writes a user, a profile
+ * and a zero wallet in one transaction, so a "customer" made of only the first of those three is
+ * a shape no registration can produce — the fixture was modelling something that cannot exist.
+ */
+const APPLICANT = {
+  email: 'partner1@safra.test',
+  phone: '+963933000001',
+  fullName: 'مالك إقامة',
 } as const;
 
 /** Which unit each booking lands on, and what state it ends in. */
@@ -964,6 +1002,67 @@ async function build(db: Seeder): Promise<void> {
     role: 'customer',
   });
 
+  /*
+    The applicant, created and then left entirely alone — no profile, no partner, no booking.
+    Its whole value is what it does NOT have. See `APPLICANT`.
+
+    Reset FIRST, and for the same reason the `request-*` fixtures are: somebody who walks the
+    journey turns this account into a partner, correctly, and a second walk would then be refused
+    with «هذا البريد شريك بالفعل» — an account cannot apply twice. Re-running `db:testbed` has to
+    hand the journey back, or it can only ever be rehearsed once per database.
+  */
+  const applicantUser = await db.execute<{ id: string }>(
+    sql`SELECT id FROM users WHERE lower(email) = ${APPLICANT.email} LIMIT 1`,
+  );
+
+  const applicantId = applicantUser.rows[0]?.id;
+
+  if (applicantId) {
+    await db.execute(sql`
+      DELETE FROM partner_application_contacts
+      WHERE application_id IN (
+        SELECT id FROM partner_applications WHERE lower(email) = ${APPLICANT.email})
+    `);
+    await db.execute(
+      sql`DELETE FROM partner_applications WHERE lower(email) = ${APPLICANT.email}`,
+    );
+
+    /* Soft-deleted, never dropped — P-003, and it is what frees `partners_user_unique`. */
+    await db.execute(sql`
+      UPDATE partners SET deleted_at = now()
+      WHERE deleted_at IS NULL AND user_id = ${applicantId}::uuid
+    `);
+  }
+
+  const applicant = await upsertUser(db, {
+    email: APPLICANT.email,
+    phone: APPLICANT.phone,
+    passwordHash,
+    role: 'customer',
+  });
+
+  /*
+    The profile and the wallet a registration would have left, and nothing else — no booking, no
+    review, no gift card. `ON CONFLICT DO NOTHING` because a re-run must not duplicate them and
+    must not disturb one a tester has since edited on «ملفي الشخصي».
+  */
+  await db.execute(sql`
+    INSERT INTO customer_profiles
+      (user_id, full_name, email, phone, preferred_locale, preferred_currency_id, gender, is_guest)
+    SELECT ${applicant.id}::uuid, ${APPLICANT.fullName}, ${APPLICANT.email},
+           ${APPLICANT.phone}, 'ar', ${usd.id}::uuid, 'undisclosed', false
+    WHERE NOT EXISTS (
+      SELECT 1 FROM customer_profiles WHERE user_id = ${applicant.id}::uuid AND deleted_at IS NULL)
+  `);
+
+  await db.execute(sql`
+    INSERT INTO wallets (customer_profile_id, balance, currency_id)
+    SELECT cp.id, '0', ${usd.id}::uuid
+    FROM customer_profiles cp
+    WHERE cp.user_id = ${applicant.id}::uuid AND cp.deleted_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM wallets w WHERE w.customer_profile_id = cp.id)
+  `);
+
   const [profile] = await db
     .insert(schema.customerProfiles)
     .values({
@@ -1556,7 +1655,8 @@ async function reviews(db: Seeder): Promise<void> {
       -- visible to a customer ended up advertising 5.0 stars from eight stays. Fiction on a
       -- fixture is worse than sparse data: it is what a screenshot gets taken of.
       AND pr.status = 'published'
-      AND lower(u.email) IN ('partner1@safra.test', 'partner2@safra.test', 'partner3@safra.test')
+      AND lower(u.email) IN
+        ('partner1-legacy@safra.test', 'partner2@safra.test', 'partner3@safra.test')
       AND NOT EXISTS (SELECT 1 FROM reviews r WHERE r.booking_id = b.id)
     -- Spread across PROPERTIES rather than taking the newest eighteen bookings overall.
     --
@@ -1722,6 +1822,9 @@ async function report(db: Seeder): Promise<void> {
     );
   }
   console.log(`    ${CUSTOMER.email.padEnd(24)} ${CUSTOMER.fullName}`);
+  console.log(
+    `    ${APPLICANT.email.padEnd(24)} customer — never a partner, for the join journey`,
+  );
   console.log(`\n  Password for all of them: ${PASSWORD}`);
   console.log('  (override with TESTBED_PASSWORD)');
   /*
