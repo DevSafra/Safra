@@ -17,7 +17,8 @@ import { DATABASE } from '../database/database.module.js';
 import { imageIsPublished } from '../storage/image-visibility.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
-import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
+import { badRequest, conflict, forbidden, notFound } from '../common/errors/app-error.js';
+import { isVerifiedPartner } from '../rbac/verified-partner.guard.js';
 
 /**
  * A partner may edit a listing only while it is theirs AND still editable.
@@ -340,6 +341,30 @@ export class PropertiesService {
 
   async create(claims: AccessTokenClaims | undefined, input: PropertyCreateInput) {
     const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
+
+    /*
+      `initialUnits` is a PRICE, so it is behind verification — and this route is not.
+
+      Step 7 puts units, prices, dates and images behind verification, and every DEDICATED route
+      for them carries `@RequireVerifiedPartner()`. This one deliberately does not: writing a
+      listing's address and description before verification is what makes the wait useful, and
+      «حسابك قيد المراجعة» promises exactly that. Then `initialUnits` was added to the create form
+      — «عدد الوحدات» and «السعر لليلة» on the same screen — and it writes units carrying a
+      `basePrice`, on the one property route the guard cannot cover.
+
+      So an unverified partner could do through the add-property form precisely what
+      `POST properties/:reference/units` refuses them, and the portal told them they could not.
+      Found by Bashar on 2026-08-21, walking the joining journey on his own account: a partner with
+      no documents uploaded had a unit priced at $250 a night. Reproduced against a `pending`
+      fixture — three units, 201.
+
+      A guard is all-or-nothing and cannot refuse ONE FIELD of a permitted request, which is why
+      this is here and not a decorator. `isVerifiedPartner` is the guard's own definition, imported
+      rather than restated.
+    */
+    if (input.initialUnits && !(await isVerifiedPartner(this.db, partnerId))) {
+      throw forbidden(ERROR.PARTNER_NOT_VERIFIED);
+    }
 
     const [city, type, policy] = await Promise.all([
       this.db.query.cities.findFirst({

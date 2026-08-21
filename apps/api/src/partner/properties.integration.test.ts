@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
-import { PERMISSIONS as P, propertyCreateSchema } from '@safra/contracts';
+import { ERROR, PERMISSIONS as P, propertyCreateSchema } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { PropertiesService } from './properties.service.js';
@@ -150,6 +150,140 @@ describeIfDb('PropertiesService.readOwn', () => {
 
   afterAll(async () => {
     await harness.close();
+  });
+
+  /**
+   * Step 7: an UNVERIFIED partner may write a listing, and may not price it (Bashar, 2026-08-21).
+   *
+   * ## The hole this closes
+   *
+   * Every dedicated route for a unit, a price, a date or an image carries
+   * `@RequireVerifiedPartner()`. `POST /partner/properties` deliberately does not — writing an
+   * address and a description while waiting is what «حسابك قيد المراجعة» promises, and taking that
+   * away would make the wait pure dead time.
+   *
+   * Then `initialUnits` was added to that route, so the create form could ask for «عدد الوحدات»
+   * and «السعر لليلة» on the same screen. It writes units carrying a `basePrice`. A guard is
+   * route-level and cannot refuse one FIELD of a permitted request, so nothing stopped it: an
+   * unverified partner could do through the add-property form exactly what
+   * `POST properties/:reference/units` refuses them, while the portal told them they could not.
+   *
+   * Found on the live journey — a partner with no documents uploaded, verification `pending`, one
+   * unit at $250 a night — and reproduced here against a `pending` fixture.
+   *
+   * ## Why the permissive half is tested just as hard
+   *
+   * The obvious over-correction is to put the guard on the route, which would refuse the whole
+   * request and leave an unverified partner unable to do the ONE thing they were promised. Three
+   * of the five tests below exist to fail if somebody makes that change.
+   */
+  describe('units before verification', () => {
+    let codes = { citySlug: '', propertyTypeCode: '', cancellationPolicyCode: '' };
+    let pendingPartnerId = '';
+
+    beforeEach(async () => {
+      const row = await db.execute<{ city: string; type: string; policy: string }>(sql`
+        SELECT (SELECT slug FROM cities LIMIT 1)                AS city,
+               (SELECT code FROM property_types LIMIT 1)        AS type,
+               (SELECT code FROM cancellation_policies LIMIT 1) AS policy
+      `);
+
+      const found = row.rows[0];
+
+      codes = {
+        citySlug: found?.city ?? '',
+        propertyTypeCode: found?.type ?? '',
+        cancellationPolicyCode: found?.policy ?? '',
+      };
+
+      /* A partner exactly as the journey leaves one: created, waiting, nothing uploaded. */
+      const made = await db.execute<{ id: string }>(sql`
+        WITH u AS (
+          INSERT INTO users (email, phone, role, status, preferred_locale)
+          VALUES ('pending-' || gen_random_uuid() || '@safra.test', '+963900000000',
+                  'partner', 'active', 'ar')
+          RETURNING id
+        )
+        INSERT INTO partners (user_id, partner_type_id, legal_name, display_name, city_id,
+                              address, phone, email, verification)
+        SELECT u.id, (SELECT id FROM partner_types LIMIT 1), 'Pending', 'Pending',
+               (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1), 'x',
+               '+963900000000', 'pending@safra.test', 'pending'
+        FROM u
+        RETURNING id
+      `);
+
+      pendingPartnerId = made.rows[0]?.id ?? '';
+    });
+
+    const input = (initialUnits?: {
+      count: number;
+      basePrice: number;
+      maxGuests: number;
+    }) => ({
+      ...codes,
+      name: { ar: `عقار ${Math.random().toString(36).slice(2, 8)}` },
+      address: 'شارع الاختبار ٧',
+      attributes: [],
+      ...(initialUnits ? { initialUnits } : {}),
+    });
+
+    /** THE assertion. */
+    it('refuses initialUnits from a partner who is not verified', async () => {
+      await expect(
+        service.create(
+          partner(pendingPartnerId),
+          input({ count: 3, basePrice: 250, maxGuests: 4 }),
+        ),
+      ).rejects.toMatchObject({ response: { code: ERROR.PARTNER_NOT_VERIFIED } });
+    });
+
+    /** And writes nothing — a refusal that left the property behind would be half a listing. */
+    it('creates no property when it refuses the units', async () => {
+      const before = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM properties WHERE partner_id = ${pendingPartnerId}::uuid
+      `);
+
+      await service
+        .create(
+          partner(pendingPartnerId),
+          input({ count: 1, basePrice: 10, maxGuests: 2 }),
+        )
+        .catch(() => null);
+
+      const after = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM properties WHERE partner_id = ${pendingPartnerId}::uuid
+      `);
+
+      expect(after.rows[0]?.n).toBe(before.rows[0]?.n);
+    });
+
+    /* ── The permissive half. These fail if the guard is moved onto the route. ── */
+
+    it('still lets an unverified partner create the listing itself', async () => {
+      const { reference } = await service.create(partner(pendingPartnerId), input());
+
+      expect(reference).toMatch(/^PRO-/);
+    });
+
+    it('leaves that listing with no units at all', async () => {
+      const { reference } = await service.create(partner(pendingPartnerId), input());
+      const read = await service.readOwn(partner(pendingPartnerId), reference);
+
+      expect(read.units).toHaveLength(0);
+    });
+
+    it('accepts initialUnits from a partner who IS verified', async () => {
+      const { reference } = await service.create(
+        partner(),
+        input({ count: 2, basePrice: 120, maxGuests: 3 }),
+      );
+
+      const read = await service.readOwn(partner(), reference);
+
+      expect(read.units).toHaveLength(2);
+      expect(read.units[0]?.basePrice).toBe('120.00');
+    });
   });
 
   /**

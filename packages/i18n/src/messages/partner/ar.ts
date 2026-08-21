@@ -627,6 +627,16 @@ export const ar = {
     reviewNote: 'تراجعه سفرة خلال 48 ساعة (P-002) قبل ظهوره للزوار.',
     created: 'أُرسل العقار للمراجعة. يظهر أدناه كمسودة حتى تعتمده سفرة.',
     createFailed: 'تعذّر إنشاء العقار. راجع الحقول وحاول مرة أخرى.',
+
+    /*
+      Said where the fields would have been, not on a page the reader has to go and find.
+
+      Before verification the price, the unit count and the guest count are not shown at all —
+      they are what step 7 holds back — so without a sentence in their place the form simply
+      looks incomplete, and «حسابك قيد المراجعة» is on a different screen.
+    */
+    unitsAfterVerification:
+      'يمكنك إضافة الوحدات والأسعار بعد التحقق من حسابك. أنشئ العقار الآن بعنوانه ووصفه.',
     unreachable: 'تعذّر الوصول إلى الخادم.',
     /*
       The three image slots §7.2 draws are absent, and the note says why rather than showing

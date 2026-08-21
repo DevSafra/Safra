@@ -88,8 +88,20 @@ export const propertyCreateSchema = z
 
 export type PropertyCreateInput = z.infer<typeof propertyCreateSchema>;
 
-/** Every field optional — PATCH semantics. Still no `status`. */
-export const propertyUpdateSchema = propertyCreateSchema.partial().strict();
+/**
+ * Every field optional — PATCH semantics. Still no `status`, and no `initialUnits`.
+ *
+ * `initialUnits` is dropped rather than inherited from `.partial()`. `PropertiesService.update`
+ * never read it, so the contract advertised a field the code silently discarded — a partner who
+ * sent it got a 200 and no units. A schema that accepts what nothing honours is a promise the
+ * server does not keep, and the shape it invites is somebody later "fixing" the omission by
+ * wiring it up on a route with no verification check, which is the hole this pairs with on
+ * `create`. Units are added through `POST properties/:reference/units`, which is guarded.
+ */
+export const propertyUpdateSchema = propertyCreateSchema
+  .omit({ initialUnits: true })
+  .partial()
+  .strict();
 export type PropertyUpdateInput = z.infer<typeof propertyUpdateSchema>;
 
 export const unitCreateSchema = z

@@ -61,7 +61,14 @@ export default async function PropertiesPage() {
           */}
           {reference === 'failed' ? null : (
             <div className="mb-3.5">
-              <AddProperty reference={reference} />
+              <AddProperty
+                reference={reference}
+                verified={
+                  profile !== 'failed' &&
+                  profile !== 'unauthenticated' &&
+                  profile.verification === 'approved'
+                }
+              />
             </div>
           )}
 

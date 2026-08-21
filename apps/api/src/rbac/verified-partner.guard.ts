@@ -18,6 +18,34 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 export const VERIFIED_PARTNER_KEY = 'requiresVerifiedPartner';
 
 /**
+ * Whether this partner may set a price, a date or an image.
+ *
+ * Exported so the ROUTE guard and the one place that has to decide per-FIELD share a definition.
+ * `POST /partner/properties` is allowed before verification — writing an address and a description
+ * is the whole point of the wait — but its `initialUnits` carries a base price, so that one field
+ * has to be refused on a route that is otherwise permitted. A guard is all-or-nothing and cannot
+ * express that; two copies of `verification === 'approved'` would drift.
+ *
+ * `approved` and nothing else. `in_review` is not "nearly verified" — it means a human is looking —
+ * and a partner who could publish prices while under review would make the review pointless.
+ */
+export async function isVerifiedPartner(
+  db: Database,
+  partnerId: string | undefined,
+): Promise<boolean> {
+  /* Deny by default: no partner id, no row, soft-deleted — all refused. */
+  if (!partnerId) return false;
+
+  const rows = await db.execute<{ verification: string }>(sql`
+    SELECT verification::text AS verification
+    FROM partners
+    WHERE id = ${partnerId}::uuid AND deleted_at IS NULL
+  `);
+
+  return rows.rows[0]?.verification === 'approved';
+}
+
+/**
  * Marks a route that only a VERIFIED partner may call (step 7, Bashar 2026-08-19).
  *
  * «بعد التحقق يمكن للشريك إضافة/تعديل الأسعار والتواريخ والصور» — so a price, an available date
@@ -68,22 +96,9 @@ export class VerifiedPartnerGuard implements CanActivate {
     if (!required) return true;
 
     const request = context.switchToHttp().getRequest<{ user?: AccessTokenClaims }>();
-    const partnerId = request.user?.partnerId;
 
-    if (!partnerId) throw forbidden(ERROR.PARTNER_NOT_VERIFIED);
-
-    const rows = await this.db.execute<{ verification: string }>(sql`
-      SELECT verification::text AS verification
-      FROM partners
-      WHERE id = ${partnerId}::uuid AND deleted_at IS NULL
-    `);
-
-    /*
-      `approved` and nothing else. `in_review` is not "nearly verified" — it means a human is
-      looking — and a partner who could publish prices while under review would make the review
-      pointless. Suspension is handled upstream by the session being revoked.
-    */
-    if (rows.rows[0]?.verification !== 'approved') {
+    /* Suspension is handled upstream by the session being revoked. */
+    if (!(await isVerifiedPartner(this.db, request.user?.partnerId))) {
       throw forbidden(ERROR.PARTNER_NOT_VERIFIED);
     }
 

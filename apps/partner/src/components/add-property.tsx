@@ -34,8 +34,24 @@ const MAX_ATTRIBUTES = 4;
  */
 export function AddProperty({
   reference,
+  verified,
 }: {
   readonly reference: PropertyFormReference;
+  /**
+   * Whether SAFRA has verified this partner.
+   *
+   * Step 7 holds units, prices, dates and images until verification, and «حسابك قيد المراجعة»
+   * says so — but this form asked for a price and a unit count regardless, and the API accepted
+   * them: `initialUnits` rides along on `POST /partner/properties`, the one property route that
+   * is deliberately NOT behind `@RequireVerifiedPartner()` because writing an address and a
+   * description before verification is the point of the wait. So the portal promised a
+   * restriction it then let the reader walk straight through (Bashar, 2026-08-21).
+   *
+   * The API refuses it now. This prop is the other half: a form that submits fields the server
+   * will reject is a form that fails after being filled in, which is worse than one that does not
+   * ask. Below, the three fields are not rendered and `initialUnits` is not sent.
+   */
+  readonly verified: boolean;
 }) {
   const router = useRouter();
 
@@ -84,11 +100,16 @@ export function AddProperty({
           /* Omitted entirely when blank, so the API stores null rather than an empty label. */
           ...(text('roomNumber') ? { roomNumber: text('roomNumber') } : {}),
           attributes: picked,
-          initialUnits: {
-            count: number('unitCount'),
-            basePrice: number('basePrice'),
-            maxGuests: number('maxGuests'),
-          },
+          /* Omitted entirely before verification — the API refuses the field, not the request. */
+          ...(verified
+            ? {
+                initialUnits: {
+                  count: number('unitCount'),
+                  basePrice: number('basePrice'),
+                  maxGuests: number('maxGuests'),
+                },
+              }
+            : {}),
         }),
       });
 
@@ -169,31 +190,44 @@ export function AddProperty({
               label: city.nameAr,
             }))}
           />
-          <Field
-            name="basePrice"
-            label={t.properties.fPrice}
-            type="number"
-            min={0}
-            required
-          />
-          <Field
-            name="unitCount"
-            label={t.properties.fUnits}
-            type="number"
-            min={1}
-            max={50}
-            defaultValue="1"
-            required
-          />
-          <Field
-            name="maxGuests"
-            label={t.properties.fGuests}
-            type="number"
-            min={1}
-            max={50}
-            defaultValue="2"
-            required
-          />
+          {verified ? (
+            <>
+              <Field
+                name="basePrice"
+                label={t.properties.fPrice}
+                type="number"
+                min={0}
+                required
+              />
+              <Field
+                name="unitCount"
+                label={t.properties.fUnits}
+                type="number"
+                min={1}
+                max={50}
+                defaultValue="1"
+                required
+              />
+              <Field
+                name="maxGuests"
+                label={t.properties.fGuests}
+                type="number"
+                min={1}
+                max={50}
+                defaultValue="2"
+                required
+              />
+            </>
+          ) : (
+            /*
+              `sm:col-span-2` so the sentence spans the grid rather than sitting in one column
+              where the price field used to be — it explains an absence, and half a row reads as
+              a field that failed to render.
+            */
+            <p className="rounded-lg border border-line bg-field p-3 text-xs text-muted sm:col-span-2">
+              {t.properties.unitsAfterVerification}
+            </p>
+          )}
           <Select
             name="cancellationPolicyCode"
             label={t.properties.fPolicy}
