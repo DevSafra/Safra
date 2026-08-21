@@ -2491,7 +2491,8 @@ address, that `Retry-After` is spread, and that the excluded conditions stay 500
 
 ### O-api-2 — Seven refusals still answer an English sentence with no code
 
-**Status:** open · **Severity:** Low–Medium · **Owner:** engineering · **Recorded:** 2026-08-20
+**Status:** open · **Severity:** Low–Medium · **Owner:** engineering · **Recorded:** 2026-08-20 ·
+**Amended:** 2026-08-20 (still seven, different seven)
 
 Found while scoping `O-api-1`'s filter and deliberately NOT fixed there — the filter's mandate was
 the errors that were not `HttpException`s, and quietly re-shaping these would have changed response
@@ -2507,13 +2508,122 @@ constructor.
 | `wallet.service.ts:203`        | **A customer** — an insufficient-balance 409     |
 | `rbac/two-factor.guard.ts:88`  | **Staff and partners** — the enrolment 403       |
 | `settings-admin.service.ts` ×2 | Staff — the settings editor's two refusals       |
-| `admin.controller.ts:207`      | Staff — the sanctions import                     |
 | `staff.service.ts:450`         | Staff — "this is the last active super admin"    |
 | `metrics.controller.ts` ×2     | A scraper. Harmless, and listed for completeness |
+| `sanctions.service.ts:94`      | Staff — the screening 503, both reasons          |
+
+**Amended 2026-08-20.** One closed and one added, so the count is unchanged and the list is not.
+
+- **Closed:** `admin.controller.ts:207`, the sanctions import. Its body validation moved to
+  `sanctionsImportSchema` while the `local_fixture` source was being added, so the two refusals it
+  can now give are `validation.sanctions_body_too_small` and `validation.sanctions_source`, both
+  with ar/en/de entries. Done there rather than deferred because the endpoint's validation was
+  being rewritten anyway — leaving a hand-written English string in code that was being replaced
+  would have been a decision to keep it.
+- **Added:** `SanctionsListUnavailableError` in `sanctions.service.ts:94`, which answers a 503 with
+  "No sanctions list has been imported…" or "…older than the 7-day limit". Found while verifying
+  that a fixture is refused. It was missing from the original seven. **Severity: Low** — the
+  console's `ScreeningPanel` renders the list's own state from `GET /admin/sanctions/status` and
+  never offers the button when the list is unusable, so a reviewer does not normally see this
+  body; it reaches a direct API caller.
 
 **The work:** one error code each, three translations each, and for the wallet one the balance and
 currency must travel in `params` rather than in the sentence — the same shape the arrival-date fix
-used on 2026-08-20. **To unblock:** nothing external.
+used on 2026-08-20. For the sanctions 503 the two reasons must stay ONE code — `missing` and
+`stale` are already deliberately distinguished to staff and not to anyone else. **To unblock:**
+nothing external.
+
+### O-e2e-1 — The verification gate has no browser spec, for want of a stable fixture
+
+**Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-21
+
+An unverified partner now sees only العقود والمستندات; every other route redirects there and the
+sidebar drops to two links (Bashar, 2026-08-21). It is held by `gate-coverage.test.ts`, which reads
+`app/` and fails on any page that neither gates nor is exempt with a stated reason — that catches
+the failure mode that matters, a NEW page forgetting the call.
+
+What it does not catch is the redirect itself breaking. That wants a browser spec, and a browser
+spec wants a partner fixture that is permanently `pending`: `db:testbed` seeds three partners and
+all three are `approved`, because every console screen needs them to be. The `APPLICANT` fixture
+is a customer and stops being useful the moment somebody walks the journey with it.
+
+**The work:** a fourth seeded partner, `partner-pending@safra.test`, verification `pending`, with
+no documents — then a spec asserting the redirect, the two-item sidebar, and the `data-stage`
+attribute on each of the four stages. Roughly an hour. **To unblock:** nothing external.
+
+**Verified by hand on 2026-08-21** against a `pending` fixture, all four stages: `/`,
+`/properties`, `/calendars`, `/payouts` and `/reviews` each redirected to `/contracts`; the
+sidebar read `["العقود والمستندات","الدعم"]`; the stage advanced `empty → waiting → done`; and on
+approval the sidebar returned to seven items and «انتقل إلى لوحة التحكم» led to `/`.
+
+### O-sec-12 — An unverified partner could price a listing through the create form
+
+**Status:** FIXED 2026-08-21 · **Severity:** Medium · **Owner:** engineering ·
+**Found by:** Bashar, walking the joining journey on his own account
+
+Step 7 puts units, prices, dates and images behind verification, and «حسابك قيد المراجعة» on
+العقود والمستندات says so in as many words. Every DEDICATED route enforced it —
+`POST properties/:reference/units`, `PATCH units/:unitId`, `PUT units/:unitId/calendar` and the
+whole images controller all carry `@RequireVerifiedPartner()` and all answer 403.
+
+`POST /partner/properties` deliberately does not, and correctly: writing a listing's address and
+description while waiting is what makes the wait useful, and it is exactly what the banner
+promises. Then `initialUnits` — «عدد الوحدات» and «السعر لليلة» — was added to that route so the
+add-property form could ask for everything on one screen. It writes units carrying a `basePrice`.
+**A guard is route-level and cannot refuse one FIELD of a permitted request**, so nothing stopped
+it: the add-property form did precisely what the dedicated units route refuses, while the portal
+told the reader they could not. Reproduced against a `pending` fixture — three units at $250, 201.
+
+**Not a privilege escalation and not a data leak.** A partner could only write to their own draft
+listing, which no customer can see: `status` is forced to `draft` on create and publication needs
+`PROPERTY_APPROVE`, which no partner role holds. What it defeated was the REVIEW — the point of
+holding prices back is that a human sees the partner before their money terms exist.
+
+**The fix, both halves.** `PropertiesService.create` refuses `initialUnits` unless
+`isVerifiedPartner` — a function now shared with the guard rather than a second copy of
+`verification === 'approved'`. And the portal stops asking: `AddProperty` takes `verified`, hides
+the three fields, omits the payload, and says «يمكنك إضافة الوحدات والأسعار بعد التحقق من حسابك».
+A form that submits fields the server will reject fails after being filled in, which is worse than
+one that does not ask.
+
+**Held by five tests** in `properties.integration.test.ts`, two of which fail without the fix
+(verified by reverting it). **Three of the five assert the PERMISSIVE half** — that an unverified
+partner can still create the listing, that it comes out with no units, and that a verified one is
+unaffected. The obvious over-correction is to put the guard on the route, which would refuse the
+whole request and take away the one thing the banner promises; those three fail if anybody does.
+
+**Also closed:** `propertyUpdateSchema` inherited `initialUnits` from `.partial()` and
+`PropertiesService.update` never read it — a contract advertising a field the code silently
+dropped, and an invitation for somebody to later "fix" the omission on a route with no
+verification check. Now `.omit({ initialUnits: true })`.
+
+### O-web-1 — A refused account page says «تعذّر التحميل» when it could say why
+
+**Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-21
+
+`apps/web/src/lib/account.ts` mapped BOTH 401 and 403 to `'unauthenticated'`, so an account with
+no `customer_profiles` row — which the API refuses precisely, with `customer.profile_missing` —
+reached محفظتي as «انتهت الجلسة، سجّل الدخول مجدداً». False, and a LOOP: signing in again yields
+the same token, the same 403 and the same sentence, so the only action the page offers is the one
+that cannot work. Reachable by any of the ~3,000 partner accounts, since the customer site's
+sign-in refuses staff but not partners. **Found by Bashar on 2026-08-21, on his own account.**
+
+**Fixed on 2026-08-21**: 403 now maps to `failed`, so the page says «تعذّر التحميل» — vague, but
+true, and it does not send anybody to sign in again. Held by `account-refusal.test.ts`, whose
+central assertion is the negative one.
+
+**What remains, and why it was not done at the same time.** «تعذّر التحميل» is not the useful
+sentence. The useful one names the cause — «هذا حساب شريك، ولوحة العميل ليست له» — and that needs
+a page state which SIXTEEN account pages do not have, plus its copy in three locales. Doing it
+under cover of a bug fix would have been a large untested change to every personal screen in the
+customer app. **To unblock:** nothing external; it is a decision about how much the customer app
+should say to somebody in the wrong place. **Order:** after the launch blockers.
+
+**Related, and already closed:** the fixture that exposed it. `seed-testbed.ts` created the
+applicant account as a `users` row with no profile and no wallet, on the reasoning that applying
+needs neither. True, and beside the point — it is a CUSTOMER account, and `AuthService.register`
+writes user + profile + zero wallet in one transaction, so a customer made of only the first was
+a shape no registration can produce. The fixture now writes all three.
 
 ### O-page-1 — What numbered pages cost, and when it stops being affordable
 
