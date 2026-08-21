@@ -158,7 +158,7 @@ the schema stays an implementation detail rather than being encoded in somebody 
 | `safra_job_last_success_age_seconds{job}`                                   | 1, 2   | **-1 means never completed** — reported rather than omitted, because an absent series is indistinguishable from a failed scrape                                                                                                                                                                                     |
 | `safra_job_failures_6h{job}`                                                | 3      | A `skipped` run is another replica doing nothing, and never counts as a success                                                                                                                                                                                                                                     |
 | `safra_notifications_1h{status}`                                            | 4, 5   | `sent`, `failed`, and `queued` — the last is its own failure: written, never sent, never retried                                                                                                                                                                                                                    |
-| `safra_sanctions_snapshot_age_seconds{source}`                              | 6      | `{source="none"} -1` while `M-2` is unresolved                                                                                                                                                                                                                                                                      |
+| `safra_sanctions_snapshot_age_seconds{source}`                              | 6      | `{source="eu_consolidated"}` is ALWAYS emitted, at **-1** while `M-2` is unresolved. A development fixture appears as its own `{source="local_fixture"}` series and never as the EU one — before 2026-08-20 the metric reported only the sources present, so one fixture silenced this alert                        |
 | `safra_payment_events_unprocessed` + `_oldest_unprocessed_seconds`          | 14     | Count and age of events AWAITING processing. Fifty events thirty seconds old is a busy minute; one stuck an hour is a paid booking that did not advance. **Excludes rejected events, which can never be processed** — counting them made this alert fire permanently after one malformed request (fixed 2026-08-13) |
 | `safra_payment_events_rejected_24h`                                         | 14b    | Webhooks refused on arrival. A rate, not a backlog: the number that matters is how many arrived, not how long they have sat                                                                                                                                                                                         |
 | `safra_bookings_sla_overdue`                                                | 15     | Counts the CONSEQUENCE, because a sweep that stops running produces no signal of its own                                                                                                                                                                                                                            |
@@ -223,9 +223,14 @@ groups:
         labels: { severity: ticket }
 
       # 6 — sanctions data stale, or never fetched.
+      #
+      # Labelled to the source the obligation names. The metric emits a series per source and a
+      # development fixture is one, so an unlabelled expression reports a fixture's age as though
+      # it were the list — which is the same "looks clean, means nothing" failure that makes
+      # screening refuse a fixture in the first place.
       - alert: SanctionsFeedStale
-        expr: safra_sanctions_snapshot_age_seconds > 172800
-          or safra_sanctions_snapshot_age_seconds == -1
+        expr: safra_sanctions_snapshot_age_seconds{source="eu_consolidated"} > 172800
+          or safra_sanctions_snapshot_age_seconds{source="eu_consolidated"} == -1
         for: 15m
         labels: { severity: page }
 

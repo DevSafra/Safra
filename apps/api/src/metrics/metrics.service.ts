@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
+import { EU_SOURCE } from '../sanctions/sanctions.service.js';
 import { MediaReachabilityService } from '../storage/media-reachability.service.js';
 import { QUEUE } from '../queue/queue.definitions.js';
 
@@ -235,7 +236,27 @@ export class MetricsService {
     ];
   }
 
-  /** Alert 6: the sanctions data we screen against is only as good as its age. */
+  /**
+   * Alert 6: the sanctions data we screen against is only as good as its age.
+   *
+   * ## `eu_consolidated` is ALWAYS a series, at -1 when it does not exist
+   *
+   * The metric used to report one series per source that happened to be present, and a single
+   * `{source="none"} -1` when the table was empty. That was correct while `eu_consolidated` was
+   * the only source a snapshot could have. It stopped being correct on 2026-08-20, when a
+   * development fixture became importable as `local_fixture`: with a fixture loaded and no EU
+   * list, the table is NOT empty, so the `none` series disappears — and the fixture reports an age
+   * of about zero. Alert 6 goes quiet, on a platform that cannot screen anybody.
+   *
+   * A fixture cannot exist in production, so this was never a production hole. It is worse than
+   * that in kind: a monitoring signal that reads healthy in the one environment where somebody is
+   * developing against it teaches the wrong thing about what the signal means.
+   *
+   * So the obliged source is reported unconditionally, and every other source is reported
+   * alongside it as information. `{source="none"}` is gone: it existed to answer "is the table
+   * empty", and the question the alert actually has is "do we hold a current EU list", which the
+   * EU series now answers on its own.
+   */
   private async sanctions(): Promise<Gauge[]> {
     const rows = await this.db.execute<{ source: string; age: string }>(sql`
       SELECT source, EXTRACT(EPOCH FROM (now() - max(fetched_at)))::text AS age
@@ -243,22 +264,25 @@ export class MetricsService {
       GROUP BY source
     `);
 
+    const samples = rows.rows.map((row) => ({
+      labels: { source: row.source },
+      value: Number(row.age),
+    }));
+
+    /*
+      -1 rather than an omitted series, for the reason the rest of this file gives: an absent
+      series is indistinguishable from a failed scrape, and "we have never fetched the list we are
+      legally obliged to screen against" must not look like a monitoring outage.
+    */
+    if (!samples.some((sample) => sample.labels.source === EU_SOURCE)) {
+      samples.unshift({ labels: { source: EU_SOURCE }, value: -1 });
+    }
+
     return [
       {
         name: 'safra_sanctions_snapshot_age_seconds',
-        help: 'Seconds since this sanctions source was last fetched.',
-        /*
-          An empty result means no feed has ever been fetched — the state the platform is in until
-          `M-2` is resolved. Reported as a single series at -1 rather than as nothing, so the alert
-          fires on "never" as loudly as on "stale".
-        */
-        samples:
-          rows.rows.length === 0
-            ? [{ labels: { source: 'none' }, value: -1 }]
-            : rows.rows.map((row) => ({
-                labels: { source: row.source },
-                value: Number(row.age),
-              })),
+        help: 'Seconds since this sanctions source was last fetched. -1 means never.',
+        samples,
       },
     ];
   }

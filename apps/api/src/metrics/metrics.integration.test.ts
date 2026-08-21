@@ -221,13 +221,56 @@ describeIfDb('MetricsService', () => {
   });
 
   describe('sanctions', () => {
+    const AGE = 'safra_sanctions_snapshot_age_seconds';
+
+    /*
+      Entries first, everywhere. The delete used to name only the snapshots and passed for a year
+      because no developer database happened to hold one — the moment somebody imported a list
+      locally, the foreign key refused and this failed with an error about `sanctions_entries` in a
+      test about a metric. A test whose result depends on what is already in the database is not a
+      test.
+    */
+    beforeEach(async () => {
+      await db.execute(sql`DELETE FROM sanctions_entries`);
+      await db.execute(sql`DELETE FROM sanctions_snapshots`);
+    });
+
+    const snapshot = (source: string) =>
+      db.execute(sql`
+        INSERT INTO sanctions_snapshots (source, content_hash, entry_count, completed_at)
+        VALUES (${source}, ${`hash-${source}`}, 1, now())
+      `);
+
     /* `M-2` is unresolved, so "never fetched" is the state the platform is actually in. */
     it('reports -1 when no feed has ever been fetched', async () => {
-      await db.execute(sql`DELETE FROM sanctions_snapshots`);
+      const metrics = await scrape();
+
+      expect(metrics[`${AGE}{source="eu_consolidated"}`]).toBe(-1);
+    });
+
+    it('reports the age once a list is held', async () => {
+      await snapshot('eu_consolidated');
 
       const metrics = await scrape();
 
-      expect(metrics['safra_sanctions_snapshot_age_seconds{source="none"}']).toBe(-1);
+      expect(metrics[`${AGE}{source="eu_consolidated"}`]).toBeGreaterThanOrEqual(0);
+    });
+
+    /**
+     * THE assertion, and the reason the EU series is unconditional.
+     *
+     * A development fixture is a row in the same table. While the metric reported whatever sources
+     * happened to be present, one fixture made the "nothing has ever been fetched" series vanish
+     * and reported an age of about zero in its place — so alert 6 fell silent on a platform that
+     * could not screen anybody. The alert must see -1 whatever else is in the table.
+     */
+    it('is not silenced by a development fixture', async () => {
+      await snapshot('local_fixture');
+
+      const metrics = await scrape();
+
+      expect(metrics[`${AGE}{source="eu_consolidated"}`]).toBe(-1);
+      expect(metrics[`${AGE}{source="local_fixture"}`]).toBeGreaterThanOrEqual(0);
     });
   });
 
