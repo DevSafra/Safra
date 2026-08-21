@@ -27,7 +27,14 @@ export const ar = {
     commercial_register: 'سجل تجاري',
     ownership_proof: 'إثبات ملكية',
     management_contract: 'عقد إدارة',
-    bank_confirmation: 'تأكيد بنكي',
+    /*
+      «تأكيد مصرفي», matching the console (Bashar, 2026-08-21).
+
+      The partner app said «تأكيد بنكي» and the reviewer's screen said «تأكيد مصرفي» — the same
+      document under two names, which is a problem the moment a partner and a reviewer discuss it
+      on الدعم. Neither is wrong; having both is.
+    */
+    bank_confirmation: 'تأكيد مصرفي',
   } as Record<string, string>,
 
   /** `partner_contract_kind` in the schema. */
@@ -76,14 +83,31 @@ export const ar = {
     documentsTitle: 'مستندات التحقق',
     documentsIntro: 'ارفع المستندات التي يحتاجها فريق سفرة للتحقق من نشاطك.',
     documentsEmpty: 'لم ترفع أي مستند بعد.',
-    documentKind: 'نوع المستند',
     documentStatus: 'الحالة',
     documentUploaded: 'تاريخ الرفع',
     documentNotes: 'ملاحظات المراجع',
-    upload: 'رفع مستند',
+    upload: 'إرسال المستندات',
     uploading: 'جارٍ الرفع…',
     file: 'الملف',
     uploadFailed: 'تعذّر رفع المستند. حاول مرة أخرى.',
+
+    /*
+      ── One field per document, all required (Bashar, 2026-08-21) ────────────────────────────
+      «نوع المستند» is gone. It was a SELECT beside a single file input, so the partner had to
+      know the list, pick from it, upload, and repeat — and nothing on the screen said how many
+      times. A field per kind makes the list the form: what is asked for, what has arrived, and
+      what is still missing are all one thing to read.
+    */
+    uploadAllIntro: 'كل المستندات التالية مطلوبة. اختر ملفًا لكل واحد ثم أرسلها معًا.',
+    uploadRemaining: 'ما زال مطلوبًا: {n}',
+    uploadAllSent: 'أرسلت كل المستندات المطلوبة.',
+    /** Beside a kind whose document has already arrived, so the row is not an empty demand. */
+    uploadDone: 'أُرسل',
+    uploadReplace: 'إرسال بديل',
+    /** A rejected document is the one case where a field reappears with something already in it. */
+    uploadAgain: 'أعد الإرسال',
+    /** Names the document that failed, because five uploads with one error message is a guess. */
+    uploadFailedOne: 'تعذّر رفع «{kind}». حاول مرة أخرى.',
     loadFailed: 'تعذّر تحميل الصفحة.',
 
     /** What the reader is waiting for, said where they are waiting. */
@@ -94,6 +118,80 @@ export const ar = {
     verifiedBody: 'يمكنك الآن ضبط الأسعار والتواريخ ورفع الصور.',
     rejectedTitle: 'لم يكتمل التحقق',
     rejectedBody: 'تواصل مع فريق سفرة من صفحة الدعم لمعرفة ما ينقص.',
+
+    /*
+      ── The onboarding screen (Bashar, 2026-08-21) ──────────────────────────────────────────
+      Until verification this page IS the portal, so it has to carry the whole story: what is
+      needed, what has arrived, what is being waited on, and what happens next. The three step
+      labels are a progress line, not decoration — a partner who cannot see where they are in a
+      process assumes it has stalled, and asks الدعم.
+    */
+    onboardingTitle: 'إكمال حسابك',
+    /*
+      The FORM's heading, distinct from «مستندات التحقق» over the list below it. Both said the
+      same words at first, which put one heading twice on one screen — a reader scanning for the
+      list finds the form, and neither heading tells them which is which.
+    */
+    uploadTitle: 'إرسال مستند',
+    onboardingLead:
+      'خطوة واحدة تفصلك عن استخدام لوحة الشريك: أرسل مستنداتك ووقّع العقد. تظهر بقية اللوحة بعد أن يعتمدها فريق سفرة.',
+
+    stepUpload: 'إرسال المستندات',
+    stepReview: 'مراجعة سفرة',
+    stepReady: 'لوحة الشريك',
+
+    /** Stage one: nothing has arrived yet. */
+    stageEmptyTitle: 'ابدأ بإرسال مستنداتك',
+    stageEmptyBody:
+      'أرسل المستندات الخمسة المطلوبة أدناه. تبدأ المراجعة بعد وصولها كلها، ويُراجَع كل مستند على حدة.',
+
+    /*
+      Stage between one and two, since all five documents became required (Bashar, 2026-08-21).
+
+      Without it a partner who had sent two of five was shown «وصلت مستنداتك · لا حاجة لأي إجراء
+      منك الآن» — false, and false in the direction that stops them. The panel is the "what to do
+      now" line on this page, so it has to distinguish a set that is complete from one that is not.
+    */
+    stagePartialTitle: 'بقيت مستندات',
+    stagePartialBody:
+      'أرسل ما تبقّى من المستندات المطلوبة. تبدأ المراجعة بعد وصولها كلها.',
+
+    /** Stage two: everything sent, nothing decided. */
+    stageWaitingTitle: 'وصلت مستنداتك',
+    stageWaitingBody:
+      'لا حاجة لأي إجراء منك الآن. يراجع فريق سفرة ما أرسلته ويصلك إشعار بالنتيجة على بريدك.',
+
+    /** Stage three: at least one document came back rejected. */
+    stageFixTitle: 'مستند يحتاج إعادة إرسال',
+    stageFixBody:
+      'راجع الملاحظة تحت كل مستند مرفوض وأرسل بديلاً عنه. البقية لا تحتاج إعادة إرسال.',
+
+    /** Stage four: done. */
+    stageDoneTitle: 'اكتمل التحقق',
+    stageDoneBody: 'حسابك جاهز. لوحة الشريك متاحة الآن بكل أقسامها.',
+    stageDoneCta: 'انتقل إلى لوحة التحكم',
+
+    /** What SAFRA asks for, listed where it is asked for rather than in an email. */
+    neededTitle: 'ما نحتاجه منك',
+    /*
+      Five lines, matching the five fields exactly — and unconditional, because the form is.
+
+      They used to read «سجل تجاري … إن وجد» and «سند ملكية أو عقد إدارة», describing a
+      conditional set while the form beside them demands all five. A page that asks for more than
+      it says it needs is read as a mistake, and the partner stops at الدعم to ask which is true.
+      See the note in `document-upload.tsx` on what that conditionality would cost to restore.
+    */
+    neededIdentity: 'هوية أو جواز سفر للشخص الموقّع.',
+    neededRegister: 'سجل تجاري للكيان القانوني.',
+    neededOwnership: 'سند ملكية يثبت حق التأجير.',
+    neededManagement: 'عقد إدارة الإقامة.',
+    neededBank: 'تأكيد مصرفي بحساب التحويلات.',
+    neededNote: 'صور واضحة أو ملفات PDF. الحد الأقصى {max} ميغابايت للملف.',
+
+    /** The counter above the list — a number a person can check against what they sent. */
+    countSent:
+      'أرسلت {sent} من المستندات · {approved} معتمد · {rejected} يحتاج إعادة إرسال',
+    lockedNote: 'تظهر بقية أقسام اللوحة بعد اعتماد حسابك.',
   },
 
   support: {

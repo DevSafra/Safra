@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation';
 
 import { statusTone } from '@safra/ui';
 
-import { getMyPayoutBookings, getMyPayouts, getMyProfile } from '@/lib/api';
+import { getMyPayoutBookings, getMyPayouts } from '@/lib/api';
+import { requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
@@ -34,7 +35,7 @@ export default async function PayoutPage({
   const { reference } = await params;
 
   const [profile, payouts, bookings] = await Promise.all([
-    getMyProfile(),
+    requireVerifiedPartner(),
     getMyPayouts(),
     getMyPayoutBookings(reference),
   ]);

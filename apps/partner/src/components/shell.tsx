@@ -34,6 +34,7 @@ export function Shell({
   partnerName,
   active,
   badges,
+  locked = false,
   children,
 }: {
   readonly title: string;
@@ -56,6 +57,18 @@ export function Shell({
    * published reviews.
    */
   readonly badges?: { readonly properties?: string; readonly reviews?: string };
+  /**
+   * An unverified partner sees two links, not seven (Bashar, 2026-08-21).
+   *
+   * العقود والمستندات, because it is the only thing they can act on, and الدعم, because the
+   * rejected banner tells them to go there and a link that is not in the nav is not a route out.
+   * Everything else would land on `requireVerifiedPartner` and bounce straight back — a nav made
+   * of links that undo themselves.
+   *
+   * The account controls at the foot are untouched. Locking somebody out of sign-out because
+   * their documents are under review would be a different bug.
+   */
+  readonly locked?: boolean;
   readonly children: React.ReactNode;
 }) {
   return (
@@ -115,37 +128,48 @@ export function Shell({
           start keeps a nav row the height of a nav row at any count.
         */}
         <nav className="grid min-h-0 flex-1 content-start gap-0.5 overflow-y-auto">
-          <Item href="/" label={t.nav.dashboard} current={active === 'dashboard'} />
-          <Item
-            href="/properties"
-            label={t.nav.properties}
-            current={active === 'properties'}
-            badge={badges?.properties}
-          />
-          {/* Directly under عقاراتي: it is the same inventory, seen by date rather than by listing. */}
-          <Item
-            href="/calendars"
-            label={t.nav.calendars}
-            current={active === 'calendars'}
-          />
-          <Item href="/payouts" label={t.nav.payouts} current={active === 'payouts'} />
+          {locked ? null : (
+            <>
+              <Item href="/" label={t.nav.dashboard} current={active === 'dashboard'} />
+              <Item
+                href="/properties"
+                label={t.nav.properties}
+                current={active === 'properties'}
+                badge={badges?.properties}
+              />
+              {/* Directly under عقاراتي: the same inventory, seen by date rather than by listing. */}
+              <Item
+                href="/calendars"
+                label={t.nav.calendars}
+                current={active === 'calendars'}
+              />
+              <Item
+                href="/payouts"
+                label={t.nav.payouts}
+                current={active === 'payouts'}
+              />
+            </>
+          )}
           {/*
             العقود والمستندات — what SAFRA sent and what SAFRA is waiting for (Bashar, 2026-08-19).
 
             Above الدعم and below مستحقاتي: it is an obligation with a deadline, not a place to ask
-            a question, and a partner who has just been accepted comes here first.
+            a question, and a partner who has just been accepted comes here first. While `locked`
+            it is the FIRST item, because it is the only one that leads anywhere.
           */}
           <Item
             href="/contracts"
             label={t.nav.contracts}
             current={active === 'contracts'}
           />
-          <Item
-            href="/reviews"
-            label={t.nav.reviews}
-            current={active === 'reviews'}
-            badge={badges?.reviews}
-          />
+          {locked ? null : (
+            <Item
+              href="/reviews"
+              label={t.nav.reviews}
+              current={active === 'reviews'}
+              badge={badges?.reviews}
+            />
+          )}
           {/* Last: it is where a partner goes when something else on this list did not work. */}
           <Item
             href="/support"

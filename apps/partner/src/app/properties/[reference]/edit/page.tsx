@@ -1,14 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import {
-  getMyProfile,
-  getProperty,
-  getPropertyFormReference,
-  sidebarBadges,
-} from '@/lib/api';
+import { getProperty, getPropertyFormReference, sidebarBadges } from '@/lib/api';
 import { PropertyEditor } from '@/components/property-editor';
 import { UnitEditor } from '@/components/unit-editor';
+import { requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { t } from '@/lib/strings';
 
@@ -32,7 +28,7 @@ export default async function EditPropertyPage({
   const { reference } = await params;
 
   const [profile, property, formReference] = await Promise.all([
-    getMyProfile(),
+    requireVerifiedPartner(),
     getProperty(reference),
     getPropertyFormReference(),
   ]);

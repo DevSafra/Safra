@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { renderRedactions } from '@safra/i18n';
 
 import { getMyProfile, getSupportThread, sidebarBadges } from '@/lib/api';
+import { isLocked } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { SupportForm } from '@/components/support-form';
@@ -57,6 +58,8 @@ export default async function SupportThreadPage({
         partnerName={partnerName}
         active="support"
         badges={sidebarBadges(profile)}
+        /* Reachable while unverified — the rejected banner sends them here — so the nav must lock. */
+        locked={isLocked(profile)}
       >
         <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
       </Shell>

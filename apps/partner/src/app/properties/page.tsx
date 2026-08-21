@@ -1,5 +1,4 @@
 import {
-  getMyProfile,
   getMyProperties,
   getPropertyFormReference,
   sidebarBadges,
@@ -8,6 +7,7 @@ import {
 import Link from 'next/link';
 
 import { AddProperty } from '@/components/add-property';
+import { requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { statusTone } from '@safra/ui';
@@ -33,7 +33,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function PropertiesPage() {
   const [profile, properties, reference] = await Promise.all([
-    getMyProfile(),
+    requireVerifiedPartner(),
     getMyProperties(),
     getPropertyFormReference(),
   ]);

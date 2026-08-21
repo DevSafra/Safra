@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { getMyProfile, getPropertyImages, sidebarBadges } from '@/lib/api';
+import { getPropertyImages, sidebarBadges } from '@/lib/api';
 import { ImageManager } from '@/components/image-manager';
+import { requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { t } from '@/lib/strings';
 
@@ -24,7 +25,7 @@ export default async function PropertyImagesPage({
   const { reference } = await params;
 
   const [profile, images] = await Promise.all([
-    getMyProfile(),
+    requireVerifiedPartner(),
     getPropertyImages(reference),
   ]);
 

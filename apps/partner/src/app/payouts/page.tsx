@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
-import { getMyPayouts, getMyProfile, type PartnerPayout, sidebarBadges } from '@/lib/api';
+import { getMyPayouts, type PartnerPayout, sidebarBadges } from '@/lib/api';
+import { requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
@@ -26,7 +27,10 @@ import { statusTone } from '@safra/ui';
 export const dynamic = 'force-dynamic';
 
 export default async function PayoutsPage() {
-  const [profile, payouts] = await Promise.all([getMyProfile(), getMyPayouts()]);
+  const [profile, payouts] = await Promise.all([
+    requireVerifiedPartner(),
+    getMyPayouts(),
+  ]);
   const name =
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
 

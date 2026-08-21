@@ -1,12 +1,8 @@
 import Link from 'next/link';
 
-import {
-  getDashboard,
-  getMyProfile,
-  type PartnerDashboard,
-  sidebarBadges,
-} from '@/lib/api';
+import { getDashboard, type PartnerDashboard, sidebarBadges } from '@/lib/api';
 import { BookingDecision } from '@/components/booking-decision';
+import { requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
@@ -35,7 +31,10 @@ import { fill, t, violationKind } from '@/lib/strings';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const [profile, dashboard] = await Promise.all([getMyProfile(), getDashboard()]);
+  const [profile, dashboard] = await Promise.all([
+    requireVerifiedPartner(),
+    getDashboard(),
+  ]);
   const name =
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
 

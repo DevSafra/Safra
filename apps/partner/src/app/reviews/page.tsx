@@ -1,4 +1,5 @@
-import { getMyProfile, getMyReviews, type PartnerReview, sidebarBadges } from '@/lib/api';
+import { getMyReviews, type PartnerReview, sidebarBadges } from '@/lib/api';
+import { requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { ReviewActions } from '@/components/review-actions';
@@ -38,7 +39,7 @@ export default async function ReviewsPage({
   const page = Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), 100_000) : 1;
 
   const [profile, result] = await Promise.all([
-    getMyProfile(),
+    requireVerifiedPartner(),
     getMyReviews({ page, limit: PAGE_SIZE }),
   ]);
 

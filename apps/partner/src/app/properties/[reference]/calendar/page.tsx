@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { getMyProfile, getProperty, getUnitCalendar, sidebarBadges } from '@/lib/api';
+import { getProperty, getUnitCalendar, sidebarBadges } from '@/lib/api';
+import { requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { UnitCalendar } from '@/components/unit-calendar';
 import { marketToday } from '@/lib/format';
@@ -58,7 +59,10 @@ export default async function UnitCalendarPage({
   const { reference } = await params;
   const query = await searchParams;
 
-  const [profile, property] = await Promise.all([getMyProfile(), getProperty(reference)]);
+  const [profile, property] = await Promise.all([
+    requireVerifiedPartner(),
+    getProperty(reference),
+  ]);
 
   const name =
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;

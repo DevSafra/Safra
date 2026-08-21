@@ -1,9 +1,10 @@
 import Link from 'next/link';
 
-import { getMyProfile, getPortfolioCalendar, sidebarBadges } from '@/lib/api';
+import { getPortfolioCalendar, sidebarBadges } from '@/lib/api';
 import { DayLegend, MonthGrid } from '@/components/month-grid';
 import { Ltr } from '@/components/ltr';
 import { RangeEditor } from '@/components/range-editor';
+import { requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { amount, count, marketToday } from '@/lib/format';
 import { fill, t } from '@/lib/strings';
@@ -121,7 +122,7 @@ export default async function CalendarsPage({
   const expand = one(query['expand']).trim().slice(0, 40);
 
   const [profile, calendar] = await Promise.all([
-    getMyProfile(),
+    requireVerifiedPartner(),
     getPortfolioCalendar(month, expand || undefined),
   ]);
 
