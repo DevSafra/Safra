@@ -4,12 +4,38 @@ import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
+import type { SanctionsSource } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { ENV, type Env } from '../config/env.js';
 import { normaliseName, tokenOverlap } from './name-normalisation.js';
 
 /** The source SAFRA is legally obliged to screen against (ADR 0002). */
-export const EU_SOURCE = 'eu_consolidated';
+export const EU_SOURCE: SanctionsSource = 'eu_consolidated';
+
+/**
+ * A list imported for DEVELOPMENT, which screening will never accept.
+ *
+ * ## Why a second source rather than a flag on the row
+ *
+ * A developer needs a list to exercise the screening path locally, and the only way to get one used
+ * to be to import a hand-made file AS `eu_consolidated`. Nothing then distinguished it: the
+ * snapshot row, the console panel and the screening record all read exactly as they would for the
+ * genuine article, and the only marking that survived was a naming convention inside the entries.
+ *
+ * That is the wrong shape for a compliance control. A screening that answers "no match" against a
+ * fabricated list produces a record that LOOKS clean and means nothing — worse than no screening,
+ * which is the reasoning `MAX_SNAPSHOT_AGE_DAYS` already gives for refusing a merely stale list.
+ *
+ * Making it a separate SOURCE makes the refusal structural rather than remembered. `screen()` asks
+ * for `EU_SOURCE` and nothing else, so a fixture cannot satisfy it — not because anything checks,
+ * but because nothing looks for it. There is no code path in which a fixture becomes compliance,
+ * and none can be added by forgetting a flag.
+ *
+ * `importSnapshot` refuses this source outright in production, so a fixture cannot exist there at
+ * all. See `SanctionsService.importSnapshot`.
+ */
+export const LOCAL_FIXTURE_SOURCE: SanctionsSource = 'local_fixture';
 
 /**
  * Below this trigram similarity a hit is not worth a reviewer's attention.
@@ -104,7 +130,10 @@ export class SanctionsListUnavailableError extends ServiceUnavailableException {
 export class SanctionsService {
   private readonly logger = new Logger(SanctionsService.name);
 
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    @Inject(ENV) private readonly env: Env,
+  ) {}
 
   /**
    * Screens a set of names — a partner's legal name, trading name and contact.
@@ -276,6 +305,25 @@ export class SanctionsService {
     publishedAt?: Date | undefined;
     entries: ImportEntry[];
   }): Promise<{ snapshotId: string; entryCount: number; unchanged: boolean }> {
+    /**
+     * A fixture cannot be created in production, at all.
+     *
+     * The structural refusal — `screen()` only ever asking for `EU_SOURCE` — already means a
+     * fixture can never become compliance. This is the second lock: it means the row cannot exist
+     * in the first place, so nobody can be looking at a production database wondering which of two
+     * snapshots is the real one.
+     *
+     * Thrown rather than silently ignored, because an import that quietly did nothing would leave
+     * whoever ran it believing a list was loaded.
+     */
+    if (input.source === LOCAL_FIXTURE_SOURCE && this.env.NODE_ENV === 'production') {
+      throw new Error(
+        'Refusing to import a local fixture sanctions list in production. Fixtures exist so a ' +
+          'developer can exercise the screening path; a real environment must screen against the ' +
+          'real list or refuse to screen at all.',
+      );
+    }
+
     const contentHash = createHash('sha256').update(input.rawBody, 'utf8').digest('hex');
 
     /**
@@ -359,7 +407,17 @@ export class SanctionsService {
     return { snapshotId, entryCount: written, unchanged: false };
   }
 
-  /** What the admin screen shows about list freshness. */
+  /**
+   * What the admin screen shows about list freshness.
+   *
+   * `fixtureLoaded` is about the DATABASE rather than about `source`: it says whether a development
+   * fixture is present at all. Without it the console tells a reviewer who has just imported a
+   * fixture that no list has been imported — true of the EU list, and baffling to the person
+   * looking at their own successful import. Saying which of the two situations they are in turns
+   * an apparently broken screen into an explained one.
+   *
+   * It cannot be true in production, where `importSnapshot` refuses the source outright.
+   */
   async status(source = EU_SOURCE): Promise<{
     imported: boolean;
     stale: boolean;
@@ -367,7 +425,17 @@ export class SanctionsService {
     fetchedAt: string | null;
     publishedAt: string | null;
     ageDays: number | null;
+    fixtureLoaded: boolean;
   }> {
+    const fixtures = await this.db.execute<{ present: boolean }>(sql`
+      SELECT EXISTS (
+        SELECT 1 FROM sanctions_snapshots
+        WHERE source = ${LOCAL_FIXTURE_SOURCE} AND completed_at IS NOT NULL
+      ) AS present
+    `);
+
+    const fixtureLoaded = fixtures.rows[0]?.present === true;
+
     const rows = await this.db.execute<{
       entry_count: number;
       fetched_at: string;
@@ -391,6 +459,7 @@ export class SanctionsService {
         fetchedAt: null,
         publishedAt: null,
         ageDays: null,
+        fixtureLoaded,
       };
     }
 
@@ -403,6 +472,7 @@ export class SanctionsService {
       fetchedAt: new Date(row.fetched_at).toISOString(),
       publishedAt: row.published_at ? new Date(row.published_at).toISOString() : null,
       ageDays: Math.round(ageDays),
+      fixtureLoaded,
     };
   }
 }

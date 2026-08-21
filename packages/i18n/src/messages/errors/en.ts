@@ -272,6 +272,9 @@ export const en = {
   'validation.password_unchanged': 'Your new password must differ from your current one.',
   'validation.rejection_notes_required':
     'A rejection requires notes explaining what must change.',
+  'validation.sanctions_body_too_small':
+    'That file is too small to be a consolidated sanctions list; the download looks truncated.',
+  'validation.sanctions_source': 'Unknown list source. Say which list is being imported.',
   'validation.document_rejection_notes_required':
     'A rejection requires notes explaining what is wrong with the document.',
   'booking.transition_invalid':

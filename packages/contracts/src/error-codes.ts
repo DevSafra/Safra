@@ -336,6 +336,8 @@ export const ERROR = {
   VALIDATION_ONE_FIELD_REQUIRED: 'validation.one_field_required',
   VALIDATION_PASSWORD_UNCHANGED: 'validation.password_unchanged',
   VALIDATION_REJECTION_NOTES_REQUIRED: 'validation.rejection_notes_required',
+  VALIDATION_SANCTIONS_BODY_TOO_SMALL: 'validation.sanctions_body_too_small',
+  VALIDATION_SANCTIONS_SOURCE: 'validation.sanctions_source',
   VALIDATION_DOCUMENT_REJECTION_NOTES_REQUIRED:
     'validation.document_rejection_notes_required',
   BOOKING_TRANSITION_INVALID: 'booking.transition_invalid',

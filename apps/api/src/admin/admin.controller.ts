@@ -1,12 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  Get,
-  Param,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
 import {
@@ -16,10 +8,12 @@ import {
   type PartnerTwoFactorResetInput,
   type PartnerVerifyInput,
   type PropertyReviewInput,
+  type SanctionsImportInput,
   type SanctionsScreeningInput,
   partnerTwoFactorResetSchema,
   partnerVerifySchema,
   propertyReviewSchema,
+  sanctionsImportSchema,
   sanctionsScreeningSchema,
 } from '@safra/contracts';
 
@@ -30,7 +24,7 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import { DashboardService } from './dashboard.service.js';
 import { PartnerTwoFactorService } from '../auth/partner-two-factor.service.js';
 import { ReviewService } from './review.service.js';
-import { EU_SOURCE, SanctionsService } from '../sanctions/sanctions.service.js';
+import { SanctionsService } from '../sanctions/sanctions.service.js';
 import { parseEuSanctionsXml } from '../sanctions/eu-list.parser.js';
 
 /**
@@ -197,23 +191,28 @@ export class AdminController {
    * `SETTINGS_UPDATE`, so only `super_admin` can replace the list a legal obligation
    * is checked against. Throttled hard: it parses megabytes and writes thousands of
    * rows.
+   *
+   * ## The caller says WHICH list, and cannot invent one
+   *
+   * `source` is a required enum of two known values, so a snapshot is either the EU
+   * consolidated list or a declared development fixture — nothing else, and never by
+   * omission. Screening only ever asks for the former, so a fixture imported here can
+   * never answer a compliance question; `SanctionsService.importSnapshot` additionally
+   * refuses a fixture outright in production. Before this, the endpoint hardcoded the
+   * EU source and a hand-made file became indistinguishable from the real list the
+   * moment it was posted.
    */
   @Post('sanctions/import')
   @RequirePermissions(P.SETTINGS_UPDATE)
   @Throttle({ default: { limit: 3, ttl: 300_000 } })
   @AuditExempt('The snapshot row itself is the record, with its content hash.')
-  async importSanctionsList(@Body() body: { xml?: unknown }) {
-    if (typeof body?.xml !== 'string' || body.xml.length < 1000) {
-      throw new BadRequestException(
-        'Post the sanctions list XML as { "xml": "..." }. A body this small cannot ' +
-          'be a consolidated list.',
-      );
-    }
-
+  async importSanctionsList(
+    @Body(new ZodValidationPipe(sanctionsImportSchema)) body: SanctionsImportInput,
+  ) {
     const parsed = parseEuSanctionsXml(body.xml);
 
     return this.sanctions.importSnapshot({
-      source: EU_SOURCE,
+      source: body.source,
       rawBody: body.xml,
       publishedAt: parsed.publishedAt,
       entries: parsed.entries,

@@ -313,6 +313,10 @@ export const de = {
     'Das neue Passwort muss sich vom aktuellen unterscheiden.',
   'validation.rejection_notes_required':
     'Eine Ablehnung erfordert Hinweise dazu, was geändert werden muss.',
+  'validation.sanctions_body_too_small':
+    'Diese Datei ist zu klein für eine konsolidierte Sanktionsliste; der Download wirkt abgeschnitten.',
+  'validation.sanctions_source':
+    'Unbekannte Listenquelle. Geben Sie an, welche Liste importiert wird.',
   'validation.document_rejection_notes_required':
     'Eine Ablehnung erfordert Hinweise dazu, was mit dem Dokument nicht stimmt.',
   'booking.transition_invalid':

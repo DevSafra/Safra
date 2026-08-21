@@ -264,6 +264,50 @@ export const sanctionsScreeningSchema = z
 export type SanctionsScreeningInput = z.infer<typeof sanctionsScreeningSchema>;
 
 /**
+ * The lists a snapshot can be imported AS (ADR 0002).
+ *
+ * `eu_consolidated` is the one SAFRA is legally obliged to screen against. `local_fixture` is a
+ * hand-made file a developer imports to exercise the screening path locally, and screening never
+ * looks for it — see `LOCAL_FIXTURE_SOURCE` in the API's `sanctions.service.ts` for why the
+ * distinction is a SOURCE rather than a flag.
+ *
+ * Here in the contract rather than only in the service because it is the boundary that has to
+ * refuse an unknown value: the source becomes a row somebody later reads as evidence of a
+ * compliance check, so a caller must not be able to invent one.
+ */
+export const SANCTIONS_SOURCES = ['eu_consolidated', 'local_fixture'] as const;
+
+export type SanctionsSource = (typeof SANCTIONS_SOURCES)[number];
+
+/**
+ * A body posted to `POST /admin/sanctions/import`.
+ *
+ * ## `source` has no default, on purpose
+ *
+ * Defaulting to the EU list would mean that FORGETTING the field labels a fixture as the genuine
+ * article — which is the exact failure this field exists to prevent, arrived at by omission
+ * instead of by intent. Making it required costs an operator one line in a runbook curl and makes
+ * the mislabelling impossible rather than unlikely. Same reasoning as the console's `Field`
+ * requiring `dir`: force the choice rather than let it be inherited by accident.
+ *
+ * ## The size floor
+ *
+ * A consolidated list is megabytes. A kilobyte of XML is a truncated download, a paste that lost
+ * its tail, or an error page saved as a file — and importing any of those would REPLACE the list
+ * every partner is screened against with almost nothing, silently.
+ */
+export const sanctionsImportSchema = z
+  .object({
+    xml: z.string().min(1000, ERROR.VALIDATION_SANCTIONS_BODY_TOO_SMALL),
+    source: z.enum(SANCTIONS_SOURCES, {
+      message: ERROR.VALIDATION_SANCTIONS_SOURCE,
+    }),
+  })
+  .strict();
+
+export type SanctionsImportInput = z.infer<typeof sanctionsImportSchema>;
+
+/**
  * Reordering a property's images (§7.2 gallery).
  *
  * The FULL set of ids, in the order they should appear — not a pair of positions. A "move item 3

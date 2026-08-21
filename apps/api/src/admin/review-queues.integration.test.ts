@@ -7,6 +7,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { ReviewService } from './review.service.js';
+import type { Env } from '../config/env.js';
 import { SanctionsService } from '../sanctions/sanctions.service.js';
 
 /**
@@ -43,7 +44,11 @@ describeIfDb('verification queues', () => {
      * screen — but constructing the real thing means a change to its shape breaks
      * here rather than silently at runtime.
      */
-    review = new ReviewService(db, new AuditService(db), new SanctionsService(db));
+    review = new ReviewService(
+      db,
+      new AuditService(db),
+      new SanctionsService(db, { NODE_ENV: 'test' } as Env),
+    );
 
     reference = await createPendingPartnerWithDocument(db);
   });

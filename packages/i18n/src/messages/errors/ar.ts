@@ -248,6 +248,10 @@ export const ar = {
   'validation.one_field_required': 'أدخل حقلاً واحداً على الأقل للتعديل.',
   'validation.password_unchanged': 'كلمة المرور الجديدة يجب أن تختلف عن الحالية.',
   'validation.rejection_notes_required': 'الرفض يتطلب ملاحظات توضح ما يجب تغييره.',
+  'validation.sanctions_body_too_small':
+    'ملف قائمة العقوبات أصغر من أن يكون قائمة مُوحَّدة؛ يبدو أن التنزيل ناقص.',
+  'validation.sanctions_source':
+    'مصدر القائمة غير معروف. حدِّد القائمة التي يجري استيرادها.',
   'validation.document_rejection_notes_required':
     'الرفض يتطلب ملاحظات توضح الخطأ في المستند.',
   'booking.transition_invalid': 'لا يمكن نقل الحجز إلى هذه الحالة من حالته الحالية.',

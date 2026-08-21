@@ -123,13 +123,63 @@ When the token has lapsed or the feed is down, `super_admin` can import a downlo
 
 ```
 POST /api/v1/admin/sanctions/import
-{ "xml": "<...the full XML...>" }
+{ "xml": "<...the full XML...>", "source": "eu_consolidated" }
 ```
 
 Requires `SETTINGS_UPDATE` (`super_admin` only — this replaces the list a legal obligation
 is checked against). Throttled to 3 requests per 5 minutes; it parses megabytes and writes
 thousands of rows. This path exists so a rotated token cannot block every partner
 verification with no recovery short of a deploy.
+
+`source` is required and has no default. Omitting it is a 400 rather than an EU import,
+because a default would mean that FORGETTING the field labels a made-up file as the genuine
+list — the exact confusion the field exists to prevent, reached by omission instead of by
+intent.
+
+### Development fixtures — `local_fixture`
+
+The real list is only obtainable from the EU publisher, so a developer exercising the
+screening path locally has to import something they made up. That file goes in under its own
+source:
+
+```
+POST /api/v1/admin/sanctions/import
+{ "xml": "<...a hand-made list...>", "source": "local_fixture" }
+```
+
+**Screening never consults it.** `SanctionsService.screen()` asks for `eu_consolidated` and
+nothing else, so a fixture cannot answer a compliance question — not because a check rejects
+it, but because nothing looks for it. There is no code path in which a fixture becomes
+compliance, and none can be added by forgetting a flag.
+
+Two consequences to expect, both intended:
+
+- **Partner verification stays blocked.** The console says «المُستورَد قائمة اختبار للتطوير»
+  rather than «لم تُستورد أي قائمة عقوبات», so the refusal is explained instead of looking
+  like a broken screen — but it is still a refusal. A screening that answered "no match"
+  against a fabricated list would produce a record that LOOKS clean and means nothing, which
+  is worse than no screening at all. Same reasoning as the 7-day staleness refusal.
+- **Production refuses the import outright.** `importSnapshot` throws when `NODE_ENV` is
+  `production`, so the row cannot exist there and nobody ends up looking at a production
+  database wondering which of two snapshots is the real one.
+
+`sanctions.integration.test.ts` holds all of this: a fixture does not satisfy screening, does
+not answer even for a name it contains, does not shadow a genuine list, and cannot be
+imported in production.
+
+**What the source does NOT do: prove the file is genuine.** A `super_admin` can still post a
+fabricated body as `eu_consolidated`, and nothing here would notice — the EU export carries no
+signature this platform verifies, so the manual path is trusted exactly as far as the person
+holding `SETTINGS_UPDATE`. That is the deliberate trade of having a manual path at all, and it
+is unchanged. What the source changes is narrower and worth stating precisely: a file imported
+AS a fixture can never be used as compliance, so the accident — a developer's test file left
+behind and treated as the list — cannot happen. Deceit by a super admin is a different threat
+with a different answer, and the answer to it is `SANCTIONS_FEED_URL` plus the audit trail,
+not this field.
+
+**Monitoring.** Alert 6 is labelled `{source="eu_consolidated"}` for the same reason. The metric
+emits a series per source, so an unlabelled expression would read a fresh fixture's age as
+though it were the list and fall silent — see `docs/alerting.md`.
 
 ### Checking the current state
 

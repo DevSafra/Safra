@@ -3,8 +3,13 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { createRollbackDatabase, type Database } from '@safra/db';
 
+import type { Env } from '../config/env.js';
 import { parseEuSanctionsXml } from './eu-list.parser.js';
-import { EU_SOURCE, SanctionsService } from './sanctions.service.js';
+import {
+  EU_SOURCE,
+  LOCAL_FIXTURE_SOURCE,
+  SanctionsService,
+} from './sanctions.service.js';
 
 /**
  * Sanctions screening against a REAL PostgreSQL (ADR 0002).
@@ -52,7 +57,7 @@ describeIfDb('sanctions screening', () => {
 
   beforeAll(() => {
     db = harness.db;
-    sanctions = new SanctionsService(db);
+    sanctions = new SanctionsService(db, { NODE_ENV: 'test' } as Env);
   });
 
   afterEach(async () => {
@@ -113,6 +118,84 @@ describeIfDb('sanctions screening', () => {
 
       expect(status.imported).toBe(false);
       expect(status.stale).toBe(true);
+    });
+  });
+
+  // ── Development fixtures ────────────────────────────────────────────────────
+
+  /**
+   * A fixture is a file somebody made up, and it must never be able to answer a compliance
+   * question — not by being marked, but by not being reachable.
+   *
+   * These tests exist because the shape they protect is invisible: `screen()` contains no check
+   * for a fixture, so nothing in that function will fail if the refusal breaks. What holds it is
+   * that screening asks for `EU_SOURCE` and a fixture is stored under a different source. If some
+   * later change gives `screen()` a fallback, or imports a fixture under the EU source "so that
+   * local development works", nothing else in the suite notices — a screening simply starts
+   * returning clean results from fabricated data, which is the worst possible outcome here and
+   * the one that looks like success.
+   */
+  describe('a local fixture', () => {
+    it('does not satisfy screening', async () => {
+      await importFixture(sanctions);
+
+      await expect(sanctions.screen(['Bashar Al-Assad'])).rejects.toThrow(
+        /no sanctions list/i,
+      );
+    });
+
+    /** Not even for a name that IS in the fixture — the file is not consulted at all. */
+    it('does not answer for a name it contains', async () => {
+      await importFixture(sanctions);
+
+      await expect(sanctions.screen(['Commercial Bank of Syria'])).rejects.toThrow(
+        /no sanctions list/i,
+      );
+    });
+
+    /** The console must be able to tell "nothing imported" from "a fixture is loaded". */
+    it('is visible in the status, without counting as an import', async () => {
+      await importFixture(sanctions);
+
+      const status = await sanctions.status();
+
+      expect(status.imported).toBe(false);
+      expect(status.fixtureLoaded).toBe(true);
+    });
+
+    it('is absent from the status when nothing was imported', async () => {
+      const status = await sanctions.status();
+
+      expect(status.fixtureLoaded).toBe(false);
+    });
+
+    /** And a real import is not mistaken for one. */
+    it('does not shadow a genuine list', async () => {
+      await importFixture(sanctions);
+      await importSample(sanctions);
+
+      const outcome = await sanctions.screen(['Bashar Al-Assad']);
+
+      expect(outcome.matched).toBe(true);
+      expect(outcome.source).toBe(EU_SOURCE);
+    });
+
+    /**
+     * The second lock. The structural refusal already means a fixture cannot become compliance;
+     * this means the row cannot exist in a real environment at all, so nobody ends up looking at
+     * a production database wondering which of two snapshots is the real one.
+     */
+    it('cannot be imported in production', async () => {
+      const production = new SanctionsService(db, { NODE_ENV: 'production' } as Env);
+
+      await expect(importFixture(production)).rejects.toThrow(/production/i);
+    });
+
+    /** A genuine import is untouched by that refusal. */
+    it('does not stop a real import in production', async () => {
+      const production = new SanctionsService(db, { NODE_ENV: 'production' } as Env);
+
+      await expect(importSample(production)).resolves.toMatchObject({ unchanged: false });
     });
   });
 
@@ -322,6 +405,18 @@ async function importSample(sanctions: SanctionsService) {
 
   return sanctions.importSnapshot({
     source: EU_SOURCE,
+    rawBody: SAMPLE_XML,
+    publishedAt: parsed.publishedAt,
+    entries: parsed.entries,
+  });
+}
+
+/** The same content, imported as what it actually is: a file somebody made up. */
+async function importFixture(sanctions: SanctionsService) {
+  const parsed = parseEuSanctionsXml(SAMPLE_XML);
+
+  return sanctions.importSnapshot({
+    source: LOCAL_FIXTURE_SOURCE,
     rawBody: SAMPLE_XML,
     publishedAt: parsed.publishedAt,
     entries: parsed.entries,
