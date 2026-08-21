@@ -1671,6 +1671,22 @@ export const ar = {
       wasCover: 'كانت صورة الغلاف',
       wasEnrolled: 'كان مفعّلاً',
       ledgerEntryGroup: 'مجموعة القيد المحاسبي',
+
+      /*
+        A sanctions screening (ADR 0002). Missing until 2026-08-21, because until then no screening
+        had ever been RUN on a database this test reads — the record only appears once somebody
+        presses the button, and the audit row is written inside the screening transaction.
+
+        `automatedMatch` and `matched` are deliberately two fields and not one. The matcher's own
+        reading is kept whatever a reviewer decides, so an override is visible AS an override
+        rather than replacing what the platform found.
+      */
+      automatedMatch: 'ما وجده الفحص الآلي',
+      matched: 'النتيجة المسجَّلة',
+      candidateCount: 'عدد المرشحين',
+      screenedAt: 'وقت الفحص',
+      snapshotId: 'معرّف نسخة القائمة',
+      /* `source` is already named «المصدر» above and is shared with other payloads. */
     } as Record<string, string>,
 
     /**
@@ -1686,6 +1702,14 @@ export const ar = {
      */
     payloadValue: {
       'EC-001': 'أُغلقت صفحة الدفع قبل إتمامه، فانتهت مهلة الحجز وأُعيدت التواريخ',
+
+      /*
+        The sanctions list a screening was run against. `local_fixture` is here for the same reason
+        it exists at all: if a fixture ever reached this column, the reader has to be told what it
+        was rather than shown a plausible-looking English identifier.
+      */
+      eu_consolidated: 'قائمة الاتحاد الأوروبي الموحدة',
+      local_fixture: 'قائمة اختبار للتطوير — ليست قائمة عقوبات',
 
       /*
         ── Statuses and codes as they appear in an audit payload (Bashar, 2026-08-20) ───────────
@@ -1711,8 +1735,20 @@ export const ar = {
       debit: 'مدين',
       manual: 'يدوي',
       central_bank: 'المصرف المركزي',
-      commercial_register: 'سجل تجاري',
+      /*
+        Every partner document KIND, not the two that happened to appear in an audit payload first.
+
+        `identity` and `commercial_register` were here because a reviewer had approved one of each
+        on this database; the other three were missing and سجل التدقيق printed them raw. That is
+        the shape this list keeps producing — a value is added when somebody exercises the path,
+        rather than when the enum gains a member — so all five are written out together and
+        `PARTNER_DOCUMENT_KINDS` is where a sixth would come from.
+      */
       identity: 'وثيقة هوية',
+      commercial_register: 'سجل تجاري',
+      ownership_proof: 'إثبات ملكية',
+      management_contract: 'عقد إدارة',
+      bank_confirmation: 'تأكيد مصرفي',
       accommodation: 'إقامة',
       finance_officer: 'مسؤول مالي',
       support_agent: 'موظف دعم',
