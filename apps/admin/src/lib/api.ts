@@ -304,6 +304,8 @@ const sanctionsStatusSchema = z.object({
   fetchedAt: z.string().nullable(),
   publishedAt: z.string().nullable(),
   ageDays: z.number().nullable(),
+  /** A development fixture is present. Never true in production — the API refuses the import. */
+  fixtureLoaded: z.boolean(),
 });
 
 export type SanctionsStatus = z.infer<typeof sanctionsStatusSchema>;

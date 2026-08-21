@@ -37,7 +37,12 @@ export function ScreeningPanel({
   reference: string;
   screenedAt: string | null;
   result: unknown;
-  listStatus: { imported: boolean; stale: boolean; ageDays: number | null } | null;
+  listStatus: {
+    imported: boolean;
+    stale: boolean;
+    ageDays: number | null;
+    fixtureLoaded: boolean;
+  } | null;
 }) {
   const router = useRouter();
 
@@ -80,6 +85,10 @@ export function ScreeningPanel({
    * The list's own state comes first. A reviewer who clicks and gets an unexplained
    * refusal will assume the feature is broken; telling them the list is nine days
    * old points at the actual problem, which somebody can fix.
+   *
+   * A loaded development fixture gets its own sentence for the same reason. It is not
+   * a sanctions list and screening never looks at it, so «no list imported» is true —
+   * and reads as a bug to whoever just watched their own import succeed.
    */
   if (listStatus && (!listStatus.imported || listStatus.stale)) {
     return (
@@ -87,7 +96,9 @@ export function ScreeningPanel({
         <p className="text-sm text-bad">
           {listStatus.imported
             ? fill(t.sections.screening.listStale, { days: listStatus.ageDays ?? 0 })
-            : t.sections.screening.listMissing}
+            : listStatus.fixtureLoaded
+              ? t.sections.screening.listFixture
+              : t.sections.screening.listMissing}
         </p>
         <p className="mt-2 text-xs text-muted">{t.sections.screening.blockedNote}</p>
       </div>
