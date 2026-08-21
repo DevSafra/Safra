@@ -2,6 +2,8 @@ import 'server-only';
 
 import { z } from 'zod';
 
+import { SANCTIONS_POLICIES } from '@safra/contracts';
+
 import { DEFAULT_PAGE_SIZE } from './search-params';
 import { getStaffSession } from './session-server';
 
@@ -307,6 +309,8 @@ const sanctionsStatusSchema = z.object({
   ageDays: z.number().nullable(),
   /** A development fixture is present. Never true in production — the API refuses the import. */
   fixtureLoaded: z.boolean(),
+  /** How hard screening bites. Parsed, not defaulted: the panel renders three different screens. */
+  policy: z.enum(SANCTIONS_POLICIES),
 });
 
 export type SanctionsStatus = z.infer<typeof sanctionsStatusSchema>;

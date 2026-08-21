@@ -89,6 +89,8 @@ export const de = {
   'payout.nothing_to_pay': 'In diesem Zeitraum ist nichts auszuzahlen.',
   'payout.frozen_by_dispute':
     'Ein offener Fall sperrt die Auszahlung für diese Buchungen.',
+  'payout.partner_not_screened':
+    'Diese Auszahlung kann erst nach der Sanktionsprüfung des Partners freigegeben werden.',
   'partner.already_verified': 'Der Partner ist bereits verifiziert.',
   'partner.profile_missing': 'Dieses Konto ist keinem Partnerprofil zugeordnet.',
   'partner.type_unknown': 'Unbekannter Partnertyp.',
@@ -145,6 +147,8 @@ export const de = {
   'geo.city_not_found': 'Stadt nicht gefunden.',
   'geo.currency_unknown': 'Unbekannte Währung.',
   'setting.value_flat_or_percent': '{key} muss „flat“ oder „percent“ sein.',
+  'setting.value_sanctions_policy':
+    'Der Wert von {key} muss required, advisory oder off sein.',
   'setting.value_percent_range': '{key} muss eine Zahl zwischen 0 und 100 sein.',
   'setting.value_positive_int': '{key} muss eine ganze Zahl von mindestens 1 sein.',
   'setting.value_hour_of_day': '{key} muss eine Stunde zwischen 0 und 23 sein.',

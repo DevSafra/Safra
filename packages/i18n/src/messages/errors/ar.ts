@@ -72,6 +72,7 @@ export const ar = {
   'payout.already_final': 'انتهت هذه الحوالة ولا يمكن تغييرها.',
   'payout.nothing_to_pay': 'لا مبلغ مستحق في هذه الفترة.',
   'payout.frozen_by_dispute': 'نزاع مفتوح يجمّد استحقاق التحويل لهذه الحجوزات.',
+  'payout.partner_not_screened': 'لا يمكن إطلاق التحويل قبل فحص العقوبات لهذا الشريك.',
   'partner.already_verified': 'تم التحقق من هذا الشريك بالفعل.',
   'partner.profile_missing': 'هذا الحساب غير مرتبط بملف شريك.',
   'partner.type_unknown': 'نوع الشريك غير معروف.',
@@ -120,6 +121,8 @@ export const ar = {
   'geo.city_not_found': 'لم يُعثر على هذه المدينة.',
   'geo.currency_unknown': 'العملة غير معروفة.',
   'setting.value_flat_or_percent': 'قيمة {key} يجب أن تكون «ثابت» أو «نسبة».',
+  'setting.value_sanctions_policy':
+    'قيمة {key} يجب أن تكون «مُلزِم» أو «استرشادي» أو «معطّل».',
   'setting.value_percent_range': 'قيمة {key} يجب أن تكون رقماً من 0 إلى 100.',
   'setting.value_positive_int': 'قيمة {key} يجب أن تكون رقماً صحيحاً لا يقل عن 1.',
   'setting.value_hour_of_day': 'قيمة {key} يجب أن تكون ساعة من 0 إلى 23.',

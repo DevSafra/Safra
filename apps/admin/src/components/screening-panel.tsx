@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { SanctionsPolicy } from '@safra/contracts';
+
 import { fill, t } from '@/lib/strings';
 
 interface Candidate {
@@ -42,6 +44,7 @@ export function ScreeningPanel({
     stale: boolean;
     ageDays: number | null;
     fixtureLoaded: boolean;
+    policy: SanctionsPolicy;
   } | null;
 }) {
   const router = useRouter();
@@ -81,26 +84,57 @@ export function ScreeningPanel({
 
   const previous = readResult(result);
 
+  /*
+    Screening switched off by policy. Said plainly, and BEFORE the list's state, because with the
+    control off the list's age is not a problem anybody needs to act on — showing «القائمة قديمة»
+    to somebody who cannot run a screening anyway is an alarm about nothing.
+  */
+  if (listStatus?.policy === 'off') {
+    return (
+      <div className="rounded-lg border border-line bg-field p-4">
+        <p className="text-sm text-muted">{t.sections.screening.policyOff}</p>
+      </div>
+    );
+  }
+
   /**
-   * The list's own state comes first. A reviewer who clicks and gets an unexplained
+   * The list's own state comes next. A reviewer who clicks and gets an unexplained
    * refusal will assume the feature is broken; telling them the list is nine days
    * old points at the actual problem, which somebody can fix.
    *
    * A loaded development fixture gets its own sentence for the same reason. It is not
    * a sanctions list and screening never looks at it, so «no list imported» is true —
    * and reads as a bug to whoever just watched their own import succeed.
+   *
+   * ## The closing note depends on the POLICY, and getting it wrong is the whole risk here
+   *
+   * «التحقق من الشريك موقوف حتى تُحل هذه المسألة» is true under `required` and FALSE under
+   * `advisory` — where the reviewer can approve this partner right now. A panel that tells
+   * somebody they are blocked when they are not sends them to chase a feed registration instead
+   * of doing the work in front of them.
    */
   if (listStatus && (!listStatus.imported || listStatus.stale)) {
+    const advisory = listStatus.policy === 'advisory';
+
     return (
-      <div className="rounded-lg border border-bad/40 bg-bad/10 p-4">
-        <p className="text-sm text-bad">
+      <div
+        data-screening-policy={listStatus.policy}
+        className={`rounded-lg border p-4 ${
+          advisory ? 'border-gold/40 bg-gold/5' : 'border-bad/40 bg-bad/10'
+        }`}
+      >
+        <p className={`text-sm ${advisory ? 'text-gold' : 'text-bad'}`}>
           {listStatus.imported
             ? fill(t.sections.screening.listStale, { days: listStatus.ageDays ?? 0 })
             : listStatus.fixtureLoaded
               ? t.sections.screening.listFixture
               : t.sections.screening.listMissing}
         </p>
-        <p className="mt-2 text-xs text-muted">{t.sections.screening.blockedNote}</p>
+        <p className="mt-2 text-xs text-muted">
+          {advisory
+            ? t.sections.screening.advisoryNote
+            : t.sections.screening.blockedNote}
+        </p>
       </div>
     );
   }

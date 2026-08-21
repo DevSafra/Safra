@@ -671,6 +671,24 @@ export const SETTINGS: {
     descriptionAr: 'السماح لمسؤول المالية بإدارة أسعار الصرف',
     descriptionEn: 'Grant fx_rate.manage to finance_officer while enabled',
   },
+  /**
+   * How hard sanctions screening bites (Bashar, 2026-08-21).
+   *
+   * `advisory` by default: screening runs and is recorded, and it blocks nothing. Set `required`
+   * to restore the hard gate on partner approval and partner payout, `off` to stop offering it.
+   *
+   * The value and the reasoning behind it live in `@safra/contracts/compliance`, and the review
+   * that produced the choice is `docs/sanctions-screening-review.md`. The three values are NOT
+   * repeated here — `sanctionsPolicy` is validated against that contract, so a fourth invented
+   * here would be refused by the editor rather than quietly stored.
+   */
+  {
+    key: 'compliance.sanctions_screening',
+    value: 'advisory',
+    valueSchema: 'sanctionsPolicy',
+    descriptionAr: 'إلزامية فحص العقوبات: مُلزِم أو استرشادي أو معطّل',
+    descriptionEn: 'Sanctions screening policy: required, advisory or off',
+  },
   {
     key: 'refund.minimum_percent',
     value: 50,

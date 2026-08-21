@@ -9,6 +9,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { ReviewService } from './review.service.js';
 import type { Env } from '../config/env.js';
 import { SanctionsService } from '../sanctions/sanctions.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 
 /**
  * The §8.1 verification queues, against a REAL PostgreSQL.
@@ -48,6 +49,7 @@ describeIfDb('verification queues', () => {
       db,
       new AuditService(db),
       new SanctionsService(db, { NODE_ENV: 'test' } as Env),
+      new SettingsService(db),
     );
 
     reference = await createPendingPartnerWithDocument(db);

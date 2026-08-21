@@ -4,15 +4,20 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 import {
   COUNT_CAP,
+  DEFAULT_SANCTIONS_POLICY,
   ERROR,
   PERMISSIONS as P,
+  SANCTIONS_POLICY_SETTING,
+  isSanctionsPolicy,
   type OffsetPage,
   type PageQuery,
+  type SanctionsPolicy,
   offsetPage,
 } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
@@ -55,7 +60,18 @@ export class PayoutService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly ledger: LedgerService,
+    private readonly settings: SettingsService,
   ) {}
+
+  /** How hard sanctions screening bites. Same reader and same fallback as `ReviewService`. */
+  private async sanctionsPolicy(): Promise<SanctionsPolicy> {
+    const raw = await this.settings.get<unknown>(
+      SANCTIONS_POLICY_SETTING,
+      DEFAULT_SANCTIONS_POLICY,
+    );
+
+    return isSanctionsPolicy(raw) ? raw : DEFAULT_SANCTIONS_POLICY;
+  }
 
   /**
    * Attaches every newly-payable booking to its partner's open period, creating one if needed.
@@ -210,6 +226,31 @@ export class PayoutService {
 
     if ((frozen.rows[0]?.n ?? 0) > 0) {
       throw conflict(ERROR.PAYOUT_FROZEN_BY_DISPUTE);
+    }
+
+    /*
+      Sanctions screening, checked HERE and not only at partner approval (Bashar, 2026-08-21).
+
+      This is where the EU asset-freeze prohibition actually applies: it forbids making funds or
+      economic resources available to a designated person, and approval makes nothing available —
+      release does. A partner approved in January and designated in June passed the only check the
+      platform had, and passed it months before the designation existed.
+
+      So the control moved to the point where money moves, and it is re-read on every release for
+      the same reason the dispute freeze above is: release is the last moment anybody looks.
+
+      Under `advisory` and `off` this refuses nothing. It exists so that turning the policy to
+      `required` protects the payment, rather than only the paperwork.
+    */
+    if ((await this.sanctionsPolicy()) === 'required') {
+      const screened = await this.db.execute<{ screened: boolean }>(sql`
+        SELECT sanctions_screened_at IS NOT NULL AS screened
+        FROM partners WHERE id = ${payout.partner_id} AND deleted_at IS NULL
+      `);
+
+      if (screened.rows[0]?.screened !== true) {
+        throw conflict(ERROR.PAYOUT_PARTNER_NOT_SCREENED);
+      }
     }
 
     const account = await this.db.execute<{ id: string }>(sql`

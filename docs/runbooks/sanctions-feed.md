@@ -117,6 +117,25 @@ naming the variable at startup and the cron job does nothing.
 - **Deduplicates:** the snapshot is content-hashed. An unchanged list logs "unchanged" and
   does not write a new set of entries.
 
+### Whether screening blocks anything: `compliance.sanctions_screening`
+
+Set from the console's settings screen (`super_admin`), audited like every other setting.
+
+| Value      | Partner approval   | Partner payout     | The console shows                         |
+| ---------- | ------------------ | ------------------ | ----------------------------------------- |
+| `required` | refused unscreened | refused unscreened | the blocked note, approve button disabled |
+| `advisory` | allowed, warned    | allowed            | «الفحص استرشادي حالياً»                   |
+| `off`      | allowed            | allowed            | «فحص العقوبات معطّل حالياً»               |
+
+**Default: `advisory`** (Bashar, 2026-08-21). Engineering recommended `required`; the
+reasoning on both sides is in [`../sanctions-screening-review.md`](../sanctions-screening-review.md).
+
+Every approval records the policy in force at the time on
+`partners.sanctions_policy_at_approval`. That column is what lets somebody answer, later,
+whether an unscreened approval was a decision or an accident — `sanctions_screened_at IS NULL`
+cannot tell those apart. NULL there means "approved before the column existed", which is not
+the same as `off`.
+
 ### Manual import — the fallback
 
 When the token has lapsed or the feed is down, `super_admin` can import a downloaded file:

@@ -6,6 +6,8 @@ import { Ltr, StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
 import { DocumentReview } from '@/components/document-review';
 import { ScreeningPanel } from '@/components/screening-panel';
+import { DEFAULT_SANCTIONS_POLICY } from '@safra/contracts';
+
 import { VerifyPartner } from '@/components/verify-partner';
 import { PartnerTwoFactor } from '@/components/partner-two-factor';
 import { BackLink, type BackTarget } from '@/components/back-link';
@@ -177,7 +179,17 @@ export default async function PartnerPage({
                 })}
           </p>
         ) : (
-          <VerifyPartner reference={partner.reference} screened={screened} />
+          <VerifyPartner
+            reference={partner.reference}
+            screened={screened}
+            /* Falls back to the contract default when the status read failed — same direction
+               as the API, so a blip cannot make the screen stricter than the server. */
+            policy={
+              listStatus === 'failed' || listStatus === 'unauthenticated'
+                ? DEFAULT_SANCTIONS_POLICY
+                : listStatus.policy
+            }
+          />
         )}
       </Section>
 

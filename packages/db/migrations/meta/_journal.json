@@ -253,6 +253,13 @@
       "when": 1787249425426,
       "tag": "0035_worried_sinister_six",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1787315988322,
+      "tag": "0036_lovely_alex_power",
+      "breakpoints": true
     }
   ]
 }

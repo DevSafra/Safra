@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common'
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import type { Role } from '@safra/contracts';
+import { isSanctionsPolicy, type Role } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
@@ -279,6 +279,22 @@ function validate(value: unknown, valueSchema: string, key: string): unknown {
     case 'feeMode': {
       if (value !== 'flat' && value !== 'percent') {
         throw badRequest(ERROR.SETTING_VALUE_FLAT_OR_PERCENT, { key });
+      }
+
+      return value;
+    }
+
+    /**
+     * How hard sanctions screening bites — see `@safra/contracts/compliance`.
+     *
+     * Validated against the contract's own list rather than a copy of it. This one is worth being
+     * strict about beyond the usual reason: an unrecognised value here would fall back to
+     * `DEFAULT_SANCTIONS_POLICY` at every read, so a typo would silently change a compliance
+     * control's severity and nothing would say so.
+     */
+    case 'sanctionsPolicy': {
+      if (!isSanctionsPolicy(value)) {
+        throw badRequest(ERROR.SETTING_VALUE_SANCTIONS_POLICY, { key });
       }
 
       return value;

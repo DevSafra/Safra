@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { SANCTIONS_POLICIES } from '@safra/contracts';
+
 import type { EditableSetting } from '@/lib/api';
 import { fill, t } from '@/lib/strings';
 import { shortDate } from '@/lib/format';
@@ -16,6 +18,7 @@ const EDITABLE = new Set([
   'money',
   'boolean',
   'feeMode',
+  'sanctionsPolicy',
 ]);
 
 /**
@@ -211,6 +214,32 @@ function ValueInput({ setting }: { setting: EditableSetting }) {
     );
   }
 
+  /*
+    The compliance policy — three named values, so a select rather than a text box.
+
+    Worth the branch: typing `requred` into a free-text field would fall back to the default at
+    every read and silently change how hard a compliance control bites. The server refuses an
+    unknown value too; this stops the reader ever producing one.
+  */
+  if (setting.valueSchema === 'sanctionsPolicy') {
+    return (
+      <label className="grid gap-1">
+        <span className="text-[10.5px] text-faint2">{t.sections.settings.policy}</span>
+        <select
+          name="value"
+          defaultValue={String(setting.value)}
+          className={`${common} cursor-pointer`}
+        >
+          {SANCTIONS_POLICIES.map((policy) => (
+            <option key={policy} value={policy}>
+              {t.sections.settings.sanctionsPolicy[policy]}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+
   if (setting.valueSchema === 'money') {
     /**
      * Money may be stored as a bare number (USD) or `{ amount, currency }`. The
@@ -281,7 +310,7 @@ function coerce(
 
   const text = typeof raw === 'string' ? raw.trim() : '';
 
-  if (valueSchema === 'feeMode') return text;
+  if (valueSchema === 'feeMode' || valueSchema === 'sanctionsPolicy') return text;
 
   /**
    * Money keeps whichever shape it already had.

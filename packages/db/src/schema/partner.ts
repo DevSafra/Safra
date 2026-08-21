@@ -269,6 +269,22 @@ export const partners = pgTable(
     sanctionsScreenedAt: timestamp('sanctions_screened_at', { withTimezone: true }),
     sanctionsScreeningResult: jsonb('sanctions_screening_result'),
 
+    /**
+     * The screening policy in force when this partner was APPROVED (Bashar, 2026-08-21).
+     *
+     * Stamped at approval, never recomputed. Without it, an approval made while the policy was
+     * `advisory` is indistinguishable afterwards from one where the control was meant to run and
+     * silently did not — and being able to answer that, years later, is the entire value of a
+     * compliance control. `sanctions_screened_at IS NULL` says a screening is absent; only this
+     * column says whether that was a decision.
+     *
+     * Text rather than an enum: the values live in `@safra/contracts/compliance`, and a Postgres
+     * enum would need a migration to add a fourth policy that the application could already
+     * express. NULL means approved before this column existed, which is not the same as `off` and
+     * must not be readable as it.
+     */
+    sanctionsPolicyAtApproval: text('sanctions_policy_at_approval'),
+
     /** SRS §8.5: internal score starts at 100 and drives "SAFRA recommends". */
     score: integer('score').notNull().default(100),
     tier: partnerTier('tier').notNull().default('new'),

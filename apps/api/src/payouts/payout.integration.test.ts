@@ -6,6 +6,7 @@ import { PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { PayoutService } from './payout.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -52,7 +53,12 @@ describeIfDb('PayoutService', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   /* Every row this suite writes is discarded when the test that wrote it ends. */
   const db: Database = harness.db;
-  const service = new PayoutService(db, new AuditService(db), new LedgerService(db));
+  const service = new PayoutService(
+    db,
+    new AuditService(db),
+    new LedgerService(db),
+    new SettingsService(db),
+  );
 
   /*
     A REAL staff user, not an invented uuid. Every transition writes an audit row and

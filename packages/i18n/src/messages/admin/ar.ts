@@ -909,6 +909,20 @@ export const ar = {
       hintInt: 'رقم صحيح',
       feeFlat: 'ثابت — مبلغ لكل حجز',
       feePercent: 'نسبة — حصة من قيمة الإقامة',
+
+      /*
+        The sanctions policy, named for a reader rather than by its code.
+
+        The descriptions are deliberately blunt about the consequence: this is the one setting on
+        the page that decides whether a compliance control runs, and «استرشادي» on its own does not
+        tell somebody that approvals will go through unscreened.
+      */
+      policy: 'السياسة',
+      sanctionsPolicy: {
+        required: 'مُلزِم — لا اعتماد ولا تحويل بدون فحص',
+        advisory: 'استرشادي — يُسجَّل الفحص ولا يمنع شيئاً',
+        off: 'معطّل — لا يُعرض الفحص إطلاقاً',
+      },
       /** Shown for a schema this form cannot validate, naming the schema. */
       notEditable:
         'هذا الإعداد من نوع {schema}، ولا يستطيع هذا النموذج التحقق منه. تعديله من حقل عام قد يعطّله بصمت، فيبقى تغييره قراراً يُراجع.',
@@ -1053,6 +1067,19 @@ export const ar = {
       confirmOverride: 'تأكيد التجاوز',
       listStale: 'قائمة العقوبات عمرها {days} يوماً ولا يمكن الفحص مقابلها.',
       listMissing: 'لم تُستورد أي قائمة عقوبات.',
+
+      /*
+        The two sentences that depend on the POLICY (Bashar, 2026-08-21).
+
+        `blockedNote` above is true only while the policy is «مُلزِم». Under «استرشادي» the
+        reviewer may approve this partner now, and telling them otherwise sends them off to chase
+        a feed registration instead of doing the work in front of them. Under «معطّل» there is
+        nothing to say about the list at all.
+      */
+      advisoryNote:
+        'يمكنك المتابعة والتحقق من الشريك رغم ذلك — الفحص استرشادي حالياً. سيُسجَّل أن الاعتماد تم دون فحص.',
+      policyOff:
+        'فحص العقوبات معطّل حالياً بقرار من الإدارة. يمكن تفعيله من الإعدادات متى لزم.',
       listFixture:
         'المُستورَد قائمة اختبار للتطوير، وليس قائمة عقوبات. الفحص لا يستخدمها، ولا يجوز أن يُبنى عليها تحقق.',
       possibleMatch: 'سُجِّلت مطابقة محتملة — لا توافق دون تصعيد.',
@@ -1075,6 +1102,13 @@ export const ar = {
     verifyPartner: {
       screeningRequired:
         'سجّل نتيجة فحص العقوبات قبل الموافقة. التحقق من طرف لم يُفحص مخاطرة قانونية على الكيان الألماني، لا إجراء شكلي.',
+      /*
+        The same warning when screening does NOT block (Bashar, 2026-08-21). It still says what
+        the risk is — that part did not stop being true when the gate came off — but it stops
+        instructing the reviewer to do something the platform is no longer going to require.
+      */
+      screeningAdvisory:
+        'لم يُسجَّل فحص عقوبات لهذا الشريك. الفحص استرشادي حالياً فلن يمنع الاعتماد، وسيُسجَّل أن الاعتماد تم دون فحص.',
       approve: 'الموافقة على الشريك',
       reject: 'رفض الطلب',
       /* Moved out of `verify-partner.tsx` (O-i18n-4). */

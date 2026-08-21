@@ -16,6 +16,11 @@ import {
   sanctionsImportSchema,
   sanctionsScreeningSchema,
 } from '@safra/contracts';
+import {
+  DEFAULT_SANCTIONS_POLICY,
+  SANCTIONS_POLICY_SETTING,
+  isSanctionsPolicy,
+} from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
@@ -24,6 +29,7 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import { DashboardService } from './dashboard.service.js';
 import { PartnerTwoFactorService } from '../auth/partner-two-factor.service.js';
 import { ReviewService } from './review.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { SanctionsService } from '../sanctions/sanctions.service.js';
 import { parseEuSanctionsXml } from '../sanctions/eu-list.parser.js';
 
@@ -42,6 +48,7 @@ export class AdminController {
     private readonly dashboard: DashboardService,
     private readonly sanctions: SanctionsService,
     private readonly partnerTwoFactor: PartnerTwoFactorService,
+    private readonly settings: SettingsService,
   ) {}
 
   /** The §9.2 dashboard counters. */
@@ -177,7 +184,21 @@ export class AdminController {
   @Get('sanctions/status')
   @RequirePermissions(P.PARTNER_DOCUMENT_REVIEW)
   async sanctionsStatus() {
-    return this.sanctions.status();
+    /*
+      The POLICY travels with the list's health, because the console cannot read one without the
+      other. «القائمة قديمة» means "verification is blocked" under `required` and "the screening
+      you are about to skip would have been unreliable anyway" under `advisory`. The same fact,
+      two different things for the reader to do — so both arrive together and the panel is never
+      in a position to guess.
+    */
+    const [status, policy] = await Promise.all([
+      this.sanctions.status(),
+      this.settings
+        .get<unknown>(SANCTIONS_POLICY_SETTING, DEFAULT_SANCTIONS_POLICY)
+        .then((raw) => (isSanctionsPolicy(raw) ? raw : DEFAULT_SANCTIONS_POLICY)),
+    ]);
+
+    return { ...status, policy };
   }
 
   /**

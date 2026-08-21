@@ -8,9 +8,16 @@ import type {
   PartnerVerifyInput,
   PropertyReviewInput,
 } from '@safra/contracts';
+import {
+  DEFAULT_SANCTIONS_POLICY,
+  SANCTIONS_POLICY_SETTING,
+  isSanctionsPolicy,
+  type SanctionsPolicy,
+} from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { SanctionsService } from '../sanctions/sanctions.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import {
@@ -40,7 +47,25 @@ export class ReviewService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly sanctions: SanctionsService,
+    private readonly settings: SettingsService,
   ) {}
+
+  /**
+   * How hard sanctions screening bites right now.
+   *
+   * One reader, so the fallback for an absent or mistyped row is decided in one place. An
+   * unreadable value resolves to `DEFAULT_SANCTIONS_POLICY` rather than to the strictest option
+   * on purpose: `settings` is hand-editable, and a typo that silently made the platform stricter
+   * would present as onboarding mysteriously stopping, with nothing on any screen to explain it.
+   */
+  private async sanctionsPolicy(): Promise<SanctionsPolicy> {
+    const raw = await this.settings.get<unknown>(
+      SANCTIONS_POLICY_SETTING,
+      DEFAULT_SANCTIONS_POLICY,
+    );
+
+    return isSanctionsPolicy(raw) ? raw : DEFAULT_SANCTIONS_POLICY;
+  }
 
   /**
    * §9.2's "properties awaiting approval" queue, oldest first so nothing rots.
@@ -521,7 +546,26 @@ export class ReviewService {
       throw conflict(ERROR.PARTNER_ALREADY_VERIFIED);
     }
 
-    if (input.decision === 'approve' && partner.sanctionsScreenedAt === null) {
+    /*
+      Screening blocks an approval only while the policy says so (Bashar, 2026-08-21).
+
+      This was an unconditional gate, and it made an external registration — `M-2`, the EU feed
+      account — a launch blocker: screening refuses a list older than seven days, so with no feed
+      onboarding stopped altogether. The legal obligation it stands for is not "screen at
+      approval"; it is the asset-freeze prohibition, which is about where money ends up. See
+      `docs/sanctions-screening-review.md` for what was checked.
+
+      Read fresh on every approval rather than cached in this service: the policy is edited from
+      the console, and an approval decided under a stale reading would be stamped below with a
+      policy that was not actually in force — which is worse than no stamp at all.
+    */
+    const policy = await this.sanctionsPolicy();
+
+    if (
+      input.decision === 'approve' &&
+      policy === 'required' &&
+      partner.sanctionsScreenedAt === null
+    ) {
       throw badRequest(ERROR.PARTNER_SANCTIONS_SCREENING_REQUIRED);
     }
 
@@ -532,6 +576,14 @@ export class ReviewService {
         .update(schema.partners)
         .set({
           verification: nextStatus,
+          /*
+            The policy in force AT THIS APPROVAL, stamped once and never recomputed.
+
+            Recomputing it later would answer a different question — what the policy is now, not
+            what it was when somebody decided. Only stamped on an approval: a rejection lets
+            nobody near any money, so there is nothing about it for this column to explain.
+          */
+          ...(input.decision === 'approve' ? { sanctionsPolicyAtApproval: policy } : {}),
           ...(input.decision === 'approve'
             ? { verifiedAt: new Date(), verifiedByUserId: claims?.sub ?? null }
             : {}),

@@ -13,6 +13,7 @@ export * from './payment.js';
 export * from './partner-application.js';
 export * from './payout.js';
 export * from './permissions.js';
+export * from './compliance.js';
 export * from './property.js';
 export * from './scope.js';
 export * from './search.js';

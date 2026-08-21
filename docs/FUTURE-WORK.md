@@ -396,12 +396,32 @@ termination, and a deploy pipeline.
 
 ### M-2 — The sanctions feed is not activated
 
-**Status:** blocked on an external party · **Owner:** **Compliance, not engineering**
+**Status:** open, **no longer a launch blocker** · **Owner:** **Compliance, not engineering**
 
-Partner verification is a hard gate on sanctions screening, and the platform refuses to
-screen against a list older than **7 days** (`MAX_SNAPSHOT_AGE_DAYS`). Without an
-automated feed the list must be imported by hand and goes stale within a week, at which
-point **partner onboarding stops entirely**.
+**Downgraded 2026-08-21 (Bashar).** Partner verification used to be an unconditional hard
+gate on sanctions screening, and the platform refuses to screen against a list older than
+**7 days** (`MAX_SNAPSHOT_AGE_DAYS`) — so with no automated feed, onboarding stopped
+entirely and an external registration held up launch.
+
+The gate is now governed by `compliance.sanctions_screening`, **defaulted to `advisory`**:
+screening runs and is recorded, and it blocks nothing. Set it to `required` to restore the
+old behaviour on both partner approval and partner payout. Every approval stamps the policy
+that was in force onto `partners.sanctions_policy_at_approval`, so an approval made without
+a screening stays distinguishable, afterwards, from one where the control silently failed.
+
+**The review that produced this, including what was verified and what still needs counsel:
+[`sanctions-screening-review.md`](sanctions-screening-review.md).** Two findings from it
+belong here:
+
+- **The EU lifted its Syria economic sanctions on 29 May 2025**, keeping targeted
+  designations for former-regime figures, chemical weapons and the captagon trade. A
+  platform onboarding Syrian businesses is therefore where the residual list is _most_
+  likely to bite, not least.
+- Engineering recommended defaulting to `required`. `advisory` is Bashar's decision of
+  2026-08-21, taken with that stated.
+
+**Still open, and still worth doing:** the feed is what makes `required` usable at all, so
+this stays on the list. It just no longer stops a launch.
 
 **Blocked by:** nobody holds an EU Login account for the European Commission's Financial
 Sanctions Files (FSF) system, and the download token is issued to a registered account.

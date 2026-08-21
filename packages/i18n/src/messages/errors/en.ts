@@ -74,6 +74,8 @@ export const en = {
   'payout.already_final': 'This payout is final and cannot be changed.',
   'payout.nothing_to_pay': 'There is nothing payable in this period.',
   'payout.frozen_by_dispute': 'An open dispute freezes the payout for these bookings.',
+  'payout.partner_not_screened':
+    'This payout cannot be released before the partner has been screened.',
   'partner.already_verified': 'Partner is already verified.',
   'partner.profile_missing': 'This account is not linked to a partner profile.',
   'partner.type_unknown': 'Unknown partner type.',
@@ -123,6 +125,8 @@ export const en = {
   'geo.city_not_found': 'City not found.',
   'geo.currency_unknown': 'Unknown currency.',
   'setting.value_flat_or_percent': '{key} must be "flat" or "percent".',
+  'setting.value_sanctions_policy':
+    'The value of {key} must be required, advisory or off.',
   'setting.value_percent_range': '{key} must be a number between 0 and 100.',
   'setting.value_positive_int': '{key} must be a whole number of at least 1.',
   'setting.value_hour_of_day': '{key} must be an hour between 0 and 23.',

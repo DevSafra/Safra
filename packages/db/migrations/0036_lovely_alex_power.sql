@@ -1,0 +1,1 @@
+ALTER TABLE "partners" ADD COLUMN "sanctions_policy_at_approval" text;

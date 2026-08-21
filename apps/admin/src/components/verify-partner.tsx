@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { SanctionsPolicy } from '@safra/contracts';
+
 import { t } from '@/lib/strings';
 
 /**
@@ -18,9 +20,21 @@ import { t } from '@/lib/strings';
 export function VerifyPartner({
   reference,
   screened,
+  policy,
 }: {
   reference: string;
   screened: boolean;
+  /**
+   * How hard sanctions screening bites (Bashar, 2026-08-21).
+   *
+   * This control used to disable «الموافقة على الشريك» whenever no screening was recorded — a
+   * client-side mirror of the API's gate, and correct while that gate was unconditional. It is
+   * not any more: under `advisory` the API approves, so a disabled button here would refuse a
+   * decision the platform is willing to make, with no way for the reviewer to tell why.
+   *
+   * The API remains the boundary. This only decides what the screen offers.
+   */
+  policy: SanctionsPolicy;
 }) {
   const router = useRouter();
 
@@ -61,9 +75,16 @@ export function VerifyPartner({
 
   return (
     <div className="rounded-lg border border-line bg-card p-4">
-      {!screened ? (
+      {/*
+        Unscreened, and the warning says which world the reviewer is in. Nothing under `off`:
+        screening is not offered at all there, so "no screening recorded" is not a fact anybody
+        can act on and reads as an accusation about a control that was switched off deliberately.
+      */}
+      {!screened && policy !== 'off' ? (
         <p className="mb-3 rounded border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-gold">
-          {t.sections.verifyPartner.screeningRequired}
+          {policy === 'required'
+            ? t.sections.verifyPartner.screeningRequired
+            : t.sections.verifyPartner.screeningAdvisory}
         </p>
       ) : null}
 
@@ -77,9 +98,13 @@ export function VerifyPartner({
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={!screened}
+            disabled={!screened && policy === 'required'}
             onClick={() => setMode('approve')}
-            title={screened ? undefined : t.sections.verifyPartner.screeningRequiredTitle}
+            title={
+              screened || policy !== 'required'
+                ? undefined
+                : t.sections.verifyPartner.screeningRequiredTitle
+            }
             className="cursor-pointer rounded-lg bg-ok px-4 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40"
           >
             {t.sections.verifyPartner.approve}

@@ -124,6 +124,7 @@ export const ERROR = {
   PAYOUT_NOTHING_TO_PAY: 'payout.nothing_to_pay',
   /** A dispute that is open or investigating freezes the partner's entitlement. */
   PAYOUT_FROZEN_BY_DISPUTE: 'payout.frozen_by_dispute',
+  PAYOUT_PARTNER_NOT_SCREENED: 'payout.partner_not_screened',
   PARTNER_ALREADY_VERIFIED: 'partner.already_verified',
   PARTNER_PROFILE_MISSING: 'partner.profile_missing',
   PARTNER_TYPE_UNKNOWN: 'partner.type_unknown',
@@ -183,6 +184,7 @@ export const ERROR = {
   GEO_CITY_NOT_FOUND: 'geo.city_not_found',
   GEO_CURRENCY_UNKNOWN: 'geo.currency_unknown',
   SETTING_VALUE_FLAT_OR_PERCENT: 'setting.value_flat_or_percent',
+  SETTING_VALUE_SANCTIONS_POLICY: 'setting.value_sanctions_policy',
   SETTING_VALUE_PERCENT_RANGE: 'setting.value_percent_range',
   SETTING_VALUE_POSITIVE_INT: 'setting.value_positive_int',
   SETTING_VALUE_HOUR_OF_DAY: 'setting.value_hour_of_day',
