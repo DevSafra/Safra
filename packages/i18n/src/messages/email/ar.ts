@@ -73,6 +73,17 @@ export const ar = {
     renewal: 'تجديد سنوي',
   } as Record<string, string>,
 
+  /*
+    A partner has sent everything, and somebody has to look (Bashar, 2026-08-21).
+
+    Sent ONCE, when the last outstanding document arrives — not per file. Five uploads in a minute
+    is one thing to act on, and five emails about it is how a team learns to filter the sender.
+  */
+  partnerDocumentsComplete: {
+    subject: 'مستندات شريك بانتظار المراجعة — {reference}',
+    body: 'أرسل الشريك {displayName} ({reference}) كل المستندات المطلوبة، وهي بانتظار المراجعة.\n\nعدد المستندات المرسلة: {documentCount}\n\nافتح ملف الشريك لمراجعتها:\n{url}\n\nلوحة تحكم سفرة',
+  },
+
   partnerContractReady: {
     subject: 'عقد الشراكة جاهز للتوقيع — {partner}',
     body: 'رفع فريق سفرة عقد الشراكة الخاص بك ({kind}).\n\nيمكنك قراءته وتنزيله من لوحة الشريك:\n{url}\n\nبعد التوقيع أعد إرسال النسخة الموقّعة إلى فريق سفرة ليُسجّل التوقيع ويصبح العقد ساريًا.\n\nفريق سفرة',

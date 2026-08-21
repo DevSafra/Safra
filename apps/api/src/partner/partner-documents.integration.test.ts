@@ -7,6 +7,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import type { Env } from '../config/env.js';
+import type { MailService } from '../mail/mail.service.js';
 import {
   PartnerDocumentsService,
   detectType,
@@ -65,12 +67,34 @@ describeIfDb('partner verification documents', () => {
   let pdf: Buffer;
   let png: Buffer;
 
+  /**
+   * Every staff mail this service sends, captured rather than delivered.
+   *
+   * A recording double instead of a stub that returns void: the point of the notification is WHO
+   * it reaches and HOW OFTEN, and a stub can only prove it did not throw.
+   */
+  let sent: { to: string; subject: string }[];
+
   beforeEach(async () => {
     await harness.begin();
 
     db = harness.db;
     storage = new MemoryStorage();
-    documents = new PartnerDocumentsService(db, storage, new AuditService(db));
+    sent = [];
+
+    documents = new PartnerDocumentsService(
+      db,
+      { ADMIN_URL: 'https://console.example' } as Env,
+      storage,
+      new AuditService(db),
+      {
+        send: (mail: { to: string; subject: string }) => {
+          sent.push({ to: mail.to, subject: mail.subject });
+
+          return Promise.resolve();
+        },
+      } as unknown as MailService,
+    );
 
     // A minimal but genuine PDF, and a real PNG that sharp can decode.
     pdf = Buffer.from(
@@ -277,6 +301,146 @@ describeIfDb('partner verification documents', () => {
       ORDER BY created_at DESC LIMIT 1`);
 
     expect((rows.rows[0]?.after as { status?: string }).status).toBe('approved');
+  });
+
+  /**
+   * Telling staff that a partner's documents are all in (Bashar, 2026-08-21).
+   *
+   * ## What these are guarding
+   *
+   * The value of this notification is entirely in WHEN it fires. One email at the wrong moment is
+   * noise; five emails for one partner teaches a team to filter the sender, and then the one that
+   * mattered is filtered too. So the negative cases outnumber the positive one four to one.
+   *
+   * None of this is visible to a test that only checks "an email was sent".
+   */
+  describe('notifying staff when the documents are complete', () => {
+    const KINDS = [
+      'identity',
+      'commercial_register',
+      'ownership_proof',
+      'management_contract',
+      'bank_confirmation',
+    ] as const;
+
+    beforeEach(async () => {
+      /*
+        The recipients are counted, so the fixture cannot inherit the ones the database already
+        holds — the seeded console account is an active super admin, and every assertion below came
+        out one too high because of it. Suspended rather than deleted, and inside the harness's
+        transaction, so the developer database is exactly as it was a moment later.
+      */
+      await db.execute(sql`
+        UPDATE users SET status = 'suspended' WHERE role = 'super_admin' AND status = 'active'
+      `);
+
+      await db.execute(sql`
+        INSERT INTO users (email, role, status, preferred_locale)
+        VALUES (${`admin-${randomUUID().slice(0, 8)}@safra.test`}, 'super_admin', 'active', 'ar')
+      `);
+    });
+
+    const send = (kind: (typeof KINDS)[number]) =>
+      documents.upload(
+        partnerId,
+        kind,
+        { buffer: pdf, originalname: `${kind}.pdf`, mimetype: 'application/pdf' },
+        STAFF,
+      );
+
+    /** THE assertion: silent until the last one lands, then exactly one message. */
+    it('sends nothing until the final document arrives, then sends once', async () => {
+      for (const kind of KINDS.slice(0, 4)) await send(kind);
+
+      expect(sent, 'four of five must not notify anybody').toEqual([]);
+
+      await send(KINDS[4]);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.subject).toContain('PAR-');
+    });
+
+    /** A partner who sends the same kind twice has not completed anything. */
+    it('does not count one kind sent five times as a complete set', async () => {
+      for (let i = 0; i < 5; i += 1) await send('identity');
+
+      expect(sent).toEqual([]);
+    });
+
+    /** Replacing a document that was already fine is not new work, so it stays quiet. */
+    it('stays silent when a settled document is replaced', async () => {
+      for (const kind of KINDS) await send(kind);
+      expect(sent).toHaveLength(1);
+
+      await send('identity');
+
+      expect(
+        sent,
+        'a replacement of something already sent is not a new notification',
+      ).toHaveLength(1);
+    });
+
+    /**
+     * But re-sending a REJECTED one is new work, and must notify again — otherwise the second round
+     * of a review is the round nobody is told about.
+     */
+    it('notifies again when a rejected document is replaced', async () => {
+      for (const kind of KINDS) await send(kind);
+      expect(sent).toHaveLength(1);
+
+      const rows = await db.execute<{ id: string }>(sql`
+        SELECT id FROM partner_documents
+        WHERE partner_id = ${partnerId}::uuid AND kind = 'identity' LIMIT 1
+      `);
+
+      await documents.review(rows.rows[0]?.id ?? '', 'reject', 'غير واضح', STAFF);
+      await send('identity');
+
+      expect(sent).toHaveLength(2);
+    });
+
+    /** One message per super admin, and none to anybody else. */
+    it('writes to every active super admin and nobody else', async () => {
+      await db.execute(sql`
+        INSERT INTO users (email, role, status, preferred_locale)
+        VALUES (${`admin2-${randomUUID().slice(0, 8)}@safra.test`}, 'super_admin', 'active', 'ar'),
+               (${`ops-${randomUUID().slice(0, 8)}@safra.test`}, 'operations_manager', 'active', 'ar'),
+               (${`gone-${randomUUID().slice(0, 8)}@safra.test`}, 'super_admin', 'suspended', 'ar')
+      `);
+
+      for (const kind of KINDS) await send(kind);
+
+      /* Two active super admins: the one from beforeEach and the one added here. */
+      expect(sent).toHaveLength(2);
+      expect(sent.every((mail) => mail.to.startsWith('admin'))).toBe(true);
+    });
+
+    /** A mail failure must never cost the partner their upload. */
+    it('still stores the document when the mail cannot be sent', async () => {
+      const failing = new PartnerDocumentsService(
+        db,
+        { ADMIN_URL: 'https://console.example' } as Env,
+        storage,
+        new AuditService(db),
+        { send: () => Promise.reject(new Error('smtp down')) } as unknown as MailService,
+      );
+
+      for (const kind of KINDS) {
+        await failing.upload(
+          partnerId,
+          kind,
+          { buffer: pdf, originalname: `${kind}.pdf`, mimetype: 'application/pdf' },
+          STAFF,
+        );
+      }
+
+      const rows = await db.execute<{ n: string }>(sql`
+        SELECT COUNT(*)::text AS n FROM partner_documents
+        WHERE partner_id = ${partnerId}::uuid
+      `);
+
+      expect(Number(rows.rows[0]?.n)).toBe(KINDS.length);
+    });
   });
 });
 

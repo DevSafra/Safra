@@ -47,7 +47,8 @@ export type DashboardCounterName =
   | 'cancelled_today_with_fine'
   | 'partners_pending_verification'
   | 'properties_pending_review'
-  | 'partner_applications_open';
+  | 'partner_applications_open'
+  | 'partner_documents_pending_review';
 
 @Injectable()
 export class DashboardService {
@@ -159,6 +160,21 @@ export class DashboardService {
       SELECT 'properties_pending_review', COUNT(*)::text
         FROM properties pr WHERE pr.status = 'pending_review' AND pr.deleted_at IS NULL
           AND ${inScope('pr')}
+      UNION ALL
+      -- Documents a partner has SENT and nobody has looked at (Bashar, 2026-08-21).
+      --
+      -- The gap this closes: a partner uploading their documents changed nothing a staff member
+      -- could see. partners_pending_verification already counted them the day they were created,
+      -- so the number was the same before and after the upload — the one moment when there is
+      -- suddenly something to do produced no signal at all.
+      --
+      -- Counts DOCUMENTS rather than partners on purpose. Five arriving at once is five minutes
+      -- of review, and a row reading "1 partner" would understate it every time.
+      SELECT 'partner_documents_pending_review', COUNT(*)::text
+        FROM partner_documents pd
+        JOIN partners pdp ON pdp.id = pd.partner_id AND pdp.deleted_at IS NULL
+        WHERE pd.status = 'pending' AND pd.deleted_at IS NULL
+          AND ${inScope('pdp')}
       UNION ALL
       -- Requests to JOIN that nobody has decided yet.
       --

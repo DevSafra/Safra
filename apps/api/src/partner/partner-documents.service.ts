@@ -5,10 +5,13 @@ import { sql } from 'drizzle-orm';
 import sharp from 'sharp';
 
 import type { Database } from '@safra/db';
-import type { PartnerDocumentKind } from '@safra/contracts';
+import { PARTNER_DOCUMENT_KINDS, type PartnerDocumentKind } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
+import { ENV, type Env } from '../config/env.js';
+import { MailService } from '../mail/mail.service.js';
+import { partnerDocumentsCompleteMail } from '../mail/mail.templates.js';
 import { StorageService } from '../storage/storage.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR } from '@safra/contracts';
@@ -61,8 +64,10 @@ export class PartnerDocumentsService {
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
+    @Inject(ENV) private readonly env: Env,
     private readonly storage: StorageService,
     private readonly audit: AuditService,
+    private readonly mail: MailService,
   ) {}
 
   async upload(
@@ -98,6 +103,14 @@ export class PartnerDocumentsService {
     if (Number(existing.rows[0]?.count ?? 0) >= MAX_PER_PARTNER) {
       throw badRequest(ERROR.DOCUMENT_LIMIT_REACHED, { max: MAX_PER_PARTNER });
     }
+
+    /*
+      Whether this KIND was already covered, read before the insert.
+
+      It is half of "did this upload complete the set" — see `notifyStaffIfComplete`. Taken here
+      rather than inferred afterwards because after the insert the answer is always yes.
+    */
+    const kindWasSettled = await this.hasSettledDocument(partnerId, kind);
 
     const { body, contentType, extension } = await this.normalise(file.buffer, detected);
 
@@ -137,6 +150,23 @@ export class PartnerDocumentsService {
     });
 
     this.logger.log(`Partner ${partnerId} uploaded a ${kind} document.`);
+
+    /*
+      AFTER the commit, and it can never fail the upload.
+
+      A partner whose fifth document was stored successfully must not be told the upload failed
+      because an SMTP server was down — they would send it again, and the reviewer would get a
+      duplicate instead of a notification. `MailService.send` already resolves on failure; the
+      catch here covers the QUERIES, which do not.
+    */
+    await this.notifyStaffIfComplete(partnerId, kindWasSettled).catch(
+      (error: unknown) => {
+        this.logger.error(
+          `Could not notify staff about ${partnerId}'s documents: ` +
+            `${error instanceof Error ? error.message : String(error)}`,
+        );
+      },
+    );
 
     return {
       id: inserted.id,
@@ -340,6 +370,124 @@ export class PartnerDocumentsService {
       // Magic bytes said image, the decoder disagreed. Trust the decoder.
       throw badRequest(ERROR.UPLOAD_IMAGE_UNREADABLE);
     }
+  }
+
+  /** Whether this kind already has a document nobody has sent back. */
+  private async hasSettledDocument(
+    partnerId: string,
+    kind: PartnerDocumentKind,
+  ): Promise<boolean> {
+    const rows = await this.db.execute<{ present: boolean }>(sql`
+      SELECT EXISTS (
+        SELECT 1 FROM partner_documents
+        WHERE partner_id = ${partnerId} AND kind = ${kind}
+          AND status <> 'rejected' AND deleted_at IS NULL
+      ) AS present
+    `);
+
+    return rows.rows[0]?.present === true;
+  }
+
+  /**
+   * Tells staff, ONCE, that a partner's documents are all in (Bashar, 2026-08-21).
+   *
+   * ## The problem it closes
+   *
+   * A partner uploading their documents produced no signal a staff member could see. The console's
+   * verification queue counts partners `pending`, and a partner is pending from the day their
+   * account is made — so the number was identical before and after the upload. The one moment when
+   * there is suddenly work to do was the one moment nothing changed.
+   *
+   * ## Once, on the TRANSITION, not per file
+   *
+   * A partner sends five documents in a minute. Five emails about one thing to do is how a team
+   * learns to filter the sender, and then the sixth email — the one that mattered — is filtered
+   * too. So this fires only when the upload just made the set complete: everything settled now,
+   * and this kind outstanding a moment ago.
+   *
+   * That also makes a REPLACEMENT behave correctly in both directions. Re-sending a rejected
+   * document completes the set again and sends again, which is right — it is new work. Replacing a
+   * document that was already fine changes nothing and stays silent, which is also right.
+   *
+   * ## Who receives it
+   *
+   * Every active `super_admin`. Not a configured address, because an address in an env var is one
+   * more thing to keep in step with who actually works here, and it survives their leaving. Not
+   * every staff role either: `PARTNER_DOCUMENT_REVIEW` is held more widely, and a mailbox that
+   * fills with other people's queues is a mailbox nobody reads.
+   *
+   * ## What it does not do
+   *
+   * It does not fail the upload, it does not carry a document, and it does not name the staff
+   * addresses in the log — the audit of 2026-08-14 found exactly that shape and it is not being
+   * reintroduced for a count.
+   */
+  private async notifyStaffIfComplete(
+    partnerId: string,
+    kindWasSettled: boolean,
+  ): Promise<void> {
+    /* Already covered before this upload, so nothing transitioned. Cheapest check first. */
+    if (kindWasSettled) return;
+
+    const state = await this.db.execute<{
+      settled: string;
+      pending: string;
+      reference: string;
+      display_name: string;
+    }>(sql`
+      SELECT
+        (SELECT COUNT(DISTINCT kind)::text FROM partner_documents
+          WHERE partner_id = ${partnerId} AND status <> 'rejected' AND deleted_at IS NULL)
+          AS settled,
+        (SELECT COUNT(*)::text FROM partner_documents
+          WHERE partner_id = ${partnerId} AND status = 'pending' AND deleted_at IS NULL)
+          AS pending,
+        p.reference, p.display_name
+      FROM partners p
+      WHERE p.id = ${partnerId} AND p.deleted_at IS NULL
+    `);
+
+    const row = state.rows[0];
+
+    if (!row) return;
+    if (Number(row.settled) < PARTNER_DOCUMENT_KINDS.length) return;
+
+    const staff = await this.db.execute<{ email: string; locale: string }>(sql`
+      SELECT email, preferred_locale AS locale
+      FROM users
+      WHERE role = 'super_admin' AND status = 'active' AND deleted_at IS NULL
+    `);
+
+    if (staff.rows.length === 0) {
+      /* Worth a line: the platform has just decided nobody needs to know something. */
+      this.logger.warn(
+        `Partner ${partnerId} completed their documents and no active super admin exists to tell.`,
+      );
+
+      return;
+    }
+
+    const url = `${this.env.ADMIN_URL}/partners/${row.reference}`;
+
+    await Promise.all(
+      staff.rows.map((recipient) =>
+        this.mail.send(
+          partnerDocumentsCompleteMail({
+            to: recipient.email,
+            reference: row.reference,
+            displayName: row.display_name,
+            documentCount: Number(row.pending),
+            url,
+            locale: recipient.locale,
+          }),
+        ),
+      ),
+    );
+
+    /* The COUNT of recipients, never their addresses. */
+    this.logger.log(
+      `Notified ${staff.rows.length} super admin(s) that ${row.reference} completed their documents.`,
+    );
   }
 }
 

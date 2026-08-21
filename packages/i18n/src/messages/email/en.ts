@@ -52,6 +52,11 @@ export const en = {
     renewal: 'annual renewal',
   } as Record<string, string>,
 
+  partnerDocumentsComplete: {
+    subject: 'Partner documents awaiting review — {reference}',
+    body: 'The partner {displayName} ({reference}) has sent every required document, and they are waiting to be reviewed.\n\nDocuments sent: {documentCount}\n\nOpen the partner to review them:\n{url}\n\nSAFRA console',
+  },
+
   partnerContractReady: {
     subject: 'Your partnership contract is ready to sign — {partner}',
     body: 'Our team has uploaded your partnership contract ({kind}).\n\nYou can read and download it from your partner dashboard:\n{url}\n\nOnce you have signed it, return the signed copy to our team so the signature can be recorded and the contract becomes active.\n\nThe SAFRA team',

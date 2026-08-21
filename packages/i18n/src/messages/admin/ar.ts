@@ -175,6 +175,14 @@ export const ar = {
     attentionSla: 'حجز تنتهي مهلة تأكيده خلال 30 دقيقة',
     attentionPartners: 'شريك بانتظار التحقق من الوثائق',
     attentionProperties: 'عقار بانتظار المراجعة قبل النشر',
+    /*
+      Documents SENT, waiting to be looked at (Bashar, 2026-08-21).
+
+      Distinct from «شريك بانتظار التحقق»: a partner sits in that queue from the day their account
+      is made, whether or not they have sent anything. This row appears only when there is
+      something to read, which is what makes it a signal rather than a standing number.
+    */
+    attentionDocuments: 'مستند شراكة بانتظار المراجعة',
     handle: 'معالجة',
     systemActor: 'النظام',
     latestBookings: 'أحدث الحجوزات',

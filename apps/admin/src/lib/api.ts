@@ -73,6 +73,7 @@ const attentionSchema = z.object({
   partners_pending_verification: z.number(),
   partners_unscreened: z.number(),
   partner_applications_open: z.number(),
+  partner_documents_pending_review: z.number(),
   bookings_awaiting_confirmation: z.number(),
   bookings_sla_expiring_within_30m: z.number(),
 });
@@ -513,6 +514,7 @@ const dashboardSchema = z.object({
     partners_pending_verification: z.number(),
     properties_pending_review: z.number(),
     partner_applications_open: z.number(),
+    partner_documents_pending_review: z.number(),
     revenue_today_usd: z.string(),
     revenue_today_syp: z.string(),
   }),

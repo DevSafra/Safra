@@ -269,6 +269,47 @@ export function partnerInvitationMail(input: {
  * inbox that may be shared, and the dashboard already authenticates the reader and keeps every
  * superseded version — which is the record that answers "which terms were in force that day".
  */
+/**
+ * A partner has sent every document, and a reviewer has to look (Bashar, 2026-08-21).
+ *
+ * ## To STAFF, not to the partner
+ *
+ * The only outbound mail in this file whose recipient is one of ours, which is why the reference
+ * and the console URL are safe to put in it and why the copy speaks about the partner in the third
+ * person. The partner already knows what they sent; the person who does not is the one who has to
+ * act on it.
+ *
+ * ## What it deliberately does not carry
+ *
+ * No document, no link to one, and no contact details. A verification document is an identity
+ * document — the thing §14 is most careful with — and an email is the least controlled place it
+ * could be. The mail carries a REFERENCE and a URL into the console, where the reader is
+ * authenticated, permissioned and audited on every view. That is the whole design: the email is a
+ * pointer, never a copy.
+ */
+export function partnerDocumentsCompleteMail(input: {
+  to: string;
+  reference: string;
+  displayName: string;
+  documentCount: number;
+  url: string;
+  locale: string;
+}): OutgoingMail {
+  const messages = emailMessages(resolveLocale(input.locale));
+  const copy = messages.partnerDocumentsComplete;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { reference: input.reference }),
+    text: fill(copy.body, {
+      reference: input.reference,
+      displayName: input.displayName,
+      documentCount: input.documentCount,
+      url: input.url,
+    }),
+  };
+}
+
 export function partnerContractReadyMail(input: {
   to: string;
   partner: string;

@@ -52,6 +52,11 @@ export const de = {
     renewal: 'Jahresverlängerung',
   } as Record<string, string>,
 
+  partnerDocumentsComplete: {
+    subject: 'Partnerdokumente zur Prüfung — {reference}',
+    body: 'Der Partner {displayName} ({reference}) hat alle erforderlichen Dokumente eingereicht; sie warten auf Prüfung.\n\nEingereichte Dokumente: {documentCount}\n\nPartner öffnen und prüfen:\n{url}\n\nSAFRA-Konsole',
+  },
+
   partnerContractReady: {
     subject: 'Ihr Partnervertrag liegt zur Unterschrift bereit — {partner}',
     body: 'Unser Team hat Ihren Partnervertrag hochgeladen ({kind}).\n\nSie können ihn in Ihrem Partner-Dashboard lesen und herunterladen:\n{url}\n\nSenden Sie die unterschriebene Fassung anschließend an unser Team zurück, damit die Unterschrift erfasst wird und der Vertrag in Kraft tritt.\n\nIhr SAFRA-Team',

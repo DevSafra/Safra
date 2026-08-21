@@ -677,6 +677,13 @@ export class ReviewService {
       SELECT 'partners_unscreened', COUNT(*)::text
         FROM partners WHERE sanctions_screened_at IS NULL AND deleted_at IS NULL
       UNION ALL
+      -- Documents sent and not yet looked at. See the note on the same counter in
+      -- DashboardService: the upload itself moved no number that staff could see.
+      SELECT 'partner_documents_pending_review', COUNT(*)::text
+        FROM partner_documents pd
+        JOIN partners pdp ON pdp.id = pd.partner_id AND pdp.deleted_at IS NULL
+        WHERE pd.status = 'pending' AND pd.deleted_at IS NULL
+      UNION ALL
       SELECT 'bookings_awaiting_confirmation', COUNT(*)::text
         FROM bookings WHERE status = 'pending_confirmation' AND deleted_at IS NULL
       UNION ALL
