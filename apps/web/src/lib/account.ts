@@ -15,6 +15,40 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
  * worst bug this app could ship. Hence `cache: 'no-store'` on every call, without an
  * option to change it.
  */
+/**
+ * What a refused status means to an account page — and specifically, what it does NOT mean.
+ *
+ * ## 401 and 403 are not the same thing, and treating them as one told the reader a lie
+ *
+ * They were folded together, so `customer.profile_missing` — an account with no customer profile,
+ * which the API refuses precisely and correctly — reached محفظتي as «انتهت الجلسة، سجّل الدخول
+ * مجدداً». That is false: the session is valid. Worse, it is a LOOP — signing in again produces
+ * the same token, the same 403 and the same sentence, so the one action the page recommends is the
+ * one action that cannot possibly help. There are 2,997 partner accounts on this platform, a
+ * partner may sign in on the customer site (only staff are refused there), and none of them has a
+ * customer profile. Found on 2026-08-21 by Bashar, on his own account.
+ *
+ * ## Why 403 becomes `failed` rather than a fourth outcome
+ *
+ * Deliberately the SMALL fix. `failed` makes the page say «تعذّر التحميل» — vague, but true —
+ * instead of a specific claim that is false and points the reader the wrong way. Saying something
+ * genuinely useful («هذا حساب شريك، ولوحة العميل ليست له») needs a page state that sixteen account
+ * pages do not have; that is `O-web-1`, not something to smuggle in here.
+ *
+ * Exported for its test. The mapping is three lines and one of them was wrong for months, which is
+ * the argument for testing it rather than for trusting it.
+ */
+export function refusalFor(status: number): 'unauthenticated' | 'failed' | null {
+  /*
+    401: the token expired between middleware's check and this fetch, or was revoked mid-request.
+    A sign-in prompt is the right answer and the customer's next navigation refreshes.
+  */
+  if (status === 401) return 'unauthenticated';
+  if (status === 403) return 'failed';
+
+  return null;
+}
+
 async function authedFetch<T>(
   path: string,
   schema: z.ZodType<T>,
@@ -36,13 +70,9 @@ async function authedFetch<T>(
     return 'failed';
   }
 
-  /**
-   * A 401 here means the token expired between middleware's check and this fetch,
-   * or was revoked mid-request. Reported as unauthenticated so the page renders a
-   * sign-in prompt rather than an error — the customer's next navigation passes
-   * through middleware and refreshes.
-   */
-  if (response.status === 401 || response.status === 403) return 'unauthenticated';
+  const refusal = refusalFor(response.status);
+
+  if (refusal) return refusal;
 
   if (!response.ok) return 'failed';
 
