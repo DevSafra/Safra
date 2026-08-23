@@ -16,6 +16,7 @@ export * from './partner-contract.js';
 export * from './partner-onboarding.js';
 export * from './payout.js';
 export * from './permissions.js';
+export * from './permission-groups.js';
 export * from './compliance.js';
 export * from './property.js';
 export * from './scope.js';
