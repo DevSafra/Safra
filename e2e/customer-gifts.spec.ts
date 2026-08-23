@@ -401,8 +401,14 @@ test.describe('بطاقات الهدايا', () => {
     const spent = new Set<string>();
 
     for (let page_ = 0; page_ < 20; page_ += 1) {
-      for (const row of await page.locator('#disputes-list li').all()) {
-        const text = (await row.textContent()) ?? '';
+      /*
+        ONE call, not a handle per row.
+
+        `.all()` snapshots the COUNT and then re-resolves `nth(i)` against the live DOM for each
+        read, so a navigation landing mid-loop leaves it waiting for a row the new page does not
+        have. `allTextContents()` is a single call and cannot straddle one.
+      */
+      for (const text of await page.locator('#disputes-list li').allTextContents()) {
         const booking = /BKG-[\d-]+/.exec(text)?.[0];
 
         for (const [kind, label] of Object.entries(en.disputeKinds)) {
@@ -414,8 +420,28 @@ test.describe('بطاقات الهدايا', () => {
 
       if ((await more.count()) === 0) break;
 
+      /*
+        Wait for THIS cursor, not for any cursor (O-e2e-2, diagnosed 2026-08-23).
+
+        This was `waitForURL(/cursor=/)`, which matches the URL the loop is already ON from the
+        second iteration onward — so it returned instantly and waited for nothing. The loop then
+        read the list while the client-side navigation was still in flight: `.all()` took its count
+        from page two's ten rows, the DOM became page three's one row underneath it, and `nth(8)`
+        waited for a ninth row that would never exist until the 30s budget was gone.
+        `customer-gifts.spec.ts:40` was the only red in the suite for that reason.
+
+        It is also why the earlier attempt at this MOVED the failure onto «Show more» rather than
+        curing it: making the read atomic left the un-awaited navigation in place, so the next
+        thing the loop touched was the link being detached under it. The read method was never the
+        cause. Both fixes are needed and neither is sufficient alone.
+
+        The link's own href is the exact destination, so waiting for it is a real wait rather than
+        a predicate that happens to be true already.
+      */
+      const next = await more.getAttribute('href');
+
       await more.click();
-      await page.waitForURL(/cursor=/);
+      await page.waitForURL((url) => `${url.pathname}${url.search}` === next);
     }
 
     /* Back to the form, which only the first page carries. */
