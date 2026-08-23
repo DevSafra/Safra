@@ -1713,6 +1713,12 @@ export const ar = {
     gift_card: 'بطاقة هدية',
     partner: 'شريك',
     partner_contract: 'عقد شراكة',
+    /* The role definition itself, not an employee — `EmployeeRolesService` audits against it. */
+    partner_employee_role: 'دور موظف شريك',
+    /* A role definition for SAFRA's OWN staff — «مدير عام», «مشرف حجوزات». */
+    staff_role: 'دور موظف سفرة',
+    /* The employment itself — invited, role changed, suspended. Not the role definition above. */
+    partner_employee: 'موظف شريك',
     partner_payout: 'مستحقات شريك',
     property: 'عقار',
     property_image: 'صورة عقار',
@@ -2050,6 +2056,15 @@ export const ar = {
     payloadKey: {
       reason: 'السبب',
       reference: 'المرجع',
+      /*
+        Generic enough to be shared, and both arrive from `partner_employee_role.*`: a role's audit
+        row carries its name and its capability set on both sides of an edit, which is what makes
+        "what changed" answerable later.
+      */
+      name: 'الاسم',
+      permissions: 'القدرات',
+      /* Which role an employee was put on. The id, because the NAME can since have changed. */
+      roleId: 'معرّف الدور',
       /*
         Whether an in-person onboarding ADOPTED an existing account or made a new one
         (`partner.onboarded_in_person`). Named as a question about the account rather than as a

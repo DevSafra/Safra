@@ -232,8 +232,25 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
         <span className="break-all text-text">
           {row.actorEmail ?? t.admin.systemActor}
         </span>
-        {row.actorRole ? (
-          <span className="text-[10px] text-faint">{roleName(row.actorRole)}</span>
+        {/*
+          The role NAME as recorded, in preference to translating its code (Bashar, 2026-08-23).
+
+          Staff roles are rows now, so a super admin can rename «مشرف حجوزات» or retire it — and
+          `roleName()` is a compile-time catalogue that can only ever know the four seeded ones.
+          Resolving a dynamic role through it would print the raw identifier, which is exactly what
+          «partner_employee» did on this screen an hour ago.
+
+          `actor_role_name` is written at action time and immutable, so this says what the actor's
+          authority was CALLED then rather than what that role is called now. The fallback covers
+          every row written before the column existed.
+
+          The condition reads either field: a row with a name and no enum value must still render,
+          which is what every row written for a custom role will look like.
+        */}
+        {(row.actorRoleName ?? row.actorRole) ? (
+          <span className="text-[10px] text-faint">
+            {row.actorRoleName ?? roleName(row.actorRole ?? undefined)}
+          </span>
         ) : null}
       </div>
     ),

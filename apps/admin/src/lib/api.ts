@@ -344,6 +344,18 @@ const auditEntrySchema = z.object({
   subjectId: z.string().nullable(),
   actorEmail: z.string().nullable(),
   actorRole: z.string().nullable(),
+  /*
+    The role's NAME as it was at the time of the action (Bashar, 2026-08-23).
+
+    Written into `audit_log` when the row is created and never resolved through a catalogue,
+    because staff roles are now rows a super admin can rename or retire — and a trail that a later
+    edit can re-label is not a trail. `actorRole` stays for the four seeded roles and for every row
+    written before this column existed.
+
+    Optional so the console renders against an API that has not been redeployed, rather than
+    failing the whole parse and blanking سجل التدقيق.
+  */
+  actorRoleName: z.string().nullable().optional(),
   before: z.unknown(),
   after: z.unknown(),
   reason: z.string().nullable(),
