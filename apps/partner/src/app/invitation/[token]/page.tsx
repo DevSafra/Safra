@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 
+import { ORNAMENT_BRAND } from '@safra/ui';
+
 import { InvitationForm } from '@/components/invitation-form';
 import { t } from '@/lib/strings';
 
@@ -45,17 +47,51 @@ export default async function InvitationPage({
 }) {
   const { token } = await params;
 
+  /*
+    The sign-in shell, exactly (Bashar, 2026-08-21).
+
+    This page was built in a hurry to unblock the joining journey and got its own layout: wider,
+    left-aligned, an ornament typed as a literal `۞`, and the form loose on the background with no
+    card. It looked like a different product.
+
+    The login page's own note gives the reason this matters, and it applies here with more force:
+    a page that does not look like the product it belongs to is indistinguishable from a phishing
+    page — and unlike sign-in, THIS page is reached from a link in an email, which is where
+    phishing starts. It also asks somebody to choose a password, which is the single most valuable
+    thing on it.
+
+    So the shell is the same object: `max-w-sm`, centred, brand ornament, heading, subtitle, form
+    in a card. The ornament comes from `@safra/ui` rather than being typed out, so the two screens
+    cannot drift by somebody editing one glyph.
+  */
   return (
-    <main className="mx-auto grid min-h-dvh w-full max-w-md content-center gap-6 px-6 py-12">
-      <header className="grid gap-2">
-        <p className="text-sm text-gold">۞ {t.login.title}</p>
-        <h1 className="text-2xl font-extrabold text-text">{t.invitation.title}</h1>
-        <p className="text-sm leading-relaxed text-muted">{t.invitation.intro}</p>
-      </header>
+    <main className="mx-auto grid min-h-screen max-w-sm content-center px-4">
+      <div className="w-full">
+        {/* `aria-hidden`: an ornament is a glyph, and a screen reader announcing it says nothing. */}
+        <p className="text-3xl text-gold text-center" aria-hidden>
+          {ORNAMENT_BRAND}
+        </p>
 
-      <InvitationForm token={token} />
+        <h1 className="mt-3 text-2xl font-semibold text-text text-center">
+          {t.invitation.title}
+        </h1>
+        <p className="mt-1 text-sm leading-relaxed text-muted text-center">
+          {t.invitation.intro}
+        </p>
 
-      <p className="text-xs leading-relaxed text-faint">{t.invitation.afterNote}</p>
+        <div className="mt-8 rounded-xl border border-line bg-card p-6">
+          <InvitationForm token={token} />
+        </div>
+
+        {/*
+          Under the card, not inside it. It describes what happens AFTER this form is finished, and
+          a note about the next screen sitting among this screen's fields reads as an instruction
+          for them.
+        */}
+        <p className="mt-6 text-xs leading-relaxed text-faint text-center">
+          {t.invitation.afterNote}
+        </p>
+      </div>
     </main>
   );
 }

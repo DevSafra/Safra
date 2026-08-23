@@ -40,7 +40,7 @@ export default async function LoginPage({
   const next = safeRedirect(query['next'], '');
 
   return (
-    <main className="mx-auto grid min-h-screen max-w-sm place-content-center px-4">
+    <main className="mx-auto grid min-h-screen max-w-sm content-center px-4">
       <div className="w-full">
         {/* `aria-hidden`: an ornament is a glyph, and a screen reader announcing it says nothing. */}
         <p className="text-3xl text-gold text-center" aria-hidden>
