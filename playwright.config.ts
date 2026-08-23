@@ -71,7 +71,7 @@ export default defineConfig({
         file that does not exist yet.
       */
       testIgnore:
-        /(partner|partner-images|partner-screens|partner-sidebar|partner-calendars|customer-review|customer-invoices|customer-gifts|partner-support|auth-throttle|three-apps-together)\.spec\.ts/,
+        /(partner|partner-images|partner-screens|partner-sidebar|partner-calendars|partner-employees|customer-review|customer-invoices|customer-gifts|partner-support|auth-throttle|three-apps-together)\.spec\.ts/,
     },
     /**
      * Everything that SIGNS IN, run after everything else.
@@ -114,7 +114,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['signed-in-setup'],
       testMatch:
-        /(partner|partner-images|partner-screens|partner-sidebar|partner-calendars|customer-review|customer-invoices|customer-gifts|partner-support|auth-throttle|three-apps-together)\.spec\.ts/,
+        /(partner|partner-images|partner-screens|partner-sidebar|partner-calendars|partner-employees|customer-review|customer-invoices|customer-gifts|partner-support|auth-throttle|three-apps-together)\.spec\.ts/,
     },
   ],
 });
