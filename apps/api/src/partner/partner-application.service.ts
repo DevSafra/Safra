@@ -20,19 +20,10 @@ import { TokenService } from '../auth/token.service.js';
 import {
   partnerApplicationReceivedMail,
   partnerApplicationRejectedMail,
-  partnerInvitationMail,
 } from '../mail/mail.templates.js';
+import { PartnerInvitationService } from './partner-invitation.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
-
-/**
- * How long an invitation link lives.
- *
- * Seventy-two hours: an invitation is EXPECTED, unlike a password reset, and the recipient has
- * just been telephoned — but it is also the only thing standing between an inbox and a partner
- * account, so it does not live for a week.
- */
-const INVITATION_TTL_MS = 72 * 60 * 60 * 1000;
 
 /** `PRQ-000031`. Bounded before it reaches a query; the lookup is parameterised regardless. */
 const REFERENCE_PATTERN = /^PRQ-\d{1,12}$/;
@@ -181,6 +172,7 @@ export class PartnerApplicationService {
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
     @Inject(ENV) private readonly env: Env,
+    private readonly invitations: PartnerInvitationService,
   ) {}
 
   /**
@@ -765,26 +757,28 @@ export class PartnerApplicationService {
     return { email: row.email, locale: row.locale };
   }
 
+  /**
+   * Delegates to `PartnerInvitationService`, which is the only place a partner invitation is
+   * issued.
+   *
+   * It used to build the token and the mail here. Onboarding in person needs the same link with
+   * the same lifetime (Bashar, 2026-08-23), and two copies of "how long is an invitation valid"
+   * is one more than can stay in step.
+   *
+   * The ADDRESS still comes from the application row rather than the account: a request should
+   * say where SAFRA wrote, not where that account's address has since moved to.
+   */
   private async sendInvitation(
     userId: string,
     row: Pick<ApplicationRow, 'email' | 'preferred_locale'>,
     partnerReference: string,
   ): Promise<void> {
-    const { token } = await this.authTokens.issue(
+    await this.invitations.send({
       userId,
-      'partner_invitation',
-      INVITATION_TTL_MS,
-    );
-
-    await this.mail.send(
-      partnerInvitationMail({
-        to: row.email,
-        reference: partnerReference,
-        url: new URL(`/invitation/${token}`, this.env.PARTNER_URL).toString(),
-        locale: row.preferred_locale,
-        expiresInHours: INVITATION_TTL_MS / 3_600_000,
-      }),
-    );
+      to: row.email,
+      partnerReference,
+      locale: row.preferred_locale,
+    });
   }
 
   /** Built from the configured `APP_URL`, never from a request — the same rule as every other mail. */

@@ -12,6 +12,7 @@ import type { PasswordService } from '../common/crypto/password.service.js';
 import type { TokenService } from '../auth/token.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { PartnerApplicationService } from './partner-application.service.js';
+import { PartnerInvitationService } from './partner-invitation.service.js';
 
 /**
  * «انضم كشريك», against a real PostgreSQL.
@@ -134,6 +135,15 @@ describeIfDb('PartnerApplicationService', () => {
       PARTNER_URL: 'https://partner.safra.test',
     } as unknown as Env;
 
+    /*
+      The real invitation service, over the same fake token service and mailbox.
+
+      Constructed rather than stubbed on purpose: it is the thing that decides an invitation's
+      lifetime and the URL it points at, and the assertions below read both out of `sent`. A stub
+      here would let those two facts change without a single test noticing.
+    */
+    const invitations = new PartnerInvitationService(authTokens, mail, env);
+
     service = new PartnerApplicationService(
       db,
       audit,
@@ -142,6 +152,7 @@ describeIfDb('PartnerApplicationService', () => {
       passwords,
       tokens,
       env,
+      invitations,
     );
 
     await seed(db);

@@ -18,6 +18,7 @@ import {
   PartnerInvitationController,
 } from './partner-application.controller.js';
 import { PartnerApplicationService } from './partner-application.service.js';
+import { PartnerInvitationService } from './partner-invitation.service.js';
 import {
   PartnerContractReadService,
   PartnerContractsController,
@@ -51,6 +52,12 @@ import { PropertyImageService } from './property-images.service.js';
     PartnerApplicationService,
     PartnerContractReadService,
     PartnerDocumentsService,
+    /*
+      One invitation path, shared. Accepting a request is the only route to a partner account
+      today; a second one is coming, and two copies of "how long is an invitation valid" would
+      drift without ever failing a test.
+    */
+    PartnerInvitationService,
   ],
   exports: [PropertiesService, CalendarService, PartnerApplicationService],
 })
