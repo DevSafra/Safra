@@ -457,6 +457,122 @@ export const ar = {
       note: 'Score يبدأ من 100: الرد السريع والتقييم المرتفع يرفعانه؛ التأخر والإلغاء وعدم تحديث التوفر يخفضونه — ويؤثر على ترتيب «موصى به من سفرة». لا حذف نهائي لأي شريك (P-003): Suspend / Deactivate فقط.',
       contracts: 'عقود الشراكة',
       pendingTitle: 'بانتظار الموافقة — التحقق قبل النشر (P-002)',
+      /* The entry point to تسجيل شريك جديد, on the registry card (Bashar, 2026-08-23). */
+      onboard: 'تسجيل شريك جديد',
+    },
+
+    /*
+      ── تسجيل شريك جديد ─────────────────────────────────────────────────────────────────────
+      المدير العام والشريك في الغرفة نفسها (Bashar, 2026-08-23). النصوص تخاطب المدير العام وهو
+      جالس مع الشريك، فتقول ما سيحدث للطرف الآخر بصيغة يستطيع أن يقرأها بصوت عالٍ: «سيصل الشريك
+      رابط…» لا «تم إنشاء الحساب».
+    */
+    partnerOnboarding: {
+      title: 'تسجيل شريك جديد',
+      subtitle:
+        'للشريك الحاضر شخصياً — البيانات والمستندات والعقد والموافقة في جلسة واحدة',
+      intro:
+        'استخدم هذه الشاشة عندما يكون الشريك معك. تُنشئ السجل والحساب، ثم تُكمل المستندات والعقد والموافقة من الشاشة التالية دون انتظار أي بريد.',
+      /*
+        Said on the form, before anything is written, because it is the sentence the super admin
+        has to be able to say out loud to the person opposite them — and because an operator who
+        expects to type a password needs to learn otherwise here rather than at the end.
+      */
+      passwordNote:
+        'لن تُنشئ كلمة مرور للشريك ولن تراها. يصل الشريك رابط دعوة إلى بريده يضبط منه كلمة مروره بنفسه، وصلاحية الرابط 72 ساعة. يمكن إكمال بقية الخطوات الآن دون انتظاره.',
+
+      /* ── The form ── */
+      businessSection: 'بيانات النشاط',
+      contactSection: 'بيانات التواصل',
+      contactName: 'اسم الشخص المسؤول',
+      contactNameHint: 'الشخص الجالس معك. الكيان القانوني لا يجيب على الهاتف.',
+      email: 'البريد الإلكتروني للشريك',
+      emailHint:
+        'إليه تُرسل الدعوة، ومنه يدخل الشريك بعد ذلك. تحقّق من الحرف الأخير قبل الحفظ.',
+      phone: 'رقم الهاتف',
+      legalName: 'الاسم القانوني',
+      legalNameHint: 'كما هو في السجل التجاري.',
+      displayName: 'الاسم المعروض',
+      displayNameHint: 'ما يراه العملاء. قد يختلف عن الاسم القانوني.',
+      partnerType: 'نوع النشاط',
+      city: 'المدينة',
+      address: 'العنوان',
+      website: 'الموقع الإلكتروني (اختياري)',
+      locale: 'لغة المخاطبة',
+      localeHint: 'بها تُكتب الدعوة وكل رسالة بعدها.',
+      notes: 'سبب التسجيل المباشر',
+      notesHint:
+        'مطلوب، ويُسجَّل في سجل التدقيق. هذا المسار يتجاوز طابور «طلبات الشراكة»، فهذه الملاحظة هي كل ما يشرح لاحقاً من كان في الغرفة ولماذا.',
+      submit: 'إنشاء السجل ومتابعة التسجيل',
+      submitting: 'جارٍ الإنشاء…',
+      cancel: 'إلغاء',
+
+      /* ── Errors ── */
+      failed: 'تعذّر إنشاء السجل. حاول مرة أخرى.',
+      unreachable: 'تعذّر الوصول إلى الخادم.',
+      fixFields: 'راجع الحقول المُعلَّمة بالأحمر.',
+
+      /* ── The stepped screen ── */
+      stepsTitle: 'خطوات التسجيل',
+      /*
+        Said once, at the top: the reader needs to know the record already exists before they read
+        a list of things that are still outstanding, or the screen reads as a failure.
+      */
+      created: 'أُنشئ السجل {reference}. أُرسلت الدعوة إلى {email}.',
+      createdExistingAccount:
+        'أُنشئ السجل {reference}. لهذا البريد حساب على سفرة بالفعل، والرابط المُرسل إلى {email} يرقّيه إلى حساب شريك.',
+      mailMayLag: 'إن لم يصل الرابط، يمكن إعادة إرساله من صفحة الشريك.',
+      stepDone: 'تم',
+      stepOutstanding: 'مطلوب',
+      stepOptional: 'اختياري',
+      openPartner: 'فتح صفحة الشريك',
+
+      step1: 'بيانات الشريك',
+      step2: 'المستندات',
+      step3: 'العقد',
+      step4: 'فحص العقوبات',
+      step5: 'الموافقة',
+
+      /* ── Documents ── */
+      documentsIntro:
+        'ارفع مستندات الشريك من الأصل الذي بين يديك. المستندات تُفحص كما لو رفعها الشريك بنفسه، ويُسجَّل في سجل التدقيق أنك من رفعها.',
+      documentsRequired: 'المطلوب قبل الموافقة: {kinds}',
+      documentsComplete: 'وصلت كل المستندات المطلوبة.',
+      documentKind: 'نوع المستند',
+      documentFile: 'الملف',
+      documentFileHint: 'صورة أو PDF، حتى 8 ميغابايت.',
+      upload: 'رفع المستند',
+      uploading: 'جارٍ الرفع…',
+      uploaded: 'رُفع {kind}.',
+      uploadFailed: 'تعذّر رفع المستند.',
+      uploadTooLarge: 'الملف أكبر من الحد المسموح (8 ميغابايت). اختر ملفاً أصغر.',
+      noDocumentsYet: 'لم يُرفع أي مستند بعد.',
+      /* The pseudo-kind `missingOnboardingDocuments` returns when neither alternative is present. */
+      rightToLet: 'إثبات الملكية أو عقد الإدارة',
+
+      /* ── The contract and the approval, both of which live on the partner page ── */
+      /*
+        The ORDER, and only the order.
+
+        The «رفع نسخة جديدة يُلغي توقيع الشريك» warning deliberately is NOT here. It lives on
+        `partnerContract.replaceWarning`, which the contract panel shows only when there is a
+        signature to invalidate — and the panel renders directly beneath this line. Stating it
+        unconditionally here would put a permanent warning next to a conditional one on the same
+        screen, and two warnings that disagree about whether something is a risk teach an operator
+        to read neither.
+      */
+      contractIntro:
+        'أنشئ العقد، اطبعه، ووقّعاه معاً، ثم ارفع نسخة سفرة الموقّعة ونسخة الشريك الموقّعة — بهذا الترتيب.',
+      contractStateNone: 'لم يُنشأ عقد بعد.',
+      contractStateDraft: 'أُنشئ العقد وينتظر توقيع سفرة.',
+      contractStateAwaitingPartner: 'وُقّع من سفرة وينتظر توقيع الشريك.',
+      contractStateActive: 'وقّع الطرفان والعقد ساري المفعول.',
+      approvalIntro:
+        'الموافقة هي الخطوة الأخيرة، وهي وحدها ما يتيح نشر عقارات هذا الشريك (P-002). تُنفَّذ من صفحة الشريك بصلاحية الموافقة على الشركاء.',
+      approvalDone: 'تمت الموافقة على الشريك.',
+      approvalPending: 'لم تصدر الموافقة بعد.',
+      screeningDone: 'سُجِّل فحص العقوبات.',
+      screeningPending: 'لم يُسجَّل فحص العقوبات بعد.',
     },
 
     properties: {

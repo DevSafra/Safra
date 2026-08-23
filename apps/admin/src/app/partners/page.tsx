@@ -69,6 +69,26 @@ export default async function PartnersPage({
     <ConsoleShell title={t.nav.partners} subtitle={t.partners.subtitle} counts={counts}>
       <div className="grid gap-4">
         <ConsolePanel title={t.sections.partners.title}>
+          {/*
+            تسجيل شريك جديد — the way in to the in-person flow (Bashar, 2026-08-23).
+
+            On the registry card rather than in the page header, because it belongs to «الشركاء»
+            and not to the screen: the header already carries the section title, the date and the
+            role, and a phone cannot hold a fourth thing on that line — the wrap read as two
+            headers the last time something was added there.
+
+            An anchor styled as a control needs `inline-flex min-h-10` below `lg`: `min-height`
+            does nothing to an inline element, so the global 40px touch floor cannot reach it.
+          */}
+          <div className="mb-3 flex justify-end">
+            <Link
+              href="/partners/new"
+              className="inline-flex min-h-10 items-center rounded-lg border border-ok/40 px-4 py-2 text-[12.5px] font-semibold text-ok hover:bg-ok/5 lg:min-h-0"
+            >
+              {t.sections.partners.onboard}
+            </Link>
+          </div>
+
           <TableToolbar
             action="/partners"
             query={q}
