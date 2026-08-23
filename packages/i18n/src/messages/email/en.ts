@@ -62,6 +62,11 @@ export const en = {
     body: 'SAFRA has signed the partnership agreement and sent it to you.\n\nOpen «العقود والمستندات» in the partner portal, download the contract, sign it by hand, then upload the signed copy from the same page.\n\n{url}\n\nThe agreement takes effect once your signed copy arrives.\n\nThe SAFRA team',
   },
 
+  partnerContractCountersigned: {
+    subject: 'Your copy of the signed partnership agreement — {reference}',
+    body: 'Both parties have signed the partnership agreement and it is now in force.\n\nYour copy is kept on the Contracts and documents page of your partner dashboard, and you can download it at any time:\n{url}\n\nThe SAFRA team',
+  },
+
   partnerContractReturned: {
     subject: 'Partner returned a signed contract — {reference}',
     body: 'The partner {displayName} ({reference}) has returned the partnership agreement signed by hand, and it is now in force.\n\nOpen the partner to review the signed copy and continue:\n{url}\n\nSAFRA console',

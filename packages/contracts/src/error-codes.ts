@@ -184,6 +184,14 @@ export const ERROR = {
   CONTRACT_PDF_REQUIRED: 'contract.pdf_required',
   CONTRACT_NOT_SIGNABLE: 'contract.not_signable',
   CONTRACT_NOT_REOPENABLE: 'contract.not_reopenable',
+  /**
+   * A joint upload was attempted for a partner who is no longer being ADDED.
+   *
+   * One scan carrying both signatures is the in-person onboarding path (Bashar, 2026-08-23). Once
+   * a partner is approved — or rejected — their agreement changes hands the ordinary way, where
+   * each signature is something the signer's own account did. `canFileJointContract` is the rule.
+   */
+  CONTRACT_JOINT_NOT_ALLOWED: 'contract.joint_not_allowed',
   CONTRACT_NOT_AWAITING_SIGNATURE: 'contract.not_awaiting_signature',
   DISPUTE_NOT_FOUND: 'dispute.not_found',
   DISPUTE_ALREADY_CLOSED: 'dispute.already_closed',

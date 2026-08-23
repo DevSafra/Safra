@@ -307,6 +307,35 @@ export class CommsController {
   }
 
   /**
+   * ONE scan carrying BOTH signatures, filed by staff — the in-person onboarding path.
+   *
+   * Available only while the partner is still being ADDED (Bashar, 2026-08-23). That is enforced
+   * in the service, from the predicate the console reads to decide whether to show the button, so
+   * a hidden control and a refused request are never in disagreement. The permission is the same
+   * one that governs every other contract write; the boundary here is the partner's state, not the
+   * caller's role.
+   */
+  @Post('partner-contracts/:id/joint-signed-copy')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @RequirePermissions(P.PARTNER_CONTRACT_MANAGE)
+  async uploadJointSignedCopy(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(signedCopySchema)) body: SignedCopyInput,
+    @Req() request: { ip?: string; headers: Record<string, unknown> },
+  ) {
+    return {
+      contracts: await this.contracts.uploadJointSignedCopy(user, id, body, {
+        ipAddress: request.ip,
+        userAgent:
+          typeof request.headers['user-agent'] === 'string'
+            ? request.headers['user-agent']
+            : undefined,
+      }),
+    };
+  }
+
+  /**
    * The contract file itself — needed because staff must print it to sign it.
    *
    * `attachment` and `nosniff`, exactly as the partner's download does: `inline` would render a

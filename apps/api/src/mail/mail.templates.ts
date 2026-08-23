@@ -348,6 +348,34 @@ export function partnerContractAwaitingSignatureMail(input: {
 }
 
 /**
+ * The partner's own copy of a contract that BOTH parties signed in person (Bashar, 2026-08-23).
+ *
+ * To the PARTNER, so it carries no console URL and speaks to them directly. It exists because a
+ * joint upload is the only path where a contract becomes binding without the partner touching the
+ * platform: they signed a sheet of paper across a desk and left. Every other route to `active` is
+ * one the partner performed themselves and already has the file from.
+ *
+ * It does not attach the PDF. The document is behind the partner's own authenticated download, and
+ * a signed commercial agreement is not something to put in an unencrypted mailbox — the link is
+ * the copy, and it is a link to a page that asks who they are.
+ */
+export function partnerContractCountersignedMail(input: {
+  to: string;
+  reference: string;
+  url: string;
+  locale: string;
+}): OutgoingMail {
+  const messages = emailMessages(resolveLocale(input.locale));
+  const copy = messages.partnerContractCountersigned;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { reference: input.reference }),
+    text: fill(copy.body, { url: input.url }),
+  };
+}
+
+/**
  * The partner has signed and returned it; the contract is in force.
  *
  * To STAFF, so the reference and the console URL are safe to carry, and the partner is spoken of

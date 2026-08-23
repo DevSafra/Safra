@@ -62,6 +62,11 @@ export const de = {
     body: 'SAFRA hat den Partnervertrag unterzeichnet und Ihnen zugesandt.\n\nÖffnen Sie «العقود والمستندات» im Partnerportal, laden Sie den Vertrag herunter, unterschreiben Sie ihn handschriftlich und laden Sie die unterschriebene Fassung auf derselben Seite wieder hoch.\n\n{url}\n\nDer Vertrag tritt in Kraft, sobald Ihre unterschriebene Fassung eingegangen ist.\n\nIhr SAFRA-Team',
   },
 
+  partnerContractCountersigned: {
+    subject: 'Ihre Ausfertigung des unterzeichneten Partnervertrags — {reference}',
+    body: 'Beide Parteien haben den Partnervertrag unterzeichnet; er ist ab sofort in Kraft.\n\nIhre Ausfertigung liegt auf der Seite «Verträge und Dokumente» in Ihrem Partner-Dashboard und kann jederzeit heruntergeladen werden:\n{url}\n\nIhr SAFRA-Team',
+  },
+
   partnerContractReturned: {
     subject: 'Partner hat den Vertrag unterschrieben zurückgesandt — {reference}',
     body: 'Der Partner {displayName} ({reference}) hat den Partnervertrag handschriftlich unterschrieben zurückgesandt; er ist nun in Kraft.\n\nPartner öffnen und die unterschriebene Fassung prüfen:\n{url}\n\nSAFRA-Konsole',

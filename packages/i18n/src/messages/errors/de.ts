@@ -123,6 +123,8 @@ export const de = {
     'Dieser Vertrag kann in seinem aktuellen Zustand nicht unterzeichnet werden.',
   'contract.not_reopenable':
     'Nur ein vollständig unterzeichneter Vertrag kann wieder geöffnet werden.',
+  'contract.joint_not_allowed':
+    'Eine von beiden Seiten unterzeichnete Kopie kann nur w\u00e4hrend der Aufnahme eines Partners hinterlegt werden. Nutzen Sie den regul\u00e4ren Weg: SAFRA-Kopie hochladen, dann auf die Unterschrift des Partners warten.',
   'contract.not_awaiting_signature':
     'Nur ein Vertrag, der auf die Signatur wartet, kann als signiert markiert werden.',
   'dispute.not_found': 'Streitfall nicht gefunden.',

@@ -103,6 +103,8 @@ export const en = {
   'contract.pdf_required': 'A contract must be a PDF of 10MB or less.',
   'contract.not_signable': 'This contract cannot be signed in its current state.',
   'contract.not_reopenable': 'Only a fully signed contract can be re-opened.',
+  'contract.joint_not_allowed':
+    'A jointly signed copy can only be filed while a partner is being added. Use the ordinary path: upload SAFRA\u2019s copy, then wait for the partner to sign.',
   'contract.not_awaiting_signature': 'Only a contract awaiting signature can be signed.',
   'dispute.not_found': 'Dispute not found.',
   'dispute.already_closed': 'This dispute is already closed.',

@@ -851,6 +851,195 @@ describeIfDb('contract signing', () => {
     });
   });
 
+  // ── One scan, both signatures, filed in the room ────────────────────────────
+
+  /**
+   * The in-person path (Bashar, 2026-08-23).
+   *
+   * Both people sign one sheet across a desk, staff scan it once, and the contract is binding
+   * without the partner ever touching the platform. Everything below is about the two properties
+   * that makes true: the RECORD says both parties signed one document, and the door is open only
+   * while the partner is still being ADDED.
+   */
+  describe('a jointly signed copy', () => {
+    const joint = () => ({ content: PDF, fileName: 'both-signed.pdf' });
+
+    const verificationTo = async (value: string) => {
+      await db.execute(
+        sql`UPDATE partners SET verification = ${value}::verification_status WHERE id = ${partnerId}::uuid`,
+      );
+    };
+
+    const signatures = async () => {
+      const rows = await db.execute<{
+        party: string;
+        file_key: string;
+        live: boolean;
+      }>(sql`
+        SELECT party::text, file_key, superseded_at IS NULL AS live
+        FROM partner_contract_signatures
+        WHERE contract_id = ${contractId}::uuid
+        ORDER BY party
+      `);
+
+      return rows.rows;
+    };
+
+    it('takes the contract straight to active from a draft', async () => {
+      await service.uploadJointSignedCopy(staff(), contractId, joint(), ctx);
+
+      expect(await statusOf()).toBe('active');
+    });
+
+    /** It NEVER passes through the partner's step — there is no send and no return trip. */
+    it('records both parties against one file', async () => {
+      await service.uploadJointSignedCopy(staff(), contractId, joint(), ctx);
+
+      const live = (await signatures()).filter((row) => row.live);
+
+      expect(live.map((row) => row.party)).toEqual(['partner', 'safra']);
+      expect(new Set(live.map((row) => row.file_key)).size).toBe(1);
+    });
+
+    it('sets both the sent and the signed date', async () => {
+      await service.uploadJointSignedCopy(staff(), contractId, joint(), ctx);
+
+      const rows = await db.execute<{ sent: boolean; signed: boolean }>(sql`
+        SELECT sent_at IS NOT NULL AS sent, signed_at IS NOT NULL AS signed
+        FROM partner_contracts WHERE id = ${contractId}::uuid
+      `);
+
+      expect(rows.rows[0]).toEqual({ sent: true, signed: true });
+    });
+
+    /** Over a contract already in flight: the sheet on the table wins, the rest is history. */
+    it('supersedes whatever either side had on file', async () => {
+      await service.uploadSafraSignedCopy(staff(), contractId, upload(), ctx);
+      await service.uploadJointSignedCopy(staff(), contractId, joint(), ctx);
+
+      const all = await signatures();
+
+      expect(all.filter((row) => row.live)).toHaveLength(2);
+      expect(all.filter((row) => !row.live)).toHaveLength(1);
+    });
+
+    it('sends the partner their countersigned copy, not a request to sign', async () => {
+      await service.uploadJointSignedCopy(staff(), contractId, joint(), ctx);
+
+      /* The address is the partner USER's, read back rather than assumed — the fixture generates it. */
+      const account = await db.execute<{ email: string }>(sql`
+        SELECT u.email FROM partners p JOIN users u ON u.id = p.user_id
+        WHERE p.id = ${partnerId}::uuid
+      `);
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.to).toBe(account.rows[0]?.email);
+      /* The awaiting-signature subject would ask them to do a thing the API then refuses. */
+      expect(sent[0]?.subject).not.toContain('جاهز لتوقيعك');
+    });
+
+    /** The audit row says JOINT — otherwise it reads as a partner signature filed by staff. */
+    it('marks the audit row as joint', async () => {
+      await service.uploadJointSignedCopy(staff(), contractId, joint(), ctx);
+
+      const rows = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM audit_log
+        WHERE subject_id = ${contractId}::uuid
+          AND action = 'partner_contract.countersigned'
+          AND after->>'joint' = 'true'
+      `);
+
+      expect(rows.rows[0]?.n).toBe('1');
+    });
+
+    // ── The boundary, which is the authorization ──────────────────────────────
+
+    it('is allowed while the partner is under review', async () => {
+      await verificationTo('in_review');
+      await service.uploadJointSignedCopy(staff(), contractId, joint(), ctx);
+
+      expect(await statusOf()).toBe('active');
+    });
+
+    /**
+     * THE refusal. Once a partner is live their agreement changes hands the ordinary way, so that
+     * each signature is something the signer's own account did — and by then they can, because
+     * their invitation has been redeemed.
+     */
+    it('is refused once the partner is approved', async () => {
+      await verificationTo('approved');
+
+      await expect(
+        service.uploadJointSignedCopy(staff(), contractId, joint(), ctx),
+      ).rejects.toMatchObject({ response: { code: ERROR.CONTRACT_JOINT_NOT_ALLOWED } });
+    });
+
+    /**
+     * And refused for a REJECTED partner, which a `!== 'approved'` guard would have allowed.
+     *
+     * Filing a signed partnership agreement for somebody the platform turned down records an
+     * agreement with a party we declined to do business with.
+     */
+    it('is refused for a rejected partner', async () => {
+      await verificationTo('rejected');
+
+      await expect(
+        service.uploadJointSignedCopy(staff(), contractId, joint(), ctx),
+      ).rejects.toMatchObject({ response: { code: ERROR.CONTRACT_JOINT_NOT_ALLOWED } });
+    });
+
+    /** A refused attempt writes nothing — not the file rows, not the status. */
+    it('leaves no trace when it is refused', async () => {
+      await verificationTo('approved');
+
+      await service
+        .uploadJointSignedCopy(staff(), contractId, joint(), ctx)
+        .catch(() => undefined);
+
+      expect(await signatures()).toEqual([]);
+      expect(await statusOf()).toBe('draft');
+    });
+
+    it('refuses anything that is not a PDF', async () => {
+      await expect(
+        service.uploadJointSignedCopy(
+          staff(),
+          contractId,
+          { content: Buffer.from('not a pdf').toString('base64'), fileName: 'x.pdf' },
+          ctx,
+        ),
+      ).rejects.toMatchObject({ response: { code: ERROR.CONTRACT_PDF_REQUIRED } });
+    });
+
+    it('answers a contract that does not exist the same as one that is not there', async () => {
+      await expect(
+        service.uploadJointSignedCopy(
+          staff(),
+          '00000000-0000-0000-0000-0000000000ee',
+          joint(),
+          ctx,
+        ),
+      ).rejects.toMatchObject({ response: { code: ERROR.CONTRACT_NOT_FOUND } });
+    });
+
+    /** The partner can fetch the document they signed — the `partner` row is what resolves it. */
+    it('leaves the partner able to download the signed contract', async () => {
+      await service.uploadJointSignedCopy(staff(), contractId, joint(), ctx);
+
+      const reader = new PartnerContractReadService(
+        db,
+        {
+          get: (key: string) => Promise.resolve(stored.get(key) ?? null),
+        } as unknown as StorageService,
+        new AuditService(db),
+      );
+
+      await expect(reader.read(contractId, partnerId, partner())).resolves.toMatchObject({
+        fileName: 'both-signed.pdf',
+      });
+    });
+  });
+
   // ── Handing the step back ───────────────────────────────────────────────────
 
   /**

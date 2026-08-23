@@ -12,12 +12,13 @@ import { StorageService } from '../storage/storage.service.js';
 import { MailService } from '../mail/mail.service.js';
 import {
   partnerContractAwaitingSignatureMail,
+  partnerContractCountersignedMail,
   partnerContractReadyMail,
   partnerContractReturnedMail,
 } from '../mail/mail.templates.js';
 import { ENV, type Env } from '../config/env.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { ERROR } from '@safra/contracts';
+import { canFileJointContract, ERROR } from '@safra/contracts';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { renderContractHtml } from './contract-template.js';
@@ -644,6 +645,44 @@ export class PartnerContractService {
   }
 
   /**
+   * Sends the partner their COUNTERSIGNED contract (Bashar, 2026-08-23).
+   *
+   * The two-step flow never needed this: the partner made the contract `active` themselves, from
+   * their own account, so they already knew and already held the file. A joint upload is the first
+   * path where a contract becomes binding without the partner touching the platform at all — they
+   * signed on paper and walked out — so without this the only record they hold is the sheet in
+   * their hand.
+   *
+   * Deliberately NOT `partnerContractAwaitingSignatureMail`: that one asks them to sign, and the
+   * API would refuse them if they tried, which is the worst kind of instruction to send somebody.
+   */
+  private async notifyPartnerContractCountersigned(
+    partnerReference: string,
+  ): Promise<void> {
+    const rows = await this.db.execute<{ email: string; locale: string }>(sql`
+      SELECT u.email, u.preferred_locale AS locale
+      FROM partners p JOIN users u ON u.id = p.user_id
+      WHERE p.reference = ${partnerReference} AND p.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const partner = rows.rows[0];
+
+    if (!partner) return;
+
+    await this.mail.send(
+      partnerContractCountersignedMail({
+        to: partner.email,
+        reference: partnerReference,
+        url: new URL('/contracts', this.env.PARTNER_URL).toString(),
+        locale: partner.locale,
+      }),
+    );
+
+    this.logger.log(`Sent ${partnerReference} their countersigned contract.`);
+  }
+
+  /**
    * Tells the super admins that a partner has returned a signed contract.
    *
    * Every active `super_admin`, the same recipients and reasoning as the documents notification:
@@ -1037,6 +1076,181 @@ export class PartnerContractService {
     });
 
     return this.list(partnerReference);
+  }
+
+  /**
+   * ONE scan carrying BOTH signatures, filed by staff (Bashar, 2026-08-23).
+   *
+   * ## The case
+   *
+   * The super admin and the partner are at the same table. They print the contract, both sign the
+   * same sheet, and it is scanned once. There is no send and no return trip — the two-step flow
+   * describes a journey neither of them is making, and before this the operator had to pretend to
+   * make it: upload as SAFRA, then have the partner sign in from an account whose password they
+   * had not set yet, which is a wall rather than a step.
+   *
+   * ## Only while the partner is still being ADDED
+   *
+   * Bashar's constraint, and it is enforced here rather than by hiding a button: refused once the
+   * partner is `approved`. "Adding a new partner" is precisely the window before verification
+   * completes; afterwards they are a live counterparty and a change to their contract goes through
+   * the ordinary two-step flow, where each side signs from their own account and the record says so.
+   *
+   * A hidden control is not an authorization decision. Without this check the route would be
+   * callable by any staff account holding the contract permission, against any partner on the
+   * platform, and would write a `partner` signature row for somebody who never signed anything.
+   *
+   * ## Two rows, one file
+   *
+   * Both signatures are on one page, so both rows carry the same `file_key` and the same
+   * `file_hash`. That is the honest record: two signatures, one document. Writing one row would
+   * lose the fact that the partner signed at all, and the partner-facing download resolves through
+   * `party = 'partner'` — so a single `safra` row would leave the partner unable to fetch the very
+   * document they signed.
+   *
+   * ## `party = 'partner'` written by a staff account
+   *
+   * Deliberate, and the schema's docblock was corrected in the same change to stop claiming
+   * otherwise. `contract_signature_party` answers "whose signature is on this paper" — and the
+   * partner's ink genuinely is. "Who put the file there" is a different question, and
+   * `uploaded_by_user_id` already answers it. A third enum value would encode in one column what
+   * two columns already say, at the cost of a migration and a new case in every reader.
+   */
+  async uploadJointSignedCopy(
+    actor: AccessTokenClaims | undefined,
+    contractId: string,
+    input: { content: string; fileName: string },
+    context: { ipAddress?: string | undefined; userAgent?: string | undefined },
+  ): Promise<ContractRow[]> {
+    const bytes = Buffer.from(input.content, 'base64');
+
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_BYTES) {
+      throw badRequest(ERROR.CONTRACT_PDF_REQUIRED);
+    }
+
+    /* Magic bytes, not the declared type — the same check every other upload here makes. */
+    if (bytes.subarray(0, 5).toString('latin1') !== '%PDF-') {
+      throw badRequest(ERROR.CONTRACT_PDF_REQUIRED);
+    }
+
+    const found = await this.db.execute<{
+      id: string;
+      status: string;
+      partner_id: string;
+      partner_reference: string;
+      verification: string;
+      document_hash: string | null;
+    }>(sql`
+      SELECT c.id, c.status::text AS status, c.partner_id, c.document_hash,
+             p.reference AS partner_reference, p.verification::text AS verification
+      FROM partner_contracts c
+      JOIN partners p ON p.id = c.partner_id
+      WHERE c.id = ${contractId}::uuid AND c.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const contract = found.rows[0];
+
+    if (!contract) throw notFound(ERROR.CONTRACT_NOT_FOUND);
+
+    /*
+      The onboarding-only boundary, from the predicate the CONSOLE also reads — so the button is
+      absent in exactly the cases this refuses. See `canFileJointContract` for why the rule is
+      "still being added" rather than "not approved": a rejected partner is excluded too, and
+      writing `!== 'approved'` here would have filed a signed agreement for somebody the platform
+      turned down.
+    */
+    if (!canFileJointContract(contract.verification)) {
+      throw conflict(ERROR.CONTRACT_JOINT_NOT_ALLOWED);
+    }
+
+    /*
+      Every live state. The operator may have generated it days ago and even sent it, and then the
+      partner walked in — in which case the sheet on the table supersedes whatever was in flight.
+    */
+    if (!['draft', 'awaiting_partner_signature', 'active'].includes(contract.status)) {
+      throw conflict(ERROR.CONTRACT_NOT_SIGNABLE);
+    }
+
+    const fileHash = createHash('sha256').update(bytes).digest('hex');
+
+    /* A uuid, not just the millisecond — see `recordSignedCopy` for what a collision destroys. */
+    const key =
+      `partner-contracts/${contract.partner_id}/` +
+      `signed-joint-${Date.now()}-${randomUUID()}.pdf`;
+
+    await this.storage.put(key, bytes, 'application/pdf');
+
+    await this.db.transaction(async (tx) => {
+      /* Whatever either side had on file stops being live. Superseded, never deleted. */
+      await tx.execute(sql`
+        UPDATE partner_contract_signatures
+        SET superseded_at = now()
+        WHERE contract_id = ${contract.id}::uuid AND superseded_at IS NULL
+      `);
+
+      /*
+        Both rows point at the SAME object. `party` is the only thing that differs, which is what
+        the partial unique index on (contract_id, party) WHERE superseded_at IS NULL expects.
+      */
+      for (const party of ['safra', 'partner'] as const) {
+        await tx.execute(sql`
+          INSERT INTO partner_contract_signatures
+            (contract_id, party, uploaded_by_user_id, file_key, file_name, size_bytes,
+             file_hash, original_hash, ip_address, user_agent)
+          VALUES (${contract.id}::uuid, ${party}::contract_signature_party,
+                  ${actor?.sub}::uuid, ${key}, ${safeContractFileName(input.fileName)},
+                  ${bytes.byteLength}, ${fileHash}, ${contract.document_hash},
+                  ${context.ipAddress ?? null}, ${context.userAgent ?? null})
+        `);
+      }
+
+      /*
+        Straight to `active`, with both dates set. It was never "sent" in the postal sense, but
+        `sent_at` means "the partner has had this document" and they have — they signed it.
+      */
+      await tx.execute(sql`
+        UPDATE partner_contracts
+        SET status = 'active'::partner_contract_status,
+            sent_at = now(), signed_at = now(), updated_at = now()
+        WHERE id = ${contract.id}::uuid
+      `);
+
+      await this.audit.record(
+        {
+          actorUserId: actor?.sub,
+          actorRole: actor?.role,
+          action: 'partner_contract.countersigned',
+          subjectType: 'partner_contract',
+          subjectId: contract.id,
+          before: { status: contract.status },
+          /*
+            `joint` is the fact that separates this row from an ordinary countersignature: one
+            document, both parties, filed by staff. Without it the log would show a partner
+            signature uploaded by a staff account and no way to tell that from a mistake.
+          */
+          after: {
+            status: 'active',
+            party: 'joint',
+            joint: true,
+            fileHash,
+            sizeBytes: bytes.byteLength,
+          },
+        },
+        tx as unknown as Database,
+      );
+    });
+
+    await this.notifyPartnerContractCountersigned(contract.partner_reference).catch(
+      (error: unknown) => {
+        this.logger.error(
+          `Could not send ${contract.partner_reference} their countersigned contract: ` +
+            `${error instanceof Error ? error.message : String(error)}`,
+        );
+      },
+    );
+
+    return this.list(contract.partner_reference);
   }
 
   /**

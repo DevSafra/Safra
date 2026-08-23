@@ -1834,6 +1834,12 @@ export const ar = {
         disputed.
       */
       invalidatedPartnerSignature: 'أُلغي توقيع الشريك',
+      /*
+        Set on `partner_contract.countersigned` when ONE scan carried both signatures and staff
+        filed it — the in-person path. Without it the log shows a `partner` signature uploaded by a
+        staff account, which is indistinguishable from a mistake.
+      */
+      joint: 'نسخة موقّعة من الطرفين',
       notes: 'ملاحظات',
       total: 'الإجمالي',
       currency: 'العملة',

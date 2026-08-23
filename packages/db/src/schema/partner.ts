@@ -459,7 +459,24 @@ export const partnerContracts = pgTable(
 export const contractSignatureParty = pgEnum('contract_signature_party', [
   /** SAFRA GmbH, signed by hand and uploaded by a member of staff acting for it. */
   'safra',
-  /** The partner, signed by hand and uploaded from their own account. */
+  /**
+   * The partner, signed BY HAND — and filed either from their own account or by staff.
+   *
+   * The second clause changed on 2026-08-23 and the change matters. This value used to mean
+   * "uploaded from their own account", and a joint upload broke that: when both parties sign one
+   * sheet across a desk during onboarding, staff file the single scan and it produces a `partner`
+   * row whose `uploaded_by_user_id` is a staff id.
+   *
+   * That is deliberate rather than a compromise. This column answers **whose signature is on this
+   * paper**, and on a joint document the partner's ink genuinely is; **who put the file there** is
+   * a different question, and `uploaded_by_user_id` already answers it. A third enum value would
+   * encode in one column what two columns already say, at the price of a migration and a new case
+   * in every reader.
+   *
+   * The docblock is corrected rather than left alone because a record that quietly disagrees with
+   * its own documentation is worse than either option — the same reasoning as
+   * `sanctions_policy_at_approval`. `after.joint` on the audit row marks which rows these are.
+   */
   'partner',
 ]);
 

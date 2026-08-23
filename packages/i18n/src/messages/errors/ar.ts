@@ -99,6 +99,8 @@ export const ar = {
   'contract.pdf_required': 'يجب أن يكون العقد ملف PDF بحجم 10 ميغابايت أو أقل.',
   'contract.not_signable': 'لا يمكن توقيع هذا العقد في حالته الحالية.',
   'contract.not_reopenable': 'لا يمكن إعادة فتح هذا العقد إلا بعد توقيع الطرفين.',
+  'contract.joint_not_allowed':
+    'لا يمكن رفع نسخة موقّعة من الطرفين إلا أثناء إضافة الشريك. استخدم المسار المعتاد: ارفع نسخة سفرة ثم انتظر توقيع الشريك.',
   'contract.not_awaiting_signature': 'لا يمكن تسجيل التوقيع إلا على عقد بانتظار التوقيع.',
   'dispute.not_found': 'لم يُعثر على هذا النزاع.',
   'dispute.already_closed': 'هذا النزاع مغلق بالفعل.',
