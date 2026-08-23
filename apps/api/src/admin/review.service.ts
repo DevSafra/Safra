@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -18,6 +18,9 @@ import {
 import { AuditService } from '../common/audit/audit.service.js';
 import { SanctionsService } from '../sanctions/sanctions.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { MailService } from '../mail/mail.service.js';
+import { partnerApprovedMail } from '../mail/mail.templates.js';
+import { ENV, type Env } from '../config/env.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import {
@@ -43,11 +46,15 @@ import {
  */
 @Injectable()
 export class ReviewService {
+  private readonly logger = new Logger(ReviewService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly sanctions: SanctionsService,
     private readonly settings: SettingsService,
+    private readonly mail: MailService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   /**
@@ -631,7 +638,64 @@ export class ReviewService {
       }
     });
 
+    /*
+      Tell the partner, AFTER the commit and never blocking it (Bashar, 2026-08-21).
+
+      Approval is the moment the portal opens, and until now nothing said so: a partner learned
+      they were approved by signing in and noticing the sidebar had grown. The mail names what is
+      newly possible rather than only that a status changed.
+
+      Approval only. A rejection has its own conversation — a partner told "the outcome is
+      recorded" by an automated message would be worse than being telephoned, which is what the
+      journey actually calls for.
+
+      A failure here cannot undo a verification that has already committed, so it is logged and
+      swallowed. The partner is approved either way, and the portal shows it.
+    */
+    if (input.decision === 'approve') {
+      await this.notifyPartnerApproved(partner.id, reference).catch((error: unknown) => {
+        this.logger.error(
+          `Could not tell ${reference} they were approved: ` +
+            `${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+    }
+
     return { reference, verification: nextStatus };
+  }
+
+  /**
+   * "Your account is approved and the portal is open."
+   *
+   * `users.email` rather than `partners.email`: the account is what receives platform mail, and
+   * the two can differ. The partner's own locale, for the same reason every other outbound message
+   * uses it.
+   */
+  private async notifyPartnerApproved(
+    partnerId: string,
+    reference: string,
+  ): Promise<void> {
+    const rows = await this.db.execute<{ email: string; locale: string }>(sql`
+      SELECT u.email, u.preferred_locale AS locale
+      FROM partners p JOIN users u ON u.id = p.user_id
+      WHERE p.id = ${partnerId}::uuid AND p.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const partner = rows.rows[0];
+
+    if (!partner) return;
+
+    await this.mail.send(
+      partnerApprovedMail({
+        to: partner.email,
+        reference,
+        url: new URL('/', this.env.PARTNER_URL).toString(),
+        locale: partner.locale,
+      }),
+    );
+
+    this.logger.log(`Told ${reference} that their account is approved.`);
   }
 
   /** Records that screening was performed, with the provider's raw result. */

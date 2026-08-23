@@ -6,8 +6,9 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
-import { ReviewService } from './review.service.js';
+import type { MailService } from '../mail/mail.service.js';
 import type { Env } from '../config/env.js';
+import { ReviewService } from './review.service.js';
 import { SanctionsService } from '../sanctions/sanctions.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 
@@ -50,6 +51,8 @@ describeIfDb('verification queues', () => {
       new AuditService(db),
       new SanctionsService(db, { NODE_ENV: 'test' } as Env),
       new SettingsService(db),
+      { send: () => Promise.resolve() } as unknown as MailService,
+      { PARTNER_URL: 'https://partner.example' } as Env,
     );
 
     reference = await createPendingPartnerWithDocument(db);

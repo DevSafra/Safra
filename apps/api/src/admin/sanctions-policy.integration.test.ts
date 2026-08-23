@@ -10,6 +10,8 @@ import {
 } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import type { MailService } from '../mail/mail.service.js';
+import type { Env } from '../config/env.js';
 import { ReviewService } from './review.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -44,6 +46,9 @@ describeIfDb('the sanctions screening policy', () => {
   let settings: SettingsService;
   let partnerReference = '';
 
+  /** Every mail the approval path sends, captured rather than delivered. */
+  let sent: { to: string; subject: string }[] = [];
+
   let staffUserId = '';
 
   /*
@@ -75,8 +80,22 @@ describeIfDb('the sanctions screening policy', () => {
   beforeEach(async () => {
     await harness.begin();
 
+    sent = [];
     settings = new SettingsService(db);
-    review = new ReviewService(db, new AuditService(db), {} as never, settings);
+    review = new ReviewService(
+      db,
+      new AuditService(db),
+      {} as never,
+      settings,
+      {
+        send: (mail: { to: string; subject: string }) => {
+          sent.push({ to: mail.to, subject: mail.subject });
+
+          return Promise.resolve();
+        },
+      } as unknown as MailService,
+      { PARTNER_URL: 'https://partner.example' } as Env,
+    );
 
     /*
       The row may predate this feature on a database seeded before it existed.
@@ -239,6 +258,49 @@ describeIfDb('the sanctions screening policy', () => {
 
       expect((await stored())?.policy).toBe(DEFAULT_SANCTIONS_POLICY);
     }
+  });
+
+  /**
+   * The partner is TOLD when they are approved (Bashar, 2026-08-21).
+   *
+   * Approval is the moment the portal opens, and nothing said so: a partner found out by signing
+   * in and noticing the sidebar had grown. Sent on approval only — a rejection is a conversation,
+   * and an automated "the outcome is recorded" would be worse than a phone call.
+   */
+  describe('telling the partner', () => {
+    beforeEach(() => setPolicy('advisory'));
+
+    it('emails the partner when they are approved', async () => {
+      await approve();
+
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.subject).toContain(partnerReference);
+    });
+
+    it('says nothing on a rejection', async () => {
+      await review.verifyPartner(staff(), partnerReference, {
+        decision: 'reject',
+        notes: 'الوثائق غير مكتملة',
+      });
+
+      expect(sent).toEqual([]);
+    });
+
+    /** And an approval that FAILS to send is still an approval. */
+    it('approves even when the mail cannot be sent', async () => {
+      const failing = new ReviewService(
+        db,
+        new AuditService(db),
+        {} as never,
+        settings,
+        { send: () => Promise.reject(new Error('smtp down')) } as unknown as MailService,
+        { PARTNER_URL: 'https://partner.example' } as Env,
+      );
+
+      await failing.verifyPartner(staff(), partnerReference, { decision: 'approve' });
+
+      expect((await stored())?.verification).toBe('approved');
+    });
   });
 
   /** A rejection has nothing to explain: nobody gets near any money. */

@@ -5,6 +5,8 @@ import { ERROR } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { SettingsService } from '../settings/settings.service.js';
+import type { MailService } from '../mail/mail.service.js';
+import type { Env } from '../config/env.js';
 import { ReviewService } from './review.service.js';
 import { codeOf } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -71,7 +73,14 @@ describeIfDb('the verification screens honour a city scope', () => {
   beforeEach(async () => {
     await harness.begin();
     db = harness.db;
-    review = new ReviewService(db, {} as never, {} as never, new SettingsService(db));
+    review = new ReviewService(
+      db,
+      {} as never,
+      {} as never,
+      new SettingsService(db),
+      { send: () => Promise.resolve() } as unknown as MailService,
+      { PARTNER_URL: 'https://partner.example' } as Env,
+    );
 
     const cities = await db.execute<{ id: string }>(sql`
       SELECT id::text FROM cities WHERE deleted_at IS NULL ORDER BY slug LIMIT 2
