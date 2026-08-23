@@ -3,6 +3,7 @@ import 'server-only';
 import { redirect } from 'next/navigation';
 
 import { getMyProfile, type PartnerProfile } from '@/lib/api';
+import { getPartnerSession } from '@/lib/session-server';
 
 /**
  * Where an unverified partner is sent, and the one page they are not sent away from.
@@ -69,4 +70,35 @@ export function isLocked(
   if (profile === 'failed' || profile === 'unauthenticated') return false;
 
   return profile.verification !== 'approved';
+}
+
+/**
+ * Whether the signed-in reader is a partner's EMPLOYEE rather than the account owner.
+ *
+ * ## Why a screen needs to ask
+ *
+ * The portal admits two roles since 2026-08-23 and they are not interchangeable. `partnerId` is
+ * the same for both — an employee sees the business's bookings and calendars, which is the point —
+ * but the OWNER'S OWN surfaces are not theirs: the partnership agreement and the verification
+ * documents are guarded by `PARTNER_CONTRACT_SIGN_OWN` and `PARTNER_DOCUMENT_MANAGE_OWN`, and an
+ * employee holds neither.
+ *
+ * Without this, an employee reaching العقود والمستندات gets two 403s, `partnerFetch` reports them
+ * as `'unauthenticated'` — deliberately, because a page cannot usefully distinguish them — and the
+ * screen says «انتهت الجلسة». That sends somebody to sign in again over a permission, which will
+ * not help and cannot be got out of. An employee of an UNVERIFIED partner is redirected here by
+ * the gate, so it is a loop rather than a wrong sentence.
+ *
+ * ## Read from the SESSION, not from the profile
+ *
+ * `/partner/me` answers about the BUSINESS and returns the same thing to both roles. The role is a
+ * property of the reader, and the only place that knows it is their own token.
+ *
+ * This is not a security boundary and must not be mistaken for one: the API refuses an employee at
+ * those routes on its own authority. This decides which SENTENCE to show instead of a refusal.
+ */
+export async function isEmployeeReader(): Promise<boolean> {
+  const session = await getPartnerSession();
+
+  return session?.user.role === 'partner_employee';
 }

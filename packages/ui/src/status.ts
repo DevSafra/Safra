@@ -217,6 +217,16 @@ export const VOCABULARIES: Readonly<Record<string, readonly string[]>> = {
     A status missing from this list is a status no test is holding to account.
   */
   contract: ['draft', 'awaiting_partner_signature', 'active', 'superseded', 'terminated'],
+  /*
+    This entry also covers `partner_employee_status`, which is `['active', 'suspended']` — a strict
+    SUBSET of it, so rule 2 is already proved for الموظفون by the line below.
+
+    Registering it separately was tried on 2026-08-23 and reverted: a two-value vocabulary fails
+    the "at least three values" guard in `status.test.ts`, which exists so a vocabulary that lost
+    its values cannot pass rule 2 while proving nothing. Weakening a real guard to admit a
+    redundant entry is the wrong trade. If `partner_employee_status` ever gains a third value that
+    `user` does not have, it needs its own entry and this note stops being true.
+  */
   user: ['active', 'suspended', 'archived'],
   notification: ['queued', 'sent', 'delivered', 'failed'],
   /**

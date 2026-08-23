@@ -673,3 +673,125 @@ export async function getMySupportTickets() {
 export async function getSupportThread(reference: string) {
   return partnerFetch(`/support/${encodeURIComponent(reference)}`, supportThreadSchema);
 }
+
+/**
+ * الموظفون — this partner's own staff.
+ *
+ * ## Two facts, not one
+ *
+ * `activated` says the person has redeemed their invitation and can sign in; `invitationPending`
+ * says a live link is still outstanding. They are separate because they answer different
+ * questions, and a screen that showed only one lies in a way this project has already paid for:
+ * the in-person onboarding flow reported five green steps while the person could not sign in at
+ * all. An invitation that has EXPIRED unredeemed is `activated: false, invitationPending: false` —
+ * the state that needs a resend, and the state a single "invited?" flag cannot express.
+ */
+const employeeSchema = z.object({
+  id: z.string(),
+  fullName: z.string(),
+  email: z.string(),
+  roleId: z.string(),
+  roleName: z.string(),
+  permissions: z.array(z.string()),
+  status: z.string(),
+  activated: z.boolean(),
+  invitationPending: z.boolean(),
+  createdAt: z.string(),
+});
+
+export type PartnerEmployee = z.infer<typeof employeeSchema>;
+
+const employeePageSchema = z.object({
+  items: z.array(employeeSchema),
+  nextCursor: z.string().nullable(),
+});
+
+export type PartnerEmployeePage = z.infer<typeof employeePageSchema>;
+
+/**
+ * One page of the team, newest first.
+ *
+ * Cursor-paged rather than showing everyone: a partner's headcount is bounded by THEIR business,
+ * not by SAFRA's roadmap, so the "it stays small" assumption the geography screens rely on is a
+ * guess about a stranger's organisation. A hotel group with three hundred staff is an ordinary
+ * customer. See `pagination.ts` for why customer-facing lists keep the cursor.
+ */
+export async function getMyEmployees(cursor?: string) {
+  const query = new URLSearchParams({ limit: '20' });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return partnerFetch(`/partner/employees?${query.toString()}`, employeePageSchema);
+}
+
+/**
+ * THIS partner's own roles, for the invite form's picker.
+ *
+ * Roles belong to the partner who defined them (Bashar, 2026-08-23) — a super admin has nothing to
+ * do with them. The endpoint scopes to the partner id on the token, so the picker cannot offer
+ * another business's role and `invite` refuses one it is handed anyway.
+ *
+ * A separate read rather than a field on the profile because the profile answers about the
+ * BUSINESS and every screen fetches it; a list that only two screens need does not belong on the
+ * call every page makes.
+ */
+const employeeRoleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  permissions: z.array(z.string()),
+});
+
+export type PartnerEmployeeRole = z.infer<typeof employeeRoleSchema>;
+
+export async function getEmployeeRoles() {
+  return partnerFetch(
+    '/partner/employees/roles',
+    z.object({ roles: z.array(employeeRoleSchema) }),
+  );
+}
+
+/**
+ * أدوار الموظفين — the roles this partner has defined, with how many people hold each.
+ *
+ * `employeeCount` rides on the row so the screen can refuse a delete BEFORE offering the button.
+ * The API refuses it too (`employee_role.in_use`), and that is the boundary; this is so an operator
+ * learns the constraint from the screen rather than from a failure.
+ */
+const employeeRoleDetailSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  permissions: z.array(z.string()),
+  employeeCount: z.number(),
+  createdAt: z.string(),
+});
+
+export type PartnerEmployeeRoleDetail = z.infer<typeof employeeRoleDetailSchema>;
+
+/**
+ * Not paged, and that is the one documented exception's reasoning rather than an oversight.
+ *
+ * Unlike the EMPLOYEE list — where a headcount is bounded by a stranger's business and a bounds
+ * test would fire after their screen broke — a role is a category of person, not a person. A
+ * business has a handful, the screen exists to show the COMPLETE set so somebody can see what
+ * already exists before naming another, and a pager over four rows is worse than four rows.
+ */
+export async function getMyEmployeeRoles() {
+  return partnerFetch(
+    '/partner/employee-roles',
+    z.object({ roles: z.array(employeeRoleDetailSchema) }),
+  );
+}
+
+/**
+ * The capabilities a role may carry, SERVED rather than imported.
+ *
+ * `PARTNER_EMPLOYEE_PERMISSIONS` is the bound the API validates against, and the screen builds its
+ * checkboxes from the same source rather than from a copy — a form offering a capability the API
+ * rejects is a form that produces a refusal nobody can act on.
+ */
+export async function getAssignableCapabilities() {
+  return partnerFetch(
+    '/partner/employee-roles/assignable',
+    z.object({ permissions: z.array(z.string()) }),
+  );
+}

@@ -1,8 +1,11 @@
 import Link from 'next/link';
 
+import { PERMISSIONS as P } from '@safra/contracts';
+
 import { SidebarBackdrop, SidebarToggle, ThemeToggle } from '@safra/ui';
 
 import { SIDEBAR_ID, t } from '@/lib/strings';
+import { getPartnerSession } from '@/lib/session-server';
 
 /**
  * The two-column shell from the design handoff §7: a 220px sidebar and the section beside it.
@@ -29,7 +32,7 @@ import { SIDEBAR_ID, t } from '@/lib/strings';
  * is the price of putting the account controls at its foot, and it is acceptable only because the
  * hamburger is always available and brings them back in one press.
  */
-export function Shell({
+export async function Shell({
   title,
   partnerName,
   active,
@@ -46,6 +49,8 @@ export function Shell({
     | 'payouts'
     | 'reviews'
     | 'contracts'
+    | 'employees'
+    | 'employeeRoles'
     | 'support';
   /**
    * The §7 sidebar badges — `عقاراتي 3` and `التقييمات ★ 4.7`.
@@ -71,6 +76,27 @@ export function Shell({
   readonly locked?: boolean;
   readonly children: React.ReactNode;
 }) {
+  /*
+    Whether THIS reader may manage the team, read here rather than passed in by every page.
+
+    The portal admits two roles, and `PARTNER_EMPLOYEE_MANAGE` is deliberately absent from
+    `PARTNER_EMPLOYEE_PERMISSIONS` — a receptionist who could hire could promote themselves. So an
+    employee must not be offered الموظفون: `partnerFetch` reports the API's 403 as
+    `'unauthenticated'`, so the screen would say «انتهت الجلسة» and send them to sign in again over
+    a permission, which cannot help.
+
+    A control that is present exactly when the request would succeed is the rule we settled on the
+    joint-contract path: a hidden control and a refused request must never disagree. The permission
+    is the same fact the API enforces, so there is one answer rather than two.
+
+    Read from the SESSION inside the shell rather than threaded through as a prop, because a prop
+    is something eight pages have to remember and a ninth will not. This is presentation only — the
+    API refuses the routes on its own authority whatever the sidebar draws.
+  */
+  const session = await getPartnerSession();
+  const mayManageEmployees =
+    session?.user.permissions.includes(P.PARTNER_EMPLOYEE_MANAGE) ?? false;
+
   return (
     <div className="portal-layout mx-auto max-w-[1380px] px-6 pt-6 pb-16">
       <main className="portal-main min-w-0">
@@ -168,6 +194,40 @@ export function Shell({
               label={t.nav.reviews}
               current={active === 'reviews'}
               badge={badges?.reviews}
+            />
+          )}
+          {/*
+            الموظفون, hidden while `locked`.
+
+            An unverified partner has no team to manage yet and the screen would be an invitation
+            to hire against a business SAFRA has not accepted. It sits below التقييمات because it
+            is administration rather than daily work — the reader comes here when somebody joins or
+            leaves, not every morning.
+
+            Only the OWNER sees it at all: `PARTNER_EMPLOYEE_MANAGE` is deliberately absent from
+            `PARTNER_EMPLOYEE_PERMISSIONS`, so an employee's own token cannot reach these routes. A
+            receptionist who could hire could promote themselves.
+          */}
+          {locked || !mayManageEmployees ? null : (
+            <Item
+              href="/employees"
+              label={t.nav.employees}
+              current={active === 'employees'}
+            />
+          )}
+          {/*
+            أدوار الموظفين, directly under الموظفون and gated on the same permission.
+
+            A partner defines these for their OWN staff — SAFRA's super admin has nothing to do with
+            them (Bashar, 2026-08-23). It sits second because a role is the prerequisite: nobody can
+            be invited until one exists, but the reader comes to الموظفون first and is sent here
+            by it, rather than being asked to define a category of person before meeting the person.
+          */}
+          {locked || !mayManageEmployees ? null : (
+            <Item
+              href="/employee-roles"
+              label={t.nav.employeeRoles}
+              current={active === 'employeeRoles'}
             />
           )}
           {/* Last: it is where a partner goes when something else on this list did not work. */}

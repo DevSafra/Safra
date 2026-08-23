@@ -304,6 +304,8 @@ export const ar = {
     reviews: 'التقييمات',
     payouts: 'مستحقاتي',
     contracts: 'العقود والمستندات',
+    employees: 'الموظفون',
+    employeeRoles: 'أدوار الموظفين',
     supportPage: 'الدعم',
     showSidebar: 'إظهار قائمة التنقل',
     hideSidebar: 'إخفاء قائمة التنقل',
@@ -1001,5 +1003,256 @@ export const ar = {
     working: 'جارٍ الإرسال…',
     failed: 'تعذّر تنفيذ الطلب.',
     unreachable: 'تعذّر الوصول إلى الخادم.',
+  },
+  /**
+   * «تفعيل حساب الموظّف» — where an invited employee sets their first password.
+   *
+   * A near-twin of `invitation` above, and deliberately NOT a reuse of it. The two journeys differ
+   * in what the reader is being told they have become: one is the partner themselves, the other is
+   * a member of that partner's staff, and «أنشئ حساب الشريك» on an employee's screen would tell a
+   * receptionist she now owns the business.
+   *
+   * The password rules are repeated rather than shared because they belong to a form, and a
+   * catalogue that hoists them into a common section makes the next screen that needs four of the
+   * five reach for a fifth it does not want.
+   */
+  employeeInvitation: {
+    title: 'تفعيل حساب الموظّف',
+    /*
+      It does NOT name the employer, and that is a security decision rather than an omission.
+
+      Naming the business would mean resolving the token before anything is submitted, and this
+      page must never say whether a token is real — the partner invitation page records the same
+      reasoning. A token IS a credential here: whoever holds a live one sets the password on that
+      account. A page that answered «دعتك فندق كذا» for a valid token and something else for an
+      invalid one would confirm which guesses were close, and leak the customer list while doing it.
+
+      The invitation EMAIL names the employer, which is where that belongs: it reaches only the
+      address the partner typed.
+    */
+    intro: 'دُعيت للانضمام إلى فريق على سفرة. اختر كلمة مرور لحسابك.',
+    password: 'كلمة المرور',
+    confirm: 'تأكيد كلمة المرور',
+    submit: 'تفعيل الحساب',
+    submitting: 'جارٍ التفعيل…',
+    mismatch: 'كلمتا المرور غير متطابقتين.',
+    weak: 'كلمة المرور لا تحقّق الشروط أعلاه.',
+    /*
+      One sentence for every refusal the API can give: expired, spent, never existed, employment
+      withdrawn. The endpoint deliberately answers them all with one code, and this does not invent
+      a distinction it was denied — telling somebody which guess was close is the whole risk.
+    */
+    invalidLink:
+      'هذا الرابط غير صالح أو انتهت صلاحيته. اطلب من صاحب العمل إعادة إرسال الدعوة.',
+    failed: 'تعذّر تفعيل الحساب. حاول مرة أخرى.',
+    done: 'تم تفعيل الحساب. سجّل الدخول للمتابعة.',
+    signIn: 'الذهاب إلى تسجيل الدخول',
+    ruleLength: '12 حرفًا على الأقل',
+    ruleUppercase: 'حرف كبير واحد على الأقل',
+    ruleLowercase: 'حرف صغير واحد على الأقل',
+    ruleDigit: 'رقم واحد على الأقل',
+    ruleSymbol: 'رمز واحد على الأقل',
+    strengthLabel: 'قوة كلمة المرور',
+    afterNote:
+      'صلاحياتك يحدّدها صاحب العمل، وقد تختلف عن صلاحيات زملائك. بعد الدخول تظهر لك الأقسام المتاحة لك فقط.',
+  },
+  /**
+   * الموظفون — a partner's own staff, and the roles the PARTNER has named for them.
+   *
+   * ## Two words for two different facts
+   *
+   * `notActivated` and `invitationExpired` are separate on purpose. "Invited but not yet signed
+   * in" and "invited, the link died, nobody can use it" call for different actions from the
+   * reader, and collapsing them into one «لم يفعّل بعد» is how somebody waits a week for a person
+   * who never had a working link. The in-person onboarding flow showed five green steps while the
+   * person could not sign in; this is the same mistake one screen along.
+   *
+   * ## The refusals name the CAUSE, not the field
+   *
+   * «هذا البريد لموظّف يعمل بالفعل» rather than «البريد غير صالح». The address is fine; the
+   * situation is the problem, and a message about the field sends somebody to retype what they
+   * typed correctly.
+   */
+  employees: {
+    title: 'الموظفون',
+    intro:
+      'ادعُ موظّفيك وحدّد ما يمكن لكلٍّ منهم فعله. الصلاحيات تأتي من الدور الذي تختاره، ولا يمكن لأي موظّف أن يتجاوز صلاحياتك.',
+    empty: 'لا يوجد موظّفون بعد. ابدأ بدعوة أول واحد.',
+    loadMore: 'عرض المزيد',
+    loadFailed: 'تعذّر تحميل قائمة الموظفين.',
+
+    /* The invite form. */
+    inviteTitle: 'دعوة موظّف',
+    fullName: 'الاسم الكامل',
+    email: 'البريد الإلكتروني',
+    role: 'الدور',
+    rolePlaceholder: 'اختر دورًا',
+    inviteSubmit: 'إرسال الدعوة',
+    inviting: 'جارٍ الإرسال…',
+    inviteSent: 'أُرسلت الدعوة.',
+    /*
+      Rewritten 2026-08-23, when roles became the PARTNER's to define.
+
+      It used to say «تواصل مع فريق سفرة» — wait for somebody else — which was true while a super
+      admin owned the catalogue and is now the opposite of true: the person who can fix this is the
+      person reading it. A sentence that sends somebody to wait for help they do not need is worse
+      than no sentence, because they will wait.
+    */
+    noRoles: 'لا يمكنك دعوة موظّف قبل تعريف دور واحد على الأقل.',
+    defineRoles: 'تعريف الأدوار',
+
+    /* What the row says about where somebody has got to. */
+    statusActive: 'نشِط',
+    statusSuspended: 'موقوف',
+    notActivated: 'لم يفعّل حسابه بعد',
+    invitationPending: 'الدعوة سارية',
+    invitationExpired: 'انتهت صلاحية الدعوة',
+
+    /* Row controls. */
+    changeRole: 'تغيير الدور',
+    suspend: 'إيقاف',
+    restore: 'إعادة التفعيل',
+    remove: 'إزالة',
+    /* Named, because four identical «إزالة» buttons in a list are indistinguishable to a reader
+       using a screen reader, and to anybody who has scrolled. */
+    removeLabel: 'إزالة {name}',
+    suspendLabel: 'إيقاف {name}',
+    restoreLabel: 'إعادة تفعيل {name}',
+    roleLabel: 'دور {name}',
+    removeConfirm: 'إزالة {name} من الموظفين؟ سيفقد الوصول فورًا.',
+    working: 'جارٍ التنفيذ…',
+
+    /*
+      What an EMPLOYEE sees where the owner sees their own account surfaces.
+
+      Not a refusal and not «انتهت الجلسة» — their session is fine. The agreement and the
+      verification documents belong to whoever signed them, and an employee account is not that
+      person. Saying so is shorter than a permission error and does not send anybody to sign in
+      again over something signing in cannot fix.
+    */
+    ownerOnly: 'هذا القسم يخص صاحب الحساب. تواصل معه إن كنت بحاجة إلى شيء منه.',
+    /*
+      The same reader, when the BUSINESS has not been verified yet.
+
+      They are sent here by the onboarding gate, and «قيد المراجعة» is the whole of what they can
+      usefully know: there is no step for them to complete, and the person who can complete one is
+      their employer.
+    */
+    employerUnderReview:
+      'حساب صاحب العمل قيد المراجعة لدى سفرة. ستظهر لك أقسامك فور اعتماده.',
+
+    /* One sentence per refusal the API can give, each naming the cause. */
+    alreadyEmployed: 'هذا البريد لموظّف يعمل بالفعل لدى شريك.',
+    emailIsOwner: 'هذا البريد لحساب شريك، ولا يمكن أن يكون موظّفًا.',
+    emailIsStaff: 'هذا البريد لحساب من فريق سفرة.',
+    roleNotFound: 'هذا الدور لم يعد متاحًا. حدّث الصفحة واختر دورًا آخر.',
+    notFound: 'لم يعد هذا الموظّف موجودًا. حدّث الصفحة.',
+    failed: 'تعذّر تنفيذ الطلب. حاول مرة أخرى.',
+  },
+  /**
+   * أدوار الموظفين — the roles a PARTNER defines for their own staff (Bashar, 2026-08-23).
+   *
+   * ## Its own catalogue, not a copy of the console's
+   *
+   * `admin/ar.ts` has a capability map with the same KEYS, and this is deliberately not a re-export
+   * of it. The console's copy addresses a super admin looking at somebody else's business —
+   * «قراءة حجوزات الشريك» — and here the reader IS the business, so it is «قراءة الحجوزات». Same
+   * permission, different possessive, and sharing one string would make one of the two screens
+   * read as if it were written for the other.
+   *
+   * ## The empty state does the teaching
+   *
+   * A partner arriving here has never met the concept: they have one login today and are being
+   * asked to name a category of person. «أنشئ دورًا» on a blank page explains nothing, so the empty
+   * state says what a role IS and what it is FOR before asking for a name. No roles are seeded —
+   * suggesting «استقبال» and «محاسب» would put SAFRA's guess about somebody's staffing into their
+   * account as real rows they then have to audit and delete.
+   */
+  employeeRoles: {
+    title: 'أدوار الموظفين',
+    intro:
+      'الدور مجموعة من القدرات تمنحها لموظّف. عرّف الأدوار التي تناسب عملك، ثم اختر دورًا لكل موظّف عند دعوته.',
+
+    /* Shown instead of the list when the partner has defined nothing yet. */
+    emptyTitle: 'لم تعرّف أي دور بعد',
+    emptyBody:
+      'قبل دعوة موظّف تحتاج إلى دور واحد على الأقل. فكّر في وظيفة لا في شخص: «من يستقبل الضيوف» أو «من يتابع الحسابات». يمكنك تعديل الدور لاحقًا، ويسري التعديل على كل من يحمله.',
+
+    /* The form. */
+    createTitle: 'دور جديد',
+    editTitle: 'تعديل الدور',
+    nameLabel: 'اسم الدور',
+    nameHint: 'ما تراه عند اختيار دور لموظّف. حرفان على الأقل.',
+    capabilitiesLabel: 'ما يستطيع حامل هذا الدور فعله',
+    capabilitiesRequired: 'اختر قدرة واحدة على الأقل.',
+    create: 'إنشاء الدور',
+    creating: 'جارٍ الإنشاء…',
+    save: 'حفظ التعديل',
+    saving: 'جارٍ الحفظ…',
+    cancel: 'إلغاء',
+    created: 'أُنشئ الدور.',
+    saved: 'حُفظ التعديل.',
+
+    /* The list. */
+    edit: 'تعديل',
+    remove: 'حذف',
+    /* Named, because a list of roles offers one «حذف» per row and they are otherwise identical. */
+    editLabel: 'تعديل الدور {name}',
+    removeLabel: 'حذف الدور {name}',
+    held: 'يحمله {n}',
+    heldNobody: 'لا يحمله أحد',
+    confirmRemove: 'حذف الدور «{name}»؟ لا يمكن التراجع.',
+    loadFailed: 'تعذّر تحميل الأدوار.',
+    working: 'جارٍ التنفيذ…',
+
+    /*
+      Said BEFORE the button is offered, not after the API refuses. `employeeCount` rides on every
+      row precisely so the screen can explain the constraint instead of reporting a failure.
+    */
+    inUse: 'لا يمكن حذف دور يحمله موظّفون. انقلهم إلى دور آخر أولاً.',
+    nameTaken: 'لديك دور بهذا الاسم بالفعل.',
+    notFound: 'لم يعد هذا الدور موجودًا. حدّث الصفحة.',
+    failed: 'تعذّر تنفيذ الطلب. حاول مرة أخرى.',
+
+    /*
+      The GROUP headings, keyed by `PermissionGroup` from `@safra/contracts`.
+
+      The grouping LOGIC is shared with the console — `groupPermissions()`, one taxonomy, so a new
+      capability cannot be categorised two ways — but the words are this reader's. «الشركاء» is a
+      domain of the platform to a super admin surveying it, and nonsense to a partner, who does not
+      look at partners: they ARE one. So the same group reads «العقارات» here. Same argument as the
+      capability map below.
+
+      An unmapped group renders its raw key, and `PERMISSION_GROUPS` keeps «أخرى» last and visible
+      on purpose — a capability nobody categorised must still be offered, because an absent checkbox
+      looks like a shorter list rather than a bug.
+    */
+    capabilityGroup: {
+      bookings: 'الحجوزات والتقويم',
+      money: 'الأسعار',
+      partners: 'العقارات',
+      customers: 'الضيوف والتقييمات',
+      platform: 'المنصّة',
+      other: 'أخرى',
+    } as Record<string, string>,
+
+    /*
+      The capabilities in words, keyed by the permission string the API validates against — so an
+      unlabelled one renders as its raw identifier and announces itself, rather than appearing as a
+      blank checkbox somebody ticks without knowing what they granted.
+    */
+    capability: {
+      'booking.read_own': 'قراءة الحجوزات',
+      'booking.respond_as_partner': 'قبول الحجوزات ورفضها',
+      'booking.check_in': 'تسجيل وصول الضيف',
+      'calendar.manage_own': 'إدارة التقويم والتوفّر',
+      'property.manage_own': 'إدارة العقارات والوحدات',
+      'price.update': 'تعديل الأسعار',
+      'message.read': 'قراءة الرسائل',
+      'message.send': 'إرسال الرسائل',
+      'review.read_own': 'قراءة التقييمات',
+      'review.respond_own': 'الرد على التقييمات',
+      'violation.read': 'قراءة المخالفات',
+    } as Record<string, string>,
   },
 } as const;

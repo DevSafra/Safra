@@ -2273,6 +2273,22 @@ export const ar = {
     operations_manager: 'مدير عمليات',
     finance_officer: 'مسؤول مالي',
     support_agent: 'موظف دعم',
+    /*
+      The three NON-STAFF roles, added 2026-08-23 after a browser walk caught one of them.
+
+      This map held only the four console roles, and `roleName` falls back to the raw key — which
+      is right, because a missing translation must look like one. So the moment a `partner_employee`
+      activated their account, سجل التدقيق printed «partner_employee» in Latin snake_case on an
+      Arabic screen, and `navigation.spec.ts` failed exactly as it is meant to.
+
+      `partner` and `customer` were missing for the same reason and had simply not been on a
+      visible page yet: a partner uploading a signed contract writes an audit row too. The sweep
+      only sees what is on screen, so the absent label survived until the right row was near the
+      top. All three are here now rather than the one that happened to be caught.
+    */
+    partner: 'شريك',
+    partner_employee: 'موظف شريك',
+    customer: 'عميل',
   } as Record<string, string>,
 
   /**

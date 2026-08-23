@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { count } from './format';
-import { cancellationReason, payloadEntries, plural, t } from './strings';
+import { cancellationReason, payloadEntries, plural, roleName, t } from './strings';
+import { ROLES } from '@safra/contracts';
 
 /**
  * A cancellation reason is either a `system.*` code or a person's own sentence, and the two are
@@ -134,5 +135,32 @@ describe('plural', () => {
   it('formats its digits the same way the rest of the console does', () => {
     expect(plural(t.table.found, { n: 5 })).toContain(count(5));
     expect(plural(t.table.found, { n: 1500 })).toContain(count(1500));
+  });
+});
+
+/**
+ * Every role the platform can put in an audit row has an Arabic name.
+ *
+ * ## Why the browser sweep was not enough
+ *
+ * `navigation.spec.ts` fails on snake_case Latin anywhere in the console, and it DID catch this —
+ * but only once a `partner_employee` audit row happened to be near the top of سجل التدقيق, which
+ * took an end-to-end walk to produce. `partner` and `customer` were missing for exactly as long
+ * and had simply not been on a visible page. A sweep sees what is on screen; this sees the list.
+ *
+ * Driven off `ROLES`, which is derived from `ROLE_PERMISSIONS` — so adding a role to the platform
+ * fails here until it has a name, rather than the day somebody with that role does something
+ * audited.
+ */
+describe('roleName', () => {
+  it('names every role the platform defines', () => {
+    const unnamed = ROLES.filter((role) => roleName(role) === role);
+
+    expect(unnamed).toStrictEqual([]);
+  });
+
+  /* The fallback is still the raw key: a missing translation must LOOK like one. */
+  it('falls back to the raw value for a role that does not exist', () => {
+    expect(roleName('not_a_role')).toBe('not_a_role');
   });
 });
