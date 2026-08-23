@@ -85,6 +85,16 @@ export const AUDIT_ACTIONS = [
   'partner_application.accepted',
   'partner_application.rejected',
   'partner_application.invitation_resent',
+  /*
+    A partner created outright by a super admin sitting with them, with no request behind it
+    (Bashar, 2026-08-23).
+
+    Its OWN action rather than `partner.registered` or `partner_application.accepted`. Both of
+    those describe somebody asking to join and being let in; this one describes a super admin
+    naming an address, which is a different power and has to be searchable as one. Reading the log
+    for "how did this partner get here" must never come back with an answer that fits both.
+  */
+  'partner.onboarded_in_person',
 
   // ── Inventory ─────────────────────────────────────────────────────────────
   'property.created',

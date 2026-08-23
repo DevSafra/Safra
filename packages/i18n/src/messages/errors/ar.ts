@@ -209,6 +209,12 @@ export const ar = {
   'partner_application.email_is_staff':
     'هذا البريد الإلكتروني يخص حساب موظف. لا يمكن تحويله إلى حساب شريك.',
   'partner_application.email_is_partner': 'هذا البريد الإلكتروني شريك بالفعل.',
+  'partner_onboarding.email_is_staff':
+    'هذا البريد الإلكتروني يخص حساب موظف، فلا يمكن تسجيله شريكًا.',
+  'partner_onboarding.email_is_partner':
+    'هذا البريد الإلكتروني شريك بالفعل. ابحث عنه في سجل الشركاء.',
+  'partner_onboarding.application_open':
+    'يوجد طلب شراكة مفتوح من هذا البريد الإلكتروني. أكمِل الطلب من «طلبات الشراكة» بدل تسجيل شريك جديد.',
   'partner.invitation_invalid': 'رابط الدعوة غير صالح أو استُخدم بالفعل.',
   'partner.not_verified': 'لم يتم التحقق من هذا الشريك بعد. تحقق منه قبل نشر عقاراته.',
   'partner.sanctions_screening_required': 'يجب تسجيل فحص العقوبات قبل التحقق من الشريك.',

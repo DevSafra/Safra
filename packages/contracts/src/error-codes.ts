@@ -306,6 +306,25 @@ export const ERROR = {
   PARTNER_APPLICATION_EMAIL_IS_STAFF: 'partner_application.email_is_staff',
   /** The address is already a partner. Nothing to accept; find them in الشركاء. */
   PARTNER_APPLICATION_EMAIL_IS_PARTNER: 'partner_application.email_is_partner',
+  /* ── Onboarding a partner in person (Bashar, 2026-08-23) ── */
+  /**
+   * The address belongs to a STAFF account.
+   *
+   * The same refusal «انضم كشريك» makes, for the same reason, and it matters more here: there the
+   * account was proven by a session, and here it is an address the operator typed. Onboarding must
+   * not be a way to demote an operations manager by mistyping a colleague's address.
+   */
+  PARTNER_ONBOARDING_EMAIL_IS_STAFF: 'partner_onboarding.email_is_staff',
+  /** The address is already a partner. Nothing to create; find them in الشركاء. */
+  PARTNER_ONBOARDING_EMAIL_IS_PARTNER: 'partner_onboarding.email_is_partner',
+  /**
+   * There is an open «انضم كشريك» request from this address.
+   *
+   * Refused rather than merged. Onboarding around it would leave a request nobody ever answers
+   * sitting in the queue against a partner who already exists, and the reviewer working that queue
+   * would telephone somebody who has been onboarded for a week.
+   */
+  PARTNER_ONBOARDING_APPLICATION_OPEN: 'partner_onboarding.application_open',
   /** The invitation link is expired, spent, or was never issued. Deliberately one code. */
   PARTNER_INVITATION_INVALID: 'partner.invitation_invalid',
   PARTNER_SANCTIONS_SCREENING_REQUIRED: 'partner.sanctions_screening_required',

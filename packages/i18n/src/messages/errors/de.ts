@@ -264,6 +264,12 @@ export const de = {
   'partner_application.email_is_staff':
     'Diese E-Mail-Adresse gehört zu einem Mitarbeiterkonto und kann nicht in ein Partnerkonto umgewandelt werden.',
   'partner_application.email_is_partner': 'Diese E-Mail-Adresse ist bereits Partner.',
+  'partner_onboarding.email_is_staff':
+    'Diese E-Mail-Adresse gehört zu einem Mitarbeiterkonto und kann nicht als Partner registriert werden.',
+  'partner_onboarding.email_is_partner':
+    'Diese E-Mail-Adresse ist bereits Partner. Sie finden ihn im Partnerregister.',
+  'partner_onboarding.application_open':
+    'Zu dieser E-Mail-Adresse liegt eine offene Partnerschaftsanfrage vor. Bitte diese in der Anfrageliste abschließen, statt einen neuen Partner zu registrieren.',
   'partner.invitation_invalid':
     'Dieser Einladungslink ist ungültig oder wurde bereits verwendet.',
   'partner.not_verified':

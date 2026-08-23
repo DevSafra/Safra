@@ -1469,6 +1469,12 @@ export const ar = {
     'partner_application.accepted': 'قبول طلب شراكة',
     'partner_application.rejected': 'رفض طلب شراكة',
     'partner_application.invitation_resent': 'إعادة إرسال دعوة شريك',
+    /*
+      Named after the ACTION rather than its result. «تسجيل شريك» alone would read the same as
+      `partner.registered`, and the whole point of a separate action is that somebody reading
+      السجل can tell a partner a super admin created from one who asked to join.
+    */
+    'partner.onboarded_in_person': 'تسجيل شريك مباشرةً من المدير العام',
     'partner_contract.viewed': 'عرض عقد شراكة',
     'partner_payout.released': 'الإفراج عن مستحقات شريك',
     'partner_payout.paid': 'دفع مستحقات شريك',
@@ -1697,6 +1703,13 @@ export const ar = {
     payloadKey: {
       reason: 'السبب',
       reference: 'المرجع',
+      /*
+        Whether an in-person onboarding ADOPTED an existing account or made a new one
+        (`partner.onboarded_in_person`). Named as a question about the account rather than as a
+        boolean, because that is what a reader of السجل is asking when they reach this row: did a
+        super admin attach a partner to somebody who already had a SAFRA account?
+      */
+      accountExisted: 'حساب قائم',
       /*
         Set on `partner_contract.countersigned` when SAFRA's new copy took the partner's signature
         down with it. The status change alone does not say it — `active` →

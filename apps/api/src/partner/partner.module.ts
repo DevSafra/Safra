@@ -19,6 +19,8 @@ import {
 } from './partner-application.controller.js';
 import { PartnerApplicationService } from './partner-application.service.js';
 import { PartnerInvitationService } from './partner-invitation.service.js';
+import { AdminPartnerOnboardingController } from './partner-onboarding.controller.js';
+import { PartnerOnboardingService } from './partner-onboarding.service.js';
 import {
   PartnerContractReadService,
   PartnerContractsController,
@@ -43,6 +45,7 @@ import { PropertyImageService } from './property-images.service.js';
     AdminPartnerApplicationController,
     PartnerInvitationController,
     PartnerContractsController,
+    AdminPartnerOnboardingController,
   ],
   providers: [
     PropertiesService,
@@ -53,11 +56,12 @@ import { PropertyImageService } from './property-images.service.js';
     PartnerContractReadService,
     PartnerDocumentsService,
     /*
-      One invitation path, shared. Accepting a request is the only route to a partner account
-      today; a second one is coming, and two copies of "how long is an invitation valid" would
-      drift without ever failing a test.
+      One invitation path, shared. Both routes to a partner account — accepting a request and
+      onboarding somebody in person — issue the same link with the same lifetime, and two copies
+      of that would drift without ever failing a test.
     */
     PartnerInvitationService,
+    PartnerOnboardingService,
   ],
   exports: [PropertiesService, CalendarService, PartnerApplicationService],
 })

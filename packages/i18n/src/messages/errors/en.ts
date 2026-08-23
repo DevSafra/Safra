@@ -226,6 +226,12 @@ export const en = {
   'partner_application.email_is_staff':
     'That email address belongs to a staff account and cannot be turned into a partner account.',
   'partner_application.email_is_partner': 'That email address is already a partner.',
+  'partner_onboarding.email_is_staff':
+    'That email address belongs to a staff account and cannot be registered as a partner.',
+  'partner_onboarding.email_is_partner':
+    'That email address is already a partner. Find them in the partner registry.',
+  'partner_onboarding.application_open':
+    'There is an open partnership request from this email address. Finish it from the requests queue instead of registering a new partner.',
   'partner.invitation_invalid':
     'That invitation link is invalid or has already been used.',
   'partner.not_verified':

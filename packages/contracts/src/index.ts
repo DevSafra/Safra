@@ -11,6 +11,7 @@ export * from './invoice.js';
 export * from './pagination.js';
 export * from './payment.js';
 export * from './partner-application.js';
+export * from './partner-onboarding.js';
 export * from './payout.js';
 export * from './permissions.js';
 export * from './compliance.js';
