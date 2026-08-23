@@ -123,12 +123,29 @@ export default async function PartnerOnboardingPage({
           <StatusPill tone={statusTone(partner.verification)}>
             {label(t.enums.verification, partner.verification)}
           </StatusPill>
-          <Link
+          {/*
+            A NEW TAB, and a plain `<a>` rather than `next/link` (Bashar, 2026-08-23).
+
+            The onboarding checklist is a place somebody is working THROUGH — documents chosen, a
+            contract generated, an approval still to make — and sending them to the partner record
+            in the same tab costs them that position and a scroll back to it. The partner page is a
+            reference they glance at, so it belongs beside the work rather than instead of it.
+
+            `next/link` would prefetch a route it is not going to navigate to in this tab, and its
+            client-side navigation is exactly what `target="_blank"` bypasses. `rel` is the usual
+            pair: `noopener` denies the new document a handle on this one, `noreferrer` withholds
+            the URL of a staff console screen — cheap here since both ends are ours, and the habit
+            is what matters when a link one day is not.
+          */}
+          <a
             href={`/partners/${encodeURIComponent(partner.reference)}`}
+            target="_blank"
+            rel="noreferrer noopener"
+            aria-label={t.sections.partnerOnboarding.openPartnerAria}
             className="inline-flex min-h-10 items-center rounded-lg border border-line px-3 py-1.5 text-xs text-muted hover:border-ok/40 hover:text-ok lg:min-h-0"
           >
             {t.sections.partnerOnboarding.openPartner}
-          </Link>
+          </a>
         </p>
       </header>
 

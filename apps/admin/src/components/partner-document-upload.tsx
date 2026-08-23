@@ -126,17 +126,33 @@ export function PartnerDocumentUpload({ reference }: { reference: string }) {
       </div>
 
       {/*
-        The hint is a DESCRIPTION, not part of the field's name — see the note on `Field` in
-        `onboard-partner-form.tsx`. Inside the `<label>` it would be announced every time the
-        field is reached, and it would make «الملف» match by substring wherever that word appears.
+        The hint sits BESIDE «الملف», not under the field (Bashar, 2026-08-23).
+
+        What it says — «صورة أو PDF، حتى 8 ميغابايت» — is a constraint on the CHOICE, so it is only
+        useful before the file picker is opened. Under the input it was read after the decision it
+        was meant to inform, and on this three-column row it pushed «رفع المستند» out of line with
+        the two fields beside it.
+
+        Still outside the `<label>` and still referenced by `aria-describedby`. Moving it back
+        inside would fold it into the field's accessible NAME, which is what made «الملف» verbose
+        to a screen reader and ambiguous to a locator in the first place — a description is
+        announced after the name and can be skipped; a name cannot.
       */}
       <div className="grid gap-1.5">
-        <label
-          htmlFor={`${formId}-file`}
-          className="text-[11.5px] font-semibold text-muted"
-        >
-          {t.sections.partnerOnboarding.documentFile}
-        </label>
+        <div className="flex flex-wrap items-baseline gap-2">
+          <label
+            htmlFor={`${formId}-file`}
+            className="text-[11.5px] font-semibold text-muted"
+          >
+            {t.sections.partnerOnboarding.documentFile}
+          </label>
+          <span
+            id={`${formId}-file-hint`}
+            className="text-[10.5px] font-normal text-faint"
+          >
+            {t.sections.partnerOnboarding.documentFileHint}
+          </span>
+        </div>
         <input
           id={`${formId}-file`}
           name="file"
@@ -146,9 +162,6 @@ export function PartnerDocumentUpload({ reference }: { reference: string }) {
           aria-describedby={`${formId}-file-hint`}
           className="min-h-10 cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] font-normal text-text lg:min-h-0"
         />
-        <span id={`${formId}-file-hint`} className="text-[10.5px] font-normal text-faint">
-          {t.sections.partnerOnboarding.documentFileHint}
-        </span>
       </div>
 
       <button
