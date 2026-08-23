@@ -9,7 +9,7 @@ import {
   type PartnerContract,
   type PartnerDocument,
 } from '@/lib/api';
-import { isLocked } from '@/lib/gate';
+import { isEmployeeReader, isLocked } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { count } from '@/lib/format';
@@ -72,11 +72,21 @@ const MAX_UPLOAD_MB = 10;
 type Stage = 'empty' | 'partial' | 'waiting' | 'fix' | 'done';
 
 export default async function ContractsPage() {
-  const [profile, contractsResult, documentsResult] = await Promise.all([
-    getMyProfile(),
-    getMyContracts(),
-    getMyDocuments(),
-  ]);
+  /*
+    The reader's ROLE decides whether this page has anything to show them at all.
+
+    An employee holds neither `PARTNER_CONTRACT_SIGN_OWN` nor `PARTNER_DOCUMENT_MANAGE_OWN`, so
+    both fetches below answer 403 — which `partnerFetch` reports as `'unauthenticated'`, and the
+    screen would say «انتهت الجلسة». Their session is fine; sending them to sign in again over a
+    permission is advice that cannot work.
+
+    It is worse than a wrong sentence for an employee of an UNVERIFIED partner, because the
+    onboarding gate redirects every other route HERE — so the two 403s become a loop with no way
+    out of it.
+
+    Asked before the fetches rather than after, so the refusals are never made.
+  */
+  const [employee, profile] = await Promise.all([isEmployeeReader(), getMyProfile()]);
 
   const name =
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
@@ -93,6 +103,27 @@ export default async function ContractsPage() {
       <div className="mx-auto grid w-full max-w-[760px] gap-5">{children}</div>
     </Shell>
   );
+
+  /*
+    Returned BEFORE the two fetches, so the refusals are never made rather than made and swallowed.
+
+    `locked` picks the sentence: an employee of a partner still under review is told that, because
+    the onboarding gate has sent them here from wherever they were going and «قيد المراجعة» is the
+    whole of what they can usefully know. An employee of an approved partner reached this page on
+    purpose, and is told it belongs to the owner.
+  */
+  if (employee) {
+    return shell(
+      <p className="text-sm leading-relaxed text-muted">
+        {locked ? t.employees.employerUnderReview : t.employees.ownerOnly}
+      </p>,
+    );
+  }
+
+  const [contractsResult, documentsResult] = await Promise.all([
+    getMyContracts(),
+    getMyDocuments(),
+  ]);
 
   if (contractsResult === 'unauthenticated' || documentsResult === 'unauthenticated') {
     return shell(<p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>);

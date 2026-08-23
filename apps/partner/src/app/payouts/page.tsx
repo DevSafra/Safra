@@ -1,7 +1,7 @@
 import Link from 'next/link';
 
 import { getMyPayouts, type PartnerPayout, sidebarBadges } from '@/lib/api';
-import { requireVerifiedPartner } from '@/lib/gate';
+import { isEmployeeReader, requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
@@ -27,12 +27,40 @@ import { statusTone } from '@safra/ui';
 export const dynamic = 'force-dynamic';
 
 export default async function PayoutsPage() {
-  const [profile, payouts] = await Promise.all([
+  /*
+    An EMPLOYEE is told this belongs to the owner, before the fetch that would refuse them.
+
+    `PAYOUT_READ_OWN` is deliberately absent from `PARTNER_EMPLOYEE_PERMISSIONS` — a receptionist
+    should not learn what the business earns — so `getMyPayouts()` answers 403, and `partnerFetch`
+    reports that as `'unauthenticated'`. The screen would then say «انتهت الجلسة» and send them to
+    sign in again over a permission, which cannot help.
+
+    Hiding the sidebar item is not enough on its own and was never meant to be: a bookmark, a link
+    pasted into a group chat, or a typed URL all reach this page directly. A hidden control and a
+    refused request must not disagree — the rule settled on the joint-contract path — and that cuts
+    both ways.
+  */
+  const [employee, profile] = await Promise.all([
+    isEmployeeReader(),
     requireVerifiedPartner(),
-    getMyPayouts(),
   ]);
   const name =
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
+
+  if (employee) {
+    return (
+      <Shell
+        title={t.payouts.title}
+        partnerName={name}
+        active="payouts"
+        badges={sidebarBadges(profile)}
+      >
+        <p className="text-sm leading-relaxed text-muted">{t.employees.ownerOnly}</p>
+      </Shell>
+    );
+  }
+
+  const payouts = await getMyPayouts();
 
   return (
     <Shell
