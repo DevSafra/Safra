@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -276,12 +277,21 @@ export class CommsController {
    * staff download the generated PDF, sign it, scan it and upload it here. That upload moves the
    * contract to `awaiting_partner_signature` and emails the partner.
    */
+  /*
+    `ParseUUIDPipe` on every contract id below (2026-08-23).
+
+    These took the id raw and interpolated it into `${id}::uuid`. The bind is parameterised, so
+    this was never injectable — but a malformed id reached Postgres, raised «invalid input syntax
+    for type uuid», and came back to the caller as an unhandled 500 with a database error in the
+    log. A 400 with a code is the honest answer, and a probe gets nothing back either way. The
+    partner-side route already did this; the console's five did not.
+  */
   @Post('partner-contracts/:id/signed-copy')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @RequirePermissions(P.PARTNER_CONTRACT_MANAGE)
   async uploadSafraSignedCopy(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(signedCopySchema)) body: SignedCopyInput,
     @Req() request: { ip?: string; headers: Record<string, unknown> },
   ) {
@@ -307,7 +317,7 @@ export class CommsController {
   @AuditExempt('PartnerContractService records partner_contract.viewed.')
   async downloadContract(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Param('party') party: string,
     @Res() response: Response,
   ) {
@@ -343,7 +353,7 @@ export class CommsController {
   @RequirePermissions(P.PARTNER_CONTRACT_MANAGE)
   async reopenContract(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return { contracts: await this.contracts.reopenForPartner(user, id) };
   }
@@ -354,7 +364,7 @@ export class CommsController {
   @RequirePermissions(P.PARTNER_CONTRACT_MANAGE)
   async markContractSigned(
     @CurrentUser() user: AccessTokenClaims | undefined,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(signedSchema)) body: z.infer<typeof signedSchema>,
   ) {
     return { contracts: await this.contracts.markSigned(user, id, body.signedOn) };
