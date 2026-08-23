@@ -62,6 +62,11 @@ export const en = {
     body: 'SAFRA has signed the partnership agreement and sent it to you.\n\nOpen «العقود والمستندات» in the partner portal, download the contract, sign it by hand, then upload the signed copy from the same page.\n\n{url}\n\nThe agreement takes effect once your signed copy arrives.\n\nThe SAFRA team',
   },
 
+  partnerEmployeeInvitation: {
+    subject: 'An invitation to join the {partnerName} team on SAFRA',
+    body: '{partnerName} has invited you to work with them on the SAFRA platform.\n\nOpen the link below to set your password and activate your account. It is valid for {hours} hours:\n{url}\n\nIf you were not expecting this invitation, ignore this message and no account will be created for you.\n\nThe SAFRA team',
+  },
+
   partnerContractCountersigned: {
     subject: 'Your copy of the signed partnership agreement — {reference}',
     body: 'Both parties have signed the partnership agreement and it is now in force.\n\nYour copy is kept on the Contracts and documents page of your partner dashboard, and you can download it at any time:\n{url}\n\nThe SAFRA team',

@@ -242,6 +242,33 @@ export function partnerLoginCodeMail(input: {
   };
 }
 
+/**
+ * Inviting somebody to work FOR a partner (Bashar, 2026-08-23).
+ *
+ * Names the business, because the recipient did not ask for this: somebody at a hotel typed their
+ * address into a staff screen, and a link arriving with no context reads as phishing. It carries
+ * no reference number — an employee has no relationship with SAFRA to quote one about.
+ */
+export function partnerEmployeeInvitationMail(input: {
+  to: string;
+  partnerName: string;
+  url: string;
+  hours: number;
+  locale: string;
+}): OutgoingMail {
+  const copy = emailMessages(resolveLocale(input.locale)).partnerEmployeeInvitation;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { partnerName: input.partnerName }),
+    text: fill(copy.body, {
+      partnerName: input.partnerName,
+      url: input.url,
+      hours: input.hours,
+    }),
+  };
+}
+
 export function partnerInvitationMail(input: {
   to: string;
   reference: string;

@@ -62,6 +62,11 @@ export const de = {
     body: 'SAFRA hat den Partnervertrag unterzeichnet und Ihnen zugesandt.\n\nÖffnen Sie «العقود والمستندات» im Partnerportal, laden Sie den Vertrag herunter, unterschreiben Sie ihn handschriftlich und laden Sie die unterschriebene Fassung auf derselben Seite wieder hoch.\n\n{url}\n\nDer Vertrag tritt in Kraft, sobald Ihre unterschriebene Fassung eingegangen ist.\n\nIhr SAFRA-Team',
   },
 
+  partnerEmployeeInvitation: {
+    subject: 'Einladung in das Team von {partnerName} auf SAFRA',
+    body: '{partnerName} hat Sie eingeladen, auf der SAFRA-Plattform mitzuarbeiten.\n\nÖffnen Sie den folgenden Link, um Ihr Passwort zu setzen und Ihr Konto zu aktivieren. Er ist {hours} Stunden gültig:\n{url}\n\nFalls Sie diese Einladung nicht erwartet haben, ignorieren Sie diese Nachricht; es wird kein Konto für Sie angelegt.\n\nIhr SAFRA-Team',
+  },
+
   partnerContractCountersigned: {
     subject: 'Ihre Ausfertigung des unterzeichneten Partnervertrags — {reference}',
     body: 'Beide Parteien haben den Partnervertrag unterzeichnet; er ist ab sofort in Kraft.\n\nIhre Ausfertigung liegt auf der Seite «Verträge und Dokumente» in Ihrem Partner-Dashboard und kann jederzeit heruntergeladen werden:\n{url}\n\nIhr SAFRA-Team',
