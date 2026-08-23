@@ -17,11 +17,11 @@ import {
   PERMISSIONS as P,
   type StaffInvitationAcceptInput,
   type StaffInviteInput,
-  type StaffRoleChangeInput,
+  type StaffRoleAssignInput,
   type StaffStatusInput,
   staffInvitationAcceptSchema,
   staffInviteSchema,
-  staffRoleChangeSchema,
+  staffRoleAssignSchema,
   staffStatusSchema,
   pageQuerySchema,
 } from '@safra/contracts';
@@ -102,9 +102,9 @@ export class StaffController {
   async changeRole(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('userId', ParseUUIDPipe) userId: string,
-    @Body(new ZodValidationPipe(staffRoleChangeSchema)) body: StaffRoleChangeInput,
+    @Body(new ZodValidationPipe(staffRoleAssignSchema)) body: StaffRoleAssignInput,
   ): Promise<void> {
-    await this.staff.changeRole(user, userId, body.role);
+    await this.staff.changeRole(user, userId, body.staffRoleId);
   }
 
   @Patch(':userId/status')

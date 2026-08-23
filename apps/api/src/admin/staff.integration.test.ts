@@ -95,10 +95,32 @@ describeIfDb('StaffService', () => {
     await harness.close();
   });
 
-  async function invite(label: string, role = 'support_agent' as const) {
+  /**
+   * The id of the seeded role that admits as a given enum value.
+   *
+   * `changeRole` takes a `staffRoleId` since 2026-08-23, not an enum — the role row decides what
+   * somebody may do and its `admits_as` decides which enum they hold. The four roles that used to
+   * BE the enum are seeded rows now (`post/0008`), so a test that wants "make them a support agent"
+   * asks for the role that admits as one.
+   */
+  const roleAdmitting = async (admitsAs: string): Promise<string> => {
+    const rows = await db.execute<{ id: string }>(sql`
+      SELECT id FROM staff_roles
+      WHERE admits_as = ${admitsAs}::user_role AND deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const id = rows.rows[0]?.id;
+
+    if (!id) throw new Error(`no seeded role admits as ${admitsAs}`);
+
+    return id;
+  };
+
+  async function invite(label: string, admitsAs = 'support_agent' as const) {
     const result = await service.invite(admin(SUPER_ADMIN_ID), {
       email: address(label),
-      role,
+      staffRoleId: await roleAdmitting(admitsAs),
     });
     created.push(result.id);
     return result;
@@ -149,10 +171,14 @@ describeIfDb('StaffService', () => {
 
       await expect(
         service.invite(admin(SUPER_ADMIN_ID), {
-          // `Role` includes customer, so only the runtime guard catches this — which
-          // is the point: the type system does not distinguish staff from customer.
           email: address('cust'),
-          role: 'customer',
+          /*
+            A role id that does not exist. The enum version of this test invited as `customer` to
+            prove the runtime guard caught what the type system could not; since 2026-08-23 an
+            invitation names a ROLE ROW, so the equivalent hole is an id nobody issued — and the
+            guard that catches it is the lookup, not a role check.
+          */
+          staffRoleId: '00000000-0000-0000-0000-0000000000ee',
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -169,9 +195,150 @@ describeIfDb('StaffService', () => {
       await expect(
         service.invite(admin(SUPER_ADMIN_ID), {
           email: first.email,
-          role: 'support_agent',
+          staffRoleId: await roleAdmitting('support_agent'),
         }),
       ).rejects.toThrow(/already exists/i);
+    });
+  });
+
+  /**
+   * The WINDOW: an invited staff member holds their named role's permissions from the moment they
+   * redeem, never an enum's (2026-08-23).
+   *
+   * ## What this is guarding
+   *
+   * Inviting used to take an enum value, so putting somebody into a custom role was invite-then-
+   * change — and between those two actions `staff_role_id` was null, so resolution fell back to
+   * `ROLE_PERMISSIONS[whichever enum was chosen]`. Somebody destined for a narrow role carried the
+   * full support-agent set until a second step that nothing forced anybody to take.
+   *
+   * ## Why it is here rather than in the browser suite
+   *
+   * The console can drive everything up to the invitation being sent, and no further: redeeming
+   * needs a mailbox and a password satisfying `passwordSchema`, which the shared testbed password
+   * cannot. So the half that matters — what the account carries AFTER redemption — is proved here
+   * or it is not proved at all.
+   */
+  describe('what an invited staff member actually carries', () => {
+    /** A password the policy accepts. `TESTBED_PASSWORD` has no uppercase and would be refused. */
+    const PASSWORD = 'A-real-Password-9';
+
+    const claimsFor = async (userId: string) => {
+      const rows = await db.execute<{
+        permissions: string[] | null;
+        staff_role_id: string;
+      }>(sql`
+        SELECT u.staff_role_id, r.permissions
+        FROM users u
+        LEFT JOIN staff_roles r ON r.id = u.staff_role_id AND r.deleted_at IS NULL
+        WHERE u.id = ${userId}::uuid
+      `);
+
+      return rows.rows[0];
+    };
+
+    it('attaches the named role at INVITE time, not after a second step', async () => {
+      await seedSuperAdmin();
+
+      const narrow = await db.execute<{ id: string }>(sql`
+        INSERT INTO staff_roles (name, permissions, admits_as)
+        VALUES ('ضيّق-' || gen_random_uuid(), ARRAY['booking.read_all'], 'support_agent')
+        RETURNING id
+      `);
+
+      const roleId = narrow.rows[0]?.id ?? '';
+      const invited = await service.invite(admin(SUPER_ADMIN_ID), {
+        email: address('narrow'),
+        staffRoleId: roleId,
+      });
+
+      created.push(invited.id);
+
+      const row = await claimsFor(invited.id);
+
+      /* The window closes HERE — before redemption, not after a follow-up action. */
+      expect(row?.staff_role_id).toBe(roleId);
+      expect(row?.permissions).toEqual(['booking.read_all']);
+    });
+
+    /**
+     * And redeeming does not widen it.
+     *
+     * `acceptInvitation` sets a password and verifies the address; it must not touch the role. If
+     * it did, the narrow role would survive the invitation and be lost at the moment the person
+     * actually starts using the account.
+     */
+    it('still carries the narrow role after the invitation is redeemed', async () => {
+      await seedSuperAdmin();
+
+      const narrow = await db.execute<{ id: string }>(sql`
+        INSERT INTO staff_roles (name, permissions, admits_as)
+        VALUES ('ضيّق2-' || gen_random_uuid(), ARRAY['booking.read_all'], 'support_agent')
+        RETURNING id
+      `);
+
+      const roleId = narrow.rows[0]?.id ?? '';
+      const invited = await service.invite(admin(SUPER_ADMIN_ID), {
+        email: address('redeem'),
+        staffRoleId: roleId,
+      });
+
+      created.push(invited.id);
+
+      /*
+        The REAL token, out of the captured invitation mail. It is returned once and stored only as
+        a hash, so the database cannot give it back — reading it from the message is the only way to
+        redeem in a test, and it is also what proves the link we send actually works.
+      */
+      const link = sent.at(-1)?.text ?? '';
+      const token = /\/invitation\/([A-Za-z0-9_-]+)/.exec(link)?.[1] ?? '';
+
+      expect(token).not.toBe('');
+
+      await service.acceptInvitation(token, PASSWORD);
+
+      const row = await claimsFor(invited.id);
+
+      /* Redemption sets a password and verifies the address. It must not touch the role. */
+      expect(row?.staff_role_id).toBe(roleId);
+      expect(row?.permissions).toEqual(['booking.read_all']);
+
+      const account = await db.execute<{ has_password: boolean }>(sql`
+        SELECT password_hash IS NOT NULL AS has_password FROM users
+        WHERE id = ${invited.id}::uuid
+      `);
+
+      /* And it did redeem — otherwise the two assertions above pass on an un-redeemed account. */
+      expect(account.rows[0]?.has_password).toBe(true);
+    });
+
+    /**
+     * The CONTROL, and without it the two above prove nothing.
+     *
+     * If a named role granted nothing at all, «carries booking.read_all» would still fail — but
+     * «does not carry the support-agent set» would pass over an account with no permissions
+     * whatsoever. This asserts the difference is the ROLE rather than emptiness.
+     */
+    it('does not carry the enum’s permission set as well', async () => {
+      await seedSuperAdmin();
+
+      const narrow = await db.execute<{ id: string }>(sql`
+        INSERT INTO staff_roles (name, permissions, admits_as)
+        VALUES ('ضيّق3-' || gen_random_uuid(), ARRAY['booking.read_all'], 'support_agent')
+        RETURNING id
+      `);
+
+      const invited = await service.invite(admin(SUPER_ADMIN_ID), {
+        email: address('narrow3'),
+        staffRoleId: narrow.rows[0]?.id ?? '',
+      });
+
+      created.push(invited.id);
+
+      const row = await claimsFor(invited.id);
+
+      /* Exactly one capability — not the twenty-odd a support agent holds by enum. */
+      expect(row?.permissions).toHaveLength(1);
     });
   });
 
@@ -324,7 +491,11 @@ describeIfDb('StaffService', () => {
       await seedSuperAdmin();
 
       await expect(
-        service.changeRole(admin(SUPER_ADMIN_ID), SUPER_ADMIN_ID, 'support_agent'),
+        service.changeRole(
+          admin(SUPER_ADMIN_ID),
+          SUPER_ADMIN_ID,
+          await roleAdmitting('support_agent'),
+        ),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -350,11 +521,11 @@ describeIfDb('StaffService', () => {
 
       try {
         await expect(
-          service.changeRole(admin(only), only, 'support_agent'),
+          service.changeRole(admin(only), only, await roleAdmitting('support_agent')),
         ).rejects.toThrow(ForbiddenException); // self-change is caught first
 
         await expect(
-          service.changeRole(admin(actor), only, 'support_agent'),
+          service.changeRole(admin(actor), only, await roleAdmitting('support_agent')),
         ).rejects.toThrow(/last active super admin/i);
       } finally {
         await restore();
@@ -386,7 +557,11 @@ describeIfDb('StaffService', () => {
       await seedSuperAdmin();
       const target = await invite('revoke-role');
 
-      await service.changeRole(admin(SUPER_ADMIN_ID), target.id, 'finance_officer');
+      await service.changeRole(
+        admin(SUPER_ADMIN_ID),
+        target.id,
+        await roleAdmitting('finance_officer'),
+      );
 
       expect(revoked).toContain(target.id);
     });

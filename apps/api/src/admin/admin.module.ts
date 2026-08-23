@@ -10,6 +10,8 @@ import { AuditLogService } from './audit-log.service.js';
 import { DashboardService } from './dashboard.service.js';
 import { BookingDetailService } from './booking-detail.service.js';
 import { AdminOperationsController } from './operations.controller.js';
+import { StaffRolesController } from './staff-roles.controller.js';
+import { StaffRolesService } from './staff-roles.service.js';
 import { ReviewService } from './review.service.js';
 import { MeController } from './me.controller.js';
 import { MeService } from './me.service.js';
@@ -49,9 +51,11 @@ import { StaffScopeService } from './staff-scope.service.js';
     MeController,
     StaffController,
     StaffInvitationController,
+    StaffRolesController,
   ],
   providers: [
     ReviewService,
+    StaffRolesService,
     AdminGrantsService,
     AuditLogService,
     DashboardService,

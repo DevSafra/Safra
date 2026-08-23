@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -120,6 +120,20 @@ export class StaffService {
     // One fragment, used by both queries below — see `countOf`.
     const fromWhere = sql`
       FROM users u
+      /*
+        The role's NAME travels with the row, not just its id.
+
+        Every screen that shows a person shows their role — the header renders on all twenty
+        console sections — and a dynamic name cannot come from a compile-time catalogue. Resolving
+        it per screen would mean fetching the role list on every page; joining it here costs one
+        indexed lookup on a query that already runs.
+
+        LEFT, because staff_role_id is null for every account seeded before named roles existed.
+        Those still resolve through ROLE_PERMISSIONS and the console falls back to the enum label.
+
+        No backticks in here — this comment is inside a sql template literal and a backtick ends it.
+      */
+      LEFT JOIN staff_roles r ON r.id = u.staff_role_id AND r.deleted_at IS NULL
       WHERE u.role <> 'customer' AND u.role <> 'partner' AND u.deleted_at IS NULL`;
 
     const [rows, total] = await Promise.all([
@@ -127,6 +141,8 @@ export class StaffService {
         id: string;
         email: string;
         role: Role;
+        staff_role_id: string | null;
+        staff_role_name: string | null;
         status: string;
         totp_enabled_at: string | null;
         password_hash: string | null;
@@ -134,6 +150,7 @@ export class StaffService {
         created_at: string;
       }>(sql`
       SELECT u.id, u.email, u.role::text AS role, u.status::text AS status,
+             u.staff_role_id, r.name AS staff_role_name,
              u.totp_enabled_at::text, u.password_hash,
              u.last_login_at::text, u.created_at::text
       ${fromWhere}
@@ -147,6 +164,8 @@ export class StaffService {
       id: row.id,
       email: row.email,
       role: row.role,
+      staffRoleId: row.staff_role_id,
+      staffRoleName: row.staff_role_name,
       status: row.status,
       twoFactorEnabled: row.totp_enabled_at !== null,
       /**
@@ -168,13 +187,36 @@ export class StaffService {
    * The account exists immediately but cannot be used: no password, and
    * `TwoFactorGuard` will hold it at enrolment even once one is set.
    */
+  /**
+   * Invites somebody into a NAMED ROLE, in one step.
+   *
+   * It took an enum value until 2026-08-23, which meant inviting into a custom role was invite-then-
+   * change — and between those two actions the account carried whatever `ROLE_PERMISSIONS` said
+   * about the enum, because `staff_role_id` was still null. A narrow role's holder with the full
+   * support-agent set, for as long as nobody took the second step.
+   */
   async invite(
     actor: AccessTokenClaims | undefined,
-    input: { email: string; role: Role; locale?: string | undefined },
+    input: { email: string; staffRoleId: string; locale?: string | undefined },
   ): Promise<{ id: string; email: string; role: Role }> {
     const email = input.email.trim().toLowerCase();
 
-    if (!isStaffRole(input.role)) {
+    const found = await this.db.execute<{ admits_as: Role }>(sql`
+      SELECT admits_as FROM staff_roles
+      WHERE id = ${input.staffRoleId}::uuid AND deleted_at IS NULL LIMIT 1
+    `);
+
+    const namedRole = found.rows[0];
+
+    if (!namedRole) throw badRequest(ERROR.STAFF_ROLE_NOT_FOUND);
+
+    /*
+      The enum the role admits its holders as — written alongside `staff_role_id` so the two can
+      never disagree, exactly as `changeRole` does.
+    */
+    const role = namedRole.admits_as;
+
+    if (!isStaffRole(role)) {
       throw badRequest(ERROR.STAFF_ROLE_INVALID_CONSOLE);
     }
 
@@ -192,8 +234,9 @@ export class StaffService {
     }
 
     const created = await this.db.execute<{ id: string }>(sql`
-      INSERT INTO users (email, role, status, preferred_locale, email_verified_at)
-      VALUES (${email}, ${input.role}::user_role, 'active',
+      INSERT INTO users (email, role, staff_role_id, status, preferred_locale,
+                         email_verified_at)
+      VALUES (${email}, ${role}::user_role, ${input.staffRoleId}::uuid, 'active',
               ${input.locale ?? 'en'}, now())
       RETURNING id
     `);
@@ -207,14 +250,14 @@ export class StaffService {
       action: 'staff.invited',
       subjectType: 'user',
       subjectId: user.id,
-      after: { email, role: input.role },
+      after: { email, role, staffRoleId: input.staffRoleId },
     });
 
-    await this.sendInvitation(user.id, email, input.role, input.locale ?? 'en');
+    await this.sendInvitation(user.id, email, role, input.locale ?? 'en');
 
-    this.logger.log(`Staff ${email} invited as ${input.role} by ${actor?.sub}.`);
+    this.logger.log(`Staff ${email} invited as ${role} by ${actor?.sub}.`);
 
-    return { id: user.id, email, role: input.role };
+    return { id: user.id, email, role };
   }
 
   /** Re-sends an invitation, for one that expired or never arrived. */
@@ -246,16 +289,37 @@ export class StaffService {
    * takes fifteen minutes to apply is not a demotion, and the access-token lifetime
    * is exactly the window in which someone who has just been demoted would act.
    */
+  /**
+   * Moves a staff member to a NAMED ROLE (Bashar, 2026-08-23).
+   *
+   * Takes a `staffRoleId`, never an enum value, and never both — two ways to say the same thing is
+   * how they come to disagree. The role row decides what the person may do; its `admits_as` decides
+   * which enum value they hold, and therefore whether they may open the console and whether the
+   * city-scope machinery applies. Both are written together so they cannot drift.
+   *
+   * A SYSTEM role is a legitimate target. «مدير عام» cannot be edited or withdrawn, but promoting
+   * somebody INTO it is the ordinary path — and it is the only way to satisfy the last-super-admin
+   * guard when the current holder is leaving.
+   */
   async changeRole(
     actor: AccessTokenClaims | undefined,
     userId: string,
-    role: Role,
+    staffRoleId: string,
   ): Promise<void> {
     const target = await this.staffById(userId);
 
-    if (!isStaffRole(role)) {
-      throw badRequest(ERROR.STAFF_ROLE_INVALID);
-    }
+    const found = await this.db.execute<{
+      name: string;
+      admits_as: Role;
+      is_system: boolean;
+    }>(sql`
+      SELECT name, admits_as, is_system FROM staff_roles
+      WHERE id = ${staffRoleId}::uuid AND deleted_at IS NULL LIMIT 1
+    `);
+
+    const role = found.rows[0];
+
+    if (!role) throw badRequest(ERROR.STAFF_ROLE_NOT_FOUND);
 
     /**
      * Refusal 1: no changing your own role.
@@ -268,10 +332,12 @@ export class StaffService {
       throw forbidden(ERROR.STAFF_CANNOT_CHANGE_OWN_ROLE);
     }
 
-    await this.assertNotLastSuperAdmin(target, role === 'super_admin');
+    await this.assertNotLastSuperAdmin(target, role.is_system);
 
     await this.db.execute(sql`
-      UPDATE users SET role = ${role}::user_role, updated_at = now()
+      UPDATE users
+      SET staff_role_id = ${staffRoleId}::uuid, role = ${role.admits_as}::user_role,
+          updated_at = now()
       WHERE id = ${userId}
     `);
 
@@ -282,7 +348,7 @@ export class StaffService {
       subjectType: 'user',
       subjectId: userId,
       before: { role: target.role },
-      after: { role },
+      after: { role: role.admits_as, staffRoleName: role.name },
     });
 
     await this.tokens.revokeAllForUser(userId);
@@ -295,7 +361,7 @@ export class StaffService {
       whatever ships them onward, for no operational gain. The id answers "who" for anybody who can
       already query the table, and tells a log reader nothing about a person.
     */
-    this.logger.log(`Staff ${userId}: ${target.role} → ${role} by ${actor?.sub}.`);
+    this.logger.log(`Staff ${userId}: ${target.role} → ${role.name} by ${actor?.sub}.`);
   }
 
   /** Suspends or reinstates an account. Suspension revokes sessions at once. */
@@ -446,11 +512,18 @@ export class StaffService {
         AND password_hash IS NOT NULL
     `);
 
+    /*
+      Its OWN code, distinct from `staff_role.system` (2026-08-23).
+
+      They are different sentences and the screen has to be able to say which: "this role cannot be
+      edited" versus "this person cannot be moved off it, because they are the last one holding it".
+
+      It also used to throw an English SENTENCE, which the project's own rule forbids — the API
+      answers with a code and the reader's language resolves it. That was a real defect on the one
+      refusal somebody meets in an emergency.
+    */
     if (Number(others.rows[0]?.count ?? 0) === 0) {
-      throw new BadRequestException(
-        'This is the last active super admin. Promote another one first, or the ' +
-          'platform cannot be administered.',
-      );
+      throw badRequest(ERROR.STAFF_LAST_SUPER_ADMIN);
     }
   }
 }
