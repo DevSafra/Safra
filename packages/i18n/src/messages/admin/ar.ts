@@ -589,11 +589,19 @@ export const ar = {
         to read neither.
       */
       contractIntro:
-        'أنشئ العقد، اطبعه، ووقّعاه معاً، ثم ارفع نسخة سفرة الموقّعة ونسخة الشريك الموقّعة — بهذا الترتيب.',
+        'أنشئ العقد واطبعه. إن كان الشريك معك فوقّعا نسخة واحدة وارفعها بزر «ارفع النسخة الموقّعة من سفرة والشريك» — يصبح العقد سارياً فوراً. وإن لم يكن حاضراً فارفع نسخة سفرة الموقّعة أولاً، ثم ينتظر العقد نسخته الموقّعة.',
       contractStateNone: 'لم يُنشأ عقد بعد.',
       contractStateDraft: 'أُنشئ العقد وينتظر توقيع سفرة.',
       contractStateAwaitingPartner: 'وُقّع من سفرة وينتظر توقيع الشريك.',
-      contractStateActive: 'وقّع الطرفان والعقد ساري المفعول.',
+      /*
+        A STEP summary, not the contract's own state line.
+
+        It read «وقّع الطرفان والعقد ساري المفعول.» — word for word what the contract panel prints
+        directly beneath it, so the screen said the same sentence twice in a row. The checklist's
+        job is to say whether the step is finished; the panel's is to say what the contract's state
+        is. Where the two are identical the reader assumes a rendering fault.
+      */
+      contractStateActive: 'اكتملت خطوة العقد.',
       approvalIntro:
         'الموافقة هي الخطوة الأخيرة، وهي وحدها ما يتيح نشر عقارات هذا الشريك (P-002). تُنفَّذ من صفحة الشريك بصلاحية الموافقة على الشركاء.',
       approvalDone: 'تمت الموافقة على الشريك.',
@@ -1267,6 +1275,19 @@ export const ar = {
       downloadSafra: 'نسخة سفرة الموقّعة',
       downloadPartner: 'نسخة الشريك الموقّعة',
       uploadSigned: 'ارفع النسخة الموقّعة وأرسلها للشريك',
+      /*
+        ── النسخة الموقّعة من الطرفين (Bashar, 2026-08-23) ──────────────────────────────────────
+        الحالة التي وقّع فيها الطرفان ورقة واحدة على الطاولة نفسها. المسح الضوئي واحد يحمل
+        التوقيعين، فلا معنى لرفعه مرّتين ولا لانتظار الشريك ليرفع ما وقّعه أمامك.
+
+        الزر الثاني بجانب الأول لا بديلاً عنه: المسار المعتاد — سفرة توقّع ثم ينتظر الشريك — ما زال
+        هو الغالب، وهذا لِمَن كان الشريك حاضراً.
+      */
+      uploadJoint: 'ارفع النسخة الموقّعة من سفرة والشريك',
+      uploadJointHint:
+        'للنسخة الواحدة التي وقّعها الطرفان معاً. يصبح العقد سارياً فوراً دون انتظار رفع الشريك، وتصل إليه نسخته بالبريد.',
+      uploadJointReplaceWarning:
+        'رفع نسخة موقّعة من الطرفين الآن يُلغي التوقيعات المحفوظة ويستبدلها بهذه النسخة. تبقى النسخ السابقة في السجل.',
       uploading: 'جارٍ الإرسال…',
       file: 'النسخة الموقّعة (PDF)',
       failed: 'تعذّر تنفيذ الطلب. حاول مرة أخرى.',

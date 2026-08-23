@@ -38,9 +38,24 @@ import { t } from '@/lib/strings';
 export function PartnerContractPanel({
   partnerReference,
   contracts,
+  allowJointUpload = false,
 }: {
   readonly partnerReference: string;
   readonly contracts: readonly ContractItem[];
+  /**
+   * Offer the JOINT upload — one scan carrying both signatures (Bashar, 2026-08-23).
+   *
+   * Off by default, and the partner detail screen leaves it off. It belongs to the in-person
+   * onboarding flow: both people at one table, one sheet, no send and no return trip.
+   *
+   * The caller passes `canFileJointContract(partner.verification)` — the SAME predicate the API
+   * refuses on — rather than `true`. That matters because the onboarding screen is reachable for
+   * any partner and approval happens on it, one step below this panel: a screen that decided for
+   * itself would keep offering the button after an approval the server had already begun
+   * refusing, and the operator would press a visible control and get a coded refusal for a reason
+   * nothing on the page hinted at.
+   */
+  readonly allowJointUpload?: boolean;
 }) {
   const router = useRouter();
 
@@ -64,12 +79,26 @@ export function PartnerContractPanel({
     history, and offering a control against it would let somebody sign a document that has already
     been replaced.
   */
+  /*
+    Whether the in-person button is offered at all.
+
+    Both conditions, in one place: the caller opted in (only the onboarding screen does) AND there
+    is a live contract to sign. `allowJointUpload` already carries the API's own predicate —
+    `canFileJointContract` — so this adds no second opinion about WHO may file one, only about
+    whether there is anything to file it against.
+  */
   const current = contracts.find(
     (contract) =>
       contract.status === 'draft' ||
       contract.status === 'awaiting_partner_signature' ||
       contract.status === 'active',
   );
+
+  const joint =
+    allowJointUpload &&
+    current !== undefined &&
+    current.status !== 'superseded' &&
+    current.status !== 'terminated';
 
   async function post(path: string, body: unknown): Promise<void> {
     if (busy) return;
@@ -117,13 +146,9 @@ export function PartnerContractPanel({
     }
   }
 
-  async function uploadSigned(event: React.FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-
-    if (!file || !current) return;
-
-    /* `readAsDataURL` yields `data:application/pdf;base64,…`; the payload follows the first comma. */
-    const content = await new Promise<string>((resolve, reject) => {
+  /** `readAsDataURL` yields `data:application/pdf;base64,…`; the payload follows the FIRST comma. */
+  async function base64Of(chosen: File): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
 
       reader.onerror = () => reject(new Error('read failed'));
@@ -134,12 +159,37 @@ export function PartnerContractPanel({
 
         resolve(comma === -1 ? '' : result.slice(comma + 1));
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(chosen);
     });
+  }
+
+  async function uploadSigned(event: React.FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+
+    if (!file || !current) return;
 
     await post(`/api/contracts/${current.id}/signed-copy`, {
       fileName: file.name,
-      content,
+      content: await base64Of(file),
+    });
+  }
+
+  /* The in-person path: one document, both signatures, straight to «ساري المفعول». */
+  /**
+   * The same scan, filed as the copy BOTH parties signed.
+   *
+   * Reads the SAME `file` as `uploadSigned` and differs only in the route. It had its own field
+   * and its own form; Bashar asked for the button to sit BESIDE the existing one, and two file
+   * pickers carrying the same label on one card made the operator choose which box to put one PDF
+   * into — a choice with no meaning, since the document is identical either way. What differs is
+   * what SAFRA is asserting about it, and that is what a button is for.
+   */
+  async function uploadJoint(): Promise<void> {
+    if (!file || !current) return;
+
+    await post(`/api/contracts/${current.id}/joint-signed-copy`, {
+      fileName: file.name,
+      content: await base64Of(file),
     });
   }
 
@@ -279,20 +329,71 @@ export function PartnerContractPanel({
             />
           </label>
 
-          <button
-            type="submit"
-            disabled={busy || !file}
-            className="w-fit cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {busy
-              ? t.sections.partnerContract.uploading
-              : t.sections.partnerContract.uploadSigned}
-          </button>
+          {/*
+            Two destinations for ONE file, side by side (Bashar, 2026-08-23).
 
-          {/* Only when there is a signature to invalidate — otherwise it is a warning about nothing. */}
+            The scan is the same document; what differs is what SAFRA asserts about it. «ارفع
+            النسخة الموقّعة وأرسلها للشريك» says only SAFRA has signed and the partner is next;
+            «ارفع النسخة الموقّعة من سفرة والشريك» says both signatures are on this sheet and the
+            contract is in force. So it is one field and two buttons, not two forms — a second
+            picker would ask the operator to choose a box before choosing a meaning.
+
+            `flex-wrap`, so the pair stacks at 390px rather than widening the card, which on the
+            onboarding screen is already the narrowest thing on the page.
+          */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="submit"
+              disabled={busy || !file}
+              className="w-fit cursor-pointer rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy
+                ? t.sections.partnerContract.uploading
+                : t.sections.partnerContract.uploadSigned}
+            </button>
+
+            {/*
+              `type="button"`, deliberately: Enter in the file field submits the ORDINARY upload.
+              This one puts a contract in force, and that should be a click rather than something
+              a keystroke can reach by accident.
+            */}
+            {joint ? (
+              <button
+                type="button"
+                disabled={busy || !file}
+                onClick={() => void uploadJoint()}
+                className="w-fit cursor-pointer rounded-lg bg-ok px-3 py-1.5 text-xs font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {busy
+                  ? t.sections.partnerContract.uploading
+                  : t.sections.partnerContract.uploadJoint}
+              </button>
+            ) : null}
+          </div>
+
+          {joint ? (
+            <p className="text-[11px] leading-relaxed text-faint2">
+              {t.sections.partnerContract.uploadJointHint}
+            </p>
+          ) : null}
+
+          {/*
+            One warning per button, and only when it has something to destroy.
+
+            They are different losses: replacing SAFRA's copy takes the partner's signature with it
+            and hands the step back to them; a joint upload replaces BOTH signatures and the
+            contract stays in force. A single sentence covering both would be wrong for whichever
+            button the operator pressed.
+          */}
           {current.status === 'active' ? (
             <p className="text-[11px] leading-relaxed text-gold">
               {t.sections.partnerContract.replaceWarning}
+            </p>
+          ) : null}
+
+          {joint && current.status !== 'draft' ? (
+            <p className="text-[11px] leading-relaxed text-gold">
+              {t.sections.partnerContract.uploadJointReplaceWarning}
             </p>
           ) : null}
         </form>
@@ -315,11 +416,22 @@ export function PartnerContractPanel({
 /**
  * What happened to this contract, newest first.
  *
- * Renders nothing below two entries: with a single copy on file the panel's own state line already
- * says everything, and a heading over one row is furniture.
+ * Renders from the first copy on file; nothing at all only when no copy exists yet.
  */
 function ContractHistory({ contract }: { readonly contract: ContractItem }) {
-  if (contract.history.length < 2) return null;
+  /*
+    Shown from the FIRST entry (Bashar, 2026-08-23).
+
+    This used to be gated at two, on the reasoning that one copy is not a history and the card's
+    own date already says when it arrived. Bashar overruled it after seeing the onboarding screen
+    directly after SAFRA's upload: there is exactly one entry at that moment, so the whole box
+    vanished and the operator saw blank space where the record should be — which reads as a missing
+    feature rather than as an empty one. One thin row saying «أرسلت سفرة نسخة موقّعة · الحالية» tells
+    them the record exists and is being kept.
+
+    Do not re-add the gate.
+  */
+  if (contract.history.length === 0) return null;
 
   return (
     <div className="mt-3 grid gap-1.5 rounded-lg border border-line2 bg-field px-3 py-2.5">

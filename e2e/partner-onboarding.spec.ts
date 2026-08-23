@@ -129,7 +129,24 @@ test.describe('onboarding a partner in person', () => {
       invitation is going somewhere the partner can actually reach.
     */
     await expect(page.getByText(reference as string).first()).toBeVisible();
-    await expect(page.getByText(partner.email, { exact: false })).toBeVisible();
+    await expect(page.getByText(partner.email, { exact: false }).first()).toBeVisible();
+
+    /*
+      ── The partner CANNOT sign in yet, and the screen says so ──
+
+      The defect this guards against shipped and was reported: a partner was onboarded, approved,
+      and could not sign in, because the invitation had never been redeemed and nothing on this
+      screen mentioned the account at all. Every step read «تم», so the operator reasonably
+      concluded the job was finished.
+
+      Asserted on the RESEND control rather than only the sentence, because the sentence alone was
+      never the gap — `O-partner-10` claimed the invitation was "re-sendable from the screen" while
+      no endpoint existed that could re-send one for an onboarded partner. The button is the proof
+      the remedy is real.
+    */
+    await expect(
+      page.getByRole('button', { name: onboarding.resendInvitation }),
+    ).toBeVisible();
 
     /* Step ② starts outstanding, and says WHICH documents are wanted rather than just "no". */
     await expect(
@@ -174,7 +191,7 @@ test.describe('onboarding a partner in person', () => {
     });
 
     /*
-      ── The signed copy: download what was generated, then upload it back ──
+      ── The joint copy: download what was generated, then upload it back as BOTH signatures ──
 
       This is not a shortcut around signing — it IS the workflow, minus the printer. SAFRA
       generates the agreement, a human signs the paper, and the scan goes back up; the bytes going
@@ -196,22 +213,45 @@ test.describe('onboarding a partner in person', () => {
 
     await page.getByLabel(t.sections.partnerContract.file).setInputFiles(signedCopy);
 
+    /*
+      «ارفع النسخة الموقّعة من سفرة والشريك» — the in-person button (Bashar, 2026-08-23).
+
+      Both people signed one sheet at the table, so the scan carries two signatures and the
+      contract is binding on upload. This is the button under test; the ordinary
+      «ارفع النسخة الموقّعة وأرسلها للشريك» beside it is covered by the contract spec.
+    */
     await page
-      .getByRole('button', { name: t.sections.partnerContract.uploadSigned })
+      .getByRole('button', { name: t.sections.partnerContract.uploadJoint })
       .click();
 
     /*
-      `awaiting_partner_signature` — SAFRA has signed and the partner has been emailed.
-
-      This is as far as ONE SITTING can honestly go, and the limit is deliberate rather than a gap
-      in the test. The partner's own signature is uploaded from the PARTNER'S account, because
-      `contract_signature_party = 'partner'` means "signed by hand and uploaded from their own
-      account" — and during the sitting that account has no password yet, by design. Filing their
-      signature for them would make that column say something untrue. See docs/FUTURE-WORK.md.
+      Straight to `active`. The whole point of the path is that it does NOT stop at the partner's
+      step, so «تم توقيع الطرفين» is asserted rather than the awaiting line.
     */
-    await expect(page.getByText(onboarding.contractStateAwaitingPartner)).toBeVisible({
+    await expect(page.getByText(onboarding.contractStateActive)).toBeVisible({
       timeout: 30_000,
     });
+
+    /*
+      And it never PASSED THROUGH `awaiting_partner_signature`.
+
+      Asserted on the DOM attribute rather than on the copy, because the state line is the thing
+      that would be re-worded and this is a claim about the state machine. A joint upload that
+      quietly went via the partner's step would still end `active`, so the end state alone does
+      not prove the transition — but it would have emailed the partner asking for a signature they
+      had already given, which is the failure worth catching.
+    */
+    await expect(page.locator('[data-contract-status="active"]')).toBeVisible();
+    await expect(page.getByText(onboarding.contractStateAwaitingPartner)).toBeHidden();
+
+    /*
+      The version history is visible with ONE entry (Bashar, 2026-08-23).
+
+      It was suppressed below two, so the operator saw blank space where the record should be and
+      concluded the feature was missing. That is the complaint this asserts against — the box has
+      to be there from the first copy on file.
+    */
+    await expect(page.getByText(t.sections.partnerContract.historyTitle)).toBeVisible();
 
     /* ── ⑤ The approval control is reachable, and approving takes ── */
     await expect(
@@ -227,6 +267,17 @@ test.describe('onboarding a partner in person', () => {
     await expect(page.getByText(onboarding.approvalDone)).toBeVisible({
       timeout: 15_000,
     });
+
+    /*
+      And the remedy survives approval.
+
+      The partner is approved by now and STILL has not activated their account — which is exactly
+      the state Bashar hit. The control has to remain, because approval is the moment an operator
+      is most likely to believe they are finished.
+    */
+    await expect(
+      page.getByRole('button', { name: onboarding.resendInvitation }),
+    ).toBeVisible();
 
     /* Nothing in that walk was allowed to log an error — a hydration failure shows up here. */
     expect(errors.filter((line) => !line.includes('favicon'))).toStrictEqual([]);

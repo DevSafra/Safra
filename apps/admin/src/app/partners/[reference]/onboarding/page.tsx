@@ -1,14 +1,18 @@
 import type { ReactNode } from 'react';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
-import { DEFAULT_SANCTIONS_POLICY, missingOnboardingDocuments } from '@safra/contracts';
+import {
+  canFileJointContract,
+  DEFAULT_SANCTIONS_POLICY,
+  missingOnboardingDocuments,
+} from '@safra/contracts';
 
 import { getContracts, getPartner, getSanctionsStatus } from '@/lib/api';
 import { Ltr, StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
 import { DocumentReview } from '@/components/document-review';
 import { PartnerContractPanel } from '@/components/partner-contract-panel';
+import { PartnerAccountState } from '@/components/partner-account-state';
 import { PartnerDocumentUpload } from '@/components/partner-document-upload';
 import { ScreeningPanel } from '@/components/screening-panel';
 import { VerifyPartner } from '@/components/verify-partner';
@@ -158,7 +162,21 @@ export default async function PartnerOnboardingPage({
             partner.partnerType.nameAr ?? partner.partnerType.nameEn
           } · ${partner.city.nameAr ?? partner.city.nameEn}`,
         })}
-      />
+      >
+        {/*
+          Whether the partner can actually sign in — the fact this screen used to omit.
+
+          It sits under step ① because the account belongs to the record, and because it is the one
+          thing here nobody in the room can finish. Everything below carries on without it; the
+          partner leaves approved and signs in when they open their mail.
+        */}
+        <PartnerAccountState
+          reference={partner.reference}
+          email={partner.email}
+          activated={partner.accountActivated}
+          invitationPending={partner.invitationPending}
+        />
+      </Step>
 
       {/* ── ② The documents ────────────────────────────────────────────────── */}
       <Step
@@ -205,9 +223,32 @@ export default async function PartnerOnboardingPage({
           {t.sections.partnerOnboarding.contractIntro}
         </p>
 
+        {/*
+          The joint upload is offered ONLY while the partner is still pending
+          (Bashar, 2026-08-23).
+
+          It is the in-person control — one sheet, both signatures, binding on the spot — and it
+          belongs to onboarding rather than to contract management, so the partner detail screen
+          does not offer it at all. The API enforces the same rule; this decides what the screen
+          shows.
+
+          The condition is passed rather than a bare `true`, because this screen is reachable for
+          ANY partner, including an approved one, and step ⑤ below can approve without leaving the
+          page. Hard-coding it would leave a button on screen that the server had just started
+          refusing, one click after the operator pressed «الموافقة على الشريك».
+
+          `canFileJointContract`, not a comparison written here. This was `verification ===
+          'pending'` and that was WRONG in a way that would not have shown up in any test on this
+          screen: it omitted `in_review`, so the button vanished during review while the API went
+          on accepting it. One predicate, called by both sides, is the only arrangement where the
+          screen and the server cannot drift — and the case they must agree on hardest is
+          `rejected`, which neither offers, because filing a signed agreement for a partner the
+          platform turned down records an agreement with somebody we declined to trade with.
+        */}
         <PartnerContractPanel
           partnerReference={partner.reference}
           contracts={contractRows}
+          allowJointUpload={canFileJointContract(partner.verification)}
         />
       </Step>
 

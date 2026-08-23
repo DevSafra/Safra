@@ -1629,16 +1629,74 @@ stranger's account, occupying `partners_user_unique` and putting a name in the r
 super admin misusing a super-admin power in a fully audited way, and it is not an escalation —
 nothing about it yields a session. **Owner:** accepted risk.
 
-**The one thing a single sitting genuinely cannot finish: the partner's own signature.**
-`contract_signature_party = 'partner'` means "signed by hand and uploaded from their own account",
-and during the sitting that account has no password yet — by design, decision 1 above. So the
-contract reaches `awaiting_partner_signature` in the room and becomes `active` when the partner
-redeems their invitation and uploads their scan. Filing it for them from the console was considered
-and REJECTED: it would make that column say something untrue, which is the one thing a signature
-record cannot afford. Approval does not depend on it — the contract check is advisory, exactly like
-screening — so the partner still leaves approved and able to trade. **Unblocks:** nothing.
-**Owner:** product, if Bashar decides a co-present signature should be recordable as a third party
-value (e.g. `partner_via_staff`) rather than as the partner's own.
+**RESOLVED 2026-08-23 — the sitting can now finish the contract too.**
+
+This entry originally recorded that a single sitting could only reach `awaiting_partner_signature`,
+because `contract_signature_party = 'partner'` meant "uploaded from their own account" and during
+the sitting that account has no password yet. Bashar's answer was better than the workaround being
+considered: when both people are at one table they sign ONE sheet, so there is a single scan
+carrying both signatures and nothing to wait for.
+
+«ارفع النسخة الموقّعة من سفرة والشريك» sits beside the ordinary upload. It writes two signature
+rows against one file, sets `sent_at` and `signed_at`, and puts the contract straight to `active`,
+skipping `awaiting_partner_signature` entirely. The partner is emailed their countersigned copy and
+can download it from their dashboard.
+
+**Onboarding only, and enforced on the server** (Bashar, 2026-08-23). The control is not general
+contract management: it appears only while the partner is still `pending`, and the API refuses it
+otherwise with a coded 409. Both halves read the same fact so the screen never offers a button the
+server has started refusing — which matters because the onboarding screen is reachable for any
+partner and step ⑤ can approve one without leaving the page.
+
+**The enum was NOT extended, and that was a decision.** A third `partner_via_staff` value was
+considered — this entry proposed it — and rejected. `contract_signature_party` answers "whose
+signature is on this paper", and on a jointly signed document the partner's ink genuinely is;
+"who filed the scan" is a different question that `uploaded_by_user_id` already answers. A third
+value would encode in one column what two columns already say, at the cost of a migration and a
+new case in every reader. The enum's docblock was corrected in the same change, because it said
+"uploaded from their own account" and that clause is false for a joint upload — a record that
+disagrees with its own documentation is worse than the missing value.
+
+**DEFECT FOUND IN USE, 2026-08-23 — the screen said "done" while the partner could not sign in.**
+
+Bashar onboarded `test@gmail.com`, approved them, and then could not sign in: "it says the login
+data are wrong, but I am sure it is correct." They were not wrong — there was no account to be
+right about. The address already existed as a CUSTOMER (since 2026-08-14), onboarding adopted it
+as designed, and the invitation was never redeemed — so the role was still `customer` and the only
+password on the account was the customer one it had always had. Seven attempts locked it.
+
+Two failures, and the second is worse than the first:
+
+1. **Nothing on the onboarding screen mentioned the account.** All five steps read «تم», so the
+   operator finished, saw a complete checklist, and reasonably concluded the partner could log in.
+2. **There was no remedy, and this document claimed there was.** The paragraph above used to say
+   the invitation "is re-sendable from the screen". It was not:
+   `PartnerApplicationService.resendInvitation` is keyed on an APPLICATION reference and refuses
+   anything without one, and an onboarded partner deliberately has no application row. A
+   capability was asserted in this register and never built.
+
+**Fixed.** `partnerDetail` now returns `accountActivated` (derived from the ROLE, which only
+redemption sets — not from the presence of a password, since an adopted account already has one)
+and `invitationPending`. A panel under step ① states whether the partner can sign in and offers
+«إعادة إرسال الدعوة», backed by a real `PartnerOnboardingService.resendInvitation` behind
+`PARTNER_ONBOARD` and throttled to three a minute, since it mails a live credential. It refuses an
+already-activated account with a coded 409 — a second link for an account whose owner has chosen a
+password is not a resend, and losing a password is what reset is for.
+
+It is a line under step ①, not a sixth step: nobody in the room can complete it, and the rest of
+onboarding genuinely does not wait for it. `e2e/partner-onboarding.spec.ts` asserts the control is
+present, and still present AFTER approval — the moment an operator is most likely to think they
+are finished.
+
+**Related, found while diagnosing and fixed alongside:** `auth.not_staff` was one code shared by
+three login routes that reject three different mismatches, so its message could only ever be right
+for one. A partner in exactly this state was told «هذا الحساب لا يملك صلاحية الدخول إلى مركز
+القيادة» — pointed at the staff console. Now three codes with correct copy each.
+
+**Accepted consequence:** a corrected joint copy cannot be filed after approval. If the scan turns
+out to be the wrong page once the partner is approved, the remedy is the ordinary two-step path —
+SAFRA re-uploads and the partner signs from their own account, which by then they can do because
+the invitation has been redeemed. Recorded rather than discovered.
 
 **Two smaller notes:**
 
