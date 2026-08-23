@@ -1,3 +1,4 @@
+export * from './actor.js';
 export * from './audit-actions.js';
 export * from './auth.js';
 export * from './password-length.js';

@@ -22,6 +22,7 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
+import { actorName } from '../common/actor-name.sql.js';
 
 /**
  * Partner payouts — the record of money SAFRA has actually sent, or committed to send.
@@ -574,7 +575,8 @@ export class PayoutService {
       after: unknown;
       created_at: string;
     }>(sql`
-      SELECT a.action, u.email AS actor_email, a.actor_role::text AS actor_role,
+      SELECT a.action, ${actorName(sql`u.email`, sql`u.role`)} AS actor_email,
+             a.actor_role::text AS actor_role,
              a.after, a.created_at::text
       FROM audit_log a
       LEFT JOIN users u ON u.id = a.actor_user_id

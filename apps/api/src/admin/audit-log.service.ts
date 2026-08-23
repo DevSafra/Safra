@@ -5,6 +5,8 @@ import type { Database } from '@safra/db';
 import { COUNT_CAP, type OffsetPage, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { ADMIN_DISPLAY_NAME } from '@safra/contracts';
+import { actorName } from '../common/actor-name.sql.js';
 
 export interface AuditEntry {
   readonly id: string;
@@ -102,7 +104,29 @@ export class AuditLogService {
     }
 
     if (query.actorEmail) {
-      conditions.push(sql`lower(u.email) = lower(${query.actorEmail})`);
+      const term = query.actorEmail.trim();
+
+      /*
+        «Admin» is searchable, because «Admin» is what the reader can SEE (Bashar, 2026-08-23).
+
+        Substituting the display name without this made the filter disagree with the column beside
+        it: a super admin's rows read «Admin», and typing «Admin» into the search box — the obvious
+        thing to do — returned nothing, because the predicate still compared an address. What you
+        can read has to be what you can search, or the search box is a trap.
+
+        The real address still matches. Somebody investigating who already knows it loses nothing,
+        which is the point: this feature stops the address being PUBLISHED, not looked up.
+
+        Branched in TypeScript rather than as a SQL `OR`, so each arm stays a single indexable
+        predicate — an `OR` across `u.email` and `u.role` would cost the email index for every
+        ordinary search to serve one special term. An account whose address is literally "admin" is
+        not reachable by that word alone, which is fine: an address contains an `@`.
+      */
+      conditions.push(
+        term.toLowerCase() === ADMIN_DISPLAY_NAME.toLowerCase()
+          ? sql`u.role::text = 'super_admin'`
+          : sql`lower(u.email) = lower(${term})`,
+      );
     }
 
     const where =
@@ -131,7 +155,8 @@ export class AuditLogService {
         created_at: string;
       }>(sql`
       SELECT a.id, a.action, a.subject_type, a.subject_id,
-             u.email AS actor_email, a.actor_role::text AS actor_role,
+             ${actorName(sql`u.email`, sql`u.role`)} AS actor_email,
+             a.actor_role::text AS actor_role,
              a.before, a.after, a.reason, a.ip_address,
              to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at

@@ -7,6 +7,7 @@ import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
+import { actorName } from '../common/actor-name.sql.js';
 
 /**
  * Renders a `timestamptz` as an explicit UTC ISO-8601 string.
@@ -95,7 +96,8 @@ export class BookingDetailService {
       payload: unknown;
       created_at: string;
     }>(sql`
-      SELECT t.event_type, t.actor_type, us.email AS actor_email, t.payload,
+      SELECT t.event_type, t.actor_type,
+             ${actorName(sql`us.email`, sql`us.role`)} AS actor_email, t.payload,
              ${utc('t.created_at')} AS created_at
       FROM timeline_events t
       LEFT JOIN users us ON us.id = t.actor_user_id

@@ -22,6 +22,7 @@ import {
   partnerApplicationRejectedMail,
 } from '../mail/mail.templates.js';
 import { PartnerInvitationService } from './partner-invitation.service.js';
+import { actorName } from '../common/actor-name.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
@@ -132,7 +133,7 @@ const LAST_CONTACT_AT = sql`(
 ) AS contacted_at`;
 
 const LAST_CONTACT_BY = sql`(
-  SELECT u.email
+  SELECT ${actorName(sql`u.email`, sql`u.role`)}
   FROM partner_application_contacts ac
   LEFT JOIN users u ON u.id = ac.contacted_by_user_id
   WHERE ac.application_id = a.id
@@ -309,7 +310,8 @@ export class PartnerApplicationService {
              c.slug AS city, c.name_ar AS city_ar, a.address, a.property_count, a.website,
              a.message, a.preferred_locale,
              ${LAST_CONTACT_AT}, ${LAST_CONTACT_BY},
-             a.decided_at::text, db.email AS decided_by_email, a.decision_notes,
+             a.decided_at::text,
+             ${actorName(sql`db.email`, sql`db.role`)} AS decided_by_email, a.decision_notes,
              p.reference AS partner_reference, p.verification::text AS partner_verification,
              a.created_at::text
       ${fromWhere}
@@ -798,7 +800,8 @@ export class PartnerApplicationService {
              c.slug AS city, c.name_ar AS city_ar, a.address, a.property_count, a.website,
              a.message, a.preferred_locale,
              ${LAST_CONTACT_AT}, ${LAST_CONTACT_BY},
-             a.decided_at::text, db.email AS decided_by_email, a.decision_notes,
+             a.decided_at::text,
+             ${actorName(sql`db.email`, sql`db.role`)} AS decided_by_email, a.decision_notes,
              p.reference AS partner_reference, p.verification::text AS partner_verification,
              a.created_at::text
       FROM partner_applications a

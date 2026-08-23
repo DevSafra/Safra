@@ -23,6 +23,7 @@ import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { renderContractHtml } from './contract-template.js';
 import { renderContractPdf } from './contract-pdf.js';
+import { actorName } from '../common/actor-name.sql.js';
 
 /** The handoff's ceiling: PDF ≤ 10MB. Also a database CHECK, for every other writer. */
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -202,7 +203,7 @@ export class PartnerContractService {
              c.kind::text   AS kind,
              c.status::text AS status,
              c.file_name, c.size_bytes,
-             u.email        AS uploaded_by,
+             ${actorName(sql`u.email`, sql`u.role`)} AS uploaded_by,
              to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS uploaded_at,
              to_char(c.signed_at  AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS signed_at,
              to_char(c.expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS expires_at,
