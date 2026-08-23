@@ -221,6 +221,8 @@ export class CommsController {
   @Get('partner-contracts')
   @RequirePermissions(P.PARTNER_CONTRACT_READ)
   async listContracts(
+    /* The actor, because the list is SCOPED — see `PartnerContractService.list`. */
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(
       new ZodValidationPipe(
         z.object({ partner: z.string().trim().max(32).optional() }).strict(),
@@ -230,7 +232,7 @@ export class CommsController {
       partner?: string | undefined;
     },
   ) {
-    return { contracts: await this.contracts.list(query.partner) };
+    return { contracts: await this.contracts.list(user, query.partner) };
   }
 
   /**

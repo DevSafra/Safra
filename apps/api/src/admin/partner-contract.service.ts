@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 import type { Database } from '@safra/db';
 
+import { assertCanRead, assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { StorageService } from '../storage/storage.service.js';
@@ -179,7 +180,30 @@ export class PartnerContractService {
   ) {}
 
   /** Every contract, newest first. Not paginated: a partner has a handful, ever. */
-  async list(partnerReference?: string): Promise<ContractRow[]> {
+  /**
+   * `actor` is REQUIRED and comes FIRST, deliberately.
+   *
+   * It was optional and second for about ten minutes. That shape re-creates the exact failure the
+   * scoping fixes: a call site that forgets it compiles, runs, and silently returns every contract
+   * in the country. Required-and-first makes an omission a compile error, which is the only kind
+   * of reminder that survives a year.
+   */
+  async list(
+    actor: AccessTokenClaims | undefined,
+    partnerReference?: string,
+  ): Promise<ContractRow[]> {
+    /*
+      Scoped through the PARTNER's city, because a contract has none of its own.
+
+      This was the tenth resource the comment in `scope.sql.ts` predicts — "enforced on eight and
+      forgotten on the ninth"; `review.service.ts` was the ninth. The joint upload made forgetting
+      it worse: that path puts an agreement in force from a single staff request, so an unscoped
+      reach stopped meaning "acts on the wrong contract" and started meaning "manufactures a
+      signature". Found by the security session, with a reproduction rather than a theory.
+
+      The predicate goes in the query below and NOT as a comment inside it — a backtick inside a
+      sql template literal ends the template, which is how this line first failed to compile.
+    */
     const filter = partnerReference ? sql`AND p.reference = ${partnerReference}` : sql``;
 
     const result = await this.db.execute<{
@@ -216,6 +240,7 @@ export class PartnerContractService {
       LEFT JOIN users u   ON u.id = c.uploaded_by_user_id
       ${contractHistoryJoin}
       WHERE c.deleted_at IS NULL ${filter}
+        AND ${scopeFilter(actor, 'p.city_id')}
       ORDER BY c.created_at DESC
       LIMIT 100
     `);
@@ -266,10 +291,11 @@ export class PartnerContractService {
     const partner = await this.db.execute<{
       id: string;
       display_name: string;
+      city_id: string;
       email: string;
       locale: string;
     }>(sql`
-      SELECT p.id, p.display_name, u.email, u.preferred_locale AS locale
+      SELECT p.id, p.display_name, p.city_id, u.email, u.preferred_locale AS locale
       FROM partners p
       JOIN users u ON u.id = p.user_id
       WHERE p.reference = ${input.partnerReference} AND p.deleted_at IS NULL
@@ -278,6 +304,17 @@ export class PartnerContractService {
 
     const partnerRow = partner.rows[0];
     const partnerId = partnerRow?.id;
+
+    /*
+      Staff scope, on the WRITE (2026-08-23).
+
+      `scopeFilter` governs lists only, and under `outside: 'read_only'` it deliberately returns
+      TRUE — so a read predicate alone leaves a read-only-scoped member able to change a contract
+      anywhere in the country. The row is fetched, then refused: 404 when the scope is `none`
+      («not yours» answers as «not there»), and a coded 403 under `read_only`, which is the mode
+      saying "look, do not touch".
+    */
+    if (partnerRow) assertCanWrite(actor, partnerRow.city_id);
 
     if (!partnerRow || !partnerId) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
@@ -365,7 +402,7 @@ export class PartnerContractService {
       }),
     );
 
-    return this.list(input.partnerReference);
+    return this.list(actor, input.partnerReference);
   }
 
   /**
@@ -395,18 +432,22 @@ export class PartnerContractService {
       partner_reference: string;
       partner_id: string;
       kind: string;
+      city_id: string;
     }>(sql`
       SELECT c.id, c.status::text AS status, c.kind::text AS kind,
-             c.partner_id, p.reference AS partner_reference
+             c.partner_id, p.reference AS partner_reference, p.city_id
       FROM partner_contracts c
       JOIN partners p ON p.id = c.partner_id
-      WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL
+      WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL AND p.deleted_at IS NULL
       LIMIT 1
     `);
 
     const contract = found.rows[0];
 
     if (!contract) throw notFound(ERROR.CONTRACT_NOT_FOUND);
+
+    /* Staff scope on the write — see `upload`. */
+    assertCanWrite(actor, contract.city_id);
 
     if (contract.status !== 'awaiting_partner_signature') {
       throw badRequest(ERROR.CONTRACT_NOT_AWAITING_SIGNATURE);
@@ -447,7 +488,7 @@ export class PartnerContractService {
       );
     });
 
-    return this.list(contract.partner_reference);
+    return this.list(actor, contract.partner_reference);
   }
 
   /**
@@ -482,14 +523,18 @@ export class PartnerContractService {
       legal_name: string;
       display_name: string;
       address: string;
+      city_id: string;
     }>(sql`
-      SELECT p.id, p.reference, p.legal_name, p.display_name, p.address
+      SELECT p.id, p.reference, p.legal_name, p.display_name, p.address, p.city_id
       FROM partners p
       WHERE p.reference = ${partnerReference} AND p.deleted_at IS NULL
       LIMIT 1
     `);
 
     const row = partner.rows[0];
+
+    /* Staff scope on the write — see `upload`. A read predicate alone leaves `read_only` able to write. */
+    if (row) assertCanWrite(actor, row.city_id);
 
     if (!row) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
@@ -558,7 +603,7 @@ export class PartnerContractService {
       );
     });
 
-    return this.list(row.reference);
+    return this.list(actor, row.reference);
   }
 
   /**
@@ -578,6 +623,53 @@ export class PartnerContractService {
     id: string,
     party: 'original' | 'safra' | 'partner',
   ): Promise<{ body: Buffer; fileName: string }> {
+    const owner = await this.db.execute<{
+      city_id: string;
+      partner_deleted: boolean;
+    }>(sql`
+      SELECT p.city_id, p.deleted_at IS NOT NULL AS partner_deleted
+      FROM partner_contracts c
+      JOIN partners p ON p.id = c.partner_id
+      WHERE c.id = ${id}::uuid AND c.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    /*
+      ABSENCE IS A REFUSAL, not a pass.
+
+      This read `if (owner.rows[0]) assertCanRead(...)` for about twenty minutes, and that shape is
+      a scope bypass: the lookup filters `p.deleted_at IS NULL`, so soft-deleting a partner made the
+      row vanish, the guard was SKIPPED rather than failed, and the file lookup below — which joins
+      no partners at all — returned the bytes. A city-scoped member with no outside access could
+      download any soft-deleted partner's contract. Deny-by-default inverted into allow-by-default
+      by a missing row.
+
+      The same `if (row)` idiom in `upload` and `generate` is safe only because the very next line
+      throws on the falsy case. It is worth not leaving that pattern around where nothing catches
+      the null, which is precisely what happened here.
+    */
+    const partner = owner.rows[0];
+
+    if (!partner) throw notFound(ERROR.CONTRACT_NOT_FOUND);
+
+    /*
+      SCOPE FIRST, existence second — and the lookup above deliberately does NOT filter
+      `p.deleted_at`. `assertCanRead` rather than `assertCanWrite`, because `read_only` means "look
+      at the rest of the country, do not change it" and the write guard would break that mode.
+
+      The first version of this guard did filter it, and read `if (owner.rows[0]) assertCanRead(…)`.
+      Soft-deleting a partner then made the row vanish, so the guard was SKIPPED rather than failed
+      and the file came back: a city-scoped member with no outside access could download any
+      soft-deleted partner's contract. Deny-by-default inverted by a missing row.
+
+      Fetching the city regardless of deletion means the scope question is always asked and always
+      answerable. Deletion is then refused on its own line, AFTER the scope has been honoured — so
+      an out-of-scope caller learns nothing about whether the partner still exists, and an in-scope
+      caller still cannot read a removed partner's file.
+    */
+    assertCanRead(actor, partner.city_id);
+
+    if (partner.partner_deleted) throw notFound(ERROR.CONTRACT_NOT_FOUND);
     const found =
       party === 'original'
         ? await this.db.execute<{ file_key: string; file_name: string }>(sql`
@@ -810,13 +902,15 @@ export class PartnerContractService {
       status: string;
       partner_id: string;
       partner_reference: string;
+      city_id: string;
       document_hash: string | null;
     }>(sql`
       SELECT c.id, c.status::text AS status, c.partner_id, c.document_hash,
-             p.reference AS partner_reference
+             p.reference AS partner_reference, p.city_id
       FROM partner_contracts c
       JOIN partners p ON p.id = c.partner_id
       WHERE c.id = ${input.contractId}::uuid AND c.deleted_at IS NULL
+        AND p.deleted_at IS NULL
       LIMIT 1
     `);
 
@@ -831,6 +925,18 @@ export class PartnerContractService {
       (input.restrictToPartnerId && contract.partner_id !== input.restrictToPartnerId)
     ) {
       throw notFound(ERROR.CONTRACT_NOT_FOUND);
+    }
+
+    /*
+      Staff scope, on the SAFRA side only.
+
+      `restrictToPartnerId` is set exactly when a PARTNER is uploading their own copy, and a partner
+      has no `scope` claim — `scopeOf` would return UNSCOPED and the guard would be a no-op. Gating
+      on its absence keeps that true by construction rather than by accident, and stops this line
+      reading as though a partner could be city-scoped.
+    */
+    if (input.restrictToPartnerId === undefined) {
+      assertCanWrite(input.actor, contract.city_id);
     }
 
     if (!allowed.includes(contract.status)) throw conflict(ERROR.CONTRACT_NOT_SIGNABLE);
@@ -864,6 +970,22 @@ export class PartnerContractService {
     let invalidatedPartnerSignature = false;
 
     await this.db.transaction(async (tx) => {
+      /*
+        Serialise concurrent uploads on THIS contract (2026-08-23).
+
+        Two requests — a double-click is enough — both superseded the live rows before either
+        inserted, because under READ COMMITTED neither sees the other's uninserted work. Both then
+        inserted, and the partial unique index on (contract_id, party) WHERE superseded_at IS NULL
+        rejected the second with a raw constraint violation: a 500, and an object already written
+        to storage that nothing references.
+
+        The row lock makes the second wait, re-read, and supersede what the first actually wrote.
+        It costs nothing on the uncontended path, which is every real one.
+      */
+      await tx.execute(sql`
+        SELECT id FROM partner_contracts WHERE id = ${contract.id}::uuid FOR UPDATE
+      `);
+
       /*
         Whatever this party sent before stops being the live copy. Superseded, never deleted — the
         earlier attempt is the record that it was sent, and the partial unique index counts only
@@ -987,17 +1109,21 @@ export class PartnerContractService {
       id: string;
       status: string;
       partner_reference: string;
+      city_id: string;
     }>(sql`
-      SELECT c.id, c.status::text AS status, p.reference AS partner_reference
+      SELECT c.id, c.status::text AS status, p.reference AS partner_reference, p.city_id
       FROM partner_contracts c
       JOIN partners p ON p.id = c.partner_id
-      WHERE c.id = ${contractId}::uuid AND c.deleted_at IS NULL
+      WHERE c.id = ${contractId}::uuid AND c.deleted_at IS NULL AND p.deleted_at IS NULL
       LIMIT 1
     `);
 
     const contract = found.rows[0];
 
     if (!contract) throw notFound(ERROR.CONTRACT_NOT_FOUND);
+
+    /* Staff scope on the write — see `upload`. */
+    assertCanWrite(actor, contract.city_id);
     if (contract.status !== 'active') throw conflict(ERROR.CONTRACT_NOT_REOPENABLE);
 
     await this.db.transaction(async (tx) => {
@@ -1044,7 +1170,7 @@ export class PartnerContractService {
       },
     );
 
-    return this.list(contract.partner_reference);
+    return this.list(actor, contract.partner_reference);
   }
 
   /**
@@ -1076,7 +1202,7 @@ export class PartnerContractService {
       );
     });
 
-    return this.list(partnerReference);
+    return this.list(actor, partnerReference);
   }
 
   /**
@@ -1140,13 +1266,16 @@ export class PartnerContractService {
       partner_id: string;
       partner_reference: string;
       verification: string;
+      city_id: string;
       document_hash: string | null;
     }>(sql`
       SELECT c.id, c.status::text AS status, c.partner_id, c.document_hash,
-             p.reference AS partner_reference, p.verification::text AS verification
+             p.reference AS partner_reference, p.verification::text AS verification,
+             p.city_id
       FROM partner_contracts c
       JOIN partners p ON p.id = c.partner_id
       WHERE c.id = ${contractId}::uuid AND c.deleted_at IS NULL
+        AND p.deleted_at IS NULL
       LIMIT 1
     `);
 
@@ -1161,6 +1290,9 @@ export class PartnerContractService {
       writing `!== 'approved'` here would have filed a signed agreement for somebody the platform
       turned down.
     */
+    /* Staff scope before anything else about the contract — see `upload`. */
+    assertCanWrite(actor, contract.city_id);
+
     if (!canFileJointContract(contract.verification)) {
       throw conflict(ERROR.CONTRACT_JOINT_NOT_ALLOWED);
     }
@@ -1183,6 +1315,22 @@ export class PartnerContractService {
     await this.storage.put(key, bytes, 'application/pdf');
 
     await this.db.transaction(async (tx) => {
+      /*
+        Serialise concurrent uploads on THIS contract (2026-08-23).
+
+        Two requests — a double-click is enough — both superseded the live rows before either
+        inserted, because under READ COMMITTED neither sees the other's uninserted work. Both then
+        inserted, and the partial unique index on (contract_id, party) WHERE superseded_at IS NULL
+        rejected the second with a raw constraint violation: a 500, and an object already written
+        to storage that nothing references.
+
+        The row lock makes the second wait, re-read, and supersede what the first actually wrote.
+        It costs nothing on the uncontended path, which is every real one.
+      */
+      await tx.execute(sql`
+        SELECT id FROM partner_contracts WHERE id = ${contract.id}::uuid FOR UPDATE
+      `);
+
       /* Whatever either side had on file stops being live. Superseded, never deleted. */
       await tx.execute(sql`
         UPDATE partner_contract_signatures
@@ -1251,7 +1399,7 @@ export class PartnerContractService {
       },
     );
 
-    return this.list(contract.partner_reference);
+    return this.list(actor, contract.partner_reference);
   }
 
   /**
