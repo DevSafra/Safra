@@ -43,7 +43,7 @@ export const en = {
   'auth.not_staff':
     'This is not a staff account, so it cannot be used to sign in to the command centre.',
   'auth.not_partner':
-    'This is not a partner account yet. If a partnership invitation was emailed to you, open its link to activate the account first.',
+    'This account cannot use the partner dashboard. If you were sent a partnership invitation or an invitation to work for a partner, open its link from your email to activate the account first.',
   'auth.staff_account':
     'This is a staff account. Sign in to the SAFRA command centre instead.',
   'permission.denied': 'You do not have access to this resource.',
@@ -105,6 +105,23 @@ export const en = {
   'contract.not_reopenable': 'Only a fully signed contract can be re-opened.',
   'contract.joint_not_allowed':
     'A jointly signed copy can only be filed while a partner is being added. Use the ordinary path: upload SAFRA\u2019s copy, then wait for the partner to sign.',
+  'employee_role.name_taken': 'A role with that name already exists. Choose another.',
+  'employee_role.not_found': 'That role could not be found.',
+  'employee_role.in_use':
+    'A role that employees still hold cannot be removed. Move them to another role first.',
+  'employee.not_found': 'That employee could not be found.',
+  'employee.already_employed': 'That address already works for a partner.',
+  'employee.email_is_staff': 'That address belongs to a SAFRA staff account.',
+  'employee.email_is_owner': 'That address belongs to the partner account itself.',
+  'employee.invitation_invalid':
+    'That invitation link is invalid or has expired. Ask the partner to send a new one.',
+  'staff_role.name_taken': 'A role with that name already exists. Choose another.',
+  'staff_role.not_found': 'That role could not be found.',
+  'staff_role.system': 'This is a system role and cannot be changed or removed.',
+  'staff_role.in_use':
+    'A role that staff still hold cannot be removed. Move them to another role first.',
+  'staff.last_super_admin':
+    'This is the last active super admin. Promote another one first, or the platform cannot be administered.',
   'contract.not_awaiting_signature': 'Only a contract awaiting signature can be signed.',
   'dispute.not_found': 'Dispute not found.',
   'dispute.already_closed': 'This dispute is already closed.',

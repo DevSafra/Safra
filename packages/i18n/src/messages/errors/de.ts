@@ -52,7 +52,7 @@ export const de = {
   'auth.not_staff':
     'Dies ist kein Mitarbeiterkonto und kann nicht für die Anmeldung im Kommandozentrum verwendet werden.',
   'auth.not_partner':
-    'Dies ist noch kein Partnerkonto. Falls Sie eine Partner-Einladung per E-Mail erhalten haben, öffnen Sie zuerst deren Link, um das Konto zu aktivieren.',
+    'Dieses Konto hat keinen Zugang zum Partner-Dashboard. Falls Sie eine Partner-Einladung oder eine Einladung zur Mitarbeit bei einem Partner erhalten haben, öffnen Sie zuerst deren Link in Ihrer E-Mail, um das Konto zu aktivieren.',
   'auth.staff_account':
     'Dies ist ein Mitarbeiterkonto. Bitte melden Sie sich stattdessen im SAFRA-Kommandozentrum an.',
   'permission.denied': 'Sie haben keinen Zugriff auf diese Ressource.',
@@ -125,6 +125,26 @@ export const de = {
     'Nur ein vollständig unterzeichneter Vertrag kann wieder geöffnet werden.',
   'contract.joint_not_allowed':
     'Eine von beiden Seiten unterzeichnete Kopie kann nur w\u00e4hrend der Aufnahme eines Partners hinterlegt werden. Nutzen Sie den regul\u00e4ren Weg: SAFRA-Kopie hochladen, dann auf die Unterschrift des Partners warten.',
+  'employee_role.name_taken':
+    'Eine Rolle mit diesem Namen existiert bereits. Bitte einen anderen wählen.',
+  'employee_role.not_found': 'Diese Rolle wurde nicht gefunden.',
+  'employee_role.in_use':
+    'Eine Rolle, die Mitarbeitende noch innehaben, kann nicht entfernt werden. Weisen Sie ihnen zuerst eine andere Rolle zu.',
+  'employee.not_found': 'Diese mitarbeitende Person wurde nicht gefunden.',
+  'employee.already_employed': 'Diese Adresse arbeitet bereits für einen Partner.',
+  'employee.email_is_staff': 'Diese Adresse gehört zu einem SAFRA-Mitarbeiterkonto.',
+  'employee.email_is_owner': 'Diese Adresse gehört zum Konto des Partners selbst.',
+  'employee.invitation_invalid':
+    'Dieser Einladungslink ist ungültig oder abgelaufen. Bitten Sie den Partner um eine neue Einladung.',
+  'staff_role.name_taken':
+    'Eine Rolle mit diesem Namen existiert bereits. Bitte einen anderen wählen.',
+  'staff_role.not_found': 'Diese Rolle wurde nicht gefunden.',
+  'staff_role.system':
+    'Dies ist eine Systemrolle und kann weder geändert noch entfernt werden.',
+  'staff_role.in_use':
+    'Eine Rolle, die Mitarbeitende noch innehaben, kann nicht entfernt werden. Weisen Sie ihnen zuerst eine andere Rolle zu.',
+  'staff.last_super_admin':
+    'Dies ist der letzte aktive Super-Admin. Ernennen Sie zuerst einen weiteren, sonst kann die Plattform nicht mehr verwaltet werden.',
   'contract.not_awaiting_signature':
     'Nur ein Vertrag, der auf die Signatur wartet, kann als signiert markiert werden.',
   'dispute.not_found': 'Streitfall nicht gefunden.',
