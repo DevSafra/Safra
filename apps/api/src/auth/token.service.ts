@@ -11,12 +11,15 @@ import {
   ERROR,
   TOGGLEABLE_GRANT_KEYS,
   UNSCOPED,
+  employeePermissions,
   isScopable,
+  staffRolePermissions,
   resolvePermissions,
   type StaffScope,
 } from '@safra/contracts';
 import type { Permission, Role } from '@safra/contracts';
 
+import { findLiveEmployment } from '../partner/live-employment.js';
 import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -276,17 +279,64 @@ export class TokenService {
     const claims: AccessTokenClaims = {
       sub: user.id,
       role: user.role,
-      permissions: resolvePermissions(
-        user.role,
-        user.permissionOverrides ?? [],
-        await this.enabledGrants(),
-      ),
+      permissions: await this.staffPermissions(user),
       locale: user.preferredLocale,
       totpEnabled: user.totpEnabledAt !== null,
       scope: await this.resolveScope(user),
     };
 
     return this.attachOwningIds(claims, user);
+  }
+
+  /**
+   * What a staff member may do — their NAMED ROLE if they hold one (Bashar, 2026-08-23).
+   *
+   * ## Assigned, never merged, and that is the whole safety of it
+   *
+   * A named role's set REPLACES what `ROLE_PERMISSIONS[user.role]` would have given. Merging would
+   * mean a role with three ticked capabilities silently carrying all of `operations_manager`'s as
+   * well, because `admits_as` decides which enum value its holders are admitted under — so a
+   * naming screen would become a privilege-escalation surface through a field nobody looks at.
+   *
+   * `staffRolePermissions` narrows on the way out, so a row that captured a since-forbidden
+   * permission cannot still grant it. The one permission no named role may ever carry is
+   * `STAFF_ROLE_MANAGE`: a role that can define roles can grant itself everything.
+   *
+   * ## No role means the old behaviour, unchanged
+   *
+   * `staff_role_id` is null for every account seeded before this existed and for every customer and
+   * partner. Those resolve exactly as they did — the role enum plus overrides plus toggled grants —
+   * so nothing breaks while roles are assigned, and a console that has not adopted them keeps
+   * working.
+   */
+  private async staffPermissions(
+    user: typeof schema.users.$inferSelect,
+  ): Promise<Permission[]> {
+    if (user.staffRoleId) {
+      const rows = await this.db
+        .select({ permissions: schema.staffRoles.permissions })
+        .from(schema.staffRoles)
+        .where(
+          and(
+            eq(schema.staffRoles.id, user.staffRoleId),
+            isNull(schema.staffRoles.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      /*
+        A withdrawn role grants NOTHING rather than falling back to the enum. Fails closed: the
+        alternative is that retiring a role silently restores whatever its holders' enum value
+        implied, which is the opposite of what withdrawing it meant.
+      */
+      return staffRolePermissions(rows[0]?.permissions ?? []);
+    }
+
+    return resolvePermissions(
+      user.role,
+      user.permissionOverrides ?? [],
+      await this.enabledGrants(),
+    );
   }
 
   /**
@@ -340,26 +390,107 @@ export class TokenService {
     claims: AccessTokenClaims,
     user: typeof schema.users.$inferSelect,
   ): Promise<AccessTokenClaims> {
-    if (user.role === 'customer') {
-      const profile = await this.db.query.customerProfiles.findFirst({
-        where: and(
-          eq(schema.customerProfiles.userId, user.id),
-          isNull(schema.customerProfiles.deletedAt),
-        ),
-        columns: { id: true },
-      });
-      claims.customerProfileId = profile?.id;
-    }
+    /*
+      A customer profile is resolved whenever one EXISTS — not only when the role says `customer`.
+      (Bashar, 2026-08-23; found by the security session.)
+
+      This was gated on the role, and that made a person's identity a function of their job. A
+      hotel invites its receptionist; she happens to book with SAFRA herself; she clicks the
+      invitation and her role becomes `partner_employee` — and her own trips, wallet and gift cards
+      become unreachable in the same instant. The `customer_profiles` row was never deleted; there
+      was simply nothing left pointing at it.
+
+      A person can genuinely be both a customer and somebody's receptionist. `role` answers what
+      they are DOING for a business; the profile belongs to the person and outlives the job. What
+      they may do with it is still decided by permissions, so widening this grants nothing — the
+      customer permissions come from the role and an employee does not have them.
+    */
+    const profile = await this.db.query.customerProfiles.findFirst({
+      where: and(
+        eq(schema.customerProfiles.userId, user.id),
+        isNull(schema.customerProfiles.deletedAt),
+      ),
+      columns: { id: true },
+    });
+
+    claims.customerProfileId = profile?.id;
 
     if (user.role === 'partner') {
       const partner = await this.db.query.partners.findFirst({
         where: and(
           eq(schema.partners.userId, user.id),
           isNull(schema.partners.deletedAt),
+          /*
+            Suspension counts here too, and it did not until 2026-08-23.
+
+            The employee branch below filtered `suspendedAt` from the start, and this one did not —
+            so suspending a business would have silenced every receptionist while leaving the OWNER,
+            who holds the listings, the calendar and the guest list, trading exactly as before. The
+            same column load-bearing in one branch and absent in the other is how two branches
+            drift apart, and this was the wrong half to enforce.
+
+            Latent rather than live when it was found: `partners.suspended_at` is read in three
+            places and written by no route yet — `P.PARTNER_SUSPEND` exists with nothing behind it.
+            The point of fixing it now is that whoever wires up the suspend button will be reading
+            the column and reasonably assuming the enforcement is already there, because for
+            employees it was.
+          */
+          isNull(schema.partners.suspendedAt),
         ),
         columns: { id: true },
       });
       claims.partnerId = partner?.id;
+    }
+
+    /*
+      An employee's authority comes from their EMPLOYER and their assigned role (Bashar,
+      2026-08-23), and both are resolved here rather than at any call site.
+
+      ## Why the permissions are replaced rather than added to
+
+      `ROLE_PERMISSIONS.partner_employee` is deliberately empty, and `resolvePermissions` has
+      already run — so `claims.permissions` currently holds whatever the account's own
+      `permission_overrides` granted. Those exist for STAFF, and an override on an employee account
+      would be a way to hand a receptionist `PAYOUT_EXECUTE` without going near the roles screen.
+      Assigning the intersected role set, rather than merging into it, closes that path: an
+      employee's permissions are exactly what their named role carries and nothing else.
+
+      ## Why `partnerId` is the EMPLOYER's
+
+      Every partner-scoped query filters on `claims.partnerId`. Setting it to the employer means an
+      employee sees precisely what the business sees and nothing of any other business — the scope
+      machinery needs no new case, which is the point.
+
+      ## A suspended employment yields no partner and no permissions
+
+      Two switches with two owners: the platform suspends the ACCOUNT, the partner suspends the
+      EMPLOYMENT. A suspended employee whose account is still active gets a token with no partner
+      id and no permissions, so every scoped read answers as if there were nothing there.
+    */
+    if (user.role === 'partner_employee') {
+      const row = await findLiveEmployment(this.db, user.id);
+
+      /*
+        Fails CLOSED. No live employment means no partner and no permissions — never a fallback
+        derived from the ABSENCE of a row.
+
+        A derived fallback to the customer set was written here and reverted within the hour. The
+        argument against it is the one `readFile` taught this codebase earlier today: granting
+        anything because a row is missing is exactly how deny-by-default inverts, and a permission
+        set is the last place to accept that shape. What an account may do is stored, not inferred.
+
+        The stranding this looks like it leaves — an activated employee whose employment ends is
+        `partner_employee` with nothing to resolve — is closed at the WRITE instead, which is where
+        it belongs: `PartnerEmployeesService.remove` puts `users.role` back to `customer`, so the
+        stored row matches reality. Suspension deliberately does not, because a suspension is meant
+        to be reversible and the job still exists.
+
+        What remains is an employment that stops being live WITHOUT going through `remove` — the
+        employer soft-deleted, the role withdrawn. Those accounts need a staff action to restore,
+        and that is recorded as open work rather than papered over with an inferred grant.
+      */
+      claims.partnerId = row?.partnerId;
+      claims.permissions = employeePermissions(row?.permissions ?? []);
     }
 
     return claims;

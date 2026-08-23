@@ -16,7 +16,9 @@ export type AuthTokenPurpose =
    * be interchangeable, and `redeem` filters on purpose so they cannot be.
    */
   | 'staff_invitation'
-  | 'partner_invitation';
+  | 'partner_invitation'
+  /** A partner EMPLOYEE's invitation — never interchangeable with the owner's. */
+  | 'partner_employee_invitation';
 
 export interface IssuedAuthToken {
   /** The clear token. Returned ONCE, goes into an email, never stored. */

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { cookies } from 'next/headers';
 
+import { isPartnerAppRole } from '@safra/contracts';
 import { PARTNER_SESSION_COOKIE, decodeSession, type Session } from '@safra/session';
 
 /**
@@ -29,5 +30,6 @@ export async function getPartnerSession(): Promise<Session | null> {
    * authorises every call on its own, and scopes every partner query to the token's `partnerId` —
    * but it keeps the wrong person from seeing the shape of the tooling.
    */
-  return session.user.role === 'partner' ? session : null;
+  /* Owners AND their employees — see `PARTNER_APP_ROLES`. */
+  return isPartnerAppRole(session.user.role) ? session : null;
 }

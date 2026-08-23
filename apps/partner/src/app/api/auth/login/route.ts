@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { ERROR, loginSchema } from '@safra/contracts';
+import { ERROR, isPartnerAppRole, loginSchema } from '@safra/contracts';
 import {
   PARTNER_SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
@@ -57,7 +57,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ code: outcome.code }, { status: outcome.status });
   }
 
-  if (outcome.session.user.role !== 'partner') {
+  if (!isPartnerAppRole(outcome.session.user.role)) {
     /*
       No cookie is set. There is no enumeration concern in being specific: the person has just
       proved they hold these credentials, so telling them the account is not a partner account
