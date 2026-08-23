@@ -73,6 +73,21 @@ export const PERMISSIONS = {
    */
   PARTNER_APPLICATION_MANAGE: 'partner_application.manage',
   /**
+   * Onboarding a partner IN PERSON — creating the record and the account outright, with no
+   * request behind it (Bashar, 2026-08-23).
+   *
+   * Its own permission, and the super admin's alone, because it is the only action in the platform
+   * that NAMES an email address and attaches a partner record to whatever account holds it.
+   * `PARTNER_APPLICATION_MANAGE` cannot stand in for it: accepting a request acts on an account
+   * that proved it holds the mailbox by signing in and applying, and this one acts on an address
+   * somebody typed. Same outcome, an entirely different thing being trusted.
+   *
+   * What it is NOT is a way in. The account it touches gets no password and no session, and its
+   * role stays `customer` until the invitation is redeemed from the mailbox itself — so holding
+   * this grants the power to create a partner, never the power to become one.
+   */
+  PARTNER_ONBOARD: 'partner.onboard',
+  /**
    * The COMMERCIAL contract between SAFRA and a partner — distinct from the documents the
    * partner submits for verification.
    *
