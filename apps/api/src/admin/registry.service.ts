@@ -71,7 +71,22 @@ export class RegistryService {
     q?: string | undefined;
     actor?: AccessTokenClaims | undefined;
   }): Promise<OffsetPage<PartnerRow>> {
-    const conditions: SQL[] = [scopeFilter(query.actor, 'pt.city_id')];
+    /*
+      Soft-deleted rows are GONE, and the registry has to agree with the detail screen.
+
+      A soft delete is what this platform means by removal (P-003): every read filters it, so the
+      row disappears. These two registries did not, so a removed partner or listing stayed in the
+      table and its link answered 404 — the console showing a row nobody can open.
+
+      Found on 2026-08-21 by `navigation.spec.ts`, which walks every registry link and reported
+      `/properties → /properties/PRO-103501 (404)` after a partner reset soft-deleted a listing.
+      The customers registry already had it, which is what makes this an omission rather than a
+      decision.
+    */
+    const conditions: SQL[] = [
+      scopeFilter(query.actor, 'pt.city_id'),
+      sql`pt.deleted_at IS NULL`,
+    ];
 
     if (query.q) {
       const term = `%${query.q}%`;
@@ -145,7 +160,11 @@ export class RegistryService {
     q?: string | undefined;
     actor?: AccessTokenClaims | undefined;
   }): Promise<OffsetPage<PropertyRow>> {
-    const conditions: SQL[] = [scopeFilter(query.actor, 'pr.city_id')];
+    /* The same omission as `partners` above, and the one the browser suite actually caught. */
+    const conditions: SQL[] = [
+      scopeFilter(query.actor, 'pr.city_id'),
+      sql`pr.deleted_at IS NULL`,
+    ];
 
     if (query.q) {
       const term = `%${query.q}%`;
