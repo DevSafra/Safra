@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Param, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
 import {
@@ -49,5 +49,27 @@ export class AdminPartnerOnboardingController {
     @Body(new ZodValidationPipe(partnerOnboardSchema)) body: PartnerOnboardInput,
   ) {
     return this.onboarding.onboard(user, body);
+  }
+
+  /**
+   * Sends the invitation again — the remedy when a partner never received or never used theirs.
+   *
+   * `PARTNER_ONBOARD` rather than a read permission: this MAILS A CREDENTIAL, and the ability to
+   * cause a live invitation link to arrive in a mailbox is the same power as creating the partner
+   * in the first place. Anyone who could call it could keep a link permanently fresh in an inbox
+   * they were watching.
+   *
+   * Throttled harder than onboarding itself. A partner who has genuinely lost their link needs one
+   * or two; a loop pointed at this endpoint is a mail flood with SAFRA's name on it.
+   */
+  @Post(':reference/resend-invitation')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @RequirePermissions(P.PARTNER_ONBOARD)
+  @AuditExempt('PartnerOnboardingService records partner.invitation_resent itself.')
+  async resend(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.onboarding.resendInvitation(user, reference);
   }
 }

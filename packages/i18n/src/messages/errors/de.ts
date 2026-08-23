@@ -274,6 +274,8 @@ export const de = {
     'Diese E-Mail-Adresse gehört zu einem Mitarbeiterkonto und kann nicht als Partner registriert werden.',
   'partner_onboarding.email_is_partner':
     'Diese E-Mail-Adresse ist bereits Partner. Sie finden ihn im Partnerregister.',
+  'partner_onboarding.already_activated':
+    'Der Partner hat die Einladung bereits angenommen und ein Passwort gesetzt. Zum Zurücksetzen bitte „Passwort vergessen“ verwenden.',
   'partner_onboarding.application_open':
     'Zu dieser E-Mail-Adresse liegt eine offene Partnerschaftsanfrage vor. Bitte diese in der Anfrageliste abschließen, statt einen neuen Partner zu registrieren.',
   'partner.invitation_invalid':

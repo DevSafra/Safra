@@ -495,8 +495,34 @@ export class ReviewService {
      * alternative — widening `partnerDetail`'s relation set — would attach a user row to every
      * other caller that wants a partner.
      */
-    const account = await this.db.execute<{ two_factor_enabled: boolean }>(sql`
-      SELECT (u.totp_enabled_at IS NOT NULL) AS two_factor_enabled
+    const account = await this.db.execute<{
+      two_factor_enabled: boolean;
+      account_activated: boolean;
+      invitation_pending: boolean;
+    }>(sql`
+      SELECT (u.totp_enabled_at IS NOT NULL) AS two_factor_enabled,
+             /*
+               Whether the partner can SIGN IN at all (Bashar, 2026-08-23).
+
+               The role is the fact, not the presence of a password: an onboarded partner may be an
+               adopted customer account that already had one, and that password signs them into the
+               customer site, not the partner portal. The partner role is set by exactly one thing
+               — redeeming the invitation — so it is the honest answer to "has this person taken
+               possession of the account we made them".
+
+               No backticks in this comment: it sits INSIDE a sql template literal, and a backtick
+               here terminates the template. The parse error it produces points at the comment, not
+               at the SQL, which is why it costs ten minutes every time.
+             */
+             (u.role = 'partner') AS account_activated,
+             /* A link that is still live. Absent means the only remedy is to send a new one. */
+             EXISTS (
+               SELECT 1 FROM auth_tokens t
+               WHERE t.user_id = u.id
+                 AND t.purpose = 'partner_invitation'
+                 AND t.consumed_at IS NULL
+                 AND t.expires_at > now()
+             ) AS invitation_pending
       FROM users u
       JOIN partners p ON p.user_id = u.id
       WHERE p.reference = ${reference}
@@ -509,6 +535,13 @@ export class ReviewService {
       ...visible,
       /* No user account behind the partner reads as "not enrolled", which it is. */
       twoFactorEnabled: account.rows[0]?.two_factor_enabled ?? false,
+      /*
+        Both default FALSE when there is no account row, and that pairing is deliberate: it reads
+        as "cannot sign in, and no link is outstanding", which is exactly the state that needs a
+        human to do something. Defaulting `accountActivated` true would hide a broken partner.
+      */
+      accountActivated: account.rows[0]?.account_activated ?? false,
+      invitationPending: account.rows[0]?.invitation_pending ?? false,
       properties: properties.rows.map((row) => ({
         reference: row.reference,
         nameAr: row.name_ar,

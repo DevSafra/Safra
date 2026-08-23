@@ -526,6 +526,33 @@ export const ar = {
       stepOutstanding: 'مطلوب',
       stepOptional: 'اختياري',
       openPartner: 'فتح صفحة الشريك',
+      /*
+        The accessible name, which says what the visible label cannot (Bashar, 2026-08-23).
+
+        The link opens a NEW TAB, and a control that moves somebody somewhere they did not expect
+        is worse for a screen-reader user than for a sighted one: the sighted reader sees the tab
+        strip change, and the screen-reader user is simply somewhere else with no announcement.
+        WCAG 3.2.5 — say it in the name rather than leave it to be discovered.
+      */
+      openPartnerAria: 'فتح صفحة الشريك في تبويب جديد',
+
+      /*
+        ── حساب الشريك ────────────────────────────────────────────────────────────────────────
+        الخطوة التي كانت ناقصة (Bashar, 2026-08-23). أُنشئ شريك واعتُمد، ثم لم يستطع الدخول: الدعوة
+        لم تُستخدم بعد، والدور ما زال «عميل». الشاشة كانت تقول «تم» في كل خطوة، فبدا أن العمل انتهى.
+
+        الحساب ليس خطوة يؤدّيها الموظف، بل حالة ينتظرها — لذلك يظهر كسطر تحت الخطوة الأولى لا كخطوة
+        سادسة: لا شيء في الغرفة يُنهيها، والشريك وحده يملك البريد.
+      */
+      accountActivated: 'قبل الشريك الدعوة ويستطيع الدخول.',
+      accountPending:
+        'لم يقبل الشريك الدعوة بعد، ولا يستطيع الدخول حتى يفتح الرابط المُرسل إلى {email} ويضبط كلمة مروره. بقية الخطوات لا تنتظره.',
+      accountPendingNoLink:
+        'لم يقبل الشريك الدعوة، ولم يعد الرابط المُرسل إلى {email} صالحاً. أعد إرساله ليتمكّن من الدخول.',
+      resendInvitation: 'إعادة إرسال الدعوة',
+      resending: 'جارٍ الإرسال…',
+      resent: 'أُرسلت الدعوة من جديد إلى {email}. صلاحيتها 72 ساعة.',
+      resendFailed: 'تعذّرت إعادة إرسال الدعوة.',
 
       step1: 'بيانات الشريك',
       step2: 'المستندات',
@@ -1591,6 +1618,7 @@ export const ar = {
       السجل can tell a partner a super admin created from one who asked to join.
     */
     'partner.onboarded_in_person': 'تسجيل شريك مباشرةً من المدير العام',
+    'partner.invitation_resent': 'إعادة إرسال دعوة شريك مُسجَّل مباشرةً',
     'partner_contract.viewed': 'عرض عقد شراكة',
     'partner_payout.released': 'الإفراج عن مستحقات شريك',
     'partner_payout.paid': 'دفع مستحقات شريك',

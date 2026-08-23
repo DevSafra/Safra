@@ -10,7 +10,7 @@ import {
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
-import { badRequest, conflict } from '../common/errors/app-error.js';
+import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { PartnerInvitationService } from './partner-invitation.service.js';
 
@@ -219,6 +219,78 @@ export class PartnerOnboardingService {
     );
 
     return { reference: created.reference, accountExisted: account.existed };
+  }
+
+  /**
+   * Sends the invitation again, for a partner onboarded in person (Bashar, 2026-08-23).
+   *
+   * ## Why this exists at all — it was an asserted capability that did not exist
+   *
+   * `O-partner-10` said the invitation "is re-sendable from the screen". It was not.
+   * `PartnerApplicationService.resendInvitation` is keyed on an APPLICATION reference and refuses
+   * anything without one, and an onboarded partner deliberately has no application row — so the
+   * one flow that most needs a second link was the one flow that could not get one.
+   *
+   * It surfaced the way these things do: a partner was onboarded, approved, and could not sign in,
+   * and the operator had no remedy on the screen that had just told them the job was finished.
+   *
+   * ## It refuses an account that has already taken possession
+   *
+   * Once the role is `partner` the invitation has been redeemed and the account has a password its
+   * owner chose. Issuing another link would supersede nothing useful and would mail a live
+   * credential to an address for an account that is already in use — so it is a conflict, not a
+   * no-op. Losing a password is what password RESET is for.
+   */
+  async resendInvitation(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+  ): Promise<{ reference: string }> {
+    const rows = await this.db.execute<{
+      user_id: string;
+      email: string;
+      locale: string;
+      role: string;
+    }>(sql`
+      SELECT p.user_id, p.email, u.preferred_locale AS locale, u.role::text AS role
+      FROM partners p
+      JOIN users u ON u.id = p.user_id
+      WHERE p.reference = ${reference}
+        AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const row = rows.rows[0];
+
+    if (!row) throw notFound(ERROR.PARTNER_NOT_FOUND);
+
+    if (row.role === 'partner') {
+      throw conflict(ERROR.PARTNER_ONBOARDING_ALREADY_ACTIVATED);
+    }
+
+    /*
+      The address on the PARTNER record, which is the one the operator typed and read back to the
+      person in the room. `users.email` can since have moved; where SAFRA wrote about this
+      partnership is the fact worth repeating.
+    */
+    await this.invitations.send({
+      userId: row.user_id,
+      to: row.email,
+      partnerReference: reference,
+      locale: row.locale,
+    });
+
+    await this.audit.record({
+      actorUserId: claims?.sub,
+      actorRole: claims?.role,
+      action: 'partner.invitation_resent',
+      subjectType: 'partner',
+      subjectId: row.user_id,
+      after: { reference, email: row.email },
+    });
+
+    this.logger.log(`Partner invitation for ${reference} re-sent.`);
+
+    return { reference };
   }
 
   /**

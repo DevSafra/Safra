@@ -95,6 +95,15 @@ export const AUDIT_ACTIONS = [
     for "how did this partner get here" must never come back with an answer that fits both.
   */
   'partner.onboarded_in_person',
+  /*
+    A second invitation link for a partner onboarded in person.
+
+    Its own action rather than `partner_application.invitation_resent`, which is subject-typed to
+    an APPLICATION and there is no application here. The distinction is not pedantry: the two are
+    re-sending different things to accounts reached by different routes, and the audit log has to
+    be able to say which.
+  */
+  'partner.invitation_resent',
 
   // ── Inventory ─────────────────────────────────────────────────────────────
   'property.created',

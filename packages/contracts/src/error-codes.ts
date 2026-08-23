@@ -347,6 +347,14 @@ export const ERROR = {
    * would telephone somebody who has been onboarded for a week.
    */
   PARTNER_ONBOARDING_APPLICATION_OPEN: 'partner_onboarding.application_open',
+  /**
+   * The partner has already redeemed their invitation, so there is nothing to re-send.
+   *
+   * A conflict rather than a silent success: issuing a second link would mail a live credential
+   * for an account whose owner has already chosen a password. Somebody who has LOST that password
+   * wants a reset, which is a different door.
+   */
+  PARTNER_ONBOARDING_ALREADY_ACTIVATED: 'partner_onboarding.already_activated',
   /** The invitation link is expired, spent, or was never issued. Deliberately one code. */
   PARTNER_INVITATION_INVALID: 'partner.invitation_invalid',
   PARTNER_SANCTIONS_SCREENING_REQUIRED: 'partner.sanctions_screening_required',

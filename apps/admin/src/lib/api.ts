@@ -174,6 +174,22 @@ const partnerDetailSchema = z.object({
     kept the listing review queue permanently empty (see §8 of the gap report).
   */
   twoFactorEnabled: z.boolean().default(false),
+  /*
+    Whether the partner has redeemed their invitation and can therefore SIGN IN
+    (Bashar, 2026-08-23).
+
+    Derived from the account's ROLE, which only redemption sets — not from the presence of a
+    password, because an onboarded partner may be an adopted customer account that already had
+    one. That password signs them into the customer site, not the partner portal, and mistaking
+    the two is the defect this field exists to make visible.
+
+    Defaulted for the same reason `twoFactorEnabled` is, and defaulted to the state that asks a
+    human to look: false reads as "cannot sign in", which is safe to show wrongly for a moment.
+    Defaulting true would hide a locked-out partner behind a console that had not been redeployed.
+  */
+  accountActivated: z.boolean().default(false),
+  /** Whether a live, unexpired invitation is still outstanding — decides which remedy to offer. */
+  invitationPending: z.boolean().default(false),
   city: z.object({
     slug: z.string(),
     nameAr: z.string(),
