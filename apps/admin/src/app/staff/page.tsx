@@ -1,4 +1,4 @@
-import { getStaff, getStaffOverview, type StaffOverview } from '@/lib/api';
+import { getStaff, getStaffOverview, getStaffRoles, type StaffOverview } from '@/lib/api';
 import { getStaffSession } from '@/lib/session-server';
 import { sidebarCounts } from '@/lib/console';
 import { count, shortDateTime } from '@/lib/format';
@@ -39,11 +39,19 @@ export default async function StaffPage({
     size: pageSize(single(params['scopeSize'])),
   };
 
-  const [result, overview, session, counts] = await Promise.all([
+  const [result, overview, session, counts, roles] = await Promise.all([
     getStaff({ page, limit: size }),
     getStaffOverview(),
     getStaffSession(),
     sidebarCounts(),
+    /*
+      The named roles, once per page load rather than per row (Bashar, 2026-08-23).
+
+      Every row's select offers the same list, so fetching it here costs one request whatever the
+      page size. A failed read leaves the select with no options — which is honest: the screen
+      cannot offer a role it could not confirm exists, and the rest of الموظفون still renders.
+    */
+    getStaffRoles(),
   ]);
 
   return (
@@ -60,7 +68,14 @@ export default async function StaffPage({
             <p className="text-[12.5px] text-bad">{t.dashboard.queueFailed}</p>
           ) : (
             <>
-              <StaffAdmin staff={result.items} currentUserId={session?.user.id} />
+              <StaffAdmin
+                staff={result.items}
+                /* An unreadable roles list yields no options, not a broken screen. */
+                roles={
+                  roles === 'failed' || roles === 'unauthenticated' ? [] : roles.roles
+                }
+                currentUserId={session?.user.id}
+              />
               {/*
                 Paged like every other registry (Bashar, 2026-08-05). This table used to render
                 every staff account in one response — 165 rows on the development database, and

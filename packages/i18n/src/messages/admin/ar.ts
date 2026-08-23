@@ -1026,6 +1026,20 @@ export const ar = {
       suspended: 'معطّل',
       suspend: 'تعطيل',
       reinstate: 'إعادة تنشيط',
+      /*
+        An account seeded before named roles existed. It still works — its permissions resolve
+        through the enum — but it holds no role ROW, and the select must say so rather than
+        appear to have «مدير العمليات» selected when nothing is.
+      */
+      noNamedRole: '— بلا دور مُسمّى',
+      /*
+        The invite select has no safe default, so it starts empty and required.
+
+        It defaulted to «وكيل الدعم» while invites carried an enum. With named roles a wrong
+        default is worse than none: the operator invites somebody into whatever happened to be
+        first, and the account holds that role's capabilities until anybody notices.
+      */
+      pickRole: 'اختر الدور…',
       roleChanged: '{email} أصبح {role}.',
       suspendedNotice: 'عُطّل {email} وأُنهيت جلساته.',
       reinstatedNotice: 'أُعيد تنشيط {email}.',

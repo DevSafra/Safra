@@ -495,7 +495,22 @@ export async function getBooking(reference: string) {
 const staffMemberSchema = z.object({
   id: z.string(),
   email: z.string(),
+  /*
+    The ENUM value, kept even though the screen no longer prints it.
+
+    It is what `isScopable` keys off and what decides console admission, so نطاق العمل needs it
+    without a second lookup. What a reader SEES is `staffRoleName`.
+  */
   role: z.string(),
+  /*
+    The named role, and its display name (Bashar, 2026-08-23).
+
+    Both nullable and both defaulted: accounts seeded before named roles existed have no
+    `staff_role_id`, and the join is LEFT so they still render. A console built against an API
+    that predates the columns shows the enum label rather than blanking الموظفون.
+  */
+  staffRoleId: z.string().nullable().default(null),
+  staffRoleName: z.string().nullable().default(null),
   status: z.string(),
   twoFactorEnabled: z.boolean(),
   invitationPending: z.boolean(),

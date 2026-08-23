@@ -1,0 +1,1 @@
+ALTER TABLE "partner_employees" ADD COLUMN "full_name" text NOT NULL;

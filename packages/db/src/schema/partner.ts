@@ -24,6 +24,7 @@ import {
   partnerApplicationStatus,
   partnerTier,
   payoutStatus,
+  partnerEmployeeStatus,
   verificationStatus,
   violationKind,
 } from './enums.js';
@@ -793,5 +794,120 @@ export const partnerPayoutItems = pgTable(
      */
     uniqueIndex('partner_payout_items_booking_unique').on(t.bookingId),
     index('partner_payout_items_payout_idx').on(t.payoutId),
+  ],
+);
+
+/**
+ * A role a super admin has named, and the capabilities it carries (Bashar, 2026-08-23).
+ *
+ * ## Global, not per partner
+ *
+ * "The super admin should have a page where he can define the employee roles himself and name
+ * them." So a role is defined once and every partner assigns from that list. That is also what
+ * keeps the permission surface reviewable: one list of roles to audit rather than one per partner,
+ * and a capability withdrawn is withdrawn everywhere at once.
+ *
+ * ## `permissions` is text[], and it is narrowed on every READ
+ *
+ * Not an enum and not a join table: the values are `PERMISSIONS` from `@safra/contracts`, which is
+ * code rather than data, and a join table would invite the belief that a row is authoritative. It
+ * is not — `employeePermissions()` intersects whatever is stored with
+ * `PARTNER_EMPLOYEE_PERMISSIONS` on the way out, so shrinking that list REVOKES from existing
+ * roles instead of merely refusing new ones.
+ */
+export const partnerEmployeeRoles = pgTable(
+  'partner_employee_roles',
+  {
+    id: primaryId(),
+    /*
+      The PARTNER who defined this role (Bashar, 2026-08-23).
+
+      It was global — one catalogue defined by the super admin and merely assigned by partners —
+      and that was a misreading. A partner names the jobs in their own business: «استقبال» means
+      something different in a hotel and a car-hire firm, and neither is SAFRA's to name.
+
+      SAFRA's own staff roles are a separate system entirely; see `staff_roles`.
+    */
+    partnerId: foreignId('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    name: text('name').notNull(),
+    permissions: text('permissions').array().notNull(),
+    createdByUserId: foreignId('created_by_user_id').references(() => users.id),
+    ...timestamps,
+  },
+  (t) => [
+    /*
+      One live role per name, case-insensitively. Two roles called «استقبال» and «الاستقبال» are a
+      judgement call, but two called «استقبال» are a mistake somebody will make within a week, and
+      the partner assigning them cannot tell which is which.
+    */
+    /* Unique per PARTNER, not globally — two businesses may both have a «استقبال». */
+    uniqueIndex('partner_employee_roles_name_unique')
+      .on(t.partnerId, sql`lower(${t.name})`)
+      .where(sql`deleted_at IS NULL`),
+    index('partner_employee_roles_partner_idx').on(t.partnerId),
+  ],
+);
+
+/**
+ * A person who works for a partner.
+ *
+ * ## The account is a real account
+ *
+ * `user_id` points at `users`, so an employee signs in with their own credentials and their own
+ * second factor, and every action they take is attributable to them rather than to a shared
+ * password. That is the entire reason this table exists.
+ *
+ * ## `status` is separate from the user's own status
+ *
+ * A partner suspending a receptionist must not touch the platform-level account, and the platform
+ * suspending an account must not be undoable by the partner. Two switches, two owners — and the
+ * sign-in path requires BOTH to be open.
+ */
+export const partnerEmployees = pgTable(
+  'partner_employees',
+  {
+    id: primaryId(),
+    partnerId: foreignId('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    userId: foreignId('user_id')
+      .notNull()
+      .references(() => users.id),
+    roleId: foreignId('role_id')
+      .notNull()
+      .references(() => partnerEmployeeRoles.id),
+    /*
+      The person's name lives HERE, not on `users`.
+
+      `users` carries no name of any kind — 22 columns, none of them a name — and that is the
+      platform's convention rather than an oversight: a customer's name is on `customer_profiles`,
+      a partner's is `legal_name`/`display_name` on `partners`, and staff have none at all. The
+      name belongs to the ROLE somebody plays, not to the credential they sign in with.
+
+      The employees code was written against a `users.full_name` that does not exist, so both of
+      its endpoints answered 500 on every call while `pnpm verify` stayed green — nothing exercised
+      them against a database. Found by the security session, and it is the same shape as the CSP
+      failure this project already has a note about: a green suite over an unusable feature.
+    */
+    fullName: text('full_name').notNull(),
+    status: partnerEmployeeStatus('status').notNull().default('active'),
+    invitedByUserId: foreignId('invited_by_user_id').references(() => users.id),
+    ...timestamps,
+  },
+  (t) => [
+    /*
+      One live employment per ACCOUNT, not per (account, partner).
+
+      An account that works for two partners at once would make "which partner is this request
+      about" a question with two answers, and the scope resolver returns one partner id. Refusing
+      it at the database is cheaper than discovering it in a WHERE clause.
+    */
+    uniqueIndex('partner_employees_user_unique')
+      .on(t.userId)
+      .where(sql`deleted_at IS NULL`),
+    index('partner_employees_partner_idx').on(t.partnerId, t.status),
+    index('partner_employees_role_idx').on(t.roleId),
   ],
 );

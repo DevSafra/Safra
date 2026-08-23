@@ -1,0 +1,1 @@
+ALTER TYPE "public"."auth_token_purpose" ADD VALUE 'partner_employee_invitation';

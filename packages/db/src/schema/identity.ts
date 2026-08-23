@@ -1,6 +1,7 @@
 import { relations, sql } from 'drizzle-orm';
 import {
   boolean,
+  type AnyPgColumn,
   index,
   integer,
   jsonb,
@@ -48,6 +49,69 @@ export const staffScopeKind = pgEnum('staff_scope_kind', ['all_cities', 'cities'
  */
 export const outsideScopeAccess = pgEnum('outside_scope_access', ['none', 'read_only']);
 
+/**
+ * A named role for SAFRA's OWN staff, defined by the super admin (Bashar, 2026-08-23).
+ *
+ * ## Why a table rather than more enum values
+ *
+ * "The super admin should have the define roles screen for his own employees" — and he wants to
+ * INVENT them: «مشرف حجوزات», «محاسب», whatever the organisation turns out to need. An enum cannot
+ * do that; adding a value is a migration, and Postgres cannot remove one at all.
+ *
+ * So `users.role` stops being the source of a staff member's AUTHORITY and keeps only two jobs it
+ * is still good at: admission (`STAFF_ROLES` decides who may open the console) and the second
+ * factor. What a staff member may DO comes from the row they point at here.
+ *
+ * ## `is_system` is the lock, and it exists to stop one specific accident
+ *
+ * `super_admin` is a system role: it cannot be renamed, reduced, retired, or unassigned from the
+ * last account holding it. Without that, a super admin edits their own role, drops `staff.manage`,
+ * and there is nobody left who can put it back — an irreversible lockout performed through a form
+ * that looks like an ordinary edit.
+ *
+ * The four roles that exist today are seeded here as ordinary rows, so they can be renamed and
+ * adjusted like any other. Only `super_admin` is locked.
+ *
+ * ## What a custom role may never carry
+ *
+ * `STAFF_ROLE_MANAGE` is excluded from what any role can be given, and the exclusion is the whole
+ * boundary: a role that can define roles can grant itself everything, and «مشرف حجوزات» becomes a
+ * super admin in one edit. Same argument as `PARTNER_EMPLOYEE_MANAGE` being absent from what an
+ * employee may hold.
+ */
+export const staffRoles = pgTable(
+  'staff_roles',
+  {
+    id: primaryId(),
+    name: text('name').notNull(),
+    permissions: text('permissions').array().notNull(),
+    /*
+      The enum value this role admits its holders as — the ONLY thing `users.role` still decides.
+
+      A custom role still has to be one of the console's admitted roles for `STAFF_ROLES` and the
+      2FA list to keep working; what changes is that four names no longer imply four permission
+      sets. Defaults to `support_agent`, the least authority a staff account can be admitted with.
+    */
+    admitsAs: userRole('admits_as').notNull().default('support_agent'),
+    /** Locked against edit, retirement and unassignment. True only for `super_admin`. */
+    isSystem: boolean('is_system').notNull().default(false),
+    /*
+      `AnyPgColumn` because the two tables reference each other: a role records who created it, and
+      a user records which role they hold. TypeScript cannot infer either type while the other is
+      still being inferred, and the annotation is drizzle's documented way out of the cycle.
+    */
+    createdByUserId: foreignId('created_by_user_id').references(
+      (): AnyPgColumn => users.id,
+    ),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('staff_roles_name_unique')
+      .on(sql`lower(${t.name})`)
+      .where(notDeleted),
+  ],
+);
+
 export const users = pgTable(
   'users',
   {
@@ -57,6 +121,15 @@ export const users = pgTable(
     /** Argon2id. Null for accounts that exist but cannot yet sign in. */
     passwordHash: text('password_hash'),
     role: userRole('role').notNull(),
+    /*
+      The role row this staff member holds, and the source of their permissions.
+
+      Nullable, because customers and partners have no staff role and every account seeded before
+      this existed has none either. A staff account with no role resolves to the permissions its
+      `role` enum value implies — the pre-2026-08-23 behaviour — so nothing breaks while the
+      backfill happens, and a console that has not assigned roles yet keeps working.
+    */
+    staffRoleId: foreignId('staff_role_id').references(() => staffRoles.id),
     status: userStatus('status').notNull().default('active'),
     preferredLocale: text('preferred_locale').notNull().default('ar'),
     emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),

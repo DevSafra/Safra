@@ -23,10 +23,29 @@ export const bookingStatus = pgEnum('booking_status', [
 export const userRole = pgEnum('user_role', [
   'customer',
   'partner',
+  /**
+   * Somebody who works FOR a partner (Bashar, 2026-08-23).
+   *
+   * A partner is an organisation, not a person: a hotel has a receptionist who takes bookings and
+   * a housekeeper who closes rooms. Until this they shared one login, which is how a partner ends
+   * up unable to say who cancelled a booking.
+   *
+   * Its permissions are NOT in `ROLE_PERMISSIONS` like every other role's. They come from the
+   * employee's assigned role row and are intersected with `PARTNER_EMPLOYEE_PERMISSIONS` — the
+   * static entry for this role is deliberately EMPTY so that a missed lookup grants nothing
+   * rather than everything a partner can do.
+   */
+  'partner_employee',
   'support_agent',
   'finance_officer',
   'operations_manager',
   'super_admin',
+]);
+
+/** Whether an employee may sign in at all, independent of the account's own status. */
+export const partnerEmployeeStatus = pgEnum('partner_employee_status', [
+  'active',
+  'suspended',
 ]);
 
 export const userStatus = pgEnum('user_status', ['active', 'suspended', 'archived']);
@@ -283,6 +302,15 @@ export const authTokenPurpose = pgEnum('auth_token_purpose', [
    * re-establishes the password for a privileged role and confirms the mailbox is live.
    */
   'partner_invitation',
+  /**
+   * A PARTNER EMPLOYEE's invitation (Bashar, 2026-08-23).
+   *
+   * Its own purpose rather than reusing `partner_invitation`, and the reason is the whole point of
+   * `redeem` filtering on purpose: the partner one redeems into `role = 'partner'`, which is the
+   * OWNER of a business. If an employee's link were the same kind of token, redeeming it would
+   * hand a receptionist the account that signs contracts and reads payouts.
+   */
+  'partner_employee_invitation',
 ]);
 
 /**

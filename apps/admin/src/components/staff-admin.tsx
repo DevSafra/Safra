@@ -4,21 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { text } from '@/lib/form';
-import type { StaffMember } from '@/lib/api';
+import type { StaffMember, StaffRole } from '@/lib/api';
 import { fill, roleName, t } from '@/lib/strings';
 import { shortDate } from '@/lib/format';
-
-const ROLES = [
-  /*
-    Labels come from `roleName`, the same translator the audit log and the permission matrix use.
-    A second English list here is how "Operations manager" and "مدير عمليات" ended up on adjacent
-    screens for the same role.
-  */
-  { value: 'support_agent' },
-  { value: 'finance_officer' },
-  { value: 'operations_manager' },
-  { value: 'super_admin' },
-] as const;
 
 /**
  * Staff administration (M-5, §9.3).
@@ -32,9 +20,17 @@ const ROLES = [
  */
 export function StaffAdmin({
   staff,
+  roles,
   currentUserId,
 }: {
   staff: StaffMember[];
+  /*
+    The named roles, fetched once by the page rather than per row (Bashar, 2026-08-23).
+
+    Staff roles are rows now, so the four hard-coded values below could not stand — and a role's
+    NAME is data, not a catalogue entry, so `roleName()` cannot resolve «مشرف حجوزات».
+  */
+  roles: readonly StaffRole[];
   currentUserId: string | undefined;
 }) {
   const router = useRouter();
@@ -116,7 +112,19 @@ export function StaffAdmin({
             void call(
               'invite',
               '/api/staff',
-              { method: 'POST', body: { email, role: text(form, 'role') } },
+              {
+                method: 'POST',
+                /*
+                  A `staffRoleId`, so somebody is invited straight INTO the role they will hold.
+
+                  It sent an enum value until 2026-08-23, which meant inviting into a custom role
+                  took two steps — and between redeeming the invitation and the second step the
+                  account carried `ROLE_PERMISSIONS[whichever enum was chosen]`, with nothing
+                  forcing anybody to take that step. An over-permission window with no upper
+                  bound, created by an omission.
+                */
+                body: { email, staffRoleId: text(form, 'staffRoleId') },
+              },
               fill(t.sections.staff.inviteSent, { email }),
             );
             event.currentTarget.reset();
@@ -132,14 +140,18 @@ export function StaffAdmin({
             className="rounded-[9px] border border-line bg-field px-3 py-2.5 text-[12.5px] text-text"
           />
           <select
-            name="role"
-            defaultValue="support_agent"
+            name="staffRoleId"
+            required
+            defaultValue=""
             aria-label={t.sections.staff.inviteRole}
             className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2.5 text-[12.5px] text-text"
           >
-            {ROLES.map((role) => (
-              <option key={role.value} value={role.value}>
-                {roleName(role.value)}
+            <option value="" disabled>
+              {t.sections.staff.pickRole}
+            </option>
+            {roles.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
               </option>
             ))}
           </select>
@@ -172,7 +184,7 @@ export function StaffAdmin({
                     ) : null}
                   </p>
                   <p className="mt-0.5 text-xs text-muted">
-                    {roleName(member.role)} ·{' '}
+                    {member.staffRoleName ?? roleName(member.role)} ·{' '}
                     {member.lastLoginAt
                       ? fill(t.sections.staff.lastSignIn, {
                           when: shortDate(member.lastLoginAt),
@@ -201,25 +213,43 @@ export function StaffAdmin({
               */}
               {isSelf ? null : (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {/*
+                    The options are the ROLE ROWS, and the body carries a `staffRoleId`.
+
+                    System roles are included: «مدير عام» cannot be edited or withdrawn, but
+                    promoting somebody INTO it is the ordinary path — and it is the only way to
+                    satisfy the last-active-super-admin guard when the current holder leaves.
+
+                    An account seeded before named roles has no `staffRoleId`, so the select falls
+                    back to no selection rather than silently claiming the first role in the list.
+                  */}
                   <select
-                    defaultValue={member.role}
+                    defaultValue={member.staffRoleId ?? ''}
                     disabled={busy === member.id}
                     onChange={(event) =>
                       void call(
                         member.id,
                         `/api/staff/${member.id}/role`,
-                        { method: 'PATCH', body: { role: event.target.value } },
+                        {
+                          method: 'PATCH',
+                          body: { staffRoleId: event.target.value },
+                        },
                         fill(t.sections.staff.roleChanged, {
                           email: member.email,
-                          role: roleName(event.target.value),
+                          role:
+                            roles.find((r) => r.id === event.target.value)?.name ??
+                            event.target.value,
                         }),
                       )
                     }
                     className="cursor-pointer rounded-lg border border-line bg-field px-3 py-1.5 text-xs text-text disabled:cursor-not-allowed"
                   >
-                    {ROLES.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {roleName(role.value)}
+                    {member.staffRoleId === null ? (
+                      <option value="">{t.sections.staff.noNamedRole}</option>
+                    ) : null}
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
                       </option>
                     ))}
                   </select>
