@@ -112,6 +112,18 @@ function statusLabel(contract: ContractItem): string {
     return t.sections.contracts.awaitingSignature;
   }
 
+  /*
+    A draft is not in force, and this card said it was.
+
+    Every branch below reads the CALENDAR — and a draft has no expiry, so it fell through to
+    «ساري حتى —»: the console telling an operator that a generated, unsigned, unsent document was
+    a valid contract. `draft` joined the enum on 2026-08-21 with the two-sided signing flow and
+    this function was not taught it; nothing failed, because the label it produced was
+    well-formed. `e2e/navigation.spec.ts` caught it as a COLOUR clash — the same phrase in two
+    tones on الشركاء — which is the only reason it surfaced at all.
+  */
+  if (contract.status === 'draft') return t.sections.contracts.draft;
+
   if (contract.daysToExpiry === null)
     return fill(t.sections.contracts.validUntil, { date: '—' });
   if (contract.daysToExpiry < 0) return t.sections.contracts.expired;

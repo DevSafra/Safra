@@ -210,7 +210,13 @@ export const VOCABULARIES: Readonly<Record<string, readonly string[]>> = {
   dispute: ['open', 'investigating', 'resolved', 'rejected'],
   giftCard: ['active', 'used', 'expired', 'cancelled'],
   ad: ['draft', 'active', 'paused', 'expired'],
-  contract: ['awaiting_partner_signature', 'active', 'superseded', 'terminated'],
+  /*
+    `draft` was added to the enum on 2026-08-21 with the two-sided signing flow and NOT added here,
+    so every sweep that walks this list skipped it — and الشركاء spent two days painting a draft
+    contract with the label «ساري حتى —», stating that an unsigned, unsent document was in force.
+    A status missing from this list is a status no test is holding to account.
+  */
+  contract: ['draft', 'awaiting_partner_signature', 'active', 'superseded', 'terminated'],
   user: ['active', 'suspended', 'archived'],
   notification: ['queued', 'sent', 'delivered', 'failed'],
   /**
