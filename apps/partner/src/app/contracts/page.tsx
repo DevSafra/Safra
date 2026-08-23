@@ -443,15 +443,26 @@ function ContractCard({ contract }: { readonly contract: PartnerContract }) {
  * had changed or that their own signature no longer stood. Somebody re-signing a document they
  * believe they already signed, with no explanation on the screen, is the failure this closes.
  *
- * ## It renders nothing when there is nothing to say
+ * ## It renders from the first copy
  *
- * A contract with one copy on it has no history worth a heading — the card's own date already says
- * when it arrived. The block appears from the second event onward, which is exactly when the
- * single date stops being the whole story.
+ * It was gated at two until Bashar overruled it (2026-08-23) — see the note inside. An empty area
+ * where a record should be reads as a missing feature, not as an empty one.
  */
 function ContractHistory({ contract }: { readonly contract: PartnerContract }) {
   /* Newest first, ordered by the query — the copy being acted on is the one at the top. */
-  if (contract.history.length < 2) return null;
+  /*
+    Shown from the FIRST entry (Bashar, 2026-08-23).
+
+    This used to be gated at two, on the reasoning that one copy is not a history and the card's
+    own date already says when it arrived. Bashar overruled it after seeing the onboarding screen
+    directly after SAFRA's upload: there is exactly one entry at that moment, so the whole box
+    vanished and the operator saw blank space where the record should be — which reads as a missing
+    feature rather than as an empty one. One thin row saying «أرسلت سفرة نسخة موقّعة · الحالية» tells
+    them the record exists and is being kept.
+
+    Do not re-add the gate.
+  */
+  if (contract.history.length === 0) return null;
 
   /*
     Was something the PARTNER did undone, and is it their turn again? That pair is the only case
