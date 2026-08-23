@@ -7,7 +7,7 @@ import { LOCALES } from '@safra/contracts';
 
 import type { PartnerType } from '@/lib/api';
 import { text } from '@/lib/form';
-import { apiError, label, t } from '@/lib/strings';
+import { apiErrorOf, label, t } from '@/lib/strings';
 
 interface CityOption {
   readonly slug: string;
@@ -100,11 +100,15 @@ export function OnboardPartnerForm({
 
       if (!response.ok) {
         /*
-          `apiError` never returns empty — it falls back to the generic Arabic sentence — so there
-          is no `||` here. A coded refusal reads as itself; anything else reads as "something went
-          wrong", which is the honest answer when the API did not name a reason.
+          `apiErrorOf`, not `apiError(messageOf(...))`.
+
+          This read `body.message`, which is the API's ENGLISH prose — so `isErrorCode` rejected it
+          and every coded refusal printed the generic «حدث خطأ ما». The screen looked right, in
+          Arabic, saying the wrong thing; and the browser test passed because it only asserted the
+          text WAS Arabic. `apiErrorOf` reads `code` first and falls back to `message` for the
+          console's own BFF refusals, which have no upstream `code` to copy.
         */
-        setError(apiError(messageOf(payload)));
+        setError(apiErrorOf(payload));
         setField(fieldOf(payload));
         setBusy(false);
 
@@ -413,14 +417,6 @@ function Field({
       ) : null}
     </div>
   );
-}
-
-function messageOf(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
-
-  const { message } = body;
-
-  return typeof message === 'string' ? message : null;
 }
 
 function fieldOf(body: unknown): string | null {

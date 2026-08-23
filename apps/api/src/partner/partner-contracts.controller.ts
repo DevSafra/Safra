@@ -210,22 +210,22 @@ export class PartnerContractsController {
   ) {}
 
   @Get()
-  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @RequirePermissions(P.PARTNER_CONTRACT_SIGN_OWN)
   async list(@CurrentUser() user: AccessTokenClaims | undefined) {
-    const partnerId = requirePartnerId(user, P.PROPERTY_MANAGE_OWN);
+    const partnerId = requirePartnerId(user, P.PARTNER_CONTRACT_SIGN_OWN);
 
     return { contracts: await this.contracts.list(partnerId) };
   }
 
   @Get(':contractId/file')
-  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @RequirePermissions(P.PARTNER_CONTRACT_SIGN_OWN)
   @AuditExempt('PartnerContractReadService records partner_contract.viewed.')
   async download(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('contractId', ParseUUIDPipe) contractId: string,
     @Res() response: Response,
   ) {
-    const partnerId = requirePartnerId(user, P.PROPERTY_MANAGE_OWN);
+    const partnerId = requirePartnerId(user, P.PARTNER_CONTRACT_SIGN_OWN);
     const contract = await this.contracts.read(contractId, partnerId, user);
 
     /*
@@ -263,7 +263,7 @@ export class PartnerContractsController {
    * verified would be a deadlock. It sits alongside document upload for the same reason.
    */
   @Post(':contractId/signed-copy')
-  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @RequirePermissions(P.PARTNER_CONTRACT_SIGN_OWN)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async uploadSignedCopy(
     @CurrentUser() user: AccessTokenClaims | undefined,
@@ -271,7 +271,7 @@ export class PartnerContractsController {
     @Body(new ZodValidationPipe(signedCopySchema)) body: SignedCopyInput,
     @Req() request: { ip?: string; headers: Record<string, unknown> },
   ) {
-    const partnerId = requirePartnerId(user, P.PROPERTY_MANAGE_OWN);
+    const partnerId = requirePartnerId(user, P.PARTNER_CONTRACT_SIGN_OWN);
 
     await this.signing.uploadPartnerSignedCopy(user, partnerId, contractId, body, {
       ipAddress: request.ip,

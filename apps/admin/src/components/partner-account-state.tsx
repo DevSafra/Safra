@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { apiError, fill, t } from '@/lib/strings';
+import { apiErrorOf, fill, t } from '@/lib/strings';
 
 /**
  * Whether the partner can actually SIGN IN, and the remedy when they cannot
@@ -67,7 +67,7 @@ export function PartnerAccountState({
       if (!response.ok) {
         const payload: unknown = await response.json().catch(() => null);
 
-        setError(apiError(messageOf(payload)));
+        setError(apiErrorOf(payload));
         setBusy(false);
 
         return;
@@ -126,12 +126,4 @@ export function PartnerAccountState({
       </button>
     </div>
   );
-}
-
-function messageOf(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
-
-  const { message } = body;
-
-  return typeof message === 'string' ? message : null;
 }

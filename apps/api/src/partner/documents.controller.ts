@@ -44,15 +44,15 @@ export class PartnerDocumentsController {
   constructor(private readonly documents: PartnerDocumentsService) {}
 
   @Get()
-  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @RequirePermissions(P.PARTNER_DOCUMENT_MANAGE_OWN)
   async list(@CurrentUser() user: AccessTokenClaims | undefined) {
-    const partnerId = requirePartnerId(user, P.PROPERTY_MANAGE_OWN);
+    const partnerId = requirePartnerId(user, P.PARTNER_DOCUMENT_MANAGE_OWN);
 
     return { documents: await this.documents.list(partnerId) };
   }
 
   @Post()
-  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @RequirePermissions(P.PARTNER_DOCUMENT_MANAGE_OWN)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @AuditExempt('PartnerDocumentsService audits the upload in the same transaction.')
   @UseInterceptors(
@@ -71,21 +71,21 @@ export class PartnerDocumentsController {
     body: PartnerDocumentUploadInput,
     @UploadedFile() file: UploadedDocument | undefined,
   ) {
-    const partnerId = requirePartnerId(user, P.PROPERTY_MANAGE_OWN);
+    const partnerId = requirePartnerId(user, P.PARTNER_DOCUMENT_MANAGE_OWN);
 
     return this.documents.upload(partnerId, body.kind, file, user);
   }
 
   /** A partner re-reading their own upload, scoped so it cannot reach another's. */
   @Get(':documentId/file')
-  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  @RequirePermissions(P.PARTNER_DOCUMENT_MANAGE_OWN)
   @AuditExempt('PartnerDocumentsService records partner_document.viewed.')
   async download(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('documentId', ParseUUIDPipe) documentId: string,
     @Res() response: Response,
   ) {
-    const partnerId = requirePartnerId(user, P.PROPERTY_MANAGE_OWN);
+    const partnerId = requirePartnerId(user, P.PARTNER_DOCUMENT_MANAGE_OWN);
     const doc = await this.documents.read(documentId, user, partnerId);
 
     sendDocument(response, doc);

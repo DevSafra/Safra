@@ -266,6 +266,34 @@ export function apiError(code: string | null): string {
 }
 
 /**
+ * The Arabic sentence for a refusal, taken from a response BODY rather than a code.
+ *
+ * ## Why this exists — reading the wrong field is silent
+ *
+ * An API refusal is `{ statusCode, code, message }`, and `message` is ENGLISH prose kept for logs
+ * (`app-error.ts`). Handing that to `apiError` looks right and is not: `isErrorCode` rejects a
+ * sentence, so `errorMessage` falls back and the reader gets «حدث خطأ ما» for every refusal the
+ * platform can name precisely. Nothing fails — the screen shows Arabic, just the wrong Arabic —
+ * which is why it survived a passing browser test that only asserted the text WAS Arabic.
+ *
+ * Found on 2026-08-23: a duplicate employee-role name answered 409 `employee_role.name_taken` and
+ * the form said "something went wrong", so the operator could not tell a clash from an outage.
+ *
+ * `code` first, then `message`, and the fallback is not laziness: the console's own BFF routes
+ * refuse malformed bodies before the API is called and put the CODE in `message`, because there is
+ * no upstream response to copy a `code` from. One reader, both shapes.
+ */
+export function apiErrorOf(body: unknown): string {
+  if (typeof body !== 'object' || body === null) return apiError(null);
+
+  if ('code' in body && typeof body.code === 'string') return apiError(body.code);
+  if ('message' in body && typeof body.message === 'string')
+    return apiError(body.message);
+
+  return apiError(null);
+}
+
+/**
  * A message whose wording depends on a COUNT.
  *
  * ## Why `fill` cannot do this

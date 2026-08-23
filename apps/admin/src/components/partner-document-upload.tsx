@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PARTNER_DOCUMENT_KINDS } from '@safra/contracts';
 
 import { text } from '@/lib/form';
-import { apiError, fill, label, t } from '@/lib/strings';
+import { apiErrorOf, fill, label, t } from '@/lib/strings';
 
 /**
  * Staff filing a partner's verification document, during an in-person onboarding
@@ -77,7 +77,7 @@ export function PartnerDocumentUpload({ reference }: { reference: string }) {
       if (!response.ok) {
         const payload: unknown = await response.json().catch(() => null);
 
-        setError(apiError(messageOf(payload)));
+        setError(apiErrorOf(payload));
         setBusy(false);
 
         return;
@@ -192,12 +192,4 @@ export function PartnerDocumentUpload({ reference }: { reference: string }) {
 /** «وثيقة هوية» rather than `identity`. An unknown kind falls back to the raw key by design. */
 function kindLabel(kind: string): string {
   return label(t.enums.documentKind, kind);
-}
-
-function messageOf(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
-
-  const { message } = body;
-
-  return typeof message === 'string' ? message : null;
 }
