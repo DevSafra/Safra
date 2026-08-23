@@ -32,6 +32,10 @@ const EXEMPT: Readonly<Record<string, string>> = {
   'invitation/[token]/page.tsx':
     'Redeems the invitation that CREATES the partner account. Gating it would require the ' +
     'account it exists to make.',
+  'employee-invitation/[token]/page.tsx':
+    'Redeems an employee invitation. The account is still a customer until this form is ' +
+    'submitted, and the gate reads a PARTNER verification the reader does not have one of — ' +
+    'the employer is the verified party, not them.',
   'enrol-2fa/page.tsx':
     'An authenticator is an upgrade any partner may set up, verified or not. Holding it back ' +
     'would make the account less protected while it waits.',

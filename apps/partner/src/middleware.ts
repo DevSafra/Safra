@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
+import { isPartnerAppRole } from '@safra/contracts';
+
 import {
   PARTNER_SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
@@ -22,8 +24,14 @@ import {
   HAS to be public: the whole point of the page is that the account is not yet a partner account
   and cannot sign in, which is exactly why the middleware bouncing it to `/login` left every
   accepted partner stranded.
+
+  `/employee-invitation` joined them on 2026-08-23 for exactly the same reason, one step down: the
+  account redeeming it is still a CUSTOMER and becomes `partner_employee` only when the form is
+  submitted. Left out of this list it would have reproduced the 2026-08-20 dead end precisely —
+  a working endpoint, a mail pointing at a page, and a redirect to a sign-in that refuses the
+  account. Both entries are prefixes, so the `[token]` segment is covered.
 */
-const PUBLIC_PATHS = ['/login', '/invitation'];
+const PUBLIC_PATHS = ['/login', '/invitation', '/employee-invitation'];
 
 /**
  * Everything that guards لوحة الشريك, in one place.
@@ -176,7 +184,8 @@ function currentSession(
 
   if (!session) return null;
 
-  return session.user.role === 'partner' ? session : null;
+  /* Owners AND their employees — see `PARTNER_APP_ROLES`. */
+  return isPartnerAppRole(session.user.role) ? session : null;
 }
 
 /**
