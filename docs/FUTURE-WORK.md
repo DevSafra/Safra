@@ -2553,6 +2553,38 @@ used on 2026-08-20. For the sanctions 503 the two reasons must stay ONE code —
 `stale` are already deliberately distinguished to staff and not to anyone else. **To unblock:**
 nothing external.
 
+### O-e2e-2 — `customer-gifts.spec.ts` fails deterministically once disputes fill two pages
+
+**Status:** open · **Severity:** Medium · **Owner:** engineering · **Recorded:** 2026-08-23
+
+`e2e/customer-gifts.spec.ts:40` («refuses a bad code, then buys and redeems a card back to par»)
+times out at 30s. It is the only red in the suite; 259 of 260 pass.
+
+**It is not a product failure and not a recent code change.** The spec first walks the account's
+dispute list to find a (booking, reason) pair no earlier run has spent — one live dispute per pair
+is allowed, so a run must pick a fresh one. That walk pages through the list. Every run of the
+suite ADDS a dispute, so the list grew: it is now 21 rows over three pages, and the walk became
+part of the test rather than a preamble to it.
+
+**The failure moves when you touch it, which is the tell.** Reading the rows with
+`allTextContents()` instead of an element handle per row moves the timeout off `#disputes-list li`
+and onto the «Show more» link, which then fails with `element was detached from the DOM, retrying`
+until the budget is gone. So the stale-handle read is real but is not the cause; the link itself
+does not stay attached long enough to be clicked. That change was reverted rather than left in,
+because a fix that relocates a failure is a wrong diagnosis written into a comment.
+
+**Two candidate causes, neither confirmed:**
+
+1. The cursor does not advance, so the loop clicks «Show more» twenty times — twenty navigations
+   is comfortably over 30s. `waitForURL(/cursor=/)` matches ANY cursor including the one already
+   in the URL, so it would not notice.
+2. `/en/account/disputes` re-renders after hydration and detaches the link under the click.
+
+**The work:** decide which, then fix the spec — and separately give the suite a way not to
+accumulate disputes, because the same clock is running on every other fixture the suite writes to.
+A test that passes for months and then fails for everybody with no code change is the shape of
+problem that costs a whole afternoon to attribute; this one has now cost one.
+
 ### O-e2e-1 — The verification gate has no browser spec, for want of a stable fixture
 
 **Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-21
@@ -3374,6 +3406,33 @@ button's helper text says «اختر «حفظ بصيغة PDF» في نافذة �
 **Recommended next action:** none until there is a reason a browser-made PDF is insufficient — the
 likely trigger is wanting to ATTACH the receipt to an email, which is a queue job and lands with M-1
 anyway.
+
+### O-ops-1 — The API image now needs a headless browser
+
+**Status:** open · **Severity:** Medium · **Owner:** Platform engineering ·
+**Recorded:** 2026-08-21 · **Blocks:** contract generation, in production only
+
+`PartnerContractService.generate` renders the partnership agreement by printing HTML in headless
+Chromium (`apps/api/src/admin/contract-pdf.ts`). The customer app has carried this dependency since
+receipts; **the API had not**, and now does.
+
+**Why a browser at all** — the same reason `O-fin-2` gives: `pdfkit` and `pdf-lib` do no contextual
+glyph shaping and no bidirectional layout, so Arabic renders as disconnected left-to-right
+letterforms. The contract is bilingual and its Arabic half is the operative one for most partners.
+
+**What this means for M-1.** An API image built without the browser binary fails this call at
+runtime, and nothing earlier says so — the service starts, every other route works, and the first
+symptom is a staff member pressing «إنشاء العقد» and getting a failure. The image needs
+`playwright-core`'s Chromium and its shared libraries, which on a slim Debian base is roughly 300MB
+and a `--no-sandbox` flag (already passed).
+
+**To unblock:** include the browser in the API image, or move generation to a worker that has one.
+Nothing external. **Order:** with M-1, before the first production deploy that offers the button.
+
+**The alternative, if the image cost is unacceptable:** generation could move to the console app,
+which is a Next.js service that could carry the browser as the customer app does — at the cost of
+the contract being produced somewhere other than where it is stored and hashed. Recorded rather
+than chosen.
 
 ### O-fin-3 — A gift card can only be bought with wallet balance
 
