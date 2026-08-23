@@ -76,7 +76,18 @@ test.describe('the command-center dashboard', () => {
 
   test('renders in Arabic, not English', async ({ page }) => {
     await expect(page.getByRole('heading', { name: t.admin.title })).toBeVisible();
-    await expect(page.getByRole('link', { name: t.nav.partners })).toBeVisible();
+    /*
+      Located by HREF, not by accessible name.
+
+      `getByRole(…, { name })` matches by SUBSTRING, and a sidebar is the one place where one
+      section's name is routinely contained in another's: «أدوار موظفي الشركاء» contains
+      «الشركاء», so this resolved to two links the day that entry was added. `exact: true` is not
+      the fix either — the real link's accessible name is «الشركاء 532», carrying its badge count.
+
+      The href identifies the link and the assertion still proves what this test is about: the
+      label renders in Arabic rather than English.
+    */
+    await expect(page.locator('aside a[href="/partners"]')).toContainText(t.nav.partners);
     await expect(page.getByRole('button', { name: t.dashboard.signOut })).toBeVisible();
 
     // And the role reads as Arabic rather than `super_admin`.

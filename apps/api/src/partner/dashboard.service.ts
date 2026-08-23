@@ -48,14 +48,31 @@ export class PartnerDashboardService {
       cheap — rule 2 treats connections as the scarce resource, and the round trip saved here is
       measured in single-digit milliseconds against a local database.
     */
-    const earnings = await this.earnings(partnerId);
+    /*
+      Money is the OWNER's, and the dashboard is read by employees now (2026-08-23).
+
+      `PAYOUT_READ_OWN` is deliberately absent from `PARTNER_EMPLOYEE_PERMISSIONS`, on the stated
+      reasoning that a receptionist should not learn what the business earns. Two lines on this
+      screen said it anyway: «ما ربحته هذا الشهر» and «تحويل مستحقات 1,240$ مجدول يوم الخميس».
+
+      Both were assembled unconditionally — the only guard on this method is `BOOKING_READ_OWN`,
+      which employees hold because reading the booking queue is the job. So the permission was
+      withheld and the fact was published, which is the same shape as `score`/`tier` and as the six
+      owner-only routes: correct code that stopped being correct when "whoever is signed in" stopped
+      meaning "the owner".
+
+      The rest of the dashboard is emphatically NOT hidden. It is most of an employee's work, and
+      withholding must not become hiding.
+    */
+    const money = (claims?.permissions ?? []).includes(P.PAYOUT_READ_OWN);
+    const earnings = money ? await this.earnings(partnerId) : null;
     const bookings = await this.activeBookings(partnerId);
     const occupancy = await this.occupancy(partnerId);
     const response = await this.responseSpeed(partnerId);
     const pendingRequests = await this.pendingRequests(partnerId);
     const calendar = await this.calendar(partnerId);
     const alerts = await this.alerts(partnerId);
-    const payout = await this.payoutLine(partnerId);
+    const payout = money ? await this.payoutLine(partnerId) : null;
 
     return {
       kpis: { earnings, bookings, occupancy, response },

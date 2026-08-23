@@ -109,14 +109,17 @@ test.describe('every admin section the design specifies', () => {
       .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''));
 
     /*
-      Nineteen rows: the design's eighteen plus «طلبات الشراكة» (Bashar, 2026-08-19). Emergency
-      Mode is not among them — it is reached from the header.
+      Twenty rows: the design's eighteen, plus «طلبات الشراكة» (Bashar, 2026-08-19) and
+      «أدوار موظفي الشركاء» (Bashar, 2026-08-23). Emergency Mode is not among them — it is reached
+      from the header.
 
       A literal rather than `SECTIONS.length`, deliberately: this assertion exists to fail when
       somebody adds a nav entry, and a count derived from the same list would agree with any
-      change made to it.
+      change made to it. It did exactly that when the roles screen landed, which is the assertion
+      working rather than getting in the way — so the number goes up by one and the reason for the
+      new entry is recorded beside it.
     */
-    expect(hrefs.length).toBe(19);
+    expect(hrefs.length).toBe(20);
 
     for (const href of hrefs) {
       const response = await page.goto(href);

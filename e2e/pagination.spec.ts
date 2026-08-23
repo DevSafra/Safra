@@ -378,11 +378,30 @@ test.describe('the step arrows', () => {
   test('next is absent on the last page', async ({ page }) => {
     await page.goto('/customers?size=100');
 
-    const pages = Number(
-      (await bar(page)
-        .innerText()
-        .then((text) => text.match(/من\s+([\d,]+)/)?.[1]?.replace(/,/g, ''))) ?? '1',
+    const text = await bar(page).innerText();
+
+    /*
+      Past `COUNT_CAP` the page count is a FLOOR, not a total — so "the last page" is not what the
+      bar says (2026-08-23).
+
+      The count is capped at 10,000 deliberately, so an ever-growing table costs a bounded query;
+      past it the bar prints «أكثر من ١٠٠٠٠ نتيجة» rather than an exact figure, and the page count
+      it derives caps with it. The dev database crossed the cap at 10,198 customers, so this walked
+      to page 100 of a 102-page list, found a next arrow, and reported a bug that was the product
+      working exactly as `.claude/CLAUDE.md` specifies.
+
+      Skipped rather than adapted: with a capped total there is no way to ADDRESS the last page,
+      which is the premise this test needs. Asserting something weaker in that state would keep it
+      green while checking nothing, which is the failure mode this suite hit three times today.
+    */
+    const capped = text.includes('أكثر من');
+
+    test.skip(
+      capped,
+      'The customer count is past COUNT_CAP, so the bar reports a floor and the last page is not addressable.',
     );
+
+    const pages = Number(text.match(/من\s+([\d,]+)/)?.[1]?.replace(/,/g, '') ?? '1');
 
     await page.goto(`/customers?size=100&page=${pages}`);
 

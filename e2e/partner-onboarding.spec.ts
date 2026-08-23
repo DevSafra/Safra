@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
+import { ar as errorsAr } from '../packages/i18n/src/messages/errors/ar.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -324,11 +325,19 @@ test.describe('onboarding a partner in person', () => {
     await expect(alert).toBeVisible({ timeout: 15_000 });
     await expect(page).toHaveURL(/\/partners\/new$/);
 
-    /* Not English, and not a raw code. Both were real failure modes on this exact path. */
+    /*
+      The SPECIFIC sentence, not merely "some Arabic".
+
+      This used to assert only `toMatch(/[؀-ۿ]/)` and `not.toContain('partner_onboarding')` — both
+      of which the GENERIC «حدث خطأ ما» satisfies. So it passed for weeks while the form read
+      `body.message` (the API's English prose) instead of `body.code`, and every coded refusal
+      printed the generic sentence. A test that cannot tell the right answer from the fallback is
+      not testing the thing it was written for.
+    */
     const message = await alert.innerText();
 
+    expect(message).toContain(errorsAr['partner_onboarding.email_is_staff'].slice(0, 24));
     expect(message).not.toContain('partner_onboarding');
-    expect(message).toMatch(/[؀-ۿ]/);
   });
 });
 

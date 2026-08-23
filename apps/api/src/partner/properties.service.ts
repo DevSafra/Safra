@@ -83,8 +83,20 @@ export class PropertiesService {
       displayName: row.display_name,
       legalName: row.legal_name,
       verification: row.verification,
-      score: row.score,
-      tier: row.tier,
+      /*
+        SAFRA's internal rating of the business, withheld from EMPLOYEES (2026-08-23).
+
+        This profile is read on every page of the portal, so whatever it carries reaches whoever is
+        signed in — and since employees exist, that is no longer only the owner. Nothing renders
+        either field today, which is exactly why it was easy to miss.
+
+        `PARTNER_EMPLOYEE_PERMISSIONS` deliberately withholds `PAYOUT_READ_OWN` on the reasoning
+        that a receptionist should not learn what the business earns. A score and a tier are the
+        same category of fact about the business rather than about the work, so they follow the
+        same rule. The owner still sees their own.
+      */
+      score: claims?.role === 'partner' ? row.score : null,
+      tier: claims?.role === 'partner' ? row.tier : null,
       propertyCount: row.property_count,
       /** Null when the partner has no published reviews — the badge is then absent, not «0». */
       reviewAverage: row.review_average,
