@@ -5,6 +5,8 @@ import {
   ROLES,
   ROLE_PERMISSIONS,
   isStaffRole,
+  PARTNER_APP_ROLES,
+  requiresAuthenticator,
   requiresTwoFactor,
   resolvePermissions,
 } from './permissions.js';
@@ -100,14 +102,51 @@ describe('role permission separation (SRS §4)', () => {
     Asserted as an exact list rather than "contains partner", so adding a role forces a decision
     here about whether it needs a second factor instead of inheriting one by omission.
   */
-  it('requires a second factor from staff and partners, and from nobody else', () => {
+  it('requires a second factor from staff and everyone in the portal, and nobody else', () => {
     expect(ROLES.filter(requiresTwoFactor).sort()).toEqual([
       'finance_officer',
       'operations_manager',
       'partner',
+      'partner_employee',
       'super_admin',
       'support_agent',
     ]);
+  });
+
+  /**
+   * A partner's EMPLOYEE proves a second factor too (Bashar, 2026-08-23: "same as partner login.
+   * Just send a code per email").
+   *
+   * They read the same guest list with names, write to guests as the business, and admit people to
+   * rooms — and they are the weaker accounts by construction: more of them, higher turnover,
+   * invited by a partner rather than vetted by SAFRA. A password alone on the account holding the
+   * guest list, while the owner needs two, is the wrong way round.
+   */
+  it('requires a second factor from a partner’s employee', () => {
+    expect(requiresTwoFactor('partner_employee')).toBe(true);
+  });
+
+  /**
+   * And nothing to ENROL, which is what makes it usable on a shift.
+   *
+   * `AUTHENTICATOR_ROLES` stays staff-only, so an employee gets the emailed code their employer
+   * gets rather than a TOTP app to set up before they can take their first booking.
+   */
+  it('never makes a partner’s employee enrol an authenticator', () => {
+    expect(requiresAuthenticator('partner_employee')).toBe(false);
+  });
+
+  /**
+   * Everyone admitted to the portal needs a second factor — asserted as a relationship rather than
+   * a list, so a role added to `PARTNER_APP_ROLES` cannot get through the door without one.
+   *
+   * That is the mistake this pair already made once in the other direction: employees were given a
+   * role and left out of the admission list, and could not sign in at all.
+   */
+  it('requires a second factor from every role admitted to the portal', () => {
+    for (const role of PARTNER_APP_ROLES) {
+      expect(requiresTwoFactor(role)).toBe(true);
+    }
   });
 
   /* §4 specifies guest checkout; a second factor on a customer account would contradict it. */

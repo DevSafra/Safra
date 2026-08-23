@@ -1,6 +1,7 @@
 import { isValidPhoneNumber } from 'libphonenumber-js/max';
 import { z } from 'zod';
 import { ERROR } from './error-codes.js';
+import { ROLES, type Role } from './permissions.js';
 import {
   PASSWORD_RULES,
   passwordEchoesIdentity,
@@ -313,14 +314,15 @@ export type EmailVerificationConfirmInput = z.infer<
 export const authUserSchema = z.object({
   id: z.string().uuid(),
   email: emailSchema,
-  role: z.enum([
-    'customer',
-    'partner',
-    'support_agent',
-    'finance_officer',
-    'operations_manager',
-    'super_admin',
-  ]),
+  /*
+    DERIVED from `ROLE_PERMISSIONS`, not written out again (2026-08-23).
+
+    This was a second hand-maintained list of the platform's roles, and adding `partner_employee`
+    broke it in the way a duplicated list always breaks: the database column and this schema
+    disagreed, and the compiler pointed at `auth.service.ts` — two files away from either list.
+    One source now, so a new role cannot be half-added.
+  */
+  role: z.enum(ROLES as [Role, ...Role[]]),
   preferredLocale: localeSchema,
   permissions: z.array(z.string()),
 });
@@ -348,10 +350,28 @@ export const STAFF_ROLE_VALUES = [
   'super_admin',
 ] as const;
 
+/**
+ * Inviting somebody to work at SAFRA — into a NAMED ROLE, not an enum value (2026-08-23).
+ *
+ * ## Why the enum had to go, and it is not only tidiness
+ *
+ * `PATCH /admin/staff/:id/role` moved to `staffRoleId` when roles became rows; this did not. So
+ * inviting somebody into «مشرف حجوزات» was two steps — invite as one of the four, then change the
+ * role — and BETWEEN them the account resolves through `ROLE_PERMISSIONS[whichever enum was
+ * chosen]`, because `staff_role_id` is still null and the fallback is correct.
+ *
+ * That window is the problem. Somebody destined for a narrow custom role holds a full support-agent
+ * set from the moment they redeem their invitation until a second action nobody is forced to take —
+ * and if the super admin is distracted, indefinitely. The tempting shortcut, inviting as
+ * `super_admin` "to get them in", is worse again.
+ *
+ * One step, one role, no window. It also matches `employeeInviteSchema` on the partner side: one
+ * idea, one spelling, across both APIs.
+ */
 export const staffInviteSchema = z
   .object({
     email: z.string().email().max(320),
-    role: z.enum(STAFF_ROLE_VALUES),
+    staffRoleId: z.string().uuid(ERROR.VALIDATION_REQUIRED),
     locale: z.enum(['ar', 'en', 'de']).optional(),
   })
   .strict();

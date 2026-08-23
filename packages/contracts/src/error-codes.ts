@@ -192,6 +192,53 @@ export const ERROR = {
    * each signature is something the signer's own account did. `canFileJointContract` is the rule.
    */
   CONTRACT_JOINT_NOT_ALLOWED: 'contract.joint_not_allowed',
+
+  /* ── Partner employees and their roles (Bashar, 2026-08-23) ── */
+  /** Two live roles cannot share a name: the partner assigning them could not tell which is which. */
+  EMPLOYEE_ROLE_NAME_TAKEN: 'employee_role.name_taken',
+  EMPLOYEE_ROLE_NOT_FOUND: 'employee_role.not_found',
+  /**
+   * Refused rather than cascaded. An employee whose role vanished resolves to NO permissions — an
+   * account that still signs in and can do nothing, for a reason no screen explains. Moving those
+   * people is a decision, and it belongs to whoever is deleting the role.
+   */
+  EMPLOYEE_ROLE_IN_USE: 'employee_role.in_use',
+  EMPLOYEE_NOT_FOUND: 'employee.not_found',
+  /** The address already belongs to somebody who works for a partner — including this one. */
+  EMPLOYEE_ALREADY_EMPLOYED: 'employee.already_employed',
+  /** The address belongs to a STAFF account. A SAFRA employee is not a partner's employee. */
+  EMPLOYEE_EMAIL_IS_STAFF: 'employee.email_is_staff',
+  /** The address belongs to the partner's OWN account. An owner is not their own employee. */
+  EMPLOYEE_EMAIL_IS_OWNER: 'employee.email_is_owner',
+  /**
+   * One code for every way an employee invitation can fail — expired, spent, never existed, or the
+   * employment withdrawn since it was sent. Distinguishing them tells somebody probing links which
+   * guesses were close.
+   */
+  EMPLOYEE_INVITATION_INVALID: 'employee.invitation_invalid',
+
+  /* ── SAFRA's own staff roles (Bashar, 2026-08-23) ── */
+  STAFF_ROLE_NAME_TAKEN: 'staff_role.name_taken',
+  STAFF_ROLE_NOT_FOUND: 'staff_role.not_found',
+  /**
+   * `super_admin` cannot be edited, renamed, reduced or retired.
+   *
+   * Without it, a super admin edits their own role, drops `staff.manage`, and nobody is left who
+   * can put it back — an irreversible lockout performed through a form that looks like an ordinary
+   * save.
+   */
+  STAFF_ROLE_SYSTEM: 'staff_role.system',
+  /** Refused rather than cascaded: a member whose role vanished can sign in and do nothing. */
+  STAFF_ROLE_IN_USE: 'staff_role.in_use',
+  /**
+   * The last active super admin cannot be moved off that role.
+   *
+   * Distinct from `STAFF_ROLE_SYSTEM` on purpose: that one says a role cannot be EDITED, this one
+   * says a PERSON cannot be moved, and the remedy differs — promote somebody else first. It also
+   * replaces an English sentence thrown from `staff.service.ts`, which was a plain violation of the
+   * rule that the API answers with codes.
+   */
+  STAFF_LAST_SUPER_ADMIN: 'staff.last_super_admin',
   CONTRACT_NOT_AWAITING_SIGNATURE: 'contract.not_awaiting_signature',
   DISPUTE_NOT_FOUND: 'dispute.not_found',
   DISPUTE_ALREADY_CLOSED: 'dispute.already_closed',

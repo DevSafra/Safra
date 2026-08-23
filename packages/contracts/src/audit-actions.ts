@@ -95,6 +95,25 @@ export const AUDIT_ACTIONS = [
     for "how did this partner get here" must never come back with an answer that fits both.
   */
   'partner.onboarded_in_person',
+  /* ── Partner employees and the roles a super admin names for them (Bashar, 2026-08-23) ── */
+  /** A super admin created a role and named it. The payload carries the capabilities. */
+  'partner_employee_role.created',
+  /** Renamed, or its capabilities changed. `before`/`after` carry both permission sets. */
+  'partner_employee_role.updated',
+  /** Withdrawn. Soft, so every employee who held it stays explainable. */
+  'partner_employee_role.deleted',
+  /** A partner invited somebody to work for them. */
+  'partner_employee.invited',
+  /** Their role changed, or they were suspended or restored. */
+  'partner_employee.updated',
+  /** Removed from the partner's staff. Soft — their past actions keep an actor. */
+  'partner_employee.removed',
+  /** They opened their invitation link and set a password; the account becomes an employee. */
+  'partner_employee.activated',
+  /* ── SAFRA's own staff roles, named by the super admin (Bashar, 2026-08-23) ── */
+  'staff_role.created',
+  'staff_role.updated',
+  'staff_role.deleted',
   /*
     A second invitation link for a partner onboarded in person.
 

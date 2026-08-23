@@ -88,6 +88,61 @@ export const PERMISSIONS = {
    */
   PARTNER_ONBOARD: 'partner.onboard',
   /**
+   * Defining and naming the roles SAFRA gives its OWN employees (Bashar, 2026-08-23).
+   *
+   * ## It does not touch partners, and that correction is the point
+   *
+   * This permission was invented for a model where the super admin defined the roles a PARTNER's
+   * employees could hold. Bashar corrected it: *"The super admin has nothing to do with the
+   * partner role definitions / employees. The partner should be able to invite his own employees
+   * and also define their roles himself."* So partner employee roles are the partner's, governed
+   * by `PARTNER_EMPLOYEE_MANAGE` and held by the partner — and this permission now governs SAFRA's
+   * own staff roles, which is the only population a super admin administers.
+   *
+   * Its own permission rather than folded into `STAFF_MANAGE`, because they are different powers:
+   * one adds a person to a role, the other decides what any role can do. A staff role that could
+   * be granted this could grant itself everything, which is why it is excluded from what any
+   * custom role may carry.
+   */
+  STAFF_ROLE_MANAGE: 'staff_role.manage',
+  /**
+   * A partner managing its OWN staff: inviting them, changing their role, suspending them.
+   *
+   * Held by the partner account, not by SAFRA staff. A hotel decides who its receptionists are;
+   * the platform decides only what a receptionist is allowed to be.
+   */
+  PARTNER_EMPLOYEE_MANAGE: 'partner_employee.manage',
+  /**
+   * A partner signing and reading THEIR OWN partnership agreement (2026-08-23).
+   *
+   * ## Why this had to be invented rather than reused
+   *
+   * The partner-side contract routes were guarded by `PROPERTY_MANAGE_OWN`, which is "may edit my
+   * listings" — and which employees hold, because managing listings is the job. So a receptionist
+   * could upload a counter-signed copy of their employer's agreement with SAFRA, setting it
+   * `active` with a `signed_at`. A member of staff at a hotel could bind the hotel.
+   *
+   * `PARTNER_CONTRACT_READ` could not be used instead: it is a STAFF permission held by
+   * `operations_manager` and `support_agent`, and NOT by `partner`. Guarding a partner-side route
+   * with it would lock the owner out of their own contract. That is also why withholding it from
+   * employees withheld nothing — the exclusion read as a control and never was one.
+   */
+  PARTNER_CONTRACT_SIGN_OWN: 'partner_contract.sign_own',
+  /**
+   * A partner filing and reading THEIR OWN verification documents.
+   *
+   * Same failure, worse data. `PROPERTY_MANAGE_OWN` guarded these too, so an employee could file
+   * documents in the owner's name — the papers SAFRA approves the business on — and download the
+   * owner's IDENTITY documents, which is §14 personal data and about the most sensitive thing this
+   * platform stores.
+   *
+   * There was no partner-side document permission at all, which is how `PROPERTY_MANAGE_OWN`
+   * quietly became "is a partner": one permission doing duty as both "may edit listings" and "may
+   * handle the owner's private papers". Harmless while those were the same person; not harmless
+   * from the moment employees existed.
+   */
+  PARTNER_DOCUMENT_MANAGE_OWN: 'partner_document.manage_own',
+  /**
    * The COMMERCIAL contract between SAFRA and a partner — distinct from the documents the
    * partner submits for verification.
    *
@@ -196,6 +251,21 @@ const PARTNER: Permission[] = [
   P.REVIEW_READ_OWN,
   /* الرد and إبلاغ — the two remedies P-006 allows. Hiding is not among them. */
   P.REVIEW_RESPOND_OWN,
+  /*
+    The owner's own papers: the partnership agreement, and the documents SAFRA verifies the
+    business on. Held by the partner, absent from `PARTNER_EMPLOYEE_PERMISSIONS` — a receptionist
+    does not sign the hotel's contract or handle the owner's identity documents.
+  */
+  P.PARTNER_CONTRACT_SIGN_OWN,
+  P.PARTNER_DOCUMENT_MANAGE_OWN,
+  /*
+    Managing its own employees — and deliberately NOT in `PARTNER_EMPLOYEE_PERMISSIONS`.
+
+    A receptionist must not be able to hire, promote or suspend another receptionist: that is the
+    owner's authority, and an employee who can grant roles can grant themselves one. The two lists
+    diverging here is the point, not an oversight.
+  */
+  P.PARTNER_EMPLOYEE_MANAGE,
 ];
 
 /**
@@ -310,9 +380,24 @@ const OPERATIONS_MANAGER: Permission[] = [
 /** SRS §4: full permissions, system setup, and Emergency Mode. */
 const SUPER_ADMIN: Permission[] = Object.values(P);
 
+/**
+ * A partner's employee gets NOTHING from this map (Bashar, 2026-08-23).
+ *
+ * Every other role's authority is static and lives here. An employee's comes from the role a super
+ * admin named for them — a database row — intersected with `PARTNER_EMPLOYEE_PERMISSIONS`.
+ *
+ * The entry is empty rather than absent, and empty rather than a sensible default, for one reason:
+ * if the per-request lookup is ever skipped, forgotten, or fails, the employee ends up with no
+ * authority at all instead of a partner's. A default of "what a receptionist usually needs" would
+ * make a missed lookup invisible — the screen would work, and the permission check would be
+ * answering from the wrong source.
+ */
+const PARTNER_EMPLOYEE: Permission[] = [];
+
 export const ROLE_PERMISSIONS = {
   customer: CUSTOMER,
   partner: PARTNER,
+  partner_employee: PARTNER_EMPLOYEE,
   support_agent: SUPPORT_AGENT,
   finance_officer: FINANCE_OFFICER,
   operations_manager: OPERATIONS_MANAGER,
@@ -322,6 +407,34 @@ export const ROLE_PERMISSIONS = {
 export type Role = keyof typeof ROLE_PERMISSIONS;
 
 export const ROLES = Object.keys(ROLE_PERMISSIONS) as Role[];
+
+/**
+ * The only roles allowed into `apps/partner`. Admission to the portal, nothing else.
+ *
+ * ## Why this exists rather than three `=== 'partner'` checks
+ *
+ * It was three: the sign-in route, the middleware, and the server-side session reader. Employees
+ * were added to the platform and every one of them still said `'partner'`, so an employee could be
+ * invited, activated, told «تم تفعيل الحساب. سجّل الدخول للمتابعة» — and then refused at the door
+ * with a 403. The whole feature was unreachable, and each layer was individually defensible.
+ *
+ * Three checks that must never disagree is how the fourth one gets forgotten. `STAFF_ROLES` exists
+ * for exactly this question on the console side; this is its counterpart, and adding a role to the
+ * portal is now one edit rather than a search.
+ *
+ * ## Admission is not authority
+ *
+ * Being on this list gets an account through the door and nothing more. What an employee may DO is
+ * their assigned role's permission set, intersected with `PARTNER_EMPLOYEE_PERMISSIONS` — and an
+ * employee with no live employment resolves to none of it, so admission without authority is a
+ * portal that renders empty rather than a portal that leaks.
+ */
+export const PARTNER_APP_ROLES: Role[] = ['partner', 'partner_employee'];
+
+/** True when a role may sign in to the partner portal at all. */
+export function isPartnerAppRole(role: string): boolean {
+  return (PARTNER_APP_ROLES as string[]).includes(role);
+}
 
 /** The only roles allowed into `apps/admin`. Admission to the console, nothing else. */
 export const STAFF_ROLES: Role[] = [
@@ -348,8 +461,25 @@ export function isStaffRole(role: Role): boolean {
  *
  * Customers are deliberately absent. §4 specifies guest checkout, and a second factor on a
  * customer account would contradict it.
+ *
+ * ## Employees are included, and it is `PARTNER_APP_ROLES` rather than two literals (Bashar, 2026-08-23)
+ *
+ * Asked whether a partner's employee should need a second factor, Bashar said: "same as partner
+ * login. Just send a code per email." So an employee proves a factor at every sign-in exactly as
+ * their employer does — and because `AUTHENTICATOR_ROLES` stays staff-only, there is nothing to
+ * enrol first. A receptionist can be invited and working the same day.
+ *
+ * The reasoning it answers: an employee reads the same guest list with names, writes to guests as
+ * the business, and admits people to rooms. They are also the WEAKER accounts by construction —
+ * more of them, higher turnover, invited by a partner rather than vetted by SAFRA. A password
+ * alone on the account that holds the guest list, while the owner needs two, is the wrong way round.
+ *
+ * Spread from `PARTNER_APP_ROLES` rather than written as `'partner', 'partner_employee'` so that a
+ * role admitted to the portal cannot be admitted WITHOUT a second factor. Two literal lists that
+ * must agree is how the next portal role gets one and not the other — which is the mistake that
+ * left employees unable to sign in at all a few hours ago.
  */
-export const TWO_FACTOR_ROLES: Role[] = [...STAFF_ROLES, 'partner'];
+export const TWO_FACTOR_ROLES: Role[] = [...STAFF_ROLES, ...PARTNER_APP_ROLES];
 
 export function requiresTwoFactor(role: Role): boolean {
   return TWO_FACTOR_ROLES.includes(role);
