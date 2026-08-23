@@ -1782,6 +1782,18 @@ export const ar = {
     'ad_campaign.paused': 'إيقاف حملة إعلانية',
     'ad_campaign.resumed': 'تشغيل حملة إعلانية',
     'partner_contract.uploaded': 'رفع عقد شراكة',
+    /* ── أدوار الموظفين، يُعرِّفها المدير العام (Bashar, 2026-08-23) ── */
+    'staff_role.created': 'إنشاء دور لموظفي سفرة',
+    'staff_role.updated': 'تعديل دور موظفي سفرة',
+    'staff_role.deleted': 'سحب دور موظفي سفرة',
+    /* ── موظفو الشركاء وأدوارهم (Bashar, 2026-08-23) ── */
+    'partner_employee_role.created': 'إنشاء دور لموظفي الشركاء',
+    'partner_employee_role.updated': 'تعديل دور موظفي الشركاء',
+    'partner_employee_role.deleted': 'سحب دور موظفي الشركاء',
+    'partner_employee.invited': 'دعوة موظف للعمل لدى شريك',
+    'partner_employee.updated': 'تعديل دور موظف أو حالته',
+    'partner_employee.removed': 'إنهاء عمل موظف لدى شريك',
+    'partner_employee.activated': 'تفعيل حساب موظف بعد قبول الدعوة',
     'partner_contract.generated': 'إنشاء عقد شراكة من النموذج',
     'partner_contract.countersigned': 'رفع نسخة موقّعة من عقد شراكة',
     'partner_contract.reopened': 'إعادة فتح عقد لتوقيع الشريك',
