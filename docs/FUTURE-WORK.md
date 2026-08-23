@@ -1578,6 +1578,85 @@ because days pass in between and an ordinary customer on Monday can be staff by 
 
 **Owner:** engineering. **Status:** complete.
 
+### O-partner-10 — تسجيل شريك جديد: a super admin can onboard a partner in one sitting
+
+**Shipped 2026-08-23.** Bashar asked for the case where the super admin and the partner are
+physically together and have already had the conversation «انضم كشريك» spreads over a week: fill in
+the form, upload the documents, produce and sign the contract, and approve — without the partner
+ever touching the partner app or waiting for an invitation.
+
+`الشركاء → «تسجيل شريك جديد»` opens `/partners/new`; saving lands on
+`/partners/[reference]/onboarding`, a numbered checklist that composes the EXISTING document,
+contract, screening and approval panels rather than reimplementing any of them.
+
+**Four decisions were taken WITH Bashar**, because each one had a defensible alternative:
+
+1. **The partner still sets their own password, from a link mailed to them.** The super admin has no
+   field in which to express a password and no way to read one. Everything else completes on the
+   spot, so the partner leaves approved and signs in whenever the email reaches them.
+2. **No `partner_applications` row is written.** Nobody filed a request, so «طلبات الشراكة» stays a
+   true record of requests people actually made. The origin lives in one audit action and one
+   timeline event instead.
+3. **A stepped screen of its own,** not extra controls on the partner detail page — because the
+   ORDER of the contract steps is load-bearing and four equal panels would hide it.
+4. **The wizard gates nothing.** Every step is reachable at any time. The sanctions feed (`M-2`)
+   already taught this repository what happens when onboarding is made to depend on a control that
+   can be unavailable.
+
+**Why it is a separate action with a separate name.** `partnerApplicationAcceptSchema` deliberately
+has no field naming an account, and its docblock says why: letting a reviewer name one would turn
+"accept this request" into "make an account of my choosing a partner". This feature IS that second
+action, so it does not get to wear the first one's label. It has its own permission
+(`PARTNER_ONBOARD`, super admin only), its own audit action (`partner.onboarded_in_person`) and its
+own timeline event, so «how did this partner get here» can never come back with an answer that fits
+both paths. The operator's reason note is REQUIRED and lands in `audit_log.reason`, because this
+path bypasses the queue that normally produces the request, the call log and the decision note.
+
+**What stops it being a way in — three mechanisms, each asserted directly in
+`partner-onboarding.integration.test.ts` and confirmed against the running database:**
+
+- The account is created with `password_hash` NULL, exactly as `staff.invited` leaves one.
+- Its role stays `customer`. `token.service.ts` only attaches `partnerId` to a token whose user is
+  already `partner`, and permissions come from the role — so the `partners` row grants the named
+  account nothing until the invitation is redeemed FROM the mailbox.
+- A staff address and an address that is already a partner are both refused, as «انضم كشريك»
+  refuses them. An address with an OPEN request is refused too: onboarding around it would leave a
+  request nobody will ever close, and the reviewer working that queue would telephone somebody who
+  was onboarded last week.
+
+**Residual exposure, stated rather than hidden.** A super admin can bind a partner record to a
+stranger's account, occupying `partners_user_unique` and putting a name in the registry. That is a
+super admin misusing a super-admin power in a fully audited way, and it is not an escalation —
+nothing about it yields a session. **Owner:** accepted risk.
+
+**The one thing a single sitting genuinely cannot finish: the partner's own signature.**
+`contract_signature_party = 'partner'` means "signed by hand and uploaded from their own account",
+and during the sitting that account has no password yet — by design, decision 1 above. So the
+contract reaches `awaiting_partner_signature` in the room and becomes `active` when the partner
+redeems their invitation and uploads their scan. Filing it for them from the console was considered
+and REJECTED: it would make that column say something untrue, which is the one thing a signature
+record cannot afford. Approval does not depend on it — the contract check is advisory, exactly like
+screening — so the partner still leaves approved and able to trade. **Unblocks:** nothing.
+**Owner:** product, if Bashar decides a co-present signature should be recordable as a third party
+value (e.g. `partner_via_staff`) rather than as the partner's own.
+
+**Two smaller notes:**
+
+- **`PartnerInvitationService` was extracted** out of `PartnerApplicationService`, because both
+  routes to a partner account now issue the same link and two copies of "how long is an invitation
+  valid" would drift without ever failing a test.
+- **The staff document upload is MULTIPART**, so it never reaches `body-parser` and `FILE_BODY_PATHS`
+  did not have to grow a prefix that would have given a 15MB JSON limit to a dozen `/admin/partners`
+  routes that should keep 100kb.
+
+**Verified:** `partner-onboarding.integration.test.ts` (18 tests), `e2e/partner-onboarding.spec.ts`
+(the whole walk in a browser, plus the refusal in Arabic and no sideways scroll at
+390/768/1024/1440), and a direct database read confirming `verification=approved`,
+`account_role=customer`, `password_hash IS NULL`, one document, one contract at
+`awaiting_partner_signature`, zero application rows.
+
+**Owner:** engineering. **Status:** complete, except the partner-signature decision above.
+
 ### O-partner-4 — Partner 2FA is mandatory and enforced; what remains is operational
 
 > **SUPERSEDED 2026-08-20 for partners — see `O-sec-9`.** Partners no longer enrol an
