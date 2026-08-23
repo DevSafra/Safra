@@ -28,6 +28,7 @@
 export const ERROR = {
   REQUEST_MALFORMED_BODY: 'request.malformed_body',
   REQUEST_VALIDATION_FAILED: 'request.validation_failed',
+  REQUEST_BODY_TOO_LARGE: 'request.body_too_large',
   REQUEST_CURSOR_INVALID: 'request.cursor_invalid',
   REQUEST_NOT_FOUND: 'request.not_found',
   REQUEST_UPSTREAM_UNREACHABLE: 'request.upstream_unreachable',
@@ -167,6 +168,8 @@ export const ERROR = {
   IMAGE_LAST_ONE: 'image.last_one',
   CONTRACT_NOT_FOUND: 'contract.not_found',
   CONTRACT_PDF_REQUIRED: 'contract.pdf_required',
+  CONTRACT_NOT_SIGNABLE: 'contract.not_signable',
+  CONTRACT_NOT_REOPENABLE: 'contract.not_reopenable',
   CONTRACT_NOT_AWAITING_SIGNATURE: 'contract.not_awaiting_signature',
   DISPUTE_NOT_FOUND: 'dispute.not_found',
   DISPUTE_ALREADY_CLOSED: 'dispute.already_closed',

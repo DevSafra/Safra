@@ -9,6 +9,7 @@
 export const en = {
   'request.malformed_body': 'Malformed request body.',
   'request.validation_failed': 'Validation failed.',
+  'request.body_too_large': 'That file is larger than the limit. Choose a smaller one.',
   'request.cursor_invalid': 'Malformed pagination cursor.',
   'request.not_found': 'Not found.',
   'request.upstream_unreachable': 'Could not reach the server. Please try again.',
@@ -96,6 +97,8 @@ export const en = {
   'image.not_found': 'Image not found.',
   'contract.not_found': 'Contract not found.',
   'contract.pdf_required': 'A contract must be a PDF of 10MB or less.',
+  'contract.not_signable': 'This contract cannot be signed in its current state.',
+  'contract.not_reopenable': 'Only a fully signed contract can be re-opened.',
   'contract.not_awaiting_signature': 'Only a contract awaiting signature can be signed.',
   'dispute.not_found': 'Dispute not found.',
   'dispute.already_closed': 'This dispute is already closed.',

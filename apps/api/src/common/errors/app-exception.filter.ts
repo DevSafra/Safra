@@ -132,6 +132,28 @@ export function isCapacityFailure(error: unknown): boolean {
   });
 }
 
+/**
+ * A body the parser refused to buffer.
+ *
+ * `body-parser` throws `PayloadTooLargeError` with `type: 'entity.too.large'` BEFORE any guard,
+ * pipe or handler runs, so nothing downstream can turn it into a sensible answer — it arrives here
+ * as an unhandled error and, until 2026-08-21, was answered 500 «حدث خطأ ما».
+ *
+ * That is a bad answer twice over. It tells the caller the platform broke when the platform worked
+ * exactly as configured, and it hides the one fact that would let them fix it: the file is too big.
+ * Bashar found it uploading a 400KB signed contract against a 100kb default nobody had noticed.
+ *
+ * Matched on `type` rather than on the message: the message is English prose from a dependency and
+ * would change under us, while the type is body-parser's own stable discriminator.
+ */
+export function isBodyTooLarge(error: unknown): boolean {
+  return chain(error).some((link) => {
+    if (typeof link !== 'object' || link === null) return false;
+
+    return (link as { type?: unknown }).type === 'entity.too.large';
+  });
+}
+
 @Catch()
 export class AppExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(AppExceptionFilter.name);
@@ -153,6 +175,23 @@ export class AppExceptionFilter implements ExceptionFilter {
 
     if (exception instanceof HttpException) {
       this.passThrough(exception, response);
+      return;
+    }
+
+    /*
+      Before the capacity check: an oversized body is a CLIENT problem with a precise remedy, and
+      answering it as a capacity failure would tell the caller to retry the very thing that cannot
+      succeed.
+    */
+    if (isBodyTooLarge(exception)) {
+      this.logger.warn(`Refused an oversized request body. ${describe(exception)}`);
+
+      response.status(HttpStatus.PAYLOAD_TOO_LARGE).json({
+        statusCode: HttpStatus.PAYLOAD_TOO_LARGE,
+        code: ERROR.REQUEST_BODY_TOO_LARGE,
+        message: 'Request body too large.',
+      });
+
       return;
     }
 

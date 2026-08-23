@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 
 import { AppModule } from './app.module.js';
+import { configureBodyParsers } from './common/http/body-parsers.js';
 import { API_PREFIX } from './config/constants.js';
 import { JsonLogger } from './common/logging/json.logger.js';
 import { requestIdMiddleware } from './common/logging/request-id.middleware.js';
@@ -58,6 +59,14 @@ async function bootstrap(): Promise<void> {
    * the guards, so this records rejections a Nest interceptor would never see.
    */
   app.use(requestLogMiddleware);
+
+  /**
+   * Both JSON body limits — see `body-parsers.ts` for why there are two and why the order matters.
+   *
+   * Before helmet and CORS on purpose: a body that is too large should be refused by the parser
+   * rather than travel through the rest of the stack first.
+   */
+  configureBodyParsers(app);
 
   app.use(helmet({ contentSecurityPolicy: env.NODE_ENV === 'production' }));
   app.use(cookieParser());

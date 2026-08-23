@@ -8,6 +8,7 @@
 export const ar = {
   'request.malformed_body': 'الطلب غير صالح.',
   'request.validation_failed': 'تحقق من الحقول المعلَّمة.',
+  'request.body_too_large': 'الملف أكبر من الحد المسموح. اختر ملفاً أصغر.',
   'request.cursor_invalid': 'تعذّر تحميل الصفحة التالية. أعد المحاولة من البداية.',
   'request.not_found': 'غير موجود.',
   'request.upstream_unreachable': 'تعذّر الوصول إلى الخادم. حاول مرة أخرى.',
@@ -93,6 +94,8 @@ export const ar = {
   'image.not_found': 'لم يُعثر على هذه الصورة.',
   'contract.not_found': 'لم يُعثر على هذا العقد.',
   'contract.pdf_required': 'يجب أن يكون العقد ملف PDF بحجم 10 ميغابايت أو أقل.',
+  'contract.not_signable': 'لا يمكن توقيع هذا العقد في حالته الحالية.',
+  'contract.not_reopenable': 'لا يمكن إعادة فتح هذا العقد إلا بعد توقيع الطرفين.',
   'contract.not_awaiting_signature': 'لا يمكن تسجيل التوقيع إلا على عقد بانتظار التوقيع.',
   'dispute.not_found': 'لم يُعثر على هذا النزاع.',
   'dispute.already_closed': 'هذا النزاع مغلق بالفعل.',

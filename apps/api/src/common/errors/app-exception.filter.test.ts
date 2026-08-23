@@ -4,7 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { ERROR } from '@safra/contracts';
 import { errorMessage } from '@safra/i18n';
 
-import { AppExceptionFilter, isCapacityFailure } from './app-exception.filter.js';
+import {
+  AppExceptionFilter,
+  isBodyTooLarge,
+  isCapacityFailure,
+} from './app-exception.filter.js';
 import { notFound } from './app-error.js';
 import { responseErrorCode } from '../logging/response-error-code.js';
 
@@ -128,6 +132,27 @@ describe('isCapacityFailure', () => {
   });
 });
 
+describe('isBodyTooLarge', () => {
+  it('recognises body-parser’s own discriminator', () => {
+    expect(
+      isBodyTooLarge(Object.assign(new Error('x'), { type: 'entity.too.large' })),
+    ).toBe(true);
+  });
+
+  /**
+   * Matched on `type`, not on the message — the message is English prose from a dependency and
+   * would change under us without any test noticing.
+   */
+  it('does not match on the wording alone', () => {
+    expect(isBodyTooLarge(new Error('request entity too large'))).toBe(false);
+  });
+
+  it('ignores an ordinary error', () => {
+    expect(isBodyTooLarge(new Error('something else'))).toBe(false);
+    expect(isBodyTooLarge(null)).toBe(false);
+  });
+});
+
 describe('AppExceptionFilter', () => {
   it('answers a pool timeout with 503 and a Retry-After', () => {
     const sent = run(new Error('timeout exceeded when trying to connect'));
@@ -163,6 +188,41 @@ describe('AppExceptionFilter', () => {
     );
 
     expect(values.size).toBeGreaterThan(1);
+  });
+
+  /**
+   * An oversized body is a 413 with a code, not a 500 (Bashar, 2026-08-21).
+   *
+   * `body-parser` throws before any guard, pipe or handler runs, so this filter is the only place
+   * that can answer it. It answered 500 «حدث خطأ ما», which told the caller the platform had broken
+   * when the platform had worked exactly as configured — and hid the one fact that would let them
+   * fix it. Found on a 400KB signed contract against a 100kb default nobody had noticed.
+   */
+  it('answers an oversized body with 413 and a code', () => {
+    const sent = run(
+      Object.assign(new Error('request entity too large'), {
+        type: 'entity.too.large',
+      }),
+    );
+
+    expect(sent.status).toBe(HttpStatus.PAYLOAD_TOO_LARGE);
+    expect(sent.body).toMatchObject({ code: ERROR.REQUEST_BODY_TOO_LARGE });
+  });
+
+  /**
+   * And it is NOT mistaken for a capacity failure.
+   *
+   * A capacity refusal carries `Retry-After` and means "try again shortly". Retrying an oversized
+   * body cannot ever succeed, so telling the caller to is worse than saying nothing.
+   */
+  it('does not treat an oversized body as a capacity failure', () => {
+    const sent = run(
+      Object.assign(new Error('request entity too large'), {
+        type: 'entity.too.large',
+      }),
+    );
+
+    expect(sent.headers['Retry-After']).toBeUndefined();
   });
 
   /** The second half of `O-api-1`: a 500 used to carry no code at all. */

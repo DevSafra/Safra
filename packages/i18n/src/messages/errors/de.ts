@@ -7,6 +7,8 @@
 export const de = {
   'request.malformed_body': 'Ungültige Anfrage.',
   'request.validation_failed': 'Bitte prüfen Sie die markierten Felder.',
+  'request.body_too_large':
+    'Diese Datei überschreitet das Limit. Wählen Sie eine kleinere.',
   'request.cursor_invalid':
     'Die nächste Seite konnte nicht geladen werden. Bitte von vorn beginnen.',
   'request.not_found': 'Nicht gefunden.',
@@ -113,6 +115,10 @@ export const de = {
   'image.not_found': 'Bild nicht gefunden.',
   'contract.not_found': 'Vertrag nicht gefunden.',
   'contract.pdf_required': 'Ein Vertrag muss eine PDF-Datei mit maximal 10 MB sein.',
+  'contract.not_signable':
+    'Dieser Vertrag kann in seinem aktuellen Zustand nicht unterzeichnet werden.',
+  'contract.not_reopenable':
+    'Nur ein vollständig unterzeichneter Vertrag kann wieder geöffnet werden.',
   'contract.not_awaiting_signature':
     'Nur ein Vertrag, der auf die Signatur wartet, kann als signiert markiert werden.',
   'dispute.not_found': 'Streitfall nicht gefunden.',
