@@ -111,7 +111,7 @@ export async function POST(request: Request): Promise<NextResponse> {
      */
     return NextResponse.json(
       {
-        code: ERROR.AUTH_NOT_STAFF,
+        code: ERROR.AUTH_STAFF_ACCOUNT,
       },
       { status: 403 },
     );

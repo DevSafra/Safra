@@ -89,7 +89,21 @@ export const ERROR = {
   AUTH_TOKEN_INVALID: 'auth.token_invalid',
   AUTH_SESSION_EXPIRED: 'auth.session_expired',
   AUTH_SESSION_MISSING: 'auth.session_missing',
+  /**
+   * The console: these credentials are good, but the account is not a STAFF account.
+   *
+   * Three sign-in routes rejected a wrong-audience login with this one code until 2026-08-23, and
+   * the single message could only be right for one of them. The console and the partner portal
+   * were both telling people «هذا حساب موظف، سجّل الدخول إلى مركز القيادة» — which was false about
+   * their account AND pointed at the app they were already standing in. Each route's own comment
+   * argues for being SPECIFIC here, because somebody who has just proved they hold the credentials
+   * learns nothing from the answer; specific and wrong is the failure that argument invites.
+   */
   AUTH_NOT_STAFF: 'auth.not_staff',
+  /** The partner portal: good credentials, but the account is not a partner account (yet). */
+  AUTH_NOT_PARTNER: 'auth.not_partner',
+  /** The customer site: good credentials, but this IS a staff account — the console is elsewhere. */
+  AUTH_STAFF_ACCOUNT: 'auth.staff_account',
   PERMISSION_DENIED: 'permission.denied',
   SCOPE_OUTSIDE: 'scope.outside',
   STAFF_NOT_FOUND: 'staff.not_found',

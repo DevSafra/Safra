@@ -50,7 +50,11 @@ export const de = {
   'auth.session_expired': 'Ihre Sitzung ist abgelaufen. Bitte erneut anmelden.',
   'auth.session_missing': 'Keine aktive Sitzung.',
   'auth.not_staff':
-    'Dies ist ein Mitarbeiterkonto. Bitte im SAFRA-Kommandozentrum anmelden.',
+    'Dies ist kein Mitarbeiterkonto und kann nicht für die Anmeldung im Kommandozentrum verwendet werden.',
+  'auth.not_partner':
+    'Dies ist noch kein Partnerkonto. Falls Sie eine Partner-Einladung per E-Mail erhalten haben, öffnen Sie zuerst deren Link, um das Konto zu aktivieren.',
+  'auth.staff_account':
+    'Dies ist ein Mitarbeiterkonto. Bitte melden Sie sich stattdessen im SAFRA-Kommandozentrum an.',
   'permission.denied': 'Sie haben keinen Zugriff auf diese Ressource.',
   'scope.outside': 'Dieser Datensatz liegt außerhalb Ihres zugewiesenen Bereichs.',
   'staff.not_found': 'Mitarbeiter nicht gefunden.',

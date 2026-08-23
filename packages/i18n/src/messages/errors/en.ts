@@ -41,7 +41,11 @@ export const en = {
   'auth.session_expired': 'Session expired. Please sign in again.',
   'auth.session_missing': 'No active session.',
   'auth.not_staff':
-    'This is a staff account. Sign in to the SAFRA command center instead.',
+    'This is not a staff account, so it cannot be used to sign in to the command centre.',
+  'auth.not_partner':
+    'This is not a partner account yet. If a partnership invitation was emailed to you, open its link to activate the account first.',
+  'auth.staff_account':
+    'This is a staff account. Sign in to the SAFRA command centre instead.',
   'permission.denied': 'You do not have access to this resource.',
   'scope.outside': 'This record is outside your assigned scope.',
   'staff.not_found': 'Staff member not found.',
