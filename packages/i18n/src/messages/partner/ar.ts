@@ -77,9 +77,58 @@ export const ar = {
     contractSigned: 'تاريخ التوقيع',
     contractExpires: 'ينتهي في',
     download: 'تنزيل العقد',
+    /*
+      Names WHICH copy, because after 2026-08-21 it is not always the same document: before SAFRA
+      signs there is nothing for the partner to fetch, and afterwards the link serves the copy
+      carrying SAFRA's signature — which is the one they must add theirs to.
+    */
+    downloadSigned: 'تنزيل العقد الموقّع من سفرة',
     signHint:
       'وقّع النسخة وأعدها إلى فريق سفرة. يسجّل الفريق التوقيع فيصبح العقد ساريًا — لا يمكنك تسجيله من هنا.',
 
+    /*
+      ── Returning the signed contract (Bashar, 2026-08-21) ──────────────────────────────────
+      Signing is on PAPER: electronic signatures are not accepted in Syria. So the partner's task
+      is three physical verbs — download, sign, upload — and the copy says them in that order,
+      because a partner reading this on a phone needs to know a printer is involved before they
+      start.
+    */
+    signTitle: 'وقّع العقد وأعده',
+    signSteps:
+      'نزّل النسخة الموقّعة من سفرة، اطبعها ووقّعها بخط اليد، ثم ارفعها هنا لتعود إلى سفرة. يصبح العقد سارياً فور وصولها.',
+    signUpload: 'ارفع النسخة الموقّعة',
+    signUploading: 'جارٍ الإرسال…',
+    signFile: 'النسخة الموقّعة (PDF)',
+    signFailed: 'تعذّر رفع النسخة الموقّعة. تأكد أنها ملف PDF وحاول مرة أخرى.',
+    signTooLarge: 'الملف أكبر من الحد المسموح (10 ميغابايت). اختر ملفاً أصغر.',
+    signDone: 'وصلت نسختك الموقّعة، والعقد ساري المفعول.',
+
+    /*
+      ── سجل العقد (Bashar, 2026-08-23) ───────────────────────────────────────────────────────
+      SAFRA can replace their signed copy on a contract that already exists. When they replace one
+      the partner has SIGNED, that signature is superseded and the contract goes back to the
+      partner's step — and until this, the partner saw none of it: the same card, quietly back to
+      «بانتظار توقيعك».
+
+      So the history says what happened, in the partner's own words: who sent what, when, and which
+      copy is the one that counts now. «مُستبدلة» is the same word the status pill uses for a
+      superseded contract, because it is the same idea and a second word for it would read as a
+      second thing.
+    */
+    historyTitle: 'سجل العقد',
+    historySafra: 'أرسلت سفرة نسخة موقّعة',
+    historyPartner: 'أرسلتَ نسختك الموقّعة',
+    historyCurrent: 'الحالية',
+    historySuperseded: 'مُستبدلة',
+    /*
+      Shown only when the partner's OWN signature was superseded and it is their turn again — the
+      one case where something they did was undone by somebody else. It says why the form is back
+      rather than leaving them to conclude their upload failed.
+    */
+    historyReplaced:
+      'أرسلت سفرة نسخة جديدة من العقد، لذلك لم يعد توقيعك السابق سارياً. نزّل النسخة الجديدة، وقّعها بخط اليد، ثم ارفعها من جديد.',
+    signWaitingSafra:
+      'بانتظار توقيع سفرة. سيصلك إشعار على بريدك حين يصبح جاهزاً لتوقيعك.',
     documentsTitle: 'مستندات التحقق',
     documentsIntro: 'ارفع المستندات التي يحتاجها فريق سفرة للتحقق من نشاطك.',
     documentsEmpty: 'لم ترفع أي مستند بعد.',
@@ -169,7 +218,6 @@ export const ar = {
     /** Stage four: done. */
     stageDoneTitle: 'اكتمل التحقق',
     stageDoneBody: 'حسابك جاهز. لوحة الشريك متاحة الآن بكل أقسامها.',
-    stageDoneCta: 'انتقل إلى لوحة التحكم',
 
     /** What SAFRA asks for, listed where it is asked for rather than in an email. */
     neededTitle: 'ما نحتاجه منك',
@@ -189,8 +237,13 @@ export const ar = {
     neededNote: 'صور واضحة أو ملفات PDF. الحد الأقصى {max} ميغابايت للملف.',
 
     /** The counter above the list — a number a person can check against what they sent. */
+    /*
+      Counted in KINDS, not rows. `partner_documents` is append-only, so a replaced rejection
+      leaves its old row behind — a line counting rows says «1 يحتاج إعادة إرسال» about a document
+      that was replaced and approved days ago (Bashar, 2026-08-21).
+    */
     countSent:
-      'أرسلت {sent} من المستندات · {approved} معتمد · {rejected} يحتاج إعادة إرسال',
+      'أرسلت {sent} من {total} مستندات · {approved} معتمد · {rejected} يحتاج إعادة إرسال',
     lockedNote: 'تظهر بقية أقسام اللوحة بعد اعتماد حسابك.',
   },
 

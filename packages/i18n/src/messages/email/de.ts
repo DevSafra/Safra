@@ -52,6 +52,21 @@ export const de = {
     renewal: 'Jahresverlängerung',
   } as Record<string, string>,
 
+  partnerApproved: {
+    subject: 'Ihr SAFRA-Konto ist freigegeben — {reference}',
+    body: 'Herzlichen Glückwunsch — Ihr Konto wurde geprüft und Sie sind nun freigegebener SAFRA-Partner.\n\nDas Partnerportal steht Ihnen vollständig offen: Sie können Einheiten, Preise, Verfügbarkeiten und Fotos hinterlegen und Ihre Inserate zur Prüfung einreichen.\n\nPartnerportal öffnen:\n{url}\n\nIhr SAFRA-Team',
+  },
+
+  partnerContractAwaitingSignature: {
+    subject: 'Ihr Partnervertrag liegt zur Unterschrift bereit — {reference}',
+    body: 'SAFRA hat den Partnervertrag unterzeichnet und Ihnen zugesandt.\n\nÖffnen Sie «العقود والمستندات» im Partnerportal, laden Sie den Vertrag herunter, unterschreiben Sie ihn handschriftlich und laden Sie die unterschriebene Fassung auf derselben Seite wieder hoch.\n\n{url}\n\nDer Vertrag tritt in Kraft, sobald Ihre unterschriebene Fassung eingegangen ist.\n\nIhr SAFRA-Team',
+  },
+
+  partnerContractReturned: {
+    subject: 'Partner hat den Vertrag unterschrieben zurückgesandt — {reference}',
+    body: 'Der Partner {displayName} ({reference}) hat den Partnervertrag handschriftlich unterschrieben zurückgesandt; er ist nun in Kraft.\n\nPartner öffnen und die unterschriebene Fassung prüfen:\n{url}\n\nSAFRA-Konsole',
+  },
+
   partnerDocumentsComplete: {
     subject: 'Partnerdokumente zur Prüfung — {reference}',
     body: 'Der Partner {displayName} ({reference}) hat alle erforderlichen Dokumente eingereicht; sie warten auf Prüfung.\n\nEingereichte Dokumente: {documentCount}\n\nPartner öffnen und prüfen:\n{url}\n\nSAFRA-Konsole',

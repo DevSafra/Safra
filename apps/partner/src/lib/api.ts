@@ -565,6 +565,18 @@ export async function getPropertyImages(reference: string) {
  * who filed it is SAFRA's business, not the partner's — a schema that accepted either would make a
  * leak upstream invisible here rather than loud.
  */
+/**
+ * One entry in a contract's version history: which side sent a copy, when, and whether it stands.
+ *
+ * Deliberately three fields. The API has the uploader, their IP and the file hash next to these in
+ * the same row and sends none of them — see `PartnerContractReadService.list`.
+ */
+const contractHistorySchema = z.object({
+  party: z.string(),
+  at: z.string(),
+  superseded: z.boolean(),
+});
+
 const partnerContractSchema = z.object({
   id: z.string(),
   kind: z.string(),
@@ -574,7 +586,12 @@ const partnerContractSchema = z.object({
   uploadedAt: z.string(),
   signedAt: z.string().nullable(),
   expiresAt: z.string().nullable(),
+  /* Defaulted, so a server that has not been redeployed yet renders a card without a history
+     rather than failing the whole list to a «تعذّر» screen. */
+  history: z.array(contractHistorySchema).default([]),
 });
+
+export type PartnerContractEvent = z.infer<typeof contractHistorySchema>;
 
 export type PartnerContract = z.infer<typeof partnerContractSchema>;
 

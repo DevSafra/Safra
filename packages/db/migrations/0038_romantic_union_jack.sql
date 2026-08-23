@@ -1,0 +1,3 @@
+ALTER TABLE "partner_contract_signatures" DROP CONSTRAINT "partner_contract_signatures_one_per_party";--> statement-breakpoint
+ALTER TABLE "partner_contract_signatures" ADD COLUMN "superseded_at" timestamp with time zone;--> statement-breakpoint
+CREATE UNIQUE INDEX "partner_contract_signatures_one_live_per_party" ON "partner_contract_signatures" USING btree ("contract_id","party") WHERE superseded_at IS NULL;

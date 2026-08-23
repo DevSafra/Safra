@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 
-import { getPartner, getSanctionsStatus } from '@/lib/api';
+import { getContracts, getPartner, getSanctionsStatus } from '@/lib/api';
 import { Ltr, StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
 import { DocumentReview } from '@/components/document-review';
 import { ScreeningPanel } from '@/components/screening-panel';
 import { DEFAULT_SANCTIONS_POLICY } from '@safra/contracts';
 
+import { PartnerContractPanel } from '@/components/partner-contract-panel';
 import { VerifyPartner } from '@/components/verify-partner';
 import { PartnerTwoFactor } from '@/components/partner-two-factor';
 import { BackLink, type BackTarget } from '@/components/back-link';
@@ -44,9 +45,10 @@ export default async function PartnerPage({
    * The list's health is fetched alongside the partner, so the screening panel can
    * explain a refusal before the reviewer triggers it rather than after.
    */
-  const [partner, listStatus] = await Promise.all([
+  const [partner, listStatus, contracts] = await Promise.all([
     getPartner(reference),
     getSanctionsStatus(),
+    getContracts(reference),
   ]);
 
   if (partner === 'unauthenticated') {
@@ -129,6 +131,23 @@ export default async function PartnerPage({
         )}
       </Section>
 
+      {/* ── The contract (Bashar, 2026-08-21) ─────────────────────────────── */}
+      <Section title={t.sections.partnerContract.title}>
+        <PartnerContractPanel
+          partnerReference={partner.reference}
+          /*
+            An empty list on a failed read, not a hidden panel. The panel's own copy explains what
+            to do next, and hiding it would make a transient API failure look like a partner who
+            is not yet at the contract stage.
+          */
+          contracts={
+            contracts === 'failed' || contracts === 'unauthenticated'
+              ? []
+              : contracts.contracts
+          }
+        />
+      </Section>
+
       {/* ── Sanctions screening (ADR 0002) ────────────────────────────────── */}
       <Section title={t.sections.partnerDetail.sanctionsScreening}>
         <ScreeningPanel
@@ -182,6 +201,11 @@ export default async function PartnerPage({
           <VerifyPartner
             reference={partner.reference}
             screened={screened}
+            contractActive={
+              contracts !== 'failed' &&
+              contracts !== 'unauthenticated' &&
+              contracts.contracts.some((contract) => contract.status === 'active')
+            }
             /* Falls back to the contract default when the status read failed — same direction
                as the API, so a blip cannot make the screen stricter than the server. */
             policy={

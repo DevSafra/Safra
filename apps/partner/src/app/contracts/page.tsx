@@ -1,5 +1,3 @@
-import Link from 'next/link';
-
 import { PARTNER_DOCUMENT_KINDS } from '@safra/contracts';
 import { statusTone } from '@safra/ui';
 
@@ -15,6 +13,7 @@ import { isLocked } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { count } from '@/lib/format';
+import { ContractSigning } from '@/components/contract-signing';
 import { DocumentUpload } from '@/components/document-upload';
 import { TONES } from '@/lib/tones';
 import {
@@ -49,11 +48,13 @@ import {
  * A partner who has done one and not the other is stuck, and two screens make that easy to not
  * notice.
  *
- * ## Signing is offline, and the screen says so
+ * ## Signing is on PAPER, and the return trip happens here
  *
- * There is no "I have signed this" button, because a partner asserting their own signature is not
- * a signature. They download it, sign it, return it, and SAFRA records that — which is the
- * `awaiting_partner_signature → active` transition on the staff side.
+ * There is still no "I have signed this" button — a partner asserting their own signature is not a
+ * signature, and electronic signatures are not accepted in Syria in any case (Bashar, 2026-08-21).
+ * What changed is where the paper goes: the partner downloads the contract, signs it by hand,
+ * scans it, and uploads the scan on this screen. That upload is what makes the contract `active`
+ * and what tells the super admins, rather than a staff member recording it by hand afterwards.
  *
  * ## The banner is the same fact the API enforces
  *
@@ -107,40 +108,56 @@ export default async function ContractsPage() {
       : profile.verification;
 
   const documents = documentsResult.documents;
-  const approved = documents.filter((d) => d.status === 'approved').length;
-  const rejected = documents.filter((d) => d.status === 'rejected').length;
 
   /*
-    Which KINDS have arrived and not been sent back. `documents` is newest-first, so the first row
-    for a kind is the one that describes where it stands — a replaced passport leaves two.
-  */
-  const settled = new Set(
-    PARTNER_DOCUMENT_KINDS.filter((kind) => {
-      const newest = documents.find((document) => document.kind === kind);
+    Everything on this screen is about KINDS, not about rows.
 
-      return newest !== undefined && newest.status !== 'rejected';
-    }),
+    `partner_documents` is append-only: replacing a rejected passport adds a row and leaves the
+    rejected one where it was. So the state of a kind is the state of its NEWEST row — the list
+    arrives `ORDER BY created_at DESC`, so that is the first match — and any count taken over rows
+    describes history rather than the present.
+
+    That distinction is the bug Bashar reported on 2026-08-21: the stage was chosen by
+    `documents.filter(d => d.status === 'rejected').length > 0`, which counts rows. Once ANY
+    document had ever been rejected the partner was told «مستند يحتاج إعادة إرسال» for ever — after
+    they had replaced it, and after a reviewer had approved the replacement. The panel described a
+    row nobody could act on, on a screen whose only job is to say what to do next.
+  */
+  const newestByKind = new Map(
+    PARTNER_DOCUMENT_KINDS.map((kind) => [
+      kind,
+      documents.find((document) => document.kind === kind),
+    ]),
   );
+
+  const states = [...newestByKind.values()];
+
+  /** Sent and not sent back — the kind needs nothing further. */
+  const settled = states.filter(
+    (newest) => newest !== undefined && newest.status !== 'rejected',
+  ).length;
+  const approved = states.filter((newest) => newest?.status === 'approved').length;
+  /** The kind's LATEST attempt was rejected, so this one is the partner's to act on. */
+  const needsResend = states.filter((newest) => newest?.status === 'rejected').length;
+  const sentKinds = states.filter((newest) => newest !== undefined).length;
 
   /*
     The stage, in the order a partner meets it.
 
-    `rejected` outranks `waiting` on purpose: a partner with two documents under review and one
-    sent back has something to DO, and «لا حاجة لأي إجراء منك الآن» would be false for exactly the
+    `fix` outranks `waiting` on purpose: a partner with two documents under review and one sent
+    back has something to DO, and «لا حاجة لأي إجراء منك الآن» would be false for exactly the
     person who needs to act.
 
-    `partial` exists because all five kinds became required on 2026-08-21. Counting ROWS rather
-    than kinds would call a partner who sent two of five "waiting", which is the same false
-    reassurance one step earlier.
+    `partial` exists because all five kinds became required on 2026-08-21.
   */
   const stage: Stage =
     verification === 'approved'
       ? 'done'
-      : rejected > 0 || verification === 'rejected'
+      : needsResend > 0 || verification === 'rejected'
         ? 'fix'
         : documents.length === 0
           ? 'empty'
-          : settled.size < PARTNER_DOCUMENT_KINDS.length
+          : settled < PARTNER_DOCUMENT_KINDS.length
             ? 'partial'
             : 'waiting';
 
@@ -188,9 +205,10 @@ export default async function ContractsPage() {
           </h2>
           <p className="mb-3 text-[12px] text-faint">
             {fill(t.contracts.countSent, {
-              sent: documents.length,
+              sent: sentKinds,
+              total: PARTNER_DOCUMENT_KINDS.length,
               approved,
-              rejected,
+              rejected: needsResend,
             })}
           </p>
 
@@ -311,18 +329,13 @@ function StagePanel({ stage }: { readonly stage: Stage }) {
       ) : null}
 
       {/*
-        The way out, on the panel that announces it. A partner told «اكتمل التحقق» and left on the
-        page they have been staring at for days has to work out for themselves that the sidebar
-        just grew five links.
+        No call to action on the finished panel (Bashar, 2026-08-21).
+
+        There was one — «انتقل إلى لوحة التحكم» — on the reasoning that a partner left on this page
+        might not notice the sidebar had just grown five links. Removed at Bashar's request: the
+        sidebar unlocks the moment verification lands, «لوحة التحكم» is its first item, and a button
+        that duplicates a nav link is a second thing to keep pointing at the right place.
       */}
-      {stage === 'done' ? (
-        <Link
-          href="/"
-          className="mt-3 inline-flex min-h-10 w-fit items-center rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 text-[12.5px] font-extrabold text-[#241A05] lg:min-h-0 lg:py-2"
-        >
-          {t.contracts.stageDoneCta}
-        </Link>
-      ) : null}
     </section>
   );
 }
@@ -393,13 +406,110 @@ function ContractCard({ contract }: { readonly contract: PartnerContract }) {
         href={`/api/contracts/${encodeURIComponent(contract.id)}/file`}
         className="inline-flex min-h-10 w-fit items-center rounded-lg border border-gold px-4 text-[12.5px] text-gold transition-colors hover:bg-gold hover:text-bg lg:min-h-0 lg:py-2"
       >
-        {t.contracts.download}
+        {/* Names which copy: after SAFRA signs, this link serves the document carrying that
+            signature rather than the blank original the partner was previously given. */}
+        {contract.status === 'draft' ? t.contracts.download : t.contracts.downloadSigned}
       </a>
 
-      {contract.status === 'awaiting_partner_signature' ? (
-        <p className="text-[11.5px] leading-relaxed text-faint">{t.contracts.signHint}</p>
-      ) : null}
+      {/*
+        The signing panel replaces the old «وقّع النسخة وأعدها إلى فريق سفرة» note.
+
+        That note described a process the platform did not carry — the partner was told to return
+        the paper by some other means, and staff recorded it by hand. The paper is the same; what
+        changed is that the return trip now happens here, so the note became the form.
+      */}
+      <ContractSigning contractId={contract.id} status={contract.status} />
+
+      {/*
+        The version history, DIRECTLY under the form (Bashar, 2026-08-23).
+
+        Under it rather than above because the form is the thing to act on; the history is why the
+        form says what it says. A partner who has just been sent a replacement reads the form first
+        and the reason second.
+      */}
+      <ContractHistory contract={contract} />
     </li>
+  );
+}
+
+/**
+ * What happened to this contract, in order (Bashar, 2026-08-23).
+ *
+ * ## The case it exists for
+ *
+ * SAFRA can replace their signed copy after the partner has already signed. That supersedes the
+ * partner's signature and returns the contract to their step — and without this the partner saw
+ * nothing: the same single card, quietly back to «بانتظار توقيعك», with no statement that anything
+ * had changed or that their own signature no longer stood. Somebody re-signing a document they
+ * believe they already signed, with no explanation on the screen, is the failure this closes.
+ *
+ * ## It renders nothing when there is nothing to say
+ *
+ * A contract with one copy on it has no history worth a heading — the card's own date already says
+ * when it arrived. The block appears from the second event onward, which is exactly when the
+ * single date stops being the whole story.
+ */
+function ContractHistory({ contract }: { readonly contract: PartnerContract }) {
+  /* Newest first, ordered by the query — the copy being acted on is the one at the top. */
+  if (contract.history.length < 2) return null;
+
+  /*
+    Was something the PARTNER did undone, and is it their turn again? That pair is the only case
+    where the screen owes an explanation rather than a record: their own signature was superseded
+    by the other side. A superseded SAFRA copy is ordinary — it is SAFRA correcting SAFRA.
+  */
+  const theirSignatureWasUndone =
+    contract.status === 'awaiting_partner_signature' &&
+    contract.history.some((event) => event.party === 'partner' && event.superseded);
+
+  return (
+    <div className="grid gap-1.5 rounded-lg border border-line2 bg-field px-3 py-2.5">
+      <p className="text-[11.5px] font-bold text-text2">{t.contracts.historyTitle}</p>
+
+      {theirSignatureWasUndone ? (
+        <p className="text-[11.5px] leading-relaxed text-gold">
+          {t.contracts.historyReplaced}
+        </p>
+      ) : null}
+
+      <ol className="grid gap-1">
+        {contract.history.map((event, index) => (
+          <li
+            /* Index: these have no id of their own, and the list is server-ordered and static. */
+            key={index}
+            className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px]"
+          >
+            <span className={event.superseded ? 'text-faint' : 'text-text2'}>
+              {event.party === 'partner'
+                ? t.contracts.historyPartner
+                : t.contracts.historySafra}
+            </span>
+            <span className="text-faint2">
+              {/* Already a day — the API cuts it, so neither screen has to. */}
+              <Ltr>{event.at}</Ltr>
+            </span>
+            {/*
+              «مُستبدلة» borrows the SUPERSEDED status tone on purpose — same idea, same colour,
+              which is rule 1 («a status is the same colour everywhere»).
+
+              «الحالية» is `teal` for rule 2. This screen already paints ok, warn, slate and stone
+              from the contract vocabulary and gold, lime, bad and sky from the document one; `ok`
+              would have put «الحالية» in the same green as «ساري المفعول» two lines above it, and
+              two different meanings in one colour on one screen is exactly what that rule forbids.
+            */}
+            <span
+              className={`rounded-full border px-2 py-0.5 text-[10.5px] font-bold ${
+                event.superseded ? TONES[statusTone('superseded')] : TONES.teal
+              }`}
+            >
+              {event.superseded
+                ? t.contracts.historySuperseded
+                : t.contracts.historyCurrent}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 

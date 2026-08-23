@@ -287,6 +287,95 @@ export function partnerInvitationMail(input: {
  * authenticated, permissioned and audited on every view. That is the whole design: the email is a
  * pointer, never a copy.
  */
+/**
+ * SAFRA has signed; the partner's copy is waiting (Bashar, 2026-08-21).
+ *
+ * Step 4 of «انضم كشريك», and the first half of a two-message exchange: this one goes OUT when
+ * staff upload their hand-signed copy, and `partnerContractReturnedMail` comes back when the
+ * partner uploads theirs.
+ *
+ * ## It says what to physically do
+ *
+ * Signing is on paper — electronic signatures are not accepted in Syria — so "your contract is
+ * ready" is not enough of an instruction. Download, sign by hand, upload again: three verbs, in
+ * the order they happen, because a partner who reads this on a phone at night needs to know
+ * whether a printer is involved.
+ *
+ * Carries a URL into the portal and nothing else. The contract is not attached: it is a document
+ * the partner is authenticated to fetch, and an email attachment is a copy nobody can revoke.
+ */
+/**
+ * Verification is complete and the portal is open (Bashar, 2026-08-21).
+ *
+ * The last message of «انضم كشريك» and the first one a partner reads as an approved partner. It
+ * therefore says what is now POSSIBLE — units, prices, availability, photographs, submitting a
+ * listing — rather than only that a status changed. A partner who is told "you are approved" and
+ * left to discover what that unlocked will open a support ticket to ask.
+ *
+ * Sent on the `approve` decision only. A rejection has its own conversation, and a partner told
+ * "the outcome is recorded" by an automated message would be worse than being telephoned.
+ */
+export function partnerApprovedMail(input: {
+  to: string;
+  reference: string;
+  url: string;
+  locale: string;
+}): OutgoingMail {
+  const messages = emailMessages(resolveLocale(input.locale));
+  const copy = messages.partnerApproved;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { reference: input.reference }),
+    text: fill(copy.body, { url: input.url }),
+  };
+}
+
+export function partnerContractAwaitingSignatureMail(input: {
+  to: string;
+  reference: string;
+  url: string;
+  locale: string;
+}): OutgoingMail {
+  const messages = emailMessages(resolveLocale(input.locale));
+  const copy = messages.partnerContractAwaitingSignature;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { reference: input.reference }),
+    text: fill(copy.body, { url: input.url }),
+  };
+}
+
+/**
+ * The partner has signed and returned it; the contract is in force.
+ *
+ * To STAFF, so the reference and the console URL are safe to carry, and the partner is spoken of
+ * in the third person. Sent to every active super admin, the same recipients and the same
+ * reasoning as `partnerDocumentsCompleteMail`: this is the message that says the last thing
+ * standing before approval is done.
+ */
+export function partnerContractReturnedMail(input: {
+  to: string;
+  reference: string;
+  displayName: string;
+  url: string;
+  locale: string;
+}): OutgoingMail {
+  const messages = emailMessages(resolveLocale(input.locale));
+  const copy = messages.partnerContractReturned;
+
+  return {
+    to: input.to,
+    subject: fill(copy.subject, { reference: input.reference }),
+    text: fill(copy.body, {
+      reference: input.reference,
+      displayName: input.displayName,
+      url: input.url,
+    }),
+  };
+}
+
 export function partnerDocumentsCompleteMail(input: {
   to: string;
   reference: string;

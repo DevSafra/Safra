@@ -20,10 +20,19 @@ import { t } from '@/lib/strings';
 export function VerifyPartner({
   reference,
   screened,
+  contractActive,
   policy,
 }: {
   reference: string;
   screened: boolean;
+  /**
+   * Whether a contract signed by BOTH parties is in force (Bashar, 2026-08-21).
+   *
+   * Advisory, exactly like the sanctions policy and for the same reason: the approval order is
+   * generate → sign → countersign → approve, but a missing contract must not strand onboarding
+   * the way the sanctions feed once did. The reviewer is told and the button works.
+   */
+  contractActive: boolean;
   /**
    * How hard sanctions screening bites (Bashar, 2026-08-21).
    *
@@ -80,6 +89,13 @@ export function VerifyPartner({
         screening is not offered at all there, so "no screening recorded" is not a fact anybody
         can act on and reads as an accusation about a control that was switched off deliberately.
       */}
+      {/* Said before the screening note: a contract is the step that comes last. */}
+      {!contractActive ? (
+        <p className="mb-3 rounded border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-gold">
+          {t.sections.partnerContract.notSignedYet}
+        </p>
+      ) : null}
+
       {!screened && policy !== 'off' ? (
         <p className="mb-3 rounded border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-gold">
           {policy === 'required'

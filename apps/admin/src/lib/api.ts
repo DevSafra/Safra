@@ -1054,6 +1054,31 @@ export async function getPartnerApplication(reference: string) {
   );
 }
 
+// ─── تسجيل شريك جديد — the in-person onboarding form's choices ────────────────
+
+/**
+ * The business kinds the onboarding form offers.
+ *
+ * Read from the PUBLIC `/partner-types` route rather than a console-only one, deliberately: it is
+ * the same list «انضم كشريك» offers, and a second endpoint would be a second answer to "which
+ * kinds exist" that could disagree with the form the public fills in. `staffFetch` attaches a
+ * token the route does not require, which costs nothing.
+ *
+ * The `id` is absent by design at the source — the form sends a CODE and the server resolves it.
+ */
+const partnerTypeSchema = z.object({
+  code: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string(),
+  nameDe: z.string(),
+});
+
+export type PartnerType = z.infer<typeof partnerTypeSchema>;
+
+export async function getPartnerTypes() {
+  return staffFetch('/partner-types', z.array(partnerTypeSchema));
+}
+
 // ─── §8 disputes, conversations, comms and advertising ────────────────────────
 
 const disputeItemSchema = z.object({
@@ -1220,6 +1245,20 @@ export async function getCampaigns(params: ListParams) {
   return staffFetch(`/admin/ad-campaigns${listQuery(params)}`, campaignsSchema);
 }
 
+/**
+ * One copy either side sent, newest first — the same three fields the partner portal shows.
+ *
+ * Bashar asked for the same list on both screens (2026-08-23), so this deliberately does NOT carry
+ * more than the partner's does. "Which staff member uploaded this" is a question سجل التدقيق
+ * answers, with the actor, the time and the payload; duplicating a thinner version of it beside the
+ * upload form would be a second source for the same fact.
+ */
+const contractHistorySchema = z.object({
+  party: z.string(),
+  at: z.string(),
+  superseded: z.boolean(),
+});
+
 const contractSchema = z.object({
   id: z.string(),
   partnerReference: z.string(),
@@ -1233,7 +1272,12 @@ const contractSchema = z.object({
   signedAt: z.string().nullable(),
   expiresAt: z.string().nullable(),
   daysToExpiry: z.number().nullable(),
+  /* Defaulted so an API that has not been redeployed renders a panel without a history rather
+     than failing the whole partner screen. */
+  history: z.array(contractHistorySchema).default([]),
 });
+
+export type ContractHistoryEntry = z.infer<typeof contractHistorySchema>;
 
 export type ContractItem = z.infer<typeof contractSchema>;
 

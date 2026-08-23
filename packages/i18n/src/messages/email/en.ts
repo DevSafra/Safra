@@ -52,6 +52,21 @@ export const en = {
     renewal: 'annual renewal',
   } as Record<string, string>,
 
+  partnerApproved: {
+    subject: 'Your SAFRA account is approved — {reference}',
+    body: 'Congratulations — your account has been verified and you are now an approved SAFRA partner.\n\nThe partner portal is open in full: you can add units, prices, availability and photographs, and submit your listings for review before they are published.\n\nOpen the partner portal:\n{url}\n\nThe SAFRA team',
+  },
+
+  partnerContractAwaitingSignature: {
+    subject: 'Your partnership agreement is ready to sign — {reference}',
+    body: 'SAFRA has signed the partnership agreement and sent it to you.\n\nOpen «العقود والمستندات» in the partner portal, download the contract, sign it by hand, then upload the signed copy from the same page.\n\n{url}\n\nThe agreement takes effect once your signed copy arrives.\n\nThe SAFRA team',
+  },
+
+  partnerContractReturned: {
+    subject: 'Partner returned a signed contract — {reference}',
+    body: 'The partner {displayName} ({reference}) has returned the partnership agreement signed by hand, and it is now in force.\n\nOpen the partner to review the signed copy and continue:\n{url}\n\nSAFRA console',
+  },
+
   partnerDocumentsComplete: {
     subject: 'Partner documents awaiting review — {reference}',
     body: 'The partner {displayName} ({reference}) has sent every required document, and they are waiting to be reviewed.\n\nDocuments sent: {documentCount}\n\nOpen the partner to review them:\n{url}\n\nSAFRA console',

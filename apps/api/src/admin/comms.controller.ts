@@ -1,9 +1,22 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 
-import { PERMISSIONS as P, pageQuerySchema } from '@safra/contracts';
+import { ERROR, PERMISSIONS as P, pageQuerySchema } from '@safra/contracts';
 
+import { AuditExempt } from '../common/audit/audit.interceptor.js';
+import { notFound } from '../common/errors/app-error.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -24,7 +37,11 @@ import {
 } from './advertising.service.js';
 import {
   PartnerContractService,
+  generateContractSchema,
+  signedCopySchema,
   uploadContractSchema,
+  type GenerateContractInput,
+  type SignedCopyInput,
   type UploadContractInput,
 } from './partner-contract.service.js';
 import { NOTIFICATION_TEMPLATES } from './notification-templates.js';
@@ -231,6 +248,104 @@ export class CommsController {
     @Body(new ZodValidationPipe(uploadContractSchema)) body: UploadContractInput,
   ) {
     return { contracts: await this.contracts.upload(user, body) };
+  }
+
+  /**
+   * Generates the partnership agreement from SAFRA's template (Bashar, 2026-08-21).
+   *
+   * Step 4 of «انضم كشريك». The document is produced, hashed and stored as a `draft`; nobody has
+   * signed anything yet. Throttled well below the upload endpoint because each call renders a PDF
+   * in a headless browser, which is expensive in a way a JSON write is not.
+   */
+  @Post('partner-contracts/generate')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @RequirePermissions(P.PARTNER_CONTRACT_MANAGE)
+  async generateContract(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(generateContractSchema)) body: GenerateContractInput,
+  ) {
+    return {
+      contracts: await this.contracts.generate(user, body.partnerReference, body.kind),
+    };
+  }
+
+  /**
+   * SAFRA's hand-signed copy, which is what SENDS the contract to the partner.
+   *
+   * Electronic signatures are not accepted in Syria (Bashar, 2026-08-21), so signing is on paper:
+   * staff download the generated PDF, sign it, scan it and upload it here. That upload moves the
+   * contract to `awaiting_partner_signature` and emails the partner.
+   */
+  @Post('partner-contracts/:id/signed-copy')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @RequirePermissions(P.PARTNER_CONTRACT_MANAGE)
+  async uploadSafraSignedCopy(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(signedCopySchema)) body: SignedCopyInput,
+    @Req() request: { ip?: string; headers: Record<string, unknown> },
+  ) {
+    return {
+      contracts: await this.contracts.uploadSafraSignedCopy(user, id, body, {
+        ipAddress: request.ip,
+        userAgent:
+          typeof request.headers['user-agent'] === 'string'
+            ? request.headers['user-agent']
+            : undefined,
+      }),
+    };
+  }
+
+  /**
+   * The contract file itself — needed because staff must print it to sign it.
+   *
+   * `attachment` and `nosniff`, exactly as the partner's download does: `inline` would render a
+   * commercial agreement inside the console's own origin, and a PDF viewer is a scripting surface.
+   */
+  @Get('partner-contracts/:id/file/:party')
+  @RequirePermissions(P.PARTNER_CONTRACT_READ)
+  @AuditExempt('PartnerContractService records partner_contract.viewed.')
+  async downloadContract(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('id') id: string,
+    @Param('party') party: string,
+    @Res() response: Response,
+  ) {
+    /*
+      An unknown party names no file, so it is answered as one that does not exist rather than as
+      a bad request. That also keeps the three-value list in one place: the service refuses
+      anything else too, and this is the same refusal made cheap.
+    */
+    if (party !== 'original' && party !== 'safra' && party !== 'partner') {
+      throw notFound(ERROR.CONTRACT_NOT_FOUND);
+    }
+
+    const file = await this.contracts.readFile(user, id, party);
+
+    response.setHeader('Content-Type', 'application/pdf');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.fileName.replace(/[^\w.-]/g, '_')}"`,
+    );
+    response.send(file.body);
+  }
+
+  /**
+   * Hands the signing step back to the partner (Bashar, 2026-08-21).
+   *
+   * For when the partner uploaded the wrong scan and the two of them have spoken. Their first
+   * attempt is superseded rather than removed, the contract returns to
+   * `awaiting_partner_signature`, and they are emailed again.
+   */
+  @Post('partner-contracts/:id/reopen')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @RequirePermissions(P.PARTNER_CONTRACT_MANAGE)
+  async reopenContract(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('id') id: string,
+  ) {
+    return { contracts: await this.contracts.reopenForPartner(user, id) };
   }
 
   /** Records the partner's signature, which is what makes a contract `active`. */

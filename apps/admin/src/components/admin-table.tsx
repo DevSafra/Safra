@@ -227,6 +227,33 @@ export function StatusPill({ tone, children }: { tone: Tone; children: ReactNode
   );
 }
 
+/**
+ * A pill that is NOT a status, and the distinction is load-bearing.
+ *
+ * `StatusPill` carries `data-status-pill`, and `e2e/navigation.spec.ts` reads that attribute as
+ * «every status on this screen and nothing else» — it fails when one status is two colours across
+ * screens, or two statuses share a colour on one. Marking a non-status with it breaks that premise
+ * in a way that surfaces later as a confusing false positive: «الحالية» and «تم الفحص» would be
+ * reported as two statuses sharing teal on الشركاء, and neither of them is a status.
+ *
+ * So this renders the same shape from the same palette and stays out of the sweep. Use it for a
+ * label that is coloured because it is a state of a ROW rather than a state of a RECORD — the
+ * contract history's «الحالية» / «مُستبدلة» is the first.
+ *
+ * It exists so that the palette still lives in exactly one place. The alternative was exporting
+ * `TONES` and letting call sites build their own span, which is how the console ended up with four
+ * different status pills before `StatusPill` replaced them.
+ */
+export function Chip({ tone, children }: { tone: Tone; children: ReactNode }) {
+  return (
+    <span
+      className={`inline-block w-fit whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-bold ${TONES[tone]}`}
+    >
+      {children}
+    </span>
+  );
+}
+
 /** Coloured text without the pill, for the design's النوع and الدور columns. */
 export function ToneText({ tone, children }: { tone: Tone; children: ReactNode }) {
   return (

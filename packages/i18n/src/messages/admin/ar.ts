@@ -858,6 +858,14 @@ export const ar = {
       expiringIn: 'ينتهي خلال {days} يوماً',
       expired: 'منتهٍ',
       awaitingSignature: 'بانتظار توقيع الشريك',
+      /*
+        A generated contract nobody has signed or sent yet (Bashar, 2026-08-23).
+
+        `draft` joined the contract enum on 2026-08-21 and this card was never taught it, so a
+        draft fell through to «ساري حتى —» — the console stating that an unsigned, unsent document
+        was in force. It surfaced only once draft contracts started outliving a test run.
+      */
+      draft: 'مسودة — لم تُرسل',
       superseded: 'مُستبدَل',
       terminated: 'مُنهى',
       none: 'لا عقود مرفوعة لهذا الشريك.',
@@ -1099,6 +1107,65 @@ export const ar = {
       reject: 'رفض',
     },
 
+    /*
+      ── عقد الشراكة على صفحة الشريك (Bashar, 2026-08-21) ────────────────────────────────────
+      التوقيع بخط اليد: التوقيع الإلكتروني غير معتمد في سوريا. فالخطوات ثلاث ومادية — أنشئ،
+      نزّل ووقّع، ثم ارفع — والنصوص تسمّيها بالترتيب الذي تحدث به.
+    */
+    partnerContract: {
+      title: 'عقد الشراكة',
+      none: 'لم يُنشأ عقد لهذا الشريك بعد.',
+      intro:
+        'أنشئ العقد من نموذج سفرة، نزّله ووقّعه بخط اليد، ثم ارفع النسخة الموقّعة ليصل الشريك إشعار بتوقيعه.',
+      generate: 'إنشاء العقد',
+      generating: 'جارٍ الإنشاء…',
+      regenerate: 'إنشاء نسخة جديدة',
+      download: 'تنزيل العقد',
+      downloadSafra: 'نسخة سفرة الموقّعة',
+      downloadPartner: 'نسخة الشريك الموقّعة',
+      uploadSigned: 'ارفع النسخة الموقّعة وأرسلها للشريك',
+      uploading: 'جارٍ الإرسال…',
+      file: 'النسخة الموقّعة (PDF)',
+      failed: 'تعذّر تنفيذ الطلب. حاول مرة أخرى.',
+      tooLarge: 'الملف أكبر من الحد المسموح (10 ميغابايت). اختر ملفاً أصغر.',
+      /* One line per state, so the panel never leaves the reader guessing whose turn it is. */
+      stateDraft:
+        'أُنشئ العقد ولم يوقّعه أحد بعد. نزّله، وقّعه بخط اليد، ثم ارفعه — وبذلك يُرسل إلى الشريك.',
+      stateAwaitingPartner:
+        'وُقّع من سفرة وأُرسل إلى الشريك، ووصله إشعار بالبريد. بانتظار نسخته الموقّعة.',
+      stateActive: 'وقّع الطرفان والعقد ساري المفعول.',
+      /*
+        Handing the step back (Bashar, 2026-08-21). The label says what it DOES to the partner
+        rather than naming the state — «إعادة فتح» on its own tells an operator nothing about who
+        ends up waiting for whom.
+      */
+      /*
+        Said before the file is chosen, and only when there is a signature to invalidate: replacing
+        SAFRA's copy after the partner has signed puts their signature on a page that is no longer
+        the contract, so it is superseded with it.
+      */
+      replaceWarning:
+        'رفع نسخة جديدة الآن يُلغي توقيع الشريك ويعيد العقد إلى انتظار توقيعه، ويصله إشعار بذلك.',
+      /*
+        ── سجل العقد (Bashar, 2026-08-23) ─────────────────────────────────────────────────────
+        The same list the partner sees, under the same upload form, so the two sides read the same
+        record of who sent what. «الحالية» is teal rather than green on both screens: this panel
+        already paints «ساري المفعول» in the green of an active contract, and two meanings in one
+        colour on one screen is what §«One status, one word, one colour» forbids.
+      */
+      historyTitle: 'سجل العقد',
+      historySafra: 'أرسلت سفرة نسخة موقّعة',
+      historyPartner: 'أرسل الشريك نسخته الموقّعة',
+      historyCurrent: 'الحالية',
+      historySuperseded: 'مُستبدلة',
+      reopen: 'السماح للشريك برفع نسخة جديدة',
+      reopening: 'جارٍ الفتح…',
+      reopenHint:
+        'يعيد الخطوة إلى الشريك ليرفع نسخة موقّعة جديدة، ويصله إشعار بذلك. تبقى نسخته السابقة محفوظة في السجل.',
+      /* Said next to the approval control, because that is where it changes what somebody does. */
+      notSignedYet: 'لا يوجد عقد ساري لهذا الشريك بعد.',
+    },
+
     verifyPartner: {
       screeningRequired:
         'سجّل نتيجة فحص العقوبات قبل الموافقة. التحقق من طرف لم يُفحص مخاطرة قانونية على الكيان الألماني، لا إجراء شكلي.',
@@ -1299,6 +1366,7 @@ export const ar = {
     fx_rate: 'سعر صرف',
     gift_card: 'بطاقة هدية',
     partner: 'شريك',
+    partner_contract: 'عقد شراكة',
     partner_payout: 'مستحقات شريك',
     property: 'عقار',
     property_image: 'صورة عقار',
@@ -1362,6 +1430,9 @@ export const ar = {
     'ad_campaign.paused': 'إيقاف حملة إعلانية',
     'ad_campaign.resumed': 'تشغيل حملة إعلانية',
     'partner_contract.uploaded': 'رفع عقد شراكة',
+    'partner_contract.generated': 'إنشاء عقد شراكة من النموذج',
+    'partner_contract.countersigned': 'رفع نسخة موقّعة من عقد شراكة',
+    'partner_contract.reopened': 'إعادة فتح عقد لتوقيع الشريك',
     'partner_contract.signed': 'تسجيل توقيع عقد شراكة',
     // ── Added 2026-08-20, closing the gap described above ──────────────────
     /*
@@ -1626,6 +1697,14 @@ export const ar = {
     payloadKey: {
       reason: 'السبب',
       reference: 'المرجع',
+      /*
+        Set on `partner_contract.countersigned` when SAFRA's new copy took the partner's signature
+        down with it. The status change alone does not say it — `active` →
+        `awaiting_partner_signature` reads the same whether a signature was undone or the state was
+        merely corrected — and which of those happened is the question asked when a contract is
+        disputed.
+      */
+      invalidatedPartnerSignature: 'أُلغي توقيع الشريك',
       notes: 'ملاحظات',
       total: 'الإجمالي',
       currency: 'العملة',
@@ -1728,6 +1807,20 @@ export const ar = {
       candidateCount: 'عدد المرشحين',
       screenedAt: 'وقت الفحص',
       snapshotId: 'معرّف نسخة القائمة',
+
+      /*
+        A partner contract (Bashar, 2026-08-21). Generation and each hand-signed upload write an
+        audit row, so سجل التدقيق would otherwise print these five in English.
+
+        `documentHash` and `fileHash` are two different documents: the first is the version SAFRA
+        generated, the second is the scan somebody signed and sent back. Naming them the same
+        would hide exactly the discrepancy they exist to expose.
+      */
+      documentHash: 'بصمة النسخة الأصلية',
+      fileHash: 'بصمة الملف المرفوع',
+      party: 'الطرف',
+      sizeBytes: 'الحجم (بايت)',
+      verification: 'حالة التحقق',
       /* `source` is already named «المصدر» above and is shared with other payloads. */
     } as Record<string, string>,
 
@@ -1752,6 +1845,13 @@ export const ar = {
       */
       eu_consolidated: 'قائمة الاتحاد الأوروبي الموحدة',
       local_fixture: 'قائمة اختبار للتطوير — ليست قائمة عقوبات',
+
+      /*
+        Contract states as they appear in an audit payload. Only this one is new — `active` and
+        `draft` are already named above, and repeating either is a compile error rather than a
+        silent second opinion.
+      */
+      awaiting_partner_signature: 'بانتظار توقيع الشريك',
 
       /*
         ── Statuses and codes as they appear in an audit payload (Bashar, 2026-08-20) ───────────

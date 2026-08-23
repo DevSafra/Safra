@@ -82,6 +82,13 @@ import { StaffScopeService } from './staff-scope.service.js';
     BookingExportService,
     ExportRequestService,
   ],
-  exports: [ReviewService, BookingExportService],
+  /*
+    `PartnerContractService` is exported because the PARTNER portal writes through it too: the
+    partner uploading their counter-signed copy is the second half of the same state machine, and
+    a second copy of that machine in `PartnerModule` is how the two halves start disagreeing about
+    what `awaiting_partner_signature` means. AdminModule does not import PartnerModule, so there
+    is no cycle to create.
+  */
+  exports: [ReviewService, BookingExportService, PartnerContractService],
 })
 export class AdminModule {}

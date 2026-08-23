@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AdminModule } from '../admin/admin.module.js';
 import { AuthModule } from '../auth/auth.module.js';
 
 import { CalendarService } from './calendar.service.js';
@@ -31,7 +32,7 @@ import { PropertyImageService } from './property-images.service.js';
     a converted account already had, `MailService` sends it, `PasswordService` hashes the first
     password. Imported rather than re-provided, so there is one Argon2id cost and one token table.
   */
-  imports: [AuthModule],
+  imports: [AuthModule, AdminModule],
   controllers: [
     PartnerController,
     PartnerImagesController,
