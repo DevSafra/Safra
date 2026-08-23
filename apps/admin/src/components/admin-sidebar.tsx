@@ -59,6 +59,14 @@ const NAV: readonly NavItem[] = [
   { key: 'properties', href: '/properties', badge: 'properties', warn: true },
   { key: 'customers', href: '/customers' },
   { key: 'staff', href: '/staff', badge: 'staff' },
+  /*
+    أدوار الموظفين, directly after الموظفون.
+
+    The pair belongs together: one screen invites the person, the other defines what the job they
+    are given can do. Partners' employee roles are a DIFFERENT screen on the partner dashboard,
+    because each side defines the roles of its own employees (Bashar, 2026-08-23).
+  */
+  { key: 'staffRoles', href: '/staff-roles' },
   { key: 'payments', href: '/payments' },
   { key: 'wallet', href: '/wallet' },
   { key: 'giftCards', href: '/giftcards' },

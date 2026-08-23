@@ -1070,6 +1070,47 @@ export async function getPartnerApplication(reference: string) {
   );
 }
 
+// ─── أدوار الموظفين ───────────────────────────────────────────────────────────
+
+const staffRoleSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  permissions: z.array(z.string()),
+  /*
+    `employeeCount`, matching the partner-side roles API exactly.
+
+    It was `memberCount` here for an hour, on the reasoning that SAFRA's people are staff rather
+    than employees. Bashar calls both populations employees — "his own employees", "the partner
+    employees" — so one idea gets one word across both APIs. Two names for one field is how a
+    third consumer picks the wrong one.
+  */
+  employeeCount: z.number(),
+  /** A seeded role. Neither editable nor removable, but still assignable to a person. */
+  isSystem: z.boolean(),
+  createdAt: z.string(),
+});
+
+export type StaffRole = z.infer<typeof staffRoleSchema>;
+
+export async function getStaffRoles() {
+  return staffFetch('/admin/staff-roles', z.object({ roles: z.array(staffRoleSchema) }));
+}
+
+/**
+ * What a staff role MAY carry, fetched rather than hard-coded.
+ *
+ * The endpoint serves the same constant the API validates against, and it REJECTS anything
+ * outside it rather than filtering — so a hand-written list here would offer capabilities the
+ * server refuses. Notably absent: `staff_role.manage` itself, so no role can grant itself the
+ * power to rewrite roles.
+ */
+export async function getAssignableStaffPermissions() {
+  return staffFetch(
+    '/admin/staff-roles/assignable',
+    z.object({ permissions: z.array(z.string()) }),
+  );
+}
+
 // ─── تسجيل شريك جديد — the in-person onboarding form's choices ────────────────
 
 /**

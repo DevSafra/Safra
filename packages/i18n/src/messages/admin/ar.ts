@@ -150,6 +150,7 @@ export const ar = {
     geo: 'المدن والدول والعملات',
     reports: 'التقارير',
     settings: 'الإعدادات',
+    staffRoles: 'أدوار الموظفين',
     audit: 'سجل التدقيق',
   },
 
@@ -445,6 +446,173 @@ export const ar = {
        */
       countAtLeast: 'أكثر من {n} حجز · كل حجز له خط زمني وسجل تدقيق ورقم مرجعي (P-004)',
       note: 'فتح أي حجز يعرض: بيانات العميل والشريك والعقار والدفع والرسائل والواتساب والبريد والخط الزمني، مع ملاحظات داخلية لا يراها العميل أو الشريك. تغيير الحالة بصلاحيات محددة فقط ويسجَّل في سجل التدقيق.',
+    },
+
+    /*
+      ── أدوار الموظفين (Bashar, 2026-08-23) ──────────────────────────────────────────────────
+      المدير العام يسمّي أدوار موظفي سفرة ويحدّد ما يحمله كل دور — والصفحة اسمها «أدوار الموظفين»،
+      دون «سفرة»، لأن كل من في مركز القيادة موظف سفرة. أدوار موظفي الشركاء شاشة أخرى على لوحة
+      الشريك، لأن كل جهة تعرّف أدوار موظفيها هي.
+
+      أسماء القدرات هنا لا في الكود: من يسمّي دوراً «مشرف حجوزات» يحتاج أن يقرأ ما يمنحه بالكلمات،
+      لا أن يقرأ `booking.read_all`. مصفوفة الصلاحيات على /staff تعرض المعرّف الخام عن قصد، لأن
+      قارئها يوازن الأدوار ببعضها؛ قارئ هذه الشاشة يبني دوراً واحداً لوظيفة.
+    */
+    staffRoles: {
+      /*
+        The PANEL's heading, and deliberately not the same words as the page's.
+
+        `ConsoleShell` already prints «أدوار موظفي الشركاء» as the h1 from `nav.employeeRoles`, so
+        repeating it on the h2 directly beneath said the same thing twice — the same stutter as the
+        contract step's state line. Every other section does this properly: الشركاء / سجل الشركاء.
+      */
+      title: 'الأدوار المُعرَّفة',
+      subtitle: 'يسمّيها المدير العام ويحدّد ما يحمله كل دور',
+      intro:
+        'الدور يحدّد ما يستطيع موظف سفرة فعله في مركز القيادة. أنشئ دوراً، سمِّه، وحدِّد قدراته — ثم أسنِده إلى موظف من صفحة «الموظفون».',
+      /*
+        Said on the screen, not left to be discovered. The list of capabilities comes from the API,
+        and it is deliberately narrower than what a partner itself can do — a role can never carry
+        payouts or settings. An operator who does not know that reads the short list as a bug.
+      */
+      scopeNote:
+        'صلاحية إدارة الأدوار نفسها ليست ضمن القدرات المعروضة، ولا يمكن لأي دور أن يحملها: دورٌ يمنح نفسه لكان الحدُّ بلا معنى. الخادم يرفض أي قدرة خارج هذه القائمة.',
+
+      colName: 'الدور',
+      colCapabilities: 'القدرات',
+      colEmployees: 'موظفون',
+      /* A seeded role — «مدير عام» and the other three. Neither editable nor removable. */
+      systemRole: 'دور أساسي',
+      systemRoleNote:
+        'دور أساسي في المنصة: لا يُعدَّل ولا يُحذف. يمكن إسناده إلى موظف كالمعتاد.',
+      colCreated: 'أُنشئ',
+      none: 'لم يُعرَّف أي دور بعد.',
+      empty: 'لا أدوار مطابقة.',
+
+      create: 'دور جديد',
+      creating: 'جارٍ الإنشاء…',
+      edit: 'تعديل',
+      save: 'حفظ',
+      saving: 'جارٍ الحفظ…',
+      cancel: 'إلغاء',
+      remove: 'حذف الدور',
+      /*
+        The confirm step says something DIFFERENT from the button that opened it.
+
+        Both read «حذف الدور» at first, so after pressing it the operator saw the same label again
+        beside a warning and could reasonably think the first press had not registered. Every other
+        two-step control in this console names the second step separately — «تأكيد الموافقة»,
+        «تأكيد الرفض» — and it is also what lets a test tell the two apart.
+      */
+      confirmRemove2: 'تأكيد الحذف',
+      removing: 'جارٍ الحذف…',
+
+      nameLabel: 'اسم الدور',
+      nameHint: 'ما يراه الشريك في قائمة الأدوار. حرفان على الأقل، ولا يتكرّر.',
+      capabilitiesLabel: 'ما يحمله هذا الدور',
+      /* A role with no capability is a role that does nothing; the API refuses it too. */
+      capabilitiesRequired: 'اختر قدرة واحدة على الأقل.',
+
+      /*
+        Said BEFORE the delete is attempted, because the API refuses it and the operator should not
+        learn that from a refusal. `employeeCount` is on every row for exactly this.
+      */
+      inUse: 'لا يمكن حذف دور يحمله موظفون. انقل الموظفين إلى دور آخر أولاً.',
+      /* The five domains the 63 capabilities are split across — see `permission-groups.ts`. */
+      group: {
+        bookings: 'الحجوزات والتقويم',
+        money: 'المال والفواتير',
+        partners: 'الشركاء والعقارات',
+        customers: 'العملاء والدعم',
+        platform: 'المنصة والإعدادات',
+        other: 'أخرى',
+      } as Record<string, string>,
+      confirmRemove:
+        'يُحذف الدور «{name}» نهائياً من قائمة الأدوار المتاحة للشركاء. تأكيد؟',
+      failed: 'تعذّر تنفيذ الطلب. حاول مرة أخرى.',
+      unreachable: 'تعذّر الوصول إلى الخادم.',
+
+      /*
+        The capabilities, in words. The keys are the permission strings the API validates against,
+        so this map is keyed by machine value and read through `label()` — an unlabelled capability
+        renders as its raw identifier, which is how a newly added one announces itself instead of
+        appearing as a blank checkbox.
+      */
+      capability: {
+        /*
+          Sixty-three capabilities, named. The screen exists so somebody naming «مشرف
+          حجوزات» can read what the role will carry; `booking.update_status` is not a
+          sentence anybody weighs a job against.
+
+          Read through `label()`, so a capability added to the allow-list before it is
+          translated renders as its raw identifier — visibly missing rather than a blank
+          checkbox. `/staff`'s matrix still shows raw identifiers on purpose: its reader is
+          comparing roles, not building one.
+        */
+        'booking.read_own': 'قراءة حجوزاته',
+        'booking.read_all': 'قراءة كل الحجوزات',
+        'booking.create': 'إنشاء حجز',
+        'booking.update_status': 'تغيير حالة الحجز',
+        'booking.cancel': 'إلغاء حجز',
+        'booking.add_internal_note': 'إضافة ملاحظة داخلية',
+        'booking.respond_as_partner': 'الرد على الحجز نيابة عن الشريك',
+        'booking.check_in': 'تسجيل وصول الضيف',
+        'calendar.manage_own': 'إدارة التقويم والتوفّر',
+        'payment.read': 'قراءة المدفوعات',
+        'refund.read': 'قراءة المستردات',
+        'refund.create': 'إصدار استرداد',
+        'ledger.read': 'قراءة دفتر الحسابات',
+        'payout.read': 'قراءة مستحقات الشركاء',
+        'payout.read_own': 'قراءة مستحقاته',
+        'payout.execute': 'تنفيذ التحويلات',
+        'payout_account.read': 'قراءة البيانات المصرفية',
+        'wallet.read': 'قراءة المحافظ',
+        'wallet.adjust': 'تعديل رصيد محفظة',
+        'gift_card.read': 'قراءة بطاقات الهدايا',
+        'gift_card.manage': 'إدارة بطاقات الهدايا',
+        'coupon.read': 'قراءة الكوبونات',
+        'coupon.manage': 'إدارة الكوبونات',
+        'price.update': 'تعديل الأسعار',
+        'fx_rate.manage': 'إدارة أسعار الصرف',
+        'partner.read': 'قراءة بيانات الشركاء',
+        'partner.approve': 'الموافقة على الشركاء',
+        'partner.suspend': 'إيقاف شريك',
+        'partner.document_review': 'مراجعة مستندات الشركاء',
+        'partner_application.read': 'قراءة طلبات الشراكة',
+        'partner_application.manage': 'البتّ في طلبات الشراكة',
+        'partner.onboard': 'تسجيل شريك مباشرةً',
+        'partner_employee.manage': 'إدارة موظفي الشريك',
+        'partner_contract.sign_own': 'توقيع عقده',
+        'partner_document.manage_own': 'إدارة مستنداته',
+        'partner_contract.read': 'قراءة عقود الشراكة',
+        'partner_contract.manage': 'إدارة عقود الشراكة',
+        'partner.two_factor_reset': 'إعادة تعيين المصادقة الثنائية لشريك',
+        'property.read': 'قراءة العقارات',
+        'property.manage_own': 'إدارة عقاراته',
+        'property.approve': 'الموافقة على العقارات',
+        'violation.read': 'قراءة المخالفات',
+        'violation.manage': 'إدارة المخالفات',
+        'violation.waive': 'إسقاط غرامة',
+        'review.create': 'كتابة تقييم',
+        'review.read_own': 'قراءة تقييماته',
+        'review.respond_own': 'الرد على تقييماته',
+        'review.moderate': 'إخفاء التقييمات المُبلَّغ عنها',
+        'customer.read': 'قراءة بيانات العملاء',
+        'message.read': 'قراءة الرسائل',
+        'message.send': 'إرسال الرسائل',
+        'dispute.read': 'قراءة النزاعات',
+        'dispute.manage': 'إدارة النزاعات',
+        'notification.read': 'قراءة سجل الإشعارات',
+        'settings.read': 'قراءة الإعدادات',
+        'settings.update': 'تعديل الإعدادات',
+        'geo.manage': 'إدارة المدن والدول والعملات',
+        'ad.read': 'قراءة الإعلانات',
+        'ad.manage': 'إدارة الإعلانات',
+        'report.read': 'قراءة التقارير',
+        'audit_log.read': 'قراءة سجل التدقيق',
+        'emergency_mode.activate': 'تفعيل وضع الطوارئ',
+        'staff.manage': 'إدارة الموظفين',
+      } as Record<string, string>,
     },
 
     partners: {
