@@ -47,8 +47,23 @@ export interface StaffActivityRow {
  * The handoff shows an 11 × 5 grid of ✓ / ○ / — and §14 requires that it be "enforced
  * server-side, not just rendered". So it is derived from `ROLE_PERMISSIONS` — the exact
  * constant `PermissionsGuard` checks on every request — rather than transcribed into the UI.
- * A permission added to a role appears here without anybody editing a table, and the matrix
- * cannot drift from what the server actually allows, because there is only one source.
+ * A permission added to a role appears here without anybody editing a table.
+ *
+ * ## The guarantee is CONSISTENCY, and it stopped being structural (2026-08-23)
+ *
+ * This paragraph used to end "the matrix cannot drift from what the server actually allows,
+ * because there is only one source" — and while roles were four compile-time constants that was
+ * true BY CONSTRUCTION: one constant, read twice, so a disagreement was not expressible.
+ *
+ * Staff roles are rows now (`staff_roles`, migration 0042). The matrix reads them and the guard
+ * reads them, so the two still agree — but they agree because two readers happen to read one
+ * table, not because there is nothing else to read. That is a weaker claim and this docblock is
+ * not going to keep making the stronger one: a comment asserting a guarantee the code no longer
+ * provides is worse than no comment, because the next person trusts it instead of checking.
+ *
+ * What would break it: any path that resolves a staff member's permissions from something other
+ * than their role row — `ROLE_PERMISSIONS[users.role]`, for instance, which is still how the
+ * SEEDED roles work. Where both exist, they must not be merged.
  *
  * The design's middle state ○ ("بموافقة مدير", requires manager approval) has **no
  * equivalent in the model**: a permission is granted or it is not. Rendering ○ would claim an
