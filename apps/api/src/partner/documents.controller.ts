@@ -118,6 +118,45 @@ export class AdminPartnerDocumentsController {
     return { documents: await this.documents.listByReference(reference) };
   }
 
+  /**
+   * Filing a partner's document for them, during an in-person onboarding
+   * (Bashar, 2026-08-23).
+   *
+   * ## Multipart, not base64 in JSON
+   *
+   * The contract routes take base64 because a generated PDF is produced server-side and handed
+   * back through the same JSON channel. A document is a file somebody chose from a disk, and
+   * sending it as multipart keeps it out of `body-parser` entirely — so this route needs no
+   * entry in `FILE_BODY_PATHS` and cannot widen the JSON limit for the dozen other routes that
+   * share the `/admin/partners` prefix.
+   *
+   * ## `PARTNER_ONBOARD`, not `PARTNER_DOCUMENT_REVIEW`
+   *
+   * Reviewing a document and PRODUCING one are different powers. An operations manager reviews
+   * what a partner sent; being able to put a document into the record and then approve it is a
+   * loop with one person in it, so this stays with the super admin who is running the meeting.
+   * The review decision on the row still needs `PARTNER_DOCUMENT_REVIEW`, unchanged.
+   *
+   * Throttled and capped in memory below the service's own 8MB ceiling, exactly as the partner's
+   * own upload is.
+   */
+  @Post(':reference/documents')
+  @RequirePermissions(P.PARTNER_ONBOARD)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @AuditExempt('PartnerDocumentsService audits the upload in the same transaction.')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 8 * 1024 * 1024, files: 1 } }),
+  )
+  async upload(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(partnerDocumentUploadSchema))
+    body: PartnerDocumentUploadInput,
+    @UploadedFile() file: UploadedDocument | undefined,
+  ) {
+    return this.documents.uploadByReference(reference, body.kind, file, user);
+  }
+
   @Get('documents/:documentId/file')
   @RequirePermissions(P.PARTNER_DOCUMENT_REVIEW)
   @AuditExempt('PartnerDocumentsService records partner_document.viewed with the actor.')

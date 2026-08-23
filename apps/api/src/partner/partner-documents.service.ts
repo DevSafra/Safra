@@ -180,6 +180,48 @@ export class PartnerDocumentsService {
 
   /** As `list`, resolving the partner by their §13.2 reference. */
   async listByReference(reference: string): Promise<DocumentRecord[]> {
+    return this.list(await this.partnerIdOf(reference));
+  }
+
+  /**
+   * Staff filing a document on a partner's behalf, keyed on the §13.2 reference.
+   *
+   * ## Why staff may upload at all
+   *
+   * Because of where onboarding now happens. A super admin sitting with a partner has their
+   * passport and their commercial register ON THE TABLE (Bashar, 2026-08-23); telling that partner
+   * to go home, find an inbox, redeem an invitation and upload them is the round trip the
+   * in-person flow exists to remove.
+   *
+   * ## It is the same upload, deliberately
+   *
+   * This delegates to `upload` rather than reimplementing it, so a staff-filed document goes
+   * through every control a partner-filed one does — the magic-byte type check, the EXIF-stripping
+   * re-encode, the size and per-partner ceilings, the generated storage key, and the same audit
+   * entry. A second upload path would be a second place for one of those to be forgotten, and the
+   * one that was forgotten would be the interesting one.
+   *
+   * What differs is only the ACTOR on the audit row, which is the caller's claims either way — so
+   * the log already distinguishes "the partner sent this" from "a super admin filed this for
+   * them" without a flag saying so.
+   */
+  async uploadByReference(
+    reference: string,
+    kind: PartnerDocumentKind,
+    file: UploadedDocument | undefined,
+    actor: AccessTokenClaims | undefined,
+  ): Promise<DocumentRecord> {
+    return this.upload(await this.partnerIdOf(reference), kind, file, actor);
+  }
+
+  /**
+   * A partner's uuid from their reference.
+   *
+   * A missing partner and a soft-deleted one answer the same way, which is the house rule: "not
+   * yours" and "not there" must be indistinguishable, or the difference between them is an
+   * enumeration oracle.
+   */
+  private async partnerIdOf(reference: string): Promise<string> {
     const rows = await this.db.execute<{ id: string }>(sql`
       SELECT id FROM partners WHERE reference = ${reference} AND deleted_at IS NULL
     `);
@@ -187,7 +229,7 @@ export class PartnerDocumentsService {
     const partnerId = rows.rows[0]?.id;
     if (!partnerId) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
-    return this.list(partnerId);
+    return partnerId;
   }
 
   /** Metadata only — the bytes are never included in a list. */
