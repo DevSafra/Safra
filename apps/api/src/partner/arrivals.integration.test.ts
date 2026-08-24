@@ -562,6 +562,76 @@ describeIfDb('arrivals and violations', () => {
       expect(theirs.items).toHaveLength(1);
     });
 
+    /**
+     * The DETAIL endpoint, and this is the assertion that matters for it.
+     *
+     * `GET /partner/violations/:id` takes an id from the URL. Scoped after the fact, a partner could
+     * read any violation on the platform by trying uuids — another business's enforcement record,
+     * including its fine. The scope is in the WHERE clause, so the row is unreachable rather than
+     * merely unreturned, and it answers `VIOLATION_NOT_FOUND`: the same answer a uuid that exists
+     * nowhere gets, so the response cannot be used to discover that a violation exists.
+     *
+     * The control underneath is the half that makes this mean something — "refused" is
+     * indistinguishable from "broken" until the owner is shown reading the same row.
+     */
+    it("cannot open another business's violation, and its owner still can", async () => {
+      const made = await db.execute<{ id: string }>(sql`
+        INSERT INTO partner_violations (partner_id, kind, occurrence_number, stage, score_penalty)
+        VALUES (${neighbourId}::uuid, 'stale_calendar', 1, 'recorded', 0)
+        RETURNING id
+      `);
+      const id = made.rows[0]?.id ?? '';
+
+      await expect(violations.one(owner(partnerId), partnerId, id)).rejects.toMatchObject(
+        {
+          response: { code: 'violation.not_found' },
+        },
+      );
+
+      /* Control: the row exists and its owner reads it. */
+      const theirs = await violations.one(
+        owner(neighbourId, neighbourUserId),
+        neighbourId,
+        id,
+      );
+
+      expect(theirs.violation.id).toBe(id);
+    });
+
+    /** A uuid that belongs to nobody answers exactly as one that belongs to somebody else. */
+    it('answers the same for a violation that does not exist at all', async () => {
+      await expect(
+        violations.one(
+          owner(partnerId),
+          partnerId,
+          '00000000-0000-4000-8000-000000000000',
+        ),
+      ).rejects.toMatchObject({ response: { code: 'violation.not_found' } });
+    });
+
+    /**
+     * The detail endpoint obeys the money rule too — the easiest place to forget it.
+     *
+     * An employee holds `violation.read` and not `payout.read_own`. The list withholds every figure
+     * from them; a detail screen written later, with its own query, is exactly where that would be
+     * dropped. The fine's REASON goes with the figures, because a sentence explaining a fine is
+     * about the fine.
+     */
+    it('withholds the figures and the fine reason on the detail, for an employee', async () => {
+      await makeDescribedViolation(partnerId);
+
+      const page = await violations.list(owner(partnerId), partnerId, { limit: 20 });
+      const id = page.items[0]?.id ?? '';
+
+      const asEmployee = await violations.one(employee(partnerId), partnerId, id);
+
+      expect(asEmployee.moneyHidden).toBe(true);
+      expect(asEmployee.violation.fineAmount).toBeNull();
+      expect(asEmployee.violation.fineReason).toBeNull();
+      /* And what happened is still theirs to read. */
+      expect(asEmployee.violation.description).not.toBeNull();
+    });
+
     it('refuses a forged cursor', async () => {
       await expect(
         violations.list(owner(partnerId), partnerId, { limit: 20, cursor: 'nope' }),

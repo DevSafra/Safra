@@ -7,6 +7,7 @@ import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
 import { count } from '@/lib/format';
 import { fill, t } from '@/lib/strings';
+import { violationDescription } from '@/lib/violation-description';
 
 /**
  * المخالفات — what SAFRA has charged against this partner, and why (SRS §6.4).
@@ -97,7 +98,19 @@ export default async function ViolationsPage({
         <ul id="violations-list" className="grid gap-2.5">
           {page.items.map((violation) => (
             <li key={violation.id}>
-              <Row violation={violation} />
+              {/*
+                The whole row is the link, not a «التفاصيل» word at the end of it.
+
+                A partner reading a list of things the platform holds against them is scanning for
+                the one they want to argue about, and a small target at the end of a dense row is a
+                control that looks bigger than it is. `block` so the anchor takes the card's size.
+              */}
+              <Link
+                href={`/violations/${encodeURIComponent(violation.id)}`}
+                className="block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+              >
+                <Row violation={violation} />
+              </Link>
             </li>
           ))}
         </ul>
@@ -119,6 +132,13 @@ export default async function ViolationsPage({
 function Row({ violation }: { violation: PartnerViolation }) {
   /* The raw kind, never `replace(/_/g, ' ')` — an unlabelled one must look unlabelled. */
   const kind = t.violations.kind[violation.kind] ?? violation.kind;
+  /*
+    The operator's words if somebody wrote them, otherwise the sentence for this KIND.
+
+    The violations that cost a partner money are written by the SLA sweep, which types nothing — so
+    without the fallback the fined rows were the ones with no explanation on them.
+  */
+  const described = violationDescription(violation);
 
   /*
     Present only when the reader may see it AND there is one. Withheld and absent are different
@@ -163,6 +183,8 @@ function Row({ violation }: { violation: PartnerViolation }) {
           </span>
         </div>
         <Ltr className="text-[12px] text-faint">{violation.createdAt}</Ltr>
+        {/* The affordance, so a card that opens looks like one. */}
+        <span className="text-[11.5px] text-gold">{t.violations.open} ←</span>
       </div>
 
       <p className="text-[12.5px] text-muted">
@@ -191,8 +213,8 @@ function Row({ violation }: { violation: PartnerViolation }) {
         Absent on rows filed before the column existed, and then NOTHING is rendered — not an empty
         line and not «—», which would claim a description exists and is blank.
       */}
-      {violation.description ? (
-        <p className="text-[12.5px] leading-relaxed text-text">{violation.description}</p>
+      {described ? (
+        <p className="text-[12.5px] leading-relaxed text-text">{described}</p>
       ) : null}
 
       {fine ? (

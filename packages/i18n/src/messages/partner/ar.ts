@@ -1491,6 +1491,37 @@ export const ar = {
     } as Record<string, string>,
 
     /* What the partner was TOLD, and when. Absent unless somebody actually warned them. */
+    /* ── The detail screen (Bashar, 2026-08-24) ──────────────────────────── */
+    /*
+      A page per violation, because a row in a list cannot hold what a partner needs when they are
+      deciding whether to accept a fine: what happened, when, which booking, what was said to them,
+      what it cost, and whether it was forgiven. The list is for scanning; this is for reading.
+    */
+    detailTitle: 'تفاصيل المخالفة',
+    open: 'التفاصيل',
+    back: 'رجوع إلى المخالفات',
+    notFound: 'لم يُعثر على هذه المخالفة على حسابك.',
+    whatHappened: 'ما حدث',
+    recordedOn: 'تاريخ التسجيل',
+    theStage: 'المرحلة',
+    theKind: 'نوع المخالفة',
+    theBooking: 'الحجز المرتبط',
+    theOccurrence: 'التكرار',
+    noBooking: 'غير مرتبطة بحجز',
+    theWarning: 'الإنذار',
+    theFine: 'الغرامة',
+    theWaiver: 'قرار الإلغاء',
+    /* «لم تُحصَّل» is a state, not an absence — a fine that exists and has not been taken yet. */
+    notCollected: 'لم تُحصَّل بعد',
+    collectedOnLabel: 'حُصّلت بتاريخ {date}',
+    /*
+      Said on the detail screen as well as in the email, because this is where somebody reads
+      carefully. A partner's first assumption about any enforcement mark is that it has cost them
+      their place in search results.
+    */
+    noRankingEffect: 'لا تؤثر هذه المخالفة على ترتيب إعلاناتك في نتائج البحث.',
+    appeal: 'إن كان هناك خطأ، تواصل مع الدعم — لا يمكن الاعتراض من هذه الصفحة.',
+
     warnedOn: 'حُذّرت بتاريخ {date}',
     warningNote: 'نص التحذير: {note}',
 
@@ -1500,6 +1531,49 @@ export const ar = {
       stale_calendar: 'تقويم غير محدّث',
       inaccurate_listing: 'وصف غير مطابق',
       no_show: 'عدم استقبال الضيف',
+    } as Record<string, string>,
+
+    /*
+      WHAT HAPPENED, for a violation nobody typed a description for.
+      ────────────────────────────────────────────────────────────────────────
+      Bashar, 2026-08-24: the descriptions were still missing, and this is why. A violation raised by
+      hand on the console carries the operator's own words. The violations a partner actually
+      RECEIVES in production are written by the platform — `sla.service.ts` levies `no_response` and
+      fines for it, `booking-actions.service.ts` records `rejected_after_payment` — and neither
+      writes a word. So a partner was fined by an automatic sweep and told only a category.
+
+      ## Why these live in the CATALOGUE and are not stored on the row
+
+      A generated sentence written into `partner_violations.description` would be frozen in whatever
+      language the sweep happened to pick, on a row that outlives every re-translation — the exact
+      thing «No user-facing text is written inside code» exists to prevent, one layer down in the
+      database. Rendered from here, a German partner reads German, and adding a language stays a task
+      somebody can finish.
+
+      ## They are specific, not a gloss on the label
+
+      Each names the condition the writer actually fires on — the two-hour window, the payment
+      already taken — so it is verifiable rather than decorative. `{reference}` is filled where the
+      violation has a booking and the sentence without it is used where it does not, because
+      «الحجز —» is worse than a sentence that does not mention one.
+    */
+    defaultDescription: {
+      no_response:
+        'لم يصل ردّ على طلب الحجز {reference} خلال مهلة الساعتين المتاحة للرد، فأُلغي الطلب تلقائياً وسُجّلت المخالفة.',
+      rejected_after_payment:
+        'رُفض الحجز {reference} بعد أن أتمّ الضيف الدفع، فاستُرد المبلغ له وسُجّلت المخالفة.',
+      stale_calendar:
+        'بقي تقويم الإتاحة دون تحديث لمدة تجاوزت الحد المسموح، فظهرت تواريخ غير متاحة كأنها متاحة للحجز.',
+      inaccurate_listing:
+        'لم تُطابق تفاصيل العقار المعروضة ما وجده الضيف على أرض الواقع.',
+      no_show: 'وصل الضيف في موعده ولم يجد من يستقبله.',
+    } as Record<string, string>,
+    /* Used where the same kind has no booking to name — no «الحجز —» on a screen. */
+    defaultDescriptionNoBooking: {
+      no_response:
+        'لم يصل ردّ على طلب الحجز خلال مهلة الساعتين المتاحة للرد، فأُلغي الطلب تلقائياً وسُجّلت المخالفة.',
+      rejected_after_payment:
+        'رُفض الحجز بعد أن أتمّ الضيف الدفع، فاستُرد المبلغ له وسُجّلت المخالفة.',
     } as Record<string, string>,
   },
 } as const;

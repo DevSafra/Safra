@@ -11,7 +11,7 @@ import {
 } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
-import { badRequest } from '../common/errors/app-error.js';
+import { badRequest, notFound } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 export type Violation = {
@@ -79,6 +79,100 @@ export type ViolationPage = {
 @Injectable()
 export class ViolationsService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
+
+  /**
+   * ONE violation, scoped to the partner in the verified token.
+   *
+   * ## The scope is the WHERE clause, and that is the whole security of this endpoint
+   *
+   * `id` comes from the URL. Checked afterwards, a partner could read any violation on the platform
+   * by trying uuids — the record of another business's enforcement, including its fine. In the
+   * predicate, the row is unreachable rather than merely unreturned, and a violation belonging to
+   * somebody else answers exactly as a violation that does not exist: `VIOLATION_NOT_FOUND`. The
+   * partner id is never a parameter; there is nowhere to pass one.
+   *
+   * ## Money obeys the same rule as the list
+   *
+   * `moneyHidden` withholds every figure, and now the fine's REASON with them, from a reader without
+   * `payout.read_own` — an employee holds `violation.read` and not that. A detail screen is where a
+   * narrower guard would be easiest to forget, so it reuses the list's own selector rather than
+   * writing a second one.
+   */
+  async one(
+    claims: AccessTokenClaims | undefined,
+    partnerId: string,
+    id: string,
+  ): Promise<{ violation: Violation; moneyHidden: boolean }> {
+    const money = (claims?.permissions ?? []).includes(P.PAYOUT_READ_OWN);
+
+    const amounts = money
+      ? sql`v.fine_amount::text, cur.code AS fine_currency,
+            v.customer_compensation_amount::text`
+      : sql`NULL::text AS fine_amount, NULL::text AS fine_currency,
+            NULL::text AS customer_compensation_amount`;
+
+    const rows = await this.db.execute<{
+      id: string;
+      kind: string;
+      occurrence_number: number;
+      booking_reference: string | null;
+      score_penalty: number;
+      fine_amount: string | null;
+      fine_currency: string | null;
+      customer_compensation_amount: string | null;
+      waived_at: string | null;
+      waived_reason: string | null;
+      collected_at: string | null;
+      created_at: string;
+      stage: string;
+      warned_at: string | null;
+      warning_note: string | null;
+      description: string | null;
+      fine_reason: string | null;
+    }>(sql`
+      SELECT v.id, v.kind::text AS kind, v.occurrence_number,
+             b.reference AS booking_reference, v.score_penalty, ${amounts},
+             v.waived_at::text, v.waived_reason, v.collected_at::text,
+             to_char(v.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS created_at,
+             v.stage::text AS stage,
+             to_char(v.warned_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS warned_at,
+             v.warning_note, v.description, v.fine_reason
+      FROM partner_violations v
+      LEFT JOIN bookings b ON b.id = v.booking_id
+      LEFT JOIN currencies cur ON cur.id = v.fine_currency_id
+      WHERE v.id = ${id}::uuid
+        AND v.partner_id = ${partnerId}::uuid
+        AND v.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const row = rows.rows[0];
+
+    if (!row) throw notFound(ERROR.VIOLATION_NOT_FOUND);
+
+    return {
+      moneyHidden: !money,
+      violation: {
+        id: row.id,
+        kind: row.kind,
+        occurrenceNumber: row.occurrence_number,
+        bookingReference: row.booking_reference,
+        scorePenalty: row.score_penalty,
+        fineAmount: row.fine_amount,
+        fineCurrency: row.fine_currency,
+        customerCompensationAmount: row.customer_compensation_amount,
+        waived: row.waived_at !== null,
+        waivedReason: row.waived_reason,
+        collectedAt: row.collected_at,
+        createdAt: row.created_at,
+        stage: row.stage,
+        warnedAt: row.warned_at,
+        warningNote: row.warning_note,
+        description: row.description,
+        fineReason: money ? row.fine_reason : null,
+      },
+    };
+  }
 
   async list(
     claims: AccessTokenClaims | undefined,

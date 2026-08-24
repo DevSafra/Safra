@@ -990,3 +990,21 @@ export async function getMyViolations(cursor?: string) {
     }),
   );
 }
+
+/**
+ * ONE violation, for the detail screen (Bashar, 2026-08-24).
+ *
+ * Sends no partner id — the API scopes the row to the partnerId in the verified token, in its WHERE
+ * clause, so another business's violation answers as one that does not exist. There is no parameter
+ * here to pass one, which is the point.
+ *
+ * The SAME `violationSchema` the list parses. A second, looser schema for the detail screen is how
+ * one of the two comes to render a field the other hides — the money rule in particular is applied
+ * by the API for both, and a detail-only schema would be the place to forget it.
+ */
+export async function getMyViolation(id: string) {
+  return partnerFetch(
+    `/partner/violations/${encodeURIComponent(id)}`,
+    z.object({ violation: violationSchema, moneyHidden: z.boolean() }),
+  );
+}

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
 import { cursorQuerySchema, PERMISSIONS as P, type CursorQuery } from '@safra/contracts';
@@ -90,5 +90,24 @@ export class ViolationsController {
     const partnerId = requirePartnerId(user, P.VIOLATION_READ);
 
     return this.violations.list(user, partnerId, query);
+  }
+
+  /**
+   * ONE violation — the detail screen a partner opens from the list (Bashar, 2026-08-24).
+   *
+   * `ParseUUIDPipe` so a malformed id is a 400 at the boundary rather than a database error, and
+   * the service scopes the row to the token's partner in its WHERE clause: another business's
+   * violation answers exactly as one that does not exist.
+   */
+  @Get(':id')
+  @RequirePermissions(P.VIOLATION_READ)
+  @AuditExempt('Reading your own violation; changes nothing.')
+  async one(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const partnerId = requirePartnerId(user, P.VIOLATION_READ);
+
+    return this.violations.one(user, partnerId, id);
   }
 }
