@@ -1,0 +1,32 @@
+-- ============================================================================
+-- SAFRA — a fine is an amount AND a currency, or it is neither (`O-fin-4`).
+--
+-- Idempotent, like the rest of the post/ stage.
+-- ============================================================================
+
+-- ── Both columns, or neither ────────────────────────────────────────────────
+--
+-- `partner_violations` carried no CHECK constraints at all, and a fine is two
+-- columns that must agree: `fine_amount` and `fine_currency_id`. Only the
+-- writing code said so, and only in one statement.
+--
+-- What makes this worth a constraint rather than a note is the failure mode,
+-- which CHANGED on 2026-08-24 and got quieter. Before that date a half-written
+-- fine took الدفع down entirely for every operator: the union selected the row,
+-- `financeItemSchema` types amount and currency as required strings, and the
+-- console rejected the whole response — «تعذّر تحميل هذه القائمة», no table, no
+-- counters. That was loud and it was found. Now that `finance.service.ts`
+-- filters on both columns, the same row would instead DISAPPEAR from الدفع:
+-- money the platform levied, absent from the screen that reconciles it. Quieter,
+-- and therefore worse.
+--
+-- The shape follows the precedent the waiver already set — `waived_reason` is
+-- NOT NULL wherever `waived_at` is set, enforced by a CHECK because the column
+-- must stay nullable for un-waived rows. Same argument: the pairing is the
+-- invariant, not the nullability.
+--
+-- Safe to add on 2026-08-24: 7,679 rows, zero violations. Verified before
+-- writing this, not assumed — a constraint added against data that breaks it
+-- fails the migration and takes the deploy with it.
+SELECT add_constraint_if_missing('partner_violations', 'partner_violations_fine_money_paired',
+  'CHECK ((fine_amount IS NULL) = (fine_currency_id IS NULL))');
