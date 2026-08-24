@@ -19,10 +19,8 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
-import { ENV, type Env } from '../config/env.js';
-import { MailService } from '../mail/mail.service.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
-import { partnerFineWaivedMail, partnerSuspendedMail } from '../mail/mail.templates.js';
+import { EnforcementNotifier } from './enforcement-notifier.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
@@ -53,12 +51,22 @@ export class EnforcementService {
 
   constructor(
     @Inject(DATABASE) private readonly db: Database,
-    @Inject(ENV) private readonly env: Env,
     private readonly audit: AuditService,
     private readonly ledger: LedgerService,
     private readonly fx: FxRateService,
-    private readonly mail: MailService,
+    private readonly notifier: EnforcementNotifier,
   ) {}
+
+  /**
+   * The effective date a notice states, in the one format all five share.
+   *
+   * A date rather than a timestamp: a partner reads "your account was suspended on 2026-08-24", and
+   * a time to the second invites the question of whose clock it was. UTC, like every other date the
+   * platform prints, so the notice and the record agree.
+   */
+  private today(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
 
   /**
    * Suspends a partner, and tells them why.
@@ -112,27 +120,16 @@ export class EnforcementService {
     });
 
     /*
-      Told, and outside the transaction. Mail is I/O to somebody else's system: inside, it would
-      hold a row lock for an SMTP round trip, and a delivery failure would roll back a suspension
-      that had already been decided. A partner still trading because a mail server was slow is the
-      wrong direction for this particular failure — the same reasoning as the staff suspension
-      notice, and the same swallow-and-log on the way out.
+      Told, and outside the transaction — see `EnforcementNotifier`, which cannot throw.
+
+      Inside, mail would hold a row lock for an SMTP round trip and a delivery failure would roll
+      back a suspension that had already been decided. A partner still trading because a mail server
+      was slow is the wrong direction for this particular failure.
     */
-    await this.mail
-      .send(
-        partnerSuspendedMail({
-          to: partner.email,
-          locale: partner.preferred_locale,
-          reason: input.reason,
-          url: `${this.env.PARTNER_URL}/`,
-        }),
-      )
-      .catch((error: unknown) => {
-        this.logger.error(
-          `Could not send the suspension notice for partner ${partner.id}.`,
-          error instanceof Error ? error.stack : undefined,
-        );
-      });
+    await this.notifier.suspended(actor, partner.id, {
+      reason: input.reason,
+      date: this.today(),
+    });
 
     this.logger.log(`Partner ${reference} suspended by ${actor?.sub}.`);
   }
@@ -175,6 +172,19 @@ export class EnforcementService {
         },
         tx as unknown as Database,
       );
+    });
+
+    /*
+      Told, and this one is easy to think unnecessary.
+
+      A partner whose transfers stopped and whose listings vanished has no way to know the hold has
+      been lifted except by checking — so a business can stay off the market for days after SAFRA
+      decided it should not be. The notice says what came BACK, including that payouts frozen during
+      the hold were held rather than cancelled.
+    */
+    await this.notifier.unsuspended(actor, partner.id, {
+      reason: input.reason,
+      date: this.today(),
     });
 
     this.logger.log(`Partner ${reference} unsuspended by ${actor?.sub}.`);
@@ -268,6 +278,18 @@ export class EnforcementService {
         tx as unknown as Database,
       );
     });
+
+    /*
+      And the partner is TOLD — which, until 2026-08-24, they were not.
+
+      `warned` means somebody informed them; that is the whole reason it is its own rung and the fact
+      an appeal turns on. The console had been saying «صدر الإنذار وأُبلغ الشريك» while nothing was
+      sent, so the rung recorded a conversation that never happened.
+    */
+    await this.notifier.warned(actor, violation.partner_id, {
+      note: input.note,
+      date: this.today(),
+    });
   }
 
   /**
@@ -315,6 +337,20 @@ export class EnforcementService {
         },
         tx as unknown as Database,
       );
+    });
+
+    /*
+      And the partner is TOLD, with the figure.
+
+      A fine is money taken from a business. It notified nobody until 2026-08-24 while the console
+      said «فُرضت الغرامة وأُبلغ الشريك» — so the first a partner knew of it was a smaller payout, or
+      nothing at all if they were not watching. The amount travels with its currency because a bare
+      number in a notice about money is worse than no number.
+    */
+    await this.notifier.fined(actor, violation.partner_id, {
+      amount: `${input.amount} ${input.currencyCode}`,
+      reason: input.reason,
+      date: this.today(),
     });
   }
 
@@ -404,26 +440,15 @@ export class EnforcementService {
     });
 
     /*
-      *"The affected partner must be notified that the fine was waived."* Outside the transaction
-      and swallowed on failure, for the reason every notice in this codebase is: the decision is
-      made and correct, and a mail server being slow must not roll it back.
+      *"The affected partner must be notified that the fine was waived."* Outside the transaction,
+      for the reason every notice in this codebase is: the decision is made and correct, and a mail
+      server being slow must not roll it back.
     */
-    await this.mail
-      .send(
-        partnerFineWaivedMail({
-          to: found.email,
-          locale: found.preferred_locale,
-          amount: `${violation.fine_amount ?? ''} ${found.code}`,
-          reason: input.reason,
-          url: `${this.env.PARTNER_URL}/violations`,
-        }),
-      )
-      .catch((error: unknown) => {
-        this.logger.error(
-          `Could not send the waiver notice for violation ${violationId}.`,
-          error instanceof Error ? error.stack : undefined,
-        );
-      });
+    await this.notifier.fineWaived(actor, violation.partner_id, {
+      amount: `${violation.fine_amount ?? ''} ${found.code}`,
+      reason: input.reason,
+      date: this.today(),
+    });
 
     this.logger.log(`Fine on violation ${violationId} waived by ${actor?.sub}.`);
   }
@@ -504,10 +529,11 @@ export class EnforcementService {
         warnedAt: row['warned_at'],
         warningNote: row['warning_note'],
         /*
-          Added to the SELECT and forgotten HERE, which is the defect the note above this mapping
-          describes — a hand-maintained field list beside a query that grew. The console's schema
-          requires both, so the parse failed and مخالفات said «تعذّر تحميل هذه القائمة» while the API
-          answered 200. Caught by the browser pass within minutes, which is the strict parse working.
+          Added to the SELECT and forgotten HERE on the first attempt, which is the defect the note
+          above this mapping describes — a hand-maintained field list beside a query that grew. The
+          console's schema requires both, so the parse failed and the whole screen said «تعذّر
+          تحميل هذه القائمة» while the API answered 200. Caught by the browser pass within minutes,
+          which is the strict parse working exactly as intended.
         */
         description: row['description'],
         fineReason: row['fine_reason'],

@@ -31,11 +31,23 @@ export const en = {
 
   partnerFineWaived: {
     subject: 'A fine on your account has been waived',
-    body: 'The SAFRA team has reviewed the fine on your account and decided to waive it.\n\nAmount: {amount}\nReason:\n{reason}\n\nYou will not be charged this amount. The original violation remains recorded on your account with the waiver recorded beside it — we do not delete the record, we add to it, so what happened stays clear to you and to us.\n\nYou can review the violation and the waiver here:\n{url}\n\nThe SAFRA team',
+    body: 'The SAFRA team has reviewed the fine on your account and decided to waive it.\n\nAmount: {amount}\nDate waived: {date}\n\nReason:\n{reason}\n\nYou will not be charged this amount. The original violation remains recorded on your account with the waiver recorded beside it — we do not delete the record, we add to it, so what happened stays clear to you and to us.\n\nYou can review the violation and the waiver here:\n{url}\n\nThe SAFRA team',
+  },
+  partnerWarned: {
+    subject: 'A warning has been issued on your account',
+    body: 'A formal warning has been issued on your SAFRA partner account.\n\nDate of warning: {date}\n\nThe warning:\n{note}\n\nA warning is a record on your account. It carries no charge, and it does not affect where your listings rank in search. Confirmed bookings stand and your guests are unaffected.\n\nYou can read the violation and its full detail in the partner portal:\n{url}\n\nTo appeal or ask a question, contact the SAFRA team through support in the partner portal.\n\nThe SAFRA team',
+  },
+  partnerFined: {
+    subject: 'A fine has been charged to your account',
+    body: 'A fine has been charged to your SAFRA partner account.\n\nAmount: {amount}\nDate of fine: {date}\n\nReason:\n{reason}\n\nA fine does not affect where your listings rank in search, and confirmed bookings stand.\n\nYou can read the violation and the fine in full in the partner portal:\n{url}\n\nIf you believe this fine was charged in error, contact the SAFRA team through support in the partner portal.\n\nThe SAFRA team',
+  },
+  partnerUnsuspended: {
+    subject: 'Your partner account has been reinstated',
+    body: 'The suspension on your SAFRA partner account has been lifted and the account is fully active again.\n\nDate lifted: {date}\n\nReason:\n{reason}\n\nWhat is back:\n- Your listings appear in search again and new bookings can be made.\n- Payouts resume. Anything frozen during the suspension was held, not cancelled.\n- You can add new properties, and publish and edit existing ones.\n\nThe suspension stays on your record with the decision to lift it beside it — we do not delete the record, we add to it.\n\nPartner portal:\n{url}\n\nThe SAFRA team',
   },
   partnerSuspended: {
     subject: 'Your partner account has been suspended',
-    body: 'Your SAFRA partner account has been suspended.\n\nReason:\n{reason}\n\nWhat this means:\n- Your listings will not appear in search, and no new bookings can be made.\n- **Confirmed bookings stand and your current guests are unaffected.** Host them as normal.\n- Payouts are frozen while the suspension is in force.\n- You cannot add new properties, or publish or edit existing ones.\n\nYou can still sign in to the partner portal, view your account and read this reason at any time:\n{url}\n\nTo appeal or ask a question, contact the SAFRA team through support in the partner portal.\n\nThe SAFRA team',
+    body: 'Your SAFRA partner account has been suspended.\n\nDate of suspension: {date}\n\nReason:\n{reason}\n\nWhat this means:\n- Your listings will not appear in search, and no new bookings can be made.\n- **Confirmed bookings stand and your current guests are unaffected.** Host them as normal.\n- Payouts are frozen while the suspension is in force.\n- You cannot add new properties, or publish or edit existing ones.\n\nYou can still sign in to the partner portal, view your account and read this reason at any time:\n{url}\n\nTo appeal or ask a question, contact the SAFRA team through support in the partner portal.\n\nThe SAFRA team',
   },
   staffSuspended: {
     subject: 'Your SAFRA console account has been disabled',

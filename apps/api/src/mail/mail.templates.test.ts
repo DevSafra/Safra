@@ -30,6 +30,8 @@ const SAMPLE = {
   locale: 'ar',
   /* A suspension reason, long enough to satisfy the twenty-character floor the schema enforces. */
   reason: 'صور لا تطابق العقار المعروض',
+  /* The effective date every enforcement notice states (Bashar, 2026-08-24). */
+  date: '2026-08-24',
 };
 
 /**
@@ -309,6 +311,7 @@ const RENDERERS: {
         url: SAMPLE.url,
         amount: '50.00 USD',
         reason: SAMPLE.reason,
+        date: SAMPLE.date,
       }),
     shows: SAMPLE.reason,
   },
@@ -326,6 +329,55 @@ const RENDERERS: {
         locale,
         url: SAMPLE.url,
         reason: SAMPLE.reason,
+        date: SAMPLE.date,
+      }),
+    shows: SAMPLE.reason,
+  },
+  /*
+    The three enforcement notices that told nobody anything until 2026-08-24.
+
+    `shows` is the REASON or the NOTE in each case, for the same argument the two above make: a
+    notice that reaches somebody in a language where the cause went missing has told them their
+    business is affected and not why. The amount is asserted separately below, because a fine notice
+    losing its figure in one language is its own distinct failure.
+  */
+  {
+    name: 'partnerWarnedMail',
+    entry: 'partnerWarned',
+    render: (locale) =>
+      templates.partnerWarnedMail({
+        to: SAMPLE.to,
+        locale,
+        url: SAMPLE.url,
+        note: SAMPLE.reason,
+        date: SAMPLE.date,
+      }),
+    shows: SAMPLE.reason,
+  },
+  {
+    name: 'partnerFinedMail',
+    entry: 'partnerFined',
+    render: (locale) =>
+      templates.partnerFinedMail({
+        to: SAMPLE.to,
+        locale,
+        url: SAMPLE.url,
+        amount: '50.00 USD',
+        reason: SAMPLE.reason,
+        date: SAMPLE.date,
+      }),
+    shows: SAMPLE.reason,
+  },
+  {
+    name: 'partnerUnsuspendedMail',
+    entry: 'partnerUnsuspended',
+    render: (locale) =>
+      templates.partnerUnsuspendedMail({
+        to: SAMPLE.to,
+        locale,
+        url: SAMPLE.url,
+        reason: SAMPLE.reason,
+        date: SAMPLE.date,
       }),
     shows: SAMPLE.reason,
   },

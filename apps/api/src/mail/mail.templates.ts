@@ -728,12 +728,97 @@ export function partnerSuspendedMail(input: {
   to: string;
   locale: string;
   reason: string;
+  date: string;
   url: string;
 }): OutgoingMail {
   return {
     to: input.to,
     ...compose((m) => m.partnerSuspended, input.locale, {
       reason: input.reason,
+      date: input.date,
+      url: input.url,
+    }),
+  };
+}
+
+/**
+ * "A warning has been issued on your account."
+ *
+ * ## What it says that the record does not
+ *
+ * Three facts a warned partner otherwise has to guess at, and each was chosen because guessing
+ * wrong is expensive: a warning carries **no charge**, it does **not** affect ranking (Bashar's
+ * standing rule, and the one thing a partner assumes has happened), and confirmed bookings stand.
+ * Without them a warning reads as an unnamed penalty of unknown size.
+ *
+ * `note` is the warning TEXT — written by an operator for this reader, under a field labelled
+ * «يقرأه الشريك». The staff-only fields never come near this template.
+ */
+export function partnerWarnedMail(input: {
+  to: string;
+  locale: string;
+  note: string;
+  date: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.partnerWarned, input.locale, {
+      note: input.note,
+      date: input.date,
+      url: input.url,
+    }),
+  };
+}
+
+/**
+ * "A fine has been charged to your account."
+ *
+ * `amount` arrives already formatted with its currency — the caller has the currency code and this
+ * template must not invent a format for money. It states that a fine does not affect ranking for
+ * the same reason the warning does: it is the assumption a partner makes.
+ */
+export function partnerFinedMail(input: {
+  to: string;
+  locale: string;
+  amount: string;
+  reason: string;
+  date: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.partnerFined, input.locale, {
+      amount: input.amount,
+      reason: input.reason,
+      date: input.date,
+      url: input.url,
+    }),
+  };
+}
+
+/**
+ * "Your partner account has been reinstated."
+ *
+ * The one notice in this group that is good news, and it still carries a reason: lifting an
+ * enforcement action is a decision with consequences, and "who decided this was over, and why" is
+ * asked exactly as often as why it began.
+ *
+ * It says the frozen payouts were HELD rather than cancelled, because a partner who watched
+ * transfers stop has no way to know which of the two happened.
+ */
+export function partnerUnsuspendedMail(input: {
+  to: string;
+  locale: string;
+  reason: string;
+  date: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.partnerUnsuspended, input.locale, {
+      reason: input.reason,
+      date: input.date,
       url: input.url,
     }),
   };
@@ -755,6 +840,7 @@ export function partnerFineWaivedMail(input: {
   locale: string;
   amount: string;
   reason: string;
+  date: string;
   url: string;
 }): OutgoingMail {
   return {
@@ -762,6 +848,7 @@ export function partnerFineWaivedMail(input: {
     ...compose((m) => m.partnerFineWaived, input.locale, {
       amount: input.amount,
       reason: input.reason,
+      date: input.date,
       url: input.url,
     }),
   };

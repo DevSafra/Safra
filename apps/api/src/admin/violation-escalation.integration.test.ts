@@ -4,11 +4,13 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { EnforcementNotifier } from './enforcement-notifier.js';
 import { EnforcementService } from './enforcement.service.js';
+import type { NotificationService } from '../notifications/notification.service.js';
 import type { Env } from '../config/env.js';
 import type { FxRateService } from '../fx/fx-rate.service.js';
 import type { LedgerService } from '../ledger/ledger.service.js';
-import type { MailService, OutgoingMail } from '../mail/mail.service.js';
+import type { OutgoingMail } from '../mail/mail.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
@@ -54,7 +56,12 @@ describeIfDb('suspending a partner because of a violation', () => {
 
   let db: Database;
   let enforcement: EnforcementService;
-  let sent: OutgoingMail[];
+  let notified: {
+    templateKey: string;
+    channel: string;
+    locale: string;
+    to: string | null;
+  }[];
   let run = 0;
 
   /** A partner of its own, so nothing here depends on what the seed happens to contain. */
@@ -119,7 +126,6 @@ describeIfDb('suspending a partner because of a violation', () => {
     await harness.begin();
     db = harness.db;
     run += 1;
-    sent = [];
 
     /* A real staff row, so `waived_by_user_id` and `actor_user_id` have something to point at. */
     const actor = await db.execute<{ id: string }>(sql`
@@ -131,16 +137,36 @@ describeIfDb('suspending a partner because of a violation', () => {
 
     staff.sub = actor.rows[0]?.id ?? '';
 
+    /*
+      A REAL notifier over a stubbed queue, not a stubbed notifier.
+
+      The notifier is what decides the recipient, the locale and the two channels — the three things
+      `O-partner-11` was about — so stubbing it would leave the part most worth testing untested.
+      What is stubbed is one level lower: `NotificationService`, so nothing reaches Redis or SMTP and
+      the calls can be counted.
+    */
+    notified = [];
     enforcement = new EnforcementService(
       db,
-      { PARTNER_URL: 'https://partner.safra.test' } as unknown as Env,
       new AuditService(db),
       /* Waiving is not exercised here, so the ledger and fx are never called. */
       {} as unknown as LedgerService,
       {} as unknown as FxRateService,
-      {
-        send: (mail: OutgoingMail) => Promise.resolve(void sent.push(mail)),
-      } as unknown as MailService,
+      new EnforcementNotifier(
+        db,
+        { PARTNER_URL: 'https://partner.safra.test' } as unknown as Env,
+        {
+          notify: (templateKey: string, mail: OutgoingMail, locale: string) =>
+            Promise.resolve(
+              void notified.push({ templateKey, channel: 'email', locale, to: mail.to }),
+            ),
+          recordInApp: (templateKey: string, locale: string) =>
+            Promise.resolve(
+              void notified.push({ templateKey, channel: 'in_app', locale, to: null }),
+            ),
+        } as unknown as NotificationService,
+        new AuditService(db),
+      ),
     );
   });
 
@@ -196,6 +222,33 @@ describeIfDb('suspending a partner because of a violation', () => {
     `);
 
     expect(fined.rows[0]?.fine_reason).toBe(fineReason);
+  });
+
+  /**
+   * The CONSOLE's own list carries the words too, and this is a mapping test on purpose.
+   *
+   * `list()` builds its response from a hand-written field list beside the query. The columns were
+   * added to the SELECT and left out of that mapping on the first attempt, so the console's schema —
+   * which requires both — rejected the whole response and مخالفات said «تعذّر تحميل هذه القائمة»
+   * while the API answered 200. The browser pass caught it in minutes; nothing else would have,
+   * because a query test would have seen the columns and a schema test would have seen the schema.
+   *
+   * Asserted through `list()` rather than against the SQL for exactly that reason: the defect lived
+   * between them.
+   */
+  it('returns the description and the fine reason to the console', async () => {
+    const partner = await makePartner('console');
+
+    await enforcement.raise(staff, partner.reference, {
+      kind: 'stale_calendar',
+      reason: 'وصف المخالفة كما كتبه الموظف ليقرأه الشريك.',
+    });
+
+    const page = await enforcement.list(partner.reference, { limit: 25, page: 1 });
+    const row = page.items[0] as Record<string, unknown> | undefined;
+
+    expect(row?.['description']).toBe('وصف المخالفة كما كتبه الموظف ليقرأه الشريك.');
+    expect(row).toHaveProperty('fineReason');
   });
 
   it('takes the cited violation to the suspension stage', async () => {
@@ -294,13 +347,29 @@ describeIfDb('suspending a partner because of a violation', () => {
     expect(suspended.rows[0]?.n).toBe(1);
   });
 
-  /** The partner still hears about it — the notice is not a casualty of the extra work. */
-  it('still emails the partner when a violation is cited', async () => {
+  /**
+   * The partner still hears about it, on BOTH channels, at the account address.
+   *
+   * Three things at once, and each was a defect before 2026-08-24: that a suspension notifies at
+   * all when a violation is cited (the extra work must not cost the notice), that it goes out
+   * in-app as well as by email, and that it is addressed to `users.email` rather than
+   * `partners.email` — `O-partner-11`, where the two diverged for the main fixture and a suspended
+   * business would have been told nothing.
+   */
+  it('notifies the partner on both channels, at the account address', async () => {
     const partner = await makePartner('mail');
     const violationId = await makeViolation(partner.id);
 
     await enforcement.suspend(staff, partner.reference, { reason: REASON, violationId });
 
-    expect(sent).toHaveLength(1);
+    expect(notified.map((n) => n.channel).sort()).toStrictEqual(['email', 'in_app']);
+    expect(notified.every((n) => n.templateKey === 'partner.suspended')).toBe(true);
+
+    const account = await db.execute<{ email: string }>(sql`
+      SELECT u.email FROM partners p JOIN users u ON u.id = p.user_id
+      WHERE p.id = ${partner.id}::uuid
+    `);
+
+    expect(notified.find((n) => n.channel === 'email')?.to).toBe(account.rows[0]?.email);
   });
 });

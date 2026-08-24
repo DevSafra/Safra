@@ -31,11 +31,23 @@ export const de = {
 
   partnerFineWaived: {
     subject: 'Eine Geldstrafe auf Ihrem Konto wurde erlassen',
-    body: 'Das SAFRA-Team hat die Geldstrafe auf Ihrem Konto geprüft und entschieden, sie zu erlassen.\n\nBetrag: {amount}\nGrund:\n{reason}\n\nDieser Betrag wird Ihnen nicht berechnet. Der ursprüngliche Verstoß bleibt in Ihrem Konto verzeichnet, mit dem Erlass daneben — wir löschen den Eintrag nicht, wir ergänzen ihn, damit nachvollziehbar bleibt, was geschehen ist.\n\nVerstoß und Erlass können Sie hier einsehen:\n{url}\n\nIhr SAFRA-Team',
+    body: 'Das SAFRA-Team hat die Geldstrafe auf Ihrem Konto geprüft und entschieden, sie zu erlassen.\n\nBetrag: {amount}\nDatum des Erlasses: {date}\n\nGrund:\n{reason}\n\nDieser Betrag wird Ihnen nicht berechnet. Der ursprüngliche Verstoß bleibt in Ihrem Konto verzeichnet, mit dem Erlass daneben — wir löschen den Eintrag nicht, wir ergänzen ihn, damit nachvollziehbar bleibt, was geschehen ist.\n\nVerstoß und Erlass können Sie hier einsehen:\n{url}\n\nIhr SAFRA-Team',
+  },
+  partnerWarned: {
+    subject: 'Eine Verwarnung wurde für Ihr Konto ausgesprochen',
+    body: 'Für Ihr SAFRA-Partnerkonto wurde eine formelle Verwarnung ausgesprochen.\n\nDatum der Verwarnung: {date}\n\nDie Verwarnung:\n{note}\n\nEine Verwarnung ist ein Eintrag in Ihrem Konto. Sie ist mit keiner Zahlung verbunden und hat keinen Einfluss darauf, wie Ihre Inserate in der Suche platziert werden. Bestätigte Buchungen bleiben bestehen, Ihre Gäste sind nicht betroffen.\n\nDen Verstoß und alle Einzelheiten finden Sie im Partnerportal:\n{url}\n\nFür Einsprüche oder Rückfragen wenden Sie sich über den Support im Partnerportal an das SAFRA-Team.\n\nIhr SAFRA-Team',
+  },
+  partnerFined: {
+    subject: 'Für Ihr Konto wurde eine Geldbuße erhoben',
+    body: 'Für Ihr SAFRA-Partnerkonto wurde eine Geldbuße erhoben.\n\nBetrag: {amount}\nDatum der Geldbuße: {date}\n\nGrund:\n{reason}\n\nEine Geldbuße hat keinen Einfluss darauf, wie Ihre Inserate in der Suche platziert werden; bestätigte Buchungen bleiben bestehen.\n\nDen Verstoß und die Geldbuße finden Sie vollständig im Partnerportal:\n{url}\n\nFalls die Geldbuße Ihrer Ansicht nach zu Unrecht erhoben wurde, wenden Sie sich über den Support im Partnerportal an das SAFRA-Team.\n\nIhr SAFRA-Team',
+  },
+  partnerUnsuspended: {
+    subject: 'Ihr Partnerkonto wurde wieder freigegeben',
+    body: 'Die Sperrung Ihres SAFRA-Partnerkontos wurde aufgehoben, das Konto ist wieder vollständig aktiv.\n\nDatum der Aufhebung: {date}\n\nGrund:\n{reason}\n\nWas wieder möglich ist:\n- Ihre Inserate erscheinen wieder in der Suche, neue Buchungen sind möglich.\n- Auszahlungen werden fortgesetzt. Während der Sperrung eingefrorene Beträge wurden gehalten, nicht storniert.\n- Sie können neue Unterkünfte anlegen sowie bestehende veröffentlichen und bearbeiten.\n\nDie Sperrung bleibt mit der Entscheidung zur Aufhebung daneben im Konto vermerkt — wir löschen den Eintrag nicht, wir ergänzen ihn.\n\nPartnerportal:\n{url}\n\nIhr SAFRA-Team',
   },
   partnerSuspended: {
     subject: 'Ihr Partnerkonto wurde gesperrt',
-    body: 'Ihr SAFRA-Partnerkonto wurde gesperrt.\n\nGrund:\n{reason}\n\nWas das bedeutet:\n- Ihre Inserate erscheinen nicht mehr in der Suche, und es sind keine neuen Buchungen möglich.\n- **Bestätigte Buchungen bleiben bestehen, Ihre aktuellen Gäste sind nicht betroffen.** Empfangen Sie sie wie gewohnt.\n- Auszahlungen sind während der Sperrung eingefroren.\n- Sie können keine neuen Unterkünfte anlegen und bestehende weder veröffentlichen noch bearbeiten.\n\nSie können sich weiterhin im Partnerportal anmelden, Ihr Konto einsehen und diesen Grund jederzeit nachlesen:\n{url}\n\nFür Einsprüche oder Rückfragen wenden Sie sich über den Support im Partnerportal an das SAFRA-Team.\n\nIhr SAFRA-Team',
+    body: 'Ihr SAFRA-Partnerkonto wurde gesperrt.\n\nDatum der Sperrung: {date}\n\nGrund:\n{reason}\n\nWas das bedeutet:\n- Ihre Inserate erscheinen nicht mehr in der Suche, und es sind keine neuen Buchungen möglich.\n- **Bestätigte Buchungen bleiben bestehen, Ihre aktuellen Gäste sind nicht betroffen.** Empfangen Sie sie wie gewohnt.\n- Auszahlungen sind während der Sperrung eingefroren.\n- Sie können keine neuen Unterkünfte anlegen und bestehende weder veröffentlichen noch bearbeiten.\n\nSie können sich weiterhin im Partnerportal anmelden, Ihr Konto einsehen und diesen Grund jederzeit nachlesen:\n{url}\n\nFür Einsprüche oder Rückfragen wenden Sie sich über den Support im Partnerportal an das SAFRA-Team.\n\nIhr SAFRA-Team',
   },
   staffSuspended: {
     subject: 'Ihr SAFRA-Konsolenkonto wurde deaktiviert',

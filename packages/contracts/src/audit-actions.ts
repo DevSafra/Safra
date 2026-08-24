@@ -174,6 +174,14 @@ export const AUDIT_ACTIONS = [
   /* The fourth rung. `partner.suspended` says the business stopped; this says which violation. */
   'violation.escalated',
   'fine.waived',
+  /*
+    The DELIVERY, distinct from the decision (Bashar, 2026-08-24).
+
+    "The audit trail must distinguish the enforcement action from the notification delivery result."
+    `violation.warned` says somebody decided to warn; this says whether the partner was told, and it
+    is written AFTER the transaction because telling them is not part of deciding.
+  */
+  'partner.notified',
   'rbac.grant_toggled',
   'setting.updated',
   /*

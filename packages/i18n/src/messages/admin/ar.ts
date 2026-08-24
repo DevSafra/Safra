@@ -2195,6 +2195,7 @@ export const ar = {
     'violation.warned': 'إنذار على مخالفة',
     'violation.fined': 'فرض غرامة على مخالفة',
     'violation.escalated': 'تصعيد مخالفة إلى تعليق الحساب',
+    'partner.notified': 'إبلاغ الشريك بإجراء',
     'fine.waived': 'إلغاء غرامة',
     'staff.scope_changed': 'تعديل نطاق موظف',
     'unit.created': 'إنشاء وحدة',
@@ -2414,6 +2415,15 @@ export const ar = {
         real `audit_log` rather than by reading the code that writes them.
       */
       stage: 'المرحلة',
+      /*
+        The delivery result of an enforcement notice (`partner.notified`, 2026-08-24).
+
+        `email` already had a name; these two did not, and `audit-catalogue.integration.test.ts`
+        found them the moment the first real notice was sent — reading the TABLE rather than the
+        code, which is why it catches a key the author forgot rather than one they declared.
+      */
+      templateKey: 'الإشعار',
+      inApp: 'داخل التطبيق',
       suspended: 'التعليق',
       /*
         Generic enough to be shared, and both arrive from `partner_employee_role.*`: a role's audit
@@ -2887,6 +2897,19 @@ export const ar = {
       platform sends, confirmed against every `templateKey` literal in the API.
     */
     'support.replied': 'رد على طلب دعم',
+    /*
+      The five enforcement notices (Bashar, 2026-08-24).
+
+      Before that date only two of the five events told the partner ANYTHING — suspension and the
+      fine waiver — while the console said «وأُبلغ الشريك» for a warning, a fine and a lift as well.
+      Each of these is now sent on both channels, so each appears in سجل واتساب والبريد and needs a
+      name here or the log prints the raw key.
+    */
+    'partner.warned': 'إنذار على الشريك',
+    'partner.fined': 'غرامة على الشريك',
+    'partner.suspended': 'تعليق حساب شريك',
+    'partner.unsuspended': 'رفع تعليق حساب شريك',
+    'partner.fine_waived': 'إلغاء غرامة عن شريك',
   } as Record<string, string>,
 
   /** Booking statuses, so the table does not show raw enum values. */

@@ -15,6 +15,7 @@ import { StaffRolesService } from './staff-roles.service.js';
 import { FxModule } from '../fx/fx.module.js';
 import { LedgerModule } from '../ledger/ledger.module.js';
 import { EnforcementController } from './enforcement.controller.js';
+import { EnforcementNotifier } from './enforcement-notifier.js';
 import { EnforcementService } from './enforcement.service.js';
 import { ReviewService } from './review.service.js';
 import { MeController } from './me.controller.js';
@@ -67,6 +68,7 @@ import { StaffScopeService } from './staff-scope.service.js';
   providers: [
     ReviewService,
     StaffRolesService,
+    EnforcementNotifier,
     EnforcementService,
     AdminGrantsService,
     AuditLogService,
