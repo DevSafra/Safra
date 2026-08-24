@@ -101,6 +101,44 @@ export default async function PartnerPage({
             {label(t.enums.verification, partner.verification)}
           </StatusPill>
         </p>
+
+        {/*
+          «متابعة المستندات» — carrying on an unfinished onboarding, from the record (Bashar,
+          2026-08-24).
+
+          > *"I should have an option to continue the documents of a partner with status بانتظار
+          > التحقق. When I want to continue it myself I should get the onboarding screen when not
+          > then display the current screen."*
+
+          ## Why an OPTION rather than a redirect
+
+          Because the two screens answer different questions and both are legitimate destinations
+          for an undecided partner. The record answers "what do we know about them", in the order a
+          REVIEWER decides; `/onboarding` answers "what is still outstanding", in the order the
+          steps have to happen. Redirecting an unverified partner to the checklist would take the
+          record away from somebody who came to read it — so the record stays, and the way onward
+          is offered.
+
+          ## Why only while the decision is open
+
+          `decided` is `verification !== 'pending'`. Once a partner is approved or rejected there is
+          nothing to continue, and a control that leads to a finished checklist is a control that
+          teaches people to ignore it. The screen itself refuses regardless; this is about not
+          offering a door that opens onto nothing.
+
+          Styled as the primary action here, unlike the violations link below, because for a partner
+          in this state it usually IS the next thing somebody does.
+        */}
+        {decided ? null : (
+          <p className="mt-3">
+            <a
+              href={`/partners/${partner.reference}/onboarding`}
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-gold/40 bg-gold/10 px-4 py-2 text-[12.5px] text-gold transition-colors hover:border-gold hover:bg-gold/15 lg:min-h-0"
+            >
+              {t.sections.partnerDetail.continueOnboarding}
+            </a>
+          </p>
+        )}
       </header>
 
       {/* ── Contact and identity ──────────────────────────────────────────── */}
