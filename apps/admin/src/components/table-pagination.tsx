@@ -174,6 +174,27 @@ export function TablePagination({
             inputMode="numeric"
             min={1}
             max={MAX_PAGE}
+            /*
+              `key` so the number actually CHANGES when the page does (Bashar, 2026-08-24).
+
+              This is uncontrolled — `defaultValue` is read once, when React mounts the node. That
+              was fine while the arrows were plain anchors: every step was a document load, the DOM
+              was rebuilt, and the box showed the new page.
+
+              Making the arrows `<Link scroll={false}>` to stop the viewport jumping turned each
+              step into a SOFT navigation. React then reconciles the same `<input>` rather than
+              replacing it, `defaultValue` is not re-applied, and the box keeps the page the reader
+              arrived on while the list beneath it moves. «صفحة ١ من ١٠٢» over the contents of page
+              four — the bar contradicting the table it describes, which is exactly the class of
+              failure the shared `fromWhere` rule exists to prevent one layer down.
+
+              Keying on the value forces a remount when it changes, which is the smallest fix that
+              keeps the input uncontrolled — and it must stay uncontrolled, because a controlled one
+              would fight the reader mid-type on every keystroke.
+
+              My regression, from the scroll fix, three hours earlier.
+            */
+            key={`page-${page}`}
             defaultValue={page}
             aria-label={t.table.pageLabel}
             className="w-14 rounded-[9px] border border-line bg-field px-2 py-1.5 text-center text-[12.5px] text-text"
@@ -195,6 +216,8 @@ export function TablePagination({
           <span className="whitespace-nowrap">{t.table.show}</span>
           <select
             name={sizeParam}
+            /* Same reason as the page box: uncontrolled, and a soft navigation does not remount it. */
+            key={`size-${size}`}
             defaultValue={String(size)}
             aria-label={t.table.pageSizeLabel}
             className="cursor-pointer rounded-[9px] border border-line bg-field px-2 py-1.5 text-[12.5px] text-text"

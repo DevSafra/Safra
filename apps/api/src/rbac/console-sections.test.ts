@@ -58,7 +58,11 @@ const SECTION_HANDLERS: Record<
   dashboard: [AdminController, 'dashboardOverview', 'getDashboard'],
   bookings: [RegistriesController, 'listBookings', 'getBookings'],
   partners: [RegistriesController, 'listPartners', 'getPartnerRegistry'],
-  applications: [AdminPartnerApplicationController, 'list', 'getPartnerApplications'],
+  partnerApplications: [
+    AdminPartnerApplicationController,
+    'list',
+    'getPartnerApplications',
+  ],
   properties: [RegistriesController, 'listProperties', 'getPropertyRegistry'],
   customers: [RegistriesController, 'listCustomers', 'getCustomers'],
   staff: [StaffController, 'list', 'getStaff'],

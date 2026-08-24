@@ -54,6 +54,16 @@ export const TABLE_SECTIONS = [
   /* «طلبات الشراكة» — the join-request queue, its own sidebar section (Bashar, 2026-08-19). */
   'partnerApplications',
   /**
+   * A partner's violations — its own key, NOT `partners` (2026-08-24).
+   *
+   * project-e9 reused `partners`, reasonably: the screen hangs off a partner record and there was
+   * no section for it. But this list is keyed by TABLE rather than by route — «ten bookings is a
+   * queue you scan; a hundred audit rows is a log you search», and a violations list is read the
+   * second way while الشركاء is read the first. Sharing a key means choosing a hundred rows on one
+   * silently rewrites the other, which is the drift `staffScope` exists to prevent on `/staff`.
+   */
+  'partnerViolations',
+  /**
    * The two P-002 VERIFICATION QUEUES, each a second paged list on its section's screen.
    *
    * They were not paged at all until 2026-08-20: the service took `limit = 50` and the screen
@@ -93,6 +103,13 @@ export type TableSection = (typeof TABLE_SECTIONS)[number];
 export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   bookings: '/bookings',
   partners: '/partners',
+  /*
+    The base path only — the reference comes from the screen. `TABLE_SECTION_PATHS` feeds the save
+    endpoint's REDIRECT, which must never take a path from a request, so a section whose real URL
+    contains a record reference cannot express it here. It redirects to the registry and the reader
+    is one click from where they were, which is the safe half of that trade.
+  */
+  partnerViolations: '/partners',
   properties: '/properties',
   customers: '/customers',
   staff: '/staff',
@@ -132,6 +149,8 @@ const NAMESPACED: Readonly<
   staffActivity: { page: 'activityPage', size: 'activitySize' },
   partnersPending: { page: 'queuePage', size: 'queueSize' },
   propertiesPending: { page: 'queuePage', size: 'queueSize' },
+  /* Namespaced like `staffScope`: the record screen may carry its own parameters too. */
+  partnerViolations: { page: 'vpage', size: 'vsize' },
 };
 
 export const TABLE_SECTION_PARAMS: Readonly<
