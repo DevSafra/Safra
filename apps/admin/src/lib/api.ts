@@ -135,6 +135,93 @@ export async function getPendingPartners(params: ListParams) {
   );
 }
 
+// ── الإيقاف والمخالفات ───────────────────────────────────────────────────────
+
+/**
+ * A partner's suspension, as the CONSOLE sees it.
+ *
+ * `notes` is staff-only and the partner's own payload omits it — not nulls it, omits it. It is the
+ * one field in this record with two audiences, and a field with two audiences and one shape is
+ * exactly what leaked a super admin's name through `actor_name` this morning. It is declared
+ * optional here so that shape stays true: a console that received a payload without it renders the
+ * rest rather than failing the parse.
+ */
+const suspensionSchema = z.object({
+  /*
+    Written FOR the partner — they can sign in and read it. Nullable because a suspension imposed
+    before the column existed has none, not because the API allows one to be raised without a reason.
+  */
+  reason: z.string().nullable(),
+  notes: z.string().nullable().optional(),
+  since: z.string(),
+  /*
+    Already resolved to a NAME by the API, and already pseudonymised: a super admin reads «Admin»,
+    through the same `actorName` helper as the audit columns. The console receives a string and
+    prints it — no id, nothing to resolve, and no second place deciding who acts under a pseudonym.
+  */
+  by: z.string().nullable(),
+});
+
+export type PartnerSuspension = z.infer<typeof suspensionSchema>;
+
+/**
+ * One violation, at whatever stage it has reached.
+ *
+ * ## `waiver` is one object, present or absent
+ *
+ * Not four nullable columns. A screen cannot then render half of it — «أُلغيت» with no reason
+ * beside it is worse for the partner than no mark at all, and the reason is the part they are owed.
+ *
+ * `waiver.amount` equals the fine by construction: the API takes the figure from the stored row
+ * rather than from a caller, so the pair cannot drift and the display can state that they net to
+ * zero without recomputing it.
+ */
+const violationSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  stage: z.string(),
+  /* How many times this partner has done this. The progression is per partner, not per booking. */
+  occurrenceNumber: z.number(),
+  bookingReference: z.string().nullable().optional(),
+  warnedAt: z.string().nullable(),
+  warningNote: z.string().nullable(),
+  fineAmount: z.string().nullable(),
+  fineCurrency: z.string().nullable(),
+  customerCompensationAmount: z.string().nullable(),
+  waiver: z
+    .object({
+      at: z.string(),
+      reason: z.string(),
+      by: z.string().nullable(),
+      ledgerGroupId: z.string().nullable().optional(),
+      amount: z.string(),
+      currency: z.string(),
+    })
+    .nullable()
+    .optional(),
+  collectedAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type Violation = z.infer<typeof violationSchema>;
+
+/**
+ * A page of one partner's violations.
+ *
+ * Its own screen rather than a panel on the record: a partner with forty violations after two
+ * years is ordinary, and an unpaged list on a record is the failure «Tables and pagination» exists
+ * to prevent. The record links here.
+ */
+export async function getPartnerViolations(
+  reference: string,
+  params: { page?: number | undefined; limit: number },
+) {
+  return staffFetch(
+    `/admin/partners/${encodeURIComponent(reference)}/violations${listQuery(params)}`,
+    offsetPage(violationSchema),
+  );
+}
+
 // ─── Partner detail (§8.1) ────────────────────────────────────────────────────
 
 /** Postgres timestamps arrive as strings or Dates depending on the driver path. */
@@ -156,6 +243,14 @@ const partnerDocumentSchema = z.object({
 export type PartnerDocument = z.infer<typeof partnerDocumentSchema>;
 
 const partnerDetailSchema = z.object({
+  /*
+    The suspension record, or null when the partner is trading normally.
+
+    Optional as well as nullable, so the record renders against an API that has not been redeployed
+    rather than failing the parse and blanking a screen an operator is using to decide whether to
+    lift an enforcement action. `notes` inside it is staff-only — see `suspensionSchema`.
+  */
+  suspension: suspensionSchema.nullable().optional(),
   reference: z.string(),
   legalName: z.string(),
   displayName: z.string(),
@@ -167,8 +262,16 @@ const partnerDetailSchema = z.object({
   sanctionsScreenedAt: timestamp,
   /** Provider payload, shape varies by provider — rendered as-is for the record. */
   sanctionsScreeningResult: z.unknown().nullable(),
-  suspendedAt: timestamp,
-  suspendedReason: z.string().nullable(),
+  /*
+    No `suspendedAt` / `suspendedReason` here. They were flat columns until 2026-08-24 and the API
+    now destructures them INTO `suspension` above, so a screen cannot render a reason without the
+    date and the author beside it — «موقوف» with nothing a reader can act on was the failure that
+    change prevents.
+
+    Declaring them as well would not be harmless: a required key the API no longer sends fails the
+    parse, `staffFetch` answers 'failed', and the record 404s. That is exactly what happened here
+    for ten minutes, with the API returning 200 the whole time.
+  */
   createdAt: timestamp,
   /*
     Whether the partner has enrolled a second factor — a boolean, deliberately. Mandatory for
