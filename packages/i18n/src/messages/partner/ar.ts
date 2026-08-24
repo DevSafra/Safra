@@ -1403,9 +1403,6 @@ export const ar = {
     allowedTitle: 'ما زال متاحًا',
     allowedRead:
       'يمكنك الدخول ومراجعة حسابك وحجوزاتك وقراءة الإشعارات والتواصل مع الدعم.',
-
-    /* Shown INSTEAD of a broken-looking failure when a write is refused because of the hold. */
-    refused: 'هذا الإجراء متوقف لأن حسابك موقوف. راجع سبب الإيقاف أعلى الصفحة.',
   },
 
   violations: {

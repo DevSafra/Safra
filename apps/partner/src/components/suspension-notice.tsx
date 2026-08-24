@@ -1,3 +1,6 @@
+import { ERROR } from '@safra/contracts';
+import { errorMessage } from '@safra/i18n';
+
 import { fill, t } from '@/lib/strings';
 
 /**
@@ -96,7 +99,7 @@ export function SuspensionNotice({
 export function SuspendedRefusal() {
   return (
     <p data-suspended-refusal className="text-sm text-bad">
-      {t.suspension.refused}
+      {errorMessage(ERROR.PARTNER_SUSPENDED, 'ar')}
     </p>
   );
 }
