@@ -25,6 +25,17 @@ export const en = {
     body: 'You have been invited to the SAFRA admin console as: {roleLabel}.\n\nOpen this link to set your password:\n{url}\n\nThe link expires in {expiresInHours} hours and can be used once.\n\nAfter setting a password you will be required to enable two-factor authentication before the account can be used.\n\nIf you were not expecting this invitation, do not open the link and tell the SAFRA team.\n\nThe SAFRA team',
   },
 
+  /* ── Suspending and reinstating a staff account (Bashar, 2026-08-23) ── */
+
+  staffSuspended: {
+    subject: 'Your SAFRA console account has been disabled',
+    body: 'Your SAFRA console account has been disabled and you can no longer sign in. Any sessions you had open on any device have been ended.\n\nThe account has not been deleted and none of your data has been lost. Disabling is reversible, and an administrator can reinstate the account at any time.\n\nIf you believe this happened by mistake, contact a SAFRA administrator directly — this cannot be resolved from the sign-in screen.\n\nThe SAFRA team',
+  },
+  staffReinstated: {
+    subject: 'Your SAFRA console account has been reinstated',
+    body: 'Your SAFRA console account has been reinstated and you can sign in again:\n{url}\n\nYou will need to sign in again on every device, because your earlier sessions were ended when the account was disabled.\n\nYour role and permissions are exactly as they were before; neither was changed.\n\nThe SAFRA team',
+  },
+
   /* ── Joining as a partner (Bashar, 2026-08-19) ── */
 
   partnerApplicationReceived: {

@@ -25,6 +25,17 @@ export const de = {
     body: 'Sie wurden zur SAFRA-Administrationskonsole eingeladen als: {roleLabel}.\n\nÖffnen Sie diesen Link, um Ihr Passwort festzulegen:\n{url}\n\nDer Link läuft in {expiresInHours} Stunden ab und ist einmal verwendbar.\n\nNach dem Festlegen des Passworts müssen Sie die Zwei-Faktor-Authentifizierung aktivieren, bevor das Konto genutzt werden kann.\n\nFalls Sie diese Einladung nicht erwartet haben, öffnen Sie den Link nicht und informieren Sie das SAFRA-Team.\n\nIhr SAFRA-Team',
   },
 
+  /* ── Sperren und Reaktivieren eines Mitarbeiterkontos (Bashar, 2026-08-23) ── */
+
+  staffSuspended: {
+    subject: 'Ihr SAFRA-Konsolenkonto wurde deaktiviert',
+    body: 'Ihr SAFRA-Konsolenkonto wurde deaktiviert und Sie können sich nicht mehr anmelden. Alle geöffneten Sitzungen auf allen Geräten wurden beendet.\n\nDas Konto wurde nicht gelöscht und es sind keine Daten verloren gegangen. Die Deaktivierung ist umkehrbar; eine Administratorin oder ein Administrator kann das Konto jederzeit wieder aktivieren.\n\nWenn Sie glauben, dass dies versehentlich geschehen ist, wenden Sie sich bitte direkt an eine SAFRA-Administration — über die Anmeldeseite lässt sich das nicht klären.\n\nIhr SAFRA-Team',
+  },
+  staffReinstated: {
+    subject: 'Ihr SAFRA-Konsolenkonto wurde wieder aktiviert',
+    body: 'Ihr SAFRA-Konsolenkonto wurde wieder aktiviert und Sie können sich erneut anmelden:\n{url}\n\nSie müssen sich auf jedem Gerät neu anmelden, da Ihre früheren Sitzungen bei der Deaktivierung beendet wurden.\n\nIhre Rolle und Ihre Berechtigungen sind unverändert.\n\nIhr SAFRA-Team',
+  },
+
   /* ── Partner werden (Bashar, 2026-08-19) ── */
 
   partnerApplicationReceived: {
