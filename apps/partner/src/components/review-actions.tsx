@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { t } from '@/lib/strings';
 
 /**
@@ -53,7 +54,7 @@ export function ReviewActions({
       );
 
       if (!response.ok) {
-        setError(t.reviews.failed);
+        setError(refusalFor(await codeOfResponse(response)) ?? t.reviews.failed);
         setBusy(false);
         return;
       }

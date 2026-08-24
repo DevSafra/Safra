@@ -8,6 +8,7 @@ import { errorMessage } from '@safra/i18n';
 
 import type { PropertyImage } from '@/lib/api';
 import { count } from '@/lib/format';
+import { refusalFor } from '@/lib/refusal';
 import { fill, t } from '@/lib/strings';
 
 /** Matches `MAX_IMAGES_PER_PROPERTY` on the API — §5.5 rewards photo count, so it is capped. */
@@ -99,7 +100,8 @@ export function ImageManager({
         const payload: unknown = await response.json().catch(() => null);
 
         setError(
-          codeOf(payload) === 'image.last_one' ? t.images.lastImage : t.images.failed,
+          refusalFor(codeOf(payload)) ??
+            (codeOf(payload) === 'image.last_one' ? t.images.lastImage : t.images.failed),
         );
         setBusy(false);
         return false;

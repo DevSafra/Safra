@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { PARTNER_DOCUMENT_KINDS, type PartnerDocumentKind } from '@safra/contracts';
 
 import type { PartnerDocument } from '@/lib/api';
+import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { documentKind, fill, t } from '@/lib/strings';
 import { count } from '@/lib/format';
 
@@ -100,13 +101,24 @@ export function DocumentUpload({ sent }: { readonly sent: readonly PartnerDocume
       body.set('kind', kind);
       body.set('file', file);
 
-      const ok = await fetch('/api/documents', { method: 'POST', body })
-        .then((response) => response.ok)
-        /* A network failure and a refusal are the same thing to this form: that file did not land. */
-        .catch(() => false);
+      /*
+        The RESPONSE is kept, not just its `ok`.
 
-      if (!ok) {
-        setError(fill(t.contracts.uploadFailedOne, { kind: documentKind(kind) }));
+        A network failure and a refusal used to be the same thing to this form — that file did not
+        land — and for every message it renders that is still true. The exception is
+        `partner.suspended`, which is a state the reader can act on rather than a transport
+        accident, and telling them the upload "failed" would hide the one refusal that explains
+        itself. `null` here means the request never got an answer, which keeps the old wording.
+      */
+      const response = await fetch('/api/documents', { method: 'POST', body }).catch(
+        () => null,
+      );
+
+      if (!response?.ok) {
+        setError(
+          (response ? refusalFor(await codeOfResponse(response)) : null) ??
+            fill(t.contracts.uploadFailedOne, { kind: documentKind(kind) }),
+        );
         setBusy(false);
         router.refresh();
 

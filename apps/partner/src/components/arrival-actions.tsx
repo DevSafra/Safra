@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { fill, t } from '@/lib/strings';
 import type { PartnerArrival } from '@/lib/api';
 
@@ -52,7 +53,10 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
         return;
       }
 
-      setError(response.status === 404 ? t.arrivals.gone : t.arrivals.failed);
+      setError(
+        refusalFor(await codeOfResponse(response)) ??
+          (response.status === 404 ? t.arrivals.gone : t.arrivals.failed),
+      );
       setBusy(false);
     } catch {
       setError(t.arrivals.failed);

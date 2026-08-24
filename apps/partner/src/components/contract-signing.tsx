@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { refusalFor } from '@/lib/refusal';
 import { t } from '@/lib/strings';
 
 /**
@@ -102,9 +103,10 @@ export function ContractSigning({
             : null;
 
         setError(
-          code === 'request.body_too_large'
-            ? t.contracts.signTooLarge
-            : t.contracts.signFailed,
+          refusalFor(code) ??
+            (code === 'request.body_too_large'
+              ? t.contracts.signTooLarge
+              : t.contracts.signFailed),
         );
         setBusy(false);
 

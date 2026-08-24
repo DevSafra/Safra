@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { TRIP_ATTRIBUTES } from '@safra/contracts';
 
 import type { PropertyFormReference } from '@/lib/api';
+import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { t, tripAttribute } from '@/lib/strings';
 
 /** §7.2: "اختر حتى 4" — the handoff's own ceiling, and the API's is ten. */
@@ -114,7 +115,7 @@ export function AddProperty({
       });
 
       if (!response.ok) {
-        setError(t.properties.createFailed);
+        setError(refusalFor(await codeOfResponse(response)) ?? t.properties.createFailed);
         setBusy(false);
         return;
       }

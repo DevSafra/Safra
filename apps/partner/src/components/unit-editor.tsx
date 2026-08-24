@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 import type { PartnerPropertyDetail } from '@/lib/api';
+import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { t } from '@/lib/strings';
 
 type Unit = PartnerPropertyDetail['units'][number];
@@ -153,7 +154,10 @@ function UnitRow({
       });
 
       if (!response.ok) {
-        setMessage({ kind: 'bad', text: t.editProperty.unitFailed });
+        setMessage({
+          kind: 'bad',
+          text: refusalFor(await codeOfResponse(response)) ?? t.editProperty.unitFailed,
+        });
         setBusy(false);
         return;
       }

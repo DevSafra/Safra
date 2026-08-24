@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { PartnerPropertyDetail, PropertyFormReference } from '@/lib/api';
+import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { t, tripAttribute } from '@/lib/strings';
 import { TRIP_ATTRIBUTES } from '@safra/contracts';
 
@@ -149,7 +150,10 @@ export function PropertyEditor({
       });
 
       if (!response.ok) {
-        setMessage({ kind: 'bad', text: t.editProperty.failed });
+        setMessage({
+          kind: 'bad',
+          text: refusalFor(await codeOfResponse(response)) ?? t.editProperty.failed,
+        });
         setBusy(false);
         return;
       }

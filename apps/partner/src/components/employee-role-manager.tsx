@@ -10,11 +10,23 @@ import {
   openableSections,
 } from '@safra/contracts';
 
+import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { fill, t } from '@/lib/strings';
 import type { PartnerEmployeeRoleDetail } from '@/lib/api';
 
 /** Every refusal the roles API can give, as a sentence about the SITUATION. */
 function messageFor(code: unknown): string {
+  /*
+    The hold comes first, before this component's own vocabulary.
+
+    `partner.suspended` is not a fact about employees, so it has no case below and would fall to
+    `default:` — a generic failure for a state the reader can see the reason for at the top of the
+    same screen. Consulted here rather than at each call site so every one of them inherits it.
+  */
+  const refused = refusalFor(code);
+
+  if (refused) return refused;
+
   switch (code) {
     case ERROR.EMPLOYEE_ROLE_NAME_TAKEN:
       return t.employeeRoles.nameTaken;
@@ -25,14 +37,6 @@ function messageFor(code: unknown): string {
     default:
       return t.employeeRoles.failed;
   }
-}
-
-async function codeOfResponse(response: Response): Promise<unknown> {
-  const body: unknown = await response.json().catch(() => null);
-
-  return typeof body === 'object' && body !== null && 'code' in body
-    ? (body as { code?: unknown }).code
-    : null;
 }
 
 /** A capability in words, falling back to the raw permission so a new one announces itself. */

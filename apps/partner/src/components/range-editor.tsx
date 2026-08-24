@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { dayStatus, t } from '@/lib/strings';
 
 /**
@@ -110,7 +111,10 @@ export function RangeEditor({
       });
 
       if (!response.ok) {
-        setMessage({ kind: 'bad', text: t.unitCalendar.failed });
+        setMessage({
+          kind: 'bad',
+          text: refusalFor(await codeOfResponse(response)) ?? t.unitCalendar.failed,
+        });
         setBusy(false);
         return;
       }

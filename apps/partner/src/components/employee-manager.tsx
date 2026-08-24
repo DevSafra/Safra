@@ -6,6 +6,7 @@ import Link from 'next/link';
 
 import { ERROR } from '@safra/contracts';
 
+import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { fill, t } from '@/lib/strings';
 import type { PartnerEmployee, PartnerEmployeeRole } from '@/lib/api';
 
@@ -26,6 +27,17 @@ import type { PartnerEmployee, PartnerEmployeeRole } from '@/lib/api';
  * a message about the field sends somebody to retype what they typed correctly.
  */
 function messageFor(code: unknown): string {
+  /*
+    The hold comes first, before this component's own vocabulary.
+
+    `partner.suspended` is not a fact about employees, so it has no case below and would fall to
+    `default:` — a generic failure for a state the reader can see the reason for at the top of the
+    same screen. Consulted here rather than at each call site so every one of them inherits it.
+  */
+  const refused = refusalFor(code);
+
+  if (refused) return refused;
+
   switch (code) {
     case ERROR.EMPLOYEE_ALREADY_EMPLOYED:
       return t.employees.alreadyEmployed;
@@ -40,15 +52,6 @@ function messageFor(code: unknown): string {
     default:
       return t.employees.failed;
   }
-}
-
-/** Reads the API's code out of a proxied response, whatever shape the failure took. */
-async function codeOfResponse(response: Response): Promise<unknown> {
-  const body: unknown = await response.json().catch(() => null);
-
-  return typeof body === 'object' && body !== null && 'code' in body
-    ? (body as { code?: unknown }).code
-    : null;
 }
 
 /** «دعوة موظّف» — an address, a name and a role. */

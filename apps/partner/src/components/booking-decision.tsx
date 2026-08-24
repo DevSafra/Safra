@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { t } from '@/lib/strings';
 
 /**
@@ -47,7 +48,9 @@ export function BookingDecision({ reference }: { readonly reference: string }) {
       );
 
       if (!response.ok) {
-        setError(t.dashboard.decisionFailed);
+        setError(
+          refusalFor(await codeOfResponse(response)) ?? t.dashboard.decisionFailed,
+        );
         setBusy(false);
         return;
       }
