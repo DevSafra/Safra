@@ -81,7 +81,19 @@ export default async function PartnerOnboardingPage({
     getContracts(reference),
   ]);
 
-  const back = backTarget('/partners', query, reference);
+  const back = backTarget(
+    /*
+      The partner's RECORD, not الشركاء (2026-08-24). A sub-page of a record belongs to that record:
+      «رجوع» from onboarding means the partner you were onboarding, not a registry the reader was
+      probably never on. Found by sweeping every `backTarget` after Bashar reported the same defect
+      on the violations sub-page — the two were written months apart and made the same assumption,
+      which is what a sweep is for.
+
+      A literal base plus THIS screen's own reference, exactly as `rowAnchor` uses it.
+    */
+    `/partners/${reference}`,
+    query,
+  );
 
   if (partner === 'unauthenticated') {
     return (

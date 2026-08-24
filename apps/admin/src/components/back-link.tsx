@@ -1,3 +1,4 @@
+import { BackNavigation } from '@/components/back-navigation';
 import type { Origin } from '@/lib/search-params';
 import { fill, t } from '@/lib/strings';
 
@@ -83,13 +84,23 @@ export function BackLink({
         : (t.nav[target.origin.key] ?? section);
 
   return (
-    <a
+    /*
+      `BackNavigation` keeps this an `<a href>` and adds one thing: on an ordinary click, if the
+      previous history entry is a page of this console, it goes THERE rather than to the rebuilt
+      URL. The rebuild remains the href — for no JavaScript, for a middle click, for a bookmarked
+      detail page with no history behind it, and for anyone arriving from outside.
+
+      Bashar (2026-08-24): the control must "navigate really back to the previous opened page". The
+      reconstruction was always a good guess and only ever as good as whether the linking screen
+      remembered to say `?from=` — which two of them do.
+    */
+    <BackNavigation
       href={target.href}
-      aria-label={fill(t.table.backToLabel, { section: destination })}
+      ariaLabel={fill(t.table.backToLabel, { section: destination })}
       className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[9px] border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold lg:min-h-0"
     >
       <span aria-hidden="true">{t.table.backArrow}</span>
       <span>{t.table.back}</span>
-    </a>
+    </BackNavigation>
   );
 }

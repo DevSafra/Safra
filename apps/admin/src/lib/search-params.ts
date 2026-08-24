@@ -99,6 +99,22 @@ export function returnQuery(params: {
   readonly size?: number | undefined;
   readonly q?: string | undefined;
   readonly status?: string | undefined;
+  /**
+   * سجل التدقيق's action filter, added 2026-08-24 — and the FIFTH member of an allow-list that
+   * exists to stay short.
+   *
+   * The list is the security boundary: a helper that copied whatever the URL happened to carry
+   * would reflect arbitrary attacker-chosen parameters into a link on our own page. So a field is
+   * added only when a screen's own filter would otherwise be lost on the way back, which is what
+   * happened here — an entry opened from a filtered log returned the reader to an unfiltered page
+   * one, discarding the work of getting there.
+   *
+   * `action` qualifies on the same grounds `q` and `status` do: it is a FILTER the reader chose,
+   * it is re-validated where it is read, and it names a value from a known set rather than a
+   * destination. A field that named a path or a redirect target would not qualify however
+   * convenient it was.
+   */
+  readonly action?: string | undefined;
 }): string {
   const query = new URLSearchParams();
 
@@ -108,6 +124,7 @@ export function returnQuery(params: {
     query.set('size', String(params.size));
   if (params.q) query.set('q', params.q);
   if (params.status) query.set('status', params.status);
+  if (params.action) query.set('action', params.action);
 
   const search = query.toString();
 

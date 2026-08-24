@@ -1,6 +1,6 @@
-import Link from 'next/link';
 import { getTranslations } from 'next-intl/server';
 
+import { BackNavigation } from '@/components/back-navigation';
 import { backArrow } from '@/lib/arrows';
 import type { Locale } from '@/i18n/routing';
 
@@ -28,12 +28,18 @@ export async function BackLink({
   const arrow = backArrow(locale);
 
   return (
-    <Link
+    /*
+      `BackNavigation` rather than `Link`: on an ordinary click it returns to the page the reader
+      actually came from, and falls back to this `href` when there is nothing of ours behind them —
+      a directly-opened page, a new tab, or JavaScript switched off. Bashar, 2026-08-24: the control
+      must "navigate really back to the previous opened page".
+    */
+    <BackNavigation
       href={href}
       className="inline-flex min-h-10 w-fit items-center gap-2 rounded-lg border border-line px-4 text-sm text-muted transition-colors hover:border-gold hover:text-gold lg:min-h-0 lg:py-2"
     >
       <span aria-hidden="true">{arrow}</span>
       {t('back')}
-    </Link>
+    </BackNavigation>
   );
 }

@@ -6,7 +6,7 @@ import { TablePagination } from '@/components/table-pagination';
 import { AdminTable, Ltr, type AdminColumn } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, auditAction, auditSubject, roleName } from '@/lib/strings';
-import { pageNumber } from '@/lib/search-params';
+import { returnQuery, pageNumber } from '@/lib/search-params';
 import { resolvePageSize } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
 
@@ -77,6 +77,21 @@ export default async function AuditPage({
   // The URL wins, then this reader's saved size for audit, then ten — see `resolvePageSize`.
   const size = await resolvePageSize('audit', first('size'));
 
+  /*
+    The list's position, carried INTO every row link (Bashar, 2026-08-24).
+
+    Without it, opening an entry and pressing «رجوع» returned the reader to page one of an
+    unfiltered سجل التدقيق — `backTarget` rebuilds the list URL from whatever the detail screen's
+    own query string carries, and this screen was sending it nothing to carry. On a log where the
+    reader is usually deep in a filtered sequence, that discards the work of getting there.
+
+    `action` and `q` travel with `page` and `size` because they are this screen's filters, and the
+    standing rule is that paging out of a filtered view is the quiet failure to prevent. They ARE
+    the allow-list: a helper that copied whatever the URL happened to hold would reflect arbitrary
+    attacker-chosen parameters into a link on our own page.
+  */
+  const back = returnQuery({ page, size, q, action });
+
   const [entries, actionList, counts] = await Promise.all([
     getAuditLog({ action, actorEmail: q, page: String(page), limit: String(size) }),
     getAuditActions(),
@@ -125,7 +140,7 @@ export default async function AuditPage({
         ) : (
           <>
             <AdminTable
-              columns={COLUMNS}
+              columns={columnsFor(back)}
               rows={entries.items}
               template={TEMPLATE}
               rowKey={(row) => row.id}
@@ -149,7 +164,14 @@ export default async function AuditPage({
   );
 }
 
-const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
+/**
+ * The columns, as a FUNCTION of the reader's position in the list.
+ *
+ * It was a module constant, which is why the row link could not carry `?page=`: a constant cannot
+ * see the request. Every other registry builds its row href from `returnQuery` for the same reason
+ * — see «Opening a row and coming back» — and this screen was the one that did not.
+ */
+const columnsFor = (back: string): readonly AdminColumn<AuditEntry>[] => [
   {
     key: 'time',
     header: t.table.colTime,
@@ -248,7 +270,7 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
     render: (row) => (
       <div className="grid gap-0.5">
         <a
-          href={`/audit/${row.id}`}
+          href={`/audit/${row.id}${back}`}
           aria-label={t.sections.staff.activityOpen}
           className="cursor-pointer text-sky hover:underline"
         >
