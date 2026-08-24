@@ -26,6 +26,29 @@ import { SupportService } from './support.service.js';
  *
  * Staff do not come through here. `admin/messaging.service.ts` is their side of the same threads, with
  * the internal notes this module deliberately never returns.
+ *
+ * ## No `@RequirePermissions` on any route, and that is a DECISION
+ *
+ * Recorded here because its absence is otherwise indistinguishable from an oversight, and a
+ * capability sweep will keep finding it. `message.read` and `message.send` exist, are held by
+ * customers and partners, and ARE grantable to an employee — so gating these routes on them would
+ * be the obvious move. It is the wrong one, twice over:
+ *
+ * 1. **It would lock out the person the screen is for.** A partner employee whose role ticks
+ *    nothing can open no section of the portal. الدعم is deliberately absent from
+ *    `PARTNER_SECTION_PERMISSIONS` so that person can still ask why. Gating the API behind a
+ *    capability their employer did not grant makes the portal able to lock somebody out of the way
+ *    to report being locked out.
+ * 2. **The capability would grant nothing anyway.** Every route here is scoped to the caller's own
+ *    data by `SupportService.askerOf` — a customer to their own profile, an employee to the threads
+ *    they opened, a partner to the business's. There is no wider read behind a permission check,
+ *    so the check could only ever subtract.
+ *
+ * Authentication is still required: `JwtAuthGuard` is global and nothing here is `@Public()`. What
+ * is absent is a CAPABILITY requirement, not a session one.
+ *
+ * Where `message.read` and `message.send` genuinely gate something is `admin/comms.controller.ts` —
+ * staff reading and replying to other people's conversations, which is a wider read and is guarded.
  */
 @Controller('support')
 export class SupportController {

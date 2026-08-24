@@ -22,6 +22,9 @@ const OTHER_USER_ID = '99994444-0000-0000-0000-0000000000d3';
 const OTHER_PROFILE_ID = '99994444-0000-0000-0000-0000000000d4';
 const PARTNER_USER_ID = '99994444-0000-0000-0000-0000000000d5';
 const PARTNER_ID = '99994444-0000-0000-0000-0000000000d6';
+const EMPLOYEE_USER_ID = '99994444-0000-0000-0000-0000000000d7';
+const OTHER_EMPLOYEE_USER_ID = '99994444-0000-0000-0000-0000000000d8';
+const PARTNER_PROFILE_ID = '99994444-0000-0000-0000-0000000000d9';
 
 const customer = (profileId = PROFILE_ID, sub = USER_ID): AccessTokenClaims => ({
   sub,
@@ -38,6 +41,20 @@ const partner: AccessTokenClaims = {
   locale: 'ar',
   partnerId: PARTNER_ID,
 };
+
+/**
+ * An employee of `PARTNER_ID`, carrying their EMPLOYER's partner id.
+ *
+ * That is what `attachOwningIds` puts on the token — every partner-scoped query filters on it, so
+ * an employee sees what the business sees. الدعم is the one place that is too much.
+ */
+const employee = (sub = EMPLOYEE_USER_ID): AccessTokenClaims => ({
+  sub,
+  role: 'partner_employee',
+  permissions: [],
+  locale: 'ar',
+  partnerId: PARTNER_ID,
+});
 
 /** Staff carry neither owning id — they have the console's own service. */
 const staff: AccessTokenClaims = {
@@ -420,6 +437,125 @@ describeIfDb('SupportService', () => {
       support.list(customer(), { limit: 20, cursor: 'not-a-cursor' }),
     ).rejects.toMatchObject({ status: 400 });
   });
+
+  // ─── Who a partner-side thread belongs to ──────────────────────────────────
+
+  /**
+   * An employee and the owner carry the SAME `partner_id`, and must not see the same threads.
+   *
+   * Every partner-scoped query in the platform filters on `claims.partnerId`, and for an employee
+   * that is their employer's — deliberately, so a receptionist sees the business's bookings and
+   * calendar. الدعم is the one place where "what the business sees" is the wrong answer: the
+   * owner's correspondence with SAFRA is where a payout dispute, a contract question, or a
+   * complaint about that receptionist gets written down.
+   */
+  describe('an employee and their employer', () => {
+    it("does not let an employee read the owner's thread", async () => {
+      const owners = await support.open(partner, LONG);
+
+      /* Control: the owner can read their own thread, so a failure below is about the SCOPE. */
+      await expect(support.thread(partner, owners.reference)).resolves.toMatchObject({
+        reference: owners.reference,
+      });
+
+      await expect(support.thread(employee(), owners.reference)).rejects.toThrow();
+      await expect(support.list(employee(), { limit: 20 })).resolves.toMatchObject({
+        items: [],
+      });
+    });
+
+    it("does not let an employee reply to or close the owner's thread", async () => {
+      const owners = await support.open(partner, LONG);
+
+      await expect(support.reply(employee(), owners.reference, LONG)).rejects.toThrow();
+      await expect(support.close(employee(), owners.reference)).rejects.toThrow();
+    });
+
+    it('lets an employee open and read a thread of their own', async () => {
+      const theirs = await support.open(employee(), LONG);
+
+      await expect(support.thread(employee(), theirs.reference)).resolves.toMatchObject({
+        reference: theirs.reference,
+      });
+
+      const list = await support.list(employee(), { limit: 20 });
+
+      expect(list.items.map((item) => item.reference)).toEqual([theirs.reference]);
+    });
+
+    /** Two employees of one business are two people, not one. */
+    it("does not let one employee read another employee's thread", async () => {
+      const first = await support.open(employee(), LONG);
+
+      await expect(
+        support.thread(employee(OTHER_EMPLOYEE_USER_ID), first.reference),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    /**
+     * The owner reads everything on the business, including what an employee opened.
+     *
+     * The asymmetry is the design: an employee's ticket is about the business's account, staff will
+     * answer it as the business, and the person responsible for the account has to be able to see
+     * it. This is the direction that must NOT be closed — a test that only proved the employee is
+     * shut out would pass just as well if partner-side threads had been broken entirely.
+     */
+    it("lets the owner read an employee's thread", async () => {
+      const theirs = await support.open(employee(), LONG);
+
+      await expect(support.thread(partner, theirs.reference)).resolves.toMatchObject({
+        reference: theirs.reference,
+      });
+    });
+
+    /**
+     * An employee whose employment ended or was suspended carries NO partner id — `attachOwningIds`
+     * fails closed. They must reach nothing of the employer's, not fall back to some other scope.
+     */
+    it('shuts out an employee with no live employment', async () => {
+      const owners = await support.open(partner, LONG);
+      const stranded: AccessTokenClaims = {
+        sub: EMPLOYEE_USER_ID,
+        role: 'partner_employee',
+        permissions: [],
+        locale: 'ar',
+      };
+
+      /* Refused as an unknown asker, not answered with an empty list — the scope never forms. */
+      await expect(support.thread(stranded, owners.reference)).rejects.toMatchObject({
+        status: 404,
+      });
+      await expect(support.list(stranded, { limit: 20 })).rejects.toMatchObject({
+        status: 404,
+      });
+    });
+  });
+
+  /**
+   * A partner who is ALSO a SAFRA customer still reaches their business's threads.
+   *
+   * `askerOf` branched on `customerProfileId` first and fell through to `partnerId`, which was
+   * correct only while the two were mutually exclusive. They stopped being on 2026-08-23, when a
+   * customer profile started being resolved for anyone who HAS one rather than only for
+   * `role = 'customer'`. A hotelier who books a trip with SAFRA then silently became a customer
+   * here, and every support thread about their business disappeared — a live regression that no
+   * existing test could see, because the fixture partner had no customer profile.
+   */
+  it('scopes a partner who also has a customer profile as a PARTNER', async () => {
+    const owners = await support.open(partner, LONG);
+    const alsoACustomer: AccessTokenClaims = {
+      ...partner,
+      customerProfileId: PARTNER_PROFILE_ID,
+    };
+
+    await expect(support.thread(alsoACustomer, owners.reference)).resolves.toMatchObject({
+      reference: owners.reference,
+    });
+
+    const list = await support.list(alsoACustomer, { limit: 20 });
+
+    expect(list.items.map((item) => item.reference)).toEqual([owners.reference]);
+  });
 });
 
 async function seed(db: Database): Promise<void> {
@@ -427,6 +563,8 @@ async function seed(db: Database): Promise<void> {
     [USER_ID, 'sup-one@safra.test', 'customer'],
     [OTHER_USER_ID, 'sup-two@safra.test', 'customer'],
     [PARTNER_USER_ID, 'sup-partner@safra.test', 'partner'],
+    [EMPLOYEE_USER_ID, 'sup-employee@safra.test', 'partner_employee'],
+    [OTHER_EMPLOYEE_USER_ID, 'sup-employee-two@safra.test', 'partner_employee'],
   ] as const) {
     await db.execute(sql`
       INSERT INTO users (id, email, role)
@@ -437,6 +575,8 @@ async function seed(db: Database): Promise<void> {
   for (const [id, userId, name, email] of [
     [PROFILE_ID, USER_ID, 'واحد', 'sup-one@safra.test'],
     [OTHER_PROFILE_ID, OTHER_USER_ID, 'اثنان', 'sup-two@safra.test'],
+    /* The partner books trips too — an ordinary thing for a hotelier, and the regression below. */
+    [PARTNER_PROFILE_ID, PARTNER_USER_ID, 'شريك', 'sup-partner@safra.test'],
   ] as const) {
     await db.execute(sql`
       INSERT INTO customer_profiles (id, user_id, full_name, email, phone, is_guest)

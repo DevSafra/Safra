@@ -31,7 +31,24 @@ const REFERENCE_PATTERN = /^CNV-\d{1,12}$/;
  */
 type Asker =
   | { readonly kind: 'customer'; readonly profileId: string; readonly userId: string }
-  | { readonly kind: 'partner'; readonly partnerId: string; readonly userId: string };
+  | { readonly kind: 'partner'; readonly partnerId: string; readonly userId: string }
+  | {
+      readonly kind: 'partner_employee';
+      readonly partnerId: string;
+      readonly userId: string;
+    };
+
+/**
+ * Which enum value goes in `messages.sender_kind`.
+ *
+ * An employee writes AS the business — `message_sender` has `customer`, `partner`, `staff` and
+ * `system`, and an employee is the partner speaking. This exists because `asker.kind` was cast
+ * straight into that column, so adding a third asker would have inserted `'partner_employee'` into
+ * an enum with no such value and answered 500 on the first employee ticket.
+ */
+function senderKindOf(asker: Asker): 'customer' | 'partner' {
+  return asker.kind === 'customer' ? 'customer' : 'partner';
+}
 
 type TicketRow = {
   id: string;
@@ -73,9 +90,39 @@ export class SupportService {
 
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
-  /** The caller, as a scope. Refuses anyone who is neither a customer nor a partner. */
+  /**
+   * The caller, as a scope. Refuses anyone who is neither a customer nor a partner-side reader.
+   *
+   * ## Keyed on the ROLE, never on which id happens to be present
+   *
+   * This branched on `customerProfileId` first and fell through to `partnerId`, which was correct
+   * only while the two were mutually exclusive. They stopped being on 2026-08-23, when a customer
+   * profile started being resolved for anyone who HAS one rather than only for `role = 'customer'`
+   * — so a partner who also books trips with SAFRA, which is an ordinary thing for a hotelier to
+   * do, silently became a `customer` here and their business's support threads disappeared.
+   *
+   * `role` is the right discriminator because it answers what the account is DOING, which is
+   * exactly the question الدعم asks: whose tickets does "my tickets" mean.
+   */
   private askerOf(claims: AccessTokenClaims | undefined): Asker {
     if (!claims) throw unauthorized(ERROR.AUTH_REQUIRED);
+
+    /*
+      An employee with no live employment carries no `partnerId` — `attachOwningIds` fails closed
+      for a suspended or ended employment. They fall through to the customer branch if they have a
+      profile, and are refused if they do not; either way they reach none of the employer's threads.
+    */
+    if (claims.role === 'partner_employee' && claims.partnerId) {
+      return {
+        kind: 'partner_employee',
+        partnerId: claims.partnerId,
+        userId: claims.sub,
+      };
+    }
+
+    if (claims.role === 'partner' && claims.partnerId) {
+      return { kind: 'partner', partnerId: claims.partnerId, userId: claims.sub };
+    }
 
     if (claims.customerProfileId) {
       return {
@@ -83,10 +130,6 @@ export class SupportService {
         profileId: claims.customerProfileId,
         userId: claims.sub,
       };
-    }
-
-    if (claims.partnerId) {
-      return { kind: 'partner', partnerId: claims.partnerId, userId: claims.sub };
     }
 
     /*
@@ -105,11 +148,29 @@ export class SupportService {
    * rather than on الدعم. A partner's threads are `partner_id`-only by construction.
    */
   private scopeOf(asker: Asker): SQL {
-    return asker.kind === 'customer'
-      ? sql`c.customer_profile_id = ${asker.profileId}::uuid
-            AND c.booking_id IS NULL AND c.dispute_id IS NULL AND c.partner_id IS NULL`
-      : sql`c.partner_id = ${asker.partnerId}::uuid
-            AND c.booking_id IS NULL AND c.dispute_id IS NULL`;
+    if (asker.kind === 'customer') {
+      return sql`c.customer_profile_id = ${asker.profileId}::uuid
+                 AND c.booking_id IS NULL AND c.dispute_id IS NULL AND c.partner_id IS NULL`;
+    }
+
+    const business = sql`c.partner_id = ${asker.partnerId}::uuid
+                         AND c.booking_id IS NULL AND c.dispute_id IS NULL`;
+
+    /*
+      An employee reads ONLY the threads they opened; the owner reads every thread on the business.
+
+      Until employees existed, a business was one person and `partner_id` answered both "whose
+      thread is this" and "who may read it". It no longer does. A receptionist and the owner carry
+      the same `partner_id`, and the owner's correspondence with SAFRA is exactly where a payout
+      dispute, a contract question, or a complaint ABOUT that receptionist gets written down.
+
+      `opened_by_user_id` is NULL on every thread written before the column existed, and `= me`
+      excludes NULL — so an employee cannot read a thread that predates them. That is the reason
+      migration 0043 does not backfill it.
+    */
+    return asker.kind === 'partner_employee'
+      ? sql`${business} AND c.opened_by_user_id = ${asker.userId}::uuid`
+      : business;
   }
 
   /** The columns a ticket row needs, listed once so the list and the thread cannot diverge. */
@@ -214,10 +275,11 @@ export class SupportService {
     const created = await this.db.transaction(async (tx) => {
       const rows = await tx.execute<{ id: string; reference: string }>(sql`
         INSERT INTO conversations
-          (customer_profile_id, partner_id, last_message_at, unread_for_staff)
+          (customer_profile_id, partner_id, opened_by_user_id, last_message_at, unread_for_staff)
         VALUES (
           ${asker.kind === 'customer' ? asker.profileId : null}::uuid,
-          ${asker.kind === 'partner' ? asker.partnerId : null}::uuid,
+          ${asker.kind === 'customer' ? null : asker.partnerId}::uuid,
+          ${asker.userId}::uuid,
           now(), 1
         )
         RETURNING id, reference
@@ -230,7 +292,7 @@ export class SupportService {
       await tx.execute(sql`
         INSERT INTO messages
           (conversation_id, sender_kind, sender_user_id, body, redacted_count, internal)
-        VALUES (${conversation.id}::uuid, ${asker.kind}::message_sender,
+        VALUES (${conversation.id}::uuid, ${senderKindOf(asker)}::message_sender,
                 ${asker.userId}::uuid, ${redacted.body}, ${redacted.redactedCount}, false)
       `);
 
@@ -275,7 +337,7 @@ export class SupportService {
       await tx.execute(sql`
         INSERT INTO messages
           (conversation_id, sender_kind, sender_user_id, body, redacted_count, internal)
-        VALUES (${row.id}::uuid, ${asker.kind}::message_sender, ${asker.userId}::uuid,
+        VALUES (${row.id}::uuid, ${senderKindOf(asker)}::message_sender, ${asker.userId}::uuid,
                 ${redacted.body}, ${redacted.redactedCount}, false)
       `);
 

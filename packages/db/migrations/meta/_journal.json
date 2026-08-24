@@ -302,6 +302,20 @@
       "when": 1787508580412,
       "tag": "0042_smiling_silver_samurai",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1787519514633,
+      "tag": "0043_lean_the_hunter",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1787521780975,
+      "tag": "0044_acoustic_lockjaw",
+      "breakpoints": true
     }
   ]
 }

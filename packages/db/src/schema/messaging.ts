@@ -58,6 +58,22 @@ export const conversations = pgTable(
     ),
 
     /**
+     * WHO opened this thread — the person, not the party.
+     *
+     * A partner-side thread belongs to a BUSINESS, and until employees existed a business was one
+     * person, so `partner_id` answered both "whose thread is this" and "who may read it". It no
+     * longer does: a receptionist and the owner both carry the same `partner_id`, and the owner's
+     * correspondence with SAFRA is where a payout dispute, a contract question or a complaint
+     * ABOUT that receptionist gets written down.
+     *
+     * So the owner reads every thread on the business and an employee reads only their own, and
+     * this column is the difference. NULL on every row written before it existed, which excludes
+     * those rows from an employee's scope — the safe direction, and the reason no backfill is
+     * needed or would be correct.
+     */
+    openedByUserId: foreignId('opened_by_user_id').references(() => users.id),
+
+    /**
      * Denormalised so the inbox can sort without touching `messages`.
      *
      * The list is ordered by most recent activity and paged by it. Deriving it with
@@ -84,6 +100,14 @@ export const conversations = pgTable(
     index('conversations_booking_idx').on(t.bookingId),
     index('conversations_dispute_idx').on(t.disputeId),
     index('conversations_partner_idx').on(t.partnerId),
+    /**
+     * An employee's own threads: `partner_id = ? AND opened_by_user_id = ?`.
+     *
+     * Leading with `partner_id` so this index also serves the OWNER's read, which filters on that
+     * column alone — one index for both partner-side scopes rather than a second one that would
+     * duplicate the first's leading column.
+     */
+    index('conversations_partner_opener_idx').on(t.partnerId, t.openedByUserId),
     /** The badge query — threads with anything waiting on staff. */
     index('conversations_unread_idx').on(t.unreadForStaff),
   ],
