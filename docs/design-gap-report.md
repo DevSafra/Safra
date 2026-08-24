@@ -473,6 +473,11 @@ found the whole partner-facing half of the suspension policy to be inert.
 | المخالفات stage and warning | **Complete, and was NOT.** `GET /partner/violations` selected neither `stage` nor `warning_note`, both defaulted in the portal schema — so every violation read «سُجّلت» whatever had happened to it, and the warning written FOR the partner reached nobody.                                 |
 | المخالفات notification      | **New.** A card in the §7.1 row showing the OPEN count and the furthest rung reached, linking to المخالفات. The alerts panel is `LIMIT 5` and said nothing about a sixth violation.                                                                                                           |
 
+**One enforcement gap remains and it is not a portal one.** Only the suspension notice and the fine
+waiver actually notify the partner. A warning, a fine and a lifted suspension send nothing, while the
+console tells the operator «وأُبلغ الشريك» for all three — see `O-staff-5`. The portal is ready for
+them: the warning note now reaches المخالفات and the card points at it.
+
 **The pattern all three defects share, and it is the reason to write this down:** a zod
 `.default()` on a field the API never sent. Every one parsed cleanly, rendered plausibly, passed the
 type checker and passed every test. `O-staff-4` recorded these surfaces as "compile-verified" in

@@ -3925,6 +3925,50 @@ add now: zero rows violate it.
 
 ---
 
+### O-staff-5 — Three enforcement actions tell the operator the partner was notified, and do not notify them
+
+**Status:** open · **Owner:** **Bashar** (a product decision, then engineering) ·
+**Recorded:** 2026-08-24
+
+`EnforcementService` makes exactly two `mail.send` calls: the suspension notice and the fine waiver.
+There is no notification of any kind — no mail, no queue job, no `notifications` row — for a
+warning, a fine, or a suspension being LIFTED. The console says otherwise, in as many words:
+
+| Console message                            | Says                            | Sends   |
+| ------------------------------------------ | ------------------------------- | ------- |
+| `suspended` «أُوقف الشريك وأُبلغ بالسبب»   | the partner was told the reason | **yes** |
+| `waived` «أُلغيت الغرامة وأُبلغ الشريك»    | the partner was told            | **yes** |
+| `warned` «صدر الإنذار وأُبلغ الشريك»       | the partner was told            | **no**  |
+| `fined` «فُرضت الغرامة وأُبلغ الشريك»      | the partner was told            | **no**  |
+| `unsuspended` «رُفع الإيقاف وأُبلغ الشريك» | the partner was told            | **no**  |
+
+**Impact, and why this is the sharpest of the open items.** A warning nobody receives is not a
+warning — it is a record that the platform can later cite against a partner who was never told. The
+whole point of `warned` being its own rung (rather than inferred from a fine) is that somebody TOLD
+them, and that is the fact an appeal turns on. Meanwhile the operator has been given an explicit
+assurance that the telling happened, so nobody follows up. The unsuspension case is smaller but the
+same shape: a business is trading again and may not know it.
+
+This is the defect class this register keeps returning to — a true-sounding sentence that describes
+an intention rather than a change (`O-staff-2`, and the docblock that claimed آخر نشاط had moved).
+Here it is worse than a docblock, because an operator reads it.
+
+**Recommendation.** Send the three notices, do not weaken the copy. The portal now renders the
+warning note (fixed 2026-08-24), so the partner has somewhere to read the detail; what is missing is
+the nudge that sends them there. Each is a template in `messages/email/{ar,en,de}.ts` composed by
+the one helper, **Arabic first and English underneath** per the standing rule, and asserted in
+`mail.templates.test.ts` per template rather than per helper. Send outside the transaction and
+swallow on failure, exactly as the two existing notices do — a mail server must not roll back an
+enforcement decision.
+
+**The decision that is Bashar's:** whether a fine and a warning should email at all, and whether
+lifting a suspension should. The engineering is a day; the question of what a partner is entitled to
+be told is not an engineering one. Until it is answered, the honest fallback is to drop «وأُبلغ
+الشريك» from those three messages so the console stops asserting something that does not happen —
+that is a three-line change and it can be done the day he says so.
+
+---
+
 ### O-staff-2 — صفحة الموظف shows no per-person activity
 
 **Status:** open · **Owner:** engineering · **Recorded:** 2026-08-23
