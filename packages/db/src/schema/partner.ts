@@ -1,5 +1,6 @@
 import { relations, sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   boolean,
   date,
   index,
@@ -27,6 +28,7 @@ import {
   partnerEmployeeStatus,
   verificationStatus,
   violationKind,
+  violationStage,
 } from './enums.js';
 import { cities, currencies } from './geo.js';
 import { users } from './identity.js';
@@ -296,8 +298,35 @@ export const partners = pgTable(
 
     contractSignedAt: timestamp('contract_signed_at', { withTimezone: true }),
     /** P-003: suspension, never deletion. */
+    /**
+     * Enforcement state (Bashar, 2026-08-24). Set together or not at all.
+     *
+     * Suspension is an ENFORCEMENT ACTION and its record has to answer the five questions the
+     * standing principle names: what happened, who did it, when, why, and what financial impact.
+     * The audit row answers all five; these columns are what the running system decides with, and
+     * what the partner is shown.
+     *
+     * The reason is REQUIRED at the boundary — `partnerSuspendSchema` refuses without one — because
+     * a suspended partner is told why, and «تم تعليق حسابك» with no reason is a support ticket the
+     * platform generated for itself.
+     */
     suspendedAt: timestamp('suspended_at', { withTimezone: true }),
     suspendedReason: text('suspended_reason'),
+    /** Internal notes: seen by staff, never shown to the partner. */
+    suspendedNotes: text('suspended_notes'),
+    /*
+      `AnyPgColumn` because `partner.ts` and `identity.ts` reference each other — the same dance
+      `identity.ts:104` already does in the opposite direction, for the same reason.
+
+      I removed this annotation on the grounds that `tsc --noEmit` was green with it gone. It was:
+      the circularity only bites in DECLARATION EMIT, which `--noEmit` by definition does not do.
+      `pnpm build` was red for both other sessions until this went back. "Typecheck green, build
+      red" is not a mystery — it is the one class of error `--noEmit` cannot see, and a package that
+      emits `.d.ts` has to be built rather than typechecked to be believed.
+    */
+    suspendedByUserId: foreignId('suspended_by_user_id').references(
+      (): AnyPgColumn => users.id,
+    ),
     ...timestamps,
   },
   (t) => [
@@ -593,6 +622,25 @@ export const partnerViolations = pgTable(
     /** Nullable: stale-calendar violations are not tied to one booking. */
     bookingId: foreignId('booking_id'),
     kind: violationKind('kind').notNull(),
+    /**
+     * Where this violation has reached: recorded → warned → fined → suspension (Bashar, 2026-08-24).
+     *
+     * ## A stage, not four tables
+     *
+     * *"Violation → Warning → Fine (optional) → Suspension (optional)"*. Both later steps are
+     * optional and both are consequences OF the violation rather than separate objects — a fine is
+     * a state this row reaches, and modelling it as its own record would mean two things to keep in
+     * step and two places to ask "was this forgiven".
+     *
+     * It only ever moves FORWARD. Nothing here is deleted or wound back: a waived fine keeps
+     * `fined` and gains `waived_at`, because the stage records what was DECIDED and the waiver
+     * records what was decided afterwards. That is the append-only principle applied to a state
+     * machine rather than to a table.
+     */
+    stage: violationStage('stage').notNull().default('recorded'),
+    /** What the partner is told. Null until the violation reaches `warned`. */
+    warnedAt: timestamp('warned_at', { withTimezone: true }),
+    warningNote: text('warning_note'),
     /** Which offence this is for that partner — drives the escalation ladder. */
     occurrenceNumber: integer('occurrence_number').notNull().default(1),
     fineAmount: money('fine_amount'),
@@ -604,6 +652,15 @@ export const partnerViolations = pgTable(
     waivedAt: timestamp('waived_at', { withTimezone: true }),
     waivedByUserId: foreignId('waived_by_user_id').references(() => users.id),
     waivedReason: text('waived_reason'),
+    /**
+     * The BALANCING ledger group, so the money and the decision are joined.
+     *
+     * *"Fine −50, Waiver +50. The net effect becomes zero, but history remains complete."* The
+     * original fine's entry is never touched; the waiver is a second, opposite entry, and this
+     * column is how a screen showing the waived fine finds the pair rather than inferring it from
+     * amounts that happen to cancel.
+     */
+    waiverLedgerGroupId: foreignId('waiver_ledger_group_id'),
     ...timestamps,
   },
   (t) => [

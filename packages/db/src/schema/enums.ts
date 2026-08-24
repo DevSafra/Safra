@@ -379,6 +379,31 @@ export const violationKind = pgEnum('violation_kind', [
   'no_show',
 ]);
 
+/**
+ * How far a violation has been taken (Bashar, 2026-08-24).
+ *
+ * *"Violation → Warning → Fine (optional) → Suspension (optional)"*. Both later steps are optional,
+ * and every one of them is a consequence OF the violation rather than a separate record — a fine is
+ * a state this row reaches.
+ *
+ * ## It only moves forward
+ *
+ * `recorded` is where the automatic ones land: the SLA sweep and the reject-after-payment path
+ * write violations with nobody deciding anything, and calling that a warning would claim the
+ * partner was told when they were not.
+ *
+ * A waived fine STAYS `fined`. The stage records what was decided; `waived_at` records what was
+ * decided afterwards. Winding the stage back would be the history-deletion the standing principle
+ * forbids, applied to a state machine instead of to a table — and it would make "was this partner
+ * ever fined" unanswerable, which is exactly the question an appeal turns on.
+ */
+export const violationStage = pgEnum('violation_stage', [
+  'recorded',
+  'warned',
+  'fined',
+  'suspension',
+]);
+
 export const adStatus = pgEnum('ad_status', ['draft', 'active', 'paused', 'expired']);
 
 /** SRS §5.4: the four fixed city categories. Cities may carry several. */

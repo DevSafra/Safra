@@ -107,6 +107,28 @@ export const ERROR = {
   PERMISSION_DENIED: 'permission.denied',
   SCOPE_OUTSIDE: 'scope.outside',
   STAFF_NOT_FOUND: 'staff.not_found',
+  /* ── Enforcement (Bashar, 2026-08-24) ── */
+  /**
+   * The refusal a SUSPENDED partner meets on a write, and it needs its own code.
+   *
+   * Distinct from `PARTNER_ALREADY_SUSPENDED`, which is a staff-side conflict — "you tried to
+   * suspend an account that already is". This one is what the partner's own portal receives, and it
+   * exists because a 403 that cannot be told from a 401 sends a suspended partner to sign in again
+   * over a state that signing in cannot change. `partnerFetch` collapses both into
+   * `'unauthenticated'`, so without a code to look for, the portal says «انتهت الجلسة» to somebody
+   * whose session is perfectly good.
+   */
+  PARTNER_SUSPENDED: 'partner.suspended',
+  /** Held, not cancelled — the money is owed and releases when the suspension is lifted. */
+  PAYOUT_FROZEN_BY_SUSPENSION: 'payout.frozen_by_suspension',
+  PARTNER_ALREADY_SUSPENDED: 'partner.already_suspended',
+  PARTNER_NOT_SUSPENDED: 'partner.not_suspended',
+  VIOLATION_NOT_FOUND: 'violation.not_found',
+  /** The progression only moves forward: `recorded → warned → fined → suspension`. */
+  VIOLATION_STAGE_INVALID: 'violation.stage_invalid',
+  VIOLATION_NOT_FINED: 'violation.not_fined',
+  VIOLATION_ALREADY_WAIVED: 'violation.already_waived',
+
   AUDIT_ENTRY_NOT_FOUND: 'audit_entry.not_found',
   STAFF_ROLE_INVALID: 'staff.role_invalid',
   STAFF_CANNOT_SUSPEND_SELF: 'staff.cannot_suspend_self',

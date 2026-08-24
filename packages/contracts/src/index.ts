@@ -5,6 +5,7 @@ export * from './password-length.js';
 export * from './password-strength.js';
 export * from './booking.js';
 export * from './calendar.js';
+export * from './enforcement.js';
 export * from './error-codes.js';
 export * from './fx.js';
 export * from './gift-card.js';
