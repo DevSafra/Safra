@@ -3697,6 +3697,106 @@ which is a Next.js service that could carry the browser as the customer app does
 the contract being produced somewhere other than where it is stored and hashed. Recorded rather
 than chosen.
 
+### O-staff-3 — A staff member's city scope can be READ and no longer SET
+
+**Status:** open, and it is a lost capability rather than missing work ·
+**Owner:** engineering · **Recorded:** 2026-08-23
+
+نطاق العمل — scoping a staff member to particular cities — was a paged table on الموظفون with an
+editing panel beside it. الموظفون was simplified on 2026-08-23 (Bashar: _"too complicated"_) and the
+table went, correctly: a scope is a property of a PERSON, and a paged list of everybody's scope sat
+on that page only because there was nowhere else to put it.
+
+**The editor went with the table, and nothing replaced it.** صفحة الموظف now DISPLAYS the scope —
+`StaffService.detail` joins `staff_scope_cities` and returns city names, with `[]` meaning every
+city — and offers no way to change it. `grep -rn "PUT" apps/admin/src | grep -i scope` returns
+nothing.
+
+So the console can show a super admin that a colleague is restricted to Damascus and give them no
+way to add Aleppo. **The API side is intact**: `PUT /admin/staff/:userId/scope` works, is guarded by
+`STAFF_MANAGE`, and revokes sessions on a narrowing. It was deliberately NOT deleted alongside the
+dead `GET /admin/staff/scopes` — removing an endpoint because its only caller went away turns a
+missing screen into a missing capability, and the console would then have to grow the endpoint back
+to get the feature back.
+
+**What it needs:** a scope editor on صفحة الموظف, beside the النطاق row it already renders — the
+cities picker plus the `all_cities` / `cities` choice, posting to the existing route. Roughly the
+panel that was deleted, rebuilt for one person instead of a table.
+
+**Why it is worth doing rather than closing:** scoping is the mechanism behind
+`.claude/CLAUDE.md`'s standing guarantee that a scope is server-enforced, and `scopeNote` on صفحة
+الموظف still states that guarantee to the reader. A promise the screen makes and cannot act on is
+the same defect as a capability with no feature behind it — see `O-staff-1`.
+
+**How it was found:** by checking what else died before deleting `GET /admin/staff/scopes` as dead
+code. The read really was dead; the write only looked dead. That distinction is the finding.
+
+---
+
+### O-staff-2 — صفحة الموظف shows no per-person activity
+
+**Status:** open · **Owner:** engineering · **Recorded:** 2026-08-23
+
+When مصفوفة الصلاحيات and نطاق العمل came off الموظفون on 2026-08-23, the page's docblock said آخر نشاط
+"moved to the member's own record". **It did not.** Nobody built it, the detail payload carries no
+history, and the sentence was written describing an intention rather than a change. It was then read,
+believed, and repeated back as fact in a cross-session message before anyone checked — which is the
+whole mechanism by which a false comment becomes a second source of truth.
+
+The platform-wide list is back on الموظفون at Bashar's request (2026-08-23) and سجل التدقيق has the
+complete record. What is missing is the narrow one: **what has this person done**, on their own page.
+
+**Why it is worth building rather than closing:** the two answer different questions. Somebody
+reading a colleague's record is deciding whether their access is right, and "signed in twice this
+month and changed one booking" answers that where a platform-wide feed does not. `audit_log` already
+carries `actor_user_id`, so the query is one indexed filter on the endpoint that already exists.
+
+**When:** الإجراءات moved directly under الحساب on 2026-08-23, which shortened the record and left the
+natural space for it at the bottom.
+
+---
+
+### O-staff-1 — Three capabilities are still grantable with nothing behind them
+
+**Status:** open · **Owner:** **Bashar** (a product decision, then engineering) ·
+**Recorded:** 2026-08-23
+
+The employee feature ships with a role form that lets a super admin, and a partner, tick capabilities.
+A capability with no feature behind it is a **promise gap** rather than a security hole: nobody gains
+access they should not have, but somebody believes a job has been delegated and it has not. That is
+its own defect and it is the one people notice last.
+
+Two sweeps ran on 2026-08-23 — one over the console's 63 capabilities, one over the partner's 11 —
+both by reading the actual `@RequirePermissions` metadata rather than grepping. Between them they
+found **no unguarded route that exists**. What they found is capabilities with no feature:
+
+| Capability         | State on 2026-08-23                                                                                                                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `booking.check_in` | **Closed.** `GET /partner/arrivals`, `POST .../check-in`, `POST .../undo-check-in`                                                                                                             |
+| `violation.read`   | **Closed.** `GET /partner/violations`                                                                                                                                                          |
+| `price.update`     | **Closed.** Checked PER FIELD at four sites — `create` with `initialUnits`, `addUnit`, `updateUnit`, `updateRange`. See `price-authority.ts` for why it is not a route guard                   |
+| `violation.manage` | **OPEN.** No route writes `partner_violations` at all                                                                                                                                          |
+| `violation.waive`  | **OPEN.** Nothing writes `waived_at`. The partner screen already RENDERS a waived row, so the read side is ready and the write side does not exist                                             |
+| `partner.suspend`  | **OPEN.** `partners.suspended_at` is enforced on both branches of `attachOwningIds` and written by no route. Whoever wires the button will reasonably assume enforcement is missing; it is not |
+
+**Why the last three are not being built alongside the others.** Waiving a fine is a decision about
+money that SAFRA has already levied, and suspending a business stops its trade — both need Bashar to
+say who may do it and under what record, which is a product decision rather than a wiring one.
+
+**One constraint already established, from the screen that reads them** (project-cc, 2026-08-23):
+**a waive must carry a reason, enforced at the point of waiving.** The partner-facing list renders a
+waived row with its reason; when the reason is absent it can only say «أُلغيت» alone, and a mark that
+says a decision happened and refuses to say what it was is worse for the partner than no row. So the
+waive endpoint takes a required reason and `waived_reason` becomes `NOT NULL` where `waived_at` is
+set — a CHECK constraint, since the column must stay nullable for un-waived rows.
+
+**Until then, the honest options** are to hide the three capabilities from both role forms, or to leave
+them and accept that ticking one does nothing. Leaving them visible is the current state and it is the
+worse one; hiding them is a small change to `STAFF_ASSIGNABLE_PERMISSIONS` and
+`PARTNER_EMPLOYEE_PERMISSIONS` and can be done the day Bashar says so.
+
+---
+
 ### O-fin-3 — A gift card can only be bought with wallet balance
 
 **Status:** built, with the funding source constrained · **Owner:** **Bashar** ·
