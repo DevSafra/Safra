@@ -117,9 +117,14 @@ test.describe('every admin section the design specifies', () => {
       .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''));
 
     /*
-      Twenty rows: the design's eighteen, plus «طلبات الشراكة» (Bashar, 2026-08-19) and
-      «أدوار موظفي الشركاء» (Bashar, 2026-08-23). Emergency Mode is not among them — it is reached
-      from the header.
+      Twenty-ONE rows: the design's eighteen, plus «طلبات الشراكة» (Bashar, 2026-08-19),
+      «أدوار الموظفين» (Bashar, 2026-08-23) and «وضع الطوارئ» (2026-08-24).
+
+      Emergency Mode used to be header-only and this comment used to say so. Gating the console
+      broke that: مركز القيادة opens on `booking.read_all`, so a role carrying
+      `emergency_mode.activate` and not that one was redirected off the only page that linked to the
+      emergency control. It is in the nav now, and the header link stays — two ways to reach the one
+      control that matters under pressure is the correct number.
 
       A literal rather than `SECTIONS.length`, deliberately: this assertion exists to fail when
       somebody adds a nav entry, and a count derived from the same list would agree with any
@@ -127,7 +132,7 @@ test.describe('every admin section the design specifies', () => {
       working rather than getting in the way — so the number goes up by one and the reason for the
       new entry is recorded beside it.
     */
-    expect(hrefs.length).toBe(20);
+    expect(hrefs.length).toBe(21);
 
     for (const href of hrefs) {
       const response = await page.goto(href);
@@ -635,16 +640,79 @@ test.describe('honesty rules the design and the register require', () => {
       page.getByRole('heading', { name: copy.activityWhat, level: 2 }),
     ).toBeVisible();
 
-    const body = await page.locator('main').innerText();
+    /*
+      Never a raw action identifier on an Arabic screen — asserted on the ACTION alone.
+    
+      This took two wrong versions and both were over-broad in the same way. `not.toMatch(/\b[a-z_]+\.[a-z_]+\b/)`
+      over the whole of `main` matched the actor's email — `safra.test` fits that pattern exactly.
+      Narrowing to the heading line was not enough either: the line reads «الإجراء — الموضوع», and
+      for a `user` subject the SUBJECT is an email too, so «تعديل نطاق موظف — doc-reviewer@safra.test»
+      still matched.
 
-    /* Never a raw action identifier on an Arabic screen. */
-    expect(body).not.toMatch(/\b[a-z_]+\.[a-z_]+\b/);
+      What is actually under test is that the ACTION resolved through the catalogue rather than
+      printing `staff.scope_changed`. So the assertion takes the segment before the separator and
+      leaves the subject — which is data, and may legitimately be an address — out of it.
+    */
+    const line = await page
+      .getByRole('heading', { name: copy.activityWhat, level: 2 })
+      .locator('xpath=following::p[1]')
+      .innerText();
+    const action = (line.split('—')[0] ?? line).trim();
+
+    console.log('action segment:', action);
+    expect(action).not.toMatch(/\b[a-z_]+\.[a-z_]+\b/);
+    /* And it is Arabic, so an empty or Latin action cannot pass by being unmatched. */
+    expect(action).toMatch(/[\u0600-\u06FF]/);
 
     await page
       .getByRole('link', { name: new RegExp(t.nav.staff) })
       .first()
       .click();
     await expect(page.getByLabel(copy.activitySearchLabel)).toBeVisible();
+  });
+
+  /**
+   * سجل التدقيق opens the SAME entry screen as آخر نشاط, and the entry names its subject.
+   *
+   * Bashar, 2026-08-24: "every سجل should have a single very detailed page" and "when an activity
+   * says الموافقة على الشريك can you write the partner name". Both halves are asserted here — the
+   * row resolves to a real screen, and the screen says what the entry happened TO rather than
+   * printing an identifier.
+   *
+   * The action segment is checked alone. The subject may legitimately be an address — a staff
+   * account with no name falls back to one — so a pattern applied to the whole line matches data
+   * rather than a translation failure, which cost me two wrong versions of this assertion.
+   */
+  test('a سجل التدقيق row opens its own entry and names its subject', async ({
+    page,
+  }) => {
+    await page.goto('/audit');
+
+    const row = page.locator('a[href^="/audit/"]').first();
+
+    test.skip((await row.count()) === 0, 'No audit rows on this database.');
+    await row.click();
+
+    await expect(
+      page.getByRole('heading', { name: t.sections.staff.activityWhat, level: 2 }),
+    ).toBeVisible();
+
+    const line = await page
+      .getByRole('heading', { name: t.sections.staff.activityWhat, level: 2 })
+      .locator('xpath=following::p[1]')
+      .innerText();
+
+    console.log('audit entry heading:', line);
+
+    const action = (line.split('—')[0] ?? line).trim();
+
+    expect(action).toMatch(/[\u0600-\u06FF]/);
+    expect(action).not.toMatch(/\b[a-z_]+\.[a-z_]+\b/);
+
+    /* And the route RESOLVED — this is the half that would catch a missing endpoint. */
+    expect(await page.locator('main').innerText()).not.toContain(
+      t.sections.staff.activityNotFound,
+    );
   });
 
   test('a member record states that scope is server-enforced', async ({ page }) => {

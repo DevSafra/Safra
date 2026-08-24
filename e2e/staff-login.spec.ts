@@ -202,9 +202,19 @@ test.describe('the command-center dashboard', () => {
     await expect(page.getByText(t.dashboard.queueFailed)).toBeHidden();
   });
 
-  /** Emergency Mode is reached from the header, as the prototype's `openEmergency` does. */
+  /**
+   * Emergency Mode is reached from the header, as the prototype's `openEmergency` does.
+   *
+   * Scoped to `main`, because since 2026-08-24 the SIDEBAR carries the same control under the same
+   * name — gating the console had made the header link unreachable for the role most likely to need
+   * it. Two entry points is deliberate; an unscoped locator matching both is not a failure of the
+   * page, it is this test naming a control without saying which one.
+   */
   test('the header Emergency Mode button reaches the section', async ({ page }) => {
-    await page.getByRole('link', { name: t.admin.emergencyMode }).click();
+    await page
+      .getByRole('main')
+      .getByRole('link', { name: t.admin.emergencyMode })
+      .click();
 
     await expect(page).toHaveURL(/\/emergency$/);
     await expect(page.getByText(t.sections.emergency.hint)).toBeVisible();

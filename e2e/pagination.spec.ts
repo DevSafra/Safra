@@ -93,6 +93,15 @@ const anyBar = (page: Page) => page.getByRole('navigation', { name: /تنقّل 
 
 const pageInput = (page: Page) => page.getByLabel(t.table.pageLabel).first();
 const sizeSelect = (page: Page) => page.getByLabel(t.table.pageSizeLabel).first();
+/*
+  The arrows became `<Link scroll={false}>` on 2026-08-24 so paging stops throwing the reader to the
+  top of the page. That makes the step a SOFT navigation: React updates the URL and the rows after
+  the click resolves, so reading `page.url()` or the rows on the next line races the render and sees
+  the page you just left. Every assertion that follows an arrow now polls.
+
+  It is a change in the test, not in what is being tested — the neighbouring search assertions have
+  polled since they were written, for the same reason.
+*/
 const nextArrow = (page: Page) =>
   page.getByRole('link', { name: t.table.nextPageShort }).first();
 const previousArrow = (page: Page) =>
@@ -232,10 +241,8 @@ test.describe('the pagination bar', () => {
 
     await nextArrow(page).click();
 
-    const url = new URL(page.url());
-
-    expect(url.searchParams.get('size')).toBe('5');
-    expect(url.searchParams.get('page')).toBe('2');
+    await expect.poll(() => new URL(page.url()).searchParams.get('page')).toBe('2');
+    expect(new URL(page.url()).searchParams.get('size')).toBe('5');
     expect(await rowCount(page)).toBe(5);
   });
 
@@ -266,10 +273,8 @@ test.describe('the pagination bar', () => {
 
     await nextArrow(page).click();
 
-    const url = new URL(page.url());
-
-    expect(url.searchParams.get('status')).toBe('cancelled');
-    expect(url.searchParams.get('page')).toBe('2');
+    await expect.poll(() => new URL(page.url()).searchParams.get('page')).toBe('2');
+    expect(new URL(page.url()).searchParams.get('status')).toBe('cancelled');
   });
 
   /** And so does typing a page number, which submits a form rather than following a link. */
@@ -449,6 +454,8 @@ test.describe('pagination itself', () => {
     const first = await page.locator('tbody tr').allInnerTexts();
 
     await nextArrow(page).click();
+    /* Wait for the SOFT navigation to land before reading rows — see the note above. */
+    await expect.poll(() => new URL(page.url()).searchParams.get('page')).toBe('2');
 
     const second = await page.locator('tbody tr').allInnerTexts();
 
