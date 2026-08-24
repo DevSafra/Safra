@@ -3804,6 +3804,50 @@ code. The read really was dead; the write only looked dead. That distinction is 
 
 ---
 
+### O-ops-4 — The committing integration suites grow the dev database without bound
+
+**Status:** open · **Owner:** engineering · **Recorded:** 2026-08-24
+
+§7b deviation 2 accepts that four integration suites COMMIT rather than roll back, on the grounds
+that it is "30 bookings and 23 audit rows per run, in a development database". That arithmetic is
+per run and nothing ever removes them. Measured on 2026-08-24, mid-session:
+
+| Artefact                                          | Count  |
+| ------------------------------------------------- | ------ |
+| `properties` with slug `payout-test-%`            | 112    |
+| `bookings` on the single `payments-test-property` | 12,636 |
+
+The consequence is not a slow test — it is a **broken one, in another app**. That property's API
+payload reached 7.1MB, over the 2MB Next.js data-cache ceiling, so the customer app logged
+`Failed to set Next.js data cache` and re-fetched it uncached on every render. Any e2e spec that
+happens to open the first property then times out, in the customer app, for a reason created by an
+API test suite. The failure names nothing that would lead anybody to the cause.
+
+**What it needs:** either the four suites roll back after all, or a teardown that deletes by the
+slug prefixes they own, or a `db:reset-dev` step before `pnpm e2e`. The accepted deviation should be
+re-read with the growth rate in it rather than the per-run count — the reasoning in §7b is sound
+about one run and silent about a thousand.
+
+**Why it was not noticed earlier:** it degrades gradually and the failures land on specs nobody
+associates with the cause. It is also invisible to `pnpm verify`, which never opens a browser.
+
+---
+
+### O-fin-4 — Nothing pairs `fine_amount` with `fine_currency_id`
+
+**Status:** open · **Owner:** engineering · **Recorded:** 2026-08-24
+
+`partner_violations` carries **no CHECK constraints at all**. A fine is two columns that must both
+be set or both be null, and only the writing code says so. `finance.service.ts` now filters on both
+being present, so a half-written fine no longer takes الدفع down — but it would DISAPPEAR from that
+screen instead, which is a quieter version of the same problem: money the platform levied, invisible.
+
+The fix is the constraint the waiver already has a precedent for — `waived_reason` is `NOT NULL`
+wherever `waived_at` is set, enforced by a CHECK because the column must stay nullable for
+un-waived rows. The same shape applies here.
+
+---
+
 ### O-staff-2 — صفحة الموظف shows no per-person activity
 
 **Status:** open · **Owner:** engineering · **Recorded:** 2026-08-23
@@ -3827,10 +3871,10 @@ natural space for it at the bottom.
 
 ---
 
-### O-staff-4 — The enforcement policy is built; three screens have never been driven
+### O-staff-4 — The enforcement policy is built; the PORTAL surfaces have never been driven
 
-**Status:** built and pushed, partially driven · **Owner:** engineering ·
-**Recorded:** 2026-08-24
+**Status:** console driven end-to-end; partner portal still undriven · **Owner:** engineering ·
+**Recorded:** 2026-08-24 · **Updated:** 2026-08-24 (enforcement completion pass)
 
 Bashar's three enforcement policies of 2026-08-24 — suspend a partner, manage violations, waive a
 fine — are implemented across the API, the console and the partner portal, and are on `origin/main`.
@@ -3841,17 +3885,40 @@ progression from record to warning to fine; **the waived fine rendering as its p
 struck through and legible, the balancing entry, the zero net, the reason and «Admin» beside them,
 with no «—» anywhere, asserted rather than eyeballed.
 
-**NOT driven, and these are the gaps a reader should assume are unverified:**
+**CLOSED on 2026-08-24 by the enforcement completion pass:**
+
+- **`PAYOUT_FROZEN_BY_SUSPENSION` now has a surface.** The finding was understated: the console's
+  release control did not merely fail to wire THIS code, it discarded EVERY code —
+  `if (!response.ok) setError(payouts.failed)` never read the response body, so all eleven refusals
+  the six payout controls can raise arrived as one vague sentence. It now uses `apiErrorOf`, the
+  helper written the day before for exactly this defect, which the other fourteen console
+  components already used. The freeze also had NO TEST; it has two now, a refusal and its opposite
+  control, both watched to fail with the check disabled.
+- **The violation ladder's fourth rung existed nowhere.** `violation_stage` has run
+  `recorded → warned → fined → suspension` since the enum was written and **nothing ever wrote the
+  last value** — it was accepted by the enum, listed in `VIOLATION_STAGES`, parsed by the portal's
+  zod schema and given an Arabic label («رُفع إلى الإيقاف»), for a state no code path could produce.
+  Five places consistent with each other and none with reality. `partnerSuspendSchema` now takes an
+  optional `violationId`; `EnforcementService.escalate` writes the stage inside the suspending
+  transaction, scoped by `partner_id` in the PREDICATE; and «تعليق الحساب على هذه المخالفة» on the
+  console's violations screen is the control that reaches it. Driven in a browser.
+
+**STILL NOT driven — a reader should assume these are unverified:**
 
 - **The partner portal's suspension surfaces.** The notice a suspended partner reads, the refusal
-  sentences across fourteen write components, and المحفظة's frozen state. Compile-verified only.
+  sentences across fourteen write components, and المحفظة's frozen state. Compile-verified, plus
+  `refusal-coverage.test.ts` for presence and a static read confirming `refusalFor` precedes each
+  component's own switch — but nothing has signed in as a suspended partner in a browser.
 - **`/violations` on the portal has no e2e spec at all** and never had one — the screen that grew
-  warnings, stages and waiver netting is the one with no browser coverage.
-- **`PAYOUT_FROZEN_BY_SUSPENSION` has no surface.** It is thrown at `payout.service.ts` behind the
-  RELEASE path, which only staff can reach — there is no payout write in the portal, so a partner
-  can never trigger it. **It belongs on the console's payout release control**, where a human will
-  actually meet it, and it is not wired there. project-cc verified this before wiring rather than
-  after, having just spent a detour on eighteen unreachable branches.
+  warnings, stages and waiver netting is the one with no browser coverage. It can now also display
+  the `suspension` stage, which is new and unseen.
+- **The blocker on both is the FIXTURE, and it is worth stating so nobody re-derives it.** The e2e
+  layer reaches nothing but the browser and HTTP — no spec touches the database — so a suspended
+  partner has to come from `seed-testbed.ts`. Re-running that seed deletes `partner_violations` for
+  every fixture partner (line 719) along with their bookings, payouts and payments, which would
+  destroy the waiver evidence this register cites as confirmed. So the dedicated fixture Bashar
+  asked for is a SEED CHANGE plus a re-seed he should choose the moment for, not something to slip
+  in beside a code change.
 
 **The lesson this work produced, and it is worth more than the feature:** six defects were found by
 USING a screen, and none of them would have failed a test. A guard registered nowhere. A route with
@@ -4443,6 +4510,7 @@ Kept because the reason something was blocked is often the reason it returns.
 
 | Date       | Item                                                                                         | Resolution                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ---------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-24 | **الدفع died on any violation that carried no fine**                                         | The fine branch of the الدفع union selected every row of `partner_violations`, including those with a NULL `fine_amount` — the ordinary state of a violation at `recorded` or `warned`. `financeItemSchema` types `amount` and `currency` as required strings, so ONE such row anywhere on the page made the console reject the whole response: «تعذّر تحميل هذه القائمة», no table, no counters, no pagination bar. The API answered 200 throughout, so no server log and no HTTP assertion could have shown it; the failure was entirely in the parse. It had gone unmet only because of ORDERING — rows come back newest first and the fixture's single un-fined violation sat thousands of rows deep. Recording a violation, the first thing the enforcement ladder asks anybody to do, puts one on page one. Fixed by filtering the branch on both fine columns; held by `finance-unfined-violation.integration.test.ts` with an opposite control proving fines still arrive. Found because two e2e specs failed on a screen the enforcement change never touched.                                                 |
 | 2026-08-24 | **O-sec-14** — finishing 2FA enrolment left the session un-enrolled                          | `POST /auth/2fa/enable` revoked every session — including the caller's own — and returned no replacement, while `hasTwoFactor` reads the `totpEnabled` CLAIM off the access token and `rotateIfStale` only refreshes near expiry. So «حفظتها — متابعة» pushed to `/`, the middleware bounced it back to `/enrol-2fa`, and the reader watched a button do nothing for up to fifteen minutes — then was signed out rather than corrected, because the refresh token had been revoked too. Same code in both apps, under a comment in each asserting the behaviour it did not have. It fails CLOSED, so it denied access rather than granting it. Fixed by returning a replacement `session` from `enable`, minted after the revocation with claims rebuilt from the row just written, and writing it to the cookie in both BFF routes. Found by the first spec that ever created a staff account from nothing: every other spec signs in as an account that is already enrolled, so nothing had walked the transition                                                                                                     |
 | 2026-08-23 | **O-e2e-2** — `customer-gifts.spec.ts:40` timed out deterministically                        | Neither recorded candidate was the cause. The cursor was ruled out by simulating the keyset walk in SQL against the live fixture — 21 disputes, three pages, `11/11/1` fetched, 21 rows seen, 21 distinct, no repeat and no skip, so the loop ran three times and not twenty. The cause was `waitForURL(/cursor=/)` on line 418: from the second iteration the URL ALREADY carries a cursor, so it matched instantly and waited for nothing. The loop then read the list mid-navigation — `.all()` snapshots the count from page two's ten rows while the DOM becomes page three's one row, so `nth(8)` waited for a row that would never exist until the budget was gone. That is also why the earlier attempt MOVED the failure onto «Show more»: making the read atomic left the un-awaited navigation in place, so the next thing touched was the link detaching. The read method was never the cause. Fixed by waiting for the link's OWN href and reading with `allTextContents()` — both needed, neither sufficient. Suite went 217/218 to **218/218**. The accumulation that made it reachable is now `O-e2e-3` |
 | 2026-08-20 | **Three load-test scenarios could not produce their own result**                             | Scenario 2 was capped at ten booking attempts a minute by a ROUTE-level `@Throttle` that `THROTTLE_DEFAULT_LIMIT` cannot reach — 2,259,751 of 2,259,812 requests refused, and **every k6 threshold passed**, because refusing a request is fast and a 409 is expected by design. Scenario 3 asked for `/admin/registries/bookings?…&size=`, which is neither the route nor the parameter name, so `setup()` threw on a 404 and there was no output at all. Scenario 4's bystander looped with no think time — 205 sign-ins a second against an allowance of ten a minute — so it starved itself and its threshold could never pass. All three fixed; the shape of the failure is the same as `O-scale-1`, and for the same reason: nothing had ever been run                                                                                                                                                                                                                                                                                                                                                            |
