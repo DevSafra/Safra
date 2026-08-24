@@ -14,13 +14,16 @@ import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 
 import {
+  ERROR,
   PERMISSIONS as P,
   type StaffInvitationAcceptInput,
   type StaffInviteInput,
+  type StaffProfileInput,
   type StaffRoleAssignInput,
   type StaffStatusInput,
   staffInvitationAcceptSchema,
   staffInviteSchema,
+  staffProfileSchema,
   staffRoleAssignSchema,
   staffStatusSchema,
   pageQuerySchema,
@@ -30,7 +33,14 @@ import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, Public, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { AuditLogService } from './audit-log.service.js';
+import { notFound } from '../common/errors/app-error.js';
 import { StaffService } from './staff.service.js';
+
+const staffActivityQuerySchema = pageQuerySchema.extend({
+  /** A name or an email, matched as a substring. Bounded so it cannot become a payload. */
+  q: z.string().trim().min(1).max(120).optional(),
+});
 
 /**
  * Staff account management (M-5, SRS §4, §9.3).
@@ -42,7 +52,10 @@ import { StaffService } from './staff.service.js';
  */
 @Controller('admin/staff')
 export class StaffController {
-  constructor(private readonly staff: StaffService) {}
+  constructor(
+    private readonly staff: StaffService,
+    private readonly audit: AuditLogService,
+  ) {}
 
   /**
    * A page of staff accounts.
@@ -71,6 +84,76 @@ export class StaffController {
   }
 
   /**
+   * آخر نشاط الموظفين — paged, and searchable by the person who acted.
+   *
+   * ## Paged, not lazily loaded
+   *
+   * Bashar offered either (2026-08-24). Paged, because his own standing instruction is that every
+   * console list carries `TablePagination` — a page NUMBER the reader chooses and a rows-per-page
+   * they choose — and an infinite list has neither. The max height he asked for is the panel
+   * scrolling inside its own box, which is a separate thing and compatible with both.
+   *
+   * ## Declared BEFORE `:userId`
+   *
+   * `activity` is a literal segment on a controller that also has `@Get(':userId')`. Express
+   * matches in declaration order, so this must come first or `ParseUUIDPipe` answers 400 for a
+   * route that exists. Same hazard as `staff/overview` one level up — see `staff-order.test.ts`.
+   */
+  @Get('activity')
+  @RequirePermissions(P.STAFF_MANAGE)
+  @AuditExempt(
+    'Reading the trail; changes nothing, and reading it is itself not recorded.',
+  )
+  async activity(
+    @Query(new ZodValidationPipe(staffActivityQuerySchema))
+    query: z.infer<typeof staffActivityQuerySchema>,
+  ) {
+    return this.audit.staffActivity({
+      limit: query.limit,
+      page: query.page,
+      actorSearch: query.q,
+    });
+  }
+
+  /**
+   * One entry, explaining what changed.
+   *
+   * A 404 for an id that names a customer's or a partner's action, not only for one that names
+   * nothing — this screen is reached with `staff.manage`, and `audit_log.read` is a different
+   * capability that opens the whole trail.
+   */
+  @Get('activity/:id')
+  @RequirePermissions(P.STAFF_MANAGE)
+  @AuditExempt('Reading one entry; changes nothing.')
+  async activityEntry(@Param('id', ParseUUIDPipe) id: string) {
+    const entry = await this.audit.staffEntry(id);
+
+    if (!entry) throw notFound(ERROR.AUDIT_ENTRY_NOT_FOUND);
+
+    return entry;
+  }
+
+  /**
+   * One staff account — the screen «رجوع» comes back from.
+   *
+   * ## The route is `:userId` and two SIBLING routes are static
+   *
+   * `GET /admin/staff/overview` and `GET /admin/staff/scopes` live on `RegistriesController`, which
+   * `AdminModule` registers BEFORE this controller. Express matches in registration order, so those
+   * two win and this parameterised route never sees them. Reorder that array and `overview` starts
+   * arriving here as a `userId`, where `ParseUUIDPipe` answers 400 — the console then renders the
+   * page with its counters silently missing, because a failed panel is rendered as nothing.
+   *
+   * `staff-order.test.ts` holds that ordering to account, since nothing else would notice.
+   */
+  @Get(':userId')
+  @RequirePermissions(P.STAFF_MANAGE)
+  @AuditExempt('Reading one staff account; changes nothing.')
+  async detail(@Param('userId', ParseUUIDPipe) userId: string) {
+    return this.staff.detail(userId);
+  }
+
+  /**
    * Invites a staff member. Throttled hard: it sends mail to an
    * attacker-chosen address, so an unthrottled version is a spam relay that happens
    * to require a super-admin session.
@@ -94,6 +177,25 @@ export class StaffController {
     @Param('userId', ParseUUIDPipe) userId: string,
   ): Promise<void> {
     await this.staff.resendInvitation(user, userId);
+  }
+
+  /**
+   * Names a staff account. `PATCH :userId`, because the person IS the resource.
+   *
+   * Separate from the role and status patches: naming somebody changes nothing about what they may
+   * do, and folding it in would mean sending a role in order to correct a spelling.
+   */
+  @Patch(':userId')
+  @RequirePermissions(P.STAFF_MANAGE)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async rename(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body(new ZodValidationPipe(staffProfileSchema)) body: StaffProfileInput,
+  ) {
+    await this.staff.rename(user, userId, body.fullName);
+
+    return this.staff.detail(userId);
   }
 
   @Patch(':userId/role')

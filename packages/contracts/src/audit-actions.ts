@@ -57,6 +57,8 @@ export const AUDIT_ACTIONS = [
   'booking.sla_expired',
   'booking.exported',
   'booking.export_requested',
+  'booking.checked_in',
+  'booking.check_in_undone',
   'payment.started',
   'payment.failed',
   'refund.created',
@@ -162,6 +164,7 @@ export const AUDIT_ACTIONS = [
   'staff.scope_changed',
   'staff.suspended',
   'staff.reinstated',
+  'staff.renamed',
   'rbac.grant_toggled',
   'setting.updated',
   /*

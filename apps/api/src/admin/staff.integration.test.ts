@@ -119,6 +119,7 @@ describeIfDb('StaffService', () => {
 
   async function invite(label: string, admitsAs = 'support_agent' as const) {
     const result = await service.invite(admin(SUPER_ADMIN_ID), {
+      fullName: 'موظف اختبار',
       email: address(label),
       staffRoleId: await roleAdmitting(admitsAs),
     });
@@ -171,6 +172,7 @@ describeIfDb('StaffService', () => {
 
       await expect(
         service.invite(admin(SUPER_ADMIN_ID), {
+          fullName: 'موظف اختبار',
           email: address('cust'),
           /*
             A role id that does not exist. The enum version of this test invited as `customer` to
@@ -194,6 +196,7 @@ describeIfDb('StaffService', () => {
 
       await expect(
         service.invite(admin(SUPER_ADMIN_ID), {
+          fullName: 'موظف اختبار',
           email: first.email,
           staffRoleId: await roleAdmitting('support_agent'),
         }),
@@ -248,6 +251,7 @@ describeIfDb('StaffService', () => {
 
       const roleId = narrow.rows[0]?.id ?? '';
       const invited = await service.invite(admin(SUPER_ADMIN_ID), {
+        fullName: 'موظف اختبار',
         email: address('narrow'),
         staffRoleId: roleId,
       });
@@ -279,6 +283,7 @@ describeIfDb('StaffService', () => {
 
       const roleId = narrow.rows[0]?.id ?? '';
       const invited = await service.invite(admin(SUPER_ADMIN_ID), {
+        fullName: 'موظف اختبار',
         email: address('redeem'),
         staffRoleId: roleId,
       });
@@ -329,6 +334,7 @@ describeIfDb('StaffService', () => {
       `);
 
       const invited = await service.invite(admin(SUPER_ADMIN_ID), {
+        fullName: 'موظف اختبار',
         email: address('narrow3'),
         staffRoleId: narrow.rows[0]?.id ?? '',
       });

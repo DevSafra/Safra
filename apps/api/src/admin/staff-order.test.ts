@@ -23,6 +23,27 @@ import { StaffController } from './staff.controller.js';
 describe('the admin/staff route prefix', () => {
   const controllers = Reflect.getMetadata('controllers', AdminModule) as unknown[];
 
+  /**
+   * `activity` and `activity/:id` are literal segments on the SAME controller as `:userId`, so
+   * this one is about declaration order within the class rather than module registration.
+   *
+   * `Reflect.getMetadata('path', …)` on each handler is what Nest itself reads, and the order the
+   * class declares them in is the order Express receives them. Declared after `:userId`,
+   * `/admin/staff/activity` would arrive at the detail handler and `ParseUUIDPipe` would answer
+   * 400 for a route that exists — a failure that looks like bad input rather than bad routing.
+   */
+  it('declares the staff activity routes before :userId', () => {
+    const names = Object.getOwnPropertyNames(StaffController.prototype);
+
+    expect(names.indexOf('activity')).toBeGreaterThanOrEqual(0);
+    expect(names.indexOf('detail')).toBeGreaterThanOrEqual(0);
+    expect(
+      names.indexOf('activity'),
+      'GET activity must be declared before GET :userId',
+    ).toBeLessThan(names.indexOf('detail'));
+    expect(names.indexOf('activityEntry')).toBeLessThan(names.indexOf('detail'));
+  });
+
   it('registers the static routes before the parameterised one', () => {
     const registries = controllers.indexOf(RegistriesController);
     const staff = controllers.indexOf(StaffController);

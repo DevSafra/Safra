@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { ERROR } from './error-codes.js';
-import { passwordChangeSchema, profileUpdateSchema } from './auth.js';
+import {
+  passwordChangeSchema,
+  profileUpdateSchema,
+  staffInviteSchema,
+  staffProfileSchema,
+} from './auth.js';
 
 /**
  * The two schemas behind الملف الشخصي's writes.
@@ -181,5 +186,50 @@ describe('passwordChangeSchema', () => {
     });
 
     expect(result.success && result.data.newPassword).toBe(padded);
+  });
+});
+
+/**
+ * A staff account's name — required on invite, and never blankable afterwards.
+ *
+ * `users.full_name` is nullable for the 165 accounts that predate it, because there is nothing true
+ * to backfill them with. That is a fact about history, and these hold the line that nothing NEW
+ * joins them: the invite refuses an account with no name, and the rename route refuses one that
+ * would erase it.
+ *
+ * The whitespace case is the one that matters. The console marks the field `required`, but that is
+ * a browser control on a route reachable without a browser — and a blanked name would put
+ * `staff.renamed` in the append-only audit log recording a change to nothing.
+ */
+describe('naming a staff account', () => {
+  it('refuses an invitation with no name', () => {
+    expect(
+      staffInviteSchema.safeParse({
+        email: 'new@safra.test',
+        staffRoleId: '00000000-0000-4000-8000-000000000000',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('refuses a blank or whitespace-only name', () => {
+    for (const fullName of ['', '   ', '\t\n', 'a']) {
+      expect(
+        staffProfileSchema.safeParse({ fullName }).success,
+        JSON.stringify(fullName),
+      ).toBe(false);
+    }
+  });
+
+  /** Trimmed on the way through, so a pasted name does not arrive with its whitespace. */
+  it('accepts and trims a real name', () => {
+    const parsed = staffProfileSchema.safeParse({ fullName: '  آدم الحلبي  ' });
+
+    expect(parsed.success && parsed.data.fullName).toBe('آدم الحلبي');
+  });
+
+  it('refuses a name too long to sit on a row', () => {
+    expect(staffProfileSchema.safeParse({ fullName: 'x'.repeat(121) }).success).toBe(
+      false,
+    );
   });
 });

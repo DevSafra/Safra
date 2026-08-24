@@ -308,10 +308,15 @@ export class TokenService {
    * partner. Those resolve exactly as they did — the role enum plus overrides plus toggled grants —
    * so nothing breaks while roles are assigned, and a console that has not adopted them keeps
    * working.
+   *
+   * ## Public so the staff detail screen shows what the GUARD will do
+   *
+   * `GET /admin/staff/:userId` prints the capabilities an account holds, and a super admin uses
+   * that list to decide whether somebody can do their job. Computed a second way it would drift
+   * from the token, and the screen would be confidently wrong about authority — the worst kind of
+   * wrong for a screen whose whole purpose is to answer "what can this person do".
    */
-  private async staffPermissions(
-    user: typeof schema.users.$inferSelect,
-  ): Promise<Permission[]> {
+  async staffPermissions(user: typeof schema.users.$inferSelect): Promise<Permission[]> {
     if (user.staffRoleId) {
       const rows = await this.db
         .select({ permissions: schema.staffRoles.permissions })

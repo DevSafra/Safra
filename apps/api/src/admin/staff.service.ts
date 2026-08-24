@@ -6,6 +6,7 @@ import {
   COUNT_CAP,
   ERROR,
   isStaffRole,
+  STAFF_ROLES,
   type Role,
   type OffsetPage,
   offsetPage,
@@ -16,7 +17,11 @@ import { AuthTokenService } from '../auth/auth-token.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
 import { MailService } from '../mail/mail.service.js';
-import { staffInvitationMail } from '../mail/mail.templates.js';
+import {
+  staffInvitationMail,
+  staffReinstatedMail,
+  staffSuspendedMail,
+} from '../mail/mail.templates.js';
 import { PasswordService } from '../common/crypto/password.service.js';
 import { TokenService } from '../auth/token.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -32,8 +37,75 @@ import { badRequest, forbidden, notFound } from '../common/errors/app-error.js';
  */
 const INVITATION_TTL_MS = 48 * 60 * 60 * 1000;
 
+/**
+ * One staff account, for the detail screen «رجوع» comes back from.
+ *
+ * Everything the list carries, plus the three things that only make sense for ONE person: the
+ * capabilities they actually hold, the cities they are scoped to, and the state of an outstanding
+ * invitation. Those lived on the LIST as a permissions matrix and a paged scope table — a screen
+ * that answered "who can do what" by making the reader scan twenty rows to learn about one.
+ *
+ * `lastLoginAt`, not `lastSignInAt`. The list already calls it that and the console reads both on
+ * the same screen; two names for one idea across two endpoints is the `memberCount` versus
+ * `employeeCount` mistake, which cost a crash and a wrong button in one afternoon.
+ */
+export interface StaffDetail extends StaffMember {
+  readonly staffRoleId: string | null;
+  readonly staffRoleName: string | null;
+  /** Exactly what the guard will compare against — see `TokenService.staffPermissions`. */
+  readonly permissions: readonly string[];
+  /**
+   * The cities this account may work in — SLUG and name, never the id.
+   *
+   * The name because somebody deciding whether a colleague can work in a city cannot read a uuid,
+   * and resolving names console-side would be a fetch of the whole geography per page view for data
+   * this query has already joined.
+   *
+   * The SLUG because it is what `setStaffScopeSchema` accepts — "a slug is stable, readable in an
+   * audit entry, and not enumerable". A read that hands back an identifier the matching write will
+   * not take makes the pair unusable as a round trip, which is what a detail screen with an editor
+   * on it needs. The id is on neither side and is therefore not here.
+   */
+  readonly scopeCities: readonly { readonly slug: string; readonly name: string }[];
+  /**
+   * `all_cities` or `cities` — and this is NOT derivable from the list above.
+   *
+   * An empty `scopeCities` was enough while the screen only displayed a scope: no cities means no
+   * restriction to show. It is not enough to EDIT one, because `cities` with an empty list is a
+   * real and deliberate state — `setStaffScopeSchema` accepts it as how an administrator starts
+   * building a scope — and a picker cannot arrive with the right choice selected if the two
+   * collapse to the same value.
+   *
+   * Maps to `kind` on the write. Named `scopeKind` here because `kind` alone is ambiguous in a
+   * payload about a person; the write's whole object IS a scope, so there it is not.
+   */
+  readonly scopeKind: 'all_cities' | 'cities';
+  /**
+   * What this account may do OUTSIDE its scope. Maps to `outside` on the write.
+   *
+   * Present because the write is a whole-object `PUT`: an editor that submitted without it would
+   * silently reset the value to whatever it defaulted to. Only meaningful while `scopeKind` is
+   * `cities`, and the schema's `.refine` refuses the contradictory combination rather than
+   * quietly ignoring half of it.
+   */
+  readonly outsideScopeAccess: 'none' | 'read_only';
+  /** Null unless an invitation is outstanding — redeemed and expired ones are not "sent". */
+  readonly invitationSentAt: string | null;
+  readonly invitationExpiresAt: string | null;
+}
+
 export interface StaffMember {
   readonly id: string;
+  /**
+   * The person's name, or NULL for an account created before names existed (Bashar, 2026-08-23).
+   *
+   * Null rather than a derived stand-in: `staff12@safra.test` yields `staff12`, and a fabricated
+   * name rendered as fact on a colleague's record is worse than an honest address. 165 accounts
+   * predate the column and there is nothing true to backfill them with, so every surface falls
+   * back to the email until somebody types the real one. New accounts cannot be nameless —
+   * `staffInviteSchema` requires it.
+   */
+  readonly fullName: string | null;
   readonly email: string;
   readonly role: Role;
   readonly status: string;
@@ -69,6 +141,48 @@ export interface StaffMember {
  * itself or quietly widen their own access. They are enforced here rather than in the
  * console because the console is not the security boundary.
  */
+/**
+ * Who counts as staff, as an ALLOW-LIST.
+ *
+ * ## The bug this replaced, 2026-08-23
+ *
+ * It was written as a DENY-list — "not a customer and not a partner" — and that was correct while
+ * those were the only two non-staff roles in the enum. `partner_employee` was added the same day,
+ * so every partner receptionist and housekeeper immediately appeared in SAFRA's own staff registry,
+ * was counted in its KPI cards, and could be opened, re-roled and suspended from الموظفون.
+ *
+ * ## What it did and did NOT reach
+ *
+ * The two READ queries only — the registry and the record. `changeRole` and `setStatus` were never
+ * exposed: both go through `staffById`, which asks `isStaffRole`, the allow-list, and refuses. That
+ * is worth stating precisely rather than leaving as "a permissions bug", because the difference
+ * between reading a row and re-roling somebody else's employee is the whole severity.
+ *
+ * It also put the registry out of step with its own counters, which have always used an allow-list
+ * (`staff-overview.service.ts`): the KPI card counted SAFRA's staff while the table beneath it
+ * listed partner employees too. A count that disagrees with the list it describes is the failure
+ * "Tables and pagination" exists to prevent.
+ *
+ * ## Why an allow-list rather than one more exclusion
+ *
+ * Adding `AND u.role <> 'partner_employee'` fixes today and fails again the next time the enum
+ * grows — silently, and in the permissive direction, which is the direction rule 1 forbids
+ * ("deny by default").
+ *
+ * The deeper point is that this file ALREADY had the right answer. `staffById` asks `isStaffRole`
+ * three hundred lines below; these two queries asked a hand-written predicate. Two answers to "who
+ * is staff" in one service, and the copy is the one that drifted — which is exactly what the note
+ * on `STAFF_ROLES` in `permissions.ts` warns about. All three readers now resolve from it.
+ *
+ * Interpolated per value through `sql.join` rather than as a bare array: an array binds as a single
+ * parameter and a tuple is what `IN` wants, so the explicit join is the form that cannot be read
+ * two ways.
+ */
+const IS_STAFF = sql`u.role::text IN (${sql.join(
+  STAFF_ROLES.map((role) => sql`${role}`),
+  sql`, `,
+)})`;
+
 @Injectable()
 export class StaffService {
   private readonly logger = new Logger(StaffService.name);
@@ -134,11 +248,12 @@ export class StaffService {
         No backticks in here — this comment is inside a sql template literal and a backtick ends it.
       */
       LEFT JOIN staff_roles r ON r.id = u.staff_role_id AND r.deleted_at IS NULL
-      WHERE u.role <> 'customer' AND u.role <> 'partner' AND u.deleted_at IS NULL`;
+      WHERE ${IS_STAFF} AND u.deleted_at IS NULL`;
 
     const [rows, total] = await Promise.all([
       this.db.execute<{
         id: string;
+        full_name: string | null;
         email: string;
         role: Role;
         staff_role_id: string | null;
@@ -149,7 +264,7 @@ export class StaffService {
         last_login_at: string | null;
         created_at: string;
       }>(sql`
-      SELECT u.id, u.email, u.role::text AS role, u.status::text AS status,
+      SELECT u.id, u.full_name, u.email, u.role::text AS role, u.status::text AS status,
              u.staff_role_id, r.name AS staff_role_name,
              u.totp_enabled_at::text, u.password_hash,
              u.last_login_at::text, u.created_at::text
@@ -162,6 +277,7 @@ export class StaffService {
 
     const items = rows.rows.map((row) => ({
       id: row.id,
+      fullName: row.full_name,
       email: row.email,
       role: row.role,
       staffRoleId: row.staff_role_id,
@@ -197,7 +313,12 @@ export class StaffService {
    */
   async invite(
     actor: AccessTokenClaims | undefined,
-    input: { email: string; staffRoleId: string; locale?: string | undefined },
+    input: {
+      fullName: string;
+      email: string;
+      staffRoleId: string;
+      locale?: string | undefined;
+    },
   ): Promise<{ id: string; email: string; role: Role }> {
     const email = input.email.trim().toLowerCase();
 
@@ -234,9 +355,9 @@ export class StaffService {
     }
 
     const created = await this.db.execute<{ id: string }>(sql`
-      INSERT INTO users (email, role, staff_role_id, status, preferred_locale,
+      INSERT INTO users (full_name, email, role, staff_role_id, status, preferred_locale,
                          email_verified_at)
-      VALUES (${email}, ${role}::user_role, ${input.staffRoleId}::uuid, 'active',
+      VALUES (${input.fullName}, ${email}, ${role}::user_role, ${input.staffRoleId}::uuid, 'active',
               ${input.locale ?? 'en'}, now())
       RETURNING id
     `);
@@ -250,7 +371,7 @@ export class StaffService {
       action: 'staff.invited',
       subjectType: 'user',
       subjectId: user.id,
-      after: { email, role, staffRoleId: input.staffRoleId },
+      after: { fullName: input.fullName, email, role, staffRoleId: input.staffRoleId },
     });
 
     await this.sendInvitation(user.id, email, role, input.locale ?? 'en');
@@ -258,6 +379,187 @@ export class StaffService {
     this.logger.log(`Staff ${email} invited as ${role} by ${actor?.sub}.`);
 
     return { id: user.id, email, role };
+  }
+
+  /**
+   * One staff account by id, or a 404.
+   *
+   * ## "Not staff" answers the same as "not there"
+   *
+   * The predicate excludes customers and partners, so passing a customer's user id — which a super
+   * admin can read off الزبائن — returns a 404 rather than a partial staff record. No response
+   * confirms that a uuid belongs to a real person on another registry.
+   *
+   * ## The permissions come from the GUARD's own resolution
+   *
+   * `TokenService.staffPermissions` is what mints the token the guard reads. Recomputing the same
+   * thing here from `role` and `permission_overrides` would be a second implementation of the most
+   * consequential rule in the platform, and it would be wrong the moment either changes — on a
+   * screen whose entire purpose is to answer what this person can do.
+   */
+  async detail(userId: string): Promise<StaffDetail> {
+    const rows = await this.db.execute<{
+      id: string;
+      full_name: string | null;
+      email: string;
+      role: Role;
+      staff_role_id: string | null;
+      staff_role_name: string | null;
+      status: string;
+      scope_kind: 'all_cities' | 'cities';
+      outside_scope_access: 'none' | 'read_only';
+      totp_enabled_at: string | null;
+      password_hash: string | null;
+      last_login_at: string | null;
+      created_at: string;
+    }>(sql`
+      SELECT u.id, u.full_name, u.email, u.role::text AS role, u.status::text AS status,
+             u.staff_role_id, r.name AS staff_role_name,
+             u.scope_kind::text AS scope_kind,
+             u.outside_scope_access::text AS outside_scope_access,
+             u.totp_enabled_at::text, u.password_hash,
+             u.last_login_at::text, u.created_at::text
+      FROM users u
+      LEFT JOIN staff_roles r ON r.id = u.staff_role_id AND r.deleted_at IS NULL
+      WHERE u.id = ${userId}::uuid
+        AND ${IS_STAFF} AND u.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const row = rows.rows[0];
+
+    if (!row) throw notFound(ERROR.STAFF_NOT_FOUND);
+
+    const [permissions, scopeCities, invitation] = await Promise.all([
+      this.permissionsOf(userId),
+      this.scopeCitiesOf(userId),
+      this.outstandingInvitation(userId),
+    ]);
+
+    return {
+      id: row.id,
+      fullName: row.full_name,
+      email: row.email,
+      role: row.role,
+      staffRoleId: row.staff_role_id,
+      staffRoleName: row.staff_role_name,
+      permissions,
+      scopeCities,
+      scopeKind: row.scope_kind,
+      outsideScopeAccess: row.outside_scope_access,
+      status: row.status,
+      twoFactorEnabled: row.totp_enabled_at !== null,
+      invitationPending: row.password_hash === null,
+      invitationSentAt: invitation?.created_at ?? null,
+      invitationExpiresAt: invitation?.expires_at ?? null,
+      lastLoginAt: row.last_login_at,
+      createdAt: row.created_at,
+    };
+  }
+
+  /** Delegated to the token service, so the screen and the guard cannot disagree. */
+  private async permissionsOf(userId: string): Promise<string[]> {
+    const user = await this.db.query.users.findFirst({
+      where: (table, { and, eq, isNull }) =>
+        and(eq(table.id, userId), isNull(table.deletedAt)),
+    });
+
+    return user ? this.tokens.staffPermissions(user) : [];
+  }
+
+  /**
+   * The cities on the account, in Arabic, or NONE when the account is unscoped.
+   *
+   * `scope_kind = 'all_cities'` short-circuits in the predicate: `staff_scope_cities` may still
+   * hold rows from a previous scoping, and returning them for an account that is not scoped would
+   * show a super admin a restriction that is not in force. `TokenService.resolveScope` ignores them
+   * for the same reason, so this matches what actually gates the queries.
+   */
+  private async scopeCitiesOf(userId: string): Promise<{ slug: string; name: string }[]> {
+    const rows = await this.db.execute<{ slug: string; name: string }>(sql`
+      SELECT c.slug, c.name_ar AS name
+      FROM staff_scope_cities s
+      JOIN cities c ON c.id = s.city_id
+      JOIN users u ON u.id = s.user_id
+      WHERE s.user_id = ${userId}::uuid AND u.scope_kind = 'cities'
+      ORDER BY c.name_ar
+    `);
+
+    return rows.rows;
+  }
+
+  /**
+   * The invitation still standing, if there is one.
+   *
+   * Unconsumed AND unexpired. A redeemed invitation is not outstanding, and an expired one needs a
+   * RESEND rather than a date the reader might wait on — "sent three weeks ago" and "still valid"
+   * are different facts, and the screen shows the second.
+   */
+  private async outstandingInvitation(
+    userId: string,
+  ): Promise<{ created_at: string; expires_at: string } | undefined> {
+    const rows = await this.db.execute<{ created_at: string; expires_at: string }>(sql`
+      SELECT created_at::text, expires_at::text
+      FROM auth_tokens
+      WHERE user_id = ${userId}::uuid AND purpose = 'staff_invitation'
+        AND consumed_at IS NULL AND expires_at > now()
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+
+    return rows.rows[0];
+  }
+
+  /**
+   * Names an account — the only route by which the accounts predating `full_name` ever get one.
+   *
+   * ## Its own route rather than a field on the role or status patches
+   *
+   * Naming somebody is not changing their authority. Folded into `PATCH :userId/role`, fixing a
+   * typo in a colleague's name would mean sending a role as well — so a slip in the role select
+   * rides along with a correction to a spelling, and the audit trail records a role change that
+   * nobody meant to make.
+   *
+   * ## No last-super-admin guard, deliberately
+   *
+   * That guard exists because demoting or suspending the last administrator locks the platform out
+   * of itself. A name cannot do that. Guards that fire where they cannot help teach people to
+   * expect refusals, and then the refusal that matters reads as noise.
+   */
+  async rename(
+    actor: AccessTokenClaims | undefined,
+    userId: string,
+    fullName: string,
+  ): Promise<void> {
+    /* `staffById` is the ONE definition of "this id names a staff account", and it 404s otherwise. */
+    const target = await this.staffById(userId);
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE users SET full_name = ${fullName}, updated_at = now()
+        WHERE id = ${userId}::uuid
+      `);
+
+      /*
+        The audit records that a name CHANGED and to what, and never the address. `full_name` is
+        the thing being edited so it has to be in the record; the email is PII this file already
+        refuses to log elsewhere for the same reason.
+      */
+      await this.audit.record(
+        {
+          actorUserId: actor?.sub,
+          actorRole: actor?.role,
+          action: 'staff.renamed',
+          subjectType: 'user',
+          subjectId: userId,
+          before: { fullName: target.full_name },
+          after: { fullName },
+        },
+        tx as unknown as Database,
+      );
+    });
+
+    this.logger.log(`Staff ${userId} renamed by ${actor?.sub}.`);
   }
 
   /** Re-sends an invitation, for one that expired or never arrived. */
@@ -401,6 +703,43 @@ export class StaffService {
       // window for sessions that are already open.
       await this.tokens.revokeAllForUser(userId);
     }
+
+    /*
+      The person is TOLD, and this is the only place they can be (Bashar, 2026-08-23).
+
+      `AuthService.login` answers a suspended account exactly as it answers a wrong password —
+      deliberately, so that a suspended address cannot be confirmed by probing. The consequence is
+      that the sign-in screen can never explain, and somebody locked out learns nothing from the
+      only surface they can still reach. The email goes to an address we already hold rather than
+      revealing anything to whoever is typing.
+
+      ## Sent AFTER the write and the revocation, and never inside a transaction
+
+      Mail delivery is I/O to somebody else's system. Inside the transaction it would hold a row
+      lock for the length of an SMTP round trip, and a delivery failure would roll back a
+      suspension that had already been decided — the account would quietly stay ACTIVE because a
+      mail server was slow, which is the wrong direction for this particular failure.
+
+      A failure is logged and swallowed for the same reason: the suspension is done and correct,
+      and throwing here would report it as failed to a super admin who would then try again.
+    */
+    await this.mail
+      .send(
+        status === 'suspended'
+          ? staffSuspendedMail({ to: target.email, locale: target.preferred_locale })
+          : staffReinstatedMail({
+              to: target.email,
+              locale: target.preferred_locale,
+              url: `${this.env.ADMIN_URL}/login`,
+            }),
+      )
+      .catch((error: unknown) => {
+        /* The user ID, never the address — see `sendInvitation` for why this file logs neither. */
+        this.logger.error(
+          `Could not send the ${status} notice for staff ${userId}.`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      });
   }
 
   /**
@@ -470,13 +809,14 @@ export class StaffService {
   private async staffById(userId: string) {
     const rows = await this.db.execute<{
       id: string;
+      full_name: string | null;
       email: string;
       role: Role;
       status: string;
       password_hash: string | null;
       preferred_locale: string;
     }>(sql`
-      SELECT id, email, role::text AS role, status::text AS status,
+      SELECT id, full_name, email, role::text AS role, status::text AS status,
              password_hash, preferred_locale
       FROM users
       WHERE id = ${userId} AND deleted_at IS NULL

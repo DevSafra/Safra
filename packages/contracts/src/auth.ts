@@ -370,12 +370,32 @@ export const STAFF_ROLE_VALUES = [
  */
 export const staffInviteSchema = z
   .object({
+    /**
+     * REQUIRED, so no account created from here on is nameless (Bashar, 2026-08-23).
+     *
+     * `users.full_name` is nullable for the accounts that predate it — there is nothing true to
+     * backfill them with — but that is a fact about history, not a licence to keep adding to it.
+     * The super admin sending the invitation knows who they are inviting; nobody else ever will.
+     */
+    fullName: z.string().trim().min(2, ERROR.VALIDATION_REQUIRED).max(120),
     email: z.string().email().max(320),
     staffRoleId: z.string().uuid(ERROR.VALIDATION_REQUIRED),
     locale: z.enum(['ar', 'en', 'de']).optional(),
   })
   .strict();
 export type StaffInviteInput = z.infer<typeof staffInviteSchema>;
+
+/**
+ * Naming an account that already exists — the only way the 165 nameless ones ever get a name.
+ *
+ * Its own schema and its own route rather than a field on the role or status patches: naming
+ * somebody is not changing their authority, and folding it into a call that does would mean the
+ * screen has to send a role in order to fix a typo in a name.
+ */
+export const staffProfileSchema = z
+  .object({ fullName: z.string().trim().min(2, ERROR.VALIDATION_REQUIRED).max(120) })
+  .strict();
+export type StaffProfileInput = z.infer<typeof staffProfileSchema>;
 
 export const staffRoleChangeSchema = z
   .object({ role: z.enum(STAFF_ROLE_VALUES) })
