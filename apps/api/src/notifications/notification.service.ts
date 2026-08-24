@@ -126,12 +126,59 @@ export class NotificationService {
         Marking it `failed` here would hide it from that scan and turn a recoverable Redis blip into
         a notice nobody is ever told about.
       */
+      /*
+        REDACTED, like the delivery failure below — and this line was not.
+
+        It printed `error.message` verbatim, and on 2026-08-24 a test run logged
+        «SMTP refused the message for host@example.test»: a recipient address in an error log, from
+        the one class whose whole job is to keep them out of the record. `deliver()` had been
+        redacting since it was written; this path was missed because an ENQUEUE failure is a Redis
+        problem in the imagination and a mail-server problem in practice.
+      */
+      const reason = redactContactDetails(
+        error instanceof Error ? error.message : String(error),
+      ).body.slice(0, 300);
+
       this.logger.error(
-        `Could not enqueue notification ${templateKey} (${row.id}): ` +
-          `${error instanceof Error ? error.message : String(error)}. The row stays queued and is ` +
-          'recoverable by re-drive.',
+        `Could not enqueue notification ${templateKey} (${row.id}): ${reason}. ` +
+          'The row stays queued and is recoverable by re-drive.',
       );
     }
+  }
+
+  /**
+   * Records an IN-APP notification — a row the partner's own portal reads.
+   *
+   * ## Why it is a row and not a message
+   *
+   * `notifications` has no body column, and deliberately not one. The detail a partner needs about
+   * an enforcement action lives on the violation itself — its description, the warning note, the
+   * fine and the waiver, all of which مخالفات renders — so a copy of that prose here would be a
+   * second version of the same sentences, free to drift from the record an appeal turns on. The row
+   * carries WHAT happened and WHEN; the screen it links to carries the detail. That is also the
+   * standing requirement that a notification point at an authenticated page rather than restate
+   * sensitive detail outside one.
+   *
+   * ## `sent` immediately, and that is honest
+   *
+   * There is no provider and no queue: the row IS the delivery. Leaving it `queued` would make the
+   * `safra_notifications_1h` gauge read a successful in-app notice as a stuck one, and marking it
+   * `delivered` would claim a confirmation nobody gave.
+   */
+  async recordInApp(
+    templateKey: string,
+    locale: string,
+    subject: { partnerId?: string | undefined; bookingId?: string | undefined } = {},
+  ): Promise<void> {
+    await this.db.insert(schema.notifications).values({
+      channel: 'in_app',
+      templateKey,
+      locale,
+      status: 'sent',
+      sentAt: new Date(),
+      ...(subject.partnerId ? { partnerId: subject.partnerId } : {}),
+      ...(subject.bookingId ? { bookingId: subject.bookingId } : {}),
+    });
   }
 
   /**
