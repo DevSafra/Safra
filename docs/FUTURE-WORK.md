@@ -2758,6 +2758,77 @@ boundary would transfer, reading route metadata and failing when a scoped resour
 scope enforcement behind it. Until that exists, §4's line should be read as "scoped where somebody
 looked". **To unblock:** nothing external.
 
+### O-sec-14 — Closed: enrolling in 2FA now issues the session it invalidates
+
+**Status:** resolved 2026-08-24 · **Severity:** Medium · **Owner:** engineering · **Recorded:** 2026-08-24
+
+**Reproduced in a browser, not theorised.** A staff member completing two-factor enrolment presses
+«حفظتها — متابعة» and nothing happens. They stay on the recovery-code screen, and every navigation
+returns them to `/enrol-2fa`, until the access token runs down or they sign out and in again.
+
+The chain, all of it verified in the source:
+
+- `POST /auth/2fa/enable` writes `totp_enabled_at` and returns `{ enabled, recoveryCodes }` —
+  **no new token** (`two-factor.controller.ts:53`, `two-factor.service.ts:106`).
+- The middleware decides with `hasTwoFactor(session)`, which reads the `totpEnabled` CLAIM off the
+  access token (`packages/session/src/session.ts:229`), signed at sign-in and still `false`.
+- `rotateIfStale` refreshes only when the token is near expiry (`apps/admin/src/middleware.ts:187`,
+  `needsRefresh` = within 30s of expiry). `ACCESS_TOKEN_TTL` defaults to **15m**, so the stale claim
+  survives up to ~15 minutes.
+- So `router.push('/')` is bounced by `route()` back to `/enrol-2fa`
+  (`apps/admin/src/middleware.ts:135-139`), and the client re-renders the same screen.
+
+**It is in BOTH apps.** `apps/admin/src/components/two-factor-enrolment.tsx:124` and
+`apps/partner/src/components/two-factor-enrolment.tsx:143` carry the same `router.refresh();
+router.push('/')`, under a comment that says "the new token carries totpEnabled" — which is what the
+code intends and not what it does. It affects every new staff member and every new partner, on the
+first thing they are asked to do.
+
+**Not a security hole:** it fails CLOSED. It denies access to somebody who should now have it; it
+grants nothing. That is why it is Medium and not High.
+
+**Found by** `e2e/console-role-gating.spec.ts`, whose narrow account had to enrol before it could be
+signed in as. That spec now clears its cookies and signs in a second time, with a comment naming
+this item — **the workaround must not be quietly deleted before the bug is fixed**, or the spec goes
+red for a reason that has nothing to do with the gating it tests.
+
+**The work.** `token.service.ts:546` shows the refresh path already rebuilds claims from the
+database row (`buildClaims` → `totpEnabled: user.totpEnabledAt !== null`), so a refresh would carry
+the corrected claim. Two candidate fixes:
+
+1. **Have `enable` issue the new session** — the act that changes the claim also issues the claim.
+   Cleanest semantically; changes an API response shape and the BFF route that proxies it.
+2. **Refresh before refusing** — in each middleware, when the session says un-enrolled, refresh once
+   and re-check before redirecting. Self-healing and no contract change; costs one refresh per
+   request while un-enrolled, which is bounded because an un-enrolled reader can reach only
+   `/enrol-2fa`.
+
+Prefer (1); (2) is the contained fallback if the API surface must stay fixed. Either needs a test
+that signs in, enrols, and asserts the very next navigation lands somewhere other than `/enrol-2fa`
+— the gap is precisely that nothing exercised the transition, because every other spec signs in as
+an account that was already enrolled.
+
+**Fixed 2026-08-24, by option (1), and it was worse than first written up.** `enable` also calls
+`revokeAllForUser` — deliberately, since any session predating the second factor was established
+under weaker authentication — and that includes the CALLER'S OWN. So the reader was not merely
+stuck for fifteen minutes: when the access token expired the refresh token was already dead, and
+they were signed out rather than corrected. `POST /auth/2fa/enable` now returns `session` beside
+`enabled` and `recoveryCodes`, minted AFTER the revocation with claims rebuilt from the row it just
+wrote, and both BFF routes write it to the cookie; the user blob comes from the cookie already in
+the jar, since enrolling changes an account's authentication and nothing about who they are.
+`partner-two-factor.integration.test.ts` walks the transition and asserts the replacement was
+minted for the account that enrolled — a session issued for somebody else would satisfy "a session
+came back" perfectly.
+
+**Confirmed end to end by the spec that found it.** `e2e/console-role-gating.spec.ts` had carried a
+clear-cookies-and-sign-in-again workaround; it was REMOVED and the account reset to un-enrolled so
+the enrolment branch actually ran. The narrow reader enrolled and went straight on to `/audit` —
+the exact navigation that used to bounce — and all four tests passed. Verified the run really did
+enrol rather than skip: `totp_enabled_at` and eight recovery codes written during that run. Note
+for anyone deploying: the fix is in `dist`/`.next` only after a rebuild AND a restart, and the
+standalone apps need `.next/static` and `public` copied into `.next/standalone/apps/<app>/` or the
+console serves HTML with no CSS or JS.
+
 ### O-e2e-4 — a spec cannot address "the last page" once a table passes COUNT_CAP
 
 **Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-23
@@ -4338,6 +4409,7 @@ Kept because the reason something was blocked is often the reason it returns.
 
 | Date       | Item                                                                                         | Resolution                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ---------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-08-24 | **O-sec-14** — finishing 2FA enrolment left the session un-enrolled                          | `POST /auth/2fa/enable` revoked every session — including the caller's own — and returned no replacement, while `hasTwoFactor` reads the `totpEnabled` CLAIM off the access token and `rotateIfStale` only refreshes near expiry. So «حفظتها — متابعة» pushed to `/`, the middleware bounced it back to `/enrol-2fa`, and the reader watched a button do nothing for up to fifteen minutes — then was signed out rather than corrected, because the refresh token had been revoked too. Same code in both apps, under a comment in each asserting the behaviour it did not have. It fails CLOSED, so it denied access rather than granting it. Fixed by returning a replacement `session` from `enable`, minted after the revocation with claims rebuilt from the row just written, and writing it to the cookie in both BFF routes. Found by the first spec that ever created a staff account from nothing: every other spec signs in as an account that is already enrolled, so nothing had walked the transition                                                                                                     |
 | 2026-08-23 | **O-e2e-2** — `customer-gifts.spec.ts:40` timed out deterministically                        | Neither recorded candidate was the cause. The cursor was ruled out by simulating the keyset walk in SQL against the live fixture — 21 disputes, three pages, `11/11/1` fetched, 21 rows seen, 21 distinct, no repeat and no skip, so the loop ran three times and not twenty. The cause was `waitForURL(/cursor=/)` on line 418: from the second iteration the URL ALREADY carries a cursor, so it matched instantly and waited for nothing. The loop then read the list mid-navigation — `.all()` snapshots the count from page two's ten rows while the DOM becomes page three's one row, so `nth(8)` waited for a row that would never exist until the budget was gone. That is also why the earlier attempt MOVED the failure onto «Show more»: making the read atomic left the un-awaited navigation in place, so the next thing touched was the link detaching. The read method was never the cause. Fixed by waiting for the link's OWN href and reading with `allTextContents()` — both needed, neither sufficient. Suite went 217/218 to **218/218**. The accumulation that made it reachable is now `O-e2e-3` |
 | 2026-08-20 | **Three load-test scenarios could not produce their own result**                             | Scenario 2 was capped at ten booking attempts a minute by a ROUTE-level `@Throttle` that `THROTTLE_DEFAULT_LIMIT` cannot reach — 2,259,751 of 2,259,812 requests refused, and **every k6 threshold passed**, because refusing a request is fast and a 409 is expected by design. Scenario 3 asked for `/admin/registries/bookings?…&size=`, which is neither the route nor the parameter name, so `setup()` threw on a 404 and there was no output at all. Scenario 4's bystander looped with no think time — 205 sign-ins a second against an allowance of ten a minute — so it starved itself and its threshold could never pass. All three fixed; the shape of the failure is the same as `O-scale-1`, and for the same reason: nothing had ever been run                                                                                                                                                                                                                                                                                                                                                            |
 | 2026-08-20 | **The double-booking invariant could not detect a double booking**                           | `pnpm load:invariants` tested `GROUP BY unit_id, check_in HAVING count(*) > 1` — only two live bookings sharing an IDENTICAL check-in date. The constraint it stands for forbids any OVERLAP, so Aug 1–5 against Aug 3–7 on one unit returned no rows and printed `ok`. It was scenario 2's entire verdict. Replaced with a window-function check over adjacent stays per unit — deliberately not a self-join on `&&`, which would lean on the gist index the constraint itself creates and so degrade exactly when it is needed. Three tests drop the constraint inside a rolled-back transaction, write the overlap it would have refused, and require the check to find it                                                                                                                                                                                                                                                                                                                                                                                                                                           |
