@@ -435,8 +435,16 @@ describeIfDb('PartnerApplicationService', () => {
       */
       expect(invitation?.sensitive).toBeUndefined();
       expect(invitation?.text).toContain('https://partner.safra.test/invitation/');
-      /* Never a credential in an inbox. The one thing §1 forbids most plainly. */
-      expect(invitation?.text).not.toMatch(/password:\s*\S/i);
+      /*
+        Never a credential in an inbox. The one thing §1 forbids most plainly.
+
+        The pattern excludes a URL, and that exclusion arrived with the bilingual rewrite
+        (2026-08-23). The mail now carries the English block too, which reads «set your account
+        password:» followed by the LINK — so the old `/password:\s*\S/i` matched the link and
+        failed on correct copy. Narrowing it to "something that is not a URL" keeps the guard's
+        teeth: a real password after the word still fails, which is the thing being forbidden.
+      */
+      expect(invitation?.text).not.toMatch(/password:\s*(?!https?:\/\/)\S/i);
     });
 
     /**
