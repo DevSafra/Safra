@@ -51,7 +51,19 @@ export async function findLiveEmployment(
         isNull(schema.partnerEmployees.deletedAt),
         isNull(schema.partnerEmployeeRoles.deletedAt),
         isNull(schema.partners.deletedAt),
-        isNull(schema.partners.suspendedAt),
+        /*
+          Suspension is NOT filtered here (Bashar, 2026-08-24), matching the owner branch.
+
+          It was, and the consequence was worse for an employee than for the owner: a receptionist
+          at a suspended business got a token with no partner and no permissions, so their portal
+          rendered empty with nothing anywhere explaining why — not even the suspension notice,
+          which needs the partner scope to be read at all.
+
+          Suspension is an enforcement action against a BUSINESS, and the people who work there
+          still need to see what has happened to it. What they may not do is enforced per action by
+          `SuspendedPartnerGuard`, which reads the column at request time — so an employee is
+          refused exactly the same writes as the owner, and told the same reason.
+        */
       ),
     )
     .limit(1);

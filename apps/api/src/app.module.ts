@@ -44,6 +44,7 @@ import { ENV, type Env } from './config/env.js';
 import { JwtAuthGuard } from './rbac/jwt-auth.guard.js';
 import { PermissionsGuard } from './rbac/permissions.guard.js';
 import { TwoFactorGuard } from './rbac/two-factor.guard.js';
+import { SuspendedPartnerGuard } from './rbac/suspended-partner.guard.js';
 import { VerifiedPartnerGuard } from './rbac/verified-partner.guard.js';
 
 @Module({
@@ -154,6 +155,13 @@ import { VerifiedPartnerGuard } from './rbac/verified-partner.guard.js';
       a database round trip, which a request that was going to be refused anyway should not spend.
     */
     { provide: APP_GUARD, useClass: VerifiedPartnerGuard },
+    /*
+      Suspension, per action (Bashar, 2026-08-24). Opt-in via `@RefusedWhileSuspended()`, because a
+      suspended partner may still sign in and read everything — so the default is ALLOWED and each
+      route that suspension blocks says so. Registered AFTER the verification guard: an unverified
+      partner is refused for the earlier reason, which is the one they can act on.
+    */
+    { provide: APP_GUARD, useClass: SuspendedPartnerGuard },
     // Runs after the guards, so an unauthorised request is never audited as an
     // action. Also warns about mutating routes with no audit declaration (§15).
     AuditService,

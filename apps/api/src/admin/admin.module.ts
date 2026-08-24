@@ -12,6 +12,10 @@ import { BookingDetailService } from './booking-detail.service.js';
 import { AdminOperationsController } from './operations.controller.js';
 import { StaffRolesController } from './staff-roles.controller.js';
 import { StaffRolesService } from './staff-roles.service.js';
+import { FxModule } from '../fx/fx.module.js';
+import { LedgerModule } from '../ledger/ledger.module.js';
+import { EnforcementController } from './enforcement.controller.js';
+import { EnforcementService } from './enforcement.service.js';
 import { ReviewService } from './review.service.js';
 import { MeController } from './me.controller.js';
 import { MeService } from './me.service.js';
@@ -40,7 +44,13 @@ import { StaffScopeService } from './staff-scope.service.js';
 @Module({
   // StaffService needs AuthTokenService, MailService, PasswordService and
   // TokenService, all of which AuthModule owns.
-  imports: [AuthModule],
+  /*
+    `LedgerModule` and `FxModule` arrived with enforcement (2026-08-24): waiving a fine posts a
+    balancing ledger entry, and posting one needs the currency's rate to SYP. `MailService` is
+    already here through `AuthModule`'s exports — the comment at the providers list below says so,
+    and importing a second copy would give this module a second nodemailer transport.
+  */
+  imports: [AuthModule, LedgerModule, FxModule],
   controllers: [
     AdminController,
     RegistriesController,
@@ -52,10 +62,12 @@ import { StaffScopeService } from './staff-scope.service.js';
     StaffController,
     StaffInvitationController,
     StaffRolesController,
+    EnforcementController,
   ],
   providers: [
     ReviewService,
     StaffRolesService,
+    EnforcementService,
     AdminGrantsService,
     AuditLogService,
     DashboardService,

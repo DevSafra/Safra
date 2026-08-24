@@ -80,6 +80,7 @@ export class BookingCreationService {
       unit_id: string;
       property_id: string;
       partner_id: string;
+      partner_suspended: boolean;
       city_id: string;
       city_timezone: string;
       city_cutoff_hour: number | null;
@@ -95,11 +96,13 @@ export class BookingCreationService {
       SELECT
         u.id AS unit_id, u.property_id, u.max_guests, u.min_nights, u.max_nights,
         p.partner_id, p.city_id, p.status AS property_status,
+        (pa.suspended_at IS NOT NULL) AS partner_suspended,
         ci.timezone AS city_timezone, ci.same_day_cutoff_hour AS city_cutoff_hour,
         cp.id AS policy_id, cp.code AS policy_code, cp.tiers AS policy_tiers,
         cp.min_refund_percent AS policy_min_refund
       FROM units u
       JOIN properties p ON p.id = u.property_id
+      JOIN partners pa ON pa.id = p.partner_id
       JOIN cities ci ON ci.id = p.city_id
       JOIN cancellation_policies cp ON cp.id = p.cancellation_policy_id
       WHERE u.id = ${input.unitId}
@@ -115,6 +118,26 @@ export class BookingCreationService {
     // Only published inventory is bookable (P-002). A draft or suspended listing is
     // reported as not found, exactly as search hides it.
     if (unit.property_status !== 'published') {
+      throw notFound(ERROR.UNIT_NOT_FOUND);
+    }
+
+    /*
+      No new bookings against a SUSPENDED partner (Bashar, 2026-08-24).
+
+      NOT FOUND, not a refusal that names the reason — deliberately, and it is the same answer the
+      line above gives an unpublished listing. This is a CUSTOMER-facing path: telling a stranger
+      that a named business is under enforcement is a disclosure the policy never intended, and it
+      would let anybody enumerate which partners are suspended by trying to book them.
+
+      The customer's experience matches search, which no longer returns these listings at all — so
+      the only way to reach here is a stale link or a bookmark, and "that is no longer available" is
+      both true and the whole truth a stranger is owed.
+
+      Existing confirmed bookings are untouched by this: it sits in CREATION and nowhere else, which
+      is what makes «حجوزاتك المؤكدة مستمرة» a promise the code keeps rather than a sentence the
+      portal prints.
+    */
+    if (unit.partner_suspended) {
       throw notFound(ERROR.UNIT_NOT_FOUND);
     }
 

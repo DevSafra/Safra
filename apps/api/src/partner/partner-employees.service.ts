@@ -497,6 +497,33 @@ export class PartnerEmployeesService {
       throw badRequest(ERROR.EMPLOYEE_INVITATION_INVALID);
     }
 
+    /*
+      A SUSPENDED employer cannot activate new staff, and this check is now explicit.
+
+      It used to be a side effect: `findLiveEmployment` filtered `partners.suspended_at`, so an
+      employment at a suspended business simply did not resolve. That filter came out on
+      2026-08-24, because Bashar's policy is that a suspended partner and their staff may still
+      sign in and read the account — so the token had to stop stripping their scope.
+
+      The refusal it was quietly providing is a real one and it is kept, here, where a reader can
+      see it. Activating an account is onboarding somebody into a business that is on hold, and it
+      is a WRITE. It is refused as an invalid invitation rather than with the suspension code
+      because this route is `@Public()` — the caller holds a link and no session, and telling an
+      anonymous holder of a token that a named business is suspended is a disclosure the enforcement
+      never intended.
+    */
+    const employer = await this.db.execute<{ suspended: boolean }>(sql`
+      SELECT (p.suspended_at IS NOT NULL) AS suspended
+      FROM partner_employees e
+      JOIN partners p ON p.id = e.partner_id
+      WHERE e.user_id = ${redeemed.userId}::uuid AND e.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    if (employer.rows[0]?.suspended) {
+      throw badRequest(ERROR.EMPLOYEE_INVITATION_INVALID);
+    }
+
     await this.db.execute(sql`
       UPDATE users
       SET password_hash = ${hash}, role = 'partner_employee'::user_role,

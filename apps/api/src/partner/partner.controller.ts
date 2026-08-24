@@ -21,6 +21,7 @@ import {
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
+import { RefusedWhileSuspended } from '../rbac/suspended-partner.guard.js';
 import { RequireVerifiedPartner } from '../rbac/verified-partner.guard.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { CalendarService } from './calendar.service.js';
@@ -111,6 +112,8 @@ export class PartnerController {
     return this.properties.readOwn(user, reference);
   }
 
+  /* Refused while suspended: creating a listing. */
+  @RefusedWhileSuspended()
   @Post('properties')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   async createProperty(
@@ -120,6 +123,8 @@ export class PartnerController {
     return this.properties.create(user, body);
   }
 
+  /* Refused while suspended: modifying a listing. */
+  @RefusedWhileSuspended()
   @Patch('properties/:reference')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   async updateProperty(
@@ -134,6 +139,8 @@ export class PartnerController {
    * As far as a partner can move a listing toward being live. Publication requires
    * PROPERTY_APPROVE, which no partner role holds (§8.1).
    */
+  /* Refused while suspended: submitting a listing for review — the ACTIVATE step. */
+  @RefusedWhileSuspended()
   @Post('properties/:reference/submit')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   async submitForReview(
@@ -151,6 +158,8 @@ export class PartnerController {
     happen, and what لوحة الشريك repeats on العقود والمستندات while they wait.
   */
   @RequireVerifiedPartner()
+  /* Refused while suspended: adding a unit, which carries a price. */
+  @RefusedWhileSuspended()
   @Post('properties/:reference/units')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   async addUnit(
@@ -163,6 +172,8 @@ export class PartnerController {
 
   /* Changes the base price among other things — gated whole rather than per field. */
   @RequireVerifiedPartner()
+  /* Refused while suspended: modifying a unit. */
+  @RefusedWhileSuspended()
   @Patch('units/:unitId')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   async updateUnit(
@@ -205,6 +216,8 @@ export class PartnerController {
 
   /* Dates AND nightly prices, which is two of the three things step 7 names. */
   @RequireVerifiedPartner()
+  /* Refused while suspended: dates and nightly prices — how a listing is OFFERED. */
+  @RefusedWhileSuspended()
   @Put('units/:unitId/calendar')
   @RequirePermissions(P.CALENDAR_MANAGE_OWN)
   async updateCalendar(

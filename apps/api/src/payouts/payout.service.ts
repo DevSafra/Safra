@@ -230,6 +230,30 @@ export class PayoutService {
     }
 
     /*
+      A SUSPENDED partner's payouts are frozen (Bashar, 2026-08-24), and checked HERE for the same
+      reason the dispute freeze is: release is the last moment anybody looks.
+
+      Suspension can land between accrual and release — that is the ordinary case, not the edge one,
+      since a payout accrues over a period and a suspension happens on a day. Checking only at
+      accrual would release money the policy freezes, for the partner who was suspended most
+      recently.
+
+      A CONFLICT rather than a refusal to exist: the money is still owed and the period is still
+      correct. It is held, and it releases when the suspension is lifted — which is what the
+      portal's «مجمّدة» tells the partner, in those terms.
+    */
+    const suspended = await this.db.execute<{ n: number }>(sql`
+      SELECT count(*)::int AS n
+      FROM partner_payouts po
+      JOIN partners pa ON pa.id = po.partner_id
+      WHERE po.id = ${payoutId} AND pa.suspended_at IS NOT NULL
+    `);
+
+    if ((suspended.rows[0]?.n ?? 0) > 0) {
+      throw conflict(ERROR.PAYOUT_FROZEN_BY_SUSPENSION);
+    }
+
+    /*
       Sanctions screening, checked HERE and not only at partner approval (Bashar, 2026-08-21).
 
       This is where the EU asset-freeze prohibition actually applies: it forbids making funds or

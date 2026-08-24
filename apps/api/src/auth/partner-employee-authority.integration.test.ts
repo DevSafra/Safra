@@ -256,8 +256,27 @@ describeIfDb('a partner employee never out-ranks their employer', () => {
     expect(employee.permissions).toEqual([]);
   });
 
-  /* The employer branch checks suspension too, so the lever stops the staff. Confirmed, not assumed. */
-  it('gives an employee of a SUSPENDED partner nothing', async () => {
+  /**
+   * An employee of a SUSPENDED partner still resolves their employer — and that is the policy.
+   *
+   * This asserted the opposite until 2026-08-24, and the opposite was what the code did: the
+   * employee branch filtered `partners.suspended_at`, so a receptionist at a suspended business got
+   * no partner and no permissions. Their portal rendered empty, with nothing anywhere saying why —
+   * not even the suspension notice, which needs the partner scope to be read at all.
+   *
+   * Bashar's policy overruled it: *"The partner may still sign in and view their account. The
+   * partner may view the suspension reason and relevant notices."* Suspension is an enforcement
+   * action against a BUSINESS, and the people who work there still need to see what has happened
+   * to it.
+   *
+   * **This test is inverted rather than deleted**, because the important half is the same in both
+   * versions: whatever suspension does, it must do the SAME thing to the owner and to their staff.
+   * That property is what this file is for, and it is asserted below.
+   *
+   * What an employee may DO while suspended is refused per action by `SuspendedPartnerGuard`, which
+   * reads the column at request time — see its docblock for why the token was the wrong place.
+   */
+  it('still resolves the employer for an employee of a SUSPENDED partner', async () => {
     await db.execute(sql`
       UPDATE partners SET suspended_at = now(), suspended_reason = 'test'
       WHERE id = ${partnerId}::uuid
@@ -265,33 +284,42 @@ describeIfDb('a partner employee never out-ranks their employer', () => {
 
     const claims = await service.buildClaims(await userRow(employeeId));
 
-    expect(claims.partnerId).toBeUndefined();
-    expect(claims.permissions).toEqual([]);
+    expect(claims.partnerId).toBe(partnerId);
+    expect(claims.permissions.length).toBeGreaterThan(0);
   });
 
   /**
-   * Suspension must stop the OWNER at least as firmly as it stops their staff.
+   * Suspension must treat the OWNER and their staff identically.
    *
-   * The employee branch filters `partners.suspended_at`; the partner branch does not. Suspending a
-   * business therefore silences every receptionist while leaving the person with the MOST access —
-   * the account that owns the listings, the calendar and the guest list — trading exactly as
-   * before. P-003 makes suspension the lever, rather than deletion, precisely so it can be the
-   * thing an operator pulls; a lever that stops the staff and not the owner is a half-measure, and
-   * the wrong half.
+   * Originally: the employee branch filtered `partners.suspended_at` and the partner branch did
+   * not, so suspending a business silenced every receptionist while leaving the person with the
+   * MOST access trading exactly as before — a lever that stopped the staff and not the owner.
+   *
+   * The policy has since moved the enforcement out of the token entirely (Bashar, 2026-08-24), so
+   * both branches now resolve. The asymmetry is what this test exists to catch, and it catches it
+   * in either direction.
    *
    * This is not an escalation of employee over employer — the ordering still holds — so it is not
    * the boundary this file is named for. It is the same column being load-bearing in one branch and
    * absent in the other, which is how the two drift.
    */
-  it('stops a suspended partner from resolving their own partner id', async () => {
+  it('treats the owner and their staff identically under suspension', async () => {
     await db.execute(sql`
       UPDATE partners SET suspended_at = now(), suspended_reason = 'test'
       WHERE id = ${partnerId}::uuid
     `);
 
     const owner = await service.buildClaims(await userRow(ownerId));
+    const employee = await service.buildClaims(await userRow(employeeId));
 
-    expect(owner.partnerId).toBeUndefined();
+    /*
+      Both resolve, and that is the point of asserting them together rather than apart. The original
+      defect this test was written for was the same column being load-bearing in one branch and
+      absent in the other — which is how a lever ends up stopping the staff and not the owner, the
+      wrong half. Whichever way the policy goes, the two branches must agree.
+    */
+    expect(owner.partnerId).toBe(partnerId);
+    expect(employee.partnerId).toBe(partnerId);
   });
 
   // ── What becoming an employee COSTS the account it lands on ─────────────────

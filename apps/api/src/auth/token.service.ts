@@ -319,7 +319,11 @@ export class TokenService {
   async staffPermissions(user: typeof schema.users.$inferSelect): Promise<Permission[]> {
     if (user.staffRoleId) {
       const rows = await this.db
-        .select({ permissions: schema.staffRoles.permissions })
+        .select({
+          permissions: schema.staffRoles.permissions,
+          isSystem: schema.staffRoles.isSystem,
+          admitsAs: schema.staffRoles.admitsAs,
+        })
         .from(schema.staffRoles)
         .where(
           and(
@@ -328,6 +332,40 @@ export class TokenService {
           ),
         )
         .limit(1);
+
+      /*
+        A SYSTEM role with an empty set resolves from `ROLE_PERMISSIONS[admits_as]` (2026-08-24).
+
+        ## The landmine this defuses
+
+        `post/0008` seeds the four system roles with `ARRAY[]::text[]`, deliberately: *"what each of
+        these four roles can do still comes from ROLE_PERMISSIONS in code while users.staff_role_id
+        is null. Copying the sets into rows here would create a second source of truth."* That
+        reasoning is right and the seed missed one thing — those roles are ASSIGNABLE. «مدير عام» is
+        offered in the console's role picker, and `changeRole` writes `staff_role_id`.
+
+        So the first person assigned the seeded «مدير عام» became a super admin with ZERO
+        permissions: the branch above returns the stored set, which is empty. They would sign in,
+        see nothing, and the account that is supposed to be able to fix it would be the one that
+        could not.
+
+        It was latent until 2026-08-24 because the console showed every link regardless and the API
+        refused them one at a time. Gating the navigation turned it into "many pages are missing",
+        which is how it would have been discovered — by somebody it had already happened to.
+
+        The fallback is gated on `is_system`, and that is the whole safety of it: a CUSTOM role with
+        no capabilities means the super admin who created it ticked nothing, and it must grant
+        nothing. Only the four seeded rows, which stand for the enum values, defer to the code.
+      */
+      const role = rows[0];
+
+      if (role?.isSystem && (role.permissions?.length ?? 0) === 0) {
+        return resolvePermissions(
+          role.admitsAs,
+          user.permissionOverrides ?? [],
+          await this.enabledGrants(),
+        );
+      }
 
       /*
         A withdrawn role grants NOTHING rather than falling back to the enum. Fails closed: the
@@ -426,21 +464,28 @@ export class TokenService {
           eq(schema.partners.userId, user.id),
           isNull(schema.partners.deletedAt),
           /*
-            Suspension counts here too, and it did not until 2026-08-23.
+            Suspension is deliberately NOT filtered here any more (Bashar, 2026-08-24).
 
-            The employee branch below filtered `suspendedAt` from the start, and this one did not —
-            so suspending a business would have silenced every receptionist while leaving the OWNER,
-            who holds the listings, the calendar and the guest list, trading exactly as before. The
-            same column load-bearing in one branch and absent in the other is how two branches
-            drift apart, and this was the wrong half to enforce.
+            It was, from 2026-08-23 — I added it, on the reasoning that suspending a business should
+            not leave the owner trading. That hardening is overruled by the policy, and the policy is
+            better:
 
-            Latent rather than live when it was found: `partners.suspended_at` is read in three
-            places and written by no route yet — `P.PARTNER_SUSPEND` exists with nothing behind it.
-            The point of fixing it now is that whoever wires up the suspend button will be reading
-            the column and reasonably assuming the enforcement is already there, because for
-            employees it was.
+            > *"The partner may still sign in and view their account. The partner may view the
+            > suspension reason and relevant notices."*
+
+            Filtering here gave a suspended owner a token with no `partnerId` and no permissions, so
+            every scoped read answered as though their business did not exist. They could sign in
+            and see nothing — no reason, no notice, no way to appeal, and no way to tell a suspension
+            from an outage.
+
+            So enforcement moved OUT of the token and into the actions it actually forbids:
+            `SuspendedPartnerGuard` on the writes, the search filter on discovery, the booking-draft
+            check, and the payout freeze. That is more places, and each one is where somebody
+            reading it can see what suspension means — which the single `isNull` never showed.
+
+            What suspension must not touch is enforced by ABSENCE: no guard on the reads, none on
+            support, and none anywhere near a confirmed booking or a guest.
           */
-          isNull(schema.partners.suspendedAt),
         ),
         columns: { id: true },
       });

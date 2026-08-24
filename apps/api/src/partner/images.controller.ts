@@ -22,6 +22,7 @@ import {
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
+import { RefusedWhileSuspended } from '../rbac/suspended-partner.guard.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import { RequireVerifiedPartner } from '../rbac/verified-partner.guard.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -63,6 +64,8 @@ export class PartnerImagesController {
     return this.images.list(user, reference);
   }
 
+  /* Refused while suspended: uploading an image to a listing — all of it is modifying a listing. */
+  @RefusedWhileSuspended()
   @Post()
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   @AuditExempt('Audited transactionally alongside the property_images insert.')
@@ -90,6 +93,8 @@ export class PartnerImagesController {
    * A PATCH on the collection rather than on each image: the order is a property of the set, and
    * applying it one row at a time leaves a window where two images share a position.
    */
+  /* Refused while suspended: reordering a listing's images — all of it is modifying a listing. */
+  @RefusedWhileSuspended()
   @Patch('order')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   @AuditExempt('Audited transactionally inside PropertyImageService.reorder.')
@@ -107,6 +112,8 @@ export class PartnerImagesController {
    * Declared AFTER `order` so `:imageId` does not swallow it — Nest matches routes in declaration
    * order, and a literal segment placed second is a route that never fires.
    */
+  /* Refused while suspended: changing the cover image — all of it is modifying a listing. */
+  @RefusedWhileSuspended()
   @Post(':imageId/cover')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   @AuditExempt('Audited transactionally inside PropertyImageService.setCover.')
@@ -119,6 +126,8 @@ export class PartnerImagesController {
   }
 
   /** Alternative text, per locale — the accessibility half of a gallery. */
+  /* Refused while suspended: editing image copy — all of it is modifying a listing. */
+  @RefusedWhileSuspended()
   @Patch(':imageId/alt')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   @AuditExempt('Copy, not a decision about money, access or visibility.')
@@ -132,6 +141,8 @@ export class PartnerImagesController {
   }
 
   /** Soft delete only (P-003). The stored objects are intentionally left in place. */
+  /* Refused while suspended: removing an image — all of it is modifying a listing. */
+  @RefusedWhileSuspended()
   @Delete(':imageId')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   @AuditExempt('Audited transactionally alongside the soft delete.')

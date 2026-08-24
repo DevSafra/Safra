@@ -180,6 +180,24 @@ export class SearchService {
           AND p.deleted_at IS NULL
           -- §8.1 / P-002: only verified, published inventory is ever searchable.
           AND p.status = 'published'
+          /*
+            A SUSPENDED partner's listings leave search and discovery (Bashar, 2026-08-24).
+
+            The first clause of the suspension policy, and the only one enforced on a path a
+            CUSTOMER walks — everything else suspension does is refused at a partner's own write.
+            This join did not exist: search referenced no partner table at all, which is why hiding
+            the listings was a new predicate rather than a changed one.
+
+            Not a soft delete: a suspension is reversible and the listing comes straight back when
+            it is lifted, which is the difference between a lever and a deletion.
+
+            No backticks in this comment — it sits inside a sql template literal and a backtick ends
+            it. Fourth time today.
+          */
+          AND NOT EXISTS (
+            SELECT 1 FROM partners sp
+            WHERE sp.id = p.partner_id AND sp.suspended_at IS NOT NULL
+          )
           AND u.max_guests >= ${guests}
           AND ${nights} >= u.min_nights
           AND (u.max_nights IS NULL OR ${nights} <= u.max_nights)
