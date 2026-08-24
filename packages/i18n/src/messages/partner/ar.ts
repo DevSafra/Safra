@@ -304,6 +304,8 @@ export const ar = {
     reviews: 'التقييمات',
     payouts: 'مستحقاتي',
     contracts: 'العقود والمستندات',
+    arrivals: 'الوصول اليوم',
+    violations: 'المخالفات',
     employees: 'الموظفون',
     employeeRoles: 'أدوار الموظفين',
     supportPage: 'الدعم',
@@ -1132,6 +1134,23 @@ export const ar = {
     */
     ownerOnly: 'هذا القسم يخص صاحب الحساب. تواصل معه إن كنت بحاجة إلى شيء منه.',
     /*
+      A DIFFERENT sentence from `ownerOnly`, and the difference is what the reader can do about it.
+
+      «يخص صاحب الحساب» is true of مستحقاتي and العقود — no role can ever carry them, so asking is
+      pointless and the sentence closes the subject. This one is for a section an employee COULD
+      hold and does not: عقاراتي, التقويمات, التقييمات. There the answer is «اطلب من صاحب العمل»,
+      because the person who can change it is one conversation away and the reader should know that.
+
+      Telling somebody a thing is impossible when it is merely not granted is the same failure as
+      «انتهت الجلسة» on a refusal: a true-sounding sentence pointing the wrong way.
+    */
+    notInYourRole:
+      'دورك الحالي لا يشمل هذا القسم. اطلب من صاحب العمل تعديله إن كنت بحاجة إليه.',
+    /* Shown when a role opens no section at all — see `openableSections` returning empty. */
+    noSectionsTitle: 'دورك لا يفتح أي قسم بعد',
+    noSectionsBody:
+      'الصلاحيات التي منحها لك صاحب العمل لا تفتح أي شاشة حتى الآن. تواصل معه لتعديل دورك، أو افتح طلب دعم من القائمة.',
+    /*
       The same reader, when the BUSINESS has not been verified yet.
 
       They are sent here by the onboarding gate, and «قيد المراجعة» is the whole of what they can
@@ -1193,6 +1212,21 @@ export const ar = {
     created: 'أُنشئ الدور.',
     saved: 'حُفظ التعديل.',
 
+    /*
+      Warned at CREATION, not discovered a week later.
+
+      A role can carry real capabilities and still open no screen: «قبول الحجوزات» and «الرد على
+      التقييمات» are both actions INSIDE sections that other capabilities open, and both are boxes
+      somebody would tick while thinking about what a person does all day. The employee then signs
+      in to a portal with nothing in it.
+
+      The partner is standing here when the mistake is made and is the only person who can fix it.
+      It is a warning rather than a refusal: a role that only grants in-page actions is legitimate
+      once another role opens the screen, so the API allows it and this makes sure it is deliberate.
+    */
+    opensNothing:
+      'هذه القدرات لا تفتح أي شاشة بمفردها. الموظّف الذي يحمل هذا الدور سيسجّل الدخول ولن يرى أي قسم.',
+
     /* The list. */
     edit: 'تعديل',
     remove: 'حذف',
@@ -1253,6 +1287,182 @@ export const ar = {
       'review.read_own': 'قراءة التقييمات',
       'review.respond_own': 'الرد على التقييمات',
       'violation.read': 'قراءة المخالفات',
+    } as Record<string, string>,
+  },
+  /**
+   * الوصول اليوم — the desk screen a receptionist works from (Bashar, 2026-08-23).
+   *
+   * ## The archetypal employee screen
+   *
+   * «reseption employees working for booking for clients» is the use the whole employees feature was
+   * described from. A guest is standing at the counter; the person serving them needs to find the
+   * booking and admit it, and nothing else.
+   *
+   * ## No money, and the copy must not imply any
+   *
+   * `booking.check_in` does not carry `payout.read_own`. A rate on this list would hand the
+   * business's earnings to whoever works the desk, so there is no price, no total and no wording
+   * that gestures at one. If the screen reads thin, that is the correct thinness.
+   *
+   * ## «اليوم» is the city's today
+   *
+   * The list carries bookings dated today AND earlier — a guest arriving at 01:00 for yesterday's
+   * date is exactly who is at the desk, and a strict "today" loses them. The title says «اليوم»
+   * because that is what the reader is doing; `overdue` is what names the rest honestly.
+   */
+  arrivals: {
+    title: 'الوصول اليوم',
+    intro:
+      'الحجوزات المؤكّدة التي وصل موعدها. ابحث بالاسم أو برقم الحجز، ثم سجّل الوصول.',
+    empty: 'لا وصول متوقّع الآن.',
+    loadFailed: 'تعذّر تحميل قائمة الوصول.',
+    loadMore: 'عرض المزيد',
+
+    nights: '{n} ليالٍ',
+    guests: '{n} ضيوف',
+    /* Said on the row, not in a tooltip: a date that has passed is the reader's cue to check. */
+    overdue: 'موعده سابق',
+
+    checkIn: 'تسجيل الوصول',
+    checkedIn: 'تم تسجيل الوصول',
+    undo: 'تراجع',
+    working: 'جارٍ التنفيذ…',
+    /* Named, because a list of arrivals offers one identical button per row. */
+    checkInLabel: 'تسجيل وصول {name}',
+    undoLabel: 'التراجع عن وصول {name}',
+    /*
+      Undo asks first — not because it is dangerous, but because it is the second press on the same
+      row and a person who has just checked somebody in is not expecting the button to have changed
+      meaning underneath their finger.
+    */
+    undoConfirm: 'التراجع عن تسجيل وصول {name}؟',
+    /* The API refuses a second press with 404 rather than writing twice; this is what that reads as. */
+    gone: 'تغيّرت حالة هذا الحجز. حدّث الصفحة.',
+    failed: 'تعذّر تنفيذ الطلب. حاول مرة أخرى.',
+  },
+
+  /**
+   * المخالفات — what SAFRA has charged against this partner, read-only.
+   *
+   * ## A partner can never act on their own fine
+   *
+   * Waiving is `violation.manage`, which is staff. There is no button on this screen and there must
+   * never be one; the list exists so a business can see what it is being charged for and why, not
+   * so it can argue with the record in place.
+   *
+   * ## `moneyHidden` is a STATEMENT, not three dashes
+   *
+   * An employee without `payout.read_own` gets the three money fields as null — the same withholding
+   * as the dashboard. Rendering «—» in a money column would say the fine was ZERO, which is a
+   * different and false claim. So the columns are dropped and one line says they are hidden. What
+   * remains is everything the screen is FOR: what happened, when, how many times, and the score it
+   * cost. A manager can fix the operational problem without being shown the invoice.
+   */
+  /**
+   * إيقاف الحساب — the notice a suspended partner reads on every screen.
+   *
+   * ## Why this is a whole block and not one sentence
+   *
+   * A suspended partner is a LIVE, authenticated session that is refused on every write (Bashar,
+   * 2026-08-24). That is a state the portal never had: suspension used to strip the token's
+   * `partnerId`, so the business simply vanished and the screen said «انتهت الجلسة». They can now
+   * sign in, read their account, and see exactly why — so there has to be enough copy to say what
+   * stopped, what did not, and what they can still do.
+   *
+   * ## `guestsSafe` is the load-bearing line
+   *
+   * The first fear of a suspended owner is that their guests have been cancelled on. Bashar's rule
+   * is explicit that existing confirmed bookings continue and guests are not disrupted — so the
+   * notice SAYS so, in the second line, before the list of what is blocked. Without it this is not
+   * a notice, it is a panic, and the support ticket it produces is one nobody needed to handle.
+   *
+   * ## `refused` is the other half
+   *
+   * A blocked write must read as suspension. `partnerFetch` reports the API's 403 as
+   * `'unauthenticated'`, so a refusal that falls through renders «انتهت الجلسة» and sends somebody
+   * to sign in again over a state signing in cannot change — the same trap the console's section
+   * gate was built to close.
+   */
+  suspension: {
+    title: 'حسابك موقوف مؤقتًا',
+    /* On المحفظة, ABOVE the list — a frozen transfer is not a missing one. */
+    payoutsFrozen:
+      'التحويلات موقوفة بسبب إيقاف الحساب. المستحقات محفوظة ولم تُلغَ، وتُستأنف عند رفع الإيقاف.',
+    reason: 'السبب: {reason}',
+    since: 'الإيقاف بتاريخ {date}',
+
+    /* The sentence this notice exists for. Second, so it is read before the list of what stopped. */
+    guestsSafe:
+      'حجوزاتك المؤكدة مستمرة كما هي ولم يتأثر ضيوفك. استقبلهم في مواعيدهم المتفق عليها كالمعتاد.',
+
+    blockedTitle: 'ما هو متوقف',
+    blockedListings: 'إعلاناتك مخفيّة من البحث ولا تُقبل حجوزات جديدة.',
+    blockedProperties: 'لا يمكن إضافة عقار جديد ولا تعديل أو نشر عقار قائم.',
+    blockedPayouts: 'التحويلات موقوفة حتى رفع الإيقاف.',
+
+    allowedTitle: 'ما زال متاحًا',
+    allowedRead:
+      'يمكنك الدخول ومراجعة حسابك وحجوزاتك وقراءة الإشعارات والتواصل مع الدعم.',
+
+    /* Shown INSTEAD of a broken-looking failure when a write is refused because of the hold. */
+    refused: 'هذا الإجراء متوقف لأن حسابك موقوف. راجع سبب الإيقاف أعلى الصفحة.',
+  },
+
+  violations: {
+    title: 'المخالفات',
+    intro:
+      'ما سجّلته سفرة على حسابك ولماذا. لا يمكن الاعتراض من هنا — تواصل مع الدعم إن كان هناك خطأ.',
+    empty: 'لا مخالفات على حسابك.',
+    loadFailed: 'تعذّر تحميل المخالفات.',
+    loadMore: 'عرض المزيد',
+
+    /* Shown once, above the list, when the reader may not see amounts. */
+    moneyHidden: 'الغرامات مخفيّة عن دورك. صاحب الحساب يراها.',
+
+    /* Which offence this is — the ladder escalates, so the number is the point. */
+    occurrence: 'المخالفة رقم {n}',
+    booking: 'الحجز {reference}',
+    fine: 'غرامة {amount}',
+    compensation: 'منها {amount} تعويض للضيف',
+    waived: 'أُلغيت',
+    /* A waived row STAYS, with its reason — one that vanished would look like it never existed. */
+    waivedFor: 'أُلغيت: {reason}',
+    collected: 'حُصّلت',
+    outstanding: 'غير محصّلة',
+
+    /**
+     * A waived fine is shown as the PAIR, never as absent and never as the net alone.
+     *
+     * Bashar's rule (2026-08-24): a waiver never deletes or rewrites history — the original fine
+     * stays permanently visible and the waiver is a BALANCING entry, −50 then +50, net zero. A row
+     * that showed «—» or «٠» alone would have deleted that history one layer above the ledger,
+     * which is the same failure the ledger design exists to prevent.
+     *
+     * Three separate keys rather than one sentence, so the order of the three figures is the
+     * catalogue's to decide and not a template literal's.
+     */
+    waivedAmount: 'أُلغيت {amount}',
+    net: 'الصافي {amount}',
+    waivedOn: 'أُلغيت بتاريخ {date}',
+
+    /* The formal ladder. A stage is a fact about the record, not a description of the offence. */
+    stage: {
+      recorded: 'مسجّلة',
+      warned: 'تحذير',
+      fined: 'غرامة',
+      suspension: 'إيقاف',
+    } as Record<string, string>,
+
+    /* What the partner was TOLD, and when. Absent unless somebody actually warned them. */
+    warnedOn: 'حُذّرت بتاريخ {date}',
+    warningNote: 'نص التحذير: {note}',
+
+    kind: {
+      no_response: 'عدم الرد على طلب حجز',
+      rejected_after_payment: 'رفض حجز بعد الدفع',
+      stale_calendar: 'تقويم غير محدّث',
+      inaccurate_listing: 'وصف غير مطابق',
+      no_show: 'عدم استقبال الضيف',
     } as Record<string, string>,
   },
 } as const;
