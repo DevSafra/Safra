@@ -103,7 +103,7 @@ export default async function ContractsPage() {
       badges={sidebarBadges(profile)}
       locked={locked}
     >
-      <div className="mx-auto grid w-full max-w-[760px] gap-5">{children}</div>
+      <div className="grid gap-5">{children}</div>
     </Shell>
   );
 

@@ -81,7 +81,7 @@ export default async function EmployeesPage({
       active="employees"
       badges={sidebarBadges(profile)}
     >
-      <div className="mx-auto grid w-full max-w-[760px] gap-5">{children}</div>
+      <div className="grid gap-5">{children}</div>
     </Shell>
   );
 

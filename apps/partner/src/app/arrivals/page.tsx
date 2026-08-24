@@ -62,7 +62,7 @@ export default async function ArrivalsPage({
       active="arrivals"
       badges={sidebarBadges(profile)}
     >
-      <div className="mx-auto grid w-full max-w-[760px] gap-4">{children}</div>
+      <div className="grid gap-4">{children}</div>
     </Shell>
   );
 

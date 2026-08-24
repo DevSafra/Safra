@@ -56,7 +56,7 @@ export default async function ViolationDetailPage({
       active="violations"
       badges={sidebarBadges(profile)}
     >
-      <div className="mx-auto grid w-full max-w-[760px] gap-4">
+      <div className="grid gap-4">
         {/*
           Back FIRST in the DOM, so a reader on a phone meets the way out before the detail — and to
           a LITERAL path, never one taken from the URL. The only thing this screen is reached with is
