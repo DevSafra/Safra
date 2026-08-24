@@ -49,6 +49,24 @@ export interface TotpEnableResponse {
   enabled: true;
   /** Shown ONCE. They are hashed server-side and cannot be retrieved again. */
   recoveryCodes: string[];
+  /**
+   * A REPLACEMENT session, because enabling revokes every session including the caller's.
+   *
+   * `totpEnabled` is a claim signed at sign-in, and both middlewares decide with it. Without a new
+   * token the caller keeps one that still says `false` and is bounced back to enrolment on every
+   * navigation — for fifteen minutes, and then signed out, because the revocation killed the
+   * refresh token too. O-sec-14, found 2026-08-24 by the browser spec that first drove a new staff
+   * account end to end.
+   *
+   * The BFF route that proxies this MUST write it to the session cookie. A caller that ignores it
+   * reproduces the bug exactly.
+   */
+  session: {
+    accessToken: string;
+    expiresIn: number;
+    refreshToken: string;
+    refreshExpiresAt: Date;
+  };
 }
 
 /**

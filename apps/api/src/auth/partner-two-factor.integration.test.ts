@@ -41,17 +41,34 @@ describeIfDb('partner two-factor authentication', () => {
   const audit = new AuditService(db);
 
   /*
-    `revokeAllForUser` is the only thing TwoFactorService needs from TokenService, and giving it a
-    real one would drag in JWT configuration that has no bearing on anything asserted here. The
-    revocation that MATTERS — the one a reset performs — is done by PartnerTwoFactorService in its
-    own transaction and is asserted against the database below.
+    A stub, because a real TokenService drags in JWT configuration that has no bearing on anything
+    asserted here. The revocation that MATTERS — the one a reset performs — is done by
+    PartnerTwoFactorService in its own transaction and is asserted against the database below.
+
+    `buildClaims` and `issue` joined `revokeAllForUser` on 2026-08-24, when `enable` started issuing
+    the REPLACEMENT session it had always been revoking (O-sec-14). The stub returns a recognisable
+    token rather than an empty object so a test asserting on the session can tell it apart from a
+    real one — and `issuedFor` records who it was minted for, which is the property that matters:
+    the account that just enrolled, not somebody else.
   */
   const revoked: string[] = [];
+  const issuedFor: string[] = [];
   const tokens = {
     revokeAllForUser: (userId: string) => {
       revoked.push(userId);
       return Promise.resolve();
     },
+    buildClaims: (user: { id: string }) => {
+      issuedFor.push(user.id);
+      return Promise.resolve({ sub: user.id });
+    },
+    issue: () =>
+      Promise.resolve({
+        accessToken: 'stub.access.token',
+        expiresIn: 900,
+        refreshToken: 'stub-refresh-token',
+        refreshExpiresAt: new Date(Date.now() + 86_400_000),
+      }),
   } as unknown as ConstructorParameters<typeof TwoFactorService>[3];
 
   const twoFactor = new TwoFactorService(db, encryption, passwords, tokens, audit);
@@ -223,6 +240,35 @@ describeIfDb('partner two-factor authentication', () => {
       expect(await twoFactor.consumeRecoveryCode(partnerUserId, code)).toBe(true);
       expect(await twoFactor.consumeRecoveryCode(partnerUserId, code)).toBe(false);
       expect((await userRow())?.recovery_count).toBe(7);
+    });
+
+    /**
+     * Enabling hands back a REPLACEMENT session, and it is for the account that just enrolled.
+     *
+     * O-sec-14, found 2026-08-24 by the first browser spec ever to drive a new staff account end to
+     * end. `enable` revokes every session — deliberately, since any session predating the second
+     * factor was established under weaker authentication — and that includes the caller's own. The
+     * token it left them holding still carried `totpEnabled: false`, which is the claim both
+     * middlewares decide with, so «حفظتها — متابعة» returned them to the enrolment screen on every
+     * navigation for fifteen minutes and then signed them out when the revoked refresh token failed.
+     *
+     * Nothing exercised this transition, because every other spec signs in as an account that is
+     * ALREADY enrolled. The bug lived on the one path no test walked.
+     *
+     * `issuedFor` is the half that matters: a session issued for somebody else would satisfy "a
+     * session came back" perfectly.
+     */
+    it('issues a replacement session for the account that enrolled', async () => {
+      const { secret } = await twoFactor.beginSetup(partnerClaims());
+      const result = await twoFactor.enable(
+        partnerClaims(),
+        authenticator.generate(secret),
+      );
+
+      expect(result.session.accessToken).toBeTruthy();
+      expect(result.session.refreshToken).toBeTruthy();
+      expect(result.session.expiresIn).toBeGreaterThan(0);
+      expect(issuedFor).toContain(partnerUserId);
     });
   });
 

@@ -1,5 +1,6 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
 
 import {
   type TotpDisableInput,
@@ -53,8 +54,17 @@ export class TwoFactorController {
   async enable(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Body(new ZodValidationPipe(totpEnableSchema)) body: TotpEnableInput,
+    @Req() request: Request,
   ) {
-    return this.twoFactor.enable(user, body.code);
+    /*
+      The request context travels so the replacement session is bound to the same device family as
+      the one it replaces — the same thing `completeLogin` does. Issuing a session with no context
+      would make every enrolment look like a sign-in from nowhere in the token family record.
+    */
+    return this.twoFactor.enable(user, body.code, {
+      ipAddress: request.ip,
+      userAgent: request.get('user-agent'),
+    });
   }
 
   @Post('disable')
