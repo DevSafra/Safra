@@ -235,6 +235,20 @@ function Row({
         </Ltr>
       </div>
 
+      {/*
+        WHAT HAPPENED, first and in full.
+
+        The operator wrote this when they raised the violation, and until 2026-08-24 it went to
+        `audit_log.reason` and nowhere else — so reviewing a violation months later meant opening
+        سجل التدقيق and matching by partner and timestamp. It sits above the warning note because it
+        is the earlier fact: what the violation IS, before what anybody said about it.
+      */}
+      {violation.description ? (
+        <p className="mt-1.5 text-[12px] leading-relaxed text-text">
+          {violation.description}
+        </p>
+      ) : null}
+
       {violation.warningNote ? (
         <p className="mt-1.5 text-[12px] leading-relaxed text-text2">
           {violation.warningNote}
@@ -270,6 +284,14 @@ function Money({ violation }: { violation: Violation }) {
 
   return (
     <dl className="mt-2 grid gap-1 rounded border border-line bg-field p-2.5 text-[12px]">
+      {/* Why the fine, inside the money box it explains rather than loose on the row. */}
+      {violation.fineReason ? (
+        <div className="flex flex-wrap items-baseline gap-2">
+          <dt className="text-faint">{t.sections.enforcement.fineReasonLabel}</dt>
+          <dd className="text-text2">{violation.fineReason}</dd>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-baseline gap-2">
         <dt className="text-faint">{t.sections.enforcement.fineOriginal}</dt>
         <dd className={waiver ? 'text-faint line-through' : 'text-text'}>

@@ -272,6 +272,26 @@ test.describe('the suspension a partner meets', () => {
     await portal.goto(`${BASE}/violations`);
     await expect(portal.locator('[data-suspension-notice]')).toBeVisible();
 
+    /*
+      And المخالفات shows WORDS, not only a category and a number.
+
+      Reported from the screen on 2026-08-24: the partner could read that they had been cited and
+      never what for. The description was required by the console's form, labelled «يقرأه الشريك»,
+      audited and stored nowhere. Asserted as "some violation on this page carries prose" rather
+      than against a specific sentence, because which violations this fixture partner holds depends
+      on what earlier specs raised — what must never happen again is a page of citations with no
+      explanation anywhere on it.
+    */
+    const described = portal
+      .locator('main li')
+      .filter({ hasText: /[\u0600-\u06FF]{25,}/ });
+
+    await expect(
+      described.first(),
+      'المخالفات shows no violation carrying a description — the partner cannot tell what they ' +
+        'were cited for.',
+    ).toBeVisible(WAIT);
+
     /* ── ④ A WRITE is refused, and it says the account is on hold ──────────── */
     await portal.goto(`${BASE}/properties/${draft}/edit`);
 

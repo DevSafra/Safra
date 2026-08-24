@@ -152,6 +152,52 @@ describeIfDb('suspending a partner because of a violation', () => {
     await harness.close();
   });
 
+  /**
+   * Raising a violation STORES the description, and fining it stores the fine's reason.
+   *
+   * ## The defect this is written against
+   *
+   * Both reasons were required by their schemas — twenty-character floor, labelled «يقرأه الشريك»
+   * on the console — and both were written to `audit_log.reason` and nowhere else. There was no
+   * column for either. `audit_log.subject_id` is the PARTNER rather than the violation, so the
+   * words could not even be joined back to the row they described: the platform accused a business
+   * of something, told the operator the partner would read it, and had no way to show them.
+   *
+   * Asserted against the COLUMNS rather than through the partner's list, because this is the half
+   * that was missing. The list reading them is asserted separately in
+   * `arrivals.integration.test.ts`; a test that only read the list would pass against a service
+   * that stored the words in the wrong row.
+   */
+  it('stores the description on raise and the reason on fine', async () => {
+    const partner = await makePartner('prose');
+    const description =
+      'تقويم الوحدة ١٠١ لم يُحدَّث منذ أحد عشر يوماً وبقيت التواريخ مفتوحة.';
+    const fineReason = 'مخالفة متكررة بعد إشعارين سابقين خلال الشهر نفسه.';
+
+    const made = await enforcement.raise(staff, partner.reference, {
+      kind: 'stale_calendar',
+      reason: description,
+    });
+
+    const stored = await db.execute<{ description: string | null }>(sql`
+      SELECT description FROM partner_violations WHERE id = ${made.id}::uuid
+    `);
+
+    expect(stored.rows[0]?.description).toBe(description);
+
+    await enforcement.fine(staff, made.id, {
+      amount: '50.00',
+      currencyCode: 'USD',
+      reason: fineReason,
+    });
+
+    const fined = await db.execute<{ fine_reason: string | null }>(sql`
+      SELECT fine_reason FROM partner_violations WHERE id = ${made.id}::uuid
+    `);
+
+    expect(fined.rows[0]?.fine_reason).toBe(fineReason);
+  });
+
   it('takes the cited violation to the suspension stage', async () => {
     const partner = await makePartner('a');
     const violationId = await makeViolation(partner.id);

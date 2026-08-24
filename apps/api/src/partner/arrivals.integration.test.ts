@@ -179,6 +179,19 @@ describeIfDb('arrivals and violations', () => {
     `);
   }
 
+  /** A violation carrying the two sentences the console asks an operator to write. */
+  async function makeDescribedViolation(partner: string): Promise<void> {
+    await db.execute(sql`
+      INSERT INTO partner_violations (partner_id, kind, occurrence_number, stage,
+                                      description, fine_amount, fine_currency_id,
+                                      fine_reason, score_penalty)
+      VALUES (${partner}::uuid, 'stale_calendar', 1, 'fined',
+              ${'تقويم الوحدة ١٠١ لم يُحدَّث منذ أحد عشر يوماً.'}, '50.00',
+              (SELECT id FROM currencies WHERE code = 'USD'),
+              ${'مخالفة متكررة بعد إشعارين سابقين.'}, 0)
+    `);
+  }
+
   /** A violation that has been WARNED, so the stage and the note have something to be. */
   async function makeWarnedViolation(partner: string, note: string): Promise<void> {
     await db.execute(sql`
@@ -429,6 +442,46 @@ describeIfDb('arrivals and violations', () => {
       expect(page.items[0]?.fineCurrency).toBe('USD');
       expect(page.items[0]?.customerCompensationAmount).toBe('50.00');
       expect(page.items[0]?.scorePenalty).toBe(5);
+    });
+
+    /**
+     * The DESCRIPTION reaches the partner — the sentence this screen most needed and never had.
+     *
+     * `violationRaiseSchema` has always required a reason with a twenty-character floor, and the
+     * console labels the field «الوصف (يقرأه الشريك)». It was written to `audit_log.reason` and
+     * nowhere else, so `partner_violations` had no column for it and this list could show only a
+     * kind, a stage, an occurrence number and a figure. A business was told it had been fined and
+     * never told what for. Reported by Bashar from the screen on 2026-08-24.
+     */
+    it('sends the description and the fine reason to the owner', async () => {
+      await makeDescribedViolation(partnerId);
+
+      const page = await violations.list(owner(partnerId), partnerId, { limit: 20 });
+
+      expect(page.items[0]?.description).toBe(
+        'تقويم الوحدة ١٠١ لم يُحدَّث منذ أحد عشر يوماً.',
+      );
+      expect(page.items[0]?.fineReason).toBe('مخالفة متكررة بعد إشعارين سابقين.');
+    });
+
+    /**
+     * The fine's REASON follows the fine's own visibility rule, and the description does not.
+     *
+     * An employee holds `violation.read` and not `payout.read_own`, so every money figure is
+     * withheld from them. A sentence explaining a fine is about the fine: sending it while hiding
+     * the amount would leak what the rule protects, one field over, in prose. The DESCRIPTION is
+     * about the violation rather than the money, so it stays — an employee who may know the
+     * business was cited may know what for.
+     */
+    it('withholds the fine reason from a reader without payout.read_own, and keeps the description', async () => {
+      await makeDescribedViolation(partnerId);
+
+      const page = await violations.list(employee(partnerId), partnerId, { limit: 20 });
+
+      expect(page.items[0]?.fineReason).toBeNull();
+      expect(page.items[0]?.description).toBe(
+        'تقويم الوحدة ١٠١ لم يُحدَّث منذ أحد عشر يوماً.',
+      );
     });
 
     /**

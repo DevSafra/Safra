@@ -1433,6 +1433,14 @@ export const ar = {
     occurrence: 'المخالفة رقم {n}',
     booking: 'الحجز {reference}',
     fine: 'غرامة {amount}',
+    /*
+      Why the fine, beneath the figure.
+
+      A label rather than bare prose, so the sentence cannot be mistaken for the description of the
+      violation itself two lines above it — the two answer different questions and an operator often
+      writes both.
+    */
+    fineReason: 'سبب الغرامة: {reason}',
     compensation: 'منها {amount} تعويض للضيف',
     waived: 'أُلغيت',
     /* A waived row STAYS, with its reason — one that vanished would look like it never existed. */

@@ -270,6 +270,15 @@ test('escalating a violation suspends the partner and records it as the cause', 
   const escalated = page.locator('main ul > li').first();
 
   await expect(escalated).toContainText(t.enums.violationStage['suspension'] ?? '');
+  /*
+    And the DESCRIPTION is on the row, not only in the audit log.
+
+    It was required by the form, labelled «يقرأه الشريك», and stored nowhere — so the console and
+    the portal both showed a kind and a stage and no words. Asserted here because this test is the
+    one that raises a violation through the form, so it is the one that can see what the form's own
+    field became.
+  */
+  await expect(escalated).toContainText(REASON);
   await page.screenshot({ path: `${dir}/enf-3-escalated.png`, fullPage: true });
 
   await page.goto(`/partners/${reference}`);

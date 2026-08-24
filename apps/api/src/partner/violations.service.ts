@@ -38,6 +38,10 @@ export type Violation = {
   stage: string;
   warnedAt: string | null;
   warningNote: string | null;
+  /** What happened, in the words of whoever recorded it. Null on rows predating 2026-08-24. */
+  description: string | null;
+  /** Why the fine was imposed. Withheld with the figures from a reader without `payout.read_own`. */
+  fineReason: string | null;
 };
 
 export type ViolationPage = {
@@ -128,6 +132,8 @@ export class ViolationsService {
       stage: string;
       warned_at: string | null;
       warning_note: string | null;
+      description: string | null;
+      fine_reason: string | null;
     }>(sql`
       SELECT v.id, v.created_at::text AS sort_key, v.kind::text AS kind,
              v.occurrence_number, b.reference AS booking_reference,
@@ -146,7 +152,16 @@ export class ViolationsService {
              -- partners.suspended_notes, which this endpoint does not touch.
              v.stage::text AS stage,
              to_char(v.warned_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS warned_at,
-             v.warning_note
+             v.warning_note,
+             -- WHAT HAPPENED, and why the fine. Both are written for this reader.
+             --
+             -- The console labels both fields «الوصف (يقرأه الشريك)» and both were audited and never
+             -- stored, so this screen could show the kind, a stage, an occurrence number and a
+             -- figure -- and no words at all. A business was accused of something and never told
+             -- what. Null on the 7,679 rows that predate the columns, and the screen says nothing
+             -- rather than showing an empty line.
+             v.description,
+             v.fine_reason
       FROM partner_violations v
       LEFT JOIN bookings b ON b.id = v.booking_id
       LEFT JOIN currencies cur ON cur.id = v.fine_currency_id
@@ -181,6 +196,16 @@ export class ViolationsService {
         stage: row.stage,
         warnedAt: row.warned_at,
         warningNote: row.warning_note,
+        description: row.description,
+        /*
+          The fine's reason follows the fine's own visibility rule.
+
+          `moneyHidden` withholds every figure from a reader without `payout.read_own` — an employee
+          holds `violation.read` and not that — and a sentence explaining a fine is about the fine.
+          Sending the words while withholding the amount would leak the thing the rule protects,
+          one field over, in prose.
+        */
+        fineReason: money ? row.fine_reason : null,
       })),
       nextCursor:
         rows.rows.length > query.limit && last

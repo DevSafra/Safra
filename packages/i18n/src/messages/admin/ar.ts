@@ -1112,6 +1112,8 @@ export const ar = {
       fine: 'فرض غرامة',
       fining: 'جارٍ الفرض…',
       fined: 'فُرضت الغرامة وأُبلغ الشريك.',
+      /* Shown inside the money box on the violations screen, above the figure it explains. */
+      fineReasonLabel: 'سبب الغرامة',
       fineAmountLabel: 'المبلغ',
       /*
         LATIN digits, and that is not an oversight on an Arabic screen.

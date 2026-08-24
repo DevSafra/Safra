@@ -638,6 +638,25 @@ export const partnerViolations = pgTable(
      * machine rather than to a table.
      */
     stage: violationStage('stage').notNull().default('recorded'),
+    /**
+     * WHAT HAPPENED, in the words of whoever recorded it — and the partner reads this.
+     *
+     * ## Why it did not exist until 2026-08-24
+     *
+     * `violationRaiseSchema` has always required a `reason` with a twenty-character floor, and the
+     * console labels that field «الوصف (يقرأه الشريك)» — the description, read by the partner. It
+     * was written to `audit_log.reason` and nowhere else. The partner's own مخالفات screen could
+     * therefore only ever show the KIND («تقويم غير محدَّث»), a stage, an occurrence number and a
+     * figure: the platform accused a business of something and never told it what.
+     *
+     * Not the same field as `warningNote`. That records what was said when somebody WARNED them,
+     * which is a later rung and a different act; conflating the two would put a note on a violation
+     * nobody has warned about, and `warnedAt` would then contradict it. Each rung's prose has its
+     * own column here — `warning_note`, `fine_reason`, `waived_reason` — and this is the first one.
+     *
+     * Nullable, because 7,679 rows predate it. Required by the SCHEMA for anything new.
+     */
+    description: text('description'),
     /** What the partner is told. Null until the violation reaches `warned`. */
     warnedAt: timestamp('warned_at', { withTimezone: true }),
     warningNote: text('warning_note'),
@@ -645,6 +664,16 @@ export const partnerViolations = pgTable(
     occurrenceNumber: integer('occurrence_number').notNull().default(1),
     fineAmount: money('fine_amount'),
     fineCurrencyId: foreignId('fine_currency_id').references(() => currencies.id),
+    /**
+     * Why the fine was imposed, which the partner also reads.
+     *
+     * `violationFineSchema.reason` was audited and never stored, exactly like `description` above —
+     * and the console's fine form reuses the SAME label, so an operator is told twice that they are
+     * writing something the partner will see, and neither sentence reached them. A fine is money
+     * taken from a business; «فُرضت غرامة ٥٠$» with no reason beside it is the shape of demand that
+     * produces an appeal nobody can answer.
+     */
+    fineReason: text('fine_reason'),
     /** Portion credited to the customer vs retained by SAFRA (§6.4). */
     customerCompensationAmount: money('customer_compensation_amount'),
     scorePenalty: integer('score_penalty').notNull().default(0),

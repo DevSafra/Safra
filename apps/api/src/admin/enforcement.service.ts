@@ -196,9 +196,9 @@ export class EnforcementService {
 
     const rows = await this.db.transaction(async (tx) => {
       const made = await tx.execute<{ id: string }>(sql`
-        INSERT INTO partner_violations (partner_id, kind, occurrence_number, stage)
+        INSERT INTO partner_violations (partner_id, kind, occurrence_number, stage, description)
         VALUES (${partner.id}::uuid, ${input.kind}::violation_kind,
-                ${Number(priors.rows[0]?.n ?? 0) + 1}, 'recorded')
+                ${Number(priors.rows[0]?.n ?? 0) + 1}, 'recorded', ${input.reason})
         RETURNING id
       `);
 
@@ -229,7 +229,14 @@ export class EnforcementService {
     return { id: rows?.id ?? '' };
   }
 
-  /** `recorded → warned`. The first step the partner hears about, which is why it is its own step. */
+  /**
+   * `recorded → warned`. The first step the partner hears about, which is why it is its own step.
+   *
+   * The reasons on this ladder are STORED as well as audited, since 2026-08-24. They were audited
+   * only, and `audit_log.subject_id` is the PARTNER rather than the violation — so the words an
+   * operator wrote for a partner to read were not reachable from the violation they described, on
+   * any screen, by anyone.
+   */
   async warn(
     actor: AccessTokenClaims | undefined,
     violationId: string,
@@ -290,6 +297,7 @@ export class EnforcementService {
         SET stage = 'fined', fine_amount = ${input.amount},
             fine_currency_id = ${currency.rows[0]?.id}::uuid,
             customer_compensation_amount = ${input.customerCompensation ?? null},
+            fine_reason = ${input.reason},
             updated_at = now()
         WHERE id = ${violationId}::uuid
       `);
@@ -449,6 +457,8 @@ export class EnforcementService {
         SELECT v.id, v.kind::text AS kind, v.stage::text AS stage, v.occurrence_number,
                b.reference AS booking_reference,
                v.warned_at::text, v.warning_note,
+               -- The operator's own words, which no screen could show until 2026-08-24.
+               v.description, v.fine_reason,
                v.fine_amount::text, c.code AS fine_currency,
                v.customer_compensation_amount::text,
                v.waived_at::text, v.waived_reason, v.waiver_ledger_group_id::text,

@@ -175,6 +175,26 @@ function Row({ violation }: { violation: PartnerViolation }) {
         ) : null}
       </p>
 
+      {/*
+        WHAT HAPPENED, in the words of whoever recorded it.
+
+        The first thing the partner needs and the last thing this screen got. The kind
+        («تقويم غير محدَّث») is a category; it does not say which calendar, which dates, or what was
+        expected. That sentence was required by the console's form, labelled «يقرأه الشريك», and
+        stored nowhere until 2026-08-24 — so a business could read that it had been fined and never
+        learn what for.
+
+        Given its own line, above the money and below the heading: it is prose, and hanging it off
+        the end of the occurrence line with a «·» would bury the only explanation on the row in a
+        metadata strip.
+
+        Absent on rows filed before the column existed, and then NOTHING is rendered — not an empty
+        line and not «—», which would claim a description exists and is blank.
+      */}
+      {violation.description ? (
+        <p className="text-[12.5px] leading-relaxed text-text">{violation.description}</p>
+      ) : null}
+
       {fine ? (
         <p className="text-[12.5px] text-text">
           {fill(t.violations.fine, { amount: fine })}
@@ -183,6 +203,19 @@ function Row({ violation }: { violation: PartnerViolation }) {
                 amount: `${violation.customerCompensationAmount} ${violation.fineCurrency}`,
               })}`
             : ''}
+        </p>
+      ) : null}
+
+      {/*
+        Why the fine, beneath the figure it explains.
+
+        Rendered only where the figure is: `fineReason` arrives null for a reader without
+        `payout.read_own`, the same rule that withholds the amount, so an employee cannot read the
+        reason for a fine whose size they may not see.
+      */}
+      {violation.fineReason ? (
+        <p className="text-[12.5px] leading-relaxed text-text2">
+          {fill(t.violations.fineReason, { reason: violation.fineReason })}
         </p>
       ) : null}
 

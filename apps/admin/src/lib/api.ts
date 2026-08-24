@@ -185,6 +185,20 @@ const violationSchema = z.object({
   bookingReference: z.string().nullable().optional(),
   warnedAt: z.string().nullable(),
   warningNote: z.string().nullable(),
+  /**
+   * What happened, and why the fine — the two sentences the forms on this screen ask for.
+   *
+   * Both were required, both labelled «الوصف (يقرأه الشريك)», and both were written to
+   * `audit_log.reason` and nowhere else until 2026-08-24. So an operator reviewing a violation six
+   * months later saw a kind and a figure, and had to open سجل التدقيق and match by partner and
+   * timestamp to find out what it was about.
+   *
+   * Nullable rather than defaulted: 7,679 rows predate the columns and there is nothing truthful to
+   * put in their place. See the note on `stage` in the portal's schema for why a default here would
+   * be the worse choice.
+   */
+  description: z.string().nullable(),
+  fineReason: z.string().nullable(),
   fineAmount: z.string().nullable(),
   fineCurrency: z.string().nullable(),
   customerCompensationAmount: z.string().nullable(),

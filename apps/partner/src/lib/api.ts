@@ -936,6 +936,16 @@ const violationSchema = z.object({
   /** What the partner was TOLD. Null until somebody actually warned them. */
   warningNote: z.string().nullable(),
   /**
+   * WHAT HAPPENED, and why the fine — the two sentences written for this reader.
+   *
+   * Both were required by the console's forms, labelled «الوصف (يقرأه الشريك)», audited, and never
+   * stored — so this screen showed a kind, a stage, a number and a figure, and no words. Null on
+   * rows filed before 2026-08-24; `fineReason` is also null for a reader without `payout.read_own`,
+   * because a sentence explaining a fine is about the fine and follows the figures' own rule.
+   */
+  description: z.string().nullable(),
+  fineReason: z.string().nullable(),
+  /**
    * The forgiveness, when there is one — and it carries its own MONEY.
    *
    * `amount` obeys the same `moneyHidden` rule as `fineAmount`: an employee without
