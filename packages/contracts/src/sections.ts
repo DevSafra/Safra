@@ -58,7 +58,19 @@ export const CONSOLE_SECTION_PERMISSIONS = {
   dashboard: P.BOOKING_READ_ALL,
   bookings: P.BOOKING_READ_ALL,
   partners: P.PARTNER_READ,
-  applications: P.PARTNER_APPLICATION_READ,
+  /*
+    `partnerApplications`, matching the sidebar's key exactly (project-e9, 2026-08-24).
+
+    It was `applications`, and the sidebar has always called it `partnerApplications`. Nothing
+    failed: `canOpenSection` answers false for anything unmapped, so filtering the nav on
+    `item.key` would simply have removed طلبات الشراكة from the console for EVERY reader, super
+    admins included, with no error and no log line. The symptom reads as a rendering bug.
+
+    Same shape as the three sections that were missing outright, and it survived the same way — a
+    check that reads two lists across two files and finds them "the same" is not a diff.
+    `nav-sections.test.ts` is now the diff.
+  */
+  partnerApplications: P.PARTNER_APPLICATION_READ,
   properties: P.PROPERTY_READ,
   customers: P.CUSTOMER_READ,
   staff: P.STAFF_MANAGE,
