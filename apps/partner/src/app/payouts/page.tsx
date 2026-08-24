@@ -63,6 +63,10 @@ export default async function PayoutsPage() {
 
   const payouts = await getMyPayouts();
 
+  /* From the profile the page already holds — `getMyProfile` is `cache()`d, so this costs nothing. */
+  const suspended =
+    profile !== 'failed' && profile !== 'unauthenticated' && profile.suspension !== null;
+
   return (
     <Shell
       title={t.payouts.title}
@@ -76,6 +80,24 @@ export default async function PayoutsPage() {
         <p className="text-sm text-bad">{t.dashboard.loadFailed}</p>
       ) : (
         <div className="grid gap-3.5">
+          {/*
+            FROZEN is not EMPTY, and the difference is the partner's money.
+
+            A suspended partner's payouts are held, not cancelled (Bashar, 2026-08-24). Without this
+            line the screen shows a list that has simply stopped growing, which reads as "SAFRA has
+            stopped paying me" — and the sentence they need is that the balance is still theirs.
+            Stated ABOVE the list, because it explains what the list is about to show.
+
+            The banner at the top of every screen says the account is on hold; this says what that
+            means HERE. The two are not redundant: one is the state, the other is the consequence on
+            the one screen that is about money.
+          */}
+          {suspended ? (
+            <p className="rounded-lg border border-bad/40 bg-bad/5 px-3 py-2 text-[12.5px] leading-relaxed text-text">
+              {t.suspension.payoutsFrozen}
+            </p>
+          ) : null}
+
           <p className="text-[12px] leading-relaxed text-faint">{t.payouts.note}</p>
 
           {payouts.length === 0 ? (

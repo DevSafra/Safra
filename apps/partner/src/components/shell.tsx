@@ -9,6 +9,8 @@ import { sessionPermissions } from '@safra/session';
 
 import { SidebarBackdrop, SidebarToggle, ThemeToggle } from '@safra/ui';
 
+import { SuspensionNotice } from '@/components/suspension-notice';
+import { getMyProfile } from '@/lib/api';
 import { SIDEBAR_ID, t } from '@/lib/strings';
 import { getPartnerSession } from '@/lib/session-server';
 
@@ -105,6 +107,15 @@ export async function Shell({
   const opens = (section: PartnerSection): boolean =>
     canOpenSection(permissions, PARTNER_SECTION_PERMISSIONS, section);
 
+  /*
+    Deliberately narrowed to the success case. `getMyProfile` answers `'failed'` or
+    `'unauthenticated'` as VALUES rather than throwing, and neither means "suspended" — so both
+    fall through to no notice at all.
+  */
+  const profile = await getMyProfile();
+  const suspension =
+    profile === 'failed' || profile === 'unauthenticated' ? null : profile.suspension;
+
   return (
     <div className="portal-layout mx-auto max-w-[1380px] px-6 pt-6 pb-16">
       <main className="portal-main min-w-0">
@@ -127,6 +138,20 @@ export async function Shell({
           {/* `ms-auto`, not `justify-between`: with three items the latter would strand the title. */}
           <p className="ms-auto text-[12.5px] text-muted">{partnerName}</p>
         </header>
+
+        {/*
+          The hold, above the section, on EVERY screen — read here rather than passed in.
+
+          Pages already hand this component a name and badges, and a fifth prop is the thing the
+          ninth page forgets; the page that forgot would be the one where a suspended partner is
+          left guessing why nothing works. `getMyProfile` is `cache()`d, so the page's own profile
+          read and this one are a single request.
+
+          A failed or unauthenticated read renders nothing rather than a notice: "we could not ask"
+          is not "you are suspended", and inventing the second from the first would tell a partner
+          in good standing that their account is on hold every time the API hiccups.
+        */}
+        {suspension ? <SuspensionNotice suspension={suspension} /> : null}
 
         {children}
       </main>

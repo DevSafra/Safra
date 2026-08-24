@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { cache } from 'react';
 import { z } from 'zod';
 
 import { getPartnerSession } from './session-server';
@@ -48,6 +49,12 @@ export async function partnerFetch<T>(
     403 is reported as `unauthenticated` alongside 401, deliberately — the same choice the console
     makes. From a page's point of view they call for the same rendering, and distinguishing them
     would tempt a screen into explaining which permission is missing.
+
+    ONE 403 will be different once it is wired: `ERROR.PARTNER_SUSPENDED` is not a missing
+    permission but a state the reader can see the reason for on the same screen, so it becomes its
+    own `ApiResult` variant. That widening makes the compiler enumerate all 18 call sites that must
+    then handle it — which is the point of doing it that way, and why it is its own change rather
+    than a line smuggled in beside others.
   */
   if (response.status === 401 || response.status === 403) return 'unauthenticated';
   if (!response.ok) return 'failed';
@@ -110,13 +117,37 @@ const profileSchema = z.object({
   /* The §7 sidebar badges. Defaulted so an older API still renders the shell. */
   propertyCount: z.number().default(0),
   reviewAverage: z.string().nullable().default(null),
+  /**
+   * The hold on this account, or `null` when there is none.
+   *
+   * `reason` is the PARTNER-facing sentence and is always present when suspended. The record also
+   * carries staff-only `notes`, and those are deliberately absent from this payload — the one field
+   * in a suspension with a different audience. Not parsing them here means a future API that
+   * leaked them could not reach a screen through this schema.
+   *
+   * Defaulted to `null` so an API that predates suspension still renders the portal rather than
+   * failing the whole profile parse on a missing key.
+   */
+  suspension: z
+    .object({ reason: z.string(), since: z.string() })
+    .nullable()
+    .default(null),
 });
 
 export type PartnerProfile = z.infer<typeof profileSchema>;
 
-export async function getMyProfile() {
-  return partnerFetch('/partner/me', profileSchema);
-}
+/**
+ * Deduplicated per request, so the SHELL can read it without costing a second fetch.
+ *
+ * Every page already loads the profile through `requireVerifiedPartner()` and hands the shell a
+ * name and badges. The suspension notice cannot be a prop on that list: it has to appear on every
+ * screen, and a prop is the thing the ninth page forgets — the shell's own docblock makes that
+ * argument about the employee permission and it applies here with more at stake, because the page
+ * that forgets is the one where a suspended partner is left guessing.
+ *
+ * `cache()` is React's per-request memo, so the shell's call and the page's call are one request.
+ */
+export const getMyProfile = cache(async () => partnerFetch('/partner/me', profileSchema));
 
 /**
  * لوحة التحكم, as `GET /partner/dashboard` returns it (design handoff §7.1).
@@ -841,12 +872,48 @@ const violationSchema = z.object({
   kind: z.string(),
   occurrenceNumber: z.number(),
   bookingReference: z.string().nullable(),
-  scorePenalty: z.number(),
+  /*
+    `score_penalty` is in the API's payload and is deliberately NOT read here.
+
+    This screen used to render it as «خصم {n} من التقييم» — "{n} deducted from your rating" — and
+    that sentence was false in both directions. Nothing ever applied `score_penalty` to anything;
+    the deduction a violation really caused went through `partners.score`, a column the partner
+    never saw. So the portal named a number with no effect and hid the one with an effect.
+
+    Since 2026-08-24 there is no deduction at all to describe (Bashar): "creating a violation must
+    not automatically modify ranking", and `score - 2` / `score - 5` are gone from the two services
+    that wrote them. `score_penalty` now records only the severity the platform assigned, applied
+    to nothing.
+
+    Left out of the schema rather than parsed and ignored, so re-displaying it takes a deliberate
+    edit here and a read of this comment first.
+  */
   fineAmount: z.string().nullable(),
   fineCurrency: z.string().nullable(),
   customerCompensationAmount: z.string().nullable(),
   waived: z.boolean(),
   waivedReason: z.string().nullable(),
+  /** The formal ladder: recorded → warned → fined → suspension, forward only. */
+  stage: z.enum(['recorded', 'warned', 'fined', 'suspension']).default('recorded'),
+  warnedAt: z.string().nullable().default(null),
+  /** What the partner was TOLD. Absent unless somebody actually warned them. */
+  warningNote: z.string().nullable().default(null),
+  /**
+   * The forgiveness, when there is one — and it carries its own MONEY.
+   *
+   * `amount` obeys the same `moneyHidden` rule as `fineAmount`: an employee without
+   * `payout.read_own` gets the waiver's existence, its date and its reason, and `null` for the
+   * figures. The rule was never about which column the money came from.
+   */
+  waiver: z
+    .object({
+      at: z.string(),
+      reason: z.string(),
+      amount: z.string().nullable(),
+      currency: z.string().nullable(),
+    })
+    .nullable()
+    .default(null),
   collectedAt: z.string().nullable(),
   createdAt: z.string(),
 });
