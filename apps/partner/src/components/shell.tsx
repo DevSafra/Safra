@@ -136,7 +136,16 @@ export async function Shell({
           </h1>
 
           {/* `ms-auto`, not `justify-between`: with three items the latter would strand the title. */}
-          <p className="ms-auto text-[12.5px] text-muted">{partnerName}</p>
+          {/*
+            `data-partner-name` so a browser test can find WHICH business it is signed in as.
+
+            The suspension spec has to suspend the partner whose session it holds, and the console
+            registry deliberately does not search by email — so the name is the only handle, and
+            scraping it by class would break the first time this row is restyled.
+          */}
+          <p data-partner-name className="ms-auto text-[12.5px] text-muted">
+            {partnerName}
+          </p>
         </header>
 
         {/*
