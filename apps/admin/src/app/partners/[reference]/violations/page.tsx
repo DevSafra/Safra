@@ -11,7 +11,7 @@ import { RaiseViolation } from '@/components/raise-violation';
 import { refuseSection } from '@/components/section-refusal';
 import { backTarget, rowAnchor } from '@/lib/search-params';
 import { listParamsFor } from '@/lib/table-size';
-import { fill, label, t } from '@/lib/strings';
+import { fill, label, t, violationDescription } from '@/lib/strings';
 
 /**
  * مخالفات شريك — the violations raised against one partner.
@@ -213,6 +213,9 @@ function Row({
   canSuspend: boolean;
   partnerSuspended: boolean;
 }) {
+  /* The operator's words if somebody wrote them, otherwise the sentence for this KIND. */
+  const described = violationDescription(violation);
+
   return (
     <>
       <div className="flex flex-wrap items-baseline gap-2.5">
@@ -243,10 +246,8 @@ function Row({
         سجل التدقيق and matching by partner and timestamp. It sits above the warning note because it
         is the earlier fact: what the violation IS, before what anybody said about it.
       */}
-      {violation.description ? (
-        <p className="mt-1.5 text-[12px] leading-relaxed text-text">
-          {violation.description}
-        </p>
+      {described ? (
+        <p className="mt-1.5 text-[12px] leading-relaxed text-text">{described}</p>
       ) : null}
 
       {violation.warningNote ? (

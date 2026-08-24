@@ -2761,6 +2761,35 @@ export const ar = {
       'property.rejected': 'رفض العقار',
     } as Record<string, string>,
 
+    /*
+      WHAT HAPPENED, for a violation the PLATFORM wrote rather than a person.
+
+      The same gap the partner portal had (Bashar, 2026-08-24): `sla.service.ts` levies `no_response`
+      and fines for it, `booking-actions.service.ts` records `rejected_after_payment`, and neither
+      types a word. So an operator deciding whether to WAIVE a fine saw a category and a figure and
+      had to know the enforcement vocabulary to reconstruct the rest.
+
+      Kept in step with the portal's `defaultDescription` by `violation-default-description.test.ts`,
+      which fails if one side gains a kind the other lacks — two catalogues describing one set of
+      events is exactly where they drift.
+    */
+    violationDefaultDescription: {
+      no_response:
+        'لم يرد الشريك على طلب الحجز {reference} خلال مهلة الساعتين، فأُلغي الطلب تلقائياً وسُجّلت المخالفة.',
+      rejected_after_payment:
+        'رفض الشريك الحجز {reference} بعد أن أتمّ الضيف الدفع، فاستُرد المبلغ للضيف.',
+      stale_calendar:
+        'بقي تقويم الإتاحة دون تحديث لمدة تجاوزت الحد المسموح، فظهرت تواريخ غير متاحة كأنها متاحة.',
+      inaccurate_listing: 'لم تطابق تفاصيل العقار المعروضة ما وجده الضيف على أرض الواقع.',
+      no_show: 'وصل الضيف في موعده ولم يجد من يستقبله.',
+    } as Record<string, string>,
+    violationDefaultDescriptionNoBooking: {
+      no_response:
+        'لم يرد الشريك على طلب حجز خلال مهلة الساعتين، فأُلغي الطلب تلقائياً وسُجّلت المخالفة.',
+      rejected_after_payment:
+        'رفض الشريك حجزاً بعد أن أتمّ الضيف الدفع، فاستُرد المبلغ للضيف.',
+    } as Record<string, string>,
+
     violationKind: {
       no_response: 'عدم الرد',
       rejected_after_payment: 'رفض بعد الدفع',

@@ -282,6 +282,36 @@ export function roleName(role: string | undefined): string {
  * `errorMessage` handles a code this build does not recognise — an API deployed ahead of the
  * console — by falling back rather than printing the code.
  */
+/**
+ * What a violation SAYS happened — the operator's words, or the sentence for its KIND.
+ *
+ * The console's counterpart to the portal's `violationDescription`, and it exists for the same
+ * reason: a violation raised by hand carries a description, and the ones the PLATFORM writes carry
+ * none. An operator deciding whether to waive a fine was reading a category and a figure.
+ *
+ * Stored words always win. The catalogue sentence is a fallback for a machine-written violation,
+ * never a paraphrase of a human one.
+ */
+export function violationDescription(violation: {
+  readonly kind: string;
+  readonly description: string | null;
+  readonly bookingReference?: string | null | undefined;
+}): string | null {
+  if (violation.description) return violation.description;
+
+  const withBooking = t.enums.violationDefaultDescription[violation.kind];
+
+  if (violation.bookingReference && withBooking) {
+    return fill(withBooking, { reference: violation.bookingReference });
+  }
+
+  return (
+    t.enums.violationDefaultDescriptionNoBooking[violation.kind] ??
+    (violation.bookingReference ? null : withBooking) ??
+    null
+  );
+}
+
 export function apiError(code: string | null): string {
   return errorMessage(code, CONSOLE_LOCALE);
 }
