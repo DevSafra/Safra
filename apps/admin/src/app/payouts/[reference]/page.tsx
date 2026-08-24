@@ -9,6 +9,7 @@ import { amount, shortDateTime } from '@/lib/format';
 import { backTarget } from '@/lib/search-params';
 import { statusTone } from '@/lib/status-tone';
 import { auditAction, label, t } from '@/lib/strings';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * One partner transfer, and everything needed to answer for it (§9.3).
@@ -37,6 +38,17 @@ export default async function PayoutPage({
   /* The list position to return to — the standing "opening a row and coming back" rule. */
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('payouts', t.sections.payouts.title);
+
+  if (refused) return refused;
+
   const { reference } = await params;
   const back = backTarget('/payouts', await searchParams, reference);
   const payout = await getPayout(reference);

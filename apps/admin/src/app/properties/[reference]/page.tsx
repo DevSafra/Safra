@@ -8,6 +8,7 @@ import { StatusPill } from '@/components/admin-table';
 import { backTarget, detailHref, origin } from '@/lib/search-params';
 import { statusTone } from '@/lib/status-tone';
 import { fill, label, t, plural } from '@/lib/strings';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * One listing, and the decision to publish it (SRS §8.1, P-002).
@@ -26,6 +27,17 @@ export default async function PropertyPage({
   /* The list position to return to — see the note in the bookings detail screen. */
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('properties', t.nav.properties);
+
+  if (refused) return refused;
+
   const { reference } = await params;
   const query = await searchParams;
   const back = backTarget('/properties', query, reference);

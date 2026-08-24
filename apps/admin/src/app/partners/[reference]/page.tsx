@@ -14,6 +14,7 @@ import { PartnerTwoFactor } from '@/components/partner-two-factor';
 import { BackLink, type BackTarget } from '@/components/back-link';
 import { backTarget } from '@/lib/search-params';
 import { fill, label, t } from '@/lib/strings';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * One partner's application, and the decision (SRS §8.1).
@@ -37,6 +38,17 @@ export default async function PartnerPage({
   /* The list position to return to — see the note in the bookings detail screen. */
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('partners', t.nav.partners);
+
+  if (refused) return refused;
+
   const { reference } = await params;
   const query = await searchParams;
   const back = backTarget('/partners', query, reference);

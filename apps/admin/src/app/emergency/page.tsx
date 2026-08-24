@@ -5,6 +5,7 @@ import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { Ltr, StatusPill } from '@/components/admin-table';
 import { DeactivateButton, EmergencyForm } from '@/components/emergency-form';
 import { fill, t } from '@/lib/strings';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * Emergency Mode (EC-009) — the 19th admin section (design handoff §8.3).
@@ -20,6 +21,17 @@ import { fill, t } from '@/lib/strings';
 export const dynamic = 'force-dynamic';
 
 export default async function EmergencyPage() {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('emergency', t.admin.emergencyMode);
+
+  if (refused) return refused;
+
   const [result, counts] = await Promise.all([getEmergency(), sidebarCounts()]);
 
   return (

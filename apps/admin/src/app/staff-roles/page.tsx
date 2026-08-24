@@ -4,6 +4,7 @@ import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { StaffRolesManager } from '@/components/staff-roles-manager';
 import { FootNote } from '@/components/admin-table';
 import { t } from '@/lib/strings';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * أدوار موظفي الشركاء — the super admin defines and names them (Bashar, 2026-08-23).
@@ -34,6 +35,17 @@ import { t } from '@/lib/strings';
 export const dynamic = 'force-dynamic';
 
 export default async function StaffRolesPage() {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('staffRoles', t.nav.staffRoles);
+
+  if (refused) return refused;
+
   const [roles, assignable, counts] = await Promise.all([
     getStaffRoles(),
     getAssignableStaffPermissions(),

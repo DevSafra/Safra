@@ -14,6 +14,7 @@ import { label, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { listParamsFor } from '@/lib/table-size';
 import { ExportsRefresh } from '@/components/exports-refresh';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * الملفات المصدَّرة — collecting a CSV somebody asked for.
@@ -119,6 +120,17 @@ export default async function ExportsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('bookings', t.sections.exports.title);
+
+  if (refused) return refused;
+
   const { page, size } = await listParamsFor('exports', searchParams);
   const params = await searchParams;
   const failed = params['failed'] === '1';

@@ -17,6 +17,7 @@ import { label, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { oneOf, returnQuery } from '@/lib/search-params';
 import { listParamsFor } from '@/lib/table-size';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * طلبات الشراكة — who has asked to join (Bashar, 2026-08-19).
@@ -48,6 +49,17 @@ export default async function PartnerApplicationsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('partnerApplications', t.nav.partnerApplications);
+
+  if (refused) return refused;
+
   const { q, page, size } = await listParamsFor('partnerApplications', searchParams);
   const params = await searchParams;
   /*

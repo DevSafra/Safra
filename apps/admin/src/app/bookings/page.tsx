@@ -18,6 +18,7 @@ import { bookingStatus, fill, t } from '@/lib/strings';
 import { oneOf, pageNumber, returnQuery } from '@/lib/search-params';
 import { resolvePageSize } from '@/lib/table-size';
 import { statusTone } from '@/lib/status-tone';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * الحجوزات — the bookings registry (design handoff §8).
@@ -72,6 +73,17 @@ export default async function BookingsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('bookings', t.nav.bookings);
+
+  if (refused) return refused;
+
   const params = await searchParams;
   const first = (key: string): string | undefined => {
     const raw = params[key];

@@ -20,6 +20,7 @@ import { rowAnchor, returnQuery } from '@/lib/search-params';
 import { fill, label, t } from '@/lib/strings';
 import { listParamsFor } from '@/lib/table-size';
 import { oneOf } from '@/lib/search-params';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * تحويلات الشركاء — the payout registry (§9.3).
@@ -45,6 +46,17 @@ export default async function PayoutsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('payouts', t.sections.payouts.title);
+
+  if (refused) return refused;
+
   const params = await searchParams;
   const { q, page, size } = await listParamsFor('payouts', searchParams);
 

@@ -9,6 +9,7 @@ import { backTarget } from '@/lib/search-params';
 import { count, shortDateTime } from '@/lib/format';
 import { label, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * One partnership request, and the decision (Bashar, 2026-08-19).
@@ -40,6 +41,17 @@ export default async function PartnerApplicationPage({
   /* The list position to return to — see `returnQuery` and `backTarget`. */
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('partnerApplications', t.nav.partnerApplications);
+
+  if (refused) return refused;
+
   const { reference } = await params;
   const query = await searchParams;
   /*

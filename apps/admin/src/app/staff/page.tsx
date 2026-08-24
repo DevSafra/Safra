@@ -15,6 +15,7 @@ import { StaffInvite } from '@/components/staff-invite';
 import { auditAction, auditSubject, fill, roleName, t } from '@/lib/strings';
 import { first, returnQuery, rowAnchor } from '@/lib/search-params';
 import { listParamsFor } from '@/lib/table-size';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * الموظفون (M-5, SRS §4, design handoff §8.2).
@@ -51,6 +52,17 @@ export default async function StaffPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('staff', t.nav.staff);
+
+  if (refused) return refused;
+
   const { page, size } = await listParamsFor('staff', searchParams);
   /*
     آخر نشاط is the SECOND paged list on this route, so its page and size are namespaced —

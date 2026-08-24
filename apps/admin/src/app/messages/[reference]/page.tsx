@@ -9,6 +9,7 @@ import { ReplyForm } from '@/components/reply-form';
 import { BackLink } from '@/components/back-link';
 import { backTarget } from '@/lib/search-params';
 import { fill, t } from '@/lib/strings';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * One three-party thread, in the order it was written (design handoff §8).
@@ -34,6 +35,17 @@ export default async function ThreadPage({
   /* The list position to return to — see the note in the bookings detail screen. */
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('messages', t.nav.messages);
+
+  if (refused) return refused;
+
   const { reference } = await params;
   const query = await searchParams;
   const back = backTarget('/messages', query, reference);

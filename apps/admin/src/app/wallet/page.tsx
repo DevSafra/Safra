@@ -13,6 +13,7 @@ import {
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
 import { listParamsFor } from '@/lib/table-size';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * المحفظة — the wallet ledger across all customers (design handoff §8).
@@ -32,6 +33,17 @@ export default async function WalletPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('wallet', t.nav.wallet);
+
+  if (refused) return refused;
+
   const { q, page, size } = await listParamsFor('wallet', searchParams);
 
   const [result, counts] = await Promise.all([

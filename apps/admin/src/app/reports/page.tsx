@@ -3,6 +3,7 @@ import { sidebarCounts } from '@/lib/console';
 import { money, percent } from '@/lib/format';
 import { ConsoleShell } from '@/components/console-shell';
 import { t } from '@/lib/strings';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * التقارير (design handoff §8).
@@ -33,6 +34,17 @@ const HIGHER_IS_BETTER: Record<ReportCard['key'], boolean> = {
 };
 
 export default async function ReportsPage() {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('reports', t.nav.reports);
+
+  if (refused) return refused;
+
   const [result, counts] = await Promise.all([getReports(), sidebarCounts()]);
 
   return (

@@ -3,6 +3,7 @@ import { OnboardPartnerForm } from '@/components/onboard-partner-form';
 import { BackLink } from '@/components/back-link';
 import { backTarget } from '@/lib/search-params';
 import { t } from '@/lib/strings';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * تسجيل شريك جديد, step 1 — the partner's details (Bashar, 2026-08-23).
@@ -21,6 +22,17 @@ import { t } from '@/lib/strings';
 export const dynamic = 'force-dynamic';
 
 export default async function NewPartnerPage() {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('partners', t.nav.partners);
+
+  if (refused) return refused;
+
   const [partnerTypes, geography] = await Promise.all([
     getPartnerTypes(),
     getGeography(),

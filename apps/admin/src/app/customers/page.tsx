@@ -13,6 +13,7 @@ import {
 import { TableToolbar } from '@/components/table-toolbar';
 import { t } from '@/lib/strings';
 import { listParamsFor } from '@/lib/table-size';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * العملاء — the customer registry (design handoff §8).
@@ -37,6 +38,17 @@ export default async function CustomersPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('customers', t.nav.customers);
+
+  if (refused) return refused;
+
   const { q, page, size } = await listParamsFor('customers', searchParams);
 
   const [result, counts] = await Promise.all([
