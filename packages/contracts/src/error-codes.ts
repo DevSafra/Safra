@@ -107,6 +107,7 @@ export const ERROR = {
   PERMISSION_DENIED: 'permission.denied',
   SCOPE_OUTSIDE: 'scope.outside',
   STAFF_NOT_FOUND: 'staff.not_found',
+  AUDIT_ENTRY_NOT_FOUND: 'audit_entry.not_found',
   STAFF_ROLE_INVALID: 'staff.role_invalid',
   STAFF_CANNOT_SUSPEND_SELF: 'staff.cannot_suspend_self',
   STAFF_CANNOT_CHANGE_OWN_SCOPE: 'staff.cannot_change_own_scope',

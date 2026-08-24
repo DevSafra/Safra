@@ -49,6 +49,7 @@ export const en = {
   'permission.denied': 'You do not have access to this resource.',
   'scope.outside': 'This record is outside your assigned scope.',
   'staff.not_found': 'Staff member not found.',
+  'audit_entry.not_found': 'That activity entry was not found.',
   'staff.role_invalid': 'That is not a staff role.',
   'staff.cannot_suspend_self': 'You cannot suspend your own account.',
   'staff.cannot_change_own_scope': 'You cannot change your own scope.',

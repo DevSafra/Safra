@@ -58,6 +58,7 @@ export const de = {
   'permission.denied': 'Sie haben keinen Zugriff auf diese Ressource.',
   'scope.outside': 'Dieser Datensatz liegt außerhalb Ihres zugewiesenen Bereichs.',
   'staff.not_found': 'Mitarbeiter nicht gefunden.',
+  'audit_entry.not_found': 'Dieser Eintrag wurde nicht gefunden.',
   'staff.role_invalid': 'Das ist keine Mitarbeiterrolle.',
   'staff.cannot_suspend_self': 'Sie können Ihr eigenes Konto nicht deaktivieren.',
   'staff.cannot_change_own_scope': 'Sie können Ihren eigenen Bereich nicht ändern.',

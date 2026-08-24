@@ -47,6 +47,7 @@ export const ar = {
   'permission.denied': 'لا تملك صلاحية الوصول إلى هذا المورد.',
   'scope.outside': 'هذا السجل خارج نطاقك المُخصَّص.',
   'staff.not_found': 'لم يُعثر على هذا الموظف.',
+  'audit_entry.not_found': 'لم يُعثر على هذا النشاط.',
   'staff.role_invalid': 'هذا ليس دوراً وظيفياً.',
   'staff.cannot_suspend_self': 'لا يمكنك تعطيل حسابك الخاص.',
   'staff.cannot_change_own_scope': 'لا يمكنك تغيير نطاقك الخاص.',

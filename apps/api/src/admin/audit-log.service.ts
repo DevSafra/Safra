@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { COUNT_CAP, type OffsetPage, offsetPage } from '@safra/contracts';
+import { COUNT_CAP, STAFF_ROLES, type OffsetPage, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { ADMIN_DISPLAY_NAME } from '@safra/contracts';
@@ -129,6 +129,20 @@ export class AuditLogService {
       );
     }
 
+    return this.pageOf(conditions, query);
+  }
+
+  /**
+   * One page of the trail, for any set of conditions.
+   *
+   * The projection, the ordering, the count cap and the offset live HERE and nowhere else. Two
+   * screens read this table — سجل التدقيق whole, and آخر نشاط الموظفين narrowed to our own people —
+   * and two copies of this query would drift into showing the same event differently on each.
+   */
+  private async pageOf(
+    conditions: SQL[],
+    query: { limit: number; page: number },
+  ): Promise<OffsetPage<AuditEntry>> {
     const where =
       conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
@@ -184,6 +198,99 @@ export class AuditLogService {
       total,
       query,
     );
+  }
+
+  /**
+   * آخر نشاط الموظفين — the same trail, narrowed to SAFRA's own people, searchable by person.
+   *
+   * ## Why this is a method here and not a query of its own
+   *
+   * الموظفون shows recent staff activity, and سجل التدقيق shows the whole trail. They are one list
+   * with two predicates, and written separately they would drift — one gaining a column, the other
+   * a filter, until the same event reads differently on two screens. This shares `pageOf` with
+   * `list`, so the projection, the ordering, the cap and the paging are decided once.
+   *
+   * ## The search is by PERSON, and it resolves to ids first
+   *
+   * Bashar (2026-08-24) asked for a search box over a name or an email. Both live on `users`, not
+   * on `audit_log`, so the obvious `WHERE u.email ILIKE '%q%'` would drag a join predicate across
+   * an ever-growing table. Instead the term is resolved against `users` — a table bounded by the
+   * size of the company — and the result becomes an id list against `audit_log_actor_idx`, which
+   * is `(actor_user_id, created_at)` and therefore serves the ordering too.
+   *
+   * **A term matching nobody returns an EMPTY page, not every row.** The failure to avoid is a
+   * search that silently ignores itself: a reader who typed a colleague's name and got the
+   * unfiltered list would read the first row as that person's work.
+   */
+  async staffActivity(
+    query: AuditQuery & { readonly actorSearch?: string | undefined },
+  ): Promise<OffsetPage<AuditEntry>> {
+    const conditions: SQL[] = [
+      /*
+        STAFF_ROLES, not a deny-list and not four literals. `actor_role` is stamped on the row at
+        write time, so this reads what the actor WAS when they acted — which is the right question
+        for a trail, and survives somebody later changing role or leaving.
+      */
+      sql`a.actor_role::text IN (${sql.join(
+        STAFF_ROLES.map((role) => sql`${role}`),
+        sql`, `,
+      )})`,
+    ];
+
+    const term = query.actorSearch?.trim();
+
+    if (term) {
+      const matches = await this.db.execute<{ id: string }>(sql`
+        SELECT id FROM users
+        WHERE deleted_at IS NULL
+          AND (full_name ILIKE ${'%' + term + '%'} OR email ILIKE ${'%' + term + '%'})
+        LIMIT 500
+      `);
+
+      const ids = matches.rows.map((row) => row.id);
+
+      /*
+        Nobody matched, so nothing matched. `IN ()` is not valid SQL and an empty condition list
+        would quietly widen the query to everything — the exact failure this guard exists for.
+      */
+      if (ids.length === 0) return offsetPage([], 0, query);
+
+      conditions.push(
+        sql`a.actor_user_id IN (${sql.join(
+          ids.map((id) => sql`${id}::uuid`),
+          sql`, `,
+        )})`,
+      );
+    }
+
+    return this.pageOf(conditions, query);
+  }
+
+  /**
+   * ONE entry, for the screen that explains what happened.
+   *
+   * Bashar (2026-08-24) asked for a page per activity, "to explain exactly what happened". The
+   * explanation is `before` and `after` — the two payloads the row already carries and the list
+   * deliberately does not render, because a column wide enough for them is a column nothing else
+   * fits in.
+   *
+   * Narrowed to STAFF actors by the same predicate as the list. Without it, a staff id from the
+   * activity panel and a customer's audit row would be reachable through the same URL, and this
+   * screen would become a way to read the whole trail without `audit_log.read`.
+   */
+  async staffEntry(id: string): Promise<AuditEntry | null> {
+    const page = await this.pageOf(
+      [
+        sql`a.id = ${id}::uuid`,
+        sql`a.actor_role::text IN (${sql.join(
+          STAFF_ROLES.map((role) => sql`${role}`),
+          sql`, `,
+        )})`,
+      ],
+      { limit: 1, page: 1 },
+    );
+
+    return page.items[0] ?? null;
   }
 
   /**
