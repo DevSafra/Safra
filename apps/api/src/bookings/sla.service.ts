@@ -303,12 +303,30 @@ export class SlaService {
             note: 'Partner did not respond within the confirmation window.',
           });
 
-          // §8.5: the internal score drives "SAFRA recommends", so a missed SLA
-          // must actually cost the partner visibility.
+          /*
+            The score deduction is gone; `cancellation_count` STAYS. That split is the decision
+            (Bashar, 2026-08-24), and it is a finer line than "remove the ranking effect".
+
+            > *"Ranking should continue to be driven by measurable quality signals such as reviews,
+            > booking performance, CANCELLATION RATES, response times, content completeness… but
+            > creating a violation must not automatically modify ranking."*
+
+            So the two writes that used to sit here are different things wearing the same shape:
+
+            - `score - 5` was an ADMINISTRATIVE deduction. A number a policy decided, applied
+              because a record was filed. Removed.
+            - `cancellation_count + 1` is a MEASUREMENT. The booking really was cancelled; counting
+              it is counting a fact about the business, and Bashar names cancellation rates as a
+              legitimate quality signal by hand. It stays, and it would stay even if violations did
+              not exist — the count is of cancellations, not of violations.
+
+            The old comment cited §8.5 to argue that a missed SLA "must actually cost the partner
+            visibility". It still does, through the measured cancellation rate rather than through
+            a punishment attached to the record.
+          */
           await tx.execute(sql`
             UPDATE partners
-            SET score = GREATEST(0, score - 5),
-                cancellation_count = cancellation_count + 1
+            SET cancellation_count = cancellation_count + 1
             WHERE id = ${booking.partner_id}
           `);
 

@@ -337,9 +337,28 @@ export class BookingActionsService {
                   ${Number(priorRows.rows[0]?.count ?? 0) + 1}, 2)
         `);
 
-        await tx.execute(sql`
-          UPDATE partners SET score = GREATEST(0, score - 2) WHERE id = ${partnerId}
-        `);
+        /*
+          The score deduction that used to sit here is GONE (Bashar, 2026-08-24).
+
+          > *"Violations must not directly affect ranking… creating a violation must not
+          > automatically modify ranking. If ranking consequences are desired in the future, they
+          > should be derived from objective platform metrics rather than administrative violation
+          > records."*
+
+          It deducted two points from `partners.score`, in this transaction, two
+          lines below the violation insert — and `partners.score` is a ranking input, so recording
+          a violation moved the listing down «SAFRA يوصي». That is precisely the coupling the rule
+          forbids: an administrative record changing a placement.
+
+          Nothing about the consequence is lost. The violation is still written, still escalates by
+          `occurrence_number`, and can still lead to a warning, a fine or a suspension — which are
+          the levers Bashar names. What it no longer does is quietly reprice visibility as a side
+          effect of somebody filing a record.
+
+          `violation-ranking.integration.test.ts` pins this. It is the kind of line somebody
+          restores in good faith six months from now, because "a partner who does this should rank
+          lower" is an intuitive thing to believe.
+        */
       }
 
       await tx.execute(sql`
