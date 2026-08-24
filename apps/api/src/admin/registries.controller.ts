@@ -21,6 +21,7 @@ import {
   type SetStaffScopeInput,
 } from '@safra/contracts';
 
+import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -214,27 +215,20 @@ export class RegistriesController {
 
   // ── الموظفون: النطاق (§8.2) ─────────────────────────────────────────────────
 
-  /**
-   * Reads every staff member's scope, for the الموظفون table's النطاق column.
-   *
-   * `STAFF_MANAGE`: a scope map is a map of who can see what, which is not something to hand to
-   * every staff role.
-   */
-  @Get('staff/scopes')
-  @RequirePermissions(P.STAFF_MANAGE)
-  async staffScopes(
-    @Query(new ZodValidationPipe(pageQuerySchema))
-    query: z.infer<typeof pageQuerySchema>,
-  ) {
-    const page = await this.staffScope.list(query);
+  /*
+    `GET staff/scopes` was removed on 2026-08-23, and the WRITE below deliberately was not.
 
-    /*
-      `scopes` kept as an alias for `items` so an existing reader survives the change. Spread
-      rather than enumerated: an enumerated copy silently drops any field the page shape grows
-      later, and the client's schema then rejects a 200 as a failed load.
-    */
-    return { ...page, scopes: page.items };
-  }
+    The read served a paged column of everybody's scope on الموظفون. That table is gone — a scope is
+    a property of a PERSON and now lives on their own record, where `StaffService.detail` joins it —
+    so the endpoint had no caller and no reader it could serve.
+
+    The write is a different question and the answer is different. Nothing in the console calls it
+    TODAY either, because the panel that did was deleted with the table. That is a gap rather than a
+    dead route: a super admin can no longer scope a colleague to cities, and صفحة الموظف shows the
+    scope it cannot change. Deleting this because its only caller went away would turn a missing
+    screen into a missing capability, quietly, and the console would have to grow the endpoint back
+    to get the feature back. Recorded as O-staff-3.
+  */
 
   /**
    * Sets one staff member's scope.
@@ -244,6 +238,11 @@ export class RegistriesController {
    */
   @Put('staff/:userId/scope')
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @AuditExempt(
+    'StaffScopeService records staff.scope_changed itself, inside the same transaction as the ' +
+      'write — with the before and after kind, the outside-access value and the city slugs, which ' +
+      'an interceptor firing after the fact could not know.',
+  )
   @RequirePermissions(P.STAFF_MANAGE)
   async setStaffScope(
     @CurrentUser() user: AccessTokenClaims | undefined,
@@ -371,11 +370,17 @@ export class RegistriesController {
   // ── الموظفون (overview) ────────────────────────────────────────────────────
 
   /**
-   * Counters, the permission matrix and recent staff activity.
+   * Counters and recent staff activity.
    *
-   * `STAFF_MANAGE` — the same right the staff list itself needs. The matrix reveals the
-   * authorization model, which is not something to hand to every staff role: it is a map of
-   * which account to compromise for which capability.
+   * `STAFF_MANAGE` — the same right the staff list itself needs. Recent activity names which
+   * colleague did what, which is not something to hand to every staff role.
+   *
+   * The permission MATRIX was removed on 2026-08-23. Bashar asked for it off الموظفون by name, and
+   * أدوار الموظفين is where a role's capabilities are read now — a matrix beside it was a second
+   * rendering of the same fact, from a second source. Dropped from the console's schema first and
+   * from this payload after, in that order deliberately: zod ignores an unknown key, so a client
+   * that stops expecting a field survives a server that still sends it, and the reverse fails the
+   * parse and blanks the page.
    */
   @Get('staff/overview')
   @RequirePermissions(P.STAFF_MANAGE)
@@ -385,7 +390,7 @@ export class RegistriesController {
       this.staffOverview.activity(),
     ]);
 
-    return { counters, matrix: this.staffOverview.matrix(), activity };
+    return { counters, activity };
   }
 
   // ── Emergency Mode (EC-009) ────────────────────────────────────────────────
