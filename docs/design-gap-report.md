@@ -458,6 +458,31 @@ by opening each screen against real data, not by reading the code.
 | لوحة التحكم §7.1  | KPIs, calendar, activity, payout line                           | **Complete.** Four KPI cards, the pending-request queue with its two-hour SLA badge and قبول/رفض, a month calendar for one unit with the §7.1 legend and reminder, and the alerts panel carrying the payout line. Absent data renders «—», never «٠» — a partner with no units has not achieved zero occupancy. Responsive at 390/768/1024/1440.                                                                                                                                                      |
 | المستحقات         | — (not drawn in §7)                                             | **Complete, read-only.** `/payouts` list and `/payouts/[reference]` with the covered bookings. A partner cannot release their own transfer and the screen says so — `PAYOUT_EXECUTE` is staff-only and the partner controller exposes no write.                                                                                                                                                                                                                                                       |
 
+### 8.1b Enforcement, as the PARTNER meets it (2026-08-24)
+
+Driven in a browser on 2026-08-24, and it is worth recording separately because the browser pass
+found the whole partner-facing half of the suspension policy to be inert.
+
+| Surface                     | State                                                                                                                                                                                                                                                                                         |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Suspension notice           | **Complete, and was NOT.** `Shell` renders it from `profile.suspension`, and `GET /partner/me` did not select `suspended_at` or `suspended_reason` — so the object never arrived and the portal schema's `.default(null)` read that silence as "not suspended". It could not appear anywhere. |
+| المحفظة «التحويلات موقوفة»  | **Complete, and was NOT** — computed from the same field, unreachable for the same reason.                                                                                                                                                                                                    |
+| Refusal on a blocked write  | **Complete.** A draft edit is refused with «حساب الشراكة معلّق مؤقتاً…», not «تعذّر الحفظ», and the value is not stored.                                                                                                                                                                      |
+| Sign-in while suspended     | **Complete.** A COLD sign-in — password plus the emailed code — reaches the portal and lands on the notice. This is the half that is easiest to break by accident: suspension once stripped `partnerId` from the token, so the portal rendered as though the business did not exist.          |
+| Listings leaving search     | **Complete.** The partner's three Damascus listings vanish from `/ar/search` while suspended and return when it is lifted, with two other partners' listings on the page throughout as the control.                                                                                           |
+| المخالفات stage and warning | **Complete, and was NOT.** `GET /partner/violations` selected neither `stage` nor `warning_note`, both defaulted in the portal schema — so every violation read «سُجّلت» whatever had happened to it, and the warning written FOR the partner reached nobody.                                 |
+| المخالفات notification      | **New.** A card in the §7.1 row showing the OPEN count and the furthest rung reached, linking to المخالفات. The alerts panel is `LIMIT 5` and said nothing about a sixth violation.                                                                                                           |
+
+**The pattern all three defects share, and it is the reason to write this down:** a zod
+`.default()` on a field the API never sent. Every one parsed cleanly, rendered plausibly, passed the
+type checker and passed every test. `O-staff-4` recorded these surfaces as "compile-verified" in
+good faith — compilation was exactly what they satisfied. All three defaults are gone; the fields
+are required-but-nullable, so an API that stops sending one fails the parse where the mistake is.
+
+`e2e/partner-suspension.spec.ts` holds the whole journey — suspend, read, be refused, sign in cold,
+disappear from search, lift, recover — and lifts the suspension in an unconditional `afterAll` so
+the window cannot outlive the spec.
+
 ### 8.2 Which workflows are complete
 
 - **Sign in → see only your own listings → sign out.** Complete and browser-tested, including that
