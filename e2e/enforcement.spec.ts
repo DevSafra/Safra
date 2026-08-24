@@ -147,3 +147,111 @@ test('suspend, raise, fine, waive — and the waived fine shows both entries', a
   await expect(page.locator('[data-partner-suspended]')).toHaveCount(0);
   console.log('lifted, partner trading again');
 });
+
+/**
+ * The ladder's fourth rung, driven: suspending a partner BECAUSE of a named violation.
+ *
+ * ## Why this is a separate test and runs after the first
+ *
+ * The escalation control is hidden while the partner is already suspended — the API answers a
+ * second suspension with `PARTNER_ALREADY_SUSPENDED`, and a button whose only outcome is a conflict
+ * is worse than no button. So this needs the partner TRADING when it starts, which is exactly the
+ * state the test above is careful to leave behind.
+ *
+ * ## What it proves that the integration test cannot
+ *
+ * `violation-escalation.integration.test.ts` proves the service writes the stage and scopes it to
+ * the partner. It says nothing about whether a human can reach it. Before this, `stage =
+ * 'suspension'` had an Arabic label («رُفع إلى الإيقاف») and a place in three schemas for a state no
+ * screen could produce — the defect being fixed is precisely "built and connected to nothing", so a
+ * test that never presses the button would miss the whole point.
+ *
+ * ## It accumulates one violation per run, deliberately
+ *
+ * `suspension` is terminal and forward-only, so a violation escalated on one run cannot be
+ * escalated again on the next. Reusing the row would mean asserting an end state rather than
+ * driving a transition — a control that changes nothing proving nothing. One extra row per run on
+ * one fixture partner is the price of actually pressing it, and it is paid knowingly.
+ */
+test('escalating a violation suspends the partner and records it as the cause', async ({
+  page,
+}) => {
+  const dir = process.env['SHOT_DIR'] as string;
+
+  await page.goto('/partners?size=25');
+
+  const row = page.locator('a[href^="/partners/PAR-"]').first();
+
+  test.skip((await row.count()) === 0, 'No partner to enforce against.');
+
+  const href = (await row.getAttribute('href')) ?? '';
+  const reference = /PAR-\d+/.exec(href)?.[0] ?? '';
+
+  /* The previous test lifts what it imposed; if it did not, this cannot run at all. */
+  await page.goto(`/partners/${reference}`);
+  await expect(page.locator('[data-partner-suspended]')).toHaveCount(0);
+
+  await page.goto(`/partners/${reference}/violations`);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+  /*
+    A violation of its own, raised here rather than reused — see the note above.
+
+    `.first()` on the toggle and `.last()` on the submit: with the form open there are two controls
+    reading «تسجيل مخالفة», and taking the wrong one clicks a toggle, posts nothing, and waits
+    twenty seconds for a message that is never coming. The same trap the fine flow documents.
+  */
+  await page.getByRole('button', { name: copy.raise }).first().click();
+  await page.getByLabel(copy.kindLabel).selectOption('stale_calendar');
+  await page.getByLabel(copy.violationReasonLabel).fill(REASON);
+  await page.getByRole('button', { name: copy.raise }).last().click();
+  await expect(page.getByText(copy.raised)).toBeVisible({ timeout: 20_000 });
+  await page.reload();
+
+  /* The newest violation is first — the list is ordered by `created_at` descending. */
+  const target = page.locator('main ul > li').first();
+
+  await expect(target.getByRole('button', { name: copy.escalate })).toBeVisible();
+  await target.getByRole('button', { name: copy.escalate }).first().click();
+
+  /* The consequence is stated before the field, because this is the one control here that stops trade. */
+  await expect(page.getByText(copy.escalateHint)).toBeVisible();
+
+  await target.getByLabel(copy.escalateReasonLabel).fill(REASON);
+  await target.getByRole('button', { name: copy.escalate }).last().click();
+  await expect(page.getByText(copy.escalated)).toBeVisible({ timeout: 20_000 });
+
+  await page.reload();
+
+  /*
+    Both halves, and neither implies the other.
+
+    The stage label is the violation saying it caused a suspension; the banner is the partner being
+    suspended. A change that wrote the stage and forgot to suspend would satisfy one of these, and
+    that is the more likely half to break — it is the one with no visible consequence.
+  */
+  const escalated = page.locator('main ul > li').first();
+
+  await expect(escalated).toContainText(t.enums.violationStage['suspension'] ?? '');
+  await page.screenshot({ path: `${dir}/enf-3-escalated.png`, fullPage: true });
+
+  await page.goto(`/partners/${reference}`);
+  await expect(page.locator('[data-partner-suspended]')).toBeVisible();
+  await expect(page.getByText(copy.suspendedTitle)).toBeVisible();
+
+  /* And the control is gone now that it would only conflict. */
+  await page.goto(`/partners/${reference}/violations`);
+  await expect(
+    page.locator('main ul > li').first().getByRole('button', { name: copy.escalate }),
+  ).toHaveCount(0);
+
+  /* ── Lift it, so the fixture partner is left trading ─────────────────── */
+  await page.goto(`/partners/${reference}`);
+  await page
+    .getByLabel(copy.unsuspendReasonLabel)
+    .fill('رُفع الإيقاف بعد معالجة السبب بالكامل');
+  await page.getByRole('button', { name: copy.unsuspend }).click();
+  await expect(page.getByText(copy.unsuspended)).toBeVisible({ timeout: 20_000 });
+  await page.reload();
+  await expect(page.locator('[data-partner-suspended]')).toHaveCount(0);
+});

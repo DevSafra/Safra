@@ -7,11 +7,13 @@ import {
   fineWaiveSchema,
   pageQuerySchema,
   partnerSuspendSchema,
+  partnerUnsuspendSchema,
   violationFineSchema,
   violationRaiseSchema,
   violationWarnSchema,
   type FineWaiveInput,
   type PartnerSuspendInput,
+  type PartnerUnsuspendInput,
   type ViolationFineInput,
   type ViolationRaiseInput,
   type ViolationWarnInput,
@@ -62,7 +64,18 @@ export class EnforcementController {
     return { suspended: true };
   }
 
-  /** Lifting takes a reason too — "who decided this was over, and why" is asked as often as why. */
+  /**
+   * Lifting takes a reason too — "who decided this was over, and why" is asked as often as why.
+   *
+   * ## Its OWN schema, which it was not using
+   *
+   * This validated with `partnerSuspendSchema` — harmless while the two were field-for-field
+   * identical, and `partnerUnsuspendSchema` sat exported and unread. It stopped being harmless the
+   * moment suspending grew `violationId`: a `.strict()` schema is the thing that REFUSES unknown
+   * fields, so borrowing the wrong one made lifting a suspension quietly accept a violation id and
+   * do nothing with it. A field accepted and ignored is worse than one rejected — the caller is
+   * told it landed.
+   */
   @Post('partners/:reference/unsuspend')
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @RequirePermissions(P.PARTNER_SUSPEND)
@@ -70,7 +83,7 @@ export class EnforcementController {
   async unsuspend(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('reference') reference: string,
-    @Body(new ZodValidationPipe(partnerSuspendSchema)) body: PartnerSuspendInput,
+    @Body(new ZodValidationPipe(partnerUnsuspendSchema)) body: PartnerUnsuspendInput,
   ) {
     await this.enforcement.unsuspend(user, reference, body);
 

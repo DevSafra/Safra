@@ -59,7 +59,31 @@ const staffNotes = z.string().trim().max(2000).optional();
  * answered.
  */
 export const partnerSuspendSchema = z
-  .object({ reason: publicReason, notes: staffNotes })
+  .object({
+    reason: publicReason,
+    notes: staffNotes,
+    /**
+     * The violation this suspension ANSWERS, where there is one — the ladder's fourth rung.
+     *
+     * `violation_stage` has run `recorded → warned → fined → suspension` since the enum was
+     * written, and nothing ever wrote the last one. Three rungs were reachable and the fourth was
+     * a value the contract accepted, the portal's zod schema parsed and no code could produce:
+     * an enum member with nothing behind it, which reads as coverage exactly the way a grantable
+     * capability with no route does (`O-staff-1`).
+     *
+     * OPTIONAL, because suspension is not always the end of a progression. A partner can be
+     * suspended for something that never became a numbered violation — a sanctions hit, a fraud
+     * report — and requiring an id would force somebody to invent a violation to record a
+     * suspension. So the partner record's own control still suspends with no linkage, and this
+     * carries the link when the decision came FROM a violation.
+     *
+     * A uuid rather than a reference: violations are addressed by id everywhere else in this
+     * file's endpoints (`violations/:id/warn`, `/fine`, `/waive`), and a second addressing scheme
+     * for one field is a second thing to keep in step. The id is scoped to the partner being
+     * suspended on the way through — see `EnforcementService.suspend`.
+     */
+    violationId: z.string().uuid(ERROR.VALIDATION_REQUIRED).optional(),
+  })
   .strict();
 export type PartnerSuspendInput = z.infer<typeof partnerSuspendSchema>;
 

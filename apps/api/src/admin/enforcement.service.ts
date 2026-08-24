@@ -66,6 +66,13 @@ export class EnforcementService {
    * The reason is REQUIRED by the schema and is the text the partner reads. `notes` never leaves
    * the console — it is the one field in this record with a different audience, and a field with
    * two audiences and one shape is how the `actor_name` leak happened this morning.
+   *
+   * ## `violationId` links the suspension to the violation that caused it
+   *
+   * Optional, and it is the only writer of `stage = 'suspension'` — see `escalate`. It stays on
+   * THIS endpoint rather than becoming a `violations/:id/escalate` route of its own, because
+   * `suspended_at` must have exactly one writer: two routes reaching one piece of state is how the
+   * two diverge, and the second one is always the one that forgets the mail or the audit row.
    */
   async suspend(
     actor: AccessTokenClaims | undefined,
@@ -98,6 +105,10 @@ export class EnforcementService {
         },
         tx as unknown as Database,
       );
+
+      if (input.violationId !== undefined) {
+        await this.escalate(tx as unknown as Database, actor, partner.id, input);
+      }
     });
 
     /*
@@ -529,6 +540,75 @@ export class EnforcementService {
     if (!partner) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
     return partner;
+  }
+
+  /**
+   * The ladder's fourth rung: takes ONE violation to `suspension`, in the suspending transaction.
+   *
+   * ## Why the partner id is in the WHERE clause and not in an `if`
+   *
+   * `violationId` is supplied by the caller. Checked afterwards, a staff member with
+   * `PARTNER_SUSPEND` could hand over ANY violation's id and mark another partner's record as
+   * having led to a suspension it had nothing to do with — a write to a row they were never
+   * authorised for, on an append-only history that exists to be trusted at an appeal. Scoped in the
+   * predicate, the row is unreachable rather than merely unmodified, which is the difference the
+   * standing rule asks for: "not yours" answers the same as "not there".
+   *
+   * ## Already at `suspension` is not an error
+   *
+   * `stage` is forward-only and `suspension` is terminal, so a violation can already be there —
+   * escalated, the suspension later lifted, and the same violation cited again. Refusing would
+   * block a legitimate suspension over a linkage that is already recorded, so the stage write is
+   * skipped and no second audit row is written. Nothing is undone and nothing is duplicated.
+   *
+   * ## Its own audit row
+   *
+   * `partner.suspended` records that the business stopped trading. This records that a numbered
+   * violation reached its last rung, which is the fact an appeal turns on — and it is the same
+   * reason `violation.warned` and `violation.fined` are their own actions rather than fields on
+   * something larger.
+   */
+  private async escalate(
+    tx: Database,
+    actor: AccessTokenClaims | undefined,
+    partnerId: string,
+    input: PartnerSuspendInput,
+  ): Promise<void> {
+    const rows = await tx.execute<{ stage: string }>(sql`
+      SELECT stage::text AS stage
+      FROM partner_violations
+      WHERE id = ${input.violationId}::uuid
+        AND partner_id = ${partnerId}::uuid
+        AND deleted_at IS NULL
+      LIMIT 1
+      FOR UPDATE
+    `);
+
+    const violation = rows.rows[0];
+
+    if (!violation) throw notFound(ERROR.VIOLATION_NOT_FOUND);
+
+    if (violation.stage === 'suspension') return;
+
+    await tx.execute(sql`
+      UPDATE partner_violations
+      SET stage = 'suspension', updated_at = now()
+      WHERE id = ${input.violationId}::uuid AND partner_id = ${partnerId}::uuid
+    `);
+
+    await this.audit.record(
+      {
+        actorUserId: actor?.sub,
+        actorRole: actor?.role,
+        action: 'violation.escalated',
+        subjectType: 'partner',
+        subjectId: partnerId,
+        before: { stage: violation.stage },
+        after: { stage: 'suspension' },
+        reason: input.reason,
+      },
+      tx,
+    );
   }
 
   private async liveViolation(id: string) {

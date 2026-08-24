@@ -1116,6 +1116,22 @@ export const ar = {
       fineCurrencyLabel: 'العملة',
       compensationLabel: 'تعويض العميل (اختياري)',
 
+      /* ── The fourth rung: suspending BECAUSE of this violation ───────────── */
+      /*
+        Deliberately not «إيقاف الشريك», which is the control on the partner record.
+
+        Two controls that read identically and do different things is how somebody suspends a
+        partner while believing they are filing a violation. This one names the violation it is
+        acting on, and the hint states the consequence in the same words the record's banner uses,
+        because this is the screen where somebody has a violation in front of them and no banner.
+      */
+      escalate: 'تعليق الحساب على هذه المخالفة',
+      escalating: 'جارٍ التعليق…',
+      escalated: 'عُلّق الحساب وسُجّلت المخالفة كسببه.',
+      escalateHint:
+        'يوقف التداول الجديد ويجمّد المستحقات، وتستمر الحجوزات المؤكدة. تُسجَّل هذه المخالفة كسبب الإيقاف.',
+      escalateReasonLabel: 'سبب الإيقاف (يقرأه الشريك)',
+
       /* ── Waiving, and the rule that shapes the whole display ─────────────── */
       waive: 'إلغاء الغرامة',
       waiving: 'جارٍ الإلغاء…',
@@ -2167,6 +2183,7 @@ export const ar = {
     'violation.recorded': 'تسجيل مخالفة',
     'violation.warned': 'إنذار على مخالفة',
     'violation.fined': 'فرض غرامة على مخالفة',
+    'violation.escalated': 'تصعيد مخالفة إلى تعليق الحساب',
     'fine.waived': 'إلغاء غرامة',
     'staff.scope_changed': 'تعديل نطاق موظف',
     'unit.created': 'إنشاء وحدة',

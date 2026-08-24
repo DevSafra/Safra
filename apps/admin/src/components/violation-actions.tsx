@@ -15,9 +15,20 @@ import { apiErrorOf, t } from '@/lib/strings';
  * ## The progression is the model
  *
  * مخالفة ← إنذار ← غرامة ← إيقاف (Bashar, 2026-08-24). A fine is a STAGE a violation reaches, not a
- * separate object, so these are three steps on one record rather than three things to create. Each
+ * separate object, so these are four steps on one record rather than four things to create. Each
  * control appears only where the next step is available: nothing offers a warning on a violation
  * already warned, and nothing offers a fine where one is already attached.
+ *
+ * This docblock described four rungs while the component implemented three — the sentence was
+ * right about the policy and wrong about the file, for as long as `stage = 'suspension'` was a value
+ * nothing could write. إيقاف is the fourth, and it is here rather than only on the partner record
+ * because this is the screen where somebody is looking at the violation they are acting on.
+ *
+ * ## Suspending goes to the PARTNER endpoint, not a violation one
+ *
+ * `partners/:reference/suspend` with this violation's id. `suspended_at` keeps one writer — the
+ * route that also emails the partner and writes the audit row — and this screen supplies the link
+ * rather than a second way to stop a business trading.
  *
  * ## Waiving is a different authority
  *
@@ -33,25 +44,36 @@ import { apiErrorOf, t } from '@/lib/strings';
  */
 export function ViolationActions({
   violation,
+  reference,
   canManage,
   canWaive,
+  canSuspend,
+  partnerSuspended,
 }: {
   violation: Violation;
+  /** The partner this violation is against — suspending is a write on the PARTNER. */
+  reference: string;
   canManage: boolean;
   canWaive: boolean;
+  canSuspend: boolean;
+  /** Already suspended: the API answers `PARTNER_ALREADY_SUSPENDED`, so do not offer it. */
+  partnerSuspended: boolean;
 }) {
   const router = useRouter();
 
-  const [open, setOpen] = useState<'warn' | 'fine' | 'waive' | null>(null);
+  const [open, setOpen] = useState<'warn' | 'fine' | 'waive' | 'escalate' | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
-  async function submit(
-    step: 'warn' | 'fine' | 'waive',
-    body: unknown,
-    success: string,
-  ): Promise<void> {
+  /**
+   * `path` rather than a step name, because the fourth rung is not a violation route.
+   *
+   * Warn, fine and waive are writes on the violation; suspending is a write on the PARTNER that
+   * happens to name a violation. Deriving the URL from the step would have meant a special case
+   * inside the one function every step shares — the place a special case is least visible.
+   */
+  async function submit(path: string, body: unknown, success: string): Promise<void> {
     if (busy) return;
 
     setBusy(true);
@@ -59,14 +81,11 @@ export function ViolationActions({
     setDone(null);
 
     try {
-      const response = await fetch(
-        `/api/violations/${encodeURIComponent(violation.id)}/${step}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        },
-      );
+      const response = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
       if (!response.ok) {
         const payload: unknown = await response.json().catch(() => null);
@@ -87,6 +106,9 @@ export function ViolationActions({
     setBusy(false);
   }
 
+  const violationPath = (step: string): string =>
+    `/api/violations/${encodeURIComponent(violation.id)}/${step}`;
+
   const canWarn = canManage && violation.warnedAt === null;
   const canFine = canManage && violation.fineAmount === null;
   const waivable =
@@ -94,8 +116,18 @@ export function ViolationActions({
     violation.fineAmount !== null &&
     !violation.waiver &&
     !violation.collectedAt;
+  /*
+    Three conditions, and the last is the one worth naming.
 
-  if (!canWarn && !canFine && !waivable) return null;
+    `stage === 'suspension'` means this violation has ALREADY been cited for a suspension — the API
+    treats a repeat as idempotent rather than an error, but offering a control that records nothing
+    new is offering a control that does nothing. `partnerSuspended` is the other half: the API
+    refuses a second suspension outright, and a button whose only outcome is a conflict is worse
+    than no button.
+  */
+  const escalatable = canSuspend && !partnerSuspended && violation.stage !== 'suspension';
+
+  if (!canWarn && !canFine && !waivable && !escalatable) return null;
 
   return (
     <div className="mt-2 grid gap-2">
@@ -128,6 +160,14 @@ export function ViolationActions({
             onClick={() => setOpen(open === 'waive' ? null : 'waive')}
           />
         ) : null}
+        {escalatable ? (
+          <Step
+            label={t.sections.enforcement.escalate}
+            active={open === 'escalate'}
+            onClick={() => setOpen(open === 'escalate' ? null : 'escalate')}
+            danger
+          />
+        ) : null}
       </div>
 
       {open === 'warn' ? (
@@ -137,7 +177,7 @@ export function ViolationActions({
             event.preventDefault();
             const note = text(new FormData(event.currentTarget), 'note').trim();
 
-            void submit('warn', { note }, t.sections.enforcement.warned);
+            void submit(violationPath('warn'), { note }, t.sections.enforcement.warned);
           }}
         >
           <Reason name="note" label={t.sections.enforcement.warnNoteLabel} busy={busy} />
@@ -158,7 +198,7 @@ export function ViolationActions({
             const compensation = text(form, 'customerCompensation').trim();
 
             void submit(
-              'fine',
+              violationPath('fine'),
               {
                 amount: text(form, 'amount').trim(),
                 currencyCode: text(form, 'currencyCode').trim().toUpperCase(),
@@ -240,7 +280,11 @@ export function ViolationActions({
             const reason = text(new FormData(event.currentTarget), 'reason').trim();
 
             /* No amount: a waiver is always the whole fine — see the note above. */
-            void submit('waive', { reason }, t.sections.enforcement.waived);
+            void submit(
+              violationPath('waive'),
+              { reason },
+              t.sections.enforcement.waived,
+            );
           }}
         >
           <Reason
@@ -255,27 +299,82 @@ export function ViolationActions({
           />
         </form>
       ) : null}
+
+      {open === 'escalate' ? (
+        <form
+          className="grid gap-1.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const reason = text(new FormData(event.currentTarget), 'reason').trim();
+
+            /*
+              The PARTNER endpoint, carrying this violation's id — see the note at the top.
+
+              No `notes` field: internal notes belong where somebody is reviewing the partner as a
+              whole, and a second optional box on a control this consequential is one more thing to
+              read past. The record's own form still has it.
+            */
+            void submit(
+              `/api/partners/${encodeURIComponent(reference)}/suspend`,
+              { reason, violationId: violation.id },
+              t.sections.enforcement.escalated,
+            );
+          }}
+        >
+          {/*
+            The consequence, before the field rather than after it.
+
+            This is the one control here that stops a business trading, and it sits on a screen
+            whose other three controls do not. Somebody who has clicked «إنذار» and «غرامة» twice is
+            not reading carefully by the third, so the sentence is above the box they type into.
+          */}
+          <p className="text-[11.5px] leading-relaxed text-bad">
+            {t.sections.enforcement.escalateHint}
+          </p>
+          <Reason
+            name="reason"
+            label={t.sections.enforcement.escalateReasonLabel}
+            busy={busy}
+          />
+          <Submit
+            busy={busy}
+            idle={t.sections.enforcement.escalate}
+            working={t.sections.enforcement.escalating}
+          />
+        </form>
+      ) : null}
     </div>
   );
 }
 
+/**
+ * One rung of the progression.
+ *
+ * `danger` marks the rung that stops a business trading. The other three are reversible or additive
+ * — a warning, a fine, a waiver — and a control with a different consequence should not be the same
+ * colour as the three beside it. Matches the danger tone `PayoutActions` gives cancelling.
+ */
 function Step({
   label,
   active,
   onClick,
+  danger,
 }: {
   label: string;
   active: boolean;
   onClick: () => void;
+  danger?: boolean;
 }) {
+  const tone = danger
+    ? 'border-bad/50 text-bad hover:border-bad hover:text-bad'
+    : 'border-line text-muted hover:border-gold/50 hover:text-gold';
+
   return (
     <button
       type="button"
       onClick={onClick}
       className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-3 py-1.5 text-[11.5px] lg:min-h-0 ${
-        active
-          ? 'border-gold/60 text-gold'
-          : 'border-line text-muted hover:border-gold/50 hover:text-gold'
+        active ? (danger ? 'border-bad text-bad' : 'border-gold/60 text-gold') : tone
       }`}
     >
       {label}

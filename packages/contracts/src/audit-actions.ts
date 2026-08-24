@@ -171,6 +171,8 @@ export const AUDIT_ACTIONS = [
   'violation.recorded',
   'violation.warned',
   'violation.fined',
+  /* The fourth rung. `partner.suspended` says the business stopped; this says which violation. */
+  'violation.escalated',
   'fine.waived',
   'rbac.grant_toggled',
   'setting.updated',

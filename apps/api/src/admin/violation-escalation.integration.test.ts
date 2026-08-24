@@ -1,0 +1,260 @@
+import { sql } from 'drizzle-orm';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { createRollbackDatabase, type Database } from '@safra/db';
+
+import { AuditService } from '../common/audit/audit.service.js';
+import { EnforcementService } from './enforcement.service.js';
+import type { Env } from '../config/env.js';
+import type { FxRateService } from '../fx/fx-rate.service.js';
+import type { LedgerService } from '../ledger/ledger.service.js';
+import type { MailService, OutgoingMail } from '../mail/mail.service.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
+
+/**
+ * The ladder's fourth rung: a suspension that names the violation it answers.
+ *
+ * ## What was wrong, and why no test caught it
+ *
+ * `violation_stage` has run `recorded → warned → fined → suspension` since the enum was written.
+ * Three of those were reachable. `suspension` was accepted by the `violation_stage` enum, listed in
+ * `VIOLATION_STAGES`, parsed by the partner portal's zod schema, and given an Arabic label
+ * («رُفع إلى الإيقاف») — and **no code path could produce it.** Every one of those five places read
+ * as coverage for a state the platform could not enter.
+ *
+ * It is the same defect as a grantable capability with no route behind it (`O-staff-1`), and it
+ * survived for the same reason: everything that mentions it is consistent with everything else that
+ * mentions it. Only asking "what WRITES this" finds it, and nothing was asking.
+ *
+ * ## Why the scope test is the important one
+ *
+ * `violationId` arrives in a request body. The stage write is scoped by `partner_id` in its own
+ * predicate rather than checked afterwards, so a staff member with `PARTNER_SUSPEND` cannot mark
+ * ANOTHER partner's violation as having caused a suspension it had nothing to do with. That would
+ * be a write to an append-only history the platform asks an appeal to trust, on a row the actor was
+ * never authorised for.
+ *
+ * The second test is the one that was watched to fail: with `AND partner_id = …` removed from both
+ * statements in `escalate`, it goes green on the wrong partner's row.
+ */
+const DATABASE_URL = process.env['DATABASE_URL'];
+const describeIfDb = DATABASE_URL ? describe : describe.skip;
+
+const staff: AccessTokenClaims = {
+  sub: '',
+  role: 'super_admin',
+  permissions: [],
+  locale: 'ar',
+};
+
+const REASON = 'إيقاف بعد ثلاث مخالفات متكررة في تحديث التقويم خلال شهر واحد';
+
+describeIfDb('suspending a partner because of a violation', () => {
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+
+  let db: Database;
+  let enforcement: EnforcementService;
+  let sent: OutgoingMail[];
+  let run = 0;
+
+  /** A partner of its own, so nothing here depends on what the seed happens to contain. */
+  async function makePartner(tag: string): Promise<{ id: string; reference: string }> {
+    const email = `esc-${process.pid}-${run}-${tag}@safra.test`;
+    const made = await db.execute<{ id: string; reference: string }>(sql`
+      WITH ref AS (
+        SELECT (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1) AS city_id,
+               (SELECT id FROM partner_types LIMIT 1) AS type_id
+      ), u AS (
+        INSERT INTO users (email, phone, role, status, preferred_locale)
+        VALUES (${email}, '+963900000000', 'partner', 'active', 'ar')
+        RETURNING id
+      )
+      INSERT INTO partners (user_id, partner_type_id, legal_name, display_name, city_id,
+                            address, phone, email, verification)
+      SELECT u.id, ref.type_id, 'Esc', 'تصعيد', ref.city_id, 'x', '+963900000000',
+             ${email}, 'approved'
+      FROM u, ref
+      RETURNING id, reference
+    `);
+
+    const row = made.rows[0];
+
+    if (!row) throw new Error('fixture partner was not created');
+
+    return row;
+  }
+
+  async function makeViolation(partnerId: string, stage = 'fined'): Promise<string> {
+    const made = await db.execute<{ id: string }>(sql`
+      INSERT INTO partner_violations (partner_id, kind, occurrence_number, stage, score_penalty)
+      VALUES (${partnerId}::uuid, 'stale_calendar', 1, ${stage}::violation_stage, 0)
+      RETURNING id
+    `);
+
+    const row = made.rows[0];
+
+    if (!row) throw new Error('fixture violation was not created');
+
+    return row.id;
+  }
+
+  const stageOf = async (violationId: string): Promise<string> => {
+    const row = await db.execute<{ stage: string }>(sql`
+      SELECT stage::text AS stage FROM partner_violations WHERE id = ${violationId}::uuid
+    `);
+
+    return row.rows[0]?.stage ?? '';
+  };
+
+  const escalationRows = async (partnerId: string): Promise<number> => {
+    const row = await db.execute<{ n: number }>(sql`
+      SELECT count(*)::int AS n FROM audit_log
+      WHERE action = 'violation.escalated' AND subject_id = ${partnerId}::uuid
+    `);
+
+    return row.rows[0]?.n ?? 0;
+  };
+
+  beforeEach(async () => {
+    await harness.begin();
+    db = harness.db;
+    run += 1;
+    sent = [];
+
+    /* A real staff row, so `waived_by_user_id` and `actor_user_id` have something to point at. */
+    const actor = await db.execute<{ id: string }>(sql`
+      INSERT INTO users (email, phone, role, status, preferred_locale)
+      VALUES (${`esc-staff-${process.pid}-${run}@safra.test`}, '+963900000001',
+              'super_admin', 'active', 'ar')
+      RETURNING id
+    `);
+
+    staff.sub = actor.rows[0]?.id ?? '';
+
+    enforcement = new EnforcementService(
+      db,
+      { PARTNER_URL: 'https://partner.safra.test' } as unknown as Env,
+      new AuditService(db),
+      /* Waiving is not exercised here, so the ledger and fx are never called. */
+      {} as unknown as LedgerService,
+      {} as unknown as FxRateService,
+      {
+        send: (mail: OutgoingMail) => Promise.resolve(void sent.push(mail)),
+      } as unknown as MailService,
+    );
+  });
+
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
+  afterAll(async () => {
+    await harness.close();
+  });
+
+  it('takes the cited violation to the suspension stage', async () => {
+    const partner = await makePartner('a');
+    const violationId = await makeViolation(partner.id);
+
+    await enforcement.suspend(staff, partner.reference, { reason: REASON, violationId });
+
+    expect(await stageOf(violationId)).toBe('suspension');
+    expect(await escalationRows(partner.id)).toBe(1);
+  });
+
+  /**
+   * The security assertion, and the one with an opposite control below it.
+   *
+   * A violation belonging to somebody else must be unreachable rather than merely unmodified —
+   * "not yours" answering the same as "not there". The refusal is `VIOLATION_NOT_FOUND`, which is
+   * also what a made-up uuid gets, so the response cannot be used to discover whether a violation
+   * exists on a partner the actor is not acting on.
+   */
+  it('refuses a violation that belongs to another partner, and changes nothing', async () => {
+    const target = await makePartner('target');
+    const bystander = await makePartner('bystander');
+    const theirViolation = await makeViolation(bystander.id);
+
+    await expect(
+      enforcement.suspend(staff, target.reference, {
+        reason: REASON,
+        violationId: theirViolation,
+      }),
+      /* Nest wraps it: the code lives on `response`, which is the body the client receives. */
+    ).rejects.toMatchObject({ response: { code: 'violation.not_found' } });
+
+    /* The bystander's row is untouched… */
+    expect(await stageOf(theirViolation)).toBe('fined');
+    expect(await escalationRows(bystander.id)).toBe(0);
+
+    /* …and the whole suspension rolled back with it, rather than half-applying. */
+    const suspended = await db.execute<{ n: number }>(sql`
+      SELECT count(*)::int AS n FROM partners
+      WHERE id = ${target.id}::uuid AND suspended_at IS NOT NULL
+    `);
+
+    expect(suspended.rows[0]?.n).toBe(0);
+  });
+
+  /**
+   * The opposite control the rule above demands.
+   *
+   * Without this, deleting the `violationId` handling entirely would satisfy the refusal test
+   * perfectly — nothing would ever escalate, so nothing could escalate wrongly. This is what
+   * distinguishes "withheld from the wrong partner" from "not implemented".
+   */
+  it('accepts the SAME violation when it is the suspended partner’s own', async () => {
+    const partner = await makePartner('own');
+    const violationId = await makeViolation(partner.id);
+
+    await enforcement.suspend(staff, partner.reference, { reason: REASON, violationId });
+
+    expect(await stageOf(violationId)).toBe('suspension');
+  });
+
+  /** Suspending with no violation cited leaves the ladder alone — the linkage is opt-in. */
+  it('does not touch any violation when none is cited', async () => {
+    const partner = await makePartner('plain');
+    const violationId = await makeViolation(partner.id);
+
+    await enforcement.suspend(staff, partner.reference, { reason: REASON });
+
+    expect(await stageOf(violationId)).toBe('fined');
+    expect(await escalationRows(partner.id)).toBe(0);
+  });
+
+  /**
+   * Re-citing a violation already at `suspension` is idempotent, not an error.
+   *
+   * `stage` is forward-only and `suspension` is terminal, so this is reachable in the ordinary way:
+   * escalate, lift the suspension, then cite the same violation again. Refusing would block a
+   * legitimate suspension over a linkage that is already recorded — and writing a second audit row
+   * would claim a transition that did not happen.
+   */
+  it('re-citing an already escalated violation suspends without a second audit row', async () => {
+    const partner = await makePartner('again');
+    const violationId = await makeViolation(partner.id, 'suspension');
+
+    await enforcement.suspend(staff, partner.reference, { reason: REASON, violationId });
+
+    expect(await stageOf(violationId)).toBe('suspension');
+    expect(await escalationRows(partner.id)).toBe(0);
+
+    const suspended = await db.execute<{ n: number }>(sql`
+      SELECT count(*)::int AS n FROM partners
+      WHERE id = ${partner.id}::uuid AND suspended_at IS NOT NULL
+    `);
+
+    expect(suspended.rows[0]?.n).toBe(1);
+  });
+
+  /** The partner still hears about it — the notice is not a casualty of the extra work. */
+  it('still emails the partner when a violation is cited', async () => {
+    const partner = await makePartner('mail');
+    const violationId = await makeViolation(partner.id);
+
+    await enforcement.suspend(staff, partner.reference, { reason: REASON, violationId });
+
+    expect(sent).toHaveLength(1);
+  });
+});

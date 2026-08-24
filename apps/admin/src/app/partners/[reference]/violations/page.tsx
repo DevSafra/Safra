@@ -96,6 +96,33 @@ export default async function PartnerViolationsPage({
 
   const canManage = permissions.includes('violation.manage');
   const canWaive = permissions.includes('violation.waive');
+  /*
+    A THIRD authority, and it is not `violation.manage`.
+
+    Suspending is `partner.suspend` — recording an offence and stopping a business trading are
+    different powers, exactly as forgiving money is. Reading it separately means the escalation
+    control is offered to the readers the API will actually allow, rather than to everyone who may
+    file a violation.
+  */
+  const canSuspend = permissions.includes('partner.suspend');
+  /*
+    Already suspended, read from the record this screen already fetched.
+
+    The API answers a second suspension with `PARTNER_ALREADY_SUSPENDED`, so the control is hidden
+    rather than offered-and-refused. A failed read defaults to TRUE — hiding the control — because
+    the safe direction for a control this consequential is absent, not present.
+  */
+  const partnerSuspended =
+    partner === 'failed' || partner === 'unauthenticated'
+      ? true
+      : /*
+          `?? null` before the comparison, because the field is `.nullable().optional()`.
+
+          `partner.suspension !== null` reads TRUE for `undefined`, so a payload that omitted the
+          key entirely would mark every trading partner as suspended and hide the control forever.
+          The record's own screen already normalises it the same way (`page.tsx:280`).
+        */
+        (partner.suspension ?? null) !== null;
 
   return (
     <ConsoleShell
@@ -132,8 +159,11 @@ export default async function PartnerViolationsPage({
                   >
                     <Row
                       violation={violation}
+                      reference={reference}
                       canManage={canManage}
                       canWaive={canWaive}
+                      canSuspend={canSuspend}
+                      partnerSuspended={partnerSuspended}
                     />
                   </li>
                 ))}
@@ -170,12 +200,18 @@ export default async function PartnerViolationsPage({
 
 function Row({
   violation,
+  reference,
   canManage,
   canWaive,
+  canSuspend,
+  partnerSuspended,
 }: {
   violation: Violation;
+  reference: string;
   canManage: boolean;
   canWaive: boolean;
+  canSuspend: boolean;
+  partnerSuspended: boolean;
 }) {
   return (
     <>
@@ -209,7 +245,14 @@ function Row({
         <Money violation={violation} />
       ) : null}
 
-      <ViolationActions violation={violation} canManage={canManage} canWaive={canWaive} />
+      <ViolationActions
+        violation={violation}
+        reference={reference}
+        canManage={canManage}
+        canWaive={canWaive}
+        canSuspend={canSuspend}
+        partnerSuspended={partnerSuspended}
+      />
     </>
   );
 }
