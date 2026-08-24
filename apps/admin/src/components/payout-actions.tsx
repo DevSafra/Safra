@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { t } from '@/lib/strings';
+import { apiErrorOf, t } from '@/lib/strings';
 
 type Action = 'close' | 'release' | 'paid' | 'hold' | 'lift-hold' | 'cancel';
 
@@ -51,7 +51,25 @@ export function PayoutActions({
       });
 
       if (!response.ok) {
-        setError(t.sections.payouts.failed);
+        /*
+          The REASON, not «تعذّر تنفيذ الإجراء».
+
+          This branch read `payouts.failed` for every refusal, and the six controls above can be
+          refused eleven distinct ways — the payout is not releasable, its net is zero, it is frozen
+          by an open dispute, it is frozen because the PARTNER IS SUSPENDED, the partner is not
+          sanctions-screened, it is already paid, already final, not held, not scheduled, not
+          accruing, or gone. `proxy` has always forwarded the API's `code`; this component was
+          throwing it away, so eleven precise sentences that exist in three languages arrived as one
+          vague one and the operator's only move was to guess or to ask an engineer.
+
+          `PAYOUT_FROZEN_BY_SUSPENSION` is the sharpest case and the reason this changed now: it is
+          thrown ONLY behind this release control, so before this line it was an error code no human
+          could ever read — the enforcement policy's payout freeze had no surface at all.
+
+          `apiErrorOf` rather than `apiError`: it reads `code` and falls back to `message`, which is
+          what the BFF route above sends when it refuses a malformed body before the API is called.
+        */
+        setError(apiErrorOf(await response.json().catch(() => null)));
         setBusy(false);
         return;
       }

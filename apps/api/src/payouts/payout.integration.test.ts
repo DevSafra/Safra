@@ -235,6 +235,103 @@ describeIfDb('PayoutService', () => {
     await db.execute(sql`DELETE FROM disputes WHERE title = 'Payout freeze test'`);
   });
 
+  /**
+   * A SUSPENDED partner's payout will not release (Bashar, 2026-08-24).
+   *
+   * ## Why this had no test until now
+   *
+   * The freeze was written, reviewed and reported as part of the suspension policy, and the code is
+   * correct — but nothing exercised it, so "payouts freeze while a suspension is active" rested
+   * entirely on reading `payout.service.ts`. It is one of the three clauses
+   * `suspension-enforcement.integration.test.ts` explicitly names as enforced in a QUERY rather
+   * than by a decorator, and therefore as somebody else's assertion to write. This is that
+   * assertion.
+   *
+   * ## Suspended AFTER accrual, deliberately
+   *
+   * That is the ordinary case rather than the edge one: a payout accrues over a period and a
+   * suspension happens on a day, so the realistic sequence is exactly this one. A test that
+   * suspended first would pass against a check placed at accrual and prove nothing about release,
+   * which is the last moment anybody looks.
+   */
+  it('refuses to release a suspended partner’s payout', async () => {
+    if (bookingIds.length === 0) return;
+
+    await service.accrue();
+
+    const found = await db.execute<{ id: string }>(sql`
+      SELECT id FROM partner_payouts WHERE partner_id = ${partnerId} AND status = 'accruing'
+    `);
+    const payout = found.rows[0];
+
+    if (!payout) return;
+
+    await service.close(payout.id, finance);
+
+    await db.execute(sql`
+      UPDATE partners SET suspended_at = now(), suspended_reason = 'freeze test'
+      WHERE id = ${partnerId}
+    `);
+
+    /*
+      Asserted on the CODE, not on the message.
+
+      `refusal()` above unwraps a DATABASE error, whose text IS the assertion. A service refusal is
+      an `HttpException` carrying `{ statusCode, code, message }`, and its `message` is English prose
+      kept for logs — the project rule is that nothing displays it and, by the same argument,
+      nothing asserts on it. `code` is the contract the console resolves into Arabic, so a reworded
+      sentence must not fail this test and a changed code must.
+    */
+    await expect(
+      service.release(payout.id, { scheduledFor: '2026-08-20' }, finance),
+    ).rejects.toMatchObject({ response: { code: 'payout.frozen_by_suspension' } });
+
+    /* Still held, not half-transitioned. */
+    const after = await db.execute<{ status: string }>(
+      sql`SELECT status::text AS status FROM partner_payouts WHERE id = ${payout.id}`,
+    );
+
+    expect(after.rows[0]?.status).toBe('pending_release');
+  });
+
+  /**
+   * The opposite control, and without it the test above proves nothing.
+   *
+   * "Release refused" is indistinguishable from "release is broken" unless the same payout, at the
+   * same stage, releases when the partner is NOT suspended. Deleting the suspension check would
+   * fail this pair; so would breaking release for everyone.
+   */
+  it('releases the same payout once the suspension is lifted', async () => {
+    if (bookingIds.length === 0) return;
+
+    await service.accrue();
+
+    const found = await db.execute<{ id: string }>(sql`
+      SELECT id FROM partner_payouts WHERE partner_id = ${partnerId} AND status = 'accruing'
+    `);
+    const payout = found.rows[0];
+
+    if (!payout) return;
+
+    await service.close(payout.id, finance);
+
+    await db.execute(sql`
+      UPDATE partners SET suspended_at = now(), suspended_reason = 'freeze test'
+      WHERE id = ${partnerId}
+    `);
+    await db.execute(
+      sql`UPDATE partners SET suspended_at = NULL, suspended_reason = NULL WHERE id = ${partnerId}`,
+    );
+
+    await service.release(payout.id, { scheduledFor: '2026-08-20' }, finance);
+
+    const after = await db.execute<{ status: string }>(
+      sql`SELECT status::text AS status FROM partner_payouts WHERE id = ${payout.id}`,
+    );
+
+    expect(after.rows[0]?.status).toBe('scheduled');
+  });
+
   it('walks the lifecycle and posts exactly one balanced movement on payment', async () => {
     if (bookingIds.length === 0) return;
 
