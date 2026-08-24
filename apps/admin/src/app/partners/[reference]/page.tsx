@@ -11,6 +11,7 @@ import { DEFAULT_SANCTIONS_POLICY } from '@safra/contracts';
 import { PartnerContractPanel } from '@/components/partner-contract-panel';
 import { VerifyPartner } from '@/components/verify-partner';
 import { PartnerTwoFactor } from '@/components/partner-two-factor';
+import { PartnerSuspension } from '@/components/partner-suspension';
 import { BackLink, type BackTarget } from '@/components/back-link';
 import { backTarget } from '@/lib/search-params';
 import { fill, label, t } from '@/lib/strings';
@@ -227,6 +228,32 @@ export default async function PartnerPage({
             }
           />
         )}
+      </Section>
+
+      {/* ── الإيقاف والمخالفات (Bashar, 2026-08-24) ───────────────────────── */}
+      <Section title={t.sections.enforcement.suspend}>
+        {/*
+          The banner renders here whether or not the partner is suspended — when they are, it is the
+          first thing worth reading on this record, because somebody opening a suspended partner is
+          usually deciding whether to lift it.
+        */}
+        <PartnerSuspension
+          reference={partner.reference}
+          suspension={partner.suspension ?? null}
+        />
+
+        {/*
+          The violations LIST is its own paged screen, not a panel here.
+
+          A partner with forty violations after two years is ordinary, and an unpaged list on a
+          record is the failure «Tables and pagination» exists to prevent. This is the link to it.
+        */}
+        <a
+          href={`/partners/${partner.reference}/violations`}
+          className="mt-3 inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-line px-4 py-2 text-[12.5px] text-muted hover:border-gold/50 hover:text-gold lg:min-h-0"
+        >
+          {t.sections.enforcement.openViolations}
+        </a>
       </Section>
 
       {/* ── Their sign-in security (O-partner-4) ──────────────────────────── */}
