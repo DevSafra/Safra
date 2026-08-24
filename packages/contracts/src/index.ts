@@ -15,6 +15,7 @@ export * from './partner-application.js';
 export * from './partner-contract.js';
 export * from './partner-employee.js';
 export * from './staff-role.js';
+export * from './sections.js';
 export * from './partner-onboarding.js';
 export * from './payout.js';
 export * from './permissions.js';

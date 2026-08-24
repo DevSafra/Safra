@@ -9,7 +9,9 @@ import {
   hasTwoFactor,
   needsRefresh,
   readClaim,
+  readStringArrayClaim,
   sessionCookieOptions,
+  sessionPermissions,
   sessionFrom,
   type Session,
 } from './session.js';
@@ -242,5 +244,68 @@ describe('readClaim', () => {
     expect(readClaim('not-a-jwt', 'sub')).toBeNull();
     expect(readClaim('a.!!!not-base64!!!.c', 'sub')).toBeNull();
     expect(readClaim('', 'sub')).toBeNull();
+  });
+});
+
+/**
+ * The reader's own capabilities, for deciding what a nav OFFERS.
+ *
+ * Every case here is about the answer when the claim is NOT a clean list of strings. Both apps
+ * gate their navigation on this, so a malformed claim that yielded something truthy would draw a
+ * nav from a value nobody vouched for.
+ */
+describe('sessionPermissions', () => {
+  function tokenWith(payload: Record<string, unknown>): string {
+    const encoded = Buffer.from(JSON.stringify(payload), 'utf8')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    return `header.${encoded}.signature`;
+  }
+
+  it('reads the list the API signed', () => {
+    const token = tokenWith({ permissions: ['booking.read_all', 'staff.manage'] });
+
+    expect(sessionPermissions(session({ accessToken: token }))).toEqual([
+      'booking.read_all',
+      'staff.manage',
+    ]);
+  });
+
+  /**
+   * Absent means EMPTY, which downstream means "opens nothing".
+   *
+   * The safe direction for a value that decides what a nav shows: a token minted before this claim
+   * existed draws a nav with nothing in it, which somebody reports. The opposite default draws
+   * every link for everybody, which nobody reports because it looks correct.
+   */
+  it('is empty when the claim is absent, and for a malformed token', () => {
+    expect(
+      sessionPermissions(session({ accessToken: tokenWith({ sub: 'u1' }) })),
+    ).toEqual([]);
+    expect(sessionPermissions(session({ accessToken: 'not-a-jwt' }))).toEqual([]);
+  });
+
+  it('is empty for a claim that is not a list at all', () => {
+    for (const value of ['booking.read_all', 42, { 0: 'booking.read_all' }, null]) {
+      expect(
+        sessionPermissions(session({ accessToken: tokenWith({ permissions: value }) })),
+        JSON.stringify(value),
+      ).toEqual([]);
+    }
+  });
+
+  /** A mixed list keeps the strings and DROPS the rest, rather than passing `7` on to `.includes`. */
+  it('drops non-string entries from a mixed list', () => {
+    const token = tokenWith({
+      permissions: ['booking.read_all', 7, null, 'staff.manage'],
+    });
+
+    expect(readStringArrayClaim(token, 'permissions')).toEqual([
+      'booking.read_all',
+      'staff.manage',
+    ]);
   });
 });

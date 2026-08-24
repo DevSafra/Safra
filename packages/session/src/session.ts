@@ -138,16 +138,20 @@ export const STAFF_SESSION_COOKIE = 'safra_admin_session';
 export const PARTNER_SESSION_COOKIE = 'safra_partner_session';
 
 /**
- * Pulls one claim out of a JWT payload WITHOUT verifying the signature.
+ * A JWT's payload, decoded and NOT verified.
  *
  * Verification is deliberately absent: a web app holds no signing key and has no
  * business making authorization decisions. The API verifies on every request. A
- * forged token here buys nothing but a misleading UI in the forger's own browser.
+ * forged token here buys nothing but a misleading UI in the forger's own browser —
+ * the nav would offer a link, and the API would refuse the request behind it.
  *
  * Decoded with `atob` rather than `Buffer` so this stays safe to reference from the
  * Edge runtime as well as from Node.
+ *
+ * One decoder rather than one per claim TYPE: the base64url fix-up below is three
+ * lines that have to agree, and three copies of it agreed only by luck.
  */
-export function readClaim(jwt: string, claim: string): string | null {
+function payloadOf(jwt: string): Record<string, unknown> | null {
   const payload = jwt.split('.')[1];
   if (!payload) return null;
 
@@ -160,30 +164,54 @@ export function readClaim(jwt: string, claim: string): string | null {
 
     if (typeof decoded !== 'object' || decoded === null) return null;
 
-    const value = (decoded as Record<string, unknown>)[claim];
-    return typeof value === 'string' ? value : null;
+    return decoded as Record<string, unknown>;
   } catch {
     return null;
   }
 }
 
+/** One string claim, or null when it is absent or is not a string. */
+export function readClaim(jwt: string, claim: string): string | null {
+  const value = payloadOf(jwt)?.[claim];
+
+  return typeof value === 'string' ? value : null;
+}
+
 /** As `readClaim`, for a boolean. Anything that is not literally `true` is false. */
 export function readBooleanClaim(jwt: string, claim: string): boolean {
-  const payload = jwt.split('.')[1];
-  if (!payload) return false;
+  return payloadOf(jwt)?.[claim] === true;
+}
 
-  try {
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+/**
+ * As `readClaim`, for a list of strings — and NON-strings are dropped rather than kept.
+ *
+ * A claim is attacker-supplied as far as this file is concerned, so `['a', 7, null]`
+ * must not become a list a caller can `.includes()` against and get a surprise from.
+ * An absent or malformed claim is the EMPTY list, which for permissions means "may
+ * open nothing" — the safe direction for a value that decides what a nav shows.
+ */
+export function readStringArrayClaim(jwt: string, claim: string): string[] {
+  const value = payloadOf(jwt)?.[claim];
 
-    const decoded: unknown = JSON.parse(atob(padded));
+  if (!Array.isArray(value)) return [];
 
-    if (typeof decoded !== 'object' || decoded === null) return false;
+  return value.filter((entry): entry is string => typeof entry === 'string');
+}
 
-    return (decoded as Record<string, unknown>)[claim] === true;
-  } catch {
-    return false;
-  }
+/**
+ * What this reader may do, for deciding what a nav OFFERS.
+ *
+ * Read from the token the API signed rather than fetched, because every rendered page
+ * needs it and an extra round-trip per render to learn what to draw is a cost paid on
+ * the hot path for a value already in hand. Pair it with `canOpenSection` /`has` from
+ * `@safra/contracts`.
+ *
+ * **This is a display decision and never an authorization one.** The API answers the
+ * same question again, per request and per resource, against a VERIFIED token — see
+ * `payloadOf` on why an unverified read is sound here and would not be there.
+ */
+export function sessionPermissions(session: Session): string[] {
+  return readStringArrayClaim(session.accessToken, 'permissions');
 }
 
 /**
