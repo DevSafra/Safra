@@ -1028,6 +1028,114 @@ export const ar = {
         'القدرات الممنوحة لدورك لا تفتح أي شاشة في مركز القيادة حتى الآن. اطلب من المدير العام تعديل الدور.',
     },
 
+    /*
+      الإيقاف والمخالفات — enforcement against a partner (Bashar, 2026-08-24).
+
+      His rules, and every one of them shapes a word below:
+
+      - Suspension stops NEW trade. Confirmed bookings continue and existing guests are not
+        disrupted, so the copy says what is blocked rather than «موقوف» alone — an operator reading
+        this record is usually deciding whether to lift it, and «the business is stopped» would be
+        false.
+      - The partner may still sign in and read this. So the REASON is written for them, not about
+        them, and the staff-only notes are a separate field that never leaves the console.
+      - A violation progresses: مخالفة ← إنذار ← غرامة ← إيقاف. A fine is a STAGE a violation
+        reaches, not a separate object.
+      - Never delete history. A waived fine keeps both entries and nets to zero; «—» is forbidden.
+      - A violation must NOT affect ranking, so nothing here mentions التقييم.
+    */
+    enforcement: {
+      /* ── The suspension banner on the partner record ─────────────────────── */
+      suspendedTitle: 'هذا الشريك موقوف',
+      /*
+        What suspension DOES, in the four clauses Bashar specified, on the screen where somebody
+        decides whether to lift it. Without this the reader has to remember the policy.
+      */
+      suspendedEffect:
+        'إعلاناته مخفية من البحث ولا تُقبل حجوزات جديدة، ومستحقاته مجمّدة. الحجوزات المؤكدة تستمر كالمعتاد ولا يُمسّ نزلاؤه الحاليون. يستطيع الدخول إلى حسابه وقراءة سبب الإيقاف.',
+      suspendedSince: 'منذ {when}',
+      suspendedBy: 'بقرار من {who}',
+      suspendedReason: 'السبب',
+      /* Staff-only. The API omits it from the partner's own payload — see the component. */
+      suspendedNotes: 'ملاحظات داخلية',
+      suspendedNotesHint: 'لا تظهر للشريك',
+
+      /* ── Suspending and lifting ──────────────────────────────────────────── */
+      suspend: 'إيقاف الشريك',
+      unsuspend: 'رفع الإيقاف',
+      suspendReasonLabel: 'سبب الإيقاف (يقرأه الشريك)',
+      unsuspendReasonLabel: 'سبب رفع الإيقاف',
+      notesLabel: 'ملاحظات داخلية (اختياري)',
+      /*
+        The API refuses under twenty characters, so the form says so before the refusal.
+
+        Not a quality bar: a bar against «مخالفة» arriving at a real business owner as the entire
+        explanation for why they cannot trade.
+      */
+      reasonHint: 'عشرون حرفًا على الأقل — يقرأه صاحب العمل.',
+      suspending: 'جارٍ الإيقاف…',
+      unsuspending: 'جارٍ رفع الإيقاف…',
+      suspended: 'أُوقف الشريك وأُبلغ بالسبب.',
+      unsuspended: 'رُفع الإيقاف وأُبلغ الشريك.',
+
+      /* ── Violations ──────────────────────────────────────────────────────── */
+      violations: 'المخالفات',
+      violationsOf: 'مخالفات {partner}',
+      openViolations: 'عرض المخالفات',
+      /*
+        Paged on its own screen, not embedded in the record.
+
+        A partner with forty violations after two years is ordinary, and an unpaged list on a record
+        is the failure «Tables and pagination» exists to prevent.
+      */
+      noViolations: 'لا مخالفات مسجّلة على هذا الشريك.',
+      colKind: 'النوع',
+      colStage: 'المرحلة',
+      colOccurrence: 'التكرار',
+      colBooking: 'الحجز',
+      colFine: 'الغرامة',
+      colRaised: 'سُجّلت',
+      occurrenceNumber: 'التكرار رقم {n}',
+
+      raise: 'تسجيل مخالفة',
+      raising: 'جارٍ التسجيل…',
+      raised: 'سُجّلت المخالفة.',
+      kindLabel: 'نوع المخالفة',
+      violationReasonLabel: 'الوصف (يقرأه الشريك)',
+      bookingLabel: 'مرجع الحجز (اختياري)',
+
+      warn: 'إصدار إنذار',
+      warning: 'جارٍ الإصدار…',
+      warned: 'صدر الإنذار وأُبلغ الشريك.',
+      warnNoteLabel: 'نص الإنذار',
+
+      fine: 'فرض غرامة',
+      fining: 'جارٍ الفرض…',
+      fined: 'فُرضت الغرامة وأُبلغ الشريك.',
+      fineAmountLabel: 'المبلغ',
+      fineCurrencyLabel: 'العملة',
+      compensationLabel: 'تعويض العميل (اختياري)',
+
+      /* ── Waiving, and the rule that shapes the whole display ─────────────── */
+      waive: 'إلغاء الغرامة',
+      waiving: 'جارٍ الإلغاء…',
+      waived: 'أُلغيت الغرامة وأُبلغ الشريك.',
+      waiveReasonLabel: 'سبب الإلغاء (يقرأه الشريك)',
+      /*
+        BOTH entries, netting to zero — never «—» and never the net alone.
+
+        Bashar: never delete or rewrite history. A screen showing only the net has deleted the
+        record one layer above the ledger, which is the same act the ledger refuses to perform.
+      */
+      waivedMark: 'أُلغيت',
+      waivedOn: 'أُلغيت في {when}',
+      waivedBy: 'بقرار من {who}',
+      waivedNet: 'الصافي',
+      fineOriginal: 'الغرامة الأصلية',
+      fineWaiver: 'قيد الإلغاء',
+      collectedOn: 'حُصّلت في {when}',
+    },
+
     staff: {
       searchPlaceholder: 'بحث بالاسم أو البريد أو الدور…',
       /** Names the list for a screen reader, and gives the paging test a stable hook. */
@@ -2046,6 +2154,12 @@ export const ar = {
     'staff.invitation_resent': 'إعادة إرسال دعوة موظف',
     'staff.reinstated': 'إعادة تنشيط موظف',
     'staff.renamed': 'تغيير اسم موظف',
+    'partner.suspended': 'تعليق حساب شريك',
+    'partner.unsuspended': 'رفع التعليق عن شريك',
+    'violation.recorded': 'تسجيل مخالفة',
+    'violation.warned': 'إنذار على مخالفة',
+    'violation.fined': 'فرض غرامة على مخالفة',
+    'fine.waived': 'إلغاء غرامة',
     'staff.scope_changed': 'تعديل نطاق موظف',
     'unit.created': 'إنشاء وحدة',
     'unit.updated': 'تعديل وحدة',
@@ -2259,6 +2373,13 @@ export const ar = {
       */
       staffRoleId: 'الدور',
       /*
+        Written by the enforcement actions (2026-08-24). Added as a SET rather than one at a time,
+        for the reason the note on `payloadValue` gives — and found by the catalogue test against the
+        real `audit_log` rather than by reading the code that writes them.
+      */
+      stage: 'المرحلة',
+      suspended: 'التعليق',
+      /*
         Generic enough to be shared, and both arrive from `partner_employee_role.*`: a role's audit
         row carries its name and its capability set on both sides of an edit, which is what makes
         "what changed" answerable later.
@@ -2332,6 +2453,19 @@ export const ar = {
       outside: 'خارج النطاق',
       cityCount: 'عدد المدن',
       citySlugs: 'المدن',
+      /*
+        The enforcement payloads — written by `fine` and `waive` (2026-08-24).
+
+        Found by `audit-catalogue.integration.test.ts` against the real `audit_log` the moment the
+        flow was actually DRIVEN, not by reading the code that writes them. Three keys nobody had
+        thought of, in a payload written by an endpoint that had been green for an hour: the rows do
+        not exist until somebody exercises the path, and until they exist the check has nothing to
+        fail on. That is the same reason the subject map was five types short.
+      */
+      fineAmount: 'مبلغ الغرامة',
+      /* The ledger group the balancing pair was posted under — the handle on the money movement. */
+      ledgerGroupId: 'مجموعة القيد',
+      waived: 'أُلغيت',
       source: 'المصدر',
       format: 'الصيغة',
       direction: 'الاتجاه',
@@ -2433,6 +2567,14 @@ export const ar = {
      */
     payloadValue: {
       'EC-001': 'أُغلقت صفحة الدفع قبل إتمامه، فانتهت مهلة الحجز وأُعيدت التواريخ',
+
+      /*
+        A violation KIND, reaching a payload because `violation.recorded` records which offence.
+        The same words as `violationKind` above and deliberately duplicated rather than referenced:
+        this catalogue is looked up by VALUE across every payload in the log, and pointing it at
+        another map would mean a reader of either could not tell what the other one covers.
+      */
+      stale_calendar: 'تقويم غير محدَّث',
 
       /*
         The sanctions list a screening was run against. `local_fixture` is here for the same reason
@@ -2566,6 +2708,25 @@ export const ar = {
       stale_calendar: 'تقويم غير محدَّث',
       inaccurate_listing: 'وصف غير مطابق',
       no_show: 'عدم استقبال',
+    } as Record<string, string>,
+
+    /*
+      How far a violation has been TAKEN — `VIOLATION_STAGES`, forward only.
+
+      «سُجّلت» and «صدر إنذار» are deliberately different words for different facts: recorded means
+      it happened, warned means somebody TOLD the partner, and an appeal turns on the second. A
+      screen that collapsed them would let an operator believe a partner had been warned when
+      nobody had written to them.
+
+      «رُفع إلى الإيقاف» rather than «موقوف»: the stage records that the violation reached the point
+      of recommending suspension, which is not the same as the partner currently being suspended —
+      that is `suspension` on the partner record, and it can be lifted while this stage stands.
+    */
+    violationStage: {
+      recorded: 'سُجّلت',
+      warned: 'صدر إنذار',
+      fined: 'غرامة',
+      suspension: 'رُفع إلى الإيقاف',
     } as Record<string, string>,
 
     walletReason: {
