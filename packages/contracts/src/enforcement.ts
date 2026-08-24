@@ -142,11 +142,38 @@ export type ViolationRaiseInput = z.infer<typeof violationRaiseSchema>;
 export const violationWarnSchema = z.object({ note: publicReason }).strict();
 export type ViolationWarnInput = z.infer<typeof violationWarnSchema>;
 
+/**
+ * The currencies a fine may be levied in (Bashar, 2026-08-24): US dollar, euro, Syrian pound.
+ *
+ * ## Why this is in the CONTRACT and not a list in the form
+ *
+ * A menu that offers three while the endpoint accepts any three-letter code is a restriction in
+ * appearance only — the next caller to post `JOD` succeeds, and the rule turns out to have been a
+ * decoration on one screen. So the schema is the narrow thing and the form reads the same constant:
+ * one list, enforced on the server, and the select cannot drift from what the API will take.
+ *
+ * `currencies` holds five rows (JOD and LBP as well), and this is deliberately narrower than the
+ * table. The table says what the platform can PRICE in; this says what SAFRA is willing to FINE in,
+ * which is a policy about its own enforcement rather than a fact about the market. Widening it is
+ * one line here.
+ *
+ * Safe against the existing record: all 7,636 fines levied to date are USD.
+ */
+export const FINE_CURRENCIES = ['USD', 'EUR', 'SYP'] as const;
+export type FineCurrency = (typeof FINE_CURRENCIES)[number];
+
 /** Attaching a fine. Optional in the progression, so it is its own step rather than a field. */
 export const violationFineSchema = z
   .object({
     amount: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/, ERROR.VALIDATION_REQUIRED),
-    currencyCode: z.string().trim().length(3),
+    /*
+      A coded message, like every other refusal here.
+
+      Without one, zod's default reaches the client as the `code` — "Invalid option: expected one of
+      …" — and `errorMessage` rejects prose, so a crafted request would be answered «حدث خطأ ما»
+      instead of something the reader can act on. Same shape as `giftCardSchema.amount`.
+    */
+    currencyCode: z.enum(FINE_CURRENCIES, { message: ERROR.VALIDATION_REQUIRED }),
     reason: publicReason,
     /**
      * How much of the fine is credited to the CUSTOMER rather than retained (§6.4).

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { Violation } from '@/lib/api';
-import { ENFORCEMENT_REASON_MIN } from '@safra/contracts';
+import { ENFORCEMENT_REASON_MIN, FINE_CURRENCIES } from '@safra/contracts';
 
 import { text } from '@/lib/form';
 import { apiErrorOf, t } from '@/lib/strings';
@@ -201,7 +201,8 @@ export function ViolationActions({
               violationPath('fine'),
               {
                 amount: text(form, 'amount').trim(),
-                currencyCode: text(form, 'currencyCode').trim().toUpperCase(),
+                /* Already a code: the select's values ARE `FINE_CURRENCIES`, so nothing to normalise. */
+                currencyCode: text(form, 'currencyCode'),
                 reason: text(form, 'reason').trim(),
                 ...(compensation ? { customerCompensation: compensation } : {}),
               },
@@ -228,6 +229,7 @@ export function ViolationActions({
                 required
                 inputMode="decimal"
                 pattern="\d{1,10}(\.\d{1,2})?"
+                placeholder={t.sections.enforcement.fineAmountPlaceholder}
                 className="w-32 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
               />
             </label>
@@ -235,13 +237,35 @@ export function ViolationActions({
               <span className="text-[11px] text-faint">
                 {t.sections.enforcement.fineCurrencyLabel}
               </span>
-              <input
+              {/*
+                A MENU of the three SAFRA fines in (Bashar, 2026-08-24), not a free-text box.
+
+                It was a three-character input, which accepted anything of that length: a typo like
+                `USB` reached the API and came back a coded refusal the operator had to decode, and
+                `usd` only worked because this form upper-cased it on the way out. The options come
+                from `FINE_CURRENCIES` in the contract that VALIDATES the field, so the menu cannot
+                offer a value the endpoint would reject, and the endpoint cannot accept one the menu
+                does not offer.
+
+                The label is the ISO code beside the symbol Arabic writes it with — «USD $»,
+                «EUR €», «SYP ل.س». The code is a machine identifier and exempt from the copy rule;
+                the SYMBOL is how a language writes it and comes from `currencySymbol` in the
+                catalogue, which already held all three.
+
+                No `dir`: a field a person operates follows the page's direction (UI conventions).
+              */}
+              <select
                 name="currencyCode"
                 required
-                maxLength={3}
-                minLength={3}
-                className="w-24 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
-              />
+                defaultValue={FINE_CURRENCIES[0]}
+                className="w-28 cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+              >
+                {FINE_CURRENCIES.map((code) => (
+                  <option key={code} value={code}>
+                    {`${code} ${t.currencySymbol[code] ?? ''}`.trim()}
+                  </option>
+                ))}
+              </select>
             </label>
             {/*
               Separate from the fine because they are two movements with two destinations. A screen

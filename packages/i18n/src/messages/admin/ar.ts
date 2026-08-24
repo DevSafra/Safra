@@ -1113,6 +1113,15 @@ export const ar = {
       fining: 'جارٍ الفرض…',
       fined: 'فُرضت الغرامة وأُبلغ الشريك.',
       fineAmountLabel: 'المبلغ',
+      /*
+        LATIN digits, and that is not an oversight on an Arabic screen.
+
+        The field's own pattern is `\d{1,10}(\.\d{1,2})?`, which matches Latin digits only — a
+        placeholder written «٥٠٫٠٠» would show the operator a value the input then refuses, and the
+        refusal is the browser's own so no error would appear to explain it. A placeholder has to be
+        something you could actually type into the field it sits in.
+      */
+      fineAmountPlaceholder: '50.00',
       fineCurrencyLabel: 'العملة',
       compensationLabel: 'تعويض العميل (اختياري)',
 
@@ -2600,6 +2609,19 @@ export const ar = {
         another map would mean a reader of either could not tell what the other one covers.
       */
       stale_calendar: 'تقويم غير محدَّث',
+      /*
+        ALL FIVE kinds, not only the one the log happened to contain.
+
+        `stale_calendar` was here alone because it was the only kind any committed run had recorded,
+        and `audit-catalogue.integration.test.ts` reads the TABLE — so each remaining kind failed
+        that test the first time somebody recorded one. `no_response` did exactly that on
+        2026-08-24, hours after the same shape of gap took الدفع down: a catalogue completed to the
+        data rather than to the enum, which reads as coverage until the sixth row arrives.
+      */
+      no_response: 'عدم الرد',
+      rejected_after_payment: 'رفض بعد الدفع',
+      inaccurate_listing: 'وصف غير مطابق',
+      no_show: 'عدم استقبال',
 
       /*
         The sanctions list a screening was run against. `local_fixture` is here for the same reason

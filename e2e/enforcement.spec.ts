@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { FINE_CURRENCIES } from '../packages/contracts/src/enforcement.js';
 import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
@@ -99,8 +100,44 @@ test('suspend, raise, fine, waive — and the waived fine shows both entries', a
 
   if ((await target.getByRole('button', { name: copy.fine }).count()) > 0) {
     await target.getByRole('button', { name: copy.fine }).first().click();
+    /*
+      The currency is a MENU of exactly three, and the amount says what it wants (Bashar, 2026-08-24).
+
+      Asserted on the OPTION VALUES rather than the labels: the values are what the API receives,
+      while the labels carry a symbol somebody could reword.
+
+      The three codes are written OUT here rather than read from `FINE_CURRENCIES`, and that is the
+      whole point. The options are RENDERED from that constant, so comparing the DOM against it is a
+      tautology — add a fourth currency and both sides move together and the test still passes,
+      while the rule it was supposed to protect is gone. Restating the rule independently of the
+      code that implements it means widening the list has to be a decision somebody makes here too.
+    */
+    const currency = target.locator('select[name="currencyCode"]');
+
+    expect(
+      await currency
+        .locator('option')
+        .evaluateAll((o) => o.map((n) => (n as HTMLOptionElement).value)),
+    ).toStrictEqual(['USD', 'EUR', 'SYP']);
+
+    /* And the constant the form reads really is that list, so the two cannot drift silently. */
+    expect([...FINE_CURRENCIES]).toStrictEqual(['USD', 'EUR', 'SYP']);
+
+    /* The placeholder is on screen, not merely in the catalogue. */
+    await expect(target.locator('input[name="amount"]')).toHaveAttribute(
+      'placeholder',
+      copy.fineAmountPlaceholder,
+    );
+
     await target.locator('input[name="amount"]').fill('50');
-    await target.locator('input[name="currencyCode"]').fill('USD');
+    /*
+      A SELECT since 2026-08-24, not a text box — `selectOption`, not `fill`.
+
+      `fill` on a select throws rather than silently missing, which is the right failure: the three
+      currencies SAFRA fines in come from `FINE_CURRENCIES`, and a spec that typed a code would keep
+      passing if the menu ever stopped offering it.
+    */
+    await target.locator('select[name="currencyCode"]').selectOption('USD');
     await target.getByLabel(copy.violationReasonLabel).fill(REASON);
     await target.getByRole('button', { name: copy.fine }).last().click();
     await expect(page.getByText(copy.fined)).toBeVisible({ timeout: 20_000 });
