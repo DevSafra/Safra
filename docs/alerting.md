@@ -324,6 +324,22 @@ and no product decision blocks alerting.
 
 ---
 
+## How an operator works النزاعات (2026-08-24)
+
+Not an alert, but the operational expectation the payout freeze depends on, recorded here because
+this is where somebody looks when disputes are the problem.
+
+**النزاعات is a work QUEUE: unresolved first, oldest of those at the top.** A dispute freezes the
+partner's payout, so an unresolved one is money held and a business waiting — the oldest is the most
+expensive, and an operator working top-down should meet it first. Closed disputes sit underneath,
+newest first, because nothing is waiting on them.
+
+Until 2026-08-24 the screen ordered strictly newest-first while a comment in `dispute.service.ts`
+described the queue ordering above it, so the oldest backlog sank out of sight (`O-cons-1`). If a
+partner reports a payout that has been frozen for weeks, that is the shape of the problem: the
+dispute holding it was at the bottom of the list. `dispute-queue-order.integration.test.ts` now
+asserts the order.
+
 ## Runbook coverage
 
 Every `page` alert must name a runbook before it is armed. Two exist:

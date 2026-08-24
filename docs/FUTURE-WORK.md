@@ -3863,9 +3863,10 @@ message area and their own vocabulary to fall back to.
 
 ---
 
-### O-e2e-4 — Two specs were stricter than the rules they test, and exhausted their own fixtures
+### O-e2e-4 — Two specs were stricter than the rules they test; and a metrics suite raced a committing one
 
-**Status:** open · **Owner:** engineering · **Recorded:** 2026-08-24
+**Status:** **RESOLVED 2026-08-24** — both, at the root ·
+**Owner:** engineering · **Recorded:** 2026-08-24
 
 Two independent instances of one shape, both found on 2026-08-24 while getting the suite green:
 
@@ -3884,13 +3885,52 @@ between, and the delta becomes 2. Observed once in eight full runs; passes alone
 either a scoped count or a serial marker — a flake in a metrics suite is the kind nobody trusts to be
 a flake when it matters.
 
-**What stays open here:** the disputes fix is landed; the metrics race is not.
+**The metrics race, investigated and fixed (Bashar: _"I do not want intermittent failures to become
+accepted background noise"_).**
+
+**Root cause.** Every assertion in that block is a DELTA on a gauge that counts a whole table:
+`scrape()`, write one row, `scrape()` again. The suite runs inside `createRollbackDatabase`, whose
+transaction was READ COMMITTED — PostgreSQL's default — so the second read also saw anything another
+connection had committed in between. `payments.integration.test.ts` commits by design (its teardown
+keeps any booking carrying a payment or a ledger entry, because that is financial evidence), vitest
+runs files in parallel, and its `payment.captured` insert could land between the two reads. The delta
+became 2 and the failure pointed at metrics code that was never wrong.
+
+**Frequency.** Once in eight full runs on 2026-08-24. Green every time in isolation, which is the
+worst way for a test to be wrong — it invites being re-run rather than read.
+
+**Impact.** No production impact: the gauge is correct and the race is between two test suites. The
+cost is trust. A suite that fails one run in eight teaches people to re-run rather than look, and the
+next real regression in that file arrives wearing the same clothes.
+
+**Fixed at the root, not by loosening the assertion.** `createRollbackDatabase` now takes an
+isolation level, and the metrics suite opens `BEGIN ISOLATION LEVEL REPEATABLE READ`. Both reads then
+see one snapshot, so a concurrent commit is invisible and the only delta is the test's own write.
+Relaxing to `>=` was rejected: it would have hidden the regressions those assertions exist to catch.
+
+The level rides on the `BEGIN` because it has to — `SET TRANSACTION ISOLATION LEVEL` must be the
+first statement in a transaction, and the harness's wrapper issues a SAVEPOINT before anything a test
+sends, so a caller cannot raise it afterwards.
+
+**Made deterministic before it was fixed.** A new test commits an event from a SECOND connection at
+exactly the racing moment and asserts the gauge does not move. It fails every time without the
+isolation and passes with it — watched both ways. Three consecutive full DB-backed runs afterwards:
+2,858 passing each time.
+
+**One thing the cleanup taught, worth keeping.** That test first tried to DELETE the row it had
+committed, and the database refused: `deny_payment_event_rewrite` allows a delete only for an
+unverified, unprocessed payload older than thirty days — _"This row is evidence."_ It permits
+`processed_at` to be set, so the test marks the row processed instead. The evidence stays and the row
+stops counting toward `safra_payment_events_unprocessed`, the gauge behind a PAGE-severity alert.
+A test that had deleted it would have been quietly breaking the append-only rule the whole table
+exists to enforce.
 
 ---
 
-### O-cons-1 — The disputes registry says «unresolved first» and orders by date
+### O-cons-1 — The disputes registry said «unresolved first» and ordered by date
 
-**Status:** open · **Owner:** engineering · **Recorded:** 2026-08-24
+**Status:** **RESOLVED 2026-08-24** — النزاعات is a work queue, and the query now says so ·
+**Owner:** engineering · **Recorded:** 2026-08-24
 
 `dispute.service.ts` carries the comment _"Unresolved first, then oldest first inside each group: the
 queue's job is to surface what has been waiting longest"_ directly above
@@ -3903,11 +3943,33 @@ frozen for every one of them. It is also how a fixture surprise arrived: re-open
 test disputes left page one showing only closed ones, and `admin-sections.spec.ts` failed on a badge
 that was correct.
 
-**Recommendation.** Decide which the screen is, then make the other one match. If it is a queue,
-`ORDER BY (status IN ('open','investigating')) DESC, created_at ASC`. If a feed is wanted, delete the
-sentence. This is the third instance recorded of a true-sounding comment describing an intention
-rather than a change (`O-staff-2`, the آخر نشاط docblock, and now this) — and the only defence that
-has worked is asserting the behaviour rather than reading the note.
+**Bashar's decision, 2026-08-24: it is a WORK QUEUE.** _"Disputes freeze payouts, unresolved disputes
+represent operational backlog, operators should naturally work from oldest unresolved item toward
+newest, queue ordering is more important than activity chronology in this workflow."_
+
+**Implemented as three keys, not one.**
+
+```
+ORDER BY (d.status IN ('open','investigating')) DESC,          -- unresolved first
+         CASE WHEN d.status IN ('open','investigating')
+              THEN d.created_at END ASC NULLS LAST,            -- oldest of those at the top
+         d.created_at DESC, d.id DESC                          -- closed ones, newest first
+```
+
+Closed disputes stay newest-first underneath, deliberately: nothing is waiting on them, so "longest
+waiting" is meaningless there, and what a reader wants from a settled dispute is the one just
+settled. Two orders for two questions, in one list.
+
+**Held by `dispute-queue-order.integration.test.ts`**, whose fixture is out of order in BOTH
+dimensions — an old resolved dispute, a new unresolved one and an older unresolved one. A fixture
+where age and status happen to agree would pass against `created_at DESC`, against `created_at ASC`
+and against the correct expression, which is exactly how the original defect survived. Watched to
+fail against the old ordering: the two queue assertions go red and the closed-order one stays green,
+which is the right shape.
+
+**This was the third recorded instance of a true-sounding comment describing an intention rather
+than a change** (`O-staff-2`, the آخر نشاط docblock, and this). The only defence that has ever
+worked is asserting the behaviour instead of reading the note, and that is now what holds it.
 
 ---
 

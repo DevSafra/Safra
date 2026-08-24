@@ -108,6 +108,21 @@ The handoff's rule — "فتح النزاع يجمّد استحقاق تحويل
 `payout_frozen` flag on the booking. A flag has one failure mode and it is unacceptable here: the
 flag and the disputes disagree, and money moves on the strength of the stale one.
 
+### النزاعات is a work QUEUE, not an activity feed (2026-08-24)
+
+Operator expectation, decided by Bashar and now matched by the query: **unresolved disputes first,
+oldest of those at the top.** An operator works down the screen and meets the longest-waiting item
+first.
+
+The reason is the freeze above. An unresolved dispute is a partner's payout held and a business
+waiting, so the oldest is the most expensive — queue order outranks activity chronology on this
+screen. Closed disputes sit underneath in newest-first order: nothing is waiting on them, and what a
+reader wants from a settled dispute is the one just settled.
+
+It read the other way round until 2026-08-24 — `ORDER BY created_at DESC` under a comment that
+described this ordering exactly (`O-cons-1`). `dispute-queue-order.integration.test.ts` now asserts
+it, because the comment had been true and wrong for as long as nobody checked.
+
 ### Defects this pass found
 
 | Found                                                                                                                                                                                                                                     | How                                                                                         |
