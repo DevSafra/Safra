@@ -229,9 +229,30 @@ export class DisputeService {
              to_char(d.closed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS closed_at,
              d.created_at
         ${fromWhere}
-        -- Unresolved first, then oldest first inside each group: the queue's job is to surface
-        -- what has been waiting longest, and a closed dispute is not waiting for anybody.
-        ORDER BY d.created_at DESC, d.id DESC
+        -- ── النزاعات is a WORK QUEUE, not an activity feed (Bashar, 2026-08-24) ──
+        --
+        -- Unresolved first, and OLDEST first inside that group. An operator works down this screen
+        -- from the top, and the item that has been waiting longest is the one that should be there.
+        --
+        -- ## The comment used to say this and the query did not
+        --
+        -- These three lines described exactly this ordering above a plain ORDER BY created_at DESC:
+        -- newest first, no status grouping. So the screen returned a feed. An operator working
+        -- top-down was reading the most recently OPENED disputes while the oldest backlog sank out
+        -- of sight, which is the opposite of what the note promised. Recorded as O-cons-1 and decided
+        -- by Bashar: a dispute FREEZES the partner's payout, so an unresolved one is money held and
+        -- somebody waiting, and queue order outranks chronology.
+        --
+        -- ## Why closed disputes are newest-first underneath
+        --
+        -- Nothing is waiting on them, so "longest waiting" is meaningless there; what a reader wants
+        -- from a closed dispute is the one just settled. Two orders for two questions, in one list,
+        -- which is what the CASE expresses.
+        ORDER BY (d.status IN ('open','investigating')) DESC,
+                 CASE WHEN d.status IN ('open','investigating')
+                      THEN d.created_at END ASC NULLS LAST,
+                 d.created_at DESC,
+                 d.id DESC
         LIMIT ${query.limit} ${this.pageOffset(query)}
       `),
       this.countOf(fromWhere),
