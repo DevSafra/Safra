@@ -3827,6 +3827,40 @@ natural space for it at the bottom.
 
 ---
 
+### O-staff-4 — The enforcement policy is built; three screens have never been driven
+
+**Status:** built and pushed, partially driven · **Owner:** engineering ·
+**Recorded:** 2026-08-24
+
+Bashar's three enforcement policies of 2026-08-24 — suspend a partner, manage violations, waive a
+fine — are implemented across the API, the console and the partner portal, and are on `origin/main`.
+**What is not done is watching some of it work.**
+
+**Driven in a browser and confirmed:** suspend → banner → unsuspend on the console; the violation
+progression from record to warning to fine; **the waived fine rendering as its pair** — the original
+struck through and legible, the balancing entry, the zero net, the reason and «Admin» beside them,
+with no «—» anywhere, asserted rather than eyeballed.
+
+**NOT driven, and these are the gaps a reader should assume are unverified:**
+
+- **The partner portal's suspension surfaces.** The notice a suspended partner reads, the refusal
+  sentences across fourteen write components, and المحفظة's frozen state. Compile-verified only.
+- **`/violations` on the portal has no e2e spec at all** and never had one — the screen that grew
+  warnings, stages and waiver netting is the one with no browser coverage.
+- **`PAYOUT_FROZEN_BY_SUSPENSION` has no surface.** It is thrown at `payout.service.ts` behind the
+  RELEASE path, which only staff can reach — there is no payout write in the portal, so a partner
+  can never trigger it. **It belongs on the console's payout release control**, where a human will
+  actually meet it, and it is not wired there. project-cc verified this before wiring rather than
+  after, having just spent a detour on eighteen unreachable branches.
+
+**The lesson this work produced, and it is worth more than the feature:** six defects were found by
+USING a screen, and none of them would have failed a test. A guard registered nowhere. A route with
+no form. A validation pattern that matched nothing, so a fine silently refused with no request and
+no error. A true sentence in the wrong place, twice. **Built, green, and connected to nothing** is a
+state this codebase produces routinely, and only a browser pass finds it.
+
+---
+
 ### O-staff-1 — Three capabilities are still grantable with nothing behind them
 
 **Status:** open · **Owner:** **Bashar** (a product decision, then engineering) ·
