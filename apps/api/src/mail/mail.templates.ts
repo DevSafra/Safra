@@ -1,5 +1,4 @@
-import { emailMessages, fill, resolveLocale } from '@safra/i18n';
-
+import { compose } from './bilingual.js';
 import type { OutgoingMail } from './mail.service.js';
 
 /**
@@ -40,12 +39,9 @@ export function passwordResetMail(input: {
   locale: string;
   expiresInMinutes: number;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).passwordReset;
-
   return {
     to: input.to,
-    subject: copy.subject,
-    text: fill(copy.body, {
+    ...compose((m) => m.passwordReset, input.locale, {
       url: input.url,
       expiresInMinutes: input.expiresInMinutes,
     }),
@@ -58,12 +54,12 @@ export function emailVerificationMail(input: {
   locale: string;
   expiresInHours: number;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).emailVerification;
-
   return {
     to: input.to,
-    subject: copy.subject,
-    text: fill(copy.body, { url: input.url, expiresInHours: input.expiresInHours }),
+    ...compose((m) => m.emailVerification, input.locale, {
+      url: input.url,
+      expiresInHours: input.expiresInHours,
+    }),
   };
 }
 
@@ -96,12 +92,12 @@ export function accountExistsMail(input: {
   resetUrl: string;
   locale: string;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).accountExists;
-
   return {
     to: input.to,
-    subject: copy.subject,
-    text: fill(copy.body, { signInUrl: input.signInUrl, resetUrl: input.resetUrl }),
+    ...compose((m) => m.accountExists, input.locale, {
+      signInUrl: input.signInUrl,
+      resetUrl: input.resetUrl,
+    }),
   };
 }
 
@@ -127,18 +123,25 @@ export function staffInvitationMail(input: {
   locale: string;
   expiresInHours: number;
 }): OutgoingMail {
-  const messages = emailMessages(resolveLocale(input.locale));
-  const copy = messages.staffInvitation;
-
   return {
     to: input.to,
-    subject: copy.subject,
-    text: fill(copy.body, {
-      url: input.url,
-      /* Falls back to the code: an unnamed role is an obvious gap, an empty one is a broken email. */
-      roleLabel: messages.roles[input.role] ?? input.role,
-      expiresInHours: input.expiresInHours,
-    }),
+    /*
+      The values are a FUNCTION of the block's own language, not a fixed record.
+
+      `roleLabel` comes from the catalogue, so a record computed once would put the Arabic word
+      «مدير عمليات» inside the English block — the exact defect this rule exists to prevent,
+      arriving one layer down. The function form resolves it per block.
+    */
+    ...compose(
+      (m) => m.staffInvitation,
+      input.locale,
+      (m) => ({
+        url: input.url,
+        /* Falls back to the code: an unnamed role is an obvious gap, an empty one is a broken email. */
+        roleLabel: m.roles[input.role] ?? input.role,
+        expiresInHours: input.expiresInHours,
+      }),
+    ),
   };
 }
 
@@ -155,12 +158,12 @@ export function partnerApplicationReceivedMail(input: {
   url: string;
   locale: string;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).partnerApplicationReceived;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { reference: input.reference }),
-    text: fill(copy.body, { reference: input.reference, url: input.url }),
+    ...compose((m) => m.partnerApplicationReceived, input.locale, {
+      reference: input.reference,
+      url: input.url,
+    }),
   };
 }
 
@@ -178,12 +181,9 @@ export function partnerApplicationRejectedMail(input: {
   url: string;
   locale: string;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).partnerApplicationRejected;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { reference: input.reference }),
-    text: fill(copy.body, {
+    ...compose((m) => m.partnerApplicationRejected, input.locale, {
       reference: input.reference,
       reason: input.reason,
       url: input.url,
@@ -221,12 +221,9 @@ export function partnerLoginCodeMail(input: {
   locale: string;
   expiresInMinutes: number;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).partnerLoginCode;
-
   return {
     to: input.to,
-    subject: copy.subject,
-    text: fill(copy.body, {
+    ...compose((m) => m.partnerLoginCode, input.locale, {
       code: input.code,
       expiresInMinutes: input.expiresInMinutes,
     }),
@@ -256,12 +253,9 @@ export function partnerEmployeeInvitationMail(input: {
   hours: number;
   locale: string;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).partnerEmployeeInvitation;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { partnerName: input.partnerName }),
-    text: fill(copy.body, {
+    ...compose((m) => m.partnerEmployeeInvitation, input.locale, {
       partnerName: input.partnerName,
       url: input.url,
       hours: input.hours,
@@ -276,12 +270,9 @@ export function partnerInvitationMail(input: {
   locale: string;
   expiresInHours: number;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).partnerInvitation;
-
   return {
     to: input.to,
-    subject: copy.subject,
-    text: fill(copy.body, {
+    ...compose((m) => m.partnerInvitation, input.locale, {
       reference: input.reference,
       url: input.url,
       expiresInHours: input.expiresInHours,
@@ -348,13 +339,12 @@ export function partnerApprovedMail(input: {
   url: string;
   locale: string;
 }): OutgoingMail {
-  const messages = emailMessages(resolveLocale(input.locale));
-  const copy = messages.partnerApproved;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { reference: input.reference }),
-    text: fill(copy.body, { url: input.url }),
+    ...compose((m) => m.partnerApproved, input.locale, {
+      reference: input.reference,
+      url: input.url,
+    }),
   };
 }
 
@@ -364,13 +354,12 @@ export function partnerContractAwaitingSignatureMail(input: {
   url: string;
   locale: string;
 }): OutgoingMail {
-  const messages = emailMessages(resolveLocale(input.locale));
-  const copy = messages.partnerContractAwaitingSignature;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { reference: input.reference }),
-    text: fill(copy.body, { url: input.url }),
+    ...compose((m) => m.partnerContractAwaitingSignature, input.locale, {
+      reference: input.reference,
+      url: input.url,
+    }),
   };
 }
 
@@ -392,13 +381,12 @@ export function partnerContractCountersignedMail(input: {
   url: string;
   locale: string;
 }): OutgoingMail {
-  const messages = emailMessages(resolveLocale(input.locale));
-  const copy = messages.partnerContractCountersigned;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { reference: input.reference }),
-    text: fill(copy.body, { url: input.url }),
+    ...compose((m) => m.partnerContractCountersigned, input.locale, {
+      reference: input.reference,
+      url: input.url,
+    }),
   };
 }
 
@@ -417,13 +405,9 @@ export function partnerContractReturnedMail(input: {
   url: string;
   locale: string;
 }): OutgoingMail {
-  const messages = emailMessages(resolveLocale(input.locale));
-  const copy = messages.partnerContractReturned;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { reference: input.reference }),
-    text: fill(copy.body, {
+    ...compose((m) => m.partnerContractReturned, input.locale, {
       reference: input.reference,
       displayName: input.displayName,
       url: input.url,
@@ -439,13 +423,9 @@ export function partnerDocumentsCompleteMail(input: {
   url: string;
   locale: string;
 }): OutgoingMail {
-  const messages = emailMessages(resolveLocale(input.locale));
-  const copy = messages.partnerDocumentsComplete;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { reference: input.reference }),
-    text: fill(copy.body, {
+    ...compose((m) => m.partnerDocumentsComplete, input.locale, {
       reference: input.reference,
       displayName: input.displayName,
       documentCount: input.documentCount,
@@ -461,17 +441,18 @@ export function partnerContractReadyMail(input: {
   url: string;
   locale: string;
 }): OutgoingMail {
-  const messages = emailMessages(resolveLocale(input.locale));
-  const copy = messages.partnerContractReady;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { partner: input.partner }),
-    text: fill(copy.body, {
-      /* The KIND in the reader's language, for the same reason the staff role is — see above. */
-      kind: messages.contractKinds[input.kind] ?? input.kind,
-      url: input.url,
-    }),
+    /* Per-block values — the KIND is catalogue copy; see `staffInvitationMail` for why. */
+    ...compose(
+      (m) => m.partnerContractReady,
+      input.locale,
+      (m) => ({
+        partner: input.partner,
+        kind: m.contractKinds[input.kind] ?? input.kind,
+        url: input.url,
+      }),
+    ),
   };
 }
 
@@ -489,12 +470,9 @@ export function reviewReceivedMail(input: {
   rating: number;
   url: string;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).reviewReceived;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { property: input.property }),
-    text: fill(copy.body, {
+    ...compose((m) => m.reviewReceived, input.locale, {
       property: input.property,
       rating: input.rating,
       url: input.url,
@@ -527,14 +505,11 @@ export function giftCardPurchasedMail(input: {
   amount: string;
   url: string;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).giftCardPurchased;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { reference: input.reference }),
-    text: fill(copy.body, {
-      code: input.code,
+    ...compose((m) => m.giftCardPurchased, input.locale, {
       reference: input.reference,
+      code: input.code,
       amount: input.amount,
       url: input.url,
     }),
@@ -565,12 +540,9 @@ export function giftCardReceivedMail(input: {
   amount: string;
   url: string;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).giftCardReceived;
-
   return {
     to: input.to,
-    subject: copy.subject,
-    text: fill(copy.body, {
+    ...compose((m) => m.giftCardReceived, input.locale, {
       code: input.code,
       reference: input.reference,
       amount: input.amount,
@@ -587,12 +559,12 @@ export function reviewRepliedMail(input: {
   property: string;
   url: string;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).reviewReplied;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { property: input.property }),
-    text: fill(copy.body, { property: input.property, url: input.url }),
+    ...compose((m) => m.reviewReplied, input.locale, {
+      property: input.property,
+      url: input.url,
+    }),
   };
 }
 
@@ -624,12 +596,12 @@ export function supportRepliedMail(input: {
   reference: string;
   url: string;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).supportReplied;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { reference: input.reference }),
-    text: fill(copy.body, { reference: input.reference, url: input.url }),
+    ...compose((m) => m.supportReplied, input.locale, {
+      reference: input.reference,
+      url: input.url,
+    }),
   };
 }
 
@@ -643,12 +615,9 @@ export function bookingNeedsActionMail(input: {
   deadline: string;
   url: string;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).bookingNeedsAction;
-
   return {
     to: input.to,
-    subject: fill(copy.subject, { reference: input.reference }),
-    text: fill(copy.body, {
+    ...compose((m) => m.bookingNeedsAction, input.locale, {
       reference: input.reference,
       property: input.property,
       checkIn: input.checkIn,
@@ -686,11 +655,57 @@ export function notificationWaitingMail(input: {
   locale: string;
   url: string;
 }): OutgoingMail {
-  const copy = emailMessages(resolveLocale(input.locale)).waiting;
-
   return {
     to: input.to,
-    subject: copy.subject,
-    text: fill(copy.body, { url: input.url }),
+    ...compose((m) => m.waiting, input.locale, {
+      url: input.url,
+    }),
+  };
+}
+
+/**
+ * "Your account has been disabled", and its counterpart.
+ *
+ * ## Why the person is told at all
+ *
+ * Bashar, 2026-08-23: *"When I set the status to غير نشط then the employee should not be able to
+ * login with his account… The employee should get a notification per email about that."*
+ *
+ * Without it, a disabled account is indistinguishable from a broken one. The sign-in refusal is
+ * deliberately GENERIC — `AuthService.login` answers a suspended account exactly as it answers a
+ * wrong password, so that a suspended address cannot be confirmed by probing — which is right, and
+ * it means the screen can never explain. The email is the only place the person can be told, and
+ * it is sent to an address we already know rather than revealed to whoever is typing.
+ *
+ * ## What it says, and what it does not
+ *
+ * It does not say WHO disabled the account or why. That is a conversation with an administrator,
+ * and a reason typed into a console field is not written for the person it is about. It does say
+ * the account still exists, because "disabled" and "deleted" are the same event from the outside
+ * and only one of them is worth panicking about.
+ *
+ * Reinstatement is sent too. Somebody who was told they were locked out and then silently let back
+ * in learns to distrust both messages.
+ */
+export function staffSuspendedMail(input: { to: string; locale: string }): OutgoingMail {
+  return { to: input.to, ...compose((m) => m.staffSuspended, input.locale) };
+}
+
+/**
+ * Reinstatement carries a LINK and suspension does not, and that asymmetry is the point.
+ *
+ * Somebody let back in can act — the link takes them to the console and saves them finding it.
+ * Somebody locked out cannot, and the only place a link could send them is the sign-in screen,
+ * which by design answers a suspended account exactly as it answers a wrong password. A link to a
+ * door that will not open and cannot say why is worse than no link.
+ */
+export function staffReinstatedMail(input: {
+  to: string;
+  locale: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.staffReinstated, input.locale, { url: input.url }),
   };
 }
