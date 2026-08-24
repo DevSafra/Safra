@@ -214,6 +214,29 @@ export class FinanceService {
         LEFT JOIN currencies cur3 ON cur3.id = v.fine_currency_id
         WHERE ${scoped('coalesce(b3.city_id, p.city_id)')}
           AND ${search(sql`coalesce(p.reference,'') || ' ' || coalesce(b3.reference,'')`)}
+          -- Only violations that CARRY a fine, and the omission of this broke the whole screen.
+          --
+          -- الدفع is money. A violation at 'recorded' or 'warned' -- the first two rungs of the
+          -- enforcement ladder, and the ordinary state of a violation nobody has fined -- has a
+          -- NULL fine_amount, and this branch selected it anyway with a NULL amount and a NULL
+          -- currency. financeItemSchema types both as a required string, so the CONSOLE's parse of
+          -- the whole response failed and the page rendered «تعذّر تحميل هذه القائمة» -- no table,
+          -- no counters, no pagination bar. One un-fined violation took الدفع down entirely.
+          --
+          -- It survived because of ORDERING, which is the only reason this was not found long ago:
+          -- rows come back newest first, and the one un-fined violation in the fixture data sat
+          -- thousands of rows deep where no page ever parsed it. Recording a violation -- the first
+          -- thing the ladder asks anybody to do -- puts one on page one.
+          --
+          -- fine_currency_id is checked too. Nothing enforces the pair (there is no CHECK on this
+          -- table), so a fine whose currency went missing would fail the parse the same way; that
+          -- is a data defect worth its own constraint, recorded in FUTURE-WORK rather than left as
+          -- a way for this screen to die again.
+          --
+          -- Written as SQL comments, not a JS block comment: this text lives INSIDE a tagged SQL
+          -- template, where a backtick would end the template and a JS comment is just more SQL.
+          AND v.fine_amount IS NOT NULL
+          AND v.fine_currency_id IS NOT NULL
       ) rows`;
 
     const [result, total] = await Promise.all([
