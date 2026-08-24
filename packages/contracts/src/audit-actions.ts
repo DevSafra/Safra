@@ -165,6 +165,13 @@ export const AUDIT_ACTIONS = [
   'staff.suspended',
   'staff.reinstated',
   'staff.renamed',
+  /* ── Enforcement (Bashar, 2026-08-24) ── */
+  'partner.suspended',
+  'partner.unsuspended',
+  'violation.recorded',
+  'violation.warned',
+  'violation.fined',
+  'fine.waived',
   'rbac.grant_toggled',
   'setting.updated',
   /*

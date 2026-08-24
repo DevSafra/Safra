@@ -49,6 +49,16 @@ export const en = {
   'permission.denied': 'You do not have access to this resource.',
   'scope.outside': 'This record is outside your assigned scope.',
   'staff.not_found': 'Staff member not found.',
+  'payout.frozen_by_suspension':
+    'The payout is frozen while the partner account is suspended.',
+  'partner.suspended':
+    'The partner account is suspended, so this action cannot be carried out.',
+  'partner.already_suspended': 'That account is already suspended.',
+  'partner.not_suspended': 'That account is not suspended.',
+  'violation.not_found': 'That violation was not found.',
+  'violation.stage_invalid': 'The violation cannot move to that stage.',
+  'violation.not_fined': 'That violation carries no fine.',
+  'violation.already_waived': 'That fine has already been waived.',
   'audit_entry.not_found': 'That activity entry was not found.',
   'staff.role_invalid': 'That is not a staff role.',
   'staff.cannot_suspend_self': 'You cannot suspend your own account.',

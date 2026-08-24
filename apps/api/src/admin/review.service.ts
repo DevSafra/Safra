@@ -15,6 +15,7 @@ import {
   type SanctionsPolicy,
 } from '@safra/contracts';
 
+import { actorName } from '../common/actor-name.sql.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { SanctionsService } from '../sanctions/sanctions.service.js';
 import { SettingsService } from '../settings/settings.service.js';
@@ -433,6 +434,14 @@ export class ReviewService {
         sanctionsScreeningResult: true,
         suspendedAt: true,
         suspendedReason: true,
+        /*
+          The staff-facing half of the suspension record (2026-08-24). `suspendedNotes` NEVER
+          reaches the partner's own payload — `/partner/me` omits it entirely rather than nulling
+          it, because a field with two audiences and one shape is what produced the `actor_name`
+          leak this morning.
+        */
+        suspendedNotes: true,
+        suspendedByUserId: true,
         createdAt: true,
       },
       with: {
@@ -528,11 +537,50 @@ export class ReviewService {
       WHERE p.reference = ${reference}
     `);
 
-    /* `cityId` was for the scope check; it does not belong in the response. */
-    const { cityId: _cityId, ...visible } = partner;
+    /*
+      `cityId` was for the scope check; the raw suspension columns are replaced by one object below.
+      Destructured out rather than left alongside it, so a screen cannot render `suspendedReason`
+      without the rest and end up telling somebody a business is on hold with no date and no author.
+    */
+    const {
+      cityId: _cityId,
+      suspendedAt,
+      suspendedReason,
+      suspendedNotes,
+      suspendedByUserId,
+      ...visible
+    } = partner;
+
+    /*
+      Who suspended, by name — through `actorName`, so a super admin appears as «Admin».
+
+      Third site for that helper today. The first two leaks both went out because a new query
+      selected an identifying column and nobody asked whether the pseudonym applied to it.
+    */
+    const by = suspendedByUserId
+      ? await this.db.execute<{ name: string | null }>(sql`
+          SELECT ${actorName(sql`u.email`, sql`u.role`)} AS name
+          FROM users u WHERE u.id = ${suspendedByUserId}::uuid LIMIT 1
+        `)
+      : null;
 
     return {
       ...visible,
+      /*
+        ONE object, or null. The console's banner states four consequences of a suspension and needs
+        the reason, the date and the author together; scattering them across the payload is how a
+        screen ends up rendering «موقوف» with nothing a reader can act on.
+
+        `notes` is here and is CONSOLE-ONLY — `/partner/me` omits it entirely.
+      */
+      suspension: suspendedAt
+        ? {
+            reason: suspendedReason,
+            notes: suspendedNotes,
+            since: suspendedAt,
+            by: by?.rows[0]?.name ?? null,
+          }
+        : null,
       /* No user account behind the partner reads as "not enrolled", which it is. */
       twoFactorEnabled: account.rows[0]?.two_factor_enabled ?? false,
       /*

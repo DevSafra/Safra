@@ -58,6 +58,16 @@ export const de = {
   'permission.denied': 'Sie haben keinen Zugriff auf diese Ressource.',
   'scope.outside': 'Dieser Datensatz liegt außerhalb Ihres zugewiesenen Bereichs.',
   'staff.not_found': 'Mitarbeiter nicht gefunden.',
+  'payout.frozen_by_suspension':
+    'Die Auszahlung ist gesperrt, solange das Konto gesperrt ist.',
+  'partner.suspended':
+    'Das Partnerkonto ist gesperrt, daher ist diese Aktion nicht möglich.',
+  'partner.already_suspended': 'Dieses Konto ist bereits gesperrt.',
+  'partner.not_suspended': 'Dieses Konto ist nicht gesperrt.',
+  'violation.not_found': 'Dieser Verstoß wurde nicht gefunden.',
+  'violation.stage_invalid': 'Der Verstoß kann nicht in diese Phase wechseln.',
+  'violation.not_fined': 'Für diesen Verstoß liegt keine Geldstrafe vor.',
+  'violation.already_waived': 'Diese Geldstrafe wurde bereits erlassen.',
   'audit_entry.not_found': 'Dieser Eintrag wurde nicht gefunden.',
   'staff.role_invalid': 'Das ist keine Mitarbeiterrolle.',
   'staff.cannot_suspend_self': 'Sie können Ihr eigenes Konto nicht deaktivieren.',

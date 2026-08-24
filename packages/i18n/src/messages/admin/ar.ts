@@ -1656,6 +1656,14 @@ export const ar = {
     },
 
     partnerDetail: {
+      /*
+        The way from a partner's RECORD to their unfinished checklist (Bashar, 2026-08-24).
+
+        «متابعة» rather than «إكمال»: the staff member is carrying on a sitting that may have been
+        started by somebody else on another day, not finishing something of their own. The word has
+        to work for both, because the common case is picking up a partner who came in weeks ago.
+      */
+      continueOnboarding: 'متابعة مستندات الشريك',
       applicant: 'مُقدّم الطلب',
       email: 'البريد الإلكتروني',
       phone: 'الهاتف',
