@@ -8,7 +8,27 @@ test.skip(MISSING_CREDENTIALS, SKIP_REASON);
 test.use({ storageState: STAFF_STATE, viewport: { width: 1440, height: 1100 } });
 
 const copy = t.sections.enforcement;
+
+/**
+ * Every partner this file suspends, so the suspension cannot outlive the run.
+ *
+ * ## Why an `afterAll` and not only the inline lift
+ *
+ * Both tests here lift what they imposed as their last step, which is correct and was not enough. On
+ * 2026-08-24 a run failed midway — the console's violation list stopped parsing because a field was
+ * added to a query and not to its response mapping — and the test aborted BEFORE its lift, leaving
+ * `PAR-236708` suspended for forty-five minutes across later runs. A suspended partner leaks into
+ * every spec that expects one to trade, and the failure it produces names something else entirely.
+ *
+ * `partner-suspension.spec.ts` already had this. The standing requirement is that no partner remains
+ * suspended after the suite, and an inline lift only holds on the happy path.
+ */
+const suspendedHere = new Set<string>();
 const REASON = 'مخالفة متكررة في تحديث التقويم بعد إشعارين سابقين';
+/** The warning text, which the partner reads on their own مخالفات screen. */
+const WARNING = 'يرجى تحديث تقويم الإتاحة خلال ٢٤ ساعة وإغلاق التواريخ غير المتاحة.';
+/** The reason every lift in this file gives, including the safety net's. */
+const LIFT = 'رُفع الإيقاف بعد معالجة السبب بالكامل';
 
 /**
  * The whole enforcement progression, in a browser: suspend, raise, fine, waive, lift.
@@ -28,6 +48,71 @@ const REASON = 'مخالفة متكررة في تحديث التقويم بعد 
  *
  * It raises a violation only when the partner has none, so re-running does not accumulate them.
  */
+/*
+  Unconditional, and it runs even when a test above fails partway.
+
+  Reads the banner first: posting an unsuspend to a partner who is not suspended is a 400, and a
+  cleanup that fails is worse than one that finds nothing to do.
+*/
+test.afterAll(async ({ browser }) => {
+  const context = await browser.newContext({ storageState: STAFF_STATE });
+  const page = await context.newPage();
+
+  /*
+    Also heals a suspension a PREVIOUS run leaked — and finds them from the LIST, not by opening
+    every record.
+
+    `PAR-236708` sat suspended for forty-five minutes on 2026-08-24 because the run that imposed it
+    aborted before its lift, and the set below only knows about the current run. الشركاء already
+    marks a suspended partner with a «موقوف مؤقتاً» pill (suspension outranks verification on that
+    screen), so the candidates come from one page load rather than a hundred; only those are opened,
+    and only to confirm the REASON.
+
+    Matching the reason is the safeguard. A blanket "lift everything suspended" would be far worse
+    than the leak: the console is a real tool and an operator's deliberate suspension is not this
+    suite's to undo. Only rows this file wrote carry that exact sentence.
+  */
+  await page.goto('/partners?size=100');
+
+  const rows = page.locator('a[href^="/partners/PAR-"]');
+  const candidates: string[] = [];
+
+  for (const row of await rows.all()) {
+    const href = (await row.getAttribute('href')) ?? '';
+    const found = /PAR-\d+/.exec(href)?.[0];
+
+    if (!found) continue;
+
+    /* The pill lives on the row, so the list alone says who is worth opening. */
+    const marked = await page
+      .locator('tr, li')
+      .filter({ hasText: found })
+      .filter({ hasText: t.sections.partners.suspended })
+      .count();
+
+    if (marked > 0) candidates.push(found);
+  }
+
+  for (const candidate of candidates) {
+    await page.goto(`/partners/${candidate}`);
+
+    if ((await page.getByText(REASON).count()) > 0) suspendedHere.add(candidate);
+  }
+
+  for (const reference of suspendedHere) {
+    await page.goto(`/partners/${reference}`);
+
+    if ((await page.locator('[data-partner-suspended]').count()) === 0) continue;
+
+    await page.getByLabel(copy.unsuspendReasonLabel).fill(LIFT);
+    await page.getByRole('button', { name: copy.unsuspend }).click();
+    await expect(page.getByText(copy.unsuspended)).toBeVisible({ timeout: 20_000 });
+    console.log(`afterAll lifted the suspension on ${reference}`);
+  }
+
+  await context.close();
+});
+
 test('suspend, raise, fine, waive — and the waived fine shows both entries', async ({
   page,
 }) => {
@@ -54,6 +139,8 @@ test('suspend, raise, fine, waive — and the waived fine shows both entries', a
     await page.getByRole('button', { name: copy.suspend }).click();
     await expect(page.getByText(copy.suspended)).toBeVisible({ timeout: 20_000 });
   }
+
+  suspendedHere.add(reference);
 
   await page.reload();
   await expect(page.locator('[data-partner-suspended]')).toBeVisible();
@@ -248,6 +335,26 @@ test('escalating a violation suspends the partner and records it as the cause', 
   /* The newest violation is first — the list is ordered by `created_at` descending. */
   const target = page.locator('main ul > li').first();
 
+  /*
+    ── The WARNING, the one rung no spec had ever clicked ──────────────────
+
+    `enforcement.spec.ts` raised, fined and waived; `canWarn` needs `warnedAt === null`, which a
+    fresh violation satisfies, so nothing was stopping it — it was simply never driven. That matters
+    more since 2026-08-24, because warning is now one of the five events that NOTIFIES the partner,
+    and «صدر الإنذار وأُبلغ الشريك» is a claim the console makes on screen.
+
+    Warned BEFORE the fine, which is the order the ladder runs in and the order an operator uses.
+  */
+  await expect(target.getByRole('button', { name: copy.warn })).toBeVisible();
+  await target.getByRole('button', { name: copy.warn }).first().click();
+  await target.getByLabel(copy.warnNoteLabel).fill(WARNING);
+  await target.getByRole('button', { name: copy.warn }).last().click();
+  await expect(page.getByText(copy.warned)).toBeVisible({ timeout: 20_000 });
+  await page.reload();
+
+  /* The note reaches the row — it is written FOR the partner and both screens render it. */
+  await expect(page.locator('main ul > li').first()).toContainText(WARNING);
+
   await expect(target.getByRole('button', { name: copy.escalate })).toBeVisible();
   await target.getByRole('button', { name: copy.escalate }).first().click();
 
@@ -257,6 +364,8 @@ test('escalating a violation suspends the partner and records it as the cause', 
   await target.getByLabel(copy.escalateReasonLabel).fill(REASON);
   await target.getByRole('button', { name: copy.escalate }).last().click();
   await expect(page.getByText(copy.escalated)).toBeVisible({ timeout: 20_000 });
+
+  suspendedHere.add(reference);
 
   await page.reload();
 

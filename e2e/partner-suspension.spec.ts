@@ -67,6 +67,9 @@ const enforcement = admin.sections.enforcement;
 const REASON =
   'إيقاف اختباري آلي: التحقق من ظهور الإشعار ورفض الكتابة في لوحة الشريك ثم رفعه.';
 const LIFT = 'رُفع الإيقاف الاختباري بعد انتهاء التحقق من سلوك الإيقاف في المتصفح.';
+/** The words a partner must be able to read on their own مخالفات screen. */
+const DESCRIPTION =
+  'تقويم الوحدة لم يُحدَّث منذ أحد عشر يوماً وبقيت التواريخ مفتوحة للحجز.';
 
 /** The refusal every blocked write must read as — resolved from the code, not written twice. */
 const REFUSED = errorMessage(ERROR.PARTNER_SUSPENDED, 'ar');
@@ -266,6 +269,19 @@ test.describe('the suspension a partner meets', () => {
     */
     await expect(notice).toContainText(t.suspension.guestsSafe);
 
+    /*
+      ── ②b The IN-APP notice, on the partner's own dashboard ────────────────
+
+      The email is the other half and a browser cannot read it. This is the half a partner can point
+      at when a spam filter ate the message: a dated row saying the platform told them, on the screen
+      they land on. Three of the five events sent nothing at all until 2026-08-24 while the console
+      claimed «وأُبلغ الشريك», so what is asserted here is that the claim is now true.
+    */
+    await expect(portal.locator('[data-notices]')).toContainText(
+      t.dashboard.notice['partner.suspended'] ?? '',
+      WAIT,
+    );
+
     /* ── ③ It is rendered by the SHELL, so no screen can omit it ───────────── */
     await portal.goto(`${BASE}/properties`);
     await expect(portal.locator('[data-suspension-notice]')).toBeVisible();
@@ -273,24 +289,30 @@ test.describe('the suspension a partner meets', () => {
     await expect(portal.locator('[data-suspension-notice]')).toBeVisible();
 
     /*
-      And المخالفات shows WORDS, not only a category and a number.
+      And المخالفات shows the WORDS, not only a category and a number.
 
       Reported from the screen on 2026-08-24: the partner could read that they had been cited and
       never what for. The description was required by the console's form, labelled «يقرأه الشريك»,
-      audited and stored nowhere. Asserted as "some violation on this page carries prose" rather
-      than against a specific sentence, because which violations this fixture partner holds depends
-      on what earlier specs raised — what must never happen again is a page of citations with no
-      explanation anywhere on it.
-    */
-    const described = portal
-      .locator('main li')
-      .filter({ hasText: /[\u0600-\u06FF]{25,}/ });
+      audited, and stored nowhere.
 
+      The violation is raised HERE rather than relying on one an earlier spec left behind — that
+      coupling would make this assertion pass or fail on another file's fixtures — and the exact
+      sentence is asserted rather than "some Arabic prose". The first attempt filtered on
+      /[\u0600-\u06FF]{25,}/ and could never have passed: Arabic words are separated by SPACES,
+      which are not in that range, so it demanded a twenty-five character run no real sentence has.
+    */
+    await staff.goto(`/partners/${reference}/violations`);
+    await staff.getByRole('button', { name: enforcement.raise }).first().click();
+    await staff.getByLabel(enforcement.kindLabel).selectOption('stale_calendar');
+    await staff.getByLabel(enforcement.violationReasonLabel).fill(DESCRIPTION);
+    await staff.getByRole('button', { name: enforcement.raise }).last().click();
+    await expect(staff.getByText(enforcement.raised)).toBeVisible(WAIT);
+
+    await portal.goto(`${BASE}/violations`);
     await expect(
-      described.first(),
-      'المخالفات shows no violation carrying a description — the partner cannot tell what they ' +
-        'were cited for.',
-    ).toBeVisible(WAIT);
+      portal.locator('main'),
+      'المخالفات does not show the description — the partner cannot tell what they were cited for.',
+    ).toContainText(DESCRIPTION, WAIT);
 
     /* ── ④ A WRITE is refused, and it says the account is on hold ──────────── */
     await portal.goto(`${BASE}/properties/${draft}/edit`);
@@ -370,6 +392,19 @@ test.describe('the suspension a partner meets', () => {
 
     await portal.goto(`${BASE}/payouts`);
     await expect(portal.getByText(t.suspension.payoutsFrozen)).toHaveCount(0);
+
+    /*
+      And the LIFT told them too — the notice a partner would otherwise have to discover by checking.
+
+      A business whose transfers stopped and whose listings vanished has no way to know the hold is
+      over. This event sent nothing at all before 2026-08-24, so a partner could stay off the market
+      for days after SAFRA had decided they should not be.
+    */
+    await portal.goto(`${BASE}/`);
+    await expect(portal.locator('[data-notices]')).toContainText(
+      t.dashboard.notice['partner.unsuspended'] ?? '',
+      WAIT,
+    );
 
     /*
       Recovery is proven by the WRITE succeeding, not by the banner going away.
