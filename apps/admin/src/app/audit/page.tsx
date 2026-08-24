@@ -10,6 +10,7 @@ import { TableToolbar } from '@/components/table-toolbar';
 import { t, auditAction, auditSubject, payloadChanges, roleName } from '@/lib/strings';
 import { pageNumber } from '@/lib/search-params';
 import { resolvePageSize } from '@/lib/table-size';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * سجل التدقيق (SRS §15, design handoff §8).
@@ -116,6 +117,17 @@ export default async function AuditPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('audit', t.nav.audit);
+
+  if (refused) return refused;
+
   const query = await searchParams;
   const first = (key: string): string | undefined => {
     const raw = query[key];
@@ -275,17 +287,32 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
     key: 'entity',
     header: t.sections.audit.colEntity,
     /*
-      Subject type plus a truncated id. A bare uuid says nothing; the type beside it turns an
-      opaque key into something an operator can act on, and eight characters is enough to match
-      against a full id they already hold.
+      The subject NAMED, and the whole row a link into its own screen.
+
+      Bashar, 2026-08-24: "I want the سجل التدقيق items to be same as last activities. I mean every
+      سجل should have a single very detailed page." The API resolves the subject, so «فندق الشام»
+      replaces a truncated uuid — and where it cannot resolve one, the type and the truncated id are
+      still printed rather than the row going quiet. An audit trail that hides what it cannot explain
+      is worse than one that admits it.
     */
     render: (row) => (
-      <div className="grid gap-0.5">
-        <span className="text-[11px] text-faint">{auditSubject(row.subjectType)}</span>
-        {row.subjectId ? (
+      <a
+        href={`/audit/${row.id}`}
+        aria-label={t.sections.staff.activityOpen}
+        className="grid gap-0.5 hover:text-gold"
+      >
+        <span className="text-[11px] text-faint">
+          {auditSubject(row.subject?.type ?? row.subjectType)}
+        </span>
+        {row.subject?.label ? (
+          <span className="text-[11.5px] text-text2">{row.subject.label}</span>
+        ) : null}
+        {row.subject?.reference ? (
+          <Ltr className="text-[10.5px] text-sky">{row.subject.reference}</Ltr>
+        ) : row.subjectId ? (
           <Ltr className="text-[10.5px] text-sky">{row.subjectId.slice(0, 8)}</Ltr>
         ) : null}
-      </div>
+      </a>
     ),
   },
   {

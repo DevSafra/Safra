@@ -10,6 +10,7 @@ import { StaffScopeEditor } from '@/components/staff-scope-editor';
 import { backTarget } from '@/lib/search-params';
 import { groupPermissions, isScopable, type Role } from '@safra/contracts';
 import { fill, label, roleName, t } from '@/lib/strings';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * صفحة الموظف — one staff member's record.
@@ -35,6 +36,17 @@ export default async function StaffMemberPage({
   params: Promise<{ userId: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('staff', t.nav.staff);
+
+  if (refused) return refused;
+
   const { userId } = await params;
   const query = await searchParams;
   /*

@@ -360,6 +360,36 @@ const auditEntrySchema = z.object({
     failing the whole parse and blanking سجل التدقيق.
   */
   actorRoleName: z.string().nullable().optional(),
+  /*
+    The actor's NAME, where the account has one (2026-08-24).
+
+    Optional and nullable both: 165 accounts predate `users.full_name`, and a console rendering
+    against an API that has not been redeployed must fall back to the address rather than failing
+    the parse and blanking سجل التدقيق.
+  */
+  actorName: z.string().nullable().optional(),
+  /*
+    WHAT the entry happened to, resolved server-side (Bashar, 2026-08-24: "write the partner name
+    (details) so me as a super admin can really know everything in details. Set that as a rule for
+    the future also").
+
+    «الموافقة على الشريك» beside a uuid is not an answer to "what happened". The API resolves the
+    subject once per batch — twenty-two subject types, six of which have a console screen to open —
+    so the console does not fetch per row and does not become a second answer to what a record is
+    called.
+
+    NULL is a real value and must render honestly: a raw type and id, never a hidden row. A trail
+    that quietly omits what it cannot explain is worse than one that admits it.
+  */
+  subject: z
+    .object({
+      type: z.string(),
+      reference: z.string().nullable(),
+      label: z.string().nullable(),
+      href: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
   before: z.unknown(),
   after: z.unknown(),
   reason: z.string().nullable(),
@@ -416,6 +446,18 @@ export async function getAuditLog(params: Record<string, string | undefined>) {
   }
 
   return staffFetch(`/admin/audit-log?${query.toString()}`, auditPageSchema);
+}
+
+/**
+ * One audit entry, for its own screen — `GET /admin/audit-log/:id`.
+ *
+ * Separate from `getStaffActivityEntry` because the CAPABILITY is different: this one is reached
+ * with `audit_log.read`, which opens the whole trail, and that one with `staff.manage`, which opens
+ * only what staff did. Same row, same rendering, two doors with two keys — collapsing them would
+ * hand every staff manager the platform-wide trail.
+ */
+export async function getAuditEntry(id: string) {
+  return staffFetch(`/admin/audit-log/${encodeURIComponent(id)}`, auditEntrySchema);
 }
 
 export async function getAuditActions() {

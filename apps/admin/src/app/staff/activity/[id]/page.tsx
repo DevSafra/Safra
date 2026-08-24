@@ -1,11 +1,11 @@
 import { getStaffActivityEntry } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { shortDateTime } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { AuditEntryDetail } from '@/components/audit-entry-detail';
 import { BackLink } from '@/components/back-link';
-import { Ltr } from '@/components/admin-table';
 import { backTarget } from '@/lib/search-params';
-import { auditAction, auditSubject, payloadChanges, roleName, t } from '@/lib/strings';
+import { t } from '@/lib/strings';
+import { refuseSection } from '@/components/section-refusal';
 
 /**
  * تفاصيل النشاط — one entry from آخر نشاط الموظفين.
@@ -41,6 +41,17 @@ export default async function StaffActivityPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  /*
+    FIRST, before any fetch.
+
+    `staffFetch` maps a 403 to 'unauthenticated', so a guard placed after the fetches never
+    runs: the page has already rendered «انتهت الجلسة» to somebody whose session is fine, and
+    signing in again lands them here again.
+  */
+  const refused = await refuseSection('staff', t.nav.staff);
+
+  if (refused) return refused;
+
   const { id } = await params;
   const query = await searchParams;
   /* Built from the LITERAL '/staff', never from a path in the URL. */
@@ -63,120 +74,18 @@ export default async function StaffActivityPage({
     );
   }
 
-  const changes = payloadChanges(entry.before, entry.after);
-
   return (
     <ConsoleShell title={t.sections.staff.activityEntry} counts={counts}>
       <BackLink target={back} section={t.nav.staff} />
 
-      <div className="mt-4 grid gap-4">
-        <ConsolePanel title={t.sections.staff.activityWhat}>
-          <p className="text-[14px] font-bold text-text">{auditAction(entry.action)}</p>
-
-          <dl className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Row term={t.sections.staff.activityWho}>
-              {/* An address is a Latin run on a line of Arabic — the VALUE is isolated, not the pair. */}
-              <Ltr>{entry.actorEmail ?? t.admin.systemActor}</Ltr>
-              {(entry.actorRoleName ??
-              (entry.actorRole ? roleName(entry.actorRole) : null)) ? (
-                <span className="text-faint">
-                  {' · '}
-                  {entry.actorRoleName ?? roleName(entry.actorRole ?? '')}
-                </span>
-              ) : null}
-            </Row>
-            <Row term={t.sections.staff.activityWhen}>
-              <Ltr>{shortDateTime(entry.createdAt)}</Ltr>
-            </Row>
-            <Row term={t.sections.staff.activitySubject}>
-              {auditSubject(entry.subjectType)}
-            </Row>
-            {/*
-              The IP is shown because سجل التدقيق shows it and this is the same row — a trail that
-              names the action and withholds where it came from is a weaker trail on a screen that
-              exists to answer "what exactly happened".
-            */}
-            {entry.ipAddress ? (
-              <Row term={t.sections.staff.activityIp}>
-                <Ltr>{entry.ipAddress}</Ltr>
-              </Row>
-            ) : null}
-          </dl>
-
-          {entry.reason ? (
-            <p className="mt-3 text-[12.5px] text-text2">
-              <span className="text-faint">{t.sections.staff.activityReason}: </span>
-              {entry.reason}
-            </p>
-          ) : null}
-        </ConsolePanel>
-
-        <ConsolePanel title={t.sections.staff.activityChanges}>
-          {changes.length === 0 ? (
-            /*
-              Many actions record nothing beyond the fact that they happened — a read, a resend. The
-              screen says so rather than rendering an empty grid, which reads as a loading fault.
-            */
-            <p className="text-[12.5px] text-faint">
-              {t.sections.staff.activityNoChanges}
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[420px] border-collapse text-[12.5px]">
-                <thead>
-                  <tr>
-                    <th
-                      scope="col"
-                      className="border-b border-line px-2.5 py-2 text-start text-[11px] font-bold text-faint"
-                    >
-                      {t.sections.audit.changeField}
-                    </th>
-                    <th
-                      scope="col"
-                      className="border-b border-line px-2.5 py-2 text-start text-[11px] font-bold text-faint"
-                    >
-                      {t.sections.audit.changeBefore}
-                    </th>
-                    <th
-                      scope="col"
-                      className="border-b border-line px-2.5 py-2 text-start text-[11px] font-bold text-faint"
-                    >
-                      {t.sections.audit.changeAfter}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {changes.map((change) => (
-                    <tr key={change.key}>
-                      <th
-                        scope="row"
-                        className="border-b border-line2 px-2.5 py-2.25 text-start font-normal text-text2"
-                      >
-                        {change.label}
-                      </th>
-                      <td className="border-b border-line2 px-2.5 py-2.25 text-faint">
-                        <bdi>{change.before ?? t.sections.audit.changeAbsent}</bdi>
-                      </td>
-                      <td className="border-b border-line2 px-2.5 py-2.25 text-text">
-                        <bdi>{change.after ?? t.sections.audit.changeAbsent}</bdi>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </ConsolePanel>
+      <div className="mt-4">
+        {/*
+          The SAME component سجل التدقيق renders. Two screens over one `audit_log` row would drift,
+          and the way that fails is that one event reads differently depending on which list you
+          opened it from — which is the one thing an audit trail cannot afford.
+        */}
+        <AuditEntryDetail entry={entry} />
       </div>
     </ConsoleShell>
-  );
-}
-
-function Row({ term, children }: { term: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-[11px] text-faint">{term}</dt>
-      <dd className="mt-0.5 text-[12.5px] text-text">{children}</dd>
-    </div>
   );
 }
