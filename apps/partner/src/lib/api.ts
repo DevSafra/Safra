@@ -128,10 +128,24 @@ const profileSchema = z.object({
    * Defaulted to `null` so an API that predates suspension still renders the portal rather than
    * failing the whole profile parse on a missing key.
    */
-  suspension: z
-    .object({ reason: z.string(), since: z.string() })
-    .nullable()
-    .default(null),
+  /*
+    NULLABLE, not defaulted — and the `.default(null)` that was here is the whole story.
+
+    `GET /partner/me` did not select `suspended_at` or `suspended_reason`, so it never sent this
+    object at all. The default turned that silence into "not suspended", every page parsed cleanly,
+    and `Shell` — which renders the suspension notice from exactly this field — had nothing to
+    render. The notice could not appear on any screen for any suspended partner, and المحفظة's
+    «التحويلات موقوفة» line, computed from the same field, was equally unreachable.
+
+    The comment that justified the default said it let an API predating suspension still render the
+    portal. It did. It also made the entire partner-facing half of the policy inert while every
+    test, type check and page load stayed green — which is why `O-staff-4` could record it as
+    "compile-verified" in good faith.
+
+    Required-but-nullable now: the key must be present. An API that stops sending it fails the parse
+    where the mistake is, instead of quietly telling a suspended business that nothing is wrong.
+  */
+  suspension: z.object({ reason: z.string(), since: z.string() }).nullable(),
 });
 
 export type PartnerProfile = z.infer<typeof profileSchema>;
@@ -893,11 +907,22 @@ const violationSchema = z.object({
   customerCompensationAmount: z.string().nullable(),
   waived: z.boolean(),
   waivedReason: z.string().nullable(),
-  /** The formal ladder: recorded → warned → fined → suspension, forward only. */
-  stage: z.enum(['recorded', 'warned', 'fined', 'suspension']).default('recorded'),
-  warnedAt: z.string().nullable().default(null),
-  /** What the partner was TOLD. Absent unless somebody actually warned them. */
-  warningNote: z.string().nullable().default(null),
+  /**
+   * The formal ladder: recorded → warned → fined → suspension, forward only.
+   *
+   * ## No `.default()`, and that is the fix
+   *
+   * These three carried `.default('recorded')`, `.default(null)` and `.default(null)` — and the API
+   * did not select any of them. Nothing failed: every violation a partner read reported «سُجّلت»
+   * whatever had really happened to it, and the warning somebody wrote FOR them reached nobody. A
+   * default turned a missing field into a plausible one, which is the quietest way for a screen to
+   * lie. Required-but-nullable now: the API must send the key, and if it stops the parse fails
+   * loudly instead of inventing a stage.
+   */
+  stage: z.enum(['recorded', 'warned', 'fined', 'suspension']),
+  warnedAt: z.string().nullable(),
+  /** What the partner was TOLD. Null until somebody actually warned them. */
+  warningNote: z.string().nullable(),
   /**
    * The forgiveness, when there is one — and it carries its own MONEY.
    *

@@ -179,6 +179,15 @@ describeIfDb('arrivals and violations', () => {
     `);
   }
 
+  /** A violation that has been WARNED, so the stage and the note have something to be. */
+  async function makeWarnedViolation(partner: string, note: string): Promise<void> {
+    await db.execute(sql`
+      INSERT INTO partner_violations (partner_id, kind, occurrence_number, stage,
+                                      warned_at, warning_note, score_penalty)
+      VALUES (${partner}::uuid, 'stale_calendar', 1, 'fined', now(), ${note}, 0)
+    `);
+  }
+
   beforeEach(async () => {
     await harness.begin();
 
@@ -420,6 +429,29 @@ describeIfDb('arrivals and violations', () => {
       expect(page.items[0]?.fineCurrency).toBe('USD');
       expect(page.items[0]?.customerCompensationAmount).toBe('50.00');
       expect(page.items[0]?.scorePenalty).toBe(5);
+    });
+
+    /**
+     * The stage and the warning REACH the partner, which for a long time they did not.
+     *
+     * `violations.service.ts` selected neither `stage` nor `warning_note`, and the portal's zod
+     * schema carried `.default('recorded')` and `.default(null)` for them — so nothing failed and
+     * every violation a partner opened reported «سُجّلت» whatever had really happened to it, while
+     * the sentence somebody wrote FOR them was never sent at all. A default turned a missing field
+     * into a plausible one.
+     *
+     * Asserted on a violation whose stage is `fined`, deliberately: `recorded` is the value the
+     * old default invented, so a test written against a recorded violation would have passed
+     * against the defect it is meant to catch.
+     */
+    it('sends the stage and the warning note the partner was written', async () => {
+      await makeWarnedViolation(partnerId, 'حدّث تقويمك خلال ٢٤ ساعة.');
+
+      const page = await violations.list(owner(partnerId), partnerId, { limit: 20 });
+
+      expect(page.items[0]?.stage).toBe('fined');
+      expect(page.items[0]?.warningNote).toBe('حدّث تقويمك خلال ٢٤ ساعة.');
+      expect(page.items[0]?.warnedAt).not.toBeNull();
     });
 
     /**

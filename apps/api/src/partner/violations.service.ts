@@ -28,6 +28,16 @@ export type Violation = {
   waivedReason: string | null;
   collectedAt: string | null;
   createdAt: string;
+  /**
+   * How far this violation was taken, and what the partner was TOLD.
+   *
+   * All three were missing from the SELECT while the portal's schema defaulted them — so every
+   * violation a partner opened reported the `recorded` stage whatever had really happened to it,
+   * and the warning somebody wrote for them to read was never sent.
+   */
+  stage: string;
+  warnedAt: string | null;
+  warningNote: string | null;
 };
 
 export type ViolationPage = {
@@ -115,12 +125,28 @@ export class ViolationsService {
       waived_reason: string | null;
       collected_at: string | null;
       created_at: string;
+      stage: string;
+      warned_at: string | null;
+      warning_note: string | null;
     }>(sql`
       SELECT v.id, v.created_at::text AS sort_key, v.kind::text AS kind,
              v.occurrence_number, b.reference AS booking_reference,
              v.score_penalty, ${amounts},
              v.waived_at::text, v.waived_reason, v.collected_at::text,
-             to_char(v.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS created_at
+             to_char(v.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS created_at,
+             -- The ladder and the warning, which this SELECT did not carry (Bashar, 2026-08-24).
+             --
+             -- The portal's schema declared all three and DEFAULTED them, so nothing failed: every
+             -- violation a partner read said «سُجّلت» whatever had really happened to it, and the
+             -- warning somebody wrote FOR the partner reached nobody. A fined violation, an
+             -- escalated one, a suspension-causing one -- all displayed as merely recorded.
+             --
+             -- warning_note is partner-facing by definition ("What the partner is told" in the
+             -- schema), so it belongs here. The staff-only field on a suspension is
+             -- partners.suspended_notes, which this endpoint does not touch.
+             v.stage::text AS stage,
+             to_char(v.warned_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS warned_at,
+             v.warning_note
       FROM partner_violations v
       LEFT JOIN bookings b ON b.id = v.booking_id
       LEFT JOIN currencies cur ON cur.id = v.fine_currency_id
@@ -152,6 +178,9 @@ export class ViolationsService {
         waivedReason: row.waived_reason,
         collectedAt: row.collected_at,
         createdAt: row.created_at,
+        stage: row.stage,
+        warnedAt: row.warned_at,
+        warningNote: row.warning_note,
       })),
       nextCursor:
         rows.rows.length > query.limit && last

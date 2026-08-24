@@ -195,6 +195,65 @@ describeIfDb('PropertiesService.readOwn', () => {
    * request and leave an unverified partner unable to do the ONE thing they were promised. Three
    * of the five tests below exist to fail if somebody makes that change.
    */
+  describe('the profile every portal page reads', () => {
+    /**
+     * The suspension REACHES the portal, which for the whole of its first day it did not.
+     *
+     * `profile()` selected neither `suspended_at` nor `suspended_reason`, and the portal's schema
+     * carried `.default(null)` on the object built from them — so `GET /partner/me` never sent it,
+     * every page parsed cleanly, and `Shell`, which renders the suspension notice from exactly this
+     * field, had nothing to render. The notice could not appear on any screen for any suspended
+     * partner, and المحفظة's «التحويلات موقوفة» line was unreachable for the same reason.
+     *
+     * Found by suspending a partner in a browser and looking at their dashboard. Nothing else would
+     * have found it: no test failed, no log recorded anything, and the type checker was satisfied
+     * by the default.
+     */
+    it('carries the suspension, with its reason and its date', async () => {
+      await db.execute(sql`
+        UPDATE partners
+        SET suspended_at = now(), suspended_reason = ${'سبب الإيقاف المعروض للشريك'},
+            suspended_notes = ${'ملاحظة داخلية لا يجوز أن تصل الشريك'}
+        WHERE id = ${partnerId}::uuid
+      `);
+
+      const view = await service.profile(partner());
+
+      expect(view.suspension).not.toBeNull();
+      expect(view.suspension?.reason).toBe('سبب الإيقاف المعروض للشريك');
+      expect(view.suspension?.since).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    /**
+     * The staff-only note does NOT reach the portal.
+     *
+     * `suspended_notes` is the one field in a suspension with a different audience, and this
+     * profile is read on every page by whoever is signed in — including employees. The assertion
+     * walks every string in the payload rather than naming the field: a privacy check phrased as
+     * "this particular value is absent" only ever protects the value it names, and the next
+     * staff-only field added beside it would walk straight around a narrower test.
+     */
+    it('never carries the staff-only note, anywhere in the payload', async () => {
+      await db.execute(sql`
+        UPDATE partners
+        SET suspended_at = now(), suspended_reason = ${'سبب الإيقاف المعروض للشريك'},
+            suspended_notes = ${'ملاحظة داخلية لا يجوز أن تصل الشريك'}
+        WHERE id = ${partnerId}::uuid
+      `);
+
+      const view = await service.profile(partner());
+
+      expect(JSON.stringify(view)).not.toContain('ملاحظة داخلية');
+    });
+
+    /** The control: a trading partner reports no suspension rather than an empty one. */
+    it('reports null for a partner who is not suspended', async () => {
+      const view = await service.profile(partner());
+
+      expect(view.suspension).toBeNull();
+    });
+  });
+
   describe('units before verification', () => {
     let codes = { citySlug: '', propertyTypeCode: '', cancellationPolicyCode: '' };
     let pendingPartnerId = '';

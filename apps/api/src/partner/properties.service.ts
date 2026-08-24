@@ -57,6 +57,8 @@ export class PropertiesService {
       city_name_ar: string | null;
       property_count: number;
       review_average: string | null;
+      suspended_since: string | null;
+      suspended_reason: string | null;
     }>(sql`
       SELECT pa.reference, pa.display_name, pa.legal_name,
              pa.verification::text AS verification, pa.score, pa.tier::text AS tier,
@@ -70,6 +72,24 @@ export class PropertiesService {
              -- the ranking uses. A badge disagreeing with the reviews screen is worse than none.
              (SELECT round(avg(rv.rating)::numeric, 1)::text FROM reviews rv
               WHERE rv.partner_id = pa.id AND rv.status = 'published') AS review_average
+             ,
+             -- The HOLD on this account, which this SELECT did not carry (Bashar, 2026-08-24).
+             --
+             -- Every page of the portal reads this profile, and the Shell renders the suspension
+             -- notice from it -- so without these two columns the notice could never appear, on any
+             -- screen, for any suspended partner. المحفظة's «التحويلات موقوفة» line is computed from
+             -- the same field and was equally unreachable.
+             --
+             -- Nothing failed and nothing logged: the portal's schema carried a default of null on
+             -- the suspension object, so a field the API never sent parsed cleanly as "not
+             -- suspended". The whole partner-facing half of the suspension policy was inert, and it
+             -- read as built.
+             --
+             -- suspended_notes is NOT selected. It is the one field in the suspension with a
+             -- different audience -- staff-only, by the same rule that keeps score and tier from
+             -- employees -- and this profile reaches whoever is signed in.
+             to_char(pa.suspended_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS suspended_since,
+             pa.suspended_reason
       FROM partners pa
       LEFT JOIN cities ci ON ci.id = pa.city_id
       WHERE pa.id = ${partnerId} AND pa.deleted_at IS NULL
@@ -102,6 +122,17 @@ export class PropertiesService {
       /** Null when the partner has no published reviews — the badge is then absent, not «0». */
       reviewAverage: row.review_average,
       city: row.city_name_ar,
+      /*
+        An OBJECT or null, not two loose fields.
+
+        `Shell` and المحفظة both ask one question — "is this account on hold, and what does it say" —
+        and a shape that can be half-present invites a screen to render «السبب:» with nothing after
+        it. Built from `suspended_at`, so the reason cannot arrive without the date that explains it.
+      */
+      suspension:
+        row.suspended_since === null
+          ? null
+          : { reason: row.suspended_reason ?? '', since: row.suspended_since },
     };
   }
 
