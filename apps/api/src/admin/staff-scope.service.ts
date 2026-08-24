@@ -177,9 +177,24 @@ export class StaffScopeService {
     const cityIds: string[] = [];
 
     if (input.kind === 'cities' && input.citySlugs.length > 0) {
+      /*
+        `IN (…)` over joined parameters, never `= ANY(${array})`.
+
+        Drizzle interpolates a JS array as a TUPLE — `($1)` — so `ANY(($1)::text[])` asks Postgres
+        to cast the single string `aleppo` to an array and it answers 22P02, malformed array
+        literal. Every `cities` scope 500d on this line, and nothing noticed because the console's
+        only caller was deleted with the panel that held it and the endpoint went quiet.
+
+        Third time today this exact trap has cost a live endpoint — `employee-roles.service.ts` and
+        `staff-roles.service.ts` were the others. `sql.join` keeps each element a BOUND PARAMETER,
+        so this is a list of placeholders rather than one placeholder holding a list.
+      */
       const cities = await this.db.execute<{ id: string; slug: string }>(sql`
         SELECT id, slug FROM cities
-        WHERE slug = ANY(${input.citySlugs}::text[]) AND deleted_at IS NULL
+        WHERE slug IN (${sql.join(
+          input.citySlugs.map((slug) => sql`${slug}`),
+          sql`, `,
+        )}) AND deleted_at IS NULL
       `);
 
       if (cities.rows.length !== new Set(input.citySlugs).size) {
@@ -209,9 +224,18 @@ export class StaffScopeService {
       );
 
       if (cityIds.length > 0) {
+        /*
+          The SAME trap, three lines further on, and it had never been reached because the query
+          above always threw first. Fixing only the reported line would have moved the 500 rather
+          than removed it — which is why the regression test beside this file asserts the stored
+          rows rather than that the call returned.
+        */
         await tx.execute(sql`
           INSERT INTO staff_scope_cities (user_id, city_id)
-          SELECT ${userId}::uuid, unnest(${cityIds}::uuid[])
+          VALUES ${sql.join(
+            cityIds.map((cityId) => sql`(${userId}::uuid, ${cityId}::uuid)`),
+            sql`, `,
+          )}
         `);
       }
 
