@@ -130,10 +130,38 @@ function Row({ violation }: { violation: PartnerViolation }) {
       ? `${violation.fineAmount} ${violation.fineCurrency}`
       : null;
 
+  /*
+    The balancing entry, on the same terms as the fine: present only when this reader may see money
+    AND there is a figure. `waiver.amount` is null for an employee without `payout.read_own`, which
+    is WITHHELD rather than zero — so the pair is simply not printed and the reason line below still
+    says a waiver happened.
+  */
+  const waiverMoney =
+    violation.waiver?.amount && violation.waiver.currency
+      ? `${violation.waiver.amount} ${violation.waiver.currency}`
+      : null;
+
+  /*
+    Zero in the fine's own currency, not the string '0'. A waiver is always the WHOLE fine — the
+    schema takes no partial amount, deliberately, so a caller cannot supply a second figure that
+    disagrees with the first — which makes the net exactly zero and lets it be stated rather than
+    computed from two numbers that could drift.
+  */
+  const net = violation.waiver?.currency ? `0 ${violation.waiver.currency}` : '0';
+
+  /* The waiver's own reason wins; `waivedReason` is the older field for rows filed before it. */
+  const waivedReason = violation.waiver?.reason ?? violation.waivedReason;
+
   return (
     <div className="grid gap-1.5 rounded-xl border border-line bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm font-semibold text-text">{kind}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-semibold text-text">{kind}</p>
+          {/* The raw value if the ladder grows a stage nobody labelled — never prettified. */}
+          <span className="rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted">
+            {t.violations.stage[violation.stage] ?? violation.stage}
+          </span>
+        </div>
         <Ltr className="text-[12px] text-faint">{violation.createdAt}</Ltr>
       </div>
 
@@ -145,9 +173,6 @@ function Row({ violation }: { violation: PartnerViolation }) {
             {fill(t.violations.booking, { reference: violation.bookingReference })}
           </>
         ) : null}
-        {violation.scorePenalty > 0
-          ? ` · ${fill(t.violations.scorePenalty, { n: count(violation.scorePenalty) })}`
-          : ''}
       </p>
 
       {fine ? (
@@ -166,12 +191,55 @@ function Row({ violation }: { violation: PartnerViolation }) {
         the mark says a decision happened and refuses to say what it was, which is worse for the
         partner than not showing the row at all.
       */}
-      {violation.waived ? (
-        <p className="text-[12.5px] text-ok">
-          {violation.waivedReason
-            ? fill(t.violations.waivedFor, { reason: violation.waivedReason })
-            : t.violations.waived}
+      {/*
+        What the partner was TOLD, and when — shown only once somebody actually warned them.
+
+        Nothing is backfilled to `warned` for exactly this reason: being warned means a person was
+        informed, and no row records that having happened for violations filed before the ladder
+        existed. A stage inferred from a fine would put words in SAFRA's mouth.
+      */}
+      {violation.warnedAt ? (
+        <p className="text-[12.5px] text-muted">
+          {fill(t.violations.warnedOn, { date: violation.warnedAt })}
+          {violation.warningNote
+            ? ` · ${fill(t.violations.warningNote, { note: violation.warningNote })}`
+            : ''}
         </p>
+      ) : null}
+
+      {/*
+        A waived fine is the PAIR — the charge, the balancing entry, and the net — never «—» and
+        never the net alone.
+
+        Bashar's rule (2026-08-24) is that a waiver does not delete or rewrite history: the original
+        fine stays permanently visible and a balancing entry cancels it. Rendering only the net, or
+        hiding the row, would delete that history one layer above the ledger and leave the partner
+        unable to answer what they were charged and what was forgiven.
+
+        `waiverMoney` is null when the amounts were WITHHELD from this reader, and the row then
+        still shows that a waiver happened, when, and why — `moneyHidden` above says which case a
+        missing figure is, so it cannot be read as zero.
+      */}
+      {violation.waived || violation.waiver ? (
+        <div className="grid gap-1">
+          {waiverMoney ? (
+            <p className="text-[12.5px] text-ok">
+              {fill(t.violations.waivedAmount, { amount: waiverMoney })}
+              {' · '}
+              {fill(t.violations.net, { amount: net })}
+            </p>
+          ) : null}
+          <p className="text-[12.5px] text-ok">
+            {waivedReason
+              ? fill(t.violations.waivedFor, { reason: waivedReason })
+              : t.violations.waived}
+          </p>
+          {violation.waiver ? (
+            <p className="text-[12px] text-faint">
+              {fill(t.violations.waivedOn, { date: violation.waiver.at })}
+            </p>
+          ) : null}
+        </div>
       ) : (
         <p className="text-[12px] text-faint">
           {violation.collectedAt ? t.violations.collected : t.violations.outstanding}
