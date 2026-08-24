@@ -144,6 +144,27 @@ function payloadValue(value: unknown): string {
 
   if (typeof value === 'number') return String(value);
 
+  /*
+    A list of SCALARS reads as a list; anything else stays JSON.
+
+    `staff.scope_changed` carries `citySlugs`, so this column was about to print `["petra","aleppo"]`
+    — brackets, quotes and all — which is the JSON-in-a-narrow-column problem this function exists
+    to remove. Each element goes through the same lookup, so a list of codes is translated element by
+    element and a list of slugs stays as slugs, which is what a slug is for.
+
+    The `every` guard is not defensive tidiness: joining an array of OBJECTS was my first version and
+    it turned `[{ days: 7 }]` into `{"days":7}`, silently dropping the fact that it was a list of
+    one. `strings.test.ts` caught it — a pricing payload really does carry nested tiers, and
+    "re-serialise rather than lose it" is that test's whole point.
+  */
+  if (Array.isArray(value)) {
+    if (value.length === 0) return t.admin.noData;
+
+    if (value.every((item) => typeof item !== 'object' || item === null)) {
+      return value.map((item) => payloadValue(item)).join(' · ');
+    }
+  }
+
   return JSON.stringify(value) ?? t.admin.noData;
 }
 
