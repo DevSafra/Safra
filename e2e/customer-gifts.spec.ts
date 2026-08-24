@@ -411,6 +411,22 @@ test.describe('بطاقات الهدايا', () => {
       for (const text of await page.locator('#disputes-list li').allTextContents()) {
         const booking = /BKG-[\d-]+/.exec(text)?.[0];
 
+        /*
+          Only a LIVE dispute spends the pair — and counting every historical one is what
+          "exhausted" this fixture (2026-08-24).
+
+          `dispute-request.service.ts` refuses a duplicate on `status IN ('open','investigating')`
+          and says why in as many words: resolved and rejected are terminal, so the reason is free to
+          raise again. This loop counted every dispute ever filed, so after thirty-two the spec threw
+          «Run `pnpm db:testbed` to clear them» — pointing at a destructive re-seed to solve a
+          problem the API did not have. A test must not be stricter than the rule it is testing.
+        */
+        const live =
+          text.includes(en.disputeStatuses.open) ||
+          text.includes(en.disputeStatuses.investigating);
+
+        if (!live) continue;
+
         for (const [kind, label] of Object.entries(en.disputeKinds)) {
           if (booking && text.includes(label)) spent.add(`${booking}|${kind}`);
         }
