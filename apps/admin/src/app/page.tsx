@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
 import {
   getDashboard,
@@ -14,6 +15,10 @@ import { t, auditAction, bookingStatus } from '@/lib/strings';
 import { StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
 import { ORNAMENT_BRAND, SidebarBackdrop } from '@safra/ui';
+import { readerSections, sectionAccess } from '@/lib/gate';
+import { landingPath } from '@/lib/section-paths';
+import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
+import { sidebarCounts } from '@/lib/console';
 
 /**
  * The command center (§9.2), built to the approved design (SAFRA 29.07).
@@ -40,6 +45,43 @@ export const dynamic = 'force-dynamic';
 const DASHBOARD_QUEUE_ROWS = 4;
 
 export default async function DashboardPage() {
+  /*
+    The landing decision, FIRST — before the dashboard's own fetches.
+
+    مركز القيادة opens on `booking.read_all`, which a narrow role need not carry. Rendering an
+    overview of a business somebody cannot see is worse than sending them somewhere they can work:
+    every figure on it would be a dash or a refusal, and `staffFetch` reports the 403s as
+    «انتهت الجلسة», so they would sign in again and land here again.
+  */
+  if ((await sectionAccess('dashboard')) !== 'open') {
+    const destination = landingPath(await readerSections());
+
+    /*
+      A role that opens NOTHING gets a sentence, not a blank page and not a redirect.
+
+      `sections.test.ts` pins that this state is reachable, so somebody will reach it — and an empty
+      console is indistinguishable from a broken one. The person who can fix it is the super admin
+      who built the role, so the copy says to ask them. Redirecting to `/` instead would be a loop
+      back to the page they were just refused.
+    */
+    if (destination === null) {
+      return (
+        <ConsoleShell
+          title={t.sections.gate.noSectionsTitle}
+          counts={await sidebarCounts()}
+        >
+          <ConsolePanel>
+            <p className="text-[13px] leading-relaxed text-muted">
+              {t.sections.gate.noSectionsBody}
+            </p>
+          </ConsolePanel>
+        </ConsoleShell>
+      );
+    }
+
+    redirect(destination);
+  }
+
   /*
     Four rows, because this is a DASHBOARD panel and not the queue.
 
@@ -91,6 +133,7 @@ export default async function DashboardPage() {
       </main>
 
       <AdminSidebar
+        sections={await readerSections()}
         /*
           Every badge the sidebar can show, from this one payload.
 

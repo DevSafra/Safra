@@ -1,6 +1,7 @@
 import { SidebarBackdrop } from '@safra/ui';
 
 import { AdminSidebar, type SidebarCounts } from '@/components/admin-sidebar';
+import { readerSections } from '@/lib/gate';
 import { ConsoleHeader } from '@/components/console-header';
 import { t } from '@/lib/strings';
 
@@ -16,7 +17,7 @@ import { t } from '@/lib/strings';
  * renders the SAME `ConsoleHeader`, so the title row cannot drift between them again.
  *
  */
-export function ConsoleShell({
+export async function ConsoleShell({
   title,
   subtitle,
   counts,
@@ -35,7 +36,7 @@ export function ConsoleShell({
         {children}
       </main>
 
-      <AdminSidebar counts={counts} />
+      <AdminSidebar counts={counts} sections={await readerSections()} />
       <SidebarBackdrop label={t.nav.hideSidebar} className="console-backdrop" />
     </div>
   );

@@ -87,6 +87,22 @@ const NAV: readonly NavItem[] = [
   { key: 'reports', href: '/reports' },
   { key: 'settings', href: '/settings' },
   { key: 'audit', href: '/audit' },
+  /*
+    وضع الطوارئ in the nav, added 2026-08-24, and it is a REACHABILITY fix rather than a promotion.
+
+    It was reachable from one place: a red link in the dashboard's header, deliberately not in the
+    sidebar so it could not be opened by a mis-click. That held while every reader landed on the
+    dashboard. Gating changed it — a reader holding `emergency_mode.activate` and not
+    `booking.read_all` is now redirected off the dashboard before that header renders, so the
+    control became reachable only by typing the URL, for exactly the role most likely to need it
+    in a crisis. Found by project-e9 checking my inferred reason against the actual link.
+
+    The mis-click argument does not survive the nav being permission-filtered: the only readers who
+    see this entry are the ones who hold the capability, and they are the ones meant to have it.
+    The dashboard link stays — two ways to reach the one control that matters under pressure is the
+    correct number.
+  */
+  { key: 'emergency', href: '/emergency', warn: true },
 ];
 
 /**
@@ -131,8 +147,26 @@ export const NO_COUNTS: SidebarCounts = {
   partnerApplications: undefined,
 };
 
-export function AdminSidebar({ counts }: { counts: SidebarCounts }) {
+export function AdminSidebar({
+  counts,
+  sections,
+}: {
+  counts: SidebarCounts;
+  /**
+   * The sections this reader may open, resolved SERVER-SIDE and passed in.
+   *
+   * This component is `'use client'`, so it cannot read the session itself — and it should not.
+   * `ConsoleShell` calls `readerSections()` and hands the answer down, which keeps one answer to
+   * "what may this person open" rather than a second one computed in the browser.
+   *
+   * Filtering here is not an access control and must not be mistaken for one: the API refuses
+   * every section on its own authority, and each page carries its own guard for a reader who
+   * arrives by URL. This stops somebody being offered nineteen links that answer «انتهت الجلسة».
+   */
+  sections: readonly string[];
+}) {
   const pathname = usePathname();
+  const openable = new Set(sections);
 
   // 14px radius and 14px padding — the handoff's sidebar values (§9.5, §9.6).
   return (
@@ -165,7 +199,12 @@ export function AdminSidebar({ counts }: { counts: SidebarCounts }) {
         scrolls inside itself, and the controls stay visible.
       */}
       <nav className="mt-1 grid min-h-0 flex-1 gap-0.5 overflow-y-auto">
-        {NAV.map((item) => {
+        {/*
+          Filtered, not disabled. A greyed-out link is a map of what somebody may not do, and this
+          console hands that map to whoever is reading — which is reconnaissance for anyone
+          deciding which account to go after. A section a reader cannot open is simply not there.
+        */}
+        {NAV.filter((item) => openable.has(item.key)).map((item) => {
           const label = t.nav[item.key];
           const badge = item.badge ? counts[item.badge] : undefined;
 

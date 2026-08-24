@@ -152,6 +152,20 @@ export const ar = {
     settings: 'الإعدادات',
     staffRoles: 'أدوار الموظفين',
     audit: 'سجل التدقيق',
+    /*
+      وضع الطوارئ reached the nav on 2026-08-24, and the ⚠ is deliberate.
+
+      It was reachable ONLY from the dashboard header. Gating مركز القيادة on `booking.read_all` and
+      redirecting readers who lack it meant a role carrying `emergency_mode.activate` and not
+      `booking.read_all` could no longer reach the emergency control at all — exactly the role most
+      likely to need it, and only in the situation where it matters. The gate created the gap; this
+      closes it.
+
+      The glyph is the same one the header uses, so the two entry points read as one control rather
+      than as two features. Both are kept: two ways to reach the control that matters under pressure
+      is the correct number.
+    */
+    emergency: '⚠ وضع الطوارئ',
   },
 
   /** The dashboard proper, matching the approved design's panels. */
@@ -973,6 +987,45 @@ export const ar = {
       minutes: 'دقيقة',
       noPrevious: 'لا مقارنة',
       vsPrevious: 'عن الأسبوع الماضي',
+    },
+
+    /*
+      What a page renders INSTEAD of itself when the reader's role does not open it
+      (Bashar, 2026-08-24: "fix it").
+
+      The console showed every reader all twenty-three sections and let the API refuse the ones they
+      could not read — and `staffFetch` reports a 403 as `'unauthenticated'`, so the screen said
+      «انتهت الجلسة» and sent somebody to sign in again over a permission. Signing in again lands
+      them in exactly the same place, so every link was a loop.
+    */
+    gate: {
+      /*
+        A section a named role COULD carry and theirs does not.
+
+        The sentence names the person who can change it, because they are one conversation away.
+        Telling somebody a thing is impossible when it is merely not granted sends them away from
+        the only conversation that would fix it.
+      */
+      role: 'دورك الحالي لا يشمل هذا القسم. اطلب من المدير العام تعديله إن كنت بحاجة إليه.',
+      /*
+        A section NO named role may carry — today only «أدوار الموظفين», because a role that can
+        define roles can grant itself everything, so `STAFF_ASSIGNABLE_PERMISSIONS` withholds it.
+
+        A different sentence because the answer is different: asking would not help, so this one
+        closes the subject rather than pointing at somebody who cannot act either.
+      */
+      closed: 'هذا القسم لا يفتحه أي دور مُسمّى — يخص المدير العام وحده.',
+      /*
+        A role that opens NOTHING. `sections.test.ts` pins that this is reachable, so somebody will
+        reach it.
+
+        Not a blank page and not a redirect to a dashboard they cannot read: an empty console is
+        indistinguishable from a broken one, and the person who needs to know is the super admin who
+        built the role.
+      */
+      noSectionsTitle: 'دورك لا يفتح أي قسم بعد',
+      noSectionsBody:
+        'القدرات الممنوحة لدورك لا تفتح أي شاشة في مركز القيادة حتى الآن. اطلب من المدير العام تعديل الدور.',
     },
 
     staff: {
@@ -2198,6 +2251,13 @@ export const ar = {
     payloadKey: {
       reason: 'السبب',
       reference: 'المرجع',
+      /*
+        Written by `staff.invited` and `staff.role_changed` since roles became rows a super admin
+        defines. The catalogue test found it against the real `audit_log`, not by review — the
+        payload key is assembled nowhere and greppable everywhere, and it still went uncatalogued
+        because nobody looks at a payload until they need it.
+      */
+      staffRoleId: 'الدور',
       /*
         Generic enough to be shared, and both arrive from `partner_employee_role.*`: a role's audit
         row carries its name and its capability set on both sides of an edit, which is what makes
