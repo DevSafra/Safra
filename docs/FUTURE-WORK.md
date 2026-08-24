@@ -3804,10 +3804,10 @@ code. The read really was dead; the write only looked dead. That distinction is 
 
 ---
 
-### O-partner-11 — Enforcement mail goes to `partners.email`, which can differ from the account
+### O-partner-11 — Enforcement mail went to `partners.email`, which can differ from the account
 
-**Status:** open · **Owner:** **Bashar** (a product decision, then a one-line change) ·
-**Recorded:** 2026-08-24
+**Status:** **RESOLVED 2026-08-24** — every enforcement notice is addressed to the sign-in account ·
+**Owner:** engineering · **Recorded:** 2026-08-24
 
 `EnforcementService.livePartner` selects `p.email`, so the suspension notice and the fine-waiver
 notice are addressed to the APPLICATION contact on the partner row — not to `users.email`, the
@@ -3821,19 +3821,26 @@ from a suspension imposed silently. Worse in the fixture's case: `partner1@safra
 APPLICANT persona, so an enforcement notice for a real partner lands in a different persona's inbox,
 which is also a trap for any future spec that reads mailpit by address.
 
-**Recommendation.** Send to BOTH, or decide deliberately which one. A business contact is a
-legitimate destination — a hotel may want notices at its front desk — but the account holder must
-not be able to miss an enforcement action, so the account address should always be among the
-recipients. That is Bashar's call; the change itself is one `JOIN` already present in the query.
-**Discovered by** a browser assertion that compared the console's displayed email against the
-session's account and refused to proceed — the check was guarding against suspending the wrong
-business and found a different defect instead.
+**Resolved.** Bashar, 2026-08-24: _"enforcement notifications must use the actual sign-in account
+or authoritative partner contact destination. Do not rely on `partners.email` if it can diverge."_
+`EnforcementNotifier.recipient` selects `u.email` joined from the partner, so the address that
+operates the portal is the address that is told what happened to it.
+
+**Held by a test with the two columns deliberately different.** `enforcement-notifications.integration.test.ts`
+sets `partners.email` to a second address on purpose and asserts the notice went to the account —
+a fixture with both the same would pass against either implementation and prove nothing. Watched to
+fail with the query reverted to `p.email`.
+
+**Discovered by** a browser assertion comparing the console's displayed email against the session's
+account, which refused to proceed. It was guarding against suspending the wrong business and found a
+different defect instead.
 
 ---
 
-### O-partner-12 — `SuspendedRefusal` is a component with no caller
+### O-partner-12 — `SuspendedRefusal` was a component with no caller
 
-**Status:** open · **Owner:** engineering · **Recorded:** 2026-08-24
+**Status:** **RESOLVED 2026-08-24** — removed, its reasoning kept where the behaviour lives ·
+**Owner:** engineering · **Recorded:** 2026-08-24
 
 `suspension-notice.tsx` exports `SuspendedRefusal`, a `<p data-suspended-refusal>` carrying the
 suspension sentence. **Nothing imports it.** The twelve write components deliver the same sentence
@@ -3846,16 +3853,68 @@ refusal; the risk is somebody later assuming the attribute is a test hook that e
 output, or wiring a thirteenth component to the component instead of the helper and getting a
 different-looking refusal from the twelve beside it.
 
-**Recommendation.** Delete it, and check first what it DID rather than who called it — the read
-really is dead here, but that judgement is exactly the one that went wrong with
-`GET /admin/staff/scopes`. Its docblock is worth keeping somewhere: it explains why the refusal is
-separate from the notice, which is a real design decision.
+**Resolved by removal**, after asking what it DID rather than who called it — the check that went
+wrong with `GET /admin/staff/scopes`. What it did was render one sentence, and `refusalFor()` renders
+the same sentence from the same error code; nothing else was attached. Its docblock made a point
+worth keeping — the notice says why the ACCOUNT is held, the refusal says why the thing you just
+tried did not happen, and both are needed — so that argument now sits on `refusal.ts`, together with
+why the answer is a string rather than a component: the twelve write components each have their own
+message area and their own vocabulary to fall back to.
 
 ---
 
-### O-ops-4 — The committing integration suites grow the dev database without bound
+### O-e2e-4 — Two specs were stricter than the rules they test, and exhausted their own fixtures
 
 **Status:** open · **Owner:** engineering · **Recorded:** 2026-08-24
+
+Two independent instances of one shape, both found on 2026-08-24 while getting the suite green:
+
+**`customer-gifts.spec.ts` counted every historical dispute as spending a (booking, reason) pair.**
+`dispute-request.service.ts` refuses a duplicate on `status IN ('open','investigating')` and says
+why in as many words — resolved and rejected are terminal, so the reason is free to raise again. The
+spec counted them all, so after 32 disputes it threw «Run `pnpm db:testbed` to clear them»: pointing
+at a destructive re-seed to solve a problem the API did not have. Fixed by counting only live
+disputes, which also means the exhaustion cannot recur. **A test must not be stricter than the rule
+it is testing** — being stricter looks safe and quietly narrows what the product is allowed to do.
+
+**`metrics.integration.test.ts` races the committing payments suite.** Its
+`safra_payment_events_unprocessed` assertions read a global count, add one event and assert
+before + 1. Under vitest's parallel execution the payments suite can commit an `awaiting` event in
+between, and the delta becomes 2. Observed once in eight full runs; passes alone every time. It needs
+either a scoped count or a serial marker — a flake in a metrics suite is the kind nobody trusts to be
+a flake when it matters.
+
+**What stays open here:** the disputes fix is landed; the metrics race is not.
+
+---
+
+### O-cons-1 — The disputes registry says «unresolved first» and orders by date
+
+**Status:** open · **Owner:** engineering · **Recorded:** 2026-08-24
+
+`dispute.service.ts` carries the comment _"Unresolved first, then oldest first inside each group: the
+queue's job is to surface what has been waiting longest"_ directly above
+`ORDER BY d.created_at DESC, d.id DESC` — newest first, with no status grouping and no ascending
+order. The comment describes a queue; the code returns a feed.
+
+**Impact.** An operator working النزاعات top-down is reading the most recently OPENED disputes, not
+the ones that have been waiting longest — the opposite of what the comment promises, and payouts are
+frozen for every one of them. It is also how a fixture surprise arrived: re-opening the four OLDEST
+test disputes left page one showing only closed ones, and `admin-sections.spec.ts` failed on a badge
+that was correct.
+
+**Recommendation.** Decide which the screen is, then make the other one match. If it is a queue,
+`ORDER BY (status IN ('open','investigating')) DESC, created_at ASC`. If a feed is wanted, delete the
+sentence. This is the third instance recorded of a true-sounding comment describing an intention
+rather than a change (`O-staff-2`, the آخر نشاط docblock, and now this) — and the only defence that
+has worked is asserting the behaviour rather than reading the note.
+
+---
+
+### O-ops-4 — The committing integration suites grew the dev database without bound
+
+**Status:** **RESOLVED 2026-08-24** — the blast radius removed without deleting any evidence ·
+**Owner:** engineering · **Recorded:** 2026-08-24
 
 §7b deviation 2 accepts that four integration suites COMMIT rather than roll back, on the grounds
 that it is "30 bookings and 23 audit rows per run, in a development database". That arithmetic is
@@ -3895,14 +3954,43 @@ grounds of "30 bookings and 23 audit rows per run, in a development database". E
 ONE run and silent about a thousand; the measured state was 112 orphan properties and 12,636
 bookings on a single fixture listing.
 
+---
+
+**Resolved, and NOT by deleting the evidence.** Bashar's constraint was to implement the cleanup
+"while preserving append-only audit and financial evidence", and the accumulation turned out to be
+deliberate: `payments.integration.test.ts` already had a teardown that keeps any booking carrying a
+payment or a ledger entry, precisely because that is financial evidence. Deleting those rows was
+never the fix.
+
+What actually caused harm was one word: the fixture property was **`published`**. That made its
+public payload 7.1MB — past the 2MB Next.js data-cache ceiling — and put it in Damascus search
+results, so a customer-app spec opening the first listing timed out. Three changes, no deletions:
+
+| Change                                                                                              | Effect                                                                                                                            |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `payments-test-property` created as `draft`, plus an idempotent `UPDATE` for databases that have it | No public page, no search entry, nothing fetches it. Every booking, payment and ledger row is kept                                |
+| `payout.integration.test.ts` fixtures created as `draft`                                            | The suite rolls back, so this only matters for residue — and residue must not be discoverable                                     |
+| An `afterAll` sweep on its own committing connection                                                | Deletes only rows with NO evidence attached (`NOT EXISTS` on bookings, payouts, properties), and DRAFTS whatever it cannot delete |
+
+The 112 orphan properties were all `published`; 336 `partner_payout_items` reference their bookings,
+so deleting them would have unpicked financial bookkeeping to tidy a fixture. They are drafts now:
+every row kept, nothing discoverable.
+
+**And it took something with it, which is the lesson.** Drafting the payments fixture broke three
+`customer-locale.spec.ts` tests that used it as their checkout property — a customer-facing spec
+depending on a test suite's private fixture, which is the coupling that made one property's growth
+that file's problem. The spec now resolves a seeded published property at run time, the way
+`findReference` does. _Before deleting, ask what it DID._
+
 **Why it was not noticed earlier:** it degrades gradually and the failures land on specs nobody
 associates with the cause. It is also invisible to `pnpm verify`, which never opens a browser.
 
 ---
 
-### O-fin-4 — Nothing pairs `fine_amount` with `fine_currency_id`
+### O-fin-4 — Nothing paired `fine_amount` with `fine_currency_id`
 
-**Status:** open · **Owner:** engineering · **Recorded:** 2026-08-24
+**Status:** **RESOLVED 2026-08-24** — enforced by a CHECK constraint ·
+**Owner:** engineering · **Recorded:** 2026-08-24
 
 `partner_violations` carries **no CHECK constraints at all**. A fine is two columns that must both
 be set or both be null, and only the writing code says so. `finance.service.ts` now filters on both
@@ -3916,19 +4004,21 @@ before 2026-08-24 a half-written fine took الدفع down entirely for every op
 screen filters on both columns it would instead DISAPPEAR from الدفع — money the platform levied,
 absent from the screen that reconciles it. The second is quieter than the first and therefore worse.
 
-**Recommendation.** A CHECK constraint, in the shape the waiver already sets a precedent for:
-`waived_reason` is `NOT NULL` wherever `waived_at` is set, enforced by a CHECK because the column
-must stay nullable for un-waived rows. Here that is
-`CHECK ((fine_amount IS NULL) = (fine_currency_id IS NULL))`. One migration, no code change, and it
-makes the filter in `finance.service.ts` a belt beside a brace rather than the only guard. Safe to
-add now: zero rows violate it.
+**Resolved.** `post/0009_fine_money_pairing.sql` adds
+`CHECK ((fine_amount IS NULL) = (fine_currency_id IS NULL))` — the shape the waiver already set a
+precedent for, where `waived_reason` is required wherever `waived_at` is set and the column stays
+nullable for un-waived rows.
+
+Verified before applying (0 of 7,679 rows violated it) and verified after, by watching the database
+refuse a half-written fine: `violates check constraint "partner_violations_fine_money_paired"`. The
+filter in `finance.service.ts` is now a belt beside a brace rather than the only guard.
 
 ---
 
-### O-staff-5 — Three enforcement actions tell the operator the partner was notified, and do not notify them
+### O-staff-5 — Three enforcement actions told the operator the partner was notified, and notified nobody
 
-**Status:** open · **Owner:** **Bashar** (a product decision, then engineering) ·
-**Recorded:** 2026-08-24
+**Status:** **RESOLVED 2026-08-24.** All five events notify on two channels, driven in a browser and
+confirmed in the mailbox · **Owner:** engineering · **Recorded:** 2026-08-24
 
 `EnforcementService` makes exactly two `mail.send` calls: the suspension notice and the fine waiver.
 There is no notification of any kind — no mail, no queue job, no `notifications` row — for a
@@ -3961,11 +4051,32 @@ the one helper, **Arabic first and English underneath** per the standing rule, a
 swallow on failure, exactly as the two existing notices do — a mail server must not roll back an
 enforcement decision.
 
-**The decision that is Bashar's:** whether a fine and a warning should email at all, and whether
-lifting a suspension should. The engineering is a day; the question of what a partner is entitled to
-be told is not an engineering one. Until it is answered, the honest fallback is to drop «وأُبلغ
-الشريك» from those three messages so the console stops asserting something that does not happen —
-that is a three-line change and it can be done the day he says so.
+**Bashar's answer, 2026-08-24:** _"The partner must be notified whenever an administrative or
+financial enforcement action changes their status, obligations, or access."_ All five events, both
+channels, no exceptions.
+
+**What was built.** `EnforcementNotifier` — one class, five callers — deciding the six things that
+were previously decided twice and then not at all: recipient, language, both channels, the link, the
+audit, and what happens when delivery fails.
+
+| Requirement                                    | How it is met                                                                                                                                                                   |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| In-app notice per event                        | `notifications` row, `channel = 'in_app'`, `status = 'sent'` — the row IS the delivery, so `queued` would make the `safra_notifications_1h` gauge read a success as stuck       |
+| Email per event                                | Through `NotificationService.notify`, so the attempt, the outcome and the retry count are recorded like every other notice                                                      |
+| Partner account's preferred locale             | `users.preferred_locale`, joined from the partner in the same row as the address — one query, so language and recipient cannot be chosen in two places                          |
+| Arabic, English and German                     | `compose` already orders ar → en → theirs, per the standing email rule. Five templates, three locales, asserted per template in `mail.templates.test.ts`                        |
+| Action, date, reason, secure link              | Every body carries all four. The link is always an authenticated portal page                                                                                                    |
+| Amount and currency for fines and waivers      | Formatted by the caller, which holds the currency code — the template never invents a money format                                                                              |
+| No internal notes or unnecessary personal data | `suspended_notes` reaches no template. The delivery audit carries `{ templateKey, inApp, email }` and no address — asserted by walking the whole payload, not by naming a field |
+| Delivery failure must not roll back            | Every notice is sent after its transaction commits, and `EnforcementNotifier` cannot throw. Held by two tests that make BOTH channels fail and assert the decision stands       |
+| Attempts recorded without addresses in logs    | `deliver()` already redacted; `notify()`'s ENQUEUE path did NOT and had logged «SMTP refused the message for host@example.test». Now redacted through the same helper           |
+| Console must not claim more than was attempted | Creation is attempted for all five, so «وأُبلغ الشريك» is now true where it was false for warning, fine and lift                                                                |
+| Audit distinguishes action from delivery       | `partner.notified` is its own action, written after the transaction. One delivery row per enforcement action — 41 for 41, verified in the browser walkthrough                   |
+
+**Verified in the mailbox, not only in a test.** The walkthrough of 2026-08-24 cleared mailpit, drove
+warning → fine → suspend → unsuspend → waive in a browser, and read the result: five distinct
+subjects, each Arabic first with English after the `·`, each body carrying the date, the reason and
+the portal link, each addressed to `users.email`.
 
 ---
 

@@ -473,10 +473,19 @@ found the whole partner-facing half of the suspension policy to be inert.
 | المخالفات stage and warning | **Complete, and was NOT.** `GET /partner/violations` selected neither `stage` nor `warning_note`, both defaulted in the portal schema — so every violation read «سُجّلت» whatever had happened to it, and the warning written FOR the partner reached nobody.                                 |
 | المخالفات notification      | **New.** A card in the §7.1 row showing the OPEN count and the furthest rung reached, linking to المخالفات. The alerts panel is `LIMIT 5` and said nothing about a sixth violation.                                                                                                           |
 
-**One enforcement gap remains and it is not a portal one.** Only the suspension notice and the fine
-waiver actually notify the partner. A warning, a fine and a lifted suspension send nothing, while the
-console tells the operator «وأُبلغ الشريك» for all three — see `O-staff-5`. The portal is ready for
-them: the warning note now reaches المخالفات and the card points at it.
+**Enforcement notification, completed 2026-08-24.** All five events — warning, fine, suspension,
+lift, fine waiver — now notify the partner on two channels, in the account's own language, at the
+account's own address. Two of the five did before; three told nobody while the console said «وأُبلغ
+الشريك». See `O-staff-5`.
+
+| Surface             | State                                                                                                                                                                                                |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Email, five events  | **Complete.** Arabic first, English underneath, German third for a German account — the standing rule, via `compose`. Each body carries the action, the effective date, the reason and a portal link |
+| In-app, five events | **Complete.** A `notifications` row per event, surfaced as إشعارات حسابك on the dashboard, each row linking to the page that holds the detail                                                        |
+| Recipient           | **Complete.** `users.email`, not `partners.email` — the two had diverged for the main fixture (`O-partner-11`)                                                                                       |
+| Money in the notice | **Complete.** Amount and currency on fine and waiver; the fine reason is withheld from a reader without `payout.read_own`, like every other figure                                                   |
+| Failure isolation   | **Complete.** Sent after the transaction, and `EnforcementNotifier` cannot throw. Two tests fail BOTH channels and assert the decision stands                                                        |
+| Audit               | **Complete.** `partner.notified` is its own action carrying `{ templateKey, inApp, email }` and no address — 41 delivery rows for 41 actions in the walkthrough                                      |
 
 **The pattern all three defects share, and it is the reason to write this down:** a zod
 `.default()` on a field the API never sent. Every one parsed cleanly, rendered plausibly, passed the
