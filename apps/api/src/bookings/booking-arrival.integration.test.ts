@@ -29,6 +29,15 @@ import { codeOf } from '../common/errors/app-error.js';
  * `db` and `SettingsService` are real and the rest are never reached. Assembling the whole container
  * to reach line 130 would test the container.
  */
+/**
+ * The fixture city's timezone, named ONCE.
+ *
+ * `days()` computes dates in it and the seed writes it onto the city. Two copies of a timezone is
+ * the same defect as the one this constant fixes, one step later: the helper and the fixture would
+ * agree until somebody changed one of them.
+ */
+const CITY_TIMEZONE = 'Asia/Damascus';
+
 const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
@@ -81,8 +90,29 @@ describeIfDb('a refused arrival date', () => {
   const refusal = (checkIn: string, checkOut: string): Promise<unknown> =>
     draft(checkIn, checkOut).catch((error: unknown) => error);
 
+  /**
+   * `n` days from today IN THE CITY, not in UTC.
+   *
+   * `evaluateArrival` judges an arrival date against the CITY's local date — the fixture city is
+   * `Asia/Damascus`, UTC+3 — so a helper that counted from the UTC date disagreed with it for the
+   * three hours between 21:00 UTC and midnight. During that window `days(0)` returned yesterday's
+   * date in Damascus, and the same-day-cutoff test was answered `arrival_in_past`, correctly.
+   *
+   * It passed for twenty-one hours a day, which is the worst possible failure rate: too rare to be
+   * anybody's first suspicion, and reliable enough to cost the next person an evening reading their
+   * own diff. Found by project-cc at 21:20 UTC on 2026-08-23, in a suite where nothing they had
+   * touched was involved.
+   */
   const days = (n: number): string => {
-    const at = new Date();
+    const today = new Intl.DateTimeFormat('en-CA', {
+      timeZone: CITY_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+
+    /* Noon UTC, so adding whole days cannot cross a boundary through any offset or DST shift. */
+    const at = new Date(`${today}T12:00:00Z`);
 
     at.setUTCDate(at.getUTCDate() + n);
 
@@ -175,7 +205,7 @@ async function publishedUnit(db: Database): Promise<string> {
              (SELECT id FROM cancellation_policies LIMIT 1)               AS policy_id
     ), ci AS (
       INSERT INTO cities (country_id, slug, name_ar, name_en, name_de, timezone)
-      SELECT ref.country_id, ${tag}, 'مدينة', 'City', 'Stadt', 'Asia/Damascus' FROM ref
+      SELECT ref.country_id, ${tag}, 'مدينة', 'City', 'Stadt', ${CITY_TIMEZONE} FROM ref
       RETURNING id
     ), pu AS (
       INSERT INTO users (email, phone, role, status)
