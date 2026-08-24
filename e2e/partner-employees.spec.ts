@@ -498,4 +498,137 @@ test.describe('الموظفون', () => {
       ).toHaveCount(0);
     });
   });
+
+  /**
+   * What a NARROW role actually shows — the point of the whole feature.
+   *
+   * ## Why this is separate from the walk above
+   *
+   * The first walk proves an employee can be invited, activated and admitted. It says nothing about
+   * whether the portal then describes their role honestly, because the role it uses opens several
+   * sections. This one builds a role carrying exactly ONE capability and checks what the portal
+   * does with it — which is the thing Bashar asked for: *"on the dashboard he should be able to see
+   * everything of his given role"*, and nothing else.
+   *
+   * ## The three failures it is written against
+   *
+   * 1. **A nav item nobody can use.** Until 2026-08-23 every section was listed for everybody and
+   *    the refusal came on arrival — reported by `partnerFetch` as `'unauthenticated'`, so the
+   *    portal told somebody with a good session to sign in again.
+   * 2. **Landing on a screen they cannot read.** `booking.check_in` does not open لوحة التحكم, so a
+   *    receptionist would meet an empty overview of a business they cannot see, which is
+   *    indistinguishable from a broken portal.
+   * 3. **Losing الدعم.** It is deliberately absent from `PARTNER_SECTION_PERMISSIONS`, so
+   *    `canOpenSection` answers false for it and any loop that gated the nav from the map alone
+   *    would remove it. It is the only channel a locked-out employee has, and the person who can
+   *    reach least is the one who most needs to ask why. That is the assertion most likely to catch
+   *    a future "tidy-up" of the nav.
+   */
+  test.describe('a role that opens one section', () => {
+    test.use({ storageState: { cookies: [], origins: [] } });
+
+    test('lands on that section, shows only it, and keeps الدعم', async ({
+      page,
+      request,
+      browser,
+    }) => {
+      const roleName = `استقبال-${Date.now()}`;
+      const address = `e2e-emp-${Date.now()}-e@safra.test`;
+      const invitedAt = new Date();
+
+      /* Owner: define a role carrying ONLY check-in, then hire into it. */
+      const ownerContext = await browser.newContext({
+        storageState: OWNER_STATE,
+        baseURL: PARTNER_BASE,
+      });
+      const ownerPage = await ownerContext.newPage();
+
+      await ownerPage.goto('/employee-roles');
+      await ownerPage.getByLabel(t.employeeRoles.nameLabel).fill(roleName);
+      await ownerPage
+        .getByLabel(t.employeeRoles.capability['booking.check_in'] ?? 'check_in')
+        .check();
+      await ownerPage.getByRole('button', { name: t.employeeRoles.create }).click();
+      await expect(
+        ownerPage.locator('#employee-roles-list li').filter({ hasText: roleName }),
+      ).toBeVisible({ timeout: 15_000 });
+
+      await ownerPage.goto('/employees');
+      await ownerPage.getByLabel(t.employees.fullName).fill('هدى الاستقبال');
+      await ownerPage.getByLabel(t.employees.email).fill(address);
+      await ownerPage.getByLabel(t.employees.role).selectOption({ label: roleName });
+      await ownerPage.getByRole('button', { name: t.employees.inviteSubmit }).click();
+      await expect(ownerPage.getByText(t.employees.inviteSent)).toBeVisible({
+        timeout: 15_000,
+      });
+      await ownerContext.close();
+
+      // ── Activate and sign in as that employee ───────────────────────────────
+      await page.goto(await activationLinkFor(request, address, invitedAt));
+      await page
+        .getByLabel(t.employeeInvitation.password, { exact: true })
+        .fill(EMPLOYEE_PASSWORD);
+      await page
+        .getByLabel(t.employeeInvitation.confirm, { exact: true })
+        .fill(EMPLOYEE_PASSWORD);
+      await page.getByRole('button', { name: t.employeeInvitation.submit }).click();
+      await expect(page.getByText(t.employeeInvitation.done)).toBeVisible({
+        timeout: 20_000,
+      });
+
+      const signedInAt = new Date();
+
+      await page.goto('/login');
+      await page.getByLabel(t.login.email).fill(address);
+      await page.getByLabel(t.login.password, { exact: true }).fill(EMPLOYEE_PASSWORD);
+      await page.getByRole('button', { name: t.login.submit }).click();
+      await page
+        .getByLabel(t.login.codeTitleEmail)
+        .fill(await signInCodeFor(request, address, signedInAt));
+      await page.getByRole('button', { name: t.login.codeSubmit }).click();
+
+      /*
+        LANDED ON ARRIVALS, not on the dashboard. `booking.read_own` is absent, so `/` redirects to
+        the first section the role opens rather than rendering an overview of nothing.
+      */
+      await page.waitForURL(/\/arrivals/, { timeout: 20_000 });
+      await expect(page.getByRole('heading', { name: t.arrivals.title })).toBeVisible();
+
+      // ── The nav describes the role, and nothing more ────────────────────────
+      const nav = page.locator('nav');
+
+      await expect(nav).toContainText(t.nav.arrivals);
+      /* الدعم survives the gating — the exemption that gives a locked-out employee a channel. */
+      await expect(nav).toContainText(t.nav.supportPage);
+
+      for (const absent of [
+        t.nav.dashboard,
+        t.nav.properties,
+        t.nav.calendars,
+        t.nav.reviews,
+        t.nav.payouts,
+        t.nav.employees,
+        t.nav.employeeRoles,
+        t.nav.violations,
+      ]) {
+        await expect(nav).not.toContainText(absent);
+      }
+
+      // ── And a gated section reached DIRECTLY says the right thing ───────────
+      /*
+        Two different sentences, and the difference is what the reader can do. عقاراتي is grantable,
+        so the answer names the person who can grant it; مستحقاتي never can be, so it closes the
+        subject. Neither is «انتهت الجلسة», which is what both were before the gating landed.
+      */
+      await page.goto('/properties');
+      await expect(page.getByText(t.employees.notInYourRole)).toBeVisible();
+
+      await page.goto('/payouts');
+      await expect(page.getByText(t.employees.ownerOnly)).toBeVisible();
+
+      /* And الدعم genuinely opens, rather than merely being listed. */
+      await page.goto('/support');
+      await expect(page.locator('main')).not.toContainText(t.dashboard.sessionExpired);
+    });
+  });
 });
