@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { TABLE_SECTION_PARAMS, type TableSection } from '@safra/contracts';
 
 import { count } from '@/lib/format';
@@ -87,6 +89,8 @@ export function TablePagination({
     "what is this table's page parameter" from one place.
   */
   const { page: pageParam, size: sizeParam } = TABLE_SECTION_PARAMS[section];
+  /** One per section, so the two bars on `/staff` cannot send a reader to each other. */
+  const anchorId = `pager-${section}`;
   const href = (target: number): string => {
     const params = new URLSearchParams();
 
@@ -97,13 +101,30 @@ export function TablePagination({
     params.set(sizeParam, String(size));
     params.set(pageParam, String(target));
 
-    return `${basePath}?${params.toString()}`;
+    /*
+      The fragment is the NO-JAVASCRIPT half of "do not scroll" (Bashar, 2026-08-24).
+
+      `<Link scroll={false}>` keeps the viewport still when JavaScript is running, which is what was
+      asked for. When it is not, `<Link>` is an ordinary anchor and the browser resets scroll — so
+      the href names the bar and the reader lands on the control they just pressed rather than at
+      the top of the page. Two mechanisms for two runtimes, and neither is a fallback for a bug in
+      the other.
+
+      Named per SECTION because two bars share a route on `/staff` — a single `#pager` would send
+      one bar's reader to the other's.
+    */
+    return `${basePath}?${params.toString()}#${anchorId}`;
   };
 
   return (
     <nav
+      id={anchorId}
       aria-label={label}
-      className="mt-3.5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5 border-t border-line pt-3.5 text-[12px] text-muted"
+      /*
+        `scroll-mt-24` so a fragment landing does not put the bar flush against the viewport edge —
+        the same allowance every row anchor makes, for the same reason.
+      */
+      className="mt-3.5 scroll-mt-24 flex flex-wrap items-center justify-center gap-x-6 gap-y-2.5 border-t border-line pt-3.5 text-[12px] text-muted"
     >
       {/*
         `page` and `size` both live in this form, so submitting either one keeps the other. The
@@ -249,13 +270,29 @@ function Step({
   }
 
   return (
-    <a
+    /*
+      `scroll={false}`, because paging is not arriving somewhere — it is staying (Bashar, 2026-08-24).
+
+      A plain `<a href>` is a full navigation and the browser resets scroll, so pressing «التالي» at
+      the foot of a long table threw the reader to the top of the page and left them scrolling back
+      down to the bar they had just used. The row they were reading, the filters they had set and
+      the control under their finger all went off-screen for a step that changed nothing about where
+      they were.
+
+      The href still carries a fragment, and the two answers do not conflict: with JavaScript
+      `scroll={false}` wins and the viewport does not move at all, which is what was asked for.
+      Without it, `<Link>` degrades to an ordinary anchor, the browser follows the fragment, and the
+      reader lands at the table instead of the page top — worse than not moving, better than today.
+      Middle-click, bookmarking and keyboard focus all survive either way.
+    */
+    <Link
       href={href}
+      scroll={false}
       aria-label={label}
       className={`${shape} cursor-pointer border-line text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold`}
     >
       <span aria-hidden="true">{glyph}</span>
-    </a>
+    </Link>
   );
 }
 

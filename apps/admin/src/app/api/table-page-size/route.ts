@@ -75,7 +75,19 @@ export async function POST(request: Request): Promise<Response> {
   */
   const target = listUrl(request, section, size, field);
 
-  return seeOther(`${target.pathname}${target.search}`);
+  /*
+    The fragment lands the reader on the BAR they just submitted (Bashar, 2026-08-24).
+
+    A redirect is a full navigation and the browser resets scroll, so applying a page number or a
+    new size at the foot of a long table threw the reader to the top of the page — the same
+    complaint as the arrows, arriving by a different route. The arrows are `<Link scroll={false}>`,
+    which no form submit can be; a fragment is the only mechanism a POST-and-redirect has.
+
+    Named per SECTION and built from the ALLOW-LISTED section, never from the request — this
+    endpoint is a redirector, and a fragment taken from a caller would be caller-controlled content
+    in a URL the console then trusts. `TablePagination` writes the same id onto its `<nav>`.
+  */
+  return seeOther(`${target.pathname}${target.search}#pager-${section}`);
 }
 
 /**
