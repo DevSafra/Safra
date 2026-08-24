@@ -1,10 +1,19 @@
 import Link from 'next/link';
 
 import type { AuditEntry } from '@/lib/api';
+import { Fragment } from 'react';
+
 import { ConsolePanel } from '@/components/console-shell';
 import { Ltr } from '@/components/admin-table';
 import { shortDateTime } from '@/lib/format';
-import { auditAction, auditSubject, payloadChanges, roleName, t } from '@/lib/strings';
+import {
+  auditAction,
+  auditSubject,
+  payloadChanges,
+  roleName,
+  t,
+  type PayloadChange,
+} from '@/lib/strings';
 
 /**
  * One `audit_log` row, explained — the whole of it, on one screen.
@@ -146,45 +155,7 @@ export function AuditEntryDetail({ entry }: { entry: AuditEntry }) {
           */
           <p className="text-[12.5px] text-faint">{t.sections.staff.activityNoChanges}</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[420px] border-collapse text-[12.5px]">
-              <thead>
-                <tr>
-                  {[
-                    t.sections.audit.changeField,
-                    t.sections.audit.changeBefore,
-                    t.sections.audit.changeAfter,
-                  ].map((heading) => (
-                    <th
-                      key={heading}
-                      scope="col"
-                      className="border-b border-line px-2.5 py-2 text-start text-[11px] font-bold text-faint"
-                    >
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {changes.map((change) => (
-                  <tr key={change.key}>
-                    <th
-                      scope="row"
-                      className="border-b border-line2 px-2.5 py-2.25 text-start font-normal text-text2"
-                    >
-                      {change.label}
-                    </th>
-                    <td className="border-b border-line2 px-2.5 py-2.25 text-faint">
-                      <bdi>{change.before ?? t.sections.audit.changeAbsent}</bdi>
-                    </td>
-                    <td className="border-b border-line2 px-2.5 py-2.25 text-text">
-                      <bdi>{change.after ?? t.sections.audit.changeAbsent}</bdi>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <Changes changes={changes} />
         )}
       </ConsolePanel>
     </div>
@@ -197,5 +168,73 @@ function Row({ term, children }: { term: string; children: React.ReactNode }) {
       <dt className="text-[11px] text-faint">{term}</dt>
       <dd className="mt-0.5 text-[12.5px] text-text">{children}</dd>
     </div>
+  );
+}
+
+/**
+ * The `before`/`after` payload, rendered as WHAT CHANGED — in Arabic.
+ *
+ * ## Where it came from, and why it moved
+ *
+ * It rendered inside every row of سجل التدقيق until 2026-08-24. Bashar: "because we have all
+ * informations on the single detail page of سجل, please remove this from the rows." It was right
+ * when the row was the only place a payload could be read; a seven-line table inside each of
+ * twenty-five entries makes the log unscannable, which is the one thing a log is for.
+ *
+ * It moved here rather than being deleted, and this screen's own hand-rolled table was deleted
+ * instead — because this version knows something that one did not: **a creation has no "before"
+ * worth a column of dashes**, so the column is omitted when nothing has one.
+ *
+ * ## What it replaced originally
+ *
+ * `JSON.stringify({ before, after })` in a one-line scroll box, so the reader met the middle of it
+ * — `e":{"status":"contacted"},"after":…` — scrolled away from both ends, in a machine format, in
+ * the column meant to answer "what exactly changed" (Bashar, 2026-08-20). Every field and both of
+ * its values are still here; what went is the JSON punctuation and the horizontal scroll.
+ *
+ * ## `bdi`, not `Ltr`
+ *
+ * What falls through is arbitrary — a reference, an amount, an Arabic address. `Ltr` forces
+ * `dir="ltr"`, right for `BKG-2026-073297` and wrong for «باب توما، دمشق». `<bdi>` isolates the run
+ * without deciding its direction, so each value is laid out on its own merits and cannot reorder
+ * the line around it.
+ */
+function Changes({ changes }: { changes: readonly PayloadChange[] }) {
+  const showBefore = changes.some((change) => change.before !== undefined);
+
+  return (
+    <dl
+      className={`grid gap-x-4 gap-y-1.5 text-[12.5px] ${
+        showBefore ? 'grid-cols-[auto_1fr_1fr]' : 'grid-cols-[auto_1fr]'
+      }`}
+    >
+      <span className="text-[11px] font-semibold text-faint">
+        {t.sections.audit.changeField}
+      </span>
+      {showBefore ? (
+        <span className="text-[11px] font-semibold text-faint">
+          {t.sections.audit.changeBefore}
+        </span>
+      ) : null}
+      <span className="text-[11px] font-semibold text-faint">
+        {t.sections.audit.changeAfter}
+      </span>
+
+      {changes.map((change) => (
+        <Fragment key={change.key}>
+          <dt className="text-faint">
+            <bdi>{change.label}</bdi>
+          </dt>
+          {showBefore ? (
+            <dd className="break-words text-faint">
+              <bdi>{change.before ?? t.sections.audit.changeAbsent}</bdi>
+            </dd>
+          ) : null}
+          <dd className="break-words text-text">
+            <bdi>{change.after ?? t.sections.audit.changeAbsent}</bdi>
+          </dd>
+        </Fragment>
+      ))}
+    </dl>
   );
 }

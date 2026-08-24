@@ -1,5 +1,3 @@
-import { Fragment } from 'react';
-
 import { getAuditActions, getAuditLog, type AuditEntry } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { clock, shortDate } from '@/lib/format';
@@ -7,7 +5,7 @@ import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import { AdminTable, Ltr, type AdminColumn } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { t, auditAction, auditSubject, payloadChanges, roleName } from '@/lib/strings';
+import { t, auditAction, auditSubject, roleName } from '@/lib/strings';
 import { pageNumber } from '@/lib/search-params';
 import { resolvePageSize } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
@@ -43,74 +41,6 @@ export const dynamic = 'force-dynamic';
 
 /** The design's `grid-template-columns`, verbatim. */
 const TEMPLATE = '.7fr 1fr 2fr 1fr .9fr';
-
-/**
- * The `before`/`after` payload, rendered as what changed — in Arabic.
- *
- * ## What it replaces
- *
- * `JSON.stringify({ before, after })` inside a one-line `overflow-x-auto` box. On a column this
- * narrow the reader met the middle of it — `e":{"status":"contacted"},"after":…` — scrolled away
- * from both ends, in a machine format, in the column that is supposed to answer "what exactly
- * changed" (Bashar, 2026-08-20).
- *
- * The module note above says the payload is shown VERBATIM rather than summarised, and that still
- * holds: every field and both of its values are here. What is gone is the JSON punctuation, the
- * key names repeated on every row, and the horizontal scroll.
- *
- * ## The words come from the catalogue, not from the database
- *
- * `payloadChanges` resolves both the field name and the value — `status` → «الحقل: الحالة»,
- * `pending_confirmation` → «قيد التأكيد», `true` → «نعم». The first version of this component did
- * none of that and printed the stored identifiers, which on an Arabic-only console is the same
- * defect as hardcoding English (Bashar, again, the same day). An unknown key or code still falls
- * through as itself: a missing translation has to LOOK like one.
- *
- * ## `bdi`, not `Ltr`
- *
- * What falls through is arbitrary — a reference, an amount, an Arabic address. `Ltr` forces
- * `dir="ltr"`, which is right for `BKG-2026-073297` and wrong for «باب توما، دمشق». `<bdi>`
- * isolates the run without deciding its direction, so each value is laid out on its own merits and
- * cannot reorder the line around it.
- */
-function Changes({ before, after }: { before: unknown; after: unknown }) {
-  const changes = payloadChanges(before, after);
-
-  if (changes.length === 0) return null;
-
-  /* A creation has no "before" worth a column of dashes. */
-  const showBefore = changes.some((change) => change.before !== undefined);
-
-  return (
-    <dl
-      className={`mt-1 grid gap-x-3 gap-y-0.5 rounded border border-line bg-field p-1.5 text-[10px] ${
-        showBefore ? 'grid-cols-[auto_1fr_1fr]' : 'grid-cols-[auto_1fr]'
-      }`}
-    >
-      <span className="font-semibold text-faint">{t.sections.audit.changeField}</span>
-      {showBefore ? (
-        <span className="font-semibold text-faint">{t.sections.audit.changeBefore}</span>
-      ) : null}
-      <span className="font-semibold text-faint">{t.sections.audit.changeAfter}</span>
-
-      {changes.map((change) => (
-        <Fragment key={change.key}>
-          <dt className="text-faint">
-            <bdi>{change.label}</bdi>
-          </dt>
-          {showBefore ? (
-            <dd className="break-words text-faint">
-              <bdi>{change.before ?? t.sections.audit.changeAbsent}</bdi>
-            </dd>
-          ) : null}
-          <dd className="break-words text-text2">
-            <bdi>{change.after ?? t.sections.audit.changeAbsent}</bdi>
-          </dd>
-        </Fragment>
-      ))}
-    </dl>
-  );
-}
 
 export default async function AuditPage({
   searchParams,
@@ -238,10 +168,34 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
   {
     key: 'actor',
     header: t.sections.audit.colStaff,
-    /* A null actor means the platform acted on its own — an expiry, a scheduled job. */
+    /*
+      The NAME, falling back to the address — and `break-words`, not `break-all`.
+
+      This column printed `actorEmail` with `break-all`, which in a 1fr column splits an address
+      mid-token: «wallet-test-finance@safra.tes» on one line and a lone «t» on the next. It reads as
+      a rendering fault, and on a screenshot of سجل التدقيق it is the first thing the eye finds.
+
+      `break-words` breaks between tokens rather than inside them, so an address wraps instead of
+      being severed.
+
+      ## Why this does NOT prefer `actorName`
+
+      It did, for about ten minutes, and a screenshot caught what no test did: the first three rows
+      changed from «Admin» to the super admin's real name. `actor_email` is pseudonymised in the
+      query — `actorName(u.email, u.role)` substitutes ADMIN_DISPLAY_NAME for a super admin — and
+      `actor_name` selects `u.full_name` RAW beside it. Preferring the name walked straight around
+      the control, and Bashar's rule (2026-08-23) is that a super admin acts under «Admin», not
+      under an identity.
+
+      Rendering `actorEmail` is therefore the correct source here: it is the field the server has
+      already decided is safe to show. This is not the console choosing to hide something — hiding
+      in a browser is not a control — it is the console reading the field that carries the decision.
+
+      A null actor means the platform acted on its own — an expiry, a scheduled job.
+    */
     render: (row) => (
       <div className="grid gap-0.5">
-        <span className="break-all text-text">
+        <span className="break-words text-text">
           {row.actorEmail ?? t.admin.systemActor}
         </span>
         {/*
@@ -270,16 +224,40 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
   {
     key: 'action',
     header: t.sections.audit.colAction,
+    /*
+      The action is the LINK into the entry, and the payload table is gone from the row
+      (Bashar, 2026-08-24).
+
+      Two of his messages, and they are one problem. He said "I saw that the سجل التدقيق page has no
+      single detail page" — it had one, and every row already carried an href. What it did not carry
+      was anything that LOOKED like a link: the href sat on the entity cell, styled as plain text.
+      He was not reporting a missing feature, he was reporting that he could not find one.
+
+      So the affordance moves to the action — the thing a reader looks at first to decide whether
+      this row is the one — and takes the console's established link styling, `text-sky
+      hover:underline`, the same as a booking reference on الحجوزات. No chevron: `›` carries
+      Unicode's `Bidi_Mirrored` property and flips inside an RTL container, which the pagination bar
+      documents the hard way.
+
+      And the «الحقل / قبل / بعد» table left the row entirely — "because we have all informations on
+      the single detail page of سجل, please remove this from the rows". It was right when the row
+      was the only place a payload could be read; a seven-row table inside each of twenty-five
+      entries makes the log unscannable, which is the one thing a log is for. The detail screen
+      renders it unchanged.
+    */
     render: (row) => (
       <div className="grid gap-0.5">
-        <span className="text-text2">{auditAction(row.action)}</span>
+        <a
+          href={`/audit/${row.id}`}
+          aria-label={t.sections.staff.activityOpen}
+          className="cursor-pointer text-sky hover:underline"
+        >
+          {auditAction(row.action)}
+        </a>
 
         {row.reason ? (
           <span className="text-[10.5px] leading-relaxed text-faint">{row.reason}</span>
         ) : null}
-
-        {/* Verbatim payload — see the module note on why it is not summarised. */}
-        <Changes before={row.before} after={row.after} />
       </div>
     ),
   },
@@ -296,11 +274,12 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
       is worse than one that admits it.
     */
     render: (row) => (
-      <a
-        href={`/audit/${row.id}`}
-        aria-label={t.sections.staff.activityOpen}
-        className="grid gap-0.5 hover:text-gold"
-      >
+      /*
+        Not a link. It was one, to the same entry as the action beside it — and two controls a row
+        apart going to one place is how a reader learns to distrust both. This cell answers WHAT the
+        entry is about; the action opens it.
+      */
+      <div className="grid gap-0.5">
         <span className="text-[11px] text-faint">
           {auditSubject(row.subject?.type ?? row.subjectType)}
         </span>
@@ -312,7 +291,7 @@ const COLUMNS: readonly AdminColumn<AuditEntry>[] = [
         ) : row.subjectId ? (
           <Ltr className="text-[10.5px] text-sky">{row.subjectId.slice(0, 8)}</Ltr>
         ) : null}
-      </a>
+      </div>
     ),
   },
   {
