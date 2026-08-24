@@ -306,13 +306,58 @@ test.describe('the suspension a partner meets', () => {
     await staff.getByLabel(enforcement.kindLabel).selectOption('stale_calendar');
     await staff.getByLabel(enforcement.violationReasonLabel).fill(DESCRIPTION);
     await staff.getByRole('button', { name: enforcement.raise }).last().click();
-    await expect(staff.getByText(enforcement.raised)).toBeVisible(WAIT);
+    /* `exact: true`: the default description for a sweep-written violation ENDS with this text. */
+    await expect(staff.getByText(enforcement.raised, { exact: true })).toBeVisible(WAIT);
 
     await portal.goto(`${BASE}/violations`);
     await expect(
       portal.locator('main'),
       'المخالفات does not show the description — the partner cannot tell what they were cited for.',
     ).toContainText(DESCRIPTION, WAIT);
+
+    /*
+      ── Every row explains itself, including the ones NOBODY typed a word for ──
+
+      Reported twice (Bashar, 2026-08-24), and the second report was the useful one: the violations a
+      partner actually receives are written by the SLA sweep, which types nothing, so the FINED rows
+      were the ones with no explanation. The sentence now comes from the catalogue keyed by kind, so
+      «عدم الرد» names the two-hour window and the booking it concerned.
+
+      Asserted as "no row is wordless" rather than against one sentence, because the point is
+      coverage: the fixture holds violations from the seed, the sweep and this suite, and every one
+      of them owes the partner an explanation.
+      */
+    const rows = portal.locator('#violations-list > li');
+    const wordless: string[] = [];
+
+    for (const row of await rows.all()) {
+      const text = (await row.innerText()).replace(/\s+/g, ' ');
+
+      /* A description is a SENTENCE — the metadata line alone is ~60 characters. */
+      if (text.length < 90) wordless.push(text.slice(0, 40));
+    }
+
+    expect(
+      wordless,
+      'These rows on المخالفات carry no description at all — a citation with no explanation.',
+    ).toStrictEqual([]);
+
+    /*
+      ── And every row OPENS, which it could not before ─────────────────────
+
+      Bashar, 2026-08-24: المخالفات had no page per item. The whole card is the link, so this clicks
+      the row rather than hunting a word at the end of it, and the detail must carry the same
+      description — two screens reading one violation differently is the defect
+      `violationDescription` exists to prevent.
+    */
+    await rows.first().click();
+    await expect(portal).toHaveURL(/\/violations\/[0-9a-f-]{36}$/, WAIT);
+    await expect(portal.locator('main')).toContainText(t.violations.whatHappened);
+    await expect(portal.locator('main')).toContainText(t.violations.noRankingEffect);
+
+    /* And back, to the list it came from. */
+    await portal.getByRole('link', { name: t.violations.back }).click();
+    await expect(portal).toHaveURL(/\/violations$/, WAIT);
 
     /* ── ④ A WRITE is refused, and it says the account is on hold ──────────── */
     await portal.goto(`${BASE}/properties/${draft}/edit`);

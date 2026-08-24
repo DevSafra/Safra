@@ -7,6 +7,18 @@ import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 test.skip(MISSING_CREDENTIALS, SKIP_REASON);
 test.use({ storageState: STAFF_STATE, viewport: { width: 1440, height: 1100 } });
 
+/**
+ * Where the screenshots go, with a default.
+ *
+ * `process.env['SHOT_DIR'] as string` was an unchecked cast: run without the variable — which is
+ * every direct `npx playwright test` — it produced the literal string "undefined", and the
+ * screenshots landed in a directory called `undefined/` at the repository root. Untracked, easy to
+ * commit by accident, and nothing ever failed to say so.
+ */
+function shotDir(): string {
+  return process.env['SHOT_DIR'] ?? 'test-results/shots';
+}
+
 const copy = t.sections.enforcement;
 
 /**
@@ -116,7 +128,7 @@ test.afterAll(async ({ browser }) => {
 test('suspend, raise, fine, waive — and the waived fine shows both entries', async ({
   page,
 }) => {
-  const dir = process.env['SHOT_DIR'] as string;
+  const dir = shotDir();
 
   await page.goto('/partners?size=25');
 
@@ -170,7 +182,17 @@ test('suspend, raise, fine, waive — and the waived fine shows both entries', a
     await page.getByLabel(copy.kindLabel).selectOption('stale_calendar');
     await page.getByLabel(copy.violationReasonLabel).fill(REASON);
     await page.getByRole('button', { name: copy.raise }).last().click();
-    await expect(page.getByText(copy.raised)).toBeVisible({ timeout: 20_000 });
+    /*
+      `exact: true`, because the success message is a SUBSTRING of the copy on the same screen.
+
+      «سُجّلت المخالفة.» is the toast, and the default description for a sweep-written violation ends
+      «…وسُجّلت المخالفة.» — natural Arabic, and `getByText` matches substrings, so the assertion
+      resolved to three elements and failed as a strict-mode violation. The toast's element text IS
+      exactly this string; the descriptions merely contain it.
+    */
+    await expect(page.getByText(copy.raised, { exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
     await page.reload();
   }
 
@@ -300,7 +322,7 @@ test('suspend, raise, fine, waive — and the waived fine shows both entries', a
 test('escalating a violation suspends the partner and records it as the cause', async ({
   page,
 }) => {
-  const dir = process.env['SHOT_DIR'] as string;
+  const dir = shotDir();
 
   await page.goto('/partners?size=25');
 
@@ -329,7 +351,10 @@ test('escalating a violation suspends the partner and records it as the cause', 
   await page.getByLabel(copy.kindLabel).selectOption('stale_calendar');
   await page.getByLabel(copy.violationReasonLabel).fill(REASON);
   await page.getByRole('button', { name: copy.raise }).last().click();
-  await expect(page.getByText(copy.raised)).toBeVisible({ timeout: 20_000 });
+  /* `exact: true` — see the note above; the description contains the toast's text. */
+  await expect(page.getByText(copy.raised, { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
   await page.reload();
 
   /* The newest violation is first — the list is ordered by `created_at` descending. */
