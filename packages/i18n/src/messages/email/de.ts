@@ -27,6 +27,16 @@ export const de = {
 
   /* ── Sperren und Reaktivieren eines Mitarbeiterkontos (Bashar, 2026-08-23) ── */
 
+  /* ── Sperrung eines Partnerkontos (Bashar, 2026-08-24) ── */
+
+  partnerFineWaived: {
+    subject: 'Eine Geldstrafe auf Ihrem Konto wurde erlassen',
+    body: 'Das SAFRA-Team hat die Geldstrafe auf Ihrem Konto geprüft und entschieden, sie zu erlassen.\n\nBetrag: {amount}\nGrund:\n{reason}\n\nDieser Betrag wird Ihnen nicht berechnet. Der ursprüngliche Verstoß bleibt in Ihrem Konto verzeichnet, mit dem Erlass daneben — wir löschen den Eintrag nicht, wir ergänzen ihn, damit nachvollziehbar bleibt, was geschehen ist.\n\nVerstoß und Erlass können Sie hier einsehen:\n{url}\n\nIhr SAFRA-Team',
+  },
+  partnerSuspended: {
+    subject: 'Ihr Partnerkonto wurde gesperrt',
+    body: 'Ihr SAFRA-Partnerkonto wurde gesperrt.\n\nGrund:\n{reason}\n\nWas das bedeutet:\n- Ihre Inserate erscheinen nicht mehr in der Suche, und es sind keine neuen Buchungen möglich.\n- **Bestätigte Buchungen bleiben bestehen, Ihre aktuellen Gäste sind nicht betroffen.** Empfangen Sie sie wie gewohnt.\n- Auszahlungen sind während der Sperrung eingefroren.\n- Sie können keine neuen Unterkünfte anlegen und bestehende weder veröffentlichen noch bearbeiten.\n\nSie können sich weiterhin im Partnerportal anmelden, Ihr Konto einsehen und diesen Grund jederzeit nachlesen:\n{url}\n\nFür Einsprüche oder Rückfragen wenden Sie sich über den Support im Partnerportal an das SAFRA-Team.\n\nIhr SAFRA-Team',
+  },
   staffSuspended: {
     subject: 'Ihr SAFRA-Konsolenkonto wurde deaktiviert',
     body: 'Ihr SAFRA-Konsolenkonto wurde deaktiviert und Sie können sich nicht mehr anmelden. Alle geöffneten Sitzungen auf allen Geräten wurden beendet.\n\nDas Konto wurde nicht gelöscht und es sind keine Daten verloren gegangen. Die Deaktivierung ist umkehrbar; eine Administratorin oder ein Administrator kann das Konto jederzeit wieder aktivieren.\n\nWenn Sie glauben, dass dies versehentlich geschehen ist, wenden Sie sich bitte direkt an eine SAFRA-Administration — über die Anmeldeseite lässt sich das nicht klären.\n\nIhr SAFRA-Team',

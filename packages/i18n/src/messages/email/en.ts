@@ -27,6 +27,16 @@ export const en = {
 
   /* ── Suspending and reinstating a staff account (Bashar, 2026-08-23) ── */
 
+  /* ── Suspending a partner account (Bashar, 2026-08-24) ── */
+
+  partnerFineWaived: {
+    subject: 'A fine on your account has been waived',
+    body: 'The SAFRA team has reviewed the fine on your account and decided to waive it.\n\nAmount: {amount}\nReason:\n{reason}\n\nYou will not be charged this amount. The original violation remains recorded on your account with the waiver recorded beside it — we do not delete the record, we add to it, so what happened stays clear to you and to us.\n\nYou can review the violation and the waiver here:\n{url}\n\nThe SAFRA team',
+  },
+  partnerSuspended: {
+    subject: 'Your partner account has been suspended',
+    body: 'Your SAFRA partner account has been suspended.\n\nReason:\n{reason}\n\nWhat this means:\n- Your listings will not appear in search, and no new bookings can be made.\n- **Confirmed bookings stand and your current guests are unaffected.** Host them as normal.\n- Payouts are frozen while the suspension is in force.\n- You cannot add new properties, or publish or edit existing ones.\n\nYou can still sign in to the partner portal, view your account and read this reason at any time:\n{url}\n\nTo appeal or ask a question, contact the SAFRA team through support in the partner portal.\n\nThe SAFRA team',
+  },
   staffSuspended: {
     subject: 'Your SAFRA console account has been disabled',
     body: 'Your SAFRA console account has been disabled and you can no longer sign in. Any sessions you had open on any device have been ended.\n\nThe account has not been deleted and none of your data has been lost. Disabling is reversible, and an administrator can reinstate the account at any time.\n\nIf you believe this happened by mistake, contact a SAFRA administrator directly — this cannot be resolved from the sign-in screen.\n\nThe SAFRA team',

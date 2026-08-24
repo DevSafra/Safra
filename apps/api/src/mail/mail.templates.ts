@@ -709,3 +709,60 @@ export function staffReinstatedMail(input: {
     ...compose((m) => m.staffReinstated, input.locale, { url: input.url }),
   };
 }
+
+/**
+ * "Your partner account has been suspended", and the sentence that matters is the third one.
+ *
+ * A suspended partner's first fear is that their guests have been cancelled on. Bashar's rule is
+ * explicit that confirmed bookings continue and existing guests are not disrupted — so the notice
+ * says so, in bold, above the things that ARE blocked. Without it this is a message that reads as
+ * "your business has stopped", which is not what happened.
+ *
+ * Carries a LINK, and `staffSuspended` deliberately does not — the difference is whether the door
+ * opens. A suspended staff account cannot sign in, so the only link available would be a sign-in
+ * screen that refuses them and, by design, cannot say why. A suspended PARTNER signs in, reads this
+ * reason on their own dashboard, and can raise a support thread from it. Sending them there is the
+ * most useful thing the message can do.
+ */
+export function partnerSuspendedMail(input: {
+  to: string;
+  locale: string;
+  reason: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.partnerSuspended, input.locale, {
+      reason: input.reason,
+      url: input.url,
+    }),
+  };
+}
+
+/**
+ * "A fine on your account has been waived."
+ *
+ * > Bashar, 2026-08-24: *"The affected partner must be notified that the fine was waived."*
+ *
+ * The copy states the thing the ledger does and a partner would not otherwise know: the original
+ * violation STAYS on the record, with the waiver recorded beside it. Somebody told only that a fine
+ * was cancelled reasonably assumes the whole matter is gone — and then finds the violation still
+ * there and reads it as the platform going back on a decision. Saying "we do not delete the record,
+ * we add to it" is the same principle the ledger implements, in a sentence a person can read.
+ */
+export function partnerFineWaivedMail(input: {
+  to: string;
+  locale: string;
+  amount: string;
+  reason: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.partnerFineWaived, input.locale, {
+      amount: input.amount,
+      reason: input.reason,
+      url: input.url,
+    }),
+  };
+}

@@ -28,6 +28,8 @@ const SAMPLE = {
   to: 'someone@example.com',
   url: 'https://safra.example/go?token=abc',
   locale: 'ar',
+  /* A suspension reason, long enough to satisfy the twenty-character floor the schema enforces. */
+  reason: 'صور لا تطابق العقار المعروض',
 };
 
 /**
@@ -291,6 +293,41 @@ const RENDERERS: {
     entry: 'staffReinstated',
     render: (locale) => templates.staffReinstatedMail({ ...SAMPLE, locale }),
     shows: SAMPLE.url,
+  },
+  {
+    name: 'partnerFineWaivedMail',
+    entry: 'partnerFineWaived',
+    /*
+      `shows` is the REASON. The amount matters and the reason is what the partner can act on — a
+      waiver notice missing its cause in one language tells somebody money was forgiven and not
+      why, which is the half that decides whether they trust the next decision.
+    */
+    render: (locale) =>
+      templates.partnerFineWaivedMail({
+        to: SAMPLE.to,
+        locale,
+        url: SAMPLE.url,
+        amount: '50.00 USD',
+        reason: SAMPLE.reason,
+      }),
+    shows: SAMPLE.reason,
+  },
+  {
+    name: 'partnerSuspendedMail',
+    entry: 'partnerSuspended',
+    /*
+      `shows` is the REASON rather than the url, because the reason is the part that would be
+      catastrophic to lose in one language. A suspended partner reading a notice with the
+      consequences and no cause has been told their business is on hold and not why.
+    */
+    render: (locale) =>
+      templates.partnerSuspendedMail({
+        to: SAMPLE.to,
+        locale,
+        url: SAMPLE.url,
+        reason: SAMPLE.reason,
+      }),
+    shows: SAMPLE.reason,
   },
 ];
 

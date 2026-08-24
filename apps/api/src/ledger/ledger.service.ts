@@ -270,6 +270,72 @@ export class LedgerService {
   }
 
   /**
+   * Forgiving a fine — as a SECOND, opposite entry, never as an edit to the first.
+   *
+   * > Bashar, 2026-08-24: *"A waived fine must never delete or rewrite history. The original fine
+   * > entry must remain permanently visible. Fine −50, Waiver +50. The net effect becomes zero, but
+   * > history remains complete."*
+   *
+   * ## Why the legs are the original's, reversed
+   *
+   * `postPartnerFine` debits `partner_fine` and credits `wallet_credit`. This does exactly the
+   * opposite, for exactly the same amount — so the partner's fine balance nets to zero AND the
+   * customer's wallet credit is taken back, which is the half that is easy to forget. Forgiving the
+   * partner without reversing the compensation would leave SAFRA having paid a guest out of its own
+   * pocket for an offence it decided did not stand, and nothing in the ledger would say so.
+   *
+   * ## Why it cannot be a partial amount
+   *
+   * `fineWaiveSchema` takes none, and this takes the figure from the original entry rather than
+   * from a caller. Two numbers that are meant to cancel and are supplied separately WILL disagree
+   * eventually, and reconciling a ledger where they have is the worst hour anybody spends.
+   *
+   * ## The group id goes back to the violation
+   *
+   * `partner_violations.waiver_ledger_group_id`, so a screen showing the waived fine finds its pair
+   * rather than inferring it from amounts that happen to sum to nothing.
+   */
+  async postFineWaiver(
+    tx: Database,
+    input: {
+      bookingId?: string | undefined;
+      partnerId: string;
+      customerProfileId?: string | undefined;
+      currencyId: string;
+      fxRateToSyp: string;
+      amount: string;
+      reference: string;
+    },
+  ): Promise<{ entryGroupId: string }> {
+    return this.post(
+      tx,
+      [
+        {
+          account: 'partner_fine',
+          direction: 'credit',
+          amount: input.amount,
+          description: `Fine waived for ${input.reference}`,
+        },
+        {
+          account: 'wallet_debit',
+          direction: 'debit',
+          amount: input.amount,
+          description: `Compensation reversed on waiver for ${input.reference}`,
+        },
+      ],
+      {
+        currencyId: input.currencyId,
+        fxRateToSyp: input.fxRateToSyp,
+        ...(input.bookingId ? { bookingId: input.bookingId } : {}),
+        partnerId: input.partnerId,
+        ...(input.customerProfileId
+          ? { customerProfileId: input.customerProfileId }
+          : {}),
+      },
+    );
+  }
+
+  /**
    * Balances per account, in SYP.
    *
    * Sums the immutable entries rather than reading a cached total, so the figure
