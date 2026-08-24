@@ -9,7 +9,7 @@ import {
   type PartnerContract,
   type PartnerDocument,
 } from '@/lib/api';
-import { isEmployeeReader, isLocked } from '@/lib/gate';
+import { isLocked, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { count } from '@/lib/format';
@@ -86,7 +86,10 @@ export default async function ContractsPage() {
 
     Asked before the fetches rather than after, so the refusals are never made.
   */
-  const [employee, profile] = await Promise.all([isEmployeeReader(), getMyProfile()]);
+  const [access, profile] = await Promise.all([
+    sectionAccess('contracts'),
+    getMyProfile(),
+  ]);
 
   const name =
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
@@ -112,7 +115,7 @@ export default async function ContractsPage() {
     whole of what they can usefully know. An employee of an approved partner reached this page on
     purpose, and is told it belongs to the owner.
   */
-  if (employee) {
+  if (access !== 'open') {
     return shell(
       <p className="text-sm leading-relaxed text-muted">
         {locked ? t.employees.employerUnderReview : t.employees.ownerOnly}

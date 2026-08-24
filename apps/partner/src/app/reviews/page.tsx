@@ -1,6 +1,7 @@
 import { getMyReviews, type PartnerReview, sidebarBadges } from '@/lib/api';
-import { requireVerifiedPartner } from '@/lib/gate';
+import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
+import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
 import { ReviewActions } from '@/components/review-actions';
 import { count } from '@/lib/format';
@@ -38,13 +39,29 @@ export default async function ReviewsPage({
   /* Clamped rather than validated: a typed `?page=0` should show page one, not an error page. */
   const page = Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), 100_000) : 1;
 
-  const [profile, result] = await Promise.all([
+  /* Refused before the fetch — see عقاراتي for why the branch is here rather than after. */
+  const [access, profile] = await Promise.all([
+    sectionAccess('reviews'),
     requireVerifiedPartner(),
-    getMyReviews({ page, limit: PAGE_SIZE }),
   ]);
 
   const name =
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
+
+  if (access !== 'open') {
+    return (
+      <Shell
+        title={t.reviews.title}
+        partnerName={name}
+        active="reviews"
+        badges={sidebarBadges(profile)}
+      >
+        <SectionRefusal access={access} />
+      </Shell>
+    );
+  }
+
+  const result = await getMyReviews({ page, limit: PAGE_SIZE });
 
   return (
     <Shell

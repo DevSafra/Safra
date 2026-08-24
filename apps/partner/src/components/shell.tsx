@@ -1,6 +1,11 @@
 import Link from 'next/link';
 
-import { PERMISSIONS as P } from '@safra/contracts';
+import {
+  PARTNER_SECTION_PERMISSIONS,
+  canOpenSection,
+  type PartnerSection,
+} from '@safra/contracts';
+import { sessionPermissions } from '@safra/session';
 
 import { SidebarBackdrop, SidebarToggle, ThemeToggle } from '@safra/ui';
 
@@ -46,6 +51,8 @@ export async function Shell({
     | 'dashboard'
     | 'properties'
     | 'calendars'
+    | 'arrivals'
+    | 'violations'
     | 'payouts'
     | 'reviews'
     | 'contracts'
@@ -94,8 +101,9 @@ export async function Shell({
     API refuses the routes on its own authority whatever the sidebar draws.
   */
   const session = await getPartnerSession();
-  const mayManageEmployees =
-    session?.user.permissions.includes(P.PARTNER_EMPLOYEE_MANAGE) ?? false;
+  const permissions = session ? sessionPermissions(session) : [];
+  const opens = (section: PartnerSection): boolean =>
+    canOpenSection(permissions, PARTNER_SECTION_PERMISSIONS, section);
 
   return (
     <div className="portal-layout mx-auto max-w-[1380px] px-6 pt-6 pb-16">
@@ -154,26 +162,64 @@ export async function Shell({
           start keeps a nav row the height of a nav row at any count.
         */}
         <nav className="grid min-h-0 flex-1 content-start gap-0.5 overflow-y-auto">
+          {/*
+            EVERY item is gated on the reader's own capabilities, not just the two that were.
+
+            Until 2026-08-23 this list was fixed and an employee saw all of it, then met a refusal
+            on arrival — which `partnerFetch` reports as «انتهت الجلسة», so the portal told somebody
+            with a perfectly good session to sign in again over a permission. A hidden control and a
+            refused request must not disagree, and doing that for two sections by hand while seven
+            others stayed open was a rule enforced where somebody remembered it.
+
+            `PARTNER_SECTION_PERMISSIONS` is the one map both apps read, so a section added without
+            a permission is absent rather than open: `canOpenSection` answers FALSE for anything
+            unmapped. That is the safe direction to fail — a missing entry hides a screen, it does
+            not expose one.
+
+            This is DISPLAY ONLY. The token is decoded, not verified, and every one of these routes
+            is refused by the API on its own authority. What this fixes is the portal lying about
+            what is available.
+          */}
           {locked ? null : (
             <>
-              <Item href="/" label={t.nav.dashboard} current={active === 'dashboard'} />
-              <Item
-                href="/properties"
-                label={t.nav.properties}
-                current={active === 'properties'}
-                badge={badges?.properties}
-              />
+              {opens('dashboard') ? (
+                <Item href="/" label={t.nav.dashboard} current={active === 'dashboard'} />
+              ) : null}
+              {opens('properties') ? (
+                <Item
+                  href="/properties"
+                  label={t.nav.properties}
+                  current={active === 'properties'}
+                  badge={badges?.properties}
+                />
+              ) : null}
               {/* Directly under عقاراتي: the same inventory, seen by date rather than by listing. */}
-              <Item
-                href="/calendars"
-                label={t.nav.calendars}
-                current={active === 'calendars'}
-              />
-              <Item
-                href="/payouts"
-                label={t.nav.payouts}
-                current={active === 'payouts'}
-              />
+              {opens('calendars') ? (
+                <Item
+                  href="/calendars"
+                  label={t.nav.calendars}
+                  current={active === 'calendars'}
+                />
+              ) : null}
+              {/*
+                الوصول اليوم — the desk screen, and for a receptionist it is the ONLY one that
+                matters. High in the list rather than filed under administration: this is opened
+                every shift, several times, usually on a phone at a counter.
+              */}
+              {opens('arrivals') ? (
+                <Item
+                  href="/arrivals"
+                  label={t.nav.arrivals}
+                  current={active === 'arrivals'}
+                />
+              ) : null}
+              {opens('payouts') ? (
+                <Item
+                  href="/payouts"
+                  label={t.nav.payouts}
+                  current={active === 'payouts'}
+                />
+              ) : null}
             </>
           )}
           {/*
@@ -181,56 +227,76 @@ export async function Shell({
 
             Above الدعم and below مستحقاتي: it is an obligation with a deadline, not a place to ask
             a question, and a partner who has just been accepted comes here first. While `locked`
-            it is the FIRST item, because it is the only one that leads anywhere.
+            it is the FIRST item, because it is the only one that leads anywhere — and it stays
+            visible while locked EVEN IF the reader cannot open it, because for an owner it is the
+            destination the gate redirects to. An employee is refused there with a sentence rather
+            than a session error; see the branch on that page.
           */}
-          <Item
-            href="/contracts"
-            label={t.nav.contracts}
-            current={active === 'contracts'}
-          />
+          {locked || opens('contracts') ? (
+            <Item
+              href="/contracts"
+              label={t.nav.contracts}
+              current={active === 'contracts'}
+            />
+          ) : null}
           {locked ? null : (
-            <Item
-              href="/reviews"
-              label={t.nav.reviews}
-              current={active === 'reviews'}
-              badge={badges?.reviews}
-            />
+            <>
+              {opens('reviews') ? (
+                <Item
+                  href="/reviews"
+                  label={t.nav.reviews}
+                  current={active === 'reviews'}
+                  badge={badges?.reviews}
+                />
+              ) : null}
+              {/*
+                المخالفات, below التقييمات: both are SAFRA's judgement of the business rather than
+                its own work, and this is the one nobody opens unless something has gone wrong.
+              */}
+              {opens('violations') ? (
+                <Item
+                  href="/violations"
+                  label={t.nav.violations}
+                  current={active === 'violations'}
+                />
+              ) : null}
+              {/*
+                الموظفون and أدوار الموظفين, both on `partner_employee.manage`.
+
+                Deliberately absent from `PARTNER_EMPLOYEE_PERMISSIONS`: a receptionist who could
+                hire could promote themselves. Roles sit second because a role is the prerequisite —
+                nobody can be invited until one exists — but the reader comes to الموظفون first and
+                is sent here by it, rather than being asked to define a category of person before
+                meeting the person.
+              */}
+              {opens('employees') ? (
+                <Item
+                  href="/employees"
+                  label={t.nav.employees}
+                  current={active === 'employees'}
+                />
+              ) : null}
+              {opens('employeeRoles') ? (
+                <Item
+                  href="/employee-roles"
+                  label={t.nav.employeeRoles}
+                  current={active === 'employeeRoles'}
+                />
+              ) : null}
+            </>
           )}
           {/*
-            الموظفون, hidden while `locked`.
+            الدعم is UNGATED, deliberately, and it is the one exemption in this list.
 
-            An unverified partner has no team to manage yet and the screen would be an invitation
-            to hire against a business SAFRA has not accepted. It sits below التقييمات because it
-            is administration rather than daily work — the reader comes here when somebody joins or
-            leaves, not every morning.
+            It is absent from `PARTNER_SECTION_PERMISSIONS` on purpose — `canOpenSection` answers
+            false for anything unmapped, so adding it to the map to make this loop tidier would
+            HIDE it from every employee. Somebody whose role opens no other section is exactly the
+            person who most needs to ask why, and a portal that shows them nothing at all and no way
+            to ask is a dead end.
 
-            Only the OWNER sees it at all: `PARTNER_EMPLOYEE_MANAGE` is deliberately absent from
-            `PARTNER_EMPLOYEE_PERMISSIONS`, so an employee's own token cannot reach these routes. A
-            receptionist who could hire could promote themselves.
+            Last in the list because it is where a partner goes when something else on it did not
+            work.
           */}
-          {locked || !mayManageEmployees ? null : (
-            <Item
-              href="/employees"
-              label={t.nav.employees}
-              current={active === 'employees'}
-            />
-          )}
-          {/*
-            أدوار الموظفين, directly under الموظفون and gated on the same permission.
-
-            A partner defines these for their OWN staff — SAFRA's super admin has nothing to do with
-            them (Bashar, 2026-08-23). It sits second because a role is the prerequisite: nobody can
-            be invited until one exists, but the reader comes to الموظفون first and is sent here
-            by it, rather than being asked to define a category of person before meeting the person.
-          */}
-          {locked || !mayManageEmployees ? null : (
-            <Item
-              href="/employee-roles"
-              label={t.nav.employeeRoles}
-              current={active === 'employeeRoles'}
-            />
-          )}
-          {/* Last: it is where a partner goes when something else on this list did not work. */}
           <Item
             href="/support"
             label={t.nav.supportPage}

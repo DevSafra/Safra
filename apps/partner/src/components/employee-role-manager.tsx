@@ -3,7 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { ERROR, groupPermissions } from '@safra/contracts';
+import {
+  ERROR,
+  PARTNER_SECTION_PERMISSIONS,
+  groupPermissions,
+  openableSections,
+} from '@safra/contracts';
 
 import { fill, t } from '@/lib/strings';
 import type { PartnerEmployeeRoleDetail } from '@/lib/api';
@@ -188,6 +193,18 @@ function RoleForm({
           </div>
         ))}
       </fieldset>
+
+      {/*
+        A role that opens no screen is legitimate but almost never intended — see the copy for why
+        it is a warning and not a refusal. Shown live as the boxes are ticked, so the partner sees
+        it while they are still deciding rather than after they have hired somebody into it.
+      */}
+      {chosen.length > 0 &&
+      openableSections(chosen, PARTNER_SECTION_PERMISSIONS).length === 0 ? (
+        <p className="rounded-lg border border-warn/40 bg-warn/10 px-3 py-2 text-[12.5px] leading-relaxed text-warn">
+          {t.employeeRoles.opensNothing}
+        </p>
+      ) : null}
 
       {error ? (
         <p role="alert" className="text-sm text-bad">

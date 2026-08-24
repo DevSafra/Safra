@@ -1,8 +1,9 @@
 import Link from 'next/link';
 
 import { getMyPayouts, type PartnerPayout, sidebarBadges } from '@/lib/api';
-import { isEmployeeReader, requireVerifiedPartner } from '@/lib/gate';
+import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
+import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
 import { payoutStatus, t } from '@/lib/strings';
@@ -40,14 +41,14 @@ export default async function PayoutsPage() {
     refused request must not disagree — the rule settled on the joint-contract path — and that cuts
     both ways.
   */
-  const [employee, profile] = await Promise.all([
-    isEmployeeReader(),
+  const [access, profile] = await Promise.all([
+    sectionAccess('payouts'),
     requireVerifiedPartner(),
   ]);
   const name =
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
 
-  if (employee) {
+  if (access !== 'open') {
     return (
       <Shell
         title={t.payouts.title}
@@ -55,7 +56,7 @@ export default async function PayoutsPage() {
         active="payouts"
         badges={sidebarBadges(profile)}
       >
-        <p className="text-sm leading-relaxed text-muted">{t.employees.ownerOnly}</p>
+        <SectionRefusal access={access} />
       </Shell>
     );
   }

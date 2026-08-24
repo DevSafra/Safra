@@ -4,8 +4,9 @@ import { getPortfolioCalendar, sidebarBadges } from '@/lib/api';
 import { DayLegend, MonthGrid } from '@/components/month-grid';
 import { Ltr } from '@/components/ltr';
 import { RangeEditor } from '@/components/range-editor';
-import { requireVerifiedPartner } from '@/lib/gate';
+import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
+import { SectionRefusal } from '@/components/section-refusal';
 import { amount, count, marketToday } from '@/lib/format';
 import { fill, t } from '@/lib/strings';
 
@@ -121,9 +122,10 @@ export default async function CalendarsPage({
   /** Which عقار is open. Its month is the only one the API expands — see `getPortfolioCalendar`. */
   const expand = one(query['expand']).trim().slice(0, 40);
 
-  const [profile, calendar] = await Promise.all([
+  /* Refused before the fetch — see عقاراتي for why the branch is here rather than after. */
+  const [access, profile] = await Promise.all([
+    sectionAccess('calendars'),
     requireVerifiedPartner(),
-    getPortfolioCalendar(month, expand || undefined),
   ]);
 
   const name =
@@ -139,6 +141,10 @@ export default async function CalendarsPage({
       <div className="grid gap-4">{children}</div>
     </Shell>
   );
+
+  if (access !== 'open') return shell(<SectionRefusal access={access} />);
+
+  const calendar = await getPortfolioCalendar(month, expand || undefined);
 
   if (calendar === 'unauthenticated') {
     return shell(<p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>);

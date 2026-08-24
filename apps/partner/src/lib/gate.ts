@@ -4,6 +4,14 @@ import { redirect } from 'next/navigation';
 
 import { getMyProfile, type PartnerProfile } from '@/lib/api';
 import { getPartnerSession } from '@/lib/session-server';
+import {
+  PARTNER_EMPLOYEE_PERMISSIONS,
+  PARTNER_SECTION_PERMISSIONS,
+  canOpenSection,
+  openableSections,
+  type PartnerSection,
+} from '@safra/contracts';
+import { sessionPermissions } from '@safra/session';
 
 /**
  * Where an unverified partner is sent, and the one page they are not sent away from.
@@ -102,3 +110,87 @@ export async function isEmployeeReader(): Promise<boolean> {
 
   return session?.user.role === 'partner_employee';
 }
+
+/**
+ * Whether this reader may open a section, and if not, which sentence to tell them.
+ *
+ * ## A hidden nav item is not an access control
+ *
+ * The sidebar stops an employee FINDING a section; it does nothing about a bookmark, a pasted link
+ * or a typed URL. Every gated page needs its own branch, and it has to run BEFORE the fetch —
+ * otherwise the API answers 403, `partnerFetch` reports that as `'unauthenticated'`, and the screen
+ * says «انتهت الجلسة» to somebody whose session is perfectly good. Signing in again cannot help.
+ *
+ * ## Two refusals, because they call for different actions
+ *
+ * `owner` — no role can ever carry this capability (مستحقاتي, العقود, الموظفون). Asking the
+ * employer would be pointless, so the sentence closes the subject.
+ *
+ * `role` — an employee COULD hold this and does not (عقاراتي, التقويمات, التقييمات). The person
+ * who can change it is one conversation away, and the sentence says so.
+ *
+ * Derived from `PARTNER_EMPLOYEE_PERMISSIONS` rather than listed by hand, so a capability moving
+ * into or out of the employee allow-list changes the sentence automatically instead of leaving one
+ * screen telling somebody a thing is impossible when it has just become grantable.
+ *
+ * ## Not the security boundary
+ *
+ * The token is decoded, not verified, and every route is refused by the API on its own authority.
+ * This decides which sentence a reader sees INSTEAD of a refusal they cannot act on.
+ */
+export type SectionAccess = 'open' | 'owner' | 'role';
+
+export async function sectionAccess(section: PartnerSection): Promise<SectionAccess> {
+  const session = await getPartnerSession();
+  const permissions = session ? sessionPermissions(session) : [];
+
+  if (canOpenSection(permissions, PARTNER_SECTION_PERMISSIONS, section)) return 'open';
+
+  const required = PARTNER_SECTION_PERMISSIONS[section];
+  const grantable = (PARTNER_EMPLOYEE_PERMISSIONS as readonly string[]).includes(
+    required,
+  );
+
+  return grantable ? 'role' : 'owner';
+}
+
+/**
+ * Every section this reader can open, in nav order — for deciding where to LAND them.
+ *
+ * A role carrying only `booking.respond_as_partner` and `review.respond_own` opens nothing: both
+ * are in-page actions on screens their other capabilities do not reach, and both are boxes somebody
+ * would reasonably tick. `sections.test.ts` pins that case. An empty overview of a business you
+ * cannot see is indistinguishable from a broken portal, so the caller has to handle the empty
+ * answer deliberately rather than rendering a dashboard with nothing in it.
+ */
+export async function readerSections(): Promise<string[]> {
+  const session = await getPartnerSession();
+
+  return openableSections(
+    session ? sessionPermissions(session) : [],
+    PARTNER_SECTION_PERMISSIONS,
+  );
+}
+
+/**
+ * Where each section lives, for landing a reader who cannot open the dashboard.
+ *
+ * A LITERAL map, never a path built from a request — this feeds `redirect()`, and a destination
+ * derived from anything a caller controls is an open redirect on the first screen of the portal.
+ * The same reasoning `ONBOARDING_PATH` records.
+ *
+ * Keyed by `PartnerSection`, so a section added to the shared map without a route here fails to
+ * compile rather than redirecting to `undefined`.
+ */
+export const SECTION_PATH: Record<PartnerSection, string> = {
+  dashboard: '/',
+  properties: '/properties',
+  calendars: '/calendars',
+  reviews: '/reviews',
+  arrivals: '/arrivals',
+  violations: '/violations',
+  payouts: '/payouts',
+  contracts: '/contracts',
+  employees: '/employees',
+  employeeRoles: '/employee-roles',
+};

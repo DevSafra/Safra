@@ -7,8 +7,9 @@ import {
 import Link from 'next/link';
 
 import { AddProperty } from '@/components/add-property';
-import { requireVerifiedPartner } from '@/lib/gate';
+import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
+import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
 import { statusTone } from '@safra/ui';
 
@@ -32,13 +33,35 @@ import { fill, propertyStatus, propertyType, t, tripAttribute } from '@/lib/stri
 export const dynamic = 'force-dynamic';
 
 export default async function PropertiesPage() {
-  const [profile, properties, reference] = await Promise.all([
+  /*
+    Refused BEFORE the fetch, so the 403 is never made rather than made and reported as a dead
+    session. `sectionAccess` picks the sentence: عقاراتي is grantable, so an employee without it is
+    told their role does not include it and who can change that.
+  */
+  const [access, profile] = await Promise.all([
+    sectionAccess('properties'),
     requireVerifiedPartner(),
-    getMyProperties(),
-    getPropertyFormReference(),
   ]);
   const name =
     profile === 'failed' || profile === 'unauthenticated' ? '' : profile.displayName;
+
+  if (access !== 'open') {
+    return (
+      <Shell
+        title={t.properties.title}
+        partnerName={name}
+        active="properties"
+        badges={sidebarBadges(profile)}
+      >
+        <SectionRefusal access={access} />
+      </Shell>
+    );
+  }
+
+  const [properties, reference] = await Promise.all([
+    getMyProperties(),
+    getPropertyFormReference(),
+  ]);
 
   return (
     <Shell
