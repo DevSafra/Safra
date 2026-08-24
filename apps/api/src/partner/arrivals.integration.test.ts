@@ -1,0 +1,486 @@
+import { sql } from 'drizzle-orm';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { PERMISSIONS as P } from '@safra/contracts';
+import { createRollbackDatabase, type Database } from '@safra/db';
+
+import { ArrivalsService } from './arrivals.service.js';
+import { AuditService } from '../common/audit/audit.service.js';
+import { ViolationsService } from './violations.service.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
+
+/**
+ * وصول الضيوف and المخالفات against a real PostgreSQL.
+ *
+ * Two screens built for capabilities that were grantable and had nothing behind them. Everything
+ * worth proving here is a boundary:
+ *
+ * 1. **Isolation.** Both lists are one business's, and the check-in write carries the partner id in
+ *    its `WHERE` rather than checking afterwards. So there are always TWO partners in the fixtures
+ *    and the assertion is about what the second one cannot reach.
+ * 2. **Money.** A violation carries a fine, and `violation.read` is not `payout.read_own`. The test
+ *    that matters is not that an employee sees null — it is that the OWNER sees the figure, because
+ *    a service that withheld money from everybody would pass the first assertion perfectly.
+ */
+const DATABASE_URL = process.env['DATABASE_URL'];
+const describeIfDb = DATABASE_URL ? describe : describe.skip;
+
+describeIfDb('arrivals and violations', () => {
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  const db: Database = harness.db;
+  const arrivals = new ArrivalsService(db, new AuditService(db));
+  const violations = new ViolationsService(db);
+
+  let partnerId = '';
+  let neighbourId = '';
+  let unitId = '';
+  let neighbourUnitId = '';
+  /* Real rows: the audit log has a foreign key to `users`, so a made-up actor id fails the write. */
+  let ownerUserId = '';
+  let neighbourUserId = '';
+  let employeeUserId = '';
+
+  /** The owner: holds `payout.read_own`, so money is visible. */
+  const owner = (id: string, sub = ownerUserId): AccessTokenClaims => ({
+    sub,
+    role: 'partner',
+    permissions: [P.BOOKING_CHECK_IN, P.VIOLATION_READ, P.PAYOUT_READ_OWN],
+    locale: 'ar',
+    partnerId: id,
+  });
+
+  /**
+   * An employee: the SAME partner id, and no `payout.read_own`.
+   *
+   * That is what `attachOwningIds` puts on the token — an employee is scoped to their employer, and
+   * the only thing separating them from the owner is the capability list.
+   */
+  const employee = (id: string): AccessTokenClaims => ({
+    sub: employeeUserId,
+    role: 'partner_employee',
+    permissions: [P.BOOKING_CHECK_IN, P.VIOLATION_READ],
+    locale: 'ar',
+    partnerId: id,
+  });
+
+  async function makePartner(): Promise<{
+    partnerId: string;
+    unitId: string;
+    userId: string;
+  }> {
+    const made = await db.execute<{
+      partner_id: string;
+      unit_id: string;
+      user_id: string;
+    }>(sql`
+      WITH ref AS (
+        SELECT (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1) AS city_id,
+               (SELECT id FROM currencies WHERE code = 'USD') AS currency_id,
+               (SELECT id FROM property_types LIMIT 1) AS type_id,
+               (SELECT id FROM partner_types LIMIT 1) AS partner_type_id,
+               (SELECT id FROM cancellation_policies LIMIT 1) AS policy_id
+      ), u AS (
+        INSERT INTO users (email, phone, role, status, preferred_locale)
+        VALUES ('arr-test-' || gen_random_uuid() || '@safra.test', '+963900000000',
+                'partner', 'active', 'ar')
+        RETURNING id
+      ), pa AS (
+        INSERT INTO partners (user_id, partner_type_id, legal_name, display_name, city_id,
+                              address, phone, email, verification)
+        SELECT u.id, ref.partner_type_id, 'Arr Test', 'Arr Test', ref.city_id,
+               'x', '+963900000000', 'arr@safra.test', 'approved'
+        FROM u, ref RETURNING id, city_id
+      ), pr AS (
+        INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
+                                slug, name_ar, name_en, name_de, address, status)
+        SELECT pa.id, ref.city_id, ref.type_id, ref.policy_id,
+               'arr-test-' || gen_random_uuid(), 'فندق', 'Test', 'Test', 'x', 'published'
+        FROM pa, ref RETURNING id, partner_id
+      ), un AS (
+        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
+                           currency_id)
+        SELECT pr.id, 'غرفة', 'Unit', 'Unit', 2, '100.00', ref.currency_id
+        FROM pr, ref RETURNING id, property_id
+      )
+      SELECT pr.partner_id, un.id AS unit_id, (SELECT id FROM u) AS user_id
+      FROM un JOIN pr ON pr.id = un.property_id
+    `);
+
+    return {
+      partnerId: made.rows[0]?.partner_id ?? '',
+      unitId: made.rows[0]?.unit_id ?? '',
+      userId: made.rows[0]?.user_id ?? '',
+    };
+  }
+
+  /** A real employee account, so the audit log's foreign key to `users` is satisfied. */
+  async function makeEmployeeUser(): Promise<string> {
+    const made = await db.execute<{ id: string }>(sql`
+      INSERT INTO users (email, phone, role, status, preferred_locale)
+      VALUES ('arr-emp-' || gen_random_uuid() || '@safra.test', '+963900000002',
+              'partner_employee', 'active', 'ar')
+      RETURNING id
+    `);
+
+    return made.rows[0]?.id ?? '';
+  }
+
+  /** One booking, dated by day offsets from the CITY's today — the same clock the service uses. */
+  async function makeBooking(options: {
+    unit: string;
+    partner: string;
+    status: string;
+    fromDay: number;
+  }): Promise<string> {
+    const { unit, partner, status, fromDay } = options;
+
+    const made = await db.execute<{ reference: string }>(sql`
+      WITH cp AS (
+        INSERT INTO customer_profiles (full_name, email, phone, is_guest)
+        VALUES ('ضيف', 'arr-guest-' || gen_random_uuid() || '@safra.test',
+                '+963900000001', true)
+        RETURNING id
+      )
+      INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                            check_in, check_out, guests_adults, status,
+                            base_amount, customer_fee_value, customer_fee_amount,
+                            partner_commission_rate, partner_commission_amount,
+                            total_amount, partner_payable_amount, currency_id,
+                            fx_rate_to_syp, total_syp, cancellation_policy_snapshot,
+                            confirmed_at, checked_in_at)
+      SELECT cp.id, un.id, un.property_id, ${partner}, pr.city_id,
+             ((now() AT TIME ZONE c.timezone)::date + ${fromDay}::int)::date,
+             ((now() AT TIME ZONE c.timezone)::date + ${fromDay}::int + 2)::date,
+             2, ${status}::booking_status,
+             '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+             un.currency_id, '12500.00000000', '2524875.00', '{"code":"flex"}'::jsonb,
+             CASE WHEN ${status} IN ('confirmed','completed','checked_in')
+                  THEN now() - interval '30 minute' END,
+             CASE WHEN ${status} = 'checked_in' THEN now() END
+      FROM cp, units un
+      JOIN properties pr ON pr.id = un.property_id
+      JOIN cities c ON c.id = pr.city_id
+      WHERE un.id = ${unit}
+      RETURNING reference
+    `);
+
+    return made.rows[0]?.reference ?? '';
+  }
+
+  async function makeViolation(partner: string, waived = false): Promise<void> {
+    await db.execute(sql`
+      INSERT INTO partner_violations (partner_id, kind, occurrence_number, fine_amount,
+                                      fine_currency_id, customer_compensation_amount,
+                                      score_penalty, waived_at, waived_reason)
+      SELECT ${partner}::uuid, 'no_response', 1, '50.00',
+             (SELECT id FROM currencies WHERE code = 'USD'), '50.00', 5,
+             ${waived ? sql`now()` : sql`NULL`},
+             ${waived ? 'عذر مقبول' : null}
+    `);
+  }
+
+  beforeEach(async () => {
+    await harness.begin();
+
+    const mine = await makePartner();
+    const theirs = await makePartner();
+
+    partnerId = mine.partnerId;
+    unitId = mine.unitId;
+    ownerUserId = mine.userId;
+    neighbourId = theirs.partnerId;
+    neighbourUnitId = theirs.unitId;
+    neighbourUserId = theirs.userId;
+    employeeUserId = await makeEmployeeUser();
+  });
+
+  afterEach(async () => {
+    await harness.rollback();
+  });
+
+  afterAll(async () => {
+    await harness.close();
+  });
+
+  // ─── وصول الضيوف ───────────────────────────────────────────────────────────
+
+  describe('the arrivals list', () => {
+    it('shows a confirmed booking arriving today', async () => {
+      const reference = await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'confirmed',
+        fromDay: 0,
+      });
+
+      const page = await arrivals.list(partnerId, { limit: 20 });
+
+      expect(page.items.map((item) => item.reference)).toEqual([reference]);
+      expect(page.items[0]?.checkedInAt).toBeNull();
+      expect(page.items[0]?.guests).toBe(2);
+    });
+
+    /**
+     * A guest arriving at 01:00 for a booking dated yesterday is the case a strict "today" filter
+     * loses, and it is the one where the desk most needs the button.
+     */
+    it('still shows a confirmed arrival whose date has passed', async () => {
+      const reference = await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'confirmed',
+        fromDay: -1,
+      });
+
+      const page = await arrivals.list(partnerId, { limit: 20 });
+
+      expect(page.items.map((item) => item.reference)).toEqual([reference]);
+    });
+
+    it('does not show a booking arriving in the future', async () => {
+      await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'confirmed',
+        fromDay: 3,
+      });
+
+      await expect(arrivals.list(partnerId, { limit: 20 })).resolves.toMatchObject({
+        items: [],
+      });
+    });
+
+    /** Isolation. A join one table too wide would show a competitor's guest list by name. */
+    it("never shows another business's arrival", async () => {
+      const theirs = await makeBooking({
+        unit: neighbourUnitId,
+        partner: neighbourId,
+        status: 'confirmed',
+        fromDay: 0,
+      });
+
+      const mine = await arrivals.list(partnerId, { limit: 20 });
+
+      expect(mine.items).toEqual([]);
+
+      /* Control: the booking exists and its OWNER can see it, so the emptiness is the scope. */
+      const neighbours = await arrivals.list(neighbourId, { limit: 20 });
+
+      expect(neighbours.items.map((item) => item.reference)).toEqual([theirs]);
+    });
+
+    it('refuses a forged cursor', async () => {
+      await expect(
+        arrivals.list(partnerId, { limit: 20, cursor: 'not-a-cursor' }),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+  });
+
+  describe('checking a guest in', () => {
+    it('moves a confirmed booking to checked in, and back', async () => {
+      const reference = await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'confirmed',
+        fromDay: 0,
+      });
+
+      const after = await arrivals.checkIn(owner(partnerId), partnerId, reference);
+
+      expect(after.status).toBe('checked_in');
+      expect(after.checkedInAt).not.toBeNull();
+
+      const undone = await arrivals.undoCheckIn(owner(partnerId), partnerId, reference);
+
+      expect(undone.status).toBe('confirmed');
+      expect(undone.checkedInAt).toBeNull();
+    });
+
+    /**
+     * The status is in the `WHERE`, not read and compared, so the second press matches no rows.
+     * Two clerks pressing at once is the ordinary version of this, and it must not double-write.
+     */
+    it('refuses a second check-in of the same booking', async () => {
+      const reference = await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'confirmed',
+        fromDay: 0,
+      });
+
+      await arrivals.checkIn(owner(partnerId), partnerId, reference);
+
+      await expect(
+        arrivals.checkIn(owner(partnerId), partnerId, reference),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    it('refuses to undo a check-in that never happened', async () => {
+      const reference = await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'confirmed',
+        fromDay: 0,
+      });
+
+      await expect(
+        arrivals.undoCheckIn(owner(partnerId), partnerId, reference),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    /** A cancelled booking whose guest turns up is a conversation with SAFRA, not a button. */
+    it('refuses to check in a cancelled booking', async () => {
+      const reference = await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'cancelled',
+        fromDay: 0,
+      });
+
+      await expect(
+        arrivals.checkIn(owner(partnerId), partnerId, reference),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    /**
+     * The partner id is a `WHERE` clause. "Not yours" answers the same as "not there", and the row
+     * must be UNTOUCHED afterwards — a 404 raised after a successful write would pass a test that
+     * only checked the exception.
+     */
+    it("cannot check in another business's guest, and does not touch the row", async () => {
+      const theirs = await makeBooking({
+        unit: neighbourUnitId,
+        partner: neighbourId,
+        status: 'confirmed',
+        fromDay: 0,
+      });
+
+      await expect(
+        arrivals.checkIn(owner(partnerId), partnerId, theirs),
+      ).rejects.toMatchObject({ status: 404 });
+
+      const row = await db.execute<{ status: string; checked_in_at: string | null }>(sql`
+        SELECT status::text AS status, checked_in_at::text FROM bookings
+        WHERE reference = ${theirs}
+      `);
+
+      expect(row.rows[0]?.status).toBe('confirmed');
+      expect(row.rows[0]?.checked_in_at).toBeNull();
+    });
+
+    /**
+     * A reference that is not shaped like one is refused BEFORE the query.
+     *
+     * Not about injection — the lookup is parameterised — but about not handing Postgres a
+     * megabyte of caller-chosen text on a route any signed-in employee may call sixty times a
+     * minute. 404 rather than 400, so "not a reference" and "not your booking" answer the same and
+     * nobody can learn the format by watching which refusal differs.
+     */
+    it('refuses a reference that is not shaped like one', async () => {
+      for (const bad of [
+        'x'.repeat(5000),
+        '../../etc/passwd',
+        'BKG-',
+        "BKG-2026-1' OR '1'='1",
+      ]) {
+        await expect(
+          arrivals.checkIn(owner(partnerId), partnerId, bad),
+          bad.slice(0, 20),
+        ).rejects.toMatchObject({ status: 404 });
+      }
+    });
+
+    /** An employee with the capability may do the job — that is the point of the capability. */
+    it('lets an employee of the business check a guest in', async () => {
+      const reference = await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'confirmed',
+        fromDay: 0,
+      });
+
+      await expect(
+        arrivals.checkIn(employee(partnerId), partnerId, reference),
+      ).resolves.toMatchObject({ status: 'checked_in' });
+    });
+  });
+
+  // ─── المخالفات ─────────────────────────────────────────────────────────────
+
+  describe('the violations list', () => {
+    it('shows this business’s violations, with the fine, to the owner', async () => {
+      await makeViolation(partnerId);
+
+      const page = await violations.list(owner(partnerId), partnerId, { limit: 20 });
+
+      expect(page.moneyHidden).toBe(false);
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]?.kind).toBe('no_response');
+      expect(page.items[0]?.fineAmount).toBe('50.00');
+      expect(page.items[0]?.fineCurrency).toBe('USD');
+      expect(page.items[0]?.customerCompensationAmount).toBe('50.00');
+      expect(page.items[0]?.scorePenalty).toBe(5);
+    });
+
+    /**
+     * THE assertion this screen exists to get right, and the one above is its control.
+     *
+     * An employee holds `violation.read` and not `payout.read_own`. Without the pairing, a service
+     * that withheld money from everyone would pass this and be wrong; without this, one that
+     * withheld it from nobody would pass that.
+     */
+    it('withholds every money figure from a reader without payout.read_own', async () => {
+      await makeViolation(partnerId);
+
+      const page = await violations.list(employee(partnerId), partnerId, { limit: 20 });
+
+      expect(page.moneyHidden).toBe(true);
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]?.fineAmount).toBeNull();
+      expect(page.items[0]?.fineCurrency).toBeNull();
+      expect(page.items[0]?.customerCompensationAmount).toBeNull();
+
+      /* What the screen is FOR is still there: what happened, and what it cost in score. */
+      expect(page.items[0]?.kind).toBe('no_response');
+      expect(page.items[0]?.scorePenalty).toBe(5);
+    });
+
+    /**
+     * A waived violation stays on the list.
+     *
+     * A row that vanishes when it is forgiven looks like one that was never written, and the
+     * partner cannot tell that SAFRA acted on their appeal.
+     */
+    it('shows a waived violation, marked as waived', async () => {
+      await makeViolation(partnerId, true);
+
+      const page = await violations.list(owner(partnerId), partnerId, { limit: 20 });
+
+      expect(page.items[0]?.waived).toBe(true);
+      expect(page.items[0]?.waivedReason).toBe('عذر مقبول');
+    });
+
+    it("never shows another business's violation", async () => {
+      await makeViolation(neighbourId);
+
+      await expect(
+        violations.list(owner(partnerId), partnerId, { limit: 20 }),
+      ).resolves.toMatchObject({ items: [] });
+
+      /* Control: it exists, and its owner sees it. */
+      const theirs = await violations.list(
+        owner(neighbourId, neighbourUserId),
+        neighbourId,
+        { limit: 20 },
+      );
+
+      expect(theirs.items).toHaveLength(1);
+    });
+
+    it('refuses a forged cursor', async () => {
+      await expect(
+        violations.list(owner(partnerId), partnerId, { limit: 20, cursor: 'nope' }),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+  });
+});

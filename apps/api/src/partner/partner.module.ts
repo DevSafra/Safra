@@ -25,6 +25,9 @@ import {
 } from './partner-employees.controller.js';
 import { PartnerEmployeeRolesController } from './partner-employee-roles.controller.js';
 import { PartnerEmployeeRolesService } from './partner-employee-roles.service.js';
+import { ArrivalsController, ViolationsController } from './arrivals.controller.js';
+import { ArrivalsService } from './arrivals.service.js';
+import { ViolationsService } from './violations.service.js';
 import { PartnerEmployeesService } from './partner-employees.service.js';
 import { AdminPartnerOnboardingController } from './partner-onboarding.controller.js';
 import { PartnerOnboardingService } from './partner-onboarding.service.js';
@@ -56,6 +59,8 @@ import { PropertyImageService } from './property-images.service.js';
     PartnerEmployeesController,
     PartnerEmployeeInvitationController,
     PartnerEmployeeRolesController,
+    ArrivalsController,
+    ViolationsController,
   ],
   providers: [
     PropertiesService,
@@ -74,6 +79,8 @@ import { PropertyImageService } from './property-images.service.js';
     PartnerOnboardingService,
     PartnerEmployeesService,
     PartnerEmployeeRolesService,
+    ArrivalsService,
+    ViolationsService,
   ],
   exports: [PropertiesService, CalendarService, PartnerApplicationService],
 })
