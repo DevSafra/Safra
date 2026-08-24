@@ -795,3 +795,75 @@ export async function getAssignableCapabilities() {
     z.object({ permissions: z.array(z.string()) }),
   );
 }
+
+/**
+ * الوصول اليوم — the confirmed bookings whose date has come, plus today's check-ins.
+ *
+ * No money on the row, and that is the endpoint's decision rather than this client's: a rate here
+ * would hand the business's earnings to whoever works the desk, and `booking.check_in` does not
+ * carry `payout.read_own`.
+ */
+const arrivalSchema = z.object({
+  reference: z.string(),
+  guestName: z.string(),
+  propertyName: z.string(),
+  unitName: z.string(),
+  checkIn: z.string(),
+  checkOut: z.string(),
+  nights: z.number(),
+  guests: z.number(),
+  status: z.string(),
+  checkedInAt: z.string().nullable(),
+});
+
+export type PartnerArrival = z.infer<typeof arrivalSchema>;
+
+export async function getMyArrivals(cursor?: string) {
+  const query = new URLSearchParams({ limit: '20' });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return partnerFetch(
+    `/partner/arrivals?${query.toString()}`,
+    z.object({ items: z.array(arrivalSchema), nextCursor: z.string().nullable() }),
+  );
+}
+
+/**
+ * المخالفات — what SAFRA has charged, read-only.
+ *
+ * `moneyHidden` says the three amounts were withheld rather than absent, and the screen must render
+ * that as a STATEMENT. A «—» in a money column claims the fine was zero, which is a different fact
+ * from "you may not see it" and the opposite of the truth.
+ */
+const violationSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  occurrenceNumber: z.number(),
+  bookingReference: z.string().nullable(),
+  scorePenalty: z.number(),
+  fineAmount: z.string().nullable(),
+  fineCurrency: z.string().nullable(),
+  customerCompensationAmount: z.string().nullable(),
+  waived: z.boolean(),
+  waivedReason: z.string().nullable(),
+  collectedAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+
+export type PartnerViolation = z.infer<typeof violationSchema>;
+
+export async function getMyViolations(cursor?: string) {
+  const query = new URLSearchParams({ limit: '20' });
+
+  if (cursor) query.set('cursor', cursor);
+
+  return partnerFetch(
+    `/partner/violations?${query.toString()}`,
+    z.object({
+      items: z.array(violationSchema),
+      nextCursor: z.string().nullable(),
+      moneyHidden: z.boolean(),
+    }),
+  );
+}
