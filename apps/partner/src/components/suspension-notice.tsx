@@ -1,6 +1,3 @@
-import { ERROR } from '@safra/contracts';
-import { errorMessage } from '@safra/i18n';
-
 import { fill, t } from '@/lib/strings';
 
 /**
@@ -80,26 +77,5 @@ export function SuspensionNotice({
         </div>
       </div>
     </section>
-  );
-}
-
-/**
- * What a refused WRITE says while the account is on hold.
- *
- * Separate from the notice because it answers a different question: the notice says why the
- * account is held, this says why the thing you just tried did not happen. Both are needed — a
- * refusal with only the banner above it leaves the reader to infer the connection, and inference
- * is what produces a support ticket.
- *
- * It exists at all because `partnerFetch` maps the API's 403 to `'unauthenticated'`, so a refusal
- * that falls through renders «انتهت الجلسة» and sends somebody to sign in again over a state that
- * signing in cannot change. That is the same trap the console's section gate was built to close,
- * arriving on a different screen.
- */
-export function SuspendedRefusal() {
-  return (
-    <p data-suspended-refusal className="text-sm text-bad">
-      {errorMessage(ERROR.PARTNER_SUSPENDED, 'ar')}
-    </p>
   );
 }

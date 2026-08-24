@@ -22,6 +22,19 @@ import { errorMessage } from '@safra/i18n';
  * as two labels for one status: whichever screen a partner happens to be on decides what they are
  * told. One code, one sentence, resolved where the reader's language is known.
  *
+ * ## A string, not a component
+ *
+ * There WAS a `SuspendedRefusal` component beside the notice — a `<p>` carrying this same sentence
+ * — and nothing ever imported it (`O-partner-12`, removed 2026-08-24). Its docblock made a point
+ * worth keeping: the notice and the refusal answer different questions, and both are needed. The
+ * banner says why the ACCOUNT is held; this says why the thing you just tried did not happen. A
+ * refusal with only a banner above it leaves the reader to infer the connection, and inference is
+ * what produces a support ticket.
+ *
+ * A string rather than a component because that is what the twelve write components need: each has
+ * its own message area, its own `kind: 'bad'` styling and its own vocabulary to fall back to. A
+ * component would have made this the thirteenth answer to a question the other twelve had settled.
+ *
  * ## Why it returns null rather than a fallback
  *
  * A helper that returned "something went wrong" for every unrecognised code would quietly swallow
