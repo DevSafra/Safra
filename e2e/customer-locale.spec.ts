@@ -183,11 +183,41 @@ test.describe('Arabic plurals on a real page', () => {
  * browser resolves the bidi algorithm and the computed style.
  */
 test.describe('a Latin-valued field on an Arabic page', () => {
-  /* A real property and unit, or the checkout renders no guest form to inspect. */
-  const CHECKOUT =
-    '/ar/checkout?property=payments-test-property' +
-    '&unitId=27b8b887-a81e-4d3d-ac2f-74503fe0c7af' +
-    '&checkIn=2026-11-10&checkOut=2026-11-12&adults=2';
+  /*
+    A real PUBLISHED property and one of its units, resolved at run time.
+
+    It was `payments-test-property` with a hard-coded unit id — the fixture the payments integration
+    suite owns. That suite commits by design (its teardown keeps any booking carrying a payment or a
+    ledger entry, because that is financial evidence), so the property had accumulated 12,846
+    bookings and its public payload had reached 7.1MB: past the 2MB Next.js data-cache ceiling, so
+    the customer app re-fetched it uncached on every render and specs opening it timed out. It is a
+    DRAFT now (`O-ops-4`), which removes it from search and from public pages — and took this
+    checkout with it, because a draft has no public page to check out of.
+
+    So this resolves a seeded property instead, the same way `findReference` does: ask the public
+    API. A hard-coded unit id could not survive a re-seed anyway, and pointing a customer-facing
+    spec at a test suite's private fixture was the coupling that made one property's growth this
+    file's problem.
+  */
+  let CHECKOUT = '';
+
+  test.beforeAll(async ({ request }) => {
+    const property = await request.get(
+      'http://localhost:4000/api/v1/properties/qasr-al-sharq-apartments',
+    );
+    const body = (await property.json()) as { units?: { id?: string }[] };
+    const unitId = body.units?.[0]?.id ?? '';
+
+    expect(
+      unitId,
+      'No unit on the seeded property — checkout has no form to inspect.',
+    ).not.toBe('');
+
+    CHECKOUT =
+      '/ar/checkout?property=qasr-al-sharq-apartments' +
+      `&unitId=${unitId}` +
+      '&checkIn=2026-11-10&checkOut=2026-11-12&adults=2';
+  });
 
   test('lays the phone number out left to right at the reader´s start edge', async ({
     page,

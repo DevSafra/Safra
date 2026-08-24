@@ -1358,15 +1358,48 @@ async function seedFixtures(db: Database): Promise<void> {
     LIMIT 1
     ON CONFLICT DO NOTHING`);
 
+  /*
+    DRAFT, not published — and this one word is `O-ops-4` (Bashar, 2026-08-24).
+
+    ## What being published cost
+
+    This suite COMMITS, for a reason a rollback harness cannot solve: `now()` is transaction-start
+    time. Its teardown deliberately keeps any booking carrying a payment or a ledger entry, because
+    that is financial evidence and deleting it to tidy a fixture would be the wrong trade. So the
+    bookings accumulate by design — 12,846 of them by 2026-08-24, all hanging off this ONE property.
+
+    Published, that made `GET /properties/payments-test-property` a 7.1MB payload, over the 2MB
+    Next.js data-cache ceiling. The customer app logged `Failed to set Next.js data cache` and
+    re-fetched it uncached on every render; the property was in Damascus and therefore in search
+    results, so an e2e spec opening the first listing timed out — thirty-three specs failed in the
+    CUSTOMER app during a change that touched only the console and the API, and the symptom looked
+    like a hydration fault in a phone field.
+
+    ## Why draft is the fix rather than deletion
+
+    It preserves every row of evidence and removes the entire blast radius: a draft listing is not in
+    search, has no public property page, and is fetched by nothing. Nothing in this suite needs it
+    published — bookings are inserted directly here, never through the booking service, which is the
+    only path that checks the status.
+
+    The `UPDATE` after it is for databases that already have the row: `ON CONFLICT DO NOTHING` means
+    the insert alone would leave an existing fixture published forever, which is every machine that
+    has ever run this suite.
+  */
   await db.execute(sql`
     INSERT INTO properties (id, partner_id, city_id, property_type_id, slug,
                             name_ar, name_en, name_de, address, cancellation_policy_id, status)
     SELECT ${PROPERTY_ID}::uuid, ${PARTNER_ID}::uuid, c.id, pt.id, 'payments-test-property',
-           'دفع', 'Payments Test', 'Test', 'Addr', cp.id, 'published'
+           'دفع', 'Payments Test', 'Test', 'Addr', cp.id, 'draft'
     FROM cities c, property_types pt, cancellation_policies cp
     WHERE c.slug = 'damascus' AND pt.code = 'apartment' AND cp.code = 'flex'
     LIMIT 1
     ON CONFLICT DO NOTHING`);
+
+  await db.execute(
+    sql`UPDATE properties SET status = 'draft'
+        WHERE id = ${PROPERTY_ID}::uuid AND status <> 'draft'`,
+  );
 
   await db.execute(sql`
     INSERT INTO units (id, property_id, name_ar, name_en, name_de, max_guests,

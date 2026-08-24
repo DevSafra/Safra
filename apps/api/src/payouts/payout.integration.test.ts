@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createRollbackDatabase, type Database } from '@safra/db';
+import { createDatabase, createRollbackDatabase, type Database } from '@safra/db';
 import { PERMISSIONS as P } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
@@ -115,7 +115,7 @@ describeIfDb('PayoutService', () => {
         INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
                                 slug, name_ar, name_en, name_de, address, status)
         SELECT pa.id, ref.city_id, ref.type_id, ref.policy_id,
-               'payout-test-' || gen_random_uuid(), 'اختبار', 'Test', 'Test', 'x', 'published'
+               'payout-test-' || gen_random_uuid(), 'اختبار', 'Test', 'Test', 'x', 'draft'
         FROM pa, ref RETURNING id, partner_id
       ), un AS (
         INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
@@ -156,8 +156,69 @@ describeIfDb('PayoutService', () => {
     await harness.rollback();
   });
 
+  /*
+    Sweeps the residue this suite leaves when a run does not finish (`O-ops-4`).
+
+    Every test here runs inside a transaction that is rolled back, so nothing SHOULD survive — and
+    112 `payout-test-%` properties and users did, left by runs killed between `begin` and `rollback`.
+    They are harmless individually and nothing ever cleaned them, which is how a development database
+    acquires a hundred orphan businesses.
+
+    ## Its own connection, deliberately
+
+    The harness wraps everything in a transaction it is about to roll back, so a delete issued
+    through it would be undone — the sweep has to commit. `createDatabase` gives one connection for
+    the length of the sweep and closes it.
+
+    ## Only rows with no evidence attached
+
+    A property with no bookings, a partner with no properties and no payouts, a user with no partner.
+    A payout, a payment or a ledger entry hanging off one of these means the row is no longer
+    residue, and the `NOT EXISTS` clauses leave it alone rather than deleting financial history to
+    tidy a fixture. Swallowed, because a cleanup that fails must not fail a suite that passed.
+  */
   afterAll(async () => {
     await harness.close();
+
+    const sweep = createDatabase(DATABASE_URL ?? '', 1);
+
+    try {
+      await sweep.execute(sql`
+        DELETE FROM units WHERE property_id IN (
+          SELECT id FROM properties WHERE slug LIKE 'payout-test-%'
+            AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.property_id = properties.id)
+        )`);
+      await sweep.execute(sql`
+        DELETE FROM properties WHERE slug LIKE 'payout-test-%'
+          AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.property_id = properties.id)`);
+      await sweep.execute(sql`
+        DELETE FROM partners WHERE email LIKE 'payout-test-%'
+          AND NOT EXISTS (SELECT 1 FROM properties p WHERE p.partner_id = partners.id)
+          AND NOT EXISTS (SELECT 1 FROM partner_payouts po WHERE po.partner_id = partners.id)`);
+      await sweep.execute(sql`
+        DELETE FROM users WHERE email LIKE 'payout-test-%'
+          AND NOT EXISTS (SELECT 1 FROM partners p WHERE p.user_id = users.id)`);
+      /*
+        Whatever survived the evidence test is UNPUBLISHED rather than left in search.
+
+        The 112 properties this suite had accumulated were all `published`, so they sat in customer
+        search results and on public property pages — the same blast radius that made
+        `payments-test-property` break thirty-three specs in the customer app. Deleting them is not
+        available: 336 `partner_payout_items` reference their bookings, and unpicking financial
+        bookkeeping to tidy a fixture is exactly the trade `O-ops-4` says not to make.
+
+        Drafting them costs nothing and removes the whole exposure: every row is kept, and a draft
+        listing is in no search, has no public page and is fetched by nothing. New rows are created
+        as drafts above, so this only ever has to catch history.
+      */
+      await sweep.execute(sql`
+        UPDATE properties SET status = 'draft'
+        WHERE slug LIKE 'payout-test-%' AND status <> 'draft'`);
+    } catch {
+      /* Residue is not worth a red suite. */
+    } finally {
+      await (sweep as unknown as { $client: { end: () => Promise<void> } }).$client.end();
+    }
   });
 
   it('accrues completed, paid bookings into one open period per partner', async () => {
