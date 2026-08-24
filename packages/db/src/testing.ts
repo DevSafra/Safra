@@ -90,7 +90,26 @@ export interface RollbackDatabase {
 
 type QueryArgs = [string | QueryConfig | QueryArrayConfig, ...(readonly unknown[])[]];
 
-export function createRollbackDatabase(connectionString: string): RollbackDatabase {
+/**
+ * How the enclosing transaction reads the rest of the database.
+ *
+ * `read committed` is PostgreSQL's default and right for almost every suite: a test writes its own
+ * rows and reads them back, and what other connections are doing is irrelevant.
+ *
+ * `repeatable read` is for a suite that measures a DELTA on something global — a gauge over a whole
+ * table, a count of every row of a kind. Those assertions read, change one thing, and read again,
+ * and under `read committed` the second read also picks up whatever another connection committed in
+ * between. Four suites in this repository COMMIT by design, so that is not hypothetical: it made
+ * `metrics.integration.test.ts` fail once in eight full runs and pass every time in isolation
+ * (`O-e2e-4`). A snapshot removes the race at the root rather than loosening the assertion to `>=`,
+ * which would hide the regressions the test exists to catch.
+ */
+export type Isolation = 'read committed' | 'repeatable read';
+
+export function createRollbackDatabase(
+  connectionString: string,
+  isolation: Isolation = 'read committed',
+): RollbackDatabase {
   const client = new Client({ connectionString, statement_timeout: 15_000 });
 
   /* Bound before the override, so the wrapper can issue its own statements without recursing. */
@@ -233,7 +252,20 @@ export function createRollbackDatabase(connectionString: string): RollbackDataba
         against whichever assertion ran first in the NEXT test, which is the hardest possible place
         to look for it.
       */
-      await serialise(() => raw('BEGIN'));
+      /*
+        The isolation level rides on the BEGIN, and it has to.
+
+        `SET TRANSACTION ISOLATION LEVEL` must be the first statement in a transaction, and the
+        wrapper above issues a SAVEPOINT before anything a test sends — so a caller cannot raise the
+        level itself after `begin()` returns. Setting it here is the only place it works.
+      */
+      await serialise(() =>
+        raw(
+          isolation === 'repeatable read'
+            ? 'BEGIN ISOLATION LEVEL REPEATABLE READ'
+            : 'BEGIN',
+        ),
+      );
       inTransaction = true;
       stack.length = 0;
     },

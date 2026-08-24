@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createRollbackDatabase, type Database } from '@safra/db';
+import { createDatabase, createRollbackDatabase, type Database } from '@safra/db';
 
 import { MetricsService } from './metrics.service.js';
 import type { MediaReachabilityService } from '../storage/media-reachability.service.js';
@@ -28,7 +28,20 @@ const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('MetricsService', () => {
   /* Every row this suite writes is discarded when the test that wrote it ends. */
-  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /*
+    REPEATABLE READ, and this is the suite that needs it (`O-e2e-4`).
+
+    Every assertion here is a DELTA on a gauge counting a whole table: read, change one row, read
+    again. Under READ COMMITTED the second read also sees whatever another connection committed in
+    between — and `payments.integration.test.ts` commits by design, while vitest runs files in
+    parallel. That turned a delta of one into two, once in eight full runs, pointing at metrics code
+    that was never wrong.
+
+    A snapshot fixes it at the root. Loosening the assertions to `>=` would have hidden the real
+    regressions they exist to catch. This suite writes only its own rows, so there is nothing here
+    for a serialization failure to conflict with.
+  */
+  const harness = createRollbackDatabase(DATABASE_URL ?? '', 'repeatable read');
   const db: Database = harness.db;
 
   const media = { status: () => 'ok' } as unknown as MediaReachabilityService;
@@ -36,6 +49,7 @@ describeIfDb('MetricsService', () => {
 
   beforeEach(async () => {
     await harness.begin();
+
     /* Each test changes a row and reads the gauge; the cache would serve the previous answer. */
     service.invalidate();
   });
@@ -316,6 +330,73 @@ describeIfDb('MetricsService', () => {
       expect(after['safra_payment_events_unprocessed']).toBe(
         before['safra_payment_events_unprocessed'],
       );
+    });
+
+    /**
+     * The gauge is not disturbed by ANOTHER connection committing an event mid-measurement.
+     *
+     * ## The flake this pins, made deterministic
+     *
+     * `safra_payment_events_unprocessed` is a count over the whole table, and every assertion in
+     * this block is a delta: read, write one row, read again. Under READ COMMITTED the second read
+     * sees anything committed in between — and `payments.integration.test.ts` COMMITS by design
+     * (its teardown keeps bookings carrying a payment or a ledger entry, because that is financial
+     * evidence). Vitest runs files in parallel, so its insert can land between the two reads and the
+     * delta becomes 2. Observed once in eight full runs on 2026-08-24; green every time in isolation,
+     * which is the worst way for a test to be wrong (`O-e2e-4`).
+     *
+     * This reproduces it on purpose from a SECOND connection, so the fix is provable rather than
+     * hoped for. Without `REPEATABLE READ` on the harness transaction it fails every time.
+     */
+    it('is not disturbed by a concurrent commit from another connection', async () => {
+      const other = createDatabase(DATABASE_URL ?? '', 1);
+
+      try {
+        const before = await scrape();
+
+        /* Another suite's write, landing exactly where the race puts it. */
+        await other.execute(sql`
+          INSERT INTO payment_provider_events
+            (provider, provider_event_id, event_type, payload, signature_verified)
+          VALUES ('simulator', ${`concurrent-${Math.random()}`}, 'payment.captured',
+                  '{}'::jsonb, true)
+        `);
+
+        await receive('awaiting');
+        service.invalidate();
+
+        const after = await scrape();
+
+        expect(
+          after['safra_payment_events_unprocessed'],
+          'A commit from another connection reached this measurement. The harness transaction is ' +
+            'not isolated, so every delta assertion in this block races the payments suite.',
+        ).toBe((before['safra_payment_events_unprocessed'] ?? 0) + 1);
+      } finally {
+        /*
+          MARKED PROCESSED, never deleted — the table refuses a delete and it is right to.
+
+          `deny_payment_event_rewrite` allows only `processed_at`, `processing_error` and
+          `payment_id` to change, and permits a DELETE only for an unverified, unprocessed payload
+          older than thirty days: "This row is evidence." The first version of this cleanup tried a
+          DELETE and was refused, which is the database defending the append-only rule against a
+          test's convenience.
+
+          Marking it processed is the sanctioned move and it is also the honest one: the row stays as
+          evidence, and it stops counting toward `safra_payment_events_unprocessed` — the gauge
+          behind a PAGE-severity alert, which is the same false positive the block below this one
+          exists to prevent.
+        */
+        await other.execute(sql`
+          UPDATE payment_provider_events
+          SET processed_at = now(),
+              processing_error = 'created by the metrics isolation test; evidence kept'
+          WHERE provider_event_id LIKE 'concurrent-%' AND processed_at IS NULL
+        `);
+        await (
+          other as unknown as { $client: { end: () => Promise<void> } }
+        ).$client.end();
+      }
     });
 
     it('does count an event that is genuinely waiting', async () => {
