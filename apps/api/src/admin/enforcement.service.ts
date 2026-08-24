@@ -503,6 +503,14 @@ export class EnforcementService {
         bookingReference: row['booking_reference'],
         warnedAt: row['warned_at'],
         warningNote: row['warning_note'],
+        /*
+          Added to the SELECT and forgotten HERE, which is the defect the note above this mapping
+          describes — a hand-maintained field list beside a query that grew. The console's schema
+          requires both, so the parse failed and مخالفات said «تعذّر تحميل هذه القائمة» while the API
+          answered 200. Caught by the browser pass within minutes, which is the strict parse working.
+        */
+        description: row['description'],
+        fineReason: row['fine_reason'],
         fineAmount: row['fine_amount'],
         fineCurrency: row['fine_currency'],
         customerCompensationAmount: row['customer_compensation_amount'],
