@@ -7,7 +7,7 @@ import { COUNT_CAP, STAFF_ROLES, type OffsetPage, offsetPage } from '@safra/cont
 import { DATABASE } from '../database/database.module.js';
 import { resolveSubjects, type AuditSubject } from './audit-subject.js';
 import { ADMIN_DISPLAY_NAME } from '@safra/contracts';
-import { actorName } from '../common/actor-name.sql.js';
+import { actorName, actorRealName } from '../common/actor-name.sql.js';
 
 export interface AuditEntry {
   /**
@@ -181,7 +181,7 @@ export class AuditLogService {
       }>(sql`
       SELECT a.id, a.action, a.subject_type, a.subject_id,
              ${actorName(sql`u.email`, sql`u.role`)} AS actor_email,
-             u.full_name AS actor_name,
+             ${actorRealName(sql`u.full_name`, sql`u.role`)} AS actor_name,
              a.actor_role::text AS actor_role,
              a.before, a.after, a.reason, a.ip_address,
              to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')

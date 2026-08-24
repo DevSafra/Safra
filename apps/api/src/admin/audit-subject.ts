@@ -2,6 +2,8 @@ import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 
+import { actorName, actorRealName } from '../common/actor-name.sql.js';
+
 /**
  * What an audit entry HAPPENED TO, named rather than identified.
  *
@@ -135,8 +137,41 @@ const SOURCES: Record<string, Source> = {
       `CASE WHEN full_name IS NOT NULL` rather than always: with no name the label is already the
       address, and «doc-reviewer@safra.test (doc-reviewer@safra.test)» is worse than either half.
     */
-    reference: sql`CASE WHEN full_name IS NOT NULL THEN email END`,
-    label: sql`coalesce(full_name, email)`,
+    /*
+      A super admin named as the SUBJECT is pseudonymised too (Bashar's rule, 2026-08-23).
+
+      ## The row that made this obvious
+
+      A sign-in is a self-action: subject IS actor. So سجل التدقيق pseudonymised the actor column
+      and re-identified the same person one column across — «Admin · تسجيل دخول ناجح · مستخدم /
+      موظف الاختبار / ops@safra.test». Found by project-e9 on a screenshot, two hours after the
+      first leak of the same kind, with the suite green both times.
+
+      ## Why the whole `user` subject and not only the self-action case
+
+      Narrowing it to subject-equals-actor was the tempting fix and it protects the wrong thing.
+      What the pseudonym defends is not just attribution — it is the MEMBERSHIP of the anonymous
+      set. A row reading «Admin changed the role of موظف الاختبار» tells any reader that موظف
+      الاختبار is a super admin, and on a platform with two or three of them that is most of the
+      way to knowing who «Admin» is. Reversing a pseudonym by enumerating its set is the ordinary
+      way pseudonyms fail, and it does not require the actor and the subject to be the same row.
+
+      ## What is NOT lost
+
+      Bashar's other rule — *"write the partner name so me as a super admin can really know
+      everything in details"* — still holds for every other subject: partners, properties,
+      bookings, customers, ordinary staff. This is one role, and the trail still names the action,
+      the time, and `subject_id`, which is the record itself. `href` is unchanged for the same
+      reason: an id is not an identity, and the screen it opens needs `staff.manage`.
+
+      Same predicate as the actor columns, from `ANONYMOUS_STAFF_ROLES`, so there is one answer to
+      "who acts under a pseudonym" and not a third copy of it.
+    */
+    reference: actorRealName(
+      sql`CASE WHEN full_name IS NOT NULL THEN email END`,
+      sql`role`,
+    ),
+    label: actorName(sql`coalesce(full_name, email)`, sql`role`),
     href: (row) => `/staff/${row.id}`,
   },
   dispute: {
