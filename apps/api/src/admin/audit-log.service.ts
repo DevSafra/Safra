@@ -5,15 +5,25 @@ import type { Database } from '@safra/db';
 import { COUNT_CAP, STAFF_ROLES, type OffsetPage, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { resolveSubjects, type AuditSubject } from './audit-subject.js';
 import { ADMIN_DISPLAY_NAME } from '@safra/contracts';
 import { actorName } from '../common/actor-name.sql.js';
 
 export interface AuditEntry {
+  /**
+   * What this entry HAPPENED TO, named (Bashar, 2026-08-24) — null when nothing resolves.
+   *
+   * Populated by the DETAIL reads and by the paged lists, both through `resolveSubjects`, which
+   * batches one query per subject type rather than one per row.
+   */
+  readonly subject?: AuditSubject | null;
   readonly id: string;
   readonly action: string;
   readonly subjectType: string;
   readonly subjectId: string | null;
   readonly actorEmail: string | null;
+  /** Who acted, by name. Null for an account created before `users.full_name` existed. */
+  readonly actorName?: string | null;
   readonly actorRole: string | null;
   readonly before: unknown;
   readonly after: unknown;
@@ -161,6 +171,7 @@ export class AuditLogService {
         subject_type: string;
         subject_id: string | null;
         actor_email: string | null;
+        actor_name: string | null;
         actor_role: string | null;
         before: unknown;
         after: unknown;
@@ -170,6 +181,7 @@ export class AuditLogService {
       }>(sql`
       SELECT a.id, a.action, a.subject_type, a.subject_id,
              ${actorName(sql`u.email`, sql`u.role`)} AS actor_email,
+             u.full_name AS actor_name,
              a.actor_role::text AS actor_role,
              a.before, a.after, a.reason, a.ip_address,
              to_char(a.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
@@ -181,13 +193,29 @@ export class AuditLogService {
       this.countOf(fromWhere),
     ]);
 
+    /*
+      Resolved AFTER the page is fetched, over exactly the rows being returned — never as a join in
+      the query above. A join would be one LEFT JOIN per subject type on a table that only grows,
+      to name at most `limit` things; this is one indexed lookup per type actually present.
+    */
+    const subjects = await resolveSubjects(
+      this.db,
+      rows.rows.map((row) => ({
+        subjectType: row.subject_type,
+        subjectId: row.subject_id,
+      })),
+    );
+
     return offsetPage(
       rows.rows.map((row) => ({
         id: row.id,
         action: row.action,
         subjectType: row.subject_type,
         subjectId: row.subject_id,
+        subject: subjects.get(`${row.subject_type}:${row.subject_id}`) ?? null,
         actorEmail: row.actor_email,
+        /* The person's NAME where the account has one — 165 predate the column and answer null. */
+        actorName: row.actor_name,
         actorRole: row.actor_role,
         before: row.before,
         after: row.after,
@@ -289,6 +317,19 @@ export class AuditLogService {
       ],
       { limit: 1, page: 1 },
     );
+
+    return page.items[0] ?? null;
+  }
+
+  /**
+   * ONE entry of the WHOLE trail, for سجل التدقيق's detail screen.
+   *
+   * Unnarrowed, unlike `staffEntry` — this is reached with `audit_log.read`, which is the
+   * capability that opens the complete record. `staffEntry` exists precisely because
+   * `staff.manage` must NOT reach a customer's or a partner's actions through the same door.
+   */
+  async entry(id: string): Promise<AuditEntry | null> {
+    const page = await this.pageOf([sql`a.id = ${id}::uuid`], { limit: 1, page: 1 });
 
     return page.items[0] ?? null;
   }

@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Put, Query } from '@nestjs/common';
 import { z } from 'zod';
 
-import { PERMISSIONS as P, pageQuerySchema } from '@safra/contracts';
+import { ERROR, PERMISSIONS as P, pageQuerySchema } from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
+import { notFound } from '../common/errors/app-error.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
@@ -69,6 +70,38 @@ export class AdminOperationsController {
   @RequirePermissions(P.AUDIT_LOG_READ)
   async auditActions() {
     return { actions: await this.audit.actions() };
+  }
+
+  /**
+   * ONE audit entry, for the screen that explains what happened.
+   *
+   * ## Declared AFTER `audit-log/actions`, and it has to be
+   *
+   * `actions` is a literal segment and this is a parameter. Express matches in DECLARATION order,
+   * so a parameter route declared first swallows the literal one — `/admin/audit-log/actions`
+   * would arrive here as an id and `ParseUUIDPipe` would answer 400 for a route that exists, which
+   * reads as bad input rather than bad routing.
+   *
+   * I wrote it in the wrong place first and the ordering test for the staff controller is what made
+   * me look. `audit-log-order.test.ts` now holds this one too, because "adjacent enough to read at
+   * a glance" is exactly the reasoning that put it in the wrong place.
+   *
+   * ## Its own capability, not `staff.manage`
+   *
+   * `/staff/activity/:id` shows the same shape narrowed to SAFRA's own people and is reached with
+   * `staff.manage`. This is the whole trail — customers, partners, everything — so it is
+   * `AUDIT_LOG_READ`. One renderer on the console, two doors, two keys: sharing the fetch would
+   * have handed every staff manager the platform-wide record.
+   */
+  @Get('audit-log/:id')
+  @RequirePermissions(P.AUDIT_LOG_READ)
+  @AuditExempt('Reading one entry of the trail; changes nothing.')
+  async auditEntry(@Param('id', ParseUUIDPipe) id: string) {
+    const entry = await this.audit.entry(id);
+
+    if (!entry) throw notFound(ERROR.AUDIT_ENTRY_NOT_FOUND);
+
+    return entry;
   }
 
   /**
