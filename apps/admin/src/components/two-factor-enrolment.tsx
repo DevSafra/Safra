@@ -156,7 +156,25 @@ export function TwoFactorEnrolment() {
 
       <div>
         <p className="text-xs text-faint">{t.sections.twoFactor.setupKey}</p>
-        <p className="mt-1 break-all rounded-lg border border-line bg-field px-3 py-2.5 font-mono text-sm text-text">
+        {/*
+          `data-totp-secret` so the browser suite can read the key without walking the DOM.
+
+          Added 2026-08-24 for `console-role-gating.spec.ts`, which is the only way this platform
+          can drive a NARROW staff role end to end: staff must enrol an authenticator, and a spec
+          can only do that because this secret is rendered as TEXT rather than a QR — see the
+          docblock above for why it is text, which is a decision made for a different reason and
+          happens to be what makes the whole refusal path testable.
+
+          The spec had located it by sibling relationship — the paragraph after «مفتاح الإعداد» —
+          which works and breaks the moment anybody wraps this in a `<div>`, with a timeout that
+          reads as a broken enrolment rather than a moved element. A one-line hook is cheaper than
+          that debugging session, and cheaper than the alternative: nobody ever proving a refusal
+          renders.
+        */}
+        <p
+          data-totp-secret
+          className="mt-1 break-all rounded-lg border border-line bg-field px-3 py-2.5 font-mono text-sm text-text"
+        >
           {setup?.secret ?? t.sections.panels.twoFactorLoading}
         </p>
       </div>
