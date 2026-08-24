@@ -25,6 +25,10 @@ coverage/
 playwright-report/
 test-results/
 
+# The e2e narrow-role account's TOTP secret, generated at its enrolment and reused by later
+# runs. NOT under test-results/, which Playwright empties at the start of every run.
+.e2e-secrets/
+
 # Logs
 *.log
 npm-debug.log*
