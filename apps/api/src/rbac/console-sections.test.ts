@@ -6,6 +6,8 @@ import { CONSOLE_SECTION_PERMISSIONS, type Permission } from '@safra/contracts';
 
 import { AdminController } from '../admin/admin.controller.js';
 import { AdminOperationsController } from '../admin/operations.controller.js';
+import { AdminPayoutController } from '../payouts/payout.controller.js';
+import { AdminReviewController } from '../reviews/review.controller.js';
 import { AdminPartnerApplicationController } from '../partner/partner-application.controller.js';
 import { CommsController } from '../admin/comms.controller.js';
 import { PERMISSIONS_KEY } from './decorators.js';
@@ -73,6 +75,14 @@ const SECTION_HANDLERS: Record<
   reports: [RegistriesController, 'reportCards', 'getReports'],
   settings: [AdminOperationsController, 'listSettings', 'getSettings'],
   audit: [AdminOperationsController, 'auditLog', 'getAuditLog'],
+  /*
+    The three that were missing from the map until 2026-08-24. Their absence is why the key-set
+    assertion below exists — it is what failed when they were added here, and it is the only thing
+    that would have noticed a section mapped and never checked.
+  */
+  payouts: [AdminPayoutController, 'list', 'getPayoutRegistry'],
+  reviews: [AdminReviewController, 'reported', 'getReportedReviews'],
+  emergency: [RegistriesController, 'emergencyState', 'getEmergency'],
 };
 
 /** Exactly what `PermissionsGuard` reads, by the same key, off the same handler. */

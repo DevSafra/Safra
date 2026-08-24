@@ -45,8 +45,14 @@ import { PERMISSIONS as P, type Permission } from './permissions.js';
  * checking all twenty the same way afterwards, which is the only reason to trust the remaining
  * sixteen.
  *
- * `sections-guard.integration.test.ts` in the API holds this to account against the running guard,
- * so the next time somebody re-guards a route the map fails rather than starts lying.
+ * `console-sections.test.ts` in the API holds this to account against the running guard, so the next
+ * time somebody re-guards a route the map fails rather than starts lying — and its key-set
+ * assertion is what would now catch a section added to one and not the other.
+ *
+ * **Three sections were missing outright** — `payouts`, `reviews`, `emergency` — found on
+ * 2026-08-24. The four wrong entries were caught by checking each one; the three absent ones were
+ * caught by asking a different question: which PAGE has no key at all. A map is wrong in two ways
+ * and only one of them is visible from inside it.
  */
 export const CONSOLE_SECTION_PERMISSIONS = {
   dashboard: P.BOOKING_READ_ALL,
@@ -69,6 +75,22 @@ export const CONSOLE_SECTION_PERMISSIONS = {
   reports: P.REPORT_READ,
   settings: P.SETTINGS_READ,
   audit: P.AUDIT_LOG_READ,
+  /*
+    Three sections that were MISSING from this map entirely until 2026-08-24, found by project-cc
+    when they asked which console page a naive loop over the map would leave behind.
+
+    Absence is worse than a wrong entry here, and quieter. A wrong capability shows up as a reader
+    who cannot open a screen they are entitled to; a missing KEY is a page `sectionAccess` cannot
+    even be CALLED for — `canOpenSection` answers false for anything unmapped, which is the safe
+    direction and is exactly why nothing complained. A loop over twenty keys gates twenty pages and
+    reports complete.
+
+    `emergency` is the sharpest of the three: Emergency Mode is the most dangerous screen in the
+    console, and it was the one with nowhere to hang a gate.
+  */
+  payouts: P.PAYOUT_READ,
+  reviews: P.REVIEW_MODERATE,
+  emergency: P.EMERGENCY_MODE_ACTIVATE,
 } as const satisfies Record<string, Permission>;
 
 export type ConsoleSection = keyof typeof CONSOLE_SECTION_PERMISSIONS;
