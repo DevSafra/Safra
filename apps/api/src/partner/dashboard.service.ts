@@ -73,6 +73,7 @@ export class PartnerDashboardService {
     const calendar = await this.calendar(partnerId);
     const alerts = await this.alerts(partnerId);
     const violations = await this.violationSummary(partnerId);
+    const notices = await this.notices(partnerId, money);
     const payout = money ? await this.payoutLine(partnerId) : null;
 
     return {
@@ -81,6 +82,7 @@ export class PartnerDashboardService {
       calendar,
       alerts,
       violations,
+      notices,
       payout,
     };
   }
@@ -444,6 +446,52 @@ export class PartnerDashboardService {
    * partner at `suspension` should not read the same word as one merely recorded. Ordered by the
    * enum's own progression rather than alphabetically, which would put `fined` before `recorded`.
    */
+  /**
+   * The in-app enforcement notices — what the platform has TOLD this partner.
+   *
+   * ## Why they are on the dashboard rather than behind their own section
+   *
+   * A notification is read when somebody arrives, and this is where they arrive. A section would
+   * also need a capability of its own, and none of the eleven fits: these notices span violations,
+   * suspension and money, so gating them on `VIOLATION_READ` would hide a suspension notice from a
+   * reader entitled to see the suspension banner two inches above it.
+   *
+   * ## What a row carries, and what it deliberately does not
+   *
+   * The template and the date. No prose: the detail lives on the record the notice concerns —
+   * مخالفات renders the description, the warning note, the fine and the waiver — and a copy here
+   * would be a second version of those sentences, free to drift from the one an appeal turns on.
+   * It is also the standing requirement that a notification POINT at an authenticated page rather
+   * than restate sensitive detail outside one.
+   *
+   * ## The money rule, applied to the same facts
+   *
+   * `partner.fined` and `partner.fine_waived` are withheld from a reader without
+   * `PAYOUT_READ_OWN`, exactly as `earnings` and the payout line are, and exactly as the violations
+   * list withholds every figure from the same reader. A notice saying a fine happened is a fact
+   * about the business's money; hiding the amount and announcing the event would be withholding in
+   * name only.
+   */
+  private async notices(partnerId: string, money: boolean) {
+    const withheld = money
+      ? sql``
+      : sql`AND n.template_key NOT IN ('partner.fined', 'partner.fine_waived')`;
+
+    const result = await this.db.execute<{ template_key: string; at: string }>(sql`
+      SELECT n.template_key,
+             to_char(n.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS at
+      FROM notifications n
+      WHERE n.partner_id = ${partnerId}
+        AND n.channel = 'in_app'
+        AND n.deleted_at IS NULL
+        ${withheld}
+      ORDER BY n.created_at DESC
+      LIMIT 10
+    `);
+
+    return result.rows.map((row) => ({ templateKey: row.template_key, at: row.at }));
+  }
+
   private async violationSummary(partnerId: string) {
     const result = await this.db.execute<{ open: number; stage: string | null }>(sql`
       SELECT count(*)::int AS open,

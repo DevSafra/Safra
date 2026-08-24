@@ -96,6 +96,14 @@ export default async function DashboardPage() {
 
             <div className="grid gap-4.5">
               <Calendar calendar={dashboard.calendar} />
+              {/*
+                ABOVE the alerts panel, because it is the newer kind of fact.
+
+                الإشعارات is what SAFRA has TOLD this partner; التنبيهات below it is what the
+                platform has recorded ABOUT them. A partner arriving after an enforcement action
+                should meet the notice before the record it refers to.
+              */}
+              <Notices notices={dashboard.notices} />
               <Alerts alerts={dashboard.alerts} payout={dashboard.payout} />
             </div>
           </div>
@@ -469,6 +477,76 @@ function Legend({ tone, label }: { readonly tone: string; readonly label: string
 }
 
 /** المخالفات والتنبيهات, and the payout line the handoff puts in the same panel. */
+/**
+ * إشعارات حسابك — every enforcement notice the platform has sent this partner.
+ *
+ * ## Why the list is here at all
+ *
+ * Until 2026-08-24 three of the five enforcement events told the partner nothing, while the console
+ * asserted «وأُبلغ الشريك» for all of them. Both halves are fixed: all five now notify, and this is
+ * where the partner can see that they did. An email a spam filter ate leaves no trace a partner can
+ * point at; a row on their own dashboard does.
+ *
+ * ## Each row LINKS, and says nothing more than what and when
+ *
+ * The detail is on the record — مخالفات carries the description, the warning note, the fine and the
+ * waiver decision — so the notice points there rather than restating it. That is deliberate twice
+ * over: a second copy of those sentences could drift from the one an appeal turns on, and a
+ * notification is required to point at an authenticated page rather than carry sensitive detail
+ * outside one.
+ *
+ * ## An unrecognised template prints its KEY
+ *
+ * Never prettified, and never hidden. A notice this build has no sentence for is a translation gap,
+ * and the raw `partner.something` is how it gets noticed — the same reasoning as `label()` returning
+ * the raw key rather than de-underscoring it, which is what hid forty-three missing translations.
+ */
+function Notices({ notices }: { readonly notices: PartnerDashboard['notices'] }) {
+  return (
+    <section data-notices className="rounded-2xl border border-gold/15 bg-card p-5">
+      <h2 className="mb-3 text-[15px] font-extrabold text-gold">
+        {t.dashboard.noticesTitle}
+      </h2>
+
+      {notices.length === 0 ? (
+        <p className="text-[12.5px] text-faint">{t.dashboard.noticesEmpty}</p>
+      ) : (
+        <ul className="flex flex-col gap-2.25 text-[12.5px]">
+          {notices.map((notice) => (
+            <li
+              key={`${notice.templateKey}-${notice.at}`}
+              className="flex flex-wrap items-baseline gap-2 text-muted"
+            >
+              <span className="text-warn" aria-hidden="true">
+                ●
+              </span>
+              <span className="text-text">
+                {t.dashboard.notice[notice.templateKey] ?? notice.templateKey}
+              </span>
+              <Ltr className="text-[11px] text-faint">{notice.at}</Ltr>
+              {/*
+                Suspension notices point at the dashboard, where the banner and its reason already
+                are; everything else points at مخالفات, where the violation is.
+              */}
+              <Link
+                href={
+                  notice.templateKey === 'partner.suspended' ||
+                  notice.templateKey === 'partner.unsuspended'
+                    ? '/'
+                    : '/violations'
+                }
+                className="ms-auto text-[11.5px] text-gold underline"
+              >
+                {t.dashboard.noticeDetail}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function Alerts({
   alerts,
   payout,

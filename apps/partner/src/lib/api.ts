@@ -244,6 +244,15 @@ const dashboardSchema = z.object({
     furthestStage: z.enum(['recorded', 'warned', 'fined', 'suspension']).nullable(),
   }),
   /**
+   * What the platform has TOLD this partner — the in-app half of every enforcement notice.
+   *
+   * `templateKey` is a string rather than an enum on purpose. An API that starts sending a sixth
+   * notice must not break this page: the panel prints the raw key for one it does not recognise,
+   * which is visibly wrong and therefore gets fixed, where an enum would refuse the whole payload
+   * and take the dashboard down over a notice nobody had translated yet.
+   */
+  notices: z.array(z.object({ templateKey: z.string(), at: z.string() })),
+  /**
    * A real `partner_payouts` row, or null.
    *
    * Null means the line is ABSENT from the screen — not «$0 مجدول», which would describe a

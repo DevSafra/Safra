@@ -488,6 +488,25 @@ export const ar = {
       from a bullet: the list is `LIMIT 5` and says nothing about a sixth, and a partner with nine
       open violations was reading five and drawing the wrong conclusion.
     */
+    /* ── الإشعارات: what SAFRA has told this partner (Bashar, 2026-08-24) ── */
+    noticesTitle: 'إشعارات حسابك',
+    noticesEmpty: 'لا إشعارات على حسابك.',
+    /*
+      One sentence per event, and each is a LINK to the page that holds the detail.
+
+      The notice says what happened and when; it does not restate the reason. That lives on the
+      record — مخالفات shows the description, the نص الإنذار, the غرامة and قرار الإلغاء — and a
+      second copy here would be free to drift from the one an appeal is decided on.
+    */
+    notice: {
+      'partner.warned': 'صدر إنذار على حسابك',
+      'partner.fined': 'فُرضت غرامة على حسابك',
+      'partner.suspended': 'عُلّق حساب الشراكة مؤقتاً',
+      'partner.unsuspended': 'رُفع التعليق عن حسابك',
+      'partner.fine_waived': 'أُلغيت غرامة على حسابك',
+    } as Record<string, string>,
+    noticeDetail: 'التفاصيل',
+
     kpiViolations: 'مخالفات مفتوحة',
     /* «لا مخالفات» and not «٠» — the same distinction the earnings card makes with «—». */
     kpiViolationsNone: 'لا مخالفات مفتوحة',
