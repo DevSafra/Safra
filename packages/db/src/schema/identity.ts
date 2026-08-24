@@ -117,6 +117,29 @@ export const users = pgTable(
   {
     id: primaryId(),
     email: text('email').notNull(),
+    /**
+     * The name of the PERSON holding this account (Bashar, 2026-08-23).
+     *
+     * ## Why on `users` and not somewhere staff-specific
+     *
+     * A staff member's only row is this one. A customer's name lives on `customer_profiles` and a
+     * partner employee's on `partner_employees`, because both of those are records ABOUT a
+     * relationship — a person can be a customer and somebody's receptionist at once, and the two
+     * names belong to the two roles. Staff have no such record, so صفحة الموظف could only ever
+     * identify a colleague by `staff12@safra.test`, which is what Bashar was looking at when he
+     * asked for this.
+     *
+     * ## Nullable, and the reason is honesty rather than convenience
+     *
+     * 165 accounts exist with no name and there is nothing true to backfill them with. Deriving one
+     * from the address — `staff12` — would put a fabricated name on a colleague's record, and the
+     * console would render it as fact. So it is null until somebody types the real one, and every
+     * surface falls back to the email, which is at least true.
+     *
+     * Required going forward: `staffInviteSchema` demands it, so no account created from now on
+     * arrives without one.
+     */
+    fullName: text('full_name'),
     phone: text('phone'),
     /** Argon2id. Null for accounts that exist but cannot yet sign in. */
     passwordHash: text('password_hash'),
