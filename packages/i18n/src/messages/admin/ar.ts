@@ -1000,6 +1000,38 @@ export const ar = {
        */
       noApprovalTier: 'لا توجد حالة «بموافقة مدير» في النموذج: الصلاحية ممنوحة أو لا.',
       activity: 'آخر نشاط الموظفين',
+      /*
+        آخر نشاط, searchable and paged (Bashar, 2026-08-24).
+
+        He offered "lazy loading or pagination" and it is paged, because his own standing rule is
+        that every console list carries a page NUMBER the reader picks and a rows-per-page they
+        pick. An infinite list has neither. The max height he asked for is a separate thing and
+        compatible: the panel scrolls INSIDE its own box, which the responsive rule requires anyway.
+      */
+      activitySearch: 'بحث بالاسم أو البريد…',
+      activitySearchLabel: 'بحث في نشاط الموظفين',
+      activitySearchGo: 'بحث',
+      activityClear: 'مسح البحث',
+      /*
+        The empty state says the SEARCH found nothing, not that nothing happened.
+
+        A term matching nobody is the failure that matters in a search box, and it is silent: the
+        reader types a colleague's name, and a screen that answered with «لا نشاط بعد» would have
+        them believe that person has done nothing.
+      */
+      activityNoMatch: 'لا نشاط مطابق لهذا البحث.',
+      activityOpen: 'عرض تفاصيل هذا النشاط',
+      /* The single-activity screen — Bashar's optional half, and it is generic by design. */
+      activityEntry: 'تفاصيل النشاط',
+      activityNotFound: 'لا يوجد نشاط بهذا المعرّف.',
+      activityWhat: 'ما الذي حدث',
+      activityWho: 'من نفّذه',
+      activityWhen: 'متى',
+      activitySubject: 'الكيان',
+      activityReason: 'السبب',
+      activityIp: 'عنوان IP',
+      activityChanges: 'ما تغيّر',
+      activityNoChanges: 'لا تفاصيل مسجّلة لهذا النشاط.',
       note: 'لا يُحذف حساب موظف نهائياً — يُعطّل فقط مع الاحتفاظ بأثره في سجل التدقيق. كل تغيير صلاحية يُوثّق باسم من نفّذه.',
 
       /** The invite form (§8.2). */
@@ -1007,6 +1039,14 @@ export const ar = {
       inviteHint:
         'تُرسل دعوة برابط لمرة واحدة يضبط بها كلمة مروره — لا تراها أنت، ولا يعمل الحساب قبل قبول الدعوة وتمكين المصادقة الثنائية.',
       inviteEmail: 'البريد المهني',
+      /*
+        Required, because the API requires it (Bashar, 2026-08-23).
+
+        A form that lets somebody submit an invitation the server will reject teaches them that the
+        screen is unreliable. The field is asked for here because it is asked for there.
+      */
+      inviteName: 'الاسم الكامل',
+      inviteNamePlaceholder: 'محمد الأحمد',
       inviteEmailPlaceholder: 'name@safra.com',
       inviteRole: 'الدور',
       inviteSend: 'إرسال الدعوة',
@@ -1055,6 +1095,93 @@ export const ar = {
       scopeNote:
         'النطاق مفروض على الخادم لا في الواجهة: الحجوزات والشركاء والعقارات والنزاعات والمحادثات والإعلانات ولوحة الإدارة والتقارير كلها مُقيَّدة بمدن الموظف. الكتابة خارج النطاق مرفوضة في الوضعين. سجل التدقيق يبقى كاملاً وغير مُقيَّد — سجل تدقيق مُقيَّد ليس سجل تدقيق.',
       scopeSuperAdmin: 'المدير العام غير قابل للتقييد',
+
+      /*
+        تحديد النطاق — the editor (2026-08-24).
+
+        نطاق العمل used to be a paged table of everybody's scopes on الموظفون, and it carried the
+        editor with it. Removing the table was right — a scope is a property of a person — but the
+        editor went too and nothing replaced it, so the record stated that scope is enforced and
+        offered no way to change it. A screen that states a guarantee it cannot act on is the same
+        defect as a capability with nothing behind it.
+      */
+      scopeEdit: 'تحديد النطاق',
+      scopeKindLabel: 'المدى',
+      scopeKindAll: 'كل المدن',
+      scopeKindCities: 'مدن محددة',
+      scopeCitiesLabel: 'المدن',
+      scopeOutsideLabel: 'خارج النطاق',
+      /*
+        Optional, and it lands in the audit log beside the change.
+
+        Narrowing a scope signs somebody out mid-shift. Six months later "why can this person no
+        longer see Aleppo" is answerable from the trail or it is not answerable at all.
+      */
+      scopeReason: 'السبب (اختياري)',
+      scopeSave: 'حفظ النطاق',
+      scopeSaving: 'جارٍ الحفظ…',
+      scopeSaved: 'حُدّث نطاق العمل.',
+      scopeCitiesFailed: 'تعذّر تحميل قائمة المدن، فلا يمكن تحديد مدن الآن.',
+
+      /*
+        صفحة الموظف — the member's own record (Bashar, 2026-08-23).
+
+        الموظفون carried six things on one screen and Bashar said it was too much. What moved here is
+        everything that describes ONE person: their role and what it can do, where they may work, and
+        the controls that used to crowd every row of the list. The list keeps the counters, the invite
+        and the table, because that is the question «من يعمل هنا» and nothing else.
+      */
+      member: {
+        open: 'فتح سجل {email}',
+        heading: 'الموظف',
+        notFound: 'لا يوجد موظف بهذا المعرّف.',
+        account: 'الحساب',
+        colName: 'الاسم',
+        /*
+          For an account nobody has named yet — 165 of them exist. It reads as a STATE, not as a
+          person's name, so nobody mistakes it for one and nobody is left wondering whether the
+          field failed to load.
+        */
+        unnamed: '— بلا اسم',
+        rename: 'تغيير الاسم',
+        renameSave: 'حفظ الاسم',
+        renameSaving: 'جارٍ الحفظ…',
+        renamed: 'أصبح الاسم {name}.',
+        colEmail: 'البريد',
+        colRole: 'الدور',
+        colStatus: 'الحالة',
+        colAdded: 'أُضيف',
+        colLastSignIn: 'آخر دخول',
+        /*
+          Shown as its own field rather than only as the list's warning pill.
+
+          An account with a password and no authenticator is a live hole in the console's own
+          defence — الموظفون raises it to a KPI card when there is one. On the record it is a fact
+          about the person, so it reads «مفعّلة» / «غير مفعّلة» rather than «بلا مصادقة ثنائية»,
+          which is a warning phrased for a pill and answers a different question under a label.
+        */
+        colTwoFactor: 'المصادقة الثنائية',
+        twoFactorOn: 'مفعّلة',
+        twoFactorOff: 'غير مفعّلة',
+        statusActive: 'نشط',
+        /*
+          What the role CAN do, resolved by the server.
+
+          Not intersected in the console against a roles list: that would make this screen a second
+          answer to «ما الذي يستطيعه هذا الدور», and a second answer is one that can disagree with the
+          guard. If the two ever differ, the screen would be the thing telling somebody they are safe.
+        */
+        capabilities: 'قدرات الدور',
+        capabilitiesHint: 'ما يسمح به الدور على الخادم، لا ما تعرضه الواجهة',
+        noCapabilities: 'هذا الدور لا يحمل أي قدرة.',
+        noNamedRoleNote:
+          'حساب أُنشئ قبل الأدوار المُسمّاة: صلاحياته تُحلّ من دوره الأساسي ولا يقابله صف دور. أسنِد له دوراً مُسمّى.',
+        invitation: 'الدعوة',
+        invitationSentAt: 'أُرسلت {when}',
+        invitationExpires: 'تنتهي {when}',
+        actions: 'الإجراءات',
+        actionsSelf: 'لا يمكنك تغيير دور حسابك أو تعطيله.',
+      },
     },
 
     audit: {
@@ -1818,6 +1945,8 @@ export const ar = {
     'booking.created': 'إنشاء حجز',
     'booking.cancelled': 'إلغاء حجز',
     'booking.payment_captured': 'تحصيل دفعة حجز',
+    'booking.checked_in': 'تسجيل وصول الضيف',
+    'booking.check_in_undone': 'التراجع عن تسجيل الوصول',
     'booking.exported': 'تصدير حجوزات',
     'booking.export_requested': 'طلب تصدير حجوزات',
     'calendar.range_updated': 'تعديل مدى في التقويم',
@@ -1863,6 +1992,7 @@ export const ar = {
     'review.report_dismissed': 'رفض بلاغ تقييم',
     'staff.invitation_resent': 'إعادة إرسال دعوة موظف',
     'staff.reinstated': 'إعادة تنشيط موظف',
+    'staff.renamed': 'تغيير اسم موظف',
     'staff.scope_changed': 'تعديل نطاق موظف',
     'unit.created': 'إنشاء وحدة',
     'unit.updated': 'تعديل وحدة',
@@ -2129,6 +2259,19 @@ export const ar = {
       note: 'ملاحظة',
       role: 'الدور',
       kind: 'النوع',
+      /*
+        نطاق العمل's audit payload — `staff.scope_changed` (2026-08-24).
+
+        Added as a SET, not one at a time. The comment on `payloadValue` below says why: values get
+        catalogued when somebody exercises a path rather than when the enum gains a member, so the
+        list is always one browser session behind. All four of this payload's fields go in together,
+        and only `all_cities` would have been caught by the browser sweep — it looks for Latin
+        snake_case, and `outside`, `cityCount` and `citySlugs` are single words or camelCase, so they
+        would have printed in English with nothing failing.
+      */
+      outside: 'خارج النطاق',
+      cityCount: 'عدد المدن',
+      citySlugs: 'المدن',
       source: 'المصدر',
       format: 'الصيغة',
       direction: 'الاتجاه',
@@ -2270,6 +2413,17 @@ export const ar = {
       debit: 'مدين',
       manual: 'يدوي',
       central_bank: 'المصرف المركزي',
+      /*
+        Both scope enums in full — `STAFF_SCOPE_KINDS` and `OUTSIDE_SCOPE_ACCESS`.
+
+        «كل المدن» / «مدن محددة» rather than the display strings from `sections.staff`: this column
+        answers "what changed", so the value has to read as a value, and «لا وصول خارج النطاق» is a
+        sentence written for a form label.
+      */
+      all_cities: 'كل المدن',
+      cities: 'مدن محددة',
+      none: 'لا وصول',
+      read_only: 'قراءة فقط',
       /*
         Every partner document KIND, not the two that happened to appear in an audit payload first.
 

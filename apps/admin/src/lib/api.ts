@@ -2,7 +2,11 @@ import 'server-only';
 
 import { z } from 'zod';
 
-import { SANCTIONS_POLICIES } from '@safra/contracts';
+import {
+  OUTSIDE_SCOPE_ACCESS,
+  SANCTIONS_POLICIES,
+  STAFF_SCOPE_KINDS,
+} from '@safra/contracts';
 
 import { DEFAULT_PAGE_SIZE } from './search-params';
 import { getStaffSession } from './session-server';
@@ -367,6 +371,43 @@ export type AuditEntry = z.infer<typeof auditEntrySchema>;
 
 const auditPageSchema = offsetPage(auditEntrySchema);
 
+/**
+ * آخر نشاط الموظفين — the same rows as سجل التدقيق, narrowed to what STAFF did.
+ *
+ * Two screens, one list, one shape. The API builds both from a single `pageOf(conditions, query)`
+ * so the projection, ordering and count cap are decided once; the console reuses `auditEntrySchema`
+ * for the same reason, because two schemas over one payload drift into rendering the same event
+ * differently on two screens.
+ *
+ * `q` matches a full name OR an email, as a substring. It is passed through untouched: this is a
+ * search term, not an identifier, and the API resolves it against `users` before it ever reaches
+ * the audit table.
+ */
+export async function getStaffActivity(params: {
+  page?: number | undefined;
+  limit: number;
+  q?: string | undefined;
+}) {
+  const query = new URLSearchParams();
+
+  if (params.page !== undefined) query.set('page', String(params.page));
+  query.set('limit', String(params.limit));
+  if (params.q) query.set('q', params.q);
+
+  return staffFetch(`/admin/staff/activity?${query.toString()}`, auditPageSchema);
+}
+
+/**
+ * One activity entry, for its own screen.
+ *
+ * Answers 404 for an id that names nothing AND for one that names a customer's or a partner's
+ * action — this screen is reached with `staff.manage`, and reading the whole trail is
+ * `audit_log.read`, a different capability. "Not yours" and "not there" answer the same way.
+ */
+export async function getStaffActivityEntry(id: string) {
+  return staffFetch(`/admin/staff/activity/${encodeURIComponent(id)}`, auditEntrySchema);
+}
+
 export async function getAuditLog(params: Record<string, string | undefined>) {
   const query = new URLSearchParams();
 
@@ -508,6 +549,16 @@ const staffMemberSchema = z.object({
   id: z.string(),
   email: z.string(),
   /*
+    The person's name, and it is NULLABLE for a reason that will not go away quickly.
+
+    Bashar asked for it (2026-08-23) after reading صفحة الموظف and finding a colleague identified as
+    `staff12@safra.test`. `staffInviteSchema` requires it, so nothing created from here on is
+    nameless — but 165 accounts already exist with nothing true to backfill them with, and inventing
+    a name for a real person is worse than showing their address. Every surface falls back to the
+    email; `PATCH /admin/staff/:userId` is how those accounts stop being nameless.
+  */
+  fullName: z.string().nullable().default(null),
+  /*
     The ENUM value, kept even though the screen no longer prints it.
 
     It is what `isScopable` keys off and what decides console admission, so نطاق العمل needs it
@@ -541,6 +592,70 @@ export type StaffMember = z.infer<typeof staffMemberSchema>;
  */
 export async function getStaff(params: { page?: number | undefined; limit: number }) {
   return staffFetch(`/admin/staff${listQuery(params)}`, offsetPage(staffMemberSchema));
+}
+
+/**
+ * One staff member's whole record, for صفحة الموظف.
+ *
+ * Extends the row rather than restating it, so a field added to the list cannot go missing here.
+ *
+ * ## `permissions` comes from the server, and that is the point
+ *
+ * The console could compute it — it already fetches the roles list, and each role carries its
+ * capabilities — but then this screen would be a SECOND answer to "what can this role do", and the
+ * first is `PermissionsGuard`. A second answer is one that can disagree, and the direction it fails
+ * in is the dangerous one: a screen telling somebody a colleague cannot reach payouts while the
+ * server lets them. It is resolved by the same path the guard uses.
+ */
+const staffMemberDetailSchema = staffMemberSchema.extend({
+  permissions: z.array(z.string()).default([]),
+  /*
+    The cities this member may work in, by SLUG and name.
+
+    The slug rather than an id because `setStaffScopeSchema.citySlugs` is what the write accepts — a
+    read that hands back an identifier its own write refuses cannot be a round trip, and this screen
+    has an editor on it.
+  */
+  scopeCities: z.array(z.object({ slug: z.string(), name: z.string() })).default([]),
+  /*
+    Carried, NOT derived from `scopeCities.length`, and the difference is not cosmetic.
+
+    An empty list has two meanings: `all_cities` — no restriction — and `cities` with none chosen
+    yet, which `setStaffScopeSchema` accepts deliberately because it is how somebody starts building
+    a scope. Deriving the kind from the length collapses them, and the collapse is silent: the editor
+    would open with «كل المدن» selected for an account restricted to nothing, and the next save would
+    widen that person's access to the whole platform.
+
+    `scopeKind`/`outsideScopeAccess` here, `kind`/`outside` on the write. Two names for one idea is
+    what we spent today removing, so this one is deliberate: `kind` alone is ambiguous in a payload
+    about a PERSON, while the write's whole object IS a scope.
+  */
+  scopeKind: z.enum(STAFF_SCOPE_KINDS).default('all_cities'),
+  /*
+    Read so the editor can send it back unchanged.
+
+    The write is a whole-object `PUT`, so a form that did not know the current value would reset it
+    to whatever it defaulted to — quietly granting or removing read access outside somebody's cities
+    as a side effect of editing their city list.
+  */
+  outsideScopeAccess: z.enum(OUTSIDE_SCOPE_ACCESS).default('none'),
+  invitationSentAt: z.string().nullable().default(null),
+  invitationExpiresAt: z.string().nullable().default(null),
+});
+
+export type StaffMemberDetail = z.infer<typeof staffMemberDetailSchema>;
+
+/**
+ * `GET /admin/staff/:userId`.
+ *
+ * The id is a path segment, so it is encoded rather than interpolated raw — it arrives from a route
+ * parameter, which is caller-controlled however ordinary it looks.
+ */
+export async function getStaffMember(userId: string) {
+  return staffFetch(
+    `/admin/staff/${encodeURIComponent(userId)}`,
+    staffMemberDetailSchema,
+  );
 }
 
 /**
@@ -925,10 +1040,17 @@ const staffOverviewSchema = z.object({
     rolesDefined: z.number(),
     twoFactorMissing: z.number(),
   }),
-  matrix: z.object({
-    roles: z.array(z.string()),
-    rows: z.array(z.object({ permission: z.string(), granted: z.array(z.boolean()) })),
-  }),
+  /*
+    No `matrix`. مصفوفة الصلاحيات was removed from الموظفون on 2026-08-23 — Bashar asked for it by
+    name, because أدوار الموظفين is where a role's capabilities are read now and a matrix beside it
+    was a second rendering of one fact.
+
+    Dropped from the SCHEMA first, deliberately, while the API still sends it: zod ignores an extra
+    key, so this parses today and keeps parsing after the API stops sending it. The other order
+    breaks the screen silently — a schema demanding a field the API no longer returns fails the
+    parse, `staffFetch` answers 'failed', and الموظفون renders with its counters and its history
+    gone and nothing anywhere saying why.
+  */
   activity: z.array(
     z.object({
       actor: z.string().nullable(),
@@ -940,41 +1062,6 @@ const staffOverviewSchema = z.object({
 });
 
 export type StaffOverview = z.infer<typeof staffOverviewSchema>;
-
-const staffScopeSchema = z.object({
-  userId: z.string(),
-  email: z.string(),
-  role: z.string(),
-  kind: z.string(),
-  outside: z.string(),
-  cities: z.array(z.object({ slug: z.string(), nameAr: z.string() })),
-});
-
-export type StaffScopeRow = z.infer<typeof staffScopeSchema>;
-
-/**
- * Every staff member's geographic scope (§8.2 النطاق).
- *
- * A separate call from `getStaffOverview` because it needs `STAFF_MANAGE` and the overview already
- * has it — but the two are rendered by different components, and merging them would make the
- * permission boundary less obvious than it should be for a map of who can see what.
- */
-/**
- * A page of staff scopes.
- *
- * `/admin/staff/scopes` returned every row until 2026-08-05 — 165 on the development database,
- * fetched on every visit to الموظفون. Keeps `scopes` as an alias for `items` server-side; this
- * reads `items`, the shape every other paged list uses.
- */
-export async function getStaffScopes(params: {
-  page?: number | undefined;
-  limit: number;
-}) {
-  return staffFetch(
-    `/admin/staff/scopes${listQuery(params)}`,
-    offsetPage(staffScopeSchema),
-  );
-}
 
 export async function getStaffOverview() {
   return staffFetch('/admin/staff/overview', staffOverviewSchema);

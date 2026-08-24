@@ -66,6 +66,19 @@ export const TABLE_SECTIONS = [
    */
   'partnersPending',
   'propertiesPending',
+  /**
+   * آخر نشاط الموظفين — a second paged list on `/staff`, beneath the registry.
+   *
+   * Its own key and namespaced parameters for the same reason as `staffScope`: it shares a route
+   * with a registry that already owns `?page=`, and sharing them would drag the reader's place in
+   * the accounts list along every time they stepped through the activity.
+   *
+   * `staffScope` above is now unused — نطاق العمل moved onto the member's own record on 2026-08-23
+   * — and is deliberately NOT removed. It is a KEY that may already exist in `users.table_page_sizes`
+   * for real accounts, so dropping it from the allow-list would turn somebody's stored preference
+   * into a value this schema rejects.
+   */
+  'staffActivity',
 ] as const;
 
 export type TableSection = (typeof TABLE_SECTIONS)[number];
@@ -96,6 +109,7 @@ export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   reviews: '/reviews',
   exports: '/bookings/exports',
   staffScope: '/staff',
+  staffActivity: '/staff',
   partnerApplications: '/applications',
   partnersPending: '/partners',
   propertiesPending: '/properties',
@@ -115,6 +129,7 @@ const NAMESPACED: Readonly<
   Partial<Record<TableSection, { page: string; size: string }>>
 > = {
   staffScope: { page: 'scopePage', size: 'scopeSize' },
+  staffActivity: { page: 'activityPage', size: 'activitySize' },
   partnersPending: { page: 'queuePage', size: 'queueSize' },
   propertiesPending: { page: 'queuePage', size: 'queueSize' },
 };
