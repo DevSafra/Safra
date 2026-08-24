@@ -29,9 +29,27 @@ const PROPERTY_ID = '99990000-0000-0000-0000-0000000000c2';
 const UNIT_ID = '99990000-0000-0000-0000-0000000000c3';
 const USER_ID = '99990000-0000-0000-0000-0000000000c4';
 
+/**
+ * A partner's real token: `calendar.manage_own` AND `price.update`.
+ *
+ * `ROLE_PERMISSIONS.partner` carries both, so this is what an owner actually holds — the fixture
+ * named only the first, and three tests here set a nightly rate. They passed until `price.update`
+ * started binding, then failed as 403s, which is the check doing its job on an under-specified
+ * fixture rather than a regression. See `deskClerk` below for the account that legitimately has
+ * one and not the other.
+ */
 const claims: AccessTokenClaims = {
   sub: USER_ID,
   role: 'partner',
+  permissions: ['calendar.manage_own', 'price.update'],
+  locale: 'ar',
+  partnerId: PARTNER_ID,
+};
+
+/** An employee who may close dates and may NOT decide what a night costs. */
+const deskClerk: AccessTokenClaims = {
+  sub: USER_ID,
+  role: 'partner_employee',
   permissions: ['calendar.manage_own'],
   locale: 'ar',
   partnerId: PARTNER_ID,
@@ -192,6 +210,57 @@ describeIfDb('CalendarService.updateRange — field-level upsert semantics', () 
         status: 'closed',
       }),
     ).rejects.toThrow(/not found/i);
+  });
+
+  /**
+   * `price.update` binds on the CALENDAR too, and only on the price.
+   *
+   * The nightly override is a price like any other, and it arrives on the same request as closing
+   * a date. So the capability is checked against the FIELD rather than the route: a desk clerk may
+   * close a week and may not decide what a night costs.
+   */
+  describe('who may set a nightly rate', () => {
+    it('refuses a price from an account without price.update', async () => {
+      await expect(
+        service.updateRange(deskClerk, UNIT_ID, {
+          from: '2026-09-01',
+          to: '2026-09-03',
+          price: 250,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    /**
+     * Clearing an override is a price change too.
+     *
+     * The new number comes from the unit's base rate rather than from the request, and that does
+     * not make it somebody else's decision — the guest is charged something different afterwards.
+     */
+    it('refuses clearing an override from the same account', async () => {
+      await expect(
+        service.updateRange(deskClerk, UNIT_ID, {
+          from: '2026-09-01',
+          to: '2026-09-03',
+          price: null,
+        }),
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    /**
+     * The control, and the half that matters more.
+     *
+     * Closing dates is the desk clerk's job. If this failed, the check would have become a route
+     * guard by accident — which is precisely what it exists instead of.
+     */
+    it('lets the same account close a range', async () => {
+      await expect(
+        service.updateRange(deskClerk, UNIT_ID, {
+          from: '2026-09-01',
+          to: '2026-09-03',
+          status: 'closed',
+        }),
+      ).resolves.toMatchObject({ daysAffected: 3 });
+    });
   });
 });
 

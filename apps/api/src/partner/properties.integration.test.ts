@@ -43,9 +43,27 @@ describeIfDb('PropertiesService.readOwn', () => {
   let otherPartnerId = '';
   let otherReference = '';
 
+  /**
+   * A partner's real token: `property.manage_own` AND `price.update`.
+   *
+   * `ROLE_PERMISSIONS.partner` carries both. The fixture named only the first, which was harmless
+   * until `price.update` started binding on the fields that ARE prices — `initialUnits` on create,
+   * `basePrice` on a unit. See `listingClerk` for the account that legitimately has one and not the
+   * other.
+   */
   const partner = (id = partnerId): AccessTokenClaims => ({
     sub: partnerUserId,
     role: 'partner',
+    permissions: [P.PROPERTY_MANAGE_OWN, P.PRICE_UPDATE],
+    locale: 'ar',
+    totpEnabled: true,
+    partnerId: id,
+  });
+
+  /** An employee who may write the listing and may NOT decide what it costs. */
+  const listingClerk = (id = partnerId): AccessTokenClaims => ({
+    sub: partnerUserId,
+    role: 'partner_employee',
     permissions: [P.PROPERTY_MANAGE_OWN],
     locale: 'ar',
     totpEnabled: true,
@@ -271,6 +289,25 @@ describeIfDb('PropertiesService.readOwn', () => {
       const read = await service.readOwn(partner(pendingPartnerId), reference);
 
       expect(read.units).toHaveLength(0);
+    });
+
+    /**
+     * `price.update` refuses the FIELD, not the route.
+     *
+     * Two checks refuse `initialUnits` for two different reasons — verification asks whether the
+     * BUSINESS may price yet, this asks whether this PERSON may. The pair below is the whole
+     * behaviour: the units are refused, and the listing is still created.
+     */
+    it('refuses initialUnits from an employee without price.update', async () => {
+      await expect(
+        service.create(listingClerk(), input({ count: 2, basePrice: 120, maxGuests: 3 })),
+      ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it('still lets that employee create the listing itself', async () => {
+      const { reference } = await service.create(listingClerk(), input());
+
+      expect(reference).toMatch(/^PRO-/);
     });
 
     it('accepts initialUnits from a partner who IS verified', async () => {

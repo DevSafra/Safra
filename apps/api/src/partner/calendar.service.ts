@@ -20,6 +20,7 @@ import {
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { assertMayPrice } from './price-authority.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
 
@@ -355,6 +356,16 @@ export class CalendarService {
   ): Promise<{ unitId: string; daysAffected: number }> {
     const partnerId = requirePartnerId(claims, P.CALENDAR_MANAGE_OWN);
     await this.assertOwnsUnit(partnerId, unitId);
+
+    /*
+      A nightly override is a PRICE. Closing dates is `calendar.manage_own` and always has been;
+      setting what a night costs is `price.update`, and the two arrive on the same request.
+
+      `price: null` counts. It clears the override and the unit falls back to its base rate, which
+      is a change to what a guest is charged — the fact that the new number comes from elsewhere
+      does not make it somebody else's decision.
+    */
+    assertMayPrice(claims, input.price !== undefined);
 
     const result = await this.db.transaction(async (tx) => {
       const written = await tx.execute<{ count: string }>(sql`

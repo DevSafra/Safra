@@ -16,6 +16,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { imageIsPublished } from '../storage/image-visibility.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { assertMayPrice } from './price-authority.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import { badRequest, conflict, forbidden, notFound } from '../common/errors/app-error.js';
 import { isVerifiedPartner } from '../rbac/verified-partner.guard.js';
@@ -378,6 +379,17 @@ export class PropertiesService {
       throw forbidden(ERROR.PARTNER_NOT_VERIFIED);
     }
 
+    /*
+      And by the same sentence — `initialUnits` IS a price — it is behind `price.update`.
+
+      The verification check above and this one refuse the same field for two different reasons: one
+      asks whether the BUSINESS may price yet, the other whether this PERSON may. An employee with
+      `property.manage_own` and no pricing grant can write the listing and must leave «السعر لليلة»
+      to somebody who holds it. The field is what is refused, not the route: the listing itself
+      still gets created.
+    */
+    assertMayPrice(claims, input.initialUnits !== undefined);
+
     const [city, type, policy] = await Promise.all([
       this.db.query.cities.findFirst({
         where: and(
@@ -647,6 +659,13 @@ export class PropertiesService {
     const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
     const property = await this.findOwned(partnerId, propertyReference);
 
+    /*
+      A unit carries a base price, so creating one IS setting a price — the same sentence the
+      controller uses about verification, and it decides this too. `basePrice` is required by
+      `unitCreateSchema`, so there is no version of this call that does not set one.
+    */
+    assertMayPrice(claims, true);
+
     const currency = await this.db.query.currencies.findFirst({
       where: eq(schema.currencies.code, input.currencyCode.toUpperCase()),
       columns: { id: true },
@@ -714,6 +733,8 @@ export class PropertiesService {
   ) {
     const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
     await this.assertOwnsUnit(partnerId, unitId);
+    /* After ownership, so this cannot be used to probe which units exist. */
+    assertMayPrice(claims, input.basePrice !== undefined);
 
     const patch: Record<string, unknown> = {};
 
