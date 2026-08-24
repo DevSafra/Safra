@@ -1,8 +1,15 @@
+import { redirect } from 'next/navigation';
+
 import Link from 'next/link';
 
 import { getDashboard, type PartnerDashboard, sidebarBadges } from '@/lib/api';
 import { BookingDecision } from '@/components/booking-decision';
-import { requireVerifiedPartner } from '@/lib/gate';
+import {
+  SECTION_PATH,
+  readerSections,
+  requireVerifiedPartner,
+  sectionAccess,
+} from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
@@ -31,6 +38,32 @@ import { fill, t, violationKind } from '@/lib/strings';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
+  /*
+    A reader who cannot open لوحة التحكم is SENT somewhere they can, not refused here.
+
+    This is the landing screen, so a refusal is the first thing an employee would ever see — and an
+    empty overview of a business you cannot read is indistinguishable from a broken portal, which is
+    the failure shape this feature produced repeatedly before anybody walked it. `booking.read_own`
+    is what opens this page, and a role can legitimately omit it: a receptionist who only admits
+    guests has no business reading the takings summary.
+
+    The order of `readerSections` is the nav order, so the destination is the first thing they would
+    have clicked anyway. The paths come from a LITERAL map — a redirect target derived from anything
+    a caller controls is an open redirect on the first screen of the portal.
+
+    Nobody is redirected in a loop: this branch only runs when `dashboard` is NOT among the sections,
+    so the target is never this page.
+  */
+  const access = await sectionAccess('dashboard');
+
+  if (access !== 'open') {
+    const [first] = await readerSections();
+
+    if (first) redirect(SECTION_PATH[first as keyof typeof SECTION_PATH] ?? '/support');
+
+    return <NoSections />;
+  }
+
   const [profile, dashboard] = await Promise.all([
     requireVerifiedPartner(),
     getDashboard(),
@@ -463,5 +496,35 @@ function Alerts({
         ) : null}
       </ul>
     </section>
+  );
+}
+
+/**
+ * What an employee sees when their role opens no section at all.
+ *
+ * ## This is a real state, not a defensive branch
+ *
+ * `sections.test.ts` pins it: `[booking.respond_as_partner, review.respond_own]` opens NOTHING.
+ * Both are in-page actions on screens the role's other capabilities do not reach, and both are
+ * boxes a partner would tick while thinking about what somebody does all day. Two reasonable
+ * choices produce an account that can see nothing.
+ *
+ * ## It is a screen, not a redirect
+ *
+ * There is nowhere useful to send them. The shell still renders الدعم — deliberately ungated, so
+ * that the person who can reach least can still ask why — and this says plainly what has happened
+ * and who can change it. An empty dashboard would say the business has no bookings, which is a
+ * different and false claim.
+ */
+function NoSections() {
+  return (
+    <Shell title={t.employees.noSectionsTitle} partnerName="" active="dashboard">
+      <div className="grid gap-1.5 rounded-xl border border-line bg-card p-4">
+        <p className="text-sm font-semibold text-text">{t.employees.noSectionsTitle}</p>
+        <p className="text-[12.5px] leading-relaxed text-muted">
+          {t.employees.noSectionsBody}
+        </p>
+      </div>
+    </Shell>
   );
 }
