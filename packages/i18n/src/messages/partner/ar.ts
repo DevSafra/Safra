@@ -481,6 +481,19 @@ export const ar = {
     kpiEarningsFlat: 'كالشهر الماضي',
     kpiEarningsNoCompare: 'لا مقارنة — لا حجوزات الشهر الماضي',
     kpiBookings: 'حجوزات مؤكدة نشطة',
+
+    /* ── The المخالفات card (Bashar, 2026-08-24) ─────────────────────────── */
+    /*
+      A card rather than a line in the alerts list, because a count is a different kind of fact
+      from a bullet: the list is `LIMIT 5` and says nothing about a sixth, and a partner with nine
+      open violations was reading five and drawing the wrong conclusion.
+    */
+    kpiViolations: 'مخالفات مفتوحة',
+    /* «لا مخالفات» and not «٠» — the same distinction the earnings card makes with «—». */
+    kpiViolationsNone: 'لا مخالفات مفتوحة',
+    kpiViolationsSub: 'اضغط لعرض التفاصيل',
+    /* The furthest rung reached, so the card says what KIND of attention this needs. */
+    kpiViolationsStage: 'أبعد مرحلة: {stage}',
     kpiBookingsArriving: '{n} وصول هذا الأسبوع',
     kpiBookingsNoneArriving: 'لا وصول هذا الأسبوع',
     kpiOccupancy: 'نسبة الإشغال',

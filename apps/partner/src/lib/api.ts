@@ -232,6 +232,18 @@ const dashboardSchema = z.object({
     }),
   ),
   /**
+   * The open-violation count and the furthest rung any of them reached.
+   *
+   * Not `.optional()` and not defaulted — the lesson from `violationSchema` two hundred lines down,
+   * where three defaulted fields the API never sent made every violation read as merely recorded
+   * for as long as nobody looked. If the endpoint stops sending this, the dashboard should fail
+   * where the mistake is rather than quietly report zero violations to somebody who has four.
+   */
+  violations: z.object({
+    open: z.number(),
+    furthestStage: z.enum(['recorded', 'warned', 'fined', 'suspension']).nullable(),
+  }),
+  /**
    * A real `partner_payouts` row, or null.
    *
    * Null means the line is ABSENT from the screen — not «$0 مجدول», which would describe a

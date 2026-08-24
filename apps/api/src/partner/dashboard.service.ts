@@ -72,6 +72,7 @@ export class PartnerDashboardService {
     const pendingRequests = await this.pendingRequests(partnerId);
     const calendar = await this.calendar(partnerId);
     const alerts = await this.alerts(partnerId);
+    const violations = await this.violationSummary(partnerId);
     const payout = money ? await this.payoutLine(partnerId) : null;
 
     return {
@@ -79,6 +80,7 @@ export class PartnerDashboardService {
       pendingRequests,
       calendar,
       alerts,
+      violations,
       payout,
     };
   }
@@ -420,6 +422,52 @@ export class PartnerDashboardService {
    * Waived violations are excluded. A fine that was reversed is not a live alert, and leaving it on
    * the dashboard would keep telling a partner they owe something they do not.
    */
+  /**
+   * How many violations are OPEN, and the furthest any of them has been taken.
+   *
+   * ## Why a count when `alerts` already returns rows
+   *
+   * `alerts` is `LIMIT 5` — a list to read, not a figure. A partner with nine open violations sees
+   * five bullets and no indication there are more, which is the shape of understatement a screen
+   * about enforcement must not have. The card states the number; the list stays a list.
+   *
+   * ## OPEN means not waived, matching `alerts`
+   *
+   * A waived violation stays on the record and stays on المخالفات — the partner needs to see that
+   * SAFRA acted — but it is settled, so counting it as something demanding attention would make the
+   * notification permanent. Same predicate as the list above, deliberately, so the card and the
+   * bullets can never disagree about what they are describing.
+   *
+   * ## `stage` comes back so the card can say WHICH rung
+   *
+   * The ladder's furthest point is the useful summary: «غرامة» matters more than the count, and a
+   * partner at `suspension` should not read the same word as one merely recorded. Ordered by the
+   * enum's own progression rather than alphabetically, which would put `fined` before `recorded`.
+   */
+  private async violationSummary(partnerId: string) {
+    const result = await this.db.execute<{ open: number; stage: string | null }>(sql`
+      SELECT count(*)::int AS open,
+             max(array_position(
+               ARRAY['recorded','warned','fined','suspension']::text[], v.stage::text
+             )) AS stage
+      FROM partner_violations v
+      WHERE v.partner_id = ${partnerId}
+        AND v.waived_at IS NULL
+        AND v.deleted_at IS NULL
+    `);
+
+    const row = result.rows[0];
+    const ladder = ['recorded', 'warned', 'fined', 'suspension'];
+    /* `max(array_position(...))` returns the 1-based rung, or null when there are no rows. */
+    const rung =
+      row?.stage === null || row?.stage === undefined ? null : Number(row.stage);
+
+    return {
+      open: row?.open ?? 0,
+      furthestStage: rung === null ? null : (ladder[rung - 1] ?? null),
+    };
+  }
+
   private async alerts(partnerId: string) {
     const result = await this.db.execute<{
       kind: string;

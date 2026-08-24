@@ -84,7 +84,7 @@ export default async function DashboardPage() {
         <p className="text-sm text-bad">{t.dashboard.loadFailed}</p>
       ) : (
         <div className="grid gap-4.5">
-          <Kpis kpis={dashboard.kpis} />
+          <Kpis kpis={dashboard.kpis} violations={dashboard.violations} />
 
           {/*
             1.4fr / 1fr on a wide screen, one column below `lg` — and the REQUEST QUEUE comes
@@ -105,8 +105,14 @@ export default async function DashboardPage() {
   );
 }
 
-/** The four §7.1 cards: auto-fit, minimum 180px. */
-function Kpis({ kpis }: { readonly kpis: PartnerDashboard['kpis'] }) {
+/** The §7.1 cards — four, plus المخالفات since 2026-08-24: auto-fit, minimum 180px. */
+function Kpis({
+  kpis,
+  violations,
+}: {
+  readonly kpis: PartnerDashboard['kpis'];
+  readonly violations: PartnerDashboard['violations'];
+}) {
   const { earnings, bookings, occupancy, response } = kpis;
 
   return (
@@ -165,6 +171,47 @@ function Kpis({ kpis }: { readonly kpis: PartnerDashboard['kpis'] }) {
             : t.dashboard.noDataYet
         }
       />
+
+      {/*
+        المخالفات, as a card and as a way IN (Bashar, 2026-08-24).
+
+        A card rather than a sixth bullet in the alerts panel, for two reasons. The panel is
+        `LIMIT 5` and silent about a sixth violation, so a partner with nine open was reading five
+        and drawing the wrong conclusion; and the panel mixes violations with the payout line, where
+        a count needs to be the only thing in its box to be read as a figure.
+
+        It is a LINK, which none of the four beside it are. That is the second half of the request —
+        the count is where a partner notices, and المخالفات is where the detail is, so noticing has
+        to lead somewhere. `block` on the anchor, because a card-sized click target that only
+        responds on the text is a control that looks bigger than it is.
+      */}
+      <Link
+        href="/violations"
+        data-violations-card
+        className="block rounded-[14px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+      >
+        <Kpi
+          label={t.dashboard.kpiViolations}
+          value={violations.open > 0 ? count(violations.open) : t.dashboard.noData}
+          /*
+            `text-bad` only when there is something open. A permanently red card is a notification
+            nobody reads after the first week, and zero open violations is good news rather than a
+            warning with a zero in it.
+          */
+          tone={violations.open > 0 ? 'text-bad' : 'text-faint2'}
+          sub={
+            violations.open === 0
+              ? t.dashboard.kpiViolationsNone
+              : violations.furthestStage
+                ? fill(t.dashboard.kpiViolationsStage, {
+                    stage:
+                      t.violations.stage[violations.furthestStage] ??
+                      violations.furthestStage,
+                  })
+                : t.dashboard.kpiViolationsSub
+          }
+        />
+      </Link>
     </section>
   );
 }

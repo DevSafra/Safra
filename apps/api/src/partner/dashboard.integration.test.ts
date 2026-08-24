@@ -225,6 +225,71 @@ describeIfDb('PartnerDashboardService', () => {
     });
   });
 
+  describe('the المخالفات card', () => {
+    /**
+     * The COUNT, which the alerts list cannot give.
+     *
+     * `alerts` is `LIMIT 5`, so a partner with more than five open violations read five bullets and
+     * nothing that said there were more. Six inserted here on purpose: five would pass against the
+     * list's own length and prove nothing about the cap.
+     */
+    it('counts every open violation, past the five the list shows', async () => {
+      for (let n = 0; n < 6; n += 1) {
+        await db.execute(sql`
+          INSERT INTO partner_violations (partner_id, kind, occurrence_number, stage, score_penalty)
+          VALUES (${partnerId}::uuid, 'stale_calendar', ${n + 1}, 'recorded', 0)
+        `);
+      }
+
+      const view = await service.overview(claims(partnerId));
+
+      expect(view.alerts).toHaveLength(5);
+      expect(view.violations.open).toBe(6);
+    });
+
+    /** A waived violation is settled: it stays on the record and off the notification. */
+    it('does not count a waived violation as open', async () => {
+      await db.execute(sql`
+        INSERT INTO partner_violations (partner_id, kind, occurrence_number, stage,
+                                        waived_at, waived_reason, score_penalty)
+        VALUES (${partnerId}::uuid, 'stale_calendar', 1, 'fined', now(), 'عذر مقبول', 0)
+      `);
+
+      const view = await service.overview(claims(partnerId));
+
+      expect(view.violations.open).toBe(0);
+    });
+
+    /**
+     * The furthest RUNG, ordered by the ladder rather than alphabetically.
+     *
+     * `fined` sorts before `recorded` and `suspension` in a plain `max()` over text, so a partner
+     * whose worst violation reached suspension would have been reported as merely recorded. The
+     * fixture inserts them out of order for exactly that reason.
+     */
+    it('reports the furthest rung reached, not the alphabetical maximum', async () => {
+      await db.execute(sql`
+        INSERT INTO partner_violations (partner_id, kind, occurrence_number, stage, score_penalty)
+        VALUES (${partnerId}::uuid, 'stale_calendar', 1, 'suspension', 0),
+               (${partnerId}::uuid, 'no_response', 1, 'warned', 0),
+               (${partnerId}::uuid, 'no_show', 1, 'recorded', 0)
+      `);
+
+      const view = await service.overview(claims(partnerId));
+
+      expect(view.violations.open).toBe(3);
+      expect(view.violations.furthestStage).toBe('suspension');
+    });
+
+    /** No violations is not a warning with a zero in it — the card needs to know the difference. */
+    it('reports no rung at all for a partner with a clean record', async () => {
+      const view = await service.overview(claims(partnerId));
+
+      expect(view.violations.open).toBe(0);
+      expect(view.violations.furthestStage).toBeNull();
+    });
+  });
+
   describe('KPIs report absence as absence, never as zero', () => {
     it('returns null earnings for a partner with no bookings', async () => {
       const view = await service.overview(claims(partnerId));
