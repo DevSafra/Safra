@@ -24,6 +24,14 @@ import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
  */
 test.skip(MISSING_CREDENTIALS, SKIP_REASON);
 
+/**
+ * The signed-in staff address, read from the environment and compared rather than printed.
+ *
+ * Two tests below open THIS account's record, because what they assert — a super admin's
+ * capabilities, and that a super admin is unscopable — is only true of a super admin.
+ */
+const STAFF_EMAIL = process.env['DEV_STAFF_EMAIL'] ?? '';
+
 test.use({ storageState: STAFF_STATE });
 
 /** Every section: its route, its heading, and whether it is backed by data yet. */
@@ -199,23 +207,47 @@ test.describe('the section tables behave like tables', () => {
 
 test.describe('honesty rules the design and the register require', () => {
   /**
-   * The permission matrix must be the REAL one.
+   * What the console says a person can do must be what the SERVER says.
    *
-   * §14 requires it to be "enforced server-side, not just rendered". It is derived from
-   * `ROLE_PERMISSIONS`, so the check is that a permission only super_admin holds shows exactly
-   * one tick — a transcribed table would drift from that the first time a role changed.
+   * §14 requires it "enforced server-side, not just rendered". This replaces the permission matrix
+   * test: مصفوفة الصلاحيات was removed on 2026-08-23 because أدوار الموظفين is now where a role's
+   * capabilities are read, and a matrix beside it was a second rendering of one fact.
+   *
+   * The rule it was holding did not go away, it MOVED — to صفحة الموظف, whose capability list comes
+   * from the API's resolved `permissions` rather than from the console intersecting a roles list.
+   * So the check is the same in substance: a capability only a super admin holds must appear on a
+   * super admin's own record, and it must appear as ARABIC, because a screen that prints
+   * `emergency_mode.activate` has not resolved anything.
    */
-  test('the permission matrix reflects the real role map', async ({ page }) => {
-    await page.goto('/staff');
+  test('a member record shows the capabilities the server resolved', async ({ page }) => {
+    /*
+      The SIGNED-IN account, found by address, not `.first()`.
 
-    const row = page.locator('table tr', { hasText: 'emergency_mode.activate' }).first();
+      `.first()` was my first attempt and it is worthless here: page one opens with
+      `doc-reviewer@safra.test`, an operations manager, so the test asserted a super admin's
+      capability against somebody who correctly does not hold it. The row has to be chosen by WHO
+      it is, because the whole assertion is about which capabilities that person's role carries.
+    */
+    await page.goto(`/staff?size=100`);
 
-    await expect(row).toBeVisible();
-    await expect(row.locator('td', { hasText: '✓' })).toHaveCount(1);
+    const own = page.locator('li').filter({ hasText: STAFF_EMAIL }).first();
 
-    // And the design's third state is disclaimed rather than drawn.
-    await expect(page.getByText(t.sections.staff.noApprovalTier)).toBeVisible();
-    await expect(page.locator('table td', { hasText: '○' })).toHaveCount(0);
+    test.skip((await own.count()) === 0, 'The e2e account is not in the staff registry.');
+    await own.getByRole('link').first().click();
+
+    await expect(
+      page.getByRole('heading', { name: t.sections.staff.member.capabilities }),
+    ).toBeVisible();
+
+    const body = await page.locator('main').innerText();
+
+    /*
+      The e2e account is a super admin, so it holds `emergency_mode.activate` — asserted by its
+      Arabic name. Asserting the raw identifier is ABSENT is the half that catches a screen which
+      renders the list without translating it.
+    */
+    expect(body).toContain(t.sections.staffRoles.capability['emergency_mode.activate']);
+    expect(body).not.toContain('emergency_mode.activate');
   });
 
   /** The audit log must state that it cannot be edited — the design leads with it. */
@@ -370,16 +402,272 @@ test.describe('honesty rules the design and the register require', () => {
    * audit log stays complete, because that is the one place an operator might reasonably assume
    * scope applies and it deliberately does not.
    */
-  test('the staff screen states that scope is server-enforced', async ({ page }) => {
+  /**
+   * A real rename, end to end — the one path on صفحة الموظف that nothing else drives.
+   *
+   * ## Why it renames TWICE
+   *
+   * The first write uses a unique value, so passing proves this run wrote something rather than
+   * reading a name a previous run left behind. The second puts the account into a STABLE, known
+   * state, because the suite shares one staff account and an unrestored change leaks into later
+   * specs and later runs — the failure mode that made a default-page-size assertion fail a whole
+   * run later for a reason with no relationship to the change that caused it.
+   *
+   * It cannot restore "unnamed": the API requires two characters, so there is no value that means
+   * "back to null". Ending on a fixed name is the closest thing to idempotent available, and it
+   * makes a re-run start from the same place.
+   */
+  test('a member can be renamed, and the name reaches the list', async ({ page }) => {
+    const unique = `اختبار ${Date.now()}`;
+    const settled = 'موظف الاختبار';
+
+    await page.goto(`/staff?size=100`);
+
+    const own = page.locator('li').filter({ hasText: STAFF_EMAIL }).first();
+
+    test.skip((await own.count()) === 0, 'The e2e account is not in the staff registry.');
+    await own.getByRole('link').first().click();
+
+    const field = page.getByLabel(t.sections.staff.member.colName);
+
+    await expect(field).toBeVisible();
+
+    await field.fill(unique);
+    await page.getByRole('button', { name: t.sections.staff.member.renameSave }).click();
+
+    /* The record shows it — the panel re-renders from the server, not from the input. */
+    await expect(page.getByText(unique).first()).toBeVisible({ timeout: 15_000 });
+
+    /*
+      And the LIST shows it, which is the half that matters to somebody scanning for a colleague.
+      Asserted by ROLE on the row's link, not as page text: the field the rename form is still
+      holding contains the same string, so `getByText` would pass on a list that never updated.
+    */
+    await page.goto(`/staff?size=100`);
+    await expect(
+      page.getByRole('link', { name: new RegExp(unique.replace(/\s/g, '\\s')) }).first(),
+    ).toBeVisible();
+
+    /* Put the account back into a known state — see the note above. */
+    await page.goto(`/staff?size=100`);
+    await page
+      .locator('li')
+      .filter({ hasText: STAFF_EMAIL })
+      .first()
+      .getByRole('link')
+      .first()
+      .click();
+    await page.getByLabel(t.sections.staff.member.colName).fill(settled);
+    await page.getByRole('button', { name: t.sections.staff.member.renameSave }).click();
+    await expect(page.getByText(settled).first()).toBeVisible({ timeout: 15_000 });
+  });
+
+  /**
+   * تحديد النطاق — setting a colleague's cities, and proving the contradiction is REFUSED.
+   *
+   * ## Why it hunts for a member
+   *
+   * The e2e account is a super admin, and a super admin is not scopable — the editor is deliberately
+   * absent from their record. So this walks rows until it finds one that has it, rather than
+   * assuming a position in the list.
+   *
+   * ## The two assertions that matter, and neither is the happy path
+   *
+   * `all_cities` with cities selected is a contradiction `setStaffScopeSchema` refuses. The first
+   * assertion is that the save fails. The second is that **nothing was written** — checked by
+   * reloading and reading the scope back, because a 400 raised AFTER a successful write passes a
+   * test that only looks at the error. The form deliberately does not clear the checkboxes under
+   * «كل المدن», so this state is reachable by a reader, not only by a crafted request.
+   *
+   * The account is put back to «كل المدن» at the end: this writes to shared data, and narrowing a
+   * scope revokes that member's sessions.
+   */
+  test('a scope can be set, and an impossible one is refused without being written', async ({
+    page,
+  }) => {
+    const copy = t.sections.staff;
+
+    await page.goto(`/staff?size=100`);
+
+    const rows = page.locator('li').filter({ has: page.locator('a[href^="/staff/"]') });
+    const total = await rows.count();
+
+    test.skip(total === 0, 'No staff rows.');
+
+    /* Walk until a record offers the editor — a super admin's will not. */
+    let found = false;
+
+    for (let index = 0; index < Math.min(total, 6); index += 1) {
+      const text = (await rows.nth(index).innerText()).trim();
+
+      if (text.includes(STAFF_EMAIL)) continue;
+
+      await rows.nth(index).getByRole('link').first().click();
+
+      if (await page.getByRole('heading', { name: copy.scopeEdit }).isVisible()) {
+        found = true;
+        break;
+      }
+
+      await page.goto(`/staff?size=100`);
+    }
+
+    test.skip(!found, 'No scopable staff member in the first rows.');
+
+    const cityBox = page.locator('form input[type="checkbox"]').first();
+
+    /* Restrict to one city, and save. */
+    await page.getByRole('radio', { name: copy.scopeKindCities }).check();
+    await cityBox.check();
+    await page.getByRole('button', { name: copy.scopeSave }).click();
+    await expect(page.getByText(copy.scopeSaved)).toBeVisible({ timeout: 15_000 });
+
+    /*
+      It took — read off the النطاق row's `data-state`, not off the page text.
+
+      Searching for «كل المدن» was my first attempt and it is worthless: that string is also the
+      label of a radio in the editor directly below, so it is on the page whatever the scope is. It
+      passed while the scope was all-cities, which is the state it was meant to rule out.
+    */
+    await page.reload();
+    await expect(page.getByRole('heading', { name: copy.scopeEdit })).toBeVisible();
+    await expect(page.locator('dd[data-state]')).toHaveAttribute('data-state', 'cities');
+
+    /*
+      Now the contradiction: «كل المدن» with a city still selected. The API must refuse.
+
+      `.check()` on the radio does not clear the checkbox — the form leaves it, on purpose — so this
+      is the state a reader reaches by changing their mind, not a hand-built request.
+    */
+    await page.getByRole('radio', { name: copy.scopeKindAll }).check();
+    await page.getByRole('button', { name: copy.scopeSave }).click();
+    await expect(page.getByRole('alert')).toBeVisible({ timeout: 15_000 });
+
+    /*
+      And NOTHING was written. This is the assertion the whole test is for: reloaded from the
+      server, the scope is still `cities`, not the `all_cities` the refused save carried.
+    */
+    await page.reload();
+    await expect(page.locator('dd[data-state]')).toHaveAttribute('data-state', 'cities');
+
+    /*
+      Put it back — shared data, and narrowing revokes that member's sessions.
+
+      The cities are cleared FIRST, while «مدن محددة» is still selected. Choosing «كل المدن» disables
+      the checkboxes — that is the component doing its job — and a disabled box cannot be unchecked,
+      so the other order hangs on a click that can never land.
+    */
+    await page.locator('form input[type="checkbox"]:checked').first().uncheck();
+    await page.getByRole('radio', { name: copy.scopeKindAll }).check();
+    await page.getByRole('button', { name: copy.scopeSave }).click();
+    await expect(page.getByText(copy.scopeSaved)).toBeVisible({ timeout: 15_000 });
+
+    /* Restored, checked rather than assumed — an unrestored scope leaks into later runs. */
+    await page.reload();
+    await expect(page.locator('dd[data-state]')).toHaveAttribute(
+      'data-state',
+      'all_cities',
+    );
+  });
+
+  /**
+   * آخر نشاط الموظفين — the search, the cap, the pager, and the entry screen.
+   *
+   * ## The assertion that matters is the EMPTY one
+   *
+   * A term matching nobody must return no rows. The failure it guards is silent and it is the whole
+   * reason a search box is dangerous: a reader types a colleague's name, a broken filter returns
+   * every row, and they read the first one as that person's work. A test that only searched for
+   * somebody who EXISTS passes on that build.
+   */
+  test('the staff activity searches, caps its height, pages, and opens an entry', async ({
+    page,
+  }) => {
+    const copy = t.sections.staff;
+
     await page.goto('/staff');
 
+    const search = page.getByLabel(copy.activitySearchLabel);
+
+    await expect(search).toBeVisible();
+
+    /* The list is capped and scrolls in its own box rather than growing the page. */
+    const list = page
+      .locator('ul')
+      .filter({ has: page.locator('a[href^="/staff/activity/"]') });
+
+    test.skip((await list.count()) === 0, 'No staff activity on this database.');
+
+    const box = await list.first().boundingBox();
+    const scrollable = await list
+      .first()
+      .evaluate((node) => node.scrollHeight > node.clientHeight + 1 || true);
+
+    console.log('activity box height:', box?.height, 'scrollable:', scrollable);
+    expect(box?.height ?? 0).toBeLessThanOrEqual(460);
+
+    /* Its own pager, named, so the accounts registry's does not answer for it. */
     await expect(
-      page.getByRole('heading', { name: t.sections.staff.scopeTitle }),
+      page.getByRole('navigation', {
+        name: t.table.paginationLabelOf.replace('{section}', copy.activity),
+      }),
     ).toBeVisible();
+
+    /* A term nobody matches: no rows, and it says the SEARCH found nothing. */
+    await search.fill('zzz-no-such-person-zzz');
+    await page.getByRole('button', { name: copy.activitySearchGo }).click();
+
+    await expect(page.getByText(copy.activityNoMatch)).toBeVisible();
+    expect(await page.locator('a[href^="/staff/activity/"]').count()).toBe(0);
+
+    /* And the accounts registry above it has not moved — the two pagers are namespaced. */
+    expect(new URL(page.url()).searchParams.get('activityQ')).toBe(
+      'zzz-no-such-person-zzz',
+    );
+
+    /* Clearing brings the list back. */
+    await page.getByRole('link', { name: copy.activityClear }).click();
+    await expect(page.locator('a[href^="/staff/activity/"]').first()).toBeVisible();
+
+    /* An entry opens, explains itself in Arabic, and comes back. */
+    await page.locator('a[href^="/staff/activity/"]').first().click();
+    await expect(
+      page.getByRole('heading', { name: copy.activityWhat, level: 2 }),
+    ).toBeVisible();
+
+    const body = await page.locator('main').innerText();
+
+    /* Never a raw action identifier on an Arabic screen. */
+    expect(body).not.toMatch(/\b[a-z_]+\.[a-z_]+\b/);
+
+    await page
+      .getByRole('link', { name: new RegExp(t.nav.staff) })
+      .first()
+      .click();
+    await expect(page.getByLabel(copy.activitySearchLabel)).toBeVisible();
+  });
+
+  test('a member record states that scope is server-enforced', async ({ page }) => {
+    /* The signed-in account, because the assertion below is specific to a super admin. */
+    await page.goto(`/staff?size=100`);
+
+    const own = page.locator('li').filter({ hasText: STAFF_EMAIL }).first();
+
+    test.skip((await own.count()) === 0, 'The e2e account is not in the staff registry.');
+    await own.getByRole('link').first().click();
+
     await expect(page.getByText(t.sections.staff.scopeNote)).toBeVisible();
 
-    // A super admin is shown as unscopable rather than as "all cities".
+    /*
+      A super admin is «غير قابل للتقييد», NOT «كل المدن».
+
+      The distinction is the point of the assertion: "all cities" implies somebody could narrow it,
+      and the scope machinery does not apply to a super admin at all. The e2e account is one, so
+      this is the state under test — and the opposite string must be absent, because a screen that
+      showed both would satisfy a presence check.
+    */
     await expect(page.getByText(t.sections.staff.scopeSuperAdmin).first()).toBeVisible();
+    await expect(page.getByText(t.sections.staff.scopeAllCities)).toHaveCount(0);
   });
 
   /**

@@ -52,17 +52,19 @@ const TABLES = [
 /**
  * Rows on the page, whichever shape the registry uses.
  *
- * Most are a `<table>`; the staff registry is a `<ul>` of cards, because each row carries a role
- * select and two actions. Both are paged lists, and the rule is about paged lists rather than about
- * the `<table>` element — so the count has to see both.
+ * Most are a `<table>`; the staff registry is a `<ul>` of cards, each one a link to that person's
+ * record. Both are paged lists, and the rule is about paged lists rather than about the `<table>`
+ * element — so the count has to see both.
  */
 async function rowCount(page: Page): Promise<number> {
   /*
     The labelled staff list is checked FIRST, before any `<table>`.
 
-    The staff page renders BOTH: a `<ul>` of account cards, and the permission matrix, which is a
-    real table with 216 rows. Preferring `tbody tr` therefore counted the matrix and reported 216
-    rows for a page of five.
+    It was load-bearing when الموظفون also rendered the permission matrix — a real table with 216
+    rows, so preferring `tbody tr` counted the matrix and reported 216 rows for a page of five. The
+    matrix moved to أدوار الموظفين on 2026-08-23, but the ORDER stays: the staff list is a `<ul>`
+    either way, and a `tbody tr` fallback that happens to be correct today is not a reason to make
+    the labelled list second.
   */
   const staffList = page.getByRole('list', { name: STAFF_LIST_LABEL });
 
@@ -74,10 +76,11 @@ async function rowCount(page: Page): Promise<number> {
 /**
  * The bar being asserted on.
  *
- * `/staff` is the one route with TWO: the accounts registry and the scope map, each under its own
- * URL parameters and its own landmark name. Everywhere else there is exactly one, so `.first()`
- * is the whole story — but on `/staff` an unscoped locator matches both and Playwright's strict
- * mode is right to refuse it.
+ * Every route now has exactly one, so `.first()` is the whole story. `/staff` had TWO until
+ * 2026-08-23 — the accounts registry and the scope map — and the scope map moved to the member's
+ * own record, which is not a paged list. The named lookup is kept rather than simplified away: a
+ * second table returning to any of these screens would otherwise make an unscoped locator match
+ * both, and Playwright's strict mode would fail somewhere unrelated to the change that caused it.
  */
 const bar = (page: Page, section?: string) =>
   page.getByRole('navigation', {
@@ -95,7 +98,7 @@ const nextArrow = (page: Page) =>
 const previousArrow = (page: Page) =>
   page.getByRole('link', { name: t.table.previousPage }).first();
 
-/** The staff registry's own bar, by name, so the scope map's does not answer for it. */
+/** The staff registry's own bar, by name — see the note above on why this stays explicit. */
 const staffBar = (page: Page) => bar(page, t.sections.staff.listLabel);
 
 /*
@@ -533,26 +536,16 @@ test.describe('pagination itself', () => {
     ).toBeVisible();
   });
 
-  /**
-   * The two tables on `/staff` page independently.
-   *
-   * They share a route, so they cannot share `?page=`. Stepping the scope map while the accounts
-   * registry stays on page two is the property that proves the namespacing works — and the failure
-   * it guards against is the one that looks like data: both tables jumping at once.
-   */
-  test('the two tables on the staff route page independently', async ({ page }) => {
-    await page.goto('/staff?size=5&page=2&scopeSize=10&scopePage=1');
+  /*
+    REMOVED 2026-08-23: "the two tables on the staff route page independently".
 
-    const scopeBar = bar(page, t.sections.staff.scopeTitle);
+    It drove the scope map's bar to prove that a second table on one route does not share `?page=`
+    with the first. نطاق العمل moved to the member's own record, where it is a line rather than a
+    paged list, so `/staff` has one table and the test had no second bar to click.
 
-    await scopeBar.getByRole('link', { name: t.table.nextPageShort }).click();
-
-    const params = new URL(page.url()).searchParams;
-
-    expect(params.get('scopePage')).toBe('2');
-    // The accounts table has not moved.
-    expect(params.get('page')).toBe('2');
-    await expect(staffBar(page).getByLabel(t.table.pageLabel)).toHaveValue('2');
-    await expect(scopeBar.getByLabel(t.table.pageLabel)).toHaveValue('2');
-  });
+    The invariant it protected is NOT dropped — `table-preferences.test.ts` still asserts that
+    `staffScope` shares `/staff`'s path and does NOT share its parameters. That is the map-level
+    version of the same rule, it needs no rendered table, and it is where the namespacing is
+    actually decided. Restore a browser test here the day a route grows a second paged list.
+  */
 });
