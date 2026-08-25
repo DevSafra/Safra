@@ -142,7 +142,18 @@ export function BookingVerification() {
             const code = text(new FormData(event.currentTarget), 'code').trim();
 
             void call(base('/confirm'), { code }).then((result) => {
-              if (result) setVerified(reference.trim().toUpperCase());
+              /*
+                The reference the SERVER verified, never one rebuilt from the input.
+
+                This used to case-shift the typed input, so «فتح الحجز» linked to
+                `BKG-TEST-2BC2C0D7` for a booking called `BKG-TEST-2bc2c0d7` and every verified
+                caller landed on a 404 (Bashar, 2026-08-25). The same upper-casing was removed from
+                the input field earlier and survived here — which is why the value now comes off the
+                response and there is nothing left to reshape.
+              */
+              const done = result as { reference?: string } | null;
+
+              if (done?.reference) setVerified(done.reference);
             });
           }}
         >

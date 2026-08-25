@@ -201,7 +201,11 @@ export class BookingRecoveryService {
     code: string,
     claims: AccessTokenClaims | undefined,
   ): Promise<{ reference: string; verifiedAt: string }> {
-    const rows = await this.db.execute<{ id: string; booking_id: string }>(sql`
+    const rows = await this.db.execute<{
+      id: string;
+      booking_id: string;
+      reference: string;
+    }>(sql`
       UPDATE booking_verifications v
       SET consumed_at = now()
       FROM bookings b
@@ -211,7 +215,7 @@ export class BookingRecoveryService {
         AND v.consumed_at IS NULL
         AND v.expires_at > now()
         AND v.attempts < ${BOOKING_VERIFICATION_ATTEMPTS}
-      RETURNING v.id, v.booking_id
+      RETURNING v.id, v.booking_id, b.reference
     `);
 
     const verification = rows.rows[0];
@@ -245,7 +249,14 @@ export class BookingRecoveryService {
       subjectId: verification.booking_id,
     });
 
-    return { reference, verifiedAt: new Date().toISOString() };
+    /*
+      The reference as the DATABASE holds it, not as the caller typed it.
+
+      The console linked to a reference it rebuilt from its own input — upper-cased — and every
+      `BKG-TEST-…` fixture 404'd, because the hex suffix is lowercase. Returning the row's own value
+      removes the class: there is nothing left for a screen to reshape.
+    */
+    return { reference: verification.reference, verifiedAt: new Date().toISOString() };
   }
 }
 

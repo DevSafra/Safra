@@ -93,7 +93,14 @@ export default async function BookingsPage({
     return value?.trim() || undefined;
   };
 
-  const reference = first('reference')?.toUpperCase();
+  /*
+    NOT upper-cased — the same defect «فتح الحجز» had (Bashar, 2026-08-25).
+
+    A reference is opaque. Production ones are `BKG-2026-000123`, where case cannot matter, so this
+    looked harmless for months; every fixture is `BKG-TEST-<lowercase hex>`, where it turns §9.4's
+    lookup into a guaranteed 404. Whatever was typed goes through, and the detail screen answers.
+  */
+  const reference = first('reference');
 
   // The lookup path, checked first so a reference never falls through into a filtered list.
   if (reference) redirect(`/bookings/${encodeURIComponent(reference)}`);
