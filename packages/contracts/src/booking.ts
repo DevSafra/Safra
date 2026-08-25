@@ -104,6 +104,53 @@ export const bookingStaffConfirmSchema = z
 
 export type BookingStaffConfirmInput = z.infer<typeof bookingStaffConfirmSchema>;
 
+/**
+ * What SAFRA is willing to COMPENSATE in — the same three it fines in.
+ *
+ * Narrower than `currencies`, which holds five: that table says what the platform can price in, and
+ * this is a policy about SAFRA's own goodwill. Widening it is one line.
+ */
+export const COMPENSATION_CURRENCIES = ['USD', 'EUR', 'SYP'] as const;
+
+/**
+ * §9.4's «تعويض» — a wallet credit made because of a booking.
+ *
+ * ## Credit only, unlike the general wallet adjustment
+ *
+ * `walletAdjustSchema` takes a `direction`, because the realistic use of a general adjustment is
+ * correcting a mistake and a system that can only credit forces finance to fix an over-credit by
+ * crediting somebody else. Compensation is not that: it is a decision to give a customer money
+ * because their stay went wrong, and «تعويض» has no debit. Taking money back is still possible —
+ * through the wallet screen, where it reads as what it is rather than as a compensation of a
+ * negative amount.
+ *
+ * The amount is a decimal STRING for the reason every money field here is: a JSON number is an
+ * IEEE-754 double and this one is added to somebody's balance.
+ */
+export const bookingCompensationSchema = z
+  .object({
+    amount: z
+      .string()
+      .regex(/^\d{1,10}(\.\d{1,2})?$/, ERROR.VALIDATION_DECIMAL_STRING)
+      .refine((value) => Number(value) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE),
+    /**
+     * The ENUM, not a three-letter pattern — the lesson `FINE_CURRENCIES` records.
+     *
+     * A select offering three while the endpoint accepts any code is a restriction in appearance
+     * only: the next caller to post `JOD` succeeds and the rule turns out to have been a decoration
+     * on one screen. The same three SAFRA fines in are the three it compensates in, and the form
+     * reads this constant so the two cannot drift.
+     */
+    currency: z.enum(COMPENSATION_CURRENCIES, {
+      message: ERROR.VALIDATION_CURRENCY_CODE,
+    }),
+    /** Why. Ten characters, matching the wallet's own floor — an unreviewable credit is not one. */
+    note: z.string().trim().min(10, ERROR.VALIDATION_REASON_REQUIRED).max(500),
+  })
+  .strict();
+
+export type BookingCompensationInput = z.infer<typeof bookingCompensationSchema>;
+
 /** A price quote for a unit and date range, with nothing created. */
 export const bookingQuoteSchema = z
   .object({

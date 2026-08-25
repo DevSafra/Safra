@@ -24,6 +24,12 @@ import { WalletService } from './wallet.service.js';
   imports: [FxModule],
   controllers: [WalletController, WalletAdminController],
   providers: [WalletService, WalletAdjustmentService, AuditService],
-  exports: [WalletService],
+  /*
+    `WalletAdjustmentService` is exported so the BOOKING screen can compensate a customer for a
+    stay (§9.4's «تعويض») without reimplementing a wallet movement. The money still moves through
+    this service, with its append-only ledger and its `wallet.adjusted` audit row — only the
+    question of WHOSE wallet is answered elsewhere, from the booking.
+  */
+  exports: [WalletService, WalletAdjustmentService],
 })
 export class WalletModule {}

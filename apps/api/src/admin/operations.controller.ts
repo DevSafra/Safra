@@ -15,10 +15,14 @@ import { z } from 'zod';
 import {
   ERROR,
   PERMISSIONS as P,
+  bookingCompensationSchema,
   bookingInternalNoteSchema,
   pageQuerySchema,
+  type BookingCompensationInput,
   type BookingInternalNoteInput,
 } from '@safra/contracts';
+
+import { Throttle } from '@nestjs/throttler';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { notFound } from '../common/errors/app-error.js';
@@ -159,6 +163,37 @@ export class AdminOperationsController {
     @CurrentUser() user: AccessTokenClaims | undefined,
   ) {
     return this.bookings.addNote(reference, body.note, user);
+  }
+
+  /**
+   * §9.4's «تعويض» — crediting a customer's wallet BECAUSE OF a booking.
+   *
+   * ## Keyed on the booking, not on a customer profile id
+   *
+   * `POST /admin/wallet/:customerProfileId/adjust` already moves the money and stays the general
+   * route. It takes an internal uuid, and every admin route in this console keys on the §13.2
+   * reference — so wiring the booking screen to it would have meant putting a raw
+   * `customer_profiles.id` into the detail payload and into a URL.
+   *
+   * Resolving the profile FROM the booking is the better reason, though. It makes this
+   * «compensate the customer for THIS stay» rather than «credit this wallet», which is what the
+   * wallet transaction's note ends up saying and what an auditor needs six months later.
+   *
+   * `WALLET_ADJUST` — the same capability as the general route, because it is the same power. A
+   * booking-shaped door onto it must not be a cheaper one.
+   */
+  @Post('bookings/:reference/compensate')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.WALLET_ADJUST)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @AuditExempt('WalletAdjustmentService records wallet.adjusted inside the movement.')
+  async compensate(
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(bookingCompensationSchema))
+    body: BookingCompensationInput,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+  ) {
+    return this.bookings.compensate(reference, body, user);
   }
 
   /**

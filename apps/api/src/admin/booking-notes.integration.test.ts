@@ -65,6 +65,12 @@ describeIfDb('internal notes on a booking', () => {
       null as never,
       new ManualTransferProvider(),
     ),
+    /*
+      Neither suite compensates anybody, and `null` here surfaces as a crash the moment one tries
+      rather than as a silently wrong balance. `booking-compensation.integration.test.ts` is where
+      the real service is exercised.
+    */
+    null as never,
   );
 
   let reference = '';

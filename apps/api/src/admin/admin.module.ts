@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { PaymentsModule } from '../payments/payments.module.js';
+import { WalletModule } from '../wallet/wallet.module.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { PartnerTwoFactorService } from '../auth/partner-two-factor.service.js';
 import { AdminGrantsController, AdminGrantsService } from './grants.controller.js';
@@ -52,7 +53,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     already here through `AuthModule`'s exports — the comment at the providers list below says so,
     and importing a second copy would give this module a second nodemailer transport.
   */
-  imports: [AuthModule, LedgerModule, FxModule, PaymentsModule],
+  imports: [AuthModule, LedgerModule, FxModule, PaymentsModule, WalletModule],
   controllers: [
     AdminController,
     RegistriesController,

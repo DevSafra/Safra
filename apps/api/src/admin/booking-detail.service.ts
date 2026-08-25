@@ -11,6 +11,7 @@ import { actorName } from '../common/actor-name.sql.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { allowedTransitions, type BookingStatus } from '../bookings/booking-state.js';
 import { PaymentProviderRegistry } from '../payments/providers/provider.registry.js';
+import { WalletAdjustmentService } from '../wallet/wallet-adjustment.service.js';
 
 /**
  * Renders a `timestamptz` as an explicit UTC ISO-8601 string.
@@ -58,6 +59,13 @@ function staffMoves(status: BookingStatus) {
     undoCheckIn: status === 'checked_in' && to.includes('confirmed'),
     /** What a partner is paid for, and what a customer may review. */
     complete: to.includes('completed'),
+    /**
+     * §9.4's «فتح نزاع». Only where §6.2 gives the edge — a paid, live-or-finished stay.
+     *
+     * The paid half is decided at the call site, because this function sees only the status and
+     * «nothing has been paid for it» is a different question from «the state forbids it».
+     */
+    openDispute: to.includes('disputed'),
   };
 }
 
@@ -82,6 +90,7 @@ export class BookingDetailService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly providers: PaymentProviderRegistry,
+    private readonly wallet: WalletAdjustmentService,
   ) {}
 
   async detail(reference: string, claims: AccessTokenClaims | undefined) {
@@ -278,6 +287,29 @@ export class BookingDetailService {
         capturePayment:
           booking['status'] === 'pending_payment' &&
           (await this.awaitsOfflineTransfer(bookingId)),
+        /*
+          `openDispute` needs the money to have moved as well as the state to allow it.
+
+          `staffMoves` sees only the status. A booking still inside its payment window has no
+          stay, no charge and nothing to complain about — the same line the customer's own route
+          draws — so the paid half is ANDed in here where `paid_at` is in hand.
+        */
+        openDispute:
+          staffMoves(booking['status'] as BookingStatus).openDispute &&
+          booking['paid_at'] !== null,
+        /*
+          Refunding needs money to have been taken, and no more than the policy allows to have
+          gone back already. `RefundService.quote` is the authority on the FIGURE and the console
+          asks it when the form opens; this only decides whether the control is worth drawing.
+        */
+        refund: booking['paid_at'] !== null,
+        /*
+          Compensation has no state condition at all, and that is deliberate. §7 puts a wallet
+          credit at SAFRA's discretion — «تعويض محفظة عند أول مخالفة» — and the case that most
+          needs it is a booking that was CANCELLED because the partner never answered. Gating it
+          on a live booking would remove it exactly there.
+        */
+        compensate: true,
       },
       /*
         How much there is to find on the three screens this booking links out to.
@@ -330,6 +362,56 @@ export class BookingDetailService {
       author: row.author,
       createdAt: row.created_at,
     }));
+  }
+
+  /**
+   * §9.4's «تعويض» — a wallet credit for THIS booking's customer.
+   *
+   * The profile is resolved from the booking rather than taken from the caller, which is what
+   * makes this a booking action: the note on the wallet transaction names the stay, so the credit
+   * explains itself in the customer's own wallet history and in the audit trail.
+   *
+   * The movement itself is `WalletAdjustmentService` — the same code the wallet screen uses, with
+   * the same append-only ledger and the same `wallet.adjusted` audit row. Nothing about the money
+   * is reimplemented here; only who it is for is decided.
+   */
+  async compensate(
+    reference: string,
+    input: { amount: string; currency: string; note: string },
+    claims: AccessTokenClaims | undefined,
+  ) {
+    const rows = await this.db.execute<{ customer_profile_id: string }>(sql`
+      SELECT customer_profile_id FROM bookings
+      WHERE reference = ${reference} AND deleted_at IS NULL
+    `);
+
+    const booking = rows.rows[0];
+
+    if (!booking) throw notFound(ERROR.BOOKING_NOT_FOUND);
+
+    const result = await this.wallet.adjust(
+      booking.customer_profile_id,
+      {
+        amount: input.amount,
+        direction: 'credit',
+        currency: input.currency,
+        /*
+          The booking reference is PREPENDED to the operator's note rather than replacing it.
+
+          `wallet_transactions.note` is what a customer support agent reads when somebody asks
+          «why do I have 10 dollars». «تعويض» alone does not answer it; the stay it was for does.
+          Truncated to the column's 500 so a long note cannot push the reference off the end.
+        */
+        note: `${reference}: ${input.note}`.slice(0, 500),
+      },
+      { userId: claims?.sub, role: claims?.role },
+    );
+
+    return {
+      reference,
+      balance: result.balance,
+      currencyCode: result.currencyCode,
+    };
   }
 
   /**
