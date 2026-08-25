@@ -171,6 +171,14 @@ export default async function BookingsPage({
                 <OutlineAction href="/bookings/exports">
                   {t.table.exportsLink}
                 </OutlineAction>
+                {/*
+                  EC-010 tier 2. Reachable from the registry because that is where an agent is when
+                  the telephone rings — and it is a SEPARATE screen because nothing about a booking
+                  may be on it until the caller has proved they control its contact details.
+                */}
+                <OutlineAction href="/bookings/verify">
+                  {t.sections.bookingVerify.title}
+                </OutlineAction>
               </>
             )
           }
