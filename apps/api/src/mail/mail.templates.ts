@@ -691,6 +691,91 @@ export function supportRepliedMail(input: {
   };
 }
 
+/**
+ * «أُلغي حجزك» — SAFRA cancelled a paid booking and the customer had not been told (§6.4, §10.3).
+ *
+ * ## The gap this closes
+ *
+ * The SLA sweep cancelled the booking, fined the partner, credited the compensation and — since
+ * 2026-08-25 — starts the refund. It sent NOTHING. A customer's stay disappeared, their money moved
+ * twice, and the first they would know of it was opening the app. Found by the final booking audit.
+ *
+ * ## One message, not three
+ *
+ * §6.4 prescribes three things at this moment — the cancellation, the full refund, the compensation
+ * — and §10.3 lists «الاسترداد» among the mails that must exist. They are one EVENT from the
+ * reader's side, so they are one message: what happened, what is coming back, what was added, and
+ * where to look for somewhere else to stay. Three emails a minute apart would read as three
+ * problems.
+ *
+ * The link is a SEARCH for the same dates, which is §6.4's «يعرض عقارات مشابهة» in the form a
+ * customer can act on at once, rather than a promise that somebody will telephone.
+ */
+export function bookingCancelledBySafraMail(input: {
+  to: string;
+  locale: string;
+  reference: string;
+  property: string;
+  checkIn: string;
+  checkOut: string;
+  amount: string;
+  compensation: string;
+  currency: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.bookingCancelledBySafra, input.locale, {
+      reference: input.reference,
+      property: input.property,
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+      amount: input.amount,
+      compensation: input.compensation,
+      /*
+        The CURRENCY travels beside every figure, never as `{currency ?? ''}`.
+
+        SAFRA prices in five currencies and settles in SYP, which differ by four orders of
+        magnitude — «نعيد إليك 200.00» is not a smaller version of the right answer, it is a number
+        nobody can act on. The standing rule, in the one place the reader cannot ask a follow-up.
+      */
+      currency: input.currency,
+      url: input.url,
+    }),
+  };
+}
+
+/**
+ * «بدأ استرداد مبلغ حجزك» — §10.3 lists the refund among the mails that must exist.
+ *
+ * Sent by `RefundService` itself, so EVERY refund is covered by construction: the staff button on
+ * the console, and the automatic §6.4 sweep. Wiring it at the two call sites instead would have
+ * meant the next path to issue a refund silently sending nothing — the same shape as the defect
+ * this replaces.
+ *
+ * It says the refund has STARTED rather than arrived. On the only rail SAFRA operates the outbound
+ * transfer is executed by a person, so `ManualTransferProvider` can honestly report no better than
+ * `processing`; a mail claiming the money is back would be wrong for days.
+ */
+export function bookingRefundedMail(input: {
+  to: string;
+  locale: string;
+  reference: string;
+  amount: string;
+  currency: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.bookingRefunded, input.locale, {
+      reference: input.reference,
+      amount: input.amount,
+      currency: input.currency,
+      url: input.url,
+    }),
+  };
+}
+
 export function bookingNeedsActionMail(input: {
   to: string;
   locale: string;

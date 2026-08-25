@@ -144,6 +144,14 @@ export const de = {
     subject: 'Der Gastgeber hat auf Ihre Bewertung von {property} geantwortet — SAFRA',
     body: 'Der Gastgeber hat auf Ihre Bewertung von {property} geantwortet.\n\nSie können die Antwort auf der Unterkunftsseite lesen:\n{url}\n\nIhr SAFRA-Team',
   },
+  bookingCancelledBySafra: {
+    subject: 'Ihre Buchung {reference} wurde storniert — SAFRA',
+    body: 'Es tut uns leid: Der Partner hat Ihre Buchung nicht fristgerecht bestätigt, daher hat SAFRA sie storniert.\n\nReferenz: {reference}\nUnterkunft: {property}\nAnreise: {checkIn}\nAbreise: {checkOut}\n\nWir erstatten den vollen Betrag von {amount} {currency}. Die Erstattung startet automatisch und kann je nach Zahlungsart einige Tage bis zur Gutschrift dauern.\n\nZusätzlich haben wir {compensation} {currency} als Entschädigung in Ihr Guthaben gebucht.\n\nEine alternative Unterkunft für dieselben Daten finden Sie hier:\n{url}\n\nIhr SAFRA-Team',
+  },
+  bookingRefunded: {
+    subject: 'Erstattung für Buchung {reference} gestartet — SAFRA',
+    body: 'Wir haben die Erstattung Ihrer Buchung gestartet.\n\nReferenz: {reference}\nErstatteter Betrag: {amount} {currency}\n\nWas in Ihr Guthaben zurückgeht, ist sofort verfügbar. Was über Ihre Zahlungsart zurückgeht, kann einige Tage dauern.\n\nBuchungsdetails:\n{url}\n\nIhr SAFRA-Team',
+  },
   bookingNeedsAction: {
     subject: 'Eine Buchung wartet auf Sie — {reference}',
     body: 'Eine neue Buchungsanfrage wartet auf Ihre Entscheidung.\n\nReferenz: {reference}\nUnterkunft: {property}\nAnreise: {checkIn}\nAbreise: {checkOut}\n\nSie haben bis {deadline} Zeit zu antworten. Eine Anfrage, die bis dahin unbeantwortet bleibt, wird automatisch storniert und ein Verstoß wegen "keine Antwort" wird Ihrem Konto zugeordnet.\n\nAnfrage hier öffnen:\n{url}\n\nIhr SAFRA-Team',

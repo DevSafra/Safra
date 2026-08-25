@@ -3205,6 +3205,8 @@ export const ar = {
     'booking.confirmed': 'تأكيد الحجز + قسيمة + QR',
     'booking.invoice': 'الفاتورة',
     'booking.cancelled_refund': 'الإلغاء والاسترداد',
+    /* Sent by RefundService on EVERY refund — the staff button and §6.4's sweep alike. */
+    'booking.refunded': 'بدء الاسترداد',
     'wallet.compensation': 'تعويض المحفظة',
     'partner.deadline_reminder': 'تذكير الشريك بالمهلة',
     'ad.single_offer': 'عرض إعلاني (رسالة واحدة)',

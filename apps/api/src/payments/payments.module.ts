@@ -7,6 +7,8 @@ import { PaymentIntentService } from './payment-intent.service.js';
 import { PaymentWebhookService } from './payment-webhook.service.js';
 import { WebhookRetentionService } from './webhook-retention.service.js';
 import { PaymentsController } from './payments.controller.js';
+import { MailService } from '../mail/mail.service.js';
+import { NotificationService } from '../notifications/notification.service.js';
 import { RefundService } from './refund.service.js';
 import { SystemRefundService } from './system-refund.service.js';
 import { ManualTransferProvider } from './providers/manual-transfer.provider.js';
@@ -34,6 +36,12 @@ import { WalletModule } from '../wallet/wallet.module.js';
     PaymentProviderRegistry,
     PaymentIntentService,
     PaymentWebhookService,
+    /*
+      Provided per-module rather than globally, matching BookingsModule and AdminModule — §10.3's
+      refund notice is sent from RefundService, so this module needs its own.
+    */
+    MailService,
+    NotificationService,
     RefundService,
     SystemRefundService,
     // Provided per-module rather than globally, matching BookingsModule. It is

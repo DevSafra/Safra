@@ -12,6 +12,7 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { ManualTransferProvider } from './providers/manual-transfer.provider.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import { RefundService } from './refund.service.js';
+import type { NotificationService } from '../notifications/notification.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { SystemRefundService } from './system-refund.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
@@ -71,8 +72,27 @@ describeIfDb('the system refund sweep', () => {
         },
       } as unknown as FxRateService,
     ),
+    /*
+      Notifications are STUBBED here, unlike in `payments.integration.test.ts`.
+
+      That suite owns §10.3's refund mail and captures a real transport for it. This one is about
+      the sweep — which bookings it selects and what it refunds — and a real NotificationService
+      would add a queue and an SMTP transport to a file that needs neither. What it must not do is
+      swallow a failure silently, so the stub RECORDS instead: `sent` is asserted below.
+    */
+    {
+      notify: () => {
+        sent.push(1);
+
+        return Promise.resolve();
+      },
+    } as unknown as NotificationService,
+    { APP_URL: 'https://safra.test' } as never,
   );
   const sweep = new SystemRefundService(db, refunds, new JobRunService(db));
+
+  /** Every notice the stub above was asked to send, so «told nobody» is visible. */
+  const sent: number[] = [];
 
   /**
    * One booking a pass — which, given the fixture is cancelled ten years ago and the sweep works
@@ -94,6 +114,7 @@ describeIfDb('the system refund sweep', () => {
 
   beforeEach(async () => {
     await harness.begin();
+    sent.length = 0;
     systemCancelled = await seed('system.partner_no_response');
     customerCancelled = await seed('غيّرت رأيي، لن أسافر.');
   });
@@ -112,6 +133,19 @@ describeIfDb('the system refund sweep', () => {
     expect(refund?.applied_refund_percent).toBe('100.00');
     /* Nobody pressed anything: a system refund has no initiating user. */
     expect(refund?.initiated_by_user_id).toBeNull();
+  });
+
+  /**
+   * §10.3 — the customer is TOLD.
+   *
+   * An automatic refund nobody hears about is half a feature: the money moves, the booking is gone,
+   * and the first the customer knows is opening the app. Asserted here rather than only in
+   * `payments.integration.test.ts` because this is the path where no human is in the loop at all.
+   */
+  it('tells the customer their money is coming back', async () => {
+    await sweep.sweep(ONLY_OURS);
+
+    expect(sent, 'one notice for one refund').toHaveLength(1);
   });
 
   it("leaves a customer's own cancellation to the policy", async () => {

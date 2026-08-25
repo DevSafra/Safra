@@ -189,9 +189,18 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       ledger,
       wallet,
       new JobRunService(db),
+      /* The real one, whose transport this suite already captures — §6.4's cancellation notice. */
+      notifications,
+      { APP_URL: 'https://safra.test' } as never,
     );
     webhooks = new PaymentWebhookService(db, registry, actions, access);
-    refunds = new RefundService(db, registry, ledger, audit, wallet);
+    /*
+      The REAL notification service, which this suite already builds and whose transport it already
+      captures — so §10.3's refund mail is exercised by every refund test here rather than stubbed.
+    */
+    refunds = new RefundService(db, registry, ledger, audit, wallet, notifications, {
+      APP_URL: 'https://safra.test',
+    } as never);
     intents = new PaymentIntentService(
       db,
       { APP_URL: 'https://safra.test' } as never,

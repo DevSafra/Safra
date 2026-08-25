@@ -8,6 +8,9 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { MONEY_SCALE, toMinor } from '../common/money.js';
 import { MoneySettingsService } from '../settings/money-settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
+import { NotificationService } from '../notifications/notification.service.js';
+import { bookingCancelledBySafraMail } from '../mail/mail.templates.js';
+import { ENV, type Env } from '../config/env.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
 import { describeError } from '../common/errors/safe-error.js';
 
@@ -56,6 +59,8 @@ export class SlaService {
     private readonly ledger: LedgerService,
     private readonly wallet: WalletService,
     private readonly runs: JobRunService,
+    private readonly notifications: NotificationService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   async sweep(): Promise<void> {
@@ -380,6 +385,15 @@ export class SlaService {
         });
 
         handled += 1;
+
+        /*
+          The customer is told, AFTER the transaction has committed.
+
+          Outside it deliberately: the cancellation, the fine and the compensation are all recorded
+          by now, and a mail server that hangs must not hold that transaction open or roll it back.
+          The same ordering `notifyPartnerOfPendingBooking` uses, for the same reason.
+        */
+        await this.tellTheCustomer(booking, compensation);
       } catch (error) {
         // One booking failing must not abandon the rest of the batch.
         this.logger.error(
@@ -389,5 +403,92 @@ export class SlaService {
     }
 
     return handled;
+  }
+
+  /**
+   * «أُلغي حجزك» — §6.4 and §10.3, and until 2026-08-25 this did not happen at all.
+   *
+   * ## What the customer used to experience
+   *
+   * Their paid booking was cancelled, a fine was recorded against the partner, compensation landed
+   * in their wallet and — since the refund sweep — their money started coming back. **They were
+   * sent nothing.** The first they could learn of any of it was opening the app and finding the
+   * stay gone. Found by the final booking SRS audit.
+   *
+   * ## Swallowed, and that is not the same as ignored
+   *
+   * The booking is already cancelled and the money has already moved. Throwing here would fail the
+   * sweep for a booking whose work is done, and the next pass would find nothing to redo. A notice
+   * that cannot be sent becomes a `notifications` row for the re-drive sweep, which is the recovery
+   * path that exists for exactly this.
+   */
+  private async tellTheCustomer(
+    booking: { id: string; reference: string; currency_code: string },
+    compensation: string,
+  ): Promise<void> {
+    try {
+      const rows = await this.db.execute<{
+        email: string | null;
+        locale: string | null;
+        property: string | null;
+        check_in: string;
+        check_out: string;
+        total_amount: string;
+        customer_profile_id: string;
+      }>(sql`
+        SELECT cp.email, u.preferred_locale AS locale,
+               coalesce(pr.name_ar, pr.name_en) AS property,
+               b.check_in::text, b.check_out::text,
+               b.total_amount::text AS total_amount,
+               b.customer_profile_id
+        FROM bookings b
+        JOIN customer_profiles cp ON cp.id = b.customer_profile_id
+        JOIN properties pr        ON pr.id = b.property_id
+        LEFT JOIN users u         ON u.id = cp.user_id
+        WHERE b.id = ${booking.id}
+        LIMIT 1
+      `);
+
+      const row = rows.rows[0];
+
+      if (!row?.email) return;
+
+      const locale = row.locale ?? 'ar';
+
+      await this.notifications.notify(
+        /*
+          The key design handoff §8 already planned — «الإلغاء والاسترداد» — and which the console
+          catalogue has carried, unused, since before this mail existed. Inventing a new one would
+          have left a planned entry describing nothing and a sent entry nobody had named.
+        */
+        'booking.cancelled_refund',
+        bookingCancelledBySafraMail({
+          to: row.email,
+          locale,
+          reference: booking.reference,
+          property: row.property ?? '',
+          checkIn: row.check_in,
+          checkOut: row.check_out,
+          amount: row.total_amount,
+          compensation,
+          currency: booking.currency_code,
+          /*
+            §6.4's «يعرض عقارات مشابهة», in the form the customer can act on immediately: a search
+            already filled in with the dates they wanted. The alternative the SRS describes is a
+            telephone call from a member of staff, which is a promise this link does not depend on.
+          */
+          url:
+            `${this.env.APP_URL}/${locale}/search` +
+            `?checkIn=${row.check_in}&checkOut=${row.check_out}`,
+        }),
+        locale,
+        { bookingId: booking.id, customerProfileId: row.customer_profile_id },
+      );
+    } catch (error: unknown) {
+      this.logger.error(
+        `Booking ${booking.reference} was cancelled but the customer could not be told: ` +
+          `${describeError(error)}`,
+      );
+    }
   }
 }

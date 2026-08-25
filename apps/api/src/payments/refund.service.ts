@@ -8,6 +8,10 @@ import { DATABASE } from '../database/database.module.js';
 import { LedgerService, type LedgerLeg } from '../ledger/ledger.service.js';
 import { MONEY_SCALE, applyRate, fromMinor, toMinor } from '../common/money.js';
 import { WalletService } from '../wallet/wallet.service.js';
+import { NotificationService } from '../notifications/notification.service.js';
+import { bookingRefundedMail } from '../mail/mail.templates.js';
+import { ENV, type Env } from '../config/env.js';
+import { describeError } from '../common/errors/safe-error.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR } from '@safra/contracts';
@@ -57,6 +61,8 @@ export class RefundService {
     private readonly ledger: LedgerService,
     private readonly audit: AuditService,
     private readonly wallet: WalletService,
+    private readonly notifications: NotificationService,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   /**
@@ -318,6 +324,7 @@ export class RefundService {
       `);
 
       await this.markPaymentRefundState(payment.id);
+      await this.tellTheCustomer(booking, quote);
 
       return {
         refundId,
@@ -353,6 +360,7 @@ export class RefundService {
      */
     if (status !== 'failed') {
       await this.markPaymentRefundState(payment.id);
+      await this.tellTheCustomer(booking, quote);
     }
 
     return {
@@ -361,6 +369,65 @@ export class RefundService {
       status,
       percent: quote.refundPercent,
     };
+  }
+
+  /**
+   * «بدأ استرداد مبلغ حجزك» — §10.3 lists the refund among the mails that must exist.
+   *
+   * ## Here rather than at the call sites
+   *
+   * Two things issue refunds today — a staff button and §6.4's automatic sweep — and neither told
+   * the customer anything. Sending from the SERVICE means the next one is covered without anybody
+   * remembering, which is the difference between a rule and a habit.
+   *
+   * ## Sent AFTER the money has moved, and never able to undo it
+   *
+   * Outside the transaction and swallowed on failure, the same shape
+   * `notifyPartnerOfPendingBooking` uses: the refund is already recorded and posted to the ledger,
+   * and a mail server that is down must not roll that back. A notice that fails is a `notifications`
+   * row the re-drive sweep picks up; a refund that fails is money.
+   *
+   * A booking with no email address on it — a guest checkout that captured only a phone — simply
+   * gets no mail. That is a real gap for a real customer and it belongs to WhatsApp (roadmap 192),
+   * not here.
+   */
+  private async tellTheCustomer(booking: BookingRow, quote: RefundQuote): Promise<void> {
+    try {
+      const rows = await this.db.execute<{
+        email: string | null;
+        locale: string | null;
+      }>(sql`
+        SELECT cp.email, u.preferred_locale AS locale
+        FROM bookings b
+        JOIN customer_profiles cp ON cp.id = b.customer_profile_id
+        LEFT JOIN users u ON u.id = cp.user_id
+        WHERE b.id = ${booking.id}
+        LIMIT 1
+      `);
+
+      const row = rows.rows[0];
+
+      if (!row?.email) return;
+
+      await this.notifications.notify(
+        'booking.refunded',
+        bookingRefundedMail({
+          to: row.email,
+          locale: row.locale ?? 'ar',
+          reference: booking.reference,
+          amount: quote.refundAmount,
+          currency: quote.currencyCode,
+          url: `${this.env.APP_URL}/ar/account/bookings/${encodeURIComponent(booking.reference)}`,
+        }),
+        row.locale ?? 'ar',
+        { bookingId: booking.id, customerProfileId: booking.customer_profile_id },
+      );
+    } catch (error: unknown) {
+      this.logger.error(
+        `Refund on ${booking.reference} was issued but the customer could not be told: ` +
+          `${describeError(error)}`,
+      );
+    }
   }
 
   /**

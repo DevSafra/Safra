@@ -63,6 +63,44 @@ const RENDERERS: {
     shows: 'BKG-2026-000042',
   },
   /*
+    §6.4's pair — the cancellation and the refund.
+
+    Both carry MONEY, so both are checked for their currency as well as their figure: «نعيد إليك
+    200.00» in an email is the one place a reader cannot ask what it is 200 of.
+  */
+  {
+    name: 'bookingCancelledBySafraMail',
+    entry: 'bookingCancelledBySafra',
+    render: (locale) =>
+      templates.bookingCancelledBySafraMail({
+        ...SAMPLE,
+        locale,
+        reference: 'BKG-2026-000042',
+        property: 'فندق قصر الشرق',
+        checkIn: '2026-09-01',
+        checkOut: '2026-09-04',
+        amount: '436.00',
+        compensation: '10.00',
+        currency: 'USD',
+        url: 'https://safra.test/ar/search',
+      }),
+    shows: 'BKG-2026-000042',
+  },
+  {
+    name: 'bookingRefundedMail',
+    entry: 'bookingRefunded',
+    render: (locale) =>
+      templates.bookingRefundedMail({
+        ...SAMPLE,
+        locale,
+        reference: 'BKG-2026-000042',
+        amount: '436.00',
+        currency: 'USD',
+        url: 'https://safra.test/ar/account/bookings/BKG-2026-000042',
+      }),
+    shows: 'BKG-2026-000042',
+  },
+  /*
     EC-010's two. `bookingRecoveryMail` has TWO bodies behind one export — references and none —
     and this row exercises the one with references, because the empty one has no placeholder to
     leave unfilled and is therefore the easier of the pair.

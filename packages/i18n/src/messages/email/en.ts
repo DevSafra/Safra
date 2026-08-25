@@ -144,6 +144,14 @@ export const en = {
     subject: 'The host replied to your review of {property} — SAFRA',
     body: 'The host has replied to the review you wrote about {property}.\n\nYou can read the reply on the property page:\n{url}\n\nThe SAFRA team',
   },
+  bookingCancelledBySafra: {
+    subject: 'Your booking {reference} was cancelled — SAFRA',
+    body: 'We are sorry: the partner did not confirm your booking within the deadline, so SAFRA cancelled it.\n\nReference: {reference}\nProperty: {property}\nCheck-in: {checkIn}\nCheck-out: {checkOut}\n\nWe are returning the full amount of {amount} {currency}. The refund starts automatically and may take a few days to reach your account, depending on the payment method.\n\nWe have also added {compensation} {currency} to your wallet as compensation.\n\nFind an alternative stay for the same dates here:\n{url}\n\nThe SAFRA team',
+  },
+  bookingRefunded: {
+    subject: 'A refund has started for booking {reference} — SAFRA',
+    body: 'We have started refunding your booking.\n\nReference: {reference}\nAmount refunded: {amount} {currency}\n\nAnything returning to your wallet is there immediately. Anything returning via your payment method may take a few days to appear.\n\nBooking details:\n{url}\n\nThe SAFRA team',
+  },
   bookingNeedsAction: {
     subject: 'A booking is waiting for you — {reference}',
     body: 'You have a new booking request waiting for your decision.\n\nReference: {reference}\nProperty: {property}\nCheck-in: {checkIn}\nCheck-out: {checkOut}\n\nYou have until {deadline} to respond. A request left unanswered past that time is cancelled automatically and a "no response" violation is recorded against your account.\n\nOpen the request here:\n{url}\n\nThe SAFRA team',
