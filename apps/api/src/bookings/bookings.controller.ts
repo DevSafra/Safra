@@ -15,12 +15,16 @@ import type { Request } from 'express';
 import {
   PERMISSIONS as P,
   type BookingCancelInput,
+  type BookingRecoveryInput,
+  type BookingVerificationInput,
   type BookingStaffConfirmInput,
   type BookingCreateInput,
   type BookingQuoteInput,
   type CursorQuery,
   type PartnerBookingDecisionInput,
   bookingCancelSchema,
+  bookingRecoverySchema,
+  bookingVerificationSchema,
   bookingStaffConfirmSchema,
   bookingCreateSchema,
   bookingQuoteSchema,
@@ -35,6 +39,7 @@ import { CurrentUser, Public, RequirePermissions } from '../rbac/decorators.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { BookingActionsService } from './booking-actions.service.js';
+import { BookingRecoveryService } from './booking-recovery.service.js';
 import { BookingCreationService } from './booking-creation.service.js';
 import { BookingsService } from './bookings.service.js';
 
@@ -60,6 +65,7 @@ export class BookingsController {
     private readonly bookings: BookingsService,
     private readonly creation: BookingCreationService,
     private readonly actions: BookingActionsService,
+    private readonly recovery: BookingRecoveryService,
     private readonly idempotency: IdempotencyService,
   ) {}
 
@@ -102,6 +108,71 @@ export class BookingsController {
     @Query(new ZodValidationPipe(bookingQuoteSchema)) query: BookingQuoteInput,
   ) {
     return this.creation.quote(query);
+  }
+
+  /**
+   * EC-010 tier 1 — «نسيت رقم الحجز». Public, and it answers the same thing to everybody.
+   *
+   * ## 202, always
+   *
+   * Not 200-with-a-count and not 404. The status, the body and the shape are identical whether the
+   * address holds forty bookings or none, because «does this person have a booking» is the question
+   * this endpoint exists to REFUSE — an email address is on every invoice and in every forwarded
+   * confirmation, so answering it would make this an oracle. What was found travels to the mailbox.
+   *
+   * ## Throttled harder than sign-in
+   *
+   * Five a minute. Not against guessing — there is nothing to guess — but against using SAFRA as a
+   * mailer: each call sends a message to an address the caller chose.
+   */
+  @Public()
+  @Post('recover')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @AuditExempt('Auditing this would record which addresses were asked about, by anybody.')
+  async recover(
+    @Body(new ZodValidationPipe(bookingRecoverySchema)) body: BookingRecoveryInput,
+  ) {
+    await this.recovery.recover(body.email);
+
+    /* A fixed body. Anything derived from what was found would leak it. */
+    return { sent: true };
+  }
+
+  /**
+   * EC-010 tier 2, step one — send a code to the contact details ON this booking.
+   *
+   * `BOOKING_READ_ALL`: the agent already holds the reference, and this discloses nothing further
+   * — the reply is a MASKED destination. What it does is put a message in the customer's mailbox,
+   * which is why it is throttled and audited by channel.
+   */
+  @Post(':reference/verification')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @RequirePermissions(P.BOOKING_READ_ALL)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @AuditExempt(
+    'BookingRecoveryService records booking.verification_sent, by channel only.',
+  )
+  async sendVerification(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.recovery.sendCode(reference, user);
+  }
+
+  /** Step two — the caller read it back. One answer for every kind of failure; see the service. */
+  @Post(':reference/verification/confirm')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.BOOKING_READ_ALL)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @AuditExempt('BookingRecoveryService records booking.verification_passed.')
+  async confirmVerification(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(bookingVerificationSchema))
+    body: BookingVerificationInput,
+  ) {
+    return this.recovery.verify(reference, body.code, user);
   }
 
   /** The partner answering within the two-hour window (§6.4). */

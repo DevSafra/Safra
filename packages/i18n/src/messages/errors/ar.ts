@@ -62,6 +62,8 @@ export const ar = {
   'staff.role_not_scopable': 'هذا الدور غير قابل للتقييد بنطاق.',
   'staff.cities_unrecognised': 'مدينة واحدة أو أكثر غير معروفة.',
   'booking.not_found': 'لم يُعثر على هذا الحجز.',
+  'booking.verification_failed':
+    'رمز التحقق غير صحيح أو انتهت صلاحيته. أرسل رمزاً جديداً.',
   'booking.not_payable': 'لم يبقَ بإمكانك دفع هذا الحجز.',
   'booking.stay_too_long': 'لا يمكن أن تتجاوز الإقامة {maxNights} ليلة.',
   'booking.no_refundable_amount': 'لا يوجد مبلغ قابل للاسترداد على هذا الحجز.',

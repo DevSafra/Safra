@@ -290,7 +290,14 @@
     "genderMale": "Male",
     "genderFemale": "Female",
     "genderUndisclosed": "Prefer not to say",
-    "genderChoose": "Choose…"
+    "genderChoose": "Choose…",
+    "findTitle": "Lost your booking number?",
+    "findSubtitle": "Enter your email address and we will send your booking numbers to it.",
+    "findEmail": "Email address",
+    "findSubmit": "Send my booking numbers",
+    "findSending": "Sending…",
+    "findSent": "If any bookings are attached to that address, we have just sent their numbers to it. Please check your inbox.",
+    "findPrivacy": "This page never reveals whether an address has a booking — the answer is the same either way."
   },
   "account": {
     "title": "My account",

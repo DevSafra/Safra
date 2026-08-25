@@ -136,6 +136,13 @@ export const ERROR = {
   STAFF_ROLE_NOT_SCOPABLE: 'staff.role_not_scopable',
   STAFF_CITIES_UNRECOGNISED: 'staff.cities_unrecognised',
   BOOKING_NOT_FOUND: 'booking.not_found',
+  /**
+   * One answer for wrong, expired, spent and over-attempted (EC-010 tier 2).
+   *
+   * The distinctions help nobody on the call — in every case the next step is to send another
+   * code — and telling them apart would let somebody map which codes had ever existed.
+   */
+  BOOKING_VERIFICATION_FAILED: 'booking.verification_failed',
   BOOKING_NOT_PAYABLE: 'booking.not_payable',
   BOOKING_STAY_TOO_LONG: 'booking.stay_too_long',
   BOOKING_NO_REFUNDABLE_AMOUNT: 'booking.no_refundable_amount',

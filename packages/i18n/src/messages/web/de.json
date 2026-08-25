@@ -290,7 +290,14 @@
     "genderMale": "Männlich",
     "genderFemale": "Weiblich",
     "genderUndisclosed": "Keine Angabe",
-    "genderChoose": "Bitte wählen…"
+    "genderChoose": "Bitte wählen…",
+    "findTitle": "Buchungsnummer vergessen?",
+    "findSubtitle": "Geben Sie Ihre E-Mail-Adresse ein — wir senden Ihre Buchungsnummern dorthin.",
+    "findEmail": "E-Mail-Adresse",
+    "findSubmit": "Buchungsnummern senden",
+    "findSending": "Wird gesendet…",
+    "findSent": "Falls zu dieser Adresse Buchungen bestehen, haben wir deren Nummern soeben dorthin gesendet. Bitte prüfen Sie Ihr Postfach.",
+    "findPrivacy": "Diese Seite verrät nie, ob zu einer Adresse eine Buchung besteht — die Antwort ist immer dieselbe."
   },
   "account": {
     "title": "Mein Konto",

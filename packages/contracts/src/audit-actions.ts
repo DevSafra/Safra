@@ -81,6 +81,15 @@ export const AUDIT_ACTIONS = [
   'booking.completed',
   /** The `disputed` overlay lifting when a booking's last open dispute closed. */
   'booking.dispute_closed',
+  /*
+    EC-010 tier 2 — a code was sent to the contact on a booking, and later read back.
+
+    The CHANNEL is recorded and never the address or the code. Two actions rather than one because
+    the interesting question afterwards is not «was a code sent» but «was one sent that nobody
+    ever passed» — a run of the first with none of the second is somebody fishing.
+  */
+  'booking.verification_sent',
+  'booking.verification_passed',
   'payment.started',
   'payment.failed',
   'refund.created',

@@ -33,6 +33,55 @@ import type { OutgoingMail } from './mail.service.js';
  * A reset link that has quietly expired is one of the most common support contacts on any
  * platform, and it is entirely avoidable by saying so up front.
  */
+/**
+ * EC-010 tier 1 — the references SAFRA holds for an address, sent to that address.
+ *
+ * Two templates rather than one with a conditional body, and the distinction never reaches the
+ * caller: the ENDPOINT answers identically either way, and which of these was sent is known only
+ * to whoever opens the mailbox. A single template with «{references}» left empty would have
+ * printed a heading over nothing.
+ */
+export function bookingRecoveryMail(input: {
+  to: string;
+  references: readonly string[];
+  locale: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...(input.references.length === 0
+      ? compose((m) => m.bookingRecoveryNone, input.locale)
+      : compose((m) => m.bookingRecovery, input.locale, {
+          /* One per line, so a customer with four stays can read them apart. */
+          references: input.references.join('\n'),
+        })),
+  };
+}
+
+/**
+ * EC-010 tier 2 — a code proving the caller controls the address on the booking.
+ *
+ * The body says what to do if the recipient is NOT on a call, and says that nothing has been
+ * disclosed. Both matter: a code arriving unprompted is the one signal a customer gets that
+ * somebody is asking about their booking, and «give it to nobody» is the instruction that makes
+ * the check worth anything.
+ */
+export function bookingVerificationMail(input: {
+  to: string;
+  reference: string;
+  code: string;
+  minutes: number;
+  locale: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.bookingVerification, input.locale, {
+      reference: input.reference,
+      code: input.code,
+      minutes: input.minutes,
+    }),
+  };
+}
+
 export function passwordResetMail(input: {
   to: string;
   url: string;

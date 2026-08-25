@@ -1,5 +1,17 @@
 /** Transactional email copy in German, formal register (`Sie`) throughout. */
 export const de = {
+  bookingRecovery: {
+    subject: 'Ihre SAFRA-Buchungen',
+    body: 'Sie haben uns gebeten, Ihre SAFRA-Buchungsnummern zu senden.\n\n{references}\n\nÖffnen Sie eine davon in Ihrem Konto oder nennen Sie die Nummer unserem Support.\n\nFalls Sie das nicht angefordert haben, ignorieren Sie diese Nachricht — es hat sich nichts geändert und niemand hat Ihre Daten gesehen.\n\nIhr SAFRA-Team',
+  },
+  bookingRecoveryNone: {
+    subject: 'Ihre SAFRA-Buchungen',
+    body: 'Sie haben uns gebeten, Ihre SAFRA-Buchungsnummern zu senden.\n\nZu dieser E-Mail-Adresse gibt es keine Buchungen.\n\nFalls Sie mit einer anderen Adresse gebucht haben, versuchen Sie diese. Wenn Sie glauben, dass dies falsch ist, wenden Sie sich an den Support.\n\nIhr SAFRA-Team',
+  },
+  bookingVerification: {
+    subject: 'Ihr Bestätigungscode — SAFRA',
+    body: 'Ein SAFRA-Mitarbeiter möchte Ihre Identität prüfen, bevor über die Buchung {reference} gesprochen wird.\n\nBestätigungscode: {code}\n\nEr läuft in {minutes} Minuten ab. Nennen Sie ihn nur der Person, mit der Sie gerade sprechen.\n\nFalls Sie nicht mit SAFRA telefonieren, ignorieren Sie diese Nachricht und geben Sie den Code an niemanden weiter — zu Ihrer Buchung wurde nichts offengelegt.\n\nIhr SAFRA-Team',
+  },
   passwordReset: {
     subject: 'SAFRA-Passwort zurücksetzen',
     body: 'Sie haben angefordert, das Passwort für Ihr SAFRA-Konto zurückzusetzen.\n\nÖffnen Sie diesen Link, um ein neues zu wählen:\n{url}\n\nDer Link läuft in {expiresInMinutes} Minuten ab und ist einmal verwendbar.\n\nFalls Sie das nicht angefordert haben, ignorieren Sie diese E-Mail — an Ihrem Konto hat sich nichts geändert.\n\nIhr SAFRA-Team',

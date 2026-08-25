@@ -287,6 +287,65 @@ export const bookingInternalNotes = pgTable(
 );
 
 /**
+ * A one-time code proving a caller controls the contact details ON a booking (EC-010, tier 2).
+ *
+ * ## What it is for
+ *
+ * §16's EC-010 — «العميل أضاع رقم الحجز: يسترجعه بالبريد أو الهاتف بعد تحقق آمن». The security is
+ * entirely in what «تحقق آمن» means, and an email address is not a secret: it is on every invoice
+ * and in every forwarded confirmation. So the caller does not prove who they are by RECITING
+ * details a staff member reads out — they prove it by controlling the channel the booking already
+ * names, before anything is disclosed.
+ *
+ * ## Its own table rather than `auth_tokens`
+ *
+ * `auth_tokens.user_id` is NOT NULL and §4 lets a guest book with no account at all — so the
+ * customers most likely to lose a reference are exactly the ones that table cannot describe. This
+ * is keyed on the BOOKING, which is the thing being unsealed.
+ *
+ * ## Append-only, and `attempts` is the exception that proves it
+ *
+ * `createdAt` alone, like every other evidence table here. Two columns move after insert —
+ * `consumed_at` and `attempts` — and both are part of the code's own lifecycle rather than an
+ * amendment of what it recorded, which is why this is not in the `deny_mutation` list. A code that
+ * was wrong is superseded by requesting another.
+ */
+export const bookingVerifications = pgTable(
+  'booking_verifications',
+  {
+    id: primaryId(),
+    bookingId: foreignId('booking_id')
+      .notNull()
+      .references(() => bookings.id),
+    /**
+     * SHA-256 of the code, never the code.
+     *
+     * Not Argon2id: this is a six-digit value with a five-minute life and a three-attempt ceiling,
+     * so the guessing is bounded by the ceiling rather than by the hash — and a slow hash on the
+     * verification path would only tax a support agent waiting on a telephone call. The same
+     * reasoning `bookings.access_token_hash` records.
+     */
+    codeHash: text('code_hash').notNull(),
+    /** Where it was sent. Only `email` today; `sms` waits on the provider §18 leaves open. */
+    channel: text('channel').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    /**
+     * Wrong guesses. Bounded, because a six-digit code is guessable in a million tries and a
+     * support call has no rate limit of its own — the agent is holding the telephone.
+     */
+    attempts: smallint('attempts').notNull().default(0),
+    /** The staff member who asked for it. Nullable so the code survives their account being removed. */
+    requestedByUserId: foreignId('requested_by_user_id').references(() => users.id),
+    ...createdAt,
+  },
+  (t) => [
+    /** The codes on one booking, newest last — ascending, read backward. See the call-log note. */
+    index('booking_verifications_booking_idx').on(t.bookingId, t.createdAt),
+  ],
+);
+
+/**
  * SRS §13.1 "Timeline Event" + P-004 (everything traceable). Append-only: the
  * SQL migration revokes UPDATE and DELETE. Polymorphic by design so a booking,
  * partner or customer timeline all read from one place.

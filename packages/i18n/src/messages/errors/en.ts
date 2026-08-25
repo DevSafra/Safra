@@ -66,6 +66,8 @@ export const en = {
   'staff.role_not_scopable': 'This role cannot be scoped.',
   'staff.cities_unrecognised': 'One or more cities were not recognised.',
   'booking.not_found': 'Booking not found.',
+  'booking.verification_failed':
+    'That verification code is not valid or has expired. Send a new one.',
   'booking.not_payable': 'This booking can no longer be paid.',
   'booking.stay_too_long': 'A stay may not exceed {maxNights} nights.',
   'booking.no_refundable_amount': 'No refundable amount remains on this booking.',

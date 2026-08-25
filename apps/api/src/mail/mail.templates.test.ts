@@ -47,6 +47,36 @@ const RENDERERS: {
   readonly render: (locale: string) => { subject: string; text: string };
   readonly shows: string;
 }[] = [
+  /*
+    EC-010's two. `bookingRecoveryMail` has TWO bodies behind one export — references and none —
+    and this row exercises the one with references, because the empty one has no placeholder to
+    leave unfilled and is therefore the easier of the pair.
+  */
+  {
+    name: 'bookingRecoveryMail',
+    entry: 'bookingRecovery',
+    render: (locale) =>
+      templates.bookingRecoveryMail({
+        ...SAMPLE,
+        locale,
+        references: ['BKG-2026-000042'],
+      }),
+    shows: 'BKG-2026-000042',
+  },
+  {
+    name: 'bookingVerificationMail',
+    entry: 'bookingVerification',
+    render: (locale) =>
+      templates.bookingVerificationMail({
+        ...SAMPLE,
+        locale,
+        reference: 'BKG-2026-000042',
+        code: '481902',
+        minutes: 5,
+      }),
+    /* The CODE, which is the one thing the message exists to carry. */
+    shows: '481902',
+  },
   {
     name: 'passwordResetMail',
     entry: 'passwordReset',

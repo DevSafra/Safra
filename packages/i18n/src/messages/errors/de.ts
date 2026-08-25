@@ -75,6 +75,8 @@ export const de = {
   'staff.role_not_scopable': 'Diese Rolle kann nicht eingeschränkt werden.',
   'staff.cities_unrecognised': 'Eine oder mehrere Städte wurden nicht erkannt.',
   'booking.not_found': 'Buchung nicht gefunden.',
+  'booking.verification_failed':
+    'Dieser Bestätigungscode ist ungültig oder abgelaufen. Senden Sie einen neuen.',
   'booking.not_payable': 'Diese Buchung kann nicht mehr bezahlt werden.',
   'booking.stay_too_long': 'Ein Aufenthalt darf {maxNights} Nächte nicht überschreiten.',
   'booking.no_refundable_amount':

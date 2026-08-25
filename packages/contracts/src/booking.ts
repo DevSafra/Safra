@@ -215,6 +215,44 @@ export const SLA_EXPIRY_WARNING_MINUTES = 30;
 export const ARRIVAL_ALERT_HOURS = 24;
 
 /**
+ * EC-010 tier 1 — a customer asking where their booking reference went.
+ *
+ * ## The response says the same thing either way
+ *
+ * An email address is not a secret: it is on every invoice and in every forwarded confirmation.
+ * So this endpoint must not become an oracle — «does this person have a booking» is exactly the
+ * question it must refuse to answer. It replies identically whether or not anything was found,
+ * and the reference travels to the MAILBOX, not to whoever typed the address. Same shape
+ * `O-sec-2` established for registration.
+ */
+export const bookingRecoverySchema = z.object({ email: emailSchema }).strict();
+
+export type BookingRecoveryInput = z.infer<typeof bookingRecoverySchema>;
+
+/**
+ * How long a staff-assisted verification code lives, and how many guesses it gets (tier 2).
+ *
+ * Five minutes because the agent is on the telephone with the customer — long enough to read a
+ * code back, short enough that one left on a notepad is useless. Three attempts because six digits
+ * is a million possibilities and a support call has no rate limit of its own: the ceiling is what
+ * bounds the guessing, not the hash.
+ */
+export const BOOKING_VERIFICATION_MINUTES = 5;
+export const BOOKING_VERIFICATION_ATTEMPTS = 3;
+
+/** Redeeming that code. Six digits, and the code is never echoed back. */
+export const bookingVerificationSchema = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .regex(/^\d{6}$/, ERROR.VALIDATION_REQUIRED),
+  })
+  .strict();
+
+export type BookingVerificationInput = z.infer<typeof bookingVerificationSchema>;
+
+/**
  * The attention filters الحجوزات accepts, and the codes they answer to.
  *
  * A booking's registry needs a destination for every alert the dashboard raises, on the SAME

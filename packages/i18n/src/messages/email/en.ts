@@ -1,5 +1,17 @@
 /** Transactional email copy in English. */
 export const en = {
+  bookingRecovery: {
+    subject: 'Your SAFRA bookings',
+    body: 'You asked us to send your SAFRA booking references.\n\n{references}\n\nOpen any of them from your account, or quote the number to our support team.\n\nIf you did not ask for this, ignore this message — nothing has changed and nobody has seen your details.\n\nThe SAFRA team',
+  },
+  bookingRecoveryNone: {
+    subject: 'Your SAFRA bookings',
+    body: 'You asked us to send your SAFRA booking references.\n\nThere are no bookings attached to this email address.\n\nIf you booked with a different address, try that one. If you believe this is wrong, contact support.\n\nThe SAFRA team',
+  },
+  bookingVerification: {
+    subject: 'Your verification code — SAFRA',
+    body: 'A SAFRA staff member has asked to verify your identity before discussing booking {reference}.\n\nVerification code: {code}\n\nIt expires in {minutes} minutes. Read it only to the person you are speaking to right now.\n\nIf you are not on a call with SAFRA, ignore this message and give the code to nobody — nothing about your booking has been disclosed.\n\nThe SAFRA team',
+  },
   passwordReset: {
     subject: 'Reset your SAFRA password',
     body: 'You asked to reset the password for your SAFRA account.\n\nOpen this link to choose a new one:\n{url}\n\nThe link expires in {expiresInMinutes} minutes and can be used once.\n\nIf you did not ask for this, ignore this email — nothing about your account has changed.\n\nThe SAFRA team',

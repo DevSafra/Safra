@@ -79,6 +79,7 @@ const CLEAR_TABLES = [
   'auth_tokens',
   'availability_days',
   'booking_internal_notes',
+  'booking_verifications',
   'bookings',
   'conversations',
   'coupon_redemptions',

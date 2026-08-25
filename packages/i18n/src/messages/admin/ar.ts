@@ -1648,6 +1648,33 @@ export const ar = {
      * literals cannot find a screen that contains no Arabic. The `no-hardcoded-text` lint rule
      * found them, which is the reason it exists.
      */
+    /* EC-010 tier 2 — التحقق من هوية متصل فقد رقم حجزه. */
+    bookingVerify: {
+      title: 'التحقق من هوية العميل',
+      /*
+        Says what the screen is FOR and what it refuses to do. An agent reaching here has a caller
+        who cannot prove who they are, and the rule that matters is: do not read anything out first.
+      */
+      intro:
+        'للمتصل الذي فقد رقم حجزه. أرسل رمزاً إلى بيانات التواصل المسجَّلة على الحجز واطلب منه قراءته — ولا تذكر أي تفصيل عن الحجز قبل نجاح التحقق.',
+      referenceLabel: 'رقم الحجز',
+      referenceHint: 'إن لم يكن لدى المتصل رقم الحجز، وجّهه إلى صفحة «نسيت رقم الحجز».',
+      send: 'إرسال رمز التحقق',
+      sending: 'جارٍ الإرسال…',
+      /* A MASKED destination — enough to recognise, not enough to learn. */
+      sentTo: 'أُرسل رمز إلى {destination}. ينتهي خلال {minutes} دقائق.',
+      codeLabel: 'الرمز كما قرأه المتصل',
+      confirm: 'تحقّق',
+      confirming: 'جارٍ التحقق…',
+      verified: 'تم التحقق. يمكنك الآن فتح الحجز ومناقشته مع المتصل.',
+      openBooking: 'فتح الحجز ←',
+      /*
+        The seal, said plainly. Nothing about the booking is on this screen until the code passes —
+        not the property, not the dates, not the customer's name.
+      */
+      sealed: 'لا تظهر أي بيانات عن الحجز قبل نجاح التحقق.',
+    },
+
     bookingDetail: {
       /**
        * Interpolated lines, as templates.
@@ -2368,6 +2395,8 @@ export const ar = {
     'booking.staff_confirmed': 'تأكيد حجز نيابة عن الشريك',
     'booking.completed': 'إنهاء الإقامة',
     'booking.dispute_closed': 'رفع حالة النزاع عن الحجز',
+    'booking.verification_sent': 'إرسال رمز تحقق للعميل',
+    'booking.verification_passed': 'نجاح تحقق العميل',
     'dispute.opened_by_staff': 'فتح نزاع نيابة عن العميل',
     'booking.exported': 'تصدير حجوزات',
     'booking.export_requested': 'طلب تصدير حجوزات',
@@ -2636,6 +2665,8 @@ export const ar = {
         actually issued (2026-08-25). `audit-catalogue.integration.test.ts` reads the TABLE, so a
         payload nothing could write was a payload nothing could flag.
       */
+      /* `booking.verification_sent` records WHERE a code went — the channel, never the address. */
+      channel: 'القناة',
       refundId: 'معرّف الاسترداد',
       provider: 'مزوّد الدفع',
       providerAmount: 'إلى مزود الدفع',
