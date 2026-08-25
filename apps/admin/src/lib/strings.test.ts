@@ -49,6 +49,84 @@ describe('cancellationReason', () => {
  * payload is on screen because a dispute can turn on which fine was applied.
  */
 describe('payloadEntries', () => {
+  /**
+   * An amount with no currency beside it is a number nobody can act on.
+   *
+   * Bashar read «المبلغ 200.00» on a booking's timeline (2026-08-25) and could not tell what it was
+   * 200 of. On this platform that is not pedantry — SYP and USD differ by four orders of magnitude,
+   * which is the same reason `bookingCompensationSchema` refuses an amount without one.
+   */
+  it('puts the payload currency on a money value', () => {
+    const entries = payloadEntries({
+      amount: '200.00',
+      toWallet: '200.00',
+      toProvider: '0.00',
+      currency: 'USD',
+    });
+
+    for (const key of ['amount', 'toWallet', 'toProvider']) {
+      expect(entries.find((e) => e.key === key)?.value, key).toMatch(/USD$/);
+    }
+  });
+
+  /** Once it is on the amounts, the currency's own row is noise — the same fact twice. */
+  it('drops the currency row once it has been attached', () => {
+    const entries = payloadEntries({ amount: '200.00', currency: 'USD' });
+
+    expect(entries.map((e) => e.key)).toEqual(['amount']);
+    expect(entries[0]?.value).toBe('200.00 USD');
+  });
+
+  /** But keeps it where there is no amount to attach it to — there it is the only mention. */
+  it('keeps the currency row when nothing money-shaped is beside it', () => {
+    const entries = payloadEntries({ currency: 'USD', percent: 50 });
+
+    expect(entries.map((e) => e.key)).toContain('currency');
+  });
+
+  /**
+   * And NOT on the two numbers that are not money — the control that makes the test above mean
+   * something.
+   *
+   * `percent` is a proportion and `rate` is an FX rate: 13000.00 is not thirteen thousand dollars.
+   * A heuristic over "looks like a decimal" would have attached a currency to both, which is why
+   * the money keys are a written list rather than a shape.
+   */
+  it('leaves a percentage and an exchange rate alone', () => {
+    const entries = payloadEntries({
+      percent: 100,
+      rate: '13000.00',
+      amount: '200.00',
+      currency: 'USD',
+    });
+
+    expect(entries.find((e) => e.key === 'percent')?.value).not.toMatch(/USD/);
+    expect(entries.find((e) => e.key === 'rate')?.value).not.toMatch(/USD/);
+    expect(entries.find((e) => e.key === 'amount')?.value).toMatch(/USD$/);
+  });
+
+  /**
+   * A payload written before the currency was recorded renders exactly as it does today.
+   *
+   * `audit_log` is append-only and every row predating 2026-08-25 has no currency key, so there is
+   * nothing to backfill. Showing such an amount wearing a guessed currency would be worse than
+   * showing it bare — an assumed currency on a money figure is how somebody refunds the wrong sum.
+   */
+  it('attaches nothing when the payload names no currency', () => {
+    const [entry] = payloadEntries({ amount: '200.00' });
+
+    expect(entry?.value).toBe('200.00');
+  });
+
+  /** A currency that is not an ISO code is not one — an id or a symbol must not be appended. */
+  it('ignores a currency that is not a three-letter code', () => {
+    for (const currency of ['us dollar', '$', '01a0-uuid', 'usd']) {
+      const [entry] = payloadEntries({ amount: '200.00', currency });
+
+      expect(entry?.value, currency).toBe('200.00');
+    }
+  });
+
   it('turns a code into a sentence a support agent can act on', () => {
     const [entry] = payloadEntries({ reason: 'EC-001' });
 

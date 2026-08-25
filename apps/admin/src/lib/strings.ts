@@ -116,11 +116,96 @@ export function payloadEntries(
   if (typeof payload !== 'object' || payload === null || Array.isArray(payload))
     return [];
 
-  return Object.entries(payload as Record<string, unknown>).map(([key, value]) => ({
-    key,
-    label: t.enums.payloadKey[key] ?? key,
-    value: payloadValue(value),
-  }));
+  const fields = payload as Record<string, unknown>;
+  const currency = currencyOf(fields);
+  const attached =
+    currency !== null && Object.keys(fields).some((key) => MONEY_KEYS.has(key));
+
+  return (
+    Object.entries(fields)
+      /*
+      The currency's OWN row goes, once it is on the amounts.
+
+      Otherwise «المبلغ 90.00 USD» is followed by «العملة USD», which is the same fact twice and
+      reads as though the two might differ. It is dropped only when it was actually attached to
+      something — a payload carrying a currency and no money key keeps its row, because there it is
+      the only place the currency appears at all.
+    */
+      .filter(([key]) => !(attached && CURRENCY_KEYS.includes(key)))
+      .map(([key, value]) => ({
+        key,
+        label: t.enums.payloadKey[key] ?? key,
+        value:
+          currency && MONEY_KEYS.has(key)
+            ? `${payloadValue(value)} ${currency}`
+            : payloadValue(value),
+      }))
+  );
+}
+
+/**
+ * The payload keys that hold an AMOUNT OF MONEY, and nothing else.
+ *
+ * ## Named, not sniffed
+ *
+ * A heuristic over "looks like a decimal" would attach a currency to `rate` — an FX rate of
+ * 13000.00 is not 13,000 dollars — and to `percent`. Both are numbers in the same payloads. So the
+ * set is written down, and `strings.test.ts` holds it.
+ *
+ * ## Grounded in the data, not invented
+ *
+ * Every entry here was read out of the live `timeline_events.payload` and `audit_log.after` key
+ * lists on 2026-08-25 rather than guessed at. A key that is money and missing from this set renders
+ * bare, which is exactly today's behaviour — the failure mode is the old one, not a wrong one.
+ */
+const MONEY_KEYS = new Set([
+  'amount',
+  'appliedAmount',
+  'balance',
+  'basePrice',
+  'compensation',
+  'compensationAmount',
+  'creditedAmount',
+  'fine',
+  'fineAmount',
+  'net',
+  'price',
+  'providerAmount',
+  'remainingAmount',
+  'requestedAmount',
+  'toProvider',
+  'toWallet',
+  'total',
+  'walletAmount',
+  'walletBalance',
+]);
+
+/**
+ * The currency this payload states, if it states one.
+ *
+ * ## Why the payload has to say, rather than the screen assuming
+ *
+ * A booking's own currency is on the screen already, and using it would be wrong the moment the two
+ * differ — a compensation credited in USD on a booking priced in SYP is exactly the case where an
+ * assumed currency is worse than none. So a payload gets a currency only when it carries one.
+ *
+ * ## And nothing is attached when it does not
+ *
+ * Every row written before 2026-08-25 has no currency key, and `audit_log` is append-only — there
+ * is no backfilling it. Those render exactly as they do today, which is the honest outcome: an
+ * amount whose currency was never recorded must not be shown wearing a guess.
+ */
+const CURRENCY_KEYS = ['currency', 'currencyCode', 'creditedCurrency'];
+
+function currencyOf(fields: Record<string, unknown>): string | null {
+  for (const key of CURRENCY_KEYS) {
+    const value = fields[key];
+
+    /* Three letters, upper case — an ISO code and not a name, a symbol or an id. */
+    if (typeof value === 'string' && /^[A-Z]{3}$/.test(value)) return value;
+  }
+
+  return null;
 }
 
 /**
