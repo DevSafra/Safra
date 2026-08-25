@@ -435,3 +435,116 @@ test('escalating a violation suspends the partner and records it as the cause', 
   await page.reload();
   await expect(page.locator('[data-partner-suspended]')).toHaveCount(0);
 });
+
+/**
+ * The confirmation for an action that leaves the row with nothing left to offer.
+ *
+ * ## Why this needs its own test, and why it drives all four rungs
+ *
+ * `ViolationActions` returns `null` when no control remains, and it used to render its success
+ * message inside that guard — so a write that exhausted the row deleted its own confirmation on the
+ * `router.refresh()` fired one line later. The waive is the sharpest case: the operator gives a
+ * partner their money back and the screen answers by going blank.
+ *
+ * The first test in this file waives too and passed three runs out of four on 2026-08-25, because it
+ * takes whichever row the fixture offers and that row usually still has a rung left. That is the
+ * trap this test exists to close: a spec that reaches the defective state only by luck reports
+ * coverage it does not have. So the row here is built rather than found — raised, warned, fined,
+ * escalated, and only then waived, which is the order that turns all four flags false.
+ *
+ * ## The two assertions are one assertion
+ *
+ * «no control remains» is not decoration. Without it a future change that leaves one rung alive
+ * would keep this test green while the defect walked back in behind it — the row would simply never
+ * enter the state the message has to survive. Asserting the message alone proves nothing about the
+ * guard; asserting both proves the message survived the guard closing.
+ */
+test('a waive that exhausts the row still confirms itself', async ({ page }) => {
+  const dir = shotDir();
+
+  await page.goto('/partners?size=25');
+
+  const row = page.locator('a[href^="/partners/PAR-"]').first();
+
+  test.skip((await row.count()) === 0, 'No partner to enforce against.');
+
+  const href = (await row.getAttribute('href')) ?? '';
+  const reference = /PAR-\d+/.exec(href)?.[0] ?? '';
+
+  /* Escalation is hidden while the partner is suspended, so this starts from trading — as the test above leaves it. */
+  await page.goto(`/partners/${reference}`);
+  await expect(page.locator('[data-partner-suspended]')).toHaveCount(0);
+
+  await page.goto(`/partners/${reference}/violations`);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+  /* A violation of its own: the row has to be driven from a known start to reach a known end. */
+  await page.getByRole('button', { name: copy.raise }).first().click();
+  await page.getByLabel(copy.kindLabel).selectOption('stale_calendar');
+  await page.getByLabel(copy.violationReasonLabel).fill(REASON);
+  await page.getByRole('button', { name: copy.raise }).last().click();
+  /* `exact: true` — the row's own description ends with this sentence; see the first test. */
+  await expect(page.getByText(copy.raised, { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
+  await page.reload();
+
+  const target = page.locator('main ul > li').first();
+
+  /* ── Warn: closes `canWarn` ─────────────────────────────────────────── */
+  await target.getByRole('button', { name: copy.warn }).first().click();
+  await target.getByLabel(copy.warnNoteLabel).fill(WARNING);
+  await target.getByRole('button', { name: copy.warn }).last().click();
+  await expect(page.getByText(copy.warned)).toBeVisible({ timeout: 20_000 });
+  await page.reload();
+
+  /* ── Fine: closes `canFine`, and is what makes a waive possible at all ─ */
+  await target.getByRole('button', { name: copy.fine }).first().click();
+  await target.locator('input[name="amount"]').fill('50');
+  await target.locator('select[name="currencyCode"]').selectOption('USD');
+  await target.getByLabel(copy.violationReasonLabel).fill(REASON);
+  await target.getByRole('button', { name: copy.fine }).last().click();
+  await expect(page.getByText(copy.fined)).toBeVisible({ timeout: 20_000 });
+  await page.reload();
+
+  /* ── Escalate: closes `escalatable`, by suspending the partner ───────── */
+  await target.getByRole('button', { name: copy.escalate }).first().click();
+  await target.getByLabel(copy.escalateReasonLabel).fill(REASON);
+  await target.getByRole('button', { name: copy.escalate }).last().click();
+  await expect(page.getByText(copy.escalated)).toBeVisible({ timeout: 20_000 });
+
+  suspendedHere.add(reference);
+
+  await page.reload();
+
+  /*
+    ── Waive: closes the LAST flag, so this is the write that empties the row ──
+
+    No reload before the assertion, on purpose. The message is client state and a reload would clear
+    it whether or not the bug is present — the whole question is what the screen says in the moment
+    after the write, which is precisely the moment `router.refresh()` used to take it away.
+  */
+  await target.getByRole('button', { name: copy.waive }).first().click();
+  await target
+    .getByLabel(copy.waiveReasonLabel)
+    .fill('أُلغيت بعد مراجعة الحالة مع الشريك');
+  await target.getByRole('button', { name: copy.waive }).last().click();
+
+  await expect(page.getByText(copy.waived)).toBeVisible({ timeout: 20_000 });
+
+  /* And the row really is exhausted — without this the assertion above could pass having never met the guard. */
+  for (const label of [copy.warn, copy.fine, copy.waive, copy.escalate]) {
+    await expect(target.getByRole('button', { name: label })).toHaveCount(0);
+  }
+
+  /* The state itself, kept: a confirmation standing alone where every control has gone. */
+  await page.screenshot({ path: `${dir}/enf-4-waived-exhausted.png`, fullPage: false });
+
+  /* ── Lift it, so the fixture partner is left trading ─────────────────── */
+  await page.goto(`/partners/${reference}`);
+  await page.getByLabel(copy.unsuspendReasonLabel).fill(LIFT);
+  await page.getByRole('button', { name: copy.unsuspend }).click();
+  await expect(page.getByText(copy.unsuspended)).toBeVisible({ timeout: 20_000 });
+  await page.reload();
+  await expect(page.locator('[data-partner-suspended]')).toHaveCount(0);
+});

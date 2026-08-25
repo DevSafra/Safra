@@ -127,16 +127,35 @@ export function ViolationActions({
   */
   const escalatable = canSuspend && !partnerSuspended && violation.stage !== 'suspension';
 
-  if (!canWarn && !canFine && !waivable && !escalatable) return null;
+  /*
+    Nothing left to offer on this row — which is a state a SUCCESSFUL action produces.
+
+    This guard used to own the notices as well, and the write that succeeded was what tripped it: a
+    waive sets `violation.waiver`, so `waivable` goes false on the `router.refresh()` that `submit`
+    fires immediately after `setDone`. On a row already warned, already fined, belonging to a partner
+    already suspended, all four flags then read false and the whole component — confirmation included
+    — was unmounted in the same tick the confirmation was written. The operator saw the controls
+    vanish and nothing else, on the one action that gives a partner their money back.
+
+    It read as a flaky test because it is DATA-dependent, not timing-dependent: a waive on a row that
+    can still be escalated keeps a control alive and the message showed. So the controls may go, and
+    the notice stays until the reader navigates.
+  */
+  const idle = !canWarn && !canFine && !waivable && !escalatable;
+
+  if (idle) {
+    if (!error && !done) return null;
+
+    return (
+      <div className="mt-2 grid gap-2">
+        <Notices error={error} done={done} />
+      </div>
+    );
+  }
 
   return (
     <div className="mt-2 grid gap-2">
-      {error ? (
-        <p role="alert" className="text-[11.5px] text-bad">
-          {error}
-        </p>
-      ) : null}
-      {done ? <p className="text-[11.5px] text-ok">{done}</p> : null}
+      <Notices error={error} done={done} />
 
       <div className="flex flex-wrap gap-2">
         {canWarn ? (
@@ -368,6 +387,26 @@ export function ViolationActions({
         </form>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * What this component has to say, extracted because it is now rendered from two places.
+ *
+ * Two places rather than one is the whole point of the fix above: the notices outlive the controls.
+ * Written once so the pair cannot drift — an `error` that survived and a `done` that did not would
+ * be the same defect again, wearing the other half's clothes.
+ */
+function Notices({ error, done }: { error: string | null; done: string | null }) {
+  return (
+    <>
+      {error ? (
+        <p role="alert" className="text-[11.5px] text-bad">
+          {error}
+        </p>
+      ) : null}
+      {done ? <p className="text-[11.5px] text-ok">{done}</p> : null}
+    </>
   );
 }
 

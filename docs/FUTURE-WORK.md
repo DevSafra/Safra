@@ -4261,7 +4261,8 @@ the portal link, each addressed to `users.email`.
 
 ### O-staff-6 — An enforcement action's confirmation is unmounted by the refresh that succeeds
 
-**Status:** open · **Severity:** Medium · **Owner:** engineering · **Recorded:** 2026-08-25
+**Status:** **FIXED 2026-08-25** — the notices outlive the controls, held by a spec watched to fail
+first · **Severity:** Medium · **Owner:** engineering · **Recorded:** 2026-08-25
 
 Found while verifying an unrelated copy change on مخالفات. `ViolationActions` holds its success
 message in its own state and renders it INSIDE the guard that decides whether the component exists
@@ -4306,6 +4307,31 @@ unchanged so it is much harder to hit.
 in a browser; before the fix the confirmation is absent, after it the confirmation stands with no
 controls beside it. The existing spec covers the happy path only by accident, so give it a row that
 is deliberately exhausted rather than whichever row the fixture happens to offer.
+
+**What was done, 2026-08-25.** The guard no longer owns the notices. `idle` names the
+nothing-left-to-offer condition, and the component returns `null` only when it is idle AND has
+nothing to say; when it has something to say it renders the notice with no controls beside it. Both
+notices moved into one `Notices` helper, rendered from both branches — written once so the pair
+cannot drift, which is the shape of half this register's entries.
+
+`error` is fixed by the same change and is NOT separately tested, deliberately: a failed write leaves
+every flag as it was, so `idle` was false when the control was pressed and stays false. Reaching
+idle-and-erroring needs the row to change underneath the reader between the click and the response.
+It is covered by construction rather than by an assertion, and saying so is better than a test that
+cannot reach the state it claims to protect.
+
+**Held by `e2e/enforcement.spec.ts` › «a waive that exhausts the row still confirms itself».** It
+builds the state instead of hoping for it — raise, warn, fine, escalate, then waive, which is the
+order that turns all four flags false — and asserts the confirmation IS on screen together with
+`toHaveCount(0)` for all four controls. The second assertion is what makes the first one mean
+anything: without it a future change that left one rung alive would keep the test green while never
+entering the state the message has to survive.
+
+**Watched to fail.** Reverted the component to `HEAD`, confirmed the file really changed back
+(`grep -c 'function Notices'` → 0), rebuilt, re-copied the standalone static tree and restarted the
+console, and the new test failed on exactly its own line — `enforcement.spec.ts:531`, «element(s) not
+found» for «أُلغيت الغرامة وأُبلغ الشريك.». Restored, rebuilt, restarted: 4 passed. The first test
+in the file, the one that had been failing one run in four, passes with it.
 
 ---
 
