@@ -487,3 +487,62 @@ test('compensating a customer credits their wallet in one of the three currencie
 
   await expect(page.getByText(copy.compensated)).toBeVisible({ timeout: 20_000 });
 });
+
+/**
+ * EC-011's alert, and the one thing that makes an alert worth having.
+ *
+ * The dashboard says a number and links somewhere. If the row's count and the destination's total
+ * disagree, the operator meets one figure on the dashboard and another on the registry — and stops
+ * believing both. `booking-attention.integration.test.ts` holds the two predicates equal in the
+ * database; this holds them equal ON SCREEN, which is where the disagreement would be read.
+ *
+ * Skips when the count is zero, because there is then no row to follow — and a zero is a legitimate
+ * state, not a broken fixture.
+ */
+test('the arrivals alert links to a list of exactly that many bookings', async ({
+  page,
+}) => {
+  await page.goto('/');
+
+  const row = page.locator('a[href="/bookings?attention=no_check_in"]').first();
+
+  test.skip(
+    (await row.count()) === 0,
+    'No stay is missing a check-in — nothing to follow.',
+  );
+
+  /*
+    The element carrying the SENTENCE, not an ancestor that happens to contain it.
+
+    A `li, div` filter matched the whole panel first, and the leading number it returned was the
+    rows-per-page select's «25» — a figure with no relationship to the alert. `getByText` on the
+    phrase lands on the element the count is prefixed to.
+  */
+  const alert = await page
+    .getByText(t.admin.attentionArrivals, { exact: false })
+    .first()
+    .innerText();
+
+  const claimed = /[\d,]+/.exec(alert)?.[0];
+
+  expect(claimed, 'the alert states a number').toBeTruthy();
+
+  await row.click();
+  await page.waitForURL(/attention=no_check_in/);
+
+  /* The pager's total is the FILTERED one — the toolbar's note counts the whole registry. */
+  const total = /[\d,]+/.exec(
+    (await page.locator('main').innerText())
+      .split('\n')
+      .find((line) => /نتيجة|نتائج/.test(line)) ?? '',
+  )?.[0];
+
+  expect(total, 'the dashboard number is the number of rows behind the link').toBe(
+    claimed,
+  );
+
+  /* And every one of them really is a confirmed stay — a filter that matched everything would pass the count. */
+  const statuses = [...new Set(await page.locator('[data-status-pill]').allInnerTexts())];
+
+  expect(statuses).toEqual([t.bookingStatus['confirmed'] ?? '']);
+});
