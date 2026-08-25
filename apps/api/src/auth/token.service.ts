@@ -178,8 +178,18 @@ export class TokenService {
     /*
       Retire the oldest sessions past the cap — but only when this IS a new one.
 
-      A rotation carries its family forward, so counting it would retire a session every fifteen
-      minutes for anybody signed in.
+      **DEFENSIVE, not load-bearing, and the difference was measured (2026-08-25.)** The comment here
+      used to claim that counting a rotation "would retire a session every fifteen minutes for
+      anybody signed in". It would not: `retireOldestSessions` offsets over FAMILIES, and a rotation
+      adds a row to an existing family rather than a family, so there is never anything past the cap
+      for it to find. Removing this guard leaves every assertion in
+      `session-cap.integration.test.ts` green — verified by mutation, after that suite was made
+      capable of seeing the ordering at all.
+
+      It stays because it says what is meant and because it saves an `UPDATE` on every refresh of
+      every session, which at scale is one statement per active session per fifteen minutes. But the
+      reason is cost and clarity, not correctness, and a comment that overstates a guard is how the
+      next person concludes there is a test proving something there is not.
     */
     if (isNewSession) await this.retireOldestSessions(claims.sub);
 
