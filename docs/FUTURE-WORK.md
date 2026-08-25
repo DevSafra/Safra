@@ -27,7 +27,12 @@ neither, so five existing cases were invisible to the search. **A grep for a sym
 for a behaviour.** Mutation testing then found the real gap: four of those five could not fail,
 because every `created_at` ties inside one rollback transaction, so no assertion about WHICH session
 was retired could bite. Retiring the NEWEST session — signing somebody out as they sign in — was
-green. `pnpm verify` 2,946 (nothing skipped) · `pnpm e2e` 280.
+green.
+
+**`O-api-2` closed the same day, and with it the last of the three.** Five refusals answered a
+hand-written English sentence; two of the seven on the list needed nothing (one already fixed and
+never struck off, one a decided exception). Two tests had to stop matching prose in order for the
+prose to go. `pnpm verify` 2,949 (nothing skipped) · `pnpm e2e` 280.
 
 **Previously, 2026-08-20 — the console audit, and the locally-honest half of blocker #10.**
 Bashar asked for every page of the super admin console to be walked and made production-ready. Ten
@@ -161,15 +166,15 @@ launch; `O-sec-7` should not wait for one either.
 
 **Classification of today's items:**
 
-| Item       | Classification                                                |
-| ---------- | ------------------------------------------------------------- |
-| `O-sec-3`  | **Completed** — approved, built, ceiling set to 300           |
-| `O-api-1`  | **Completed** — approved, built                               |
-| `O-page-1` | **Completed** — ceiling set to 1,000                          |
-| `O-sec-5`  | **External dependency** — needs an edge, so it needs `M-1`    |
-| `O-api-2`  | **Engineering work remains**, unblocked                       |
-| `O-sec-7`  | **Closed 2026-08-25** — four columns, not one; see the entry  |
-| `O-sec-6`  | **Closed 2026-08-20**, recorded as open here until 2026-08-25 |
+| Item       | Classification                                                      |
+| ---------- | ------------------------------------------------------------------- |
+| `O-sec-3`  | **Completed** — approved, built, ceiling set to 300                 |
+| `O-api-1`  | **Completed** — approved, built                                     |
+| `O-page-1` | **Completed** — ceiling set to 1,000                                |
+| `O-sec-5`  | **External dependency** — needs an edge, so it needs `M-1`          |
+| `O-api-2`  | **Closed 2026-08-25** — five codes; two of the seven needed nothing |
+| `O-sec-7`  | **Closed 2026-08-25** — four columns, not one; see the entry        |
+| `O-sec-6`  | **Closed 2026-08-20**, recorded as open here until 2026-08-25       |
 
 | #   | Blocker                                            | Owner               | Gated by 1 |
 | --- | -------------------------------------------------- | ------------------- | ---------- |
@@ -2723,10 +2728,45 @@ bodies this filter has no mandate to change. Those are recorded separately as `O
 **Held by 17 tests** in `app-exception.filter.test.ts`, including that the body leaks no SQL and no
 address, that `Retry-After` is spread, and that the excluded conditions stay 500.
 
-### O-api-2 — Seven refusals still answer an English sentence with no code
+### O-api-2 — RESOLVED: every refusal answers a code
 
-**Status:** open · **Severity:** Low–Medium · **Owner:** engineering · **Recorded:** 2026-08-20 ·
+**Status:** **RESOLVED 2026-08-25** — five codes, fifteen translations, and a sweep that holds the
+class at zero · **Severity:** was Low–Medium · **Owner:** closed · **Recorded:** 2026-08-20 ·
 **Amended:** 2026-08-20 (still seven, different seven)
+
+**The seven turned out to be five**, and finding that out first is why this was an hour rather than a
+day. Two of the listed items needed no work:
+
+- **`staff.service.ts` was already done.** It throws `badRequest(ERROR.STAFF_LAST_SUPER_ADMIN)`, and
+  the comment beside it records the change — "It also used to throw an English SENTENCE, which the
+  project's own rule forbids". Fixed on 2026-08-23 and never struck from this list.
+- **`metrics.controller.ts` ×2 is a DECIDED exception, not an omission.** Both are
+  `new NotFoundException()` with no argument: the 404 is deliberate camouflage, identical whether the
+  bearer token is absent or wrong, so a prober cannot learn the endpoint exists. There is no sentence
+  to translate — the body is Nest's own `{"message":"Not Found"}` — and giving it a code would tell
+  the prober precisely what withholding one denies them. A Prometheus scraper reads status codes.
+
+**The five, and what each answers now:**
+
+| Was                                                                                     | Now                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `wallet.service.ts` — «Wallet balance is X USD, which is less than the Y USD requested» | `wallet.balance_below_amount`, with `balance`, `currency` and `requested` in `params`. **The only one a paying customer meets.** The figures stay — "insufficient balance" with no numbers opens a support ticket instead of closing one — but as VALUES, so a translator puts them where their grammar wants them. Distinct from `wallet.insufficient_balance`, which the gift-card paths raise without figures                                        |
+| `two-factor.guard.ts` — «…Enrol at /auth/2fa/setup before using this endpoint»          | `auth.two_factor_enrolment_required`. Reached by **every unenrolled staff member and partner**. The remedy is still named; the PATH is deliberately dropped — that is this API's route, and the console and portal each enrol at their own URL, so naming ours sent people somewhere they do not enrol                                                                                                                                                  |
+| `settings-admin.service.ts` ×2                                                          | `setting.value_not_positive_money` and `setting.schema_not_editable`, with the key and the schema name as `params`                                                                                                                                                                                                                                                                                                                                      |
+| `sanctions.service.ts` — two sentences, for `missing` and for `stale`                   | `sanctions.list_unavailable`, **one code for both**, as the plan required. The two sentences told any caller who could reach the endpoint whether SAFRA has ever imported a list and how old it is — the platform's compliance posture in a readable body. Staff keep the distinction where it belongs, in `GET /admin/sanctions/status`, which is what the console's `ScreeningPanel` renders; `reason` stays a property for the log and that endpoint |
+
+**Two tests had to be re-pointed, and that is the finding worth keeping.** Six assertions matched the
+English prose — `toThrow(/no sanctions list/i)`, `toThrow(/cannot validate/i)`. **A test pinned to a
+message asserts the wording rather than the behaviour, and it is what makes the wording hard to
+remove.** They now assert the code, and the sanctions ones assert `reason` too, so the
+missing-versus-stale distinction they were really checking is still checked.
+
+**The class is held at zero.** `no-english-refusals.test.ts` sweeps every production file in the API
+for a NestJS exception constructed with a string or template literal. There were no survivors, so it
+asserts an empty array rather than carrying an allow-list — an allow-list here would be a place to
+add the eighth. `safra/no-hardcoded-text` could never see these: the prose is an argument to a
+constructor rather than JSX, which is how seven of them passed every `pnpm lint` since that rule
+shipped.
 
 Found while scoping `O-api-1`'s filter and deliberately NOT fixed there — the filter's mandate was
 the errors that were not `HttpException`s, and quietly re-shaping these would have changed response

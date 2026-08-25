@@ -32,15 +32,15 @@ accepted partner was stranded and every partner on the platform had come from th
 exists now and the journey was walked end to end in a browser. See `O-partner-8`, and `O-sec-9` for
 the second factor that changed with it.
 
-**One unblocked engineering item remains**, plus two closed ones and one test that is owed. All
-were opened on 2026-08-20, none was planned scope, and every one came out of a security pass rather
-than a test:
+**No unblocked engineering item remains** on this list — all three are closed, the last on
+2026-08-25. They stay recorded rather than folded away because every one came out of a security pass
+rather than a test, which is the point the line beneath the table makes:
 
 | Item      | What                                                                                | Severity     |
 | --------- | ----------------------------------------------------------------------------------- | ------------ |
 | `O-sec-7` | **Closed 2026-08-25** — one shared describer, every call site, FOUR columns not one | was **High** |
 | `O-sec-6` | **Closed 2026-08-20** — swept nightly, ten sessions per account, both tested        | Low          |
-| `O-api-2` | Seven refusals answer an English sentence with no error code                        | Low–Medium   |
+| `O-api-2` | **Closed 2026-08-25** — five codes; two of the seven needed nothing at all          | was Low–Med  |
 
 None of them blocks a launch and none needs anything external. They are listed here rather than
 folded away because this line read "No unblocked engineering item remains" until they were found,
