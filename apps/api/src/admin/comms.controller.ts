@@ -14,7 +14,13 @@ import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 
-import { ERROR, PERMISSIONS as P, pageQuerySchema } from '@safra/contracts';
+import {
+  ERROR,
+  PERMISSIONS as P,
+  pageQuerySchema,
+  staffDisputeOpenSchema,
+  type StaffDisputeOpenInput,
+} from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { notFound } from '../common/errors/app-error.js';
@@ -138,6 +144,28 @@ export class CommsController {
     @Body(new ZodValidationPipe(closeDisputeSchema)) body: CloseDisputeInput,
   ) {
     return this.disputes.close(user, reference, body);
+  }
+
+  /**
+   * Staff open a dispute on a booking — §9.4's «فتح نزاع», from the booking screen.
+   *
+   * `DISPUTE_MANAGE`, the same capability closing takes: recording a complaint and deciding one
+   * are both the dispute desk's work, and a role that may close but not open would be unable to
+   * take the telephone call that starts the case.
+   *
+   * Throttled harder than closing, and for the reason the customer's own route is: a dispute
+   * FREEZES the partner's payout for that booking, so a loop here does not merely fill a queue —
+   * it stops somebody being paid.
+   */
+  @Post('disputes')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @RequirePermissions(P.DISPUTE_MANAGE)
+  @AuditExempt('DisputeService records dispute.opened_by_staff inside the transaction.')
+  async openDispute(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(staffDisputeOpenSchema)) body: StaffDisputeOpenInput,
+  ) {
+    return this.disputes.openForBooking(user, body);
   }
 
   // ── الرسائل ────────────────────────────────────────────────────────────────

@@ -39,6 +39,15 @@ export const disputeKindSchema = z.enum([
 export type DisputeKind = z.infer<typeof disputeKindSchema>;
 
 /**
+ * The same four as a LIST, for a form to render.
+ *
+ * Derived from the schema rather than written again, so a fifth kind appears in the console's
+ * select by adding it in one place. `VIOLATION_KINDS` exists for the same reason and learnt it the
+ * same way — a hand-written copy is a list that silently stops matching the enum.
+ */
+export const DISPUTE_KINDS = disputeKindSchema.options;
+
+/**
  * Opening a dispute.
  *
  * The booking is named by REFERENCE, not by id. A reference is what a customer has in front of them
@@ -67,6 +76,33 @@ export const disputeOpenSchema = z
   .strict();
 
 export type DisputeOpenInput = z.infer<typeof disputeOpenSchema>;
+
+/**
+ * A dispute a STAFF member records, from the booking screen (§9.4).
+ *
+ * Deliberately the same shape as the customer's, and it is worth saying why rather than aliasing
+ * it: the two are validated identically because the RESULT is the same record — a complaint of a
+ * kind, with a line and an account of what happened. What differs is who is trusted for what.
+ * The customer's route scopes the booking to their own profile; this one takes the customer FROM
+ * the booking, and records the staff member in `opened_by_user_id`.
+ *
+ * Written out rather than re-exported so that a future divergence — a staff-only field, a
+ * different floor on the description — is a change to one schema instead of a fork of both.
+ */
+export const staffDisputeOpenSchema = z
+  .object({
+    bookingReference: z.string().trim().min(6).max(40),
+    kind: disputeKindSchema,
+    title: z.string().trim().min(4, ERROR.SUPPORT_MESSAGE_TOO_SHORT).max(120),
+    description: z
+      .string()
+      .trim()
+      .min(20, ERROR.SUPPORT_MESSAGE_TOO_SHORT)
+      .max(4000, ERROR.VALIDATION_TOO_LONG),
+  })
+  .strict();
+
+export type StaffDisputeOpenInput = z.infer<typeof staffDisputeOpenSchema>;
 
 /** The caller's own disputes. Cursor-based, like every other customer-facing list. */
 export const disputeQuerySchema = cursorQuerySchema;

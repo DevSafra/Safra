@@ -1,0 +1,278 @@
+import { sql } from 'drizzle-orm';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { createRollbackDatabase, type Database } from '@safra/db';
+
+import { AuditService } from '../common/audit/audit.service.js';
+import { DisputeService } from './dispute.service.js';
+import type { AccessTokenClaims } from '../auth/token.service.js';
+
+/**
+ * A dispute opened from the booking screen, and the four consequences that follow it.
+ *
+ * ## What this is really protecting
+ *
+ * Bashar asked for the booking's status to follow reality (2026-08-25), and moving a booking into
+ * `disputed` has one implication that is far larger than the label: **`disputed` was not in
+ * `BLOCKING_STATUSES`**. A live booking leaving `confirmed` or `checked_in` for a status outside
+ * the exclusion constraint would have released its nights for sale — while the guest disputing the
+ * room was still standing in it. EC-006 and EC-007 are raised ON ARRIVAL, so that is the ordinary
+ * case, not the edge one.
+ *
+ * So the assertion that matters most here is not "the status moved". It is «the dates are still
+ * held», asked of the database rather than of a list in TypeScript: a second booking for the same
+ * unit and the same nights must still be refused.
+ *
+ * ## And the way back
+ *
+ * §6.2 defines `Disputed` as a booking that HAS an open dispute. Closing the last one makes that
+ * untrue, so the overlay has to lift — and if it did not, the booking would sit outside
+ * `PayoutService`'s `status = 'completed'` predicate for ever, silently, and the partner would
+ * never be paid for a stay that was resolved in their favour.
+ */
+const DATABASE_URL = process.env['DATABASE_URL'];
+const describeIfDb = DATABASE_URL ? describe : describe.skip;
+
+const STAFF = (sub: string): AccessTokenClaims =>
+  ({
+    sub,
+    role: 'operations_manager',
+    permissions: ['dispute.manage'],
+  }) as unknown as AccessTokenClaims;
+
+describeIfDb('a dispute opened on a booking', () => {
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  const db: Database = harness.db;
+  const disputes = new DisputeService(db, new AuditService(db));
+
+  let reference = '';
+  let staffId = '';
+  let checkIn = '';
+  let checkOut = '';
+
+  beforeEach(async () => {
+    await harness.begin();
+    await seed();
+  });
+
+  afterEach(() => harness.rollback());
+  afterAll(() => harness.close());
+
+  const statusOf = async (ref: string): Promise<string> => {
+    const rows = await db.execute<{ status: string }>(sql`
+      SELECT status::text AS status FROM bookings WHERE reference = ${ref}
+    `);
+
+    return rows.rows[0]?.status ?? '';
+  };
+
+  const open = (kind = 'not_as_described') =>
+    disputes.openForBooking(STAFF(staffId), {
+      bookingReference: reference,
+      kind,
+      title: 'الغرفة لا تطابق الوصف',
+      description: 'أفاد العميل بأن الغرفة أصغر بكثير مما ظهر في الصور المنشورة.',
+    });
+
+  it('moves the booking to disputed', async () => {
+    await open();
+
+    expect(await statusOf(reference)).toBe('disputed');
+  });
+
+  /**
+   * The consequence that decided the design, asked of the DATABASE.
+   *
+   * Watched to fail: with `disputed` left out of the exclusion constraint's predicate, this insert
+   * succeeds — and that is a second customer sold the nights somebody is currently disputing from
+   * inside the room.
+   */
+  it('still holds the unit for those nights', async () => {
+    await open();
+
+    const overlapping = db.execute(sql`
+      INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                            check_in, check_out, guests_adults, status,
+                            base_amount, customer_fee_value, customer_fee_amount,
+                            partner_commission_rate, partner_commission_amount,
+                            total_amount, partner_payable_amount, currency_id,
+                            fx_rate_to_syp, total_syp, cancellation_policy_snapshot)
+      SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+             ${checkIn}::date, ${checkOut}::date, 2, 'pending_payment'::booking_status,
+             '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+             b.currency_id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
+      FROM bookings b WHERE b.reference = ${reference}
+    `);
+
+    await expect(
+      overlapping,
+      'the nights must still be held while the stay is disputed',
+    ).rejects.toThrow();
+  });
+
+  /** The control on the test above: the same insert on FREE nights succeeds. */
+  it('holds only its own nights', async () => {
+    await open();
+
+    await expect(
+      db.execute(sql`
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot)
+        SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+               ${checkOut}::date + 30, ${checkOut}::date + 33, 2,
+               'pending_payment'::booking_status,
+               '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+               b.currency_id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
+        FROM bookings b WHERE b.reference = ${reference}
+      `),
+    ).resolves.toBeDefined();
+  });
+
+  it('records who opened it, and that staff did', async () => {
+    const view = await open();
+
+    const rows = await db.execute<{ opened_by: string | null }>(sql`
+      SELECT opened_by_user_id AS opened_by FROM disputes WHERE reference = ${view.reference}
+    `);
+
+    expect(
+      rows.rows[0]?.opened_by,
+      'the column exists to say a STAFF member raised it',
+    ).toBe(staffId);
+  });
+
+  /** Closing the last one lifts the overlay and puts the booking back where it was. */
+  it('returns the booking to where it was when the dispute closes', async () => {
+    const view = await open();
+
+    expect(await statusOf(reference)).toBe('disputed');
+
+    await disputes.close(STAFF(staffId), view.reference, {
+      outcome: 'rejected',
+      resolution: 'روجعت الصور ووُجدت مطابقة للوحدة المحجوزة.',
+    });
+
+    expect(
+      await statusOf(reference),
+      'the booking was checked in when the dispute opened',
+    ).toBe('checked_in');
+  });
+
+  /**
+   * And NOT while another is still open.
+   *
+   * A booking may carry two disputes of different kinds. Lifting the overlay on the first closure
+   * would put it back in the payout accrual with a live complaint against it — and relying on the
+   * accrual's own `NOT EXISTS` clause to catch that is relying on the second guard to cover the
+   * first one being wrong.
+   */
+  it('stays disputed while a second dispute is still open', async () => {
+    const first = await open('not_as_described');
+
+    await open('complaint');
+
+    await disputes.close(STAFF(staffId), first.reference, {
+      outcome: 'resolved',
+      resolution: 'عولجت الشكوى الأولى وبقيت الثانية قيد المراجعة.',
+    });
+
+    expect(await statusOf(reference)).toBe('disputed');
+  });
+
+  it('refuses a second dispute of the same kind while the first is open', async () => {
+    await open('not_as_described');
+
+    await expect(open('not_as_described')).rejects.toThrow();
+  });
+
+  it('refuses a dispute on a booking nothing has been paid for', async () => {
+    await db.execute(sql`
+      UPDATE bookings SET status = 'pending_payment', paid_at = NULL
+      WHERE reference = ${reference}
+    `);
+
+    await expect(open()).rejects.toThrow();
+  });
+
+  /** One paid, checked-in booking — the state EC-007 is raised from. */
+  async function seed(): Promise<void> {
+    const made = await db.execute<{
+      reference: string;
+      staff: string;
+      check_in: string;
+      check_out: string;
+    }>(sql`
+      WITH ref AS (
+        SELECT (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1) AS city_id,
+               (SELECT id FROM currencies WHERE code = 'USD')           AS currency_id,
+               (SELECT id FROM property_types LIMIT 1)                  AS type_id,
+               (SELECT id FROM partner_types LIMIT 1)                   AS partner_type_id,
+               (SELECT id FROM cancellation_policies LIMIT 1)           AS policy_id
+      ), st AS (
+        INSERT INTO users (full_name, email, phone, role, status)
+        VALUES ('مدير العمليات', 'dsp-s-' || gen_random_uuid() || '@safra.test',
+                '+963900000081', 'operations_manager', 'active')
+        RETURNING id
+      ), cu AS (
+        INSERT INTO users (email, phone, role, status)
+        VALUES ('dsp-c-' || gen_random_uuid() || '@safra.test', '+963900000082', 'customer', 'active')
+        RETURNING id
+      ), pu AS (
+        INSERT INTO users (email, phone, role, status)
+        VALUES ('dsp-p-' || gen_random_uuid() || '@safra.test', '+963900000083', 'partner', 'active')
+        RETURNING id
+      ), cp AS (
+        INSERT INTO customer_profiles (user_id, full_name, email, phone, is_guest)
+        SELECT cu.id, 'نزيل النزاع', 'dsp-c-' || gen_random_uuid() || '@safra.test',
+               '+963900000082', false
+        FROM cu RETURNING id
+      ), pa AS (
+        INSERT INTO partners (user_id, partner_type_id, legal_name, display_name, city_id,
+                              address, phone, email, verification)
+        SELECT pu.id, ref.partner_type_id, 'Dispute Test', 'نزاع', ref.city_id, 'x',
+               '+963900000083', 'dsp-p-' || gen_random_uuid() || '@safra.test', 'approved'
+        FROM pu, ref RETURNING id, city_id
+      ), pr AS (
+        INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
+                                slug, name_ar, name_en, name_de, address, status)
+        SELECT pa.id, ref.city_id, ref.type_id, ref.policy_id,
+               'dispute-test-' || gen_random_uuid(), 'عقار النزاع', 'Dispute', 'Dispute', 'x',
+               'published'
+        FROM pa, ref RETURNING id, partner_id
+      ), un AS (
+        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price, currency_id)
+        SELECT pr.id, 'وحدة', 'Unit', 'Einheit', 2, '100.00', ref.currency_id FROM pr, ref
+        RETURNING id
+      ), bk AS (
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status, paid_at, checked_in_at,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot)
+        SELECT cp.id, un.id, pr.id, pr.partner_id, ref.city_id,
+               current_date + 500, current_date + 503, 2, 'checked_in'::booking_status,
+               now(), now(),
+               '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+               ref.currency_id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
+        FROM cp, un, pr, ref
+        RETURNING reference, unit_id, check_in::text AS check_in, check_out::text AS check_out
+      )
+      SELECT bk.reference, st.id AS staff, bk.check_in, bk.check_out
+      FROM bk, st
+    `);
+
+    const row = made.rows[0];
+
+    if (!row) throw new Error('Seed produced no row.');
+
+    reference = row.reference;
+    staffId = row.staff;
+    checkIn = row.check_in;
+    checkOut = row.check_out;
+  }
+});

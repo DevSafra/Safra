@@ -9,7 +9,9 @@ import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
-import { conflict, notFound } from '../common/errors/app-error.js';
+import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
+import { canTransition, type BookingStatus } from '../bookings/booking-state.js';
+import { redactIncomingMessage } from '../messaging/redaction.js';
 
 export const closeDisputeSchema = z
   .object({
@@ -95,12 +97,16 @@ const UNRESOLVED = sql`('open', 'investigating')`;
  * disputes disagree, and money moves on the strength of the stale one. Deriving it costs an
  * indexed lookup and cannot be wrong.
  *
- * ## Closing is the only write
+ * ## Staff open disputes too, since 2026-08-25
  *
- * Opening a dispute happens where the failure happens — a customer raising it in the app, or the
- * SLA job detecting EC-008 — not from the console. What staff do here is investigate and close,
- * and closing is the consequential action: it releases the partner's payout and may credit the
- * customer's wallet.
+ * This said "closing is the only write", on the reasoning that a dispute is raised where the
+ * failure happens — a customer in the app, or the SLA job detecting EC-008. §9.4 disagrees and
+ * always did: «فتح نزاع أو استرداد أو تعويض» is on its list of what the booking screen must do,
+ * and the common case is a customer who telephones rather than opens the app. `openForBooking` is
+ * that route.
+ *
+ * Closing remains the consequential action — it releases the partner's payout and may credit the
+ * customer's wallet — and it now also lifts the `disputed` overlay from the booking.
  */
 @Injectable()
 export class DisputeService {
@@ -415,6 +421,17 @@ export class DisputeService {
         },
         tx as unknown as Database,
       );
+
+      /*
+        The overlay lifts, IN THE SAME TRANSACTION as the closure.
+
+        §6.2 defines `Disputed` as «يوجد نزاع مفتوح على الحجز» — a booking that HAS an open
+        dispute. Closing the last one makes that untrue, so the booking must stop saying it. A
+        separate write would give two failure modes, and one of them is permanent: a dispute closed
+        with the booking left `disputed` is a booking that no payout accrual will ever pick up,
+        silently, for ever.
+      */
+      await this.restoreBookingStatus(tx as unknown as Database, dispute.id, actor);
     });
 
     /*
@@ -428,6 +445,233 @@ export class DisputeService {
     if (!view) throw notFound(ERROR.DISPUTE_NOT_FOUND);
 
     return view;
+  }
+
+  /**
+   * Staff open a dispute on a booking, from §9.4's own list of what that screen must do.
+   *
+   * ## Not the customer's route with a different guard
+   *
+   * `DisputeRequestService.open` scopes the booking to the CALLER's profile — a customer disputing
+   * their own stay. Staff have no profile and are not the aggrieved party: they are recording a
+   * complaint somebody made by telephone. So the booking is found by reference alone, the
+   * customer is taken FROM the booking, and `opened_by_user_id` carries the staff member — which
+   * is the column's stated meaning, and the only thing that later distinguishes a complaint SAFRA
+   * recorded from one the customer filed themselves.
+   *
+   * ## It moves the booking, and that is the point
+   *
+   * §6.2 lists `Disputed` with «سفرة» in the "who changes it" column, and it has never had a
+   * writer. Bashar's instruction (2026-08-25): the lifecycle shown on the booking must match
+   * reality. So the dispute row and the status move are one transaction — a dispute that exists
+   * against a booking still claiming to be `confirmed` is precisely the mismatch this closes.
+   *
+   * A booking whose state does not permit the move gets the dispute anyway. `pending_payment` and
+   * `pending_confirmation` are not disputable states in §6.2 and the guard below refuses them
+   * outright; `cancelled` is not either. What remains is the case where the move is refused for a
+   * reason the table knows and this method does not — and refusing to RECORD a complaint because
+   * of a state machine would be the wrong way round.
+   */
+  async openForBooking(
+    actor: AccessTokenClaims | undefined,
+    input: {
+      bookingReference: string;
+      kind: string;
+      title: string;
+      description: string;
+    },
+  ): Promise<DisputeRow> {
+    const found = await this.db.execute<{
+      id: string;
+      partner_id: string;
+      customer_profile_id: string;
+      status: BookingStatus;
+      city_id: string | null;
+      paid: boolean;
+    }>(sql`
+      SELECT b.id, b.partner_id, b.customer_profile_id, b.status::text AS status, b.city_id,
+             (b.paid_at IS NOT NULL) AS paid
+      FROM bookings b
+      WHERE b.reference = ${input.bookingReference} AND b.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const booking = found.rows[0];
+
+    if (!booking) throw notFound(ERROR.BOOKING_NOT_FOUND);
+
+    /* Geographic scope on the WRITE path — a caller can name any reference; the list is not the gate. */
+    assertCanWrite(actor, booking.city_id);
+
+    /*
+      Nothing to dispute before money has moved, exactly as the customer's route decides it. A
+      booking still in its payment window has no stay, no charge and nothing to complain about —
+      and §6.2 gives `Disputed` no edge from either pending state.
+    */
+    /*
+      Already `disputed` counts as disputable, and missing that was a bug the test found.
+
+      The schema allows a booking two disputes of different kinds, and the second one arrives when
+      the booking is already carrying the first — at which point `canTransition('disputed',
+      'disputed', …)` is false, because a state never transitions to itself. Asking only the
+      transition therefore refused exactly the case the "one live dispute per KIND" rule exists to
+      permit. There is simply nothing to move.
+    */
+    const alreadyDisputed = booking.status === 'disputed';
+
+    if (
+      !booking.paid ||
+      !(alreadyDisputed || canTransition(booking.status, 'disputed', 'staff'))
+    ) {
+      throw badRequest(ERROR.DISPUTE_BOOKING_NOT_DISPUTABLE);
+    }
+
+    /* One live dispute per booking per KIND — the same rule the customer's route enforces. */
+    const existing = await this.db.execute<{ reference: string }>(sql`
+      SELECT reference FROM disputes
+      WHERE booking_id = ${booking.id}::uuid
+        AND kind = ${input.kind}::dispute_kind
+        AND status IN ${UNRESOLVED}
+      LIMIT 1
+    `);
+
+    if (existing.rows[0]) throw conflict(ERROR.DISPUTE_ALREADY_OPEN);
+
+    /* Both prose fields masked, as every stored message is. The originals are not kept. */
+    const title = redactIncomingMessage(input.title);
+    const description = redactIncomingMessage(input.description);
+
+    const reference = await this.db.transaction(async (tx) => {
+      const created = await tx.execute<{ id: string; reference: string }>(sql`
+        INSERT INTO disputes
+          (booking_id, partner_id, customer_profile_id, kind, status, title, description,
+           opened_by_user_id)
+        VALUES (${booking.id}::uuid, ${booking.partner_id}::uuid,
+                ${booking.customer_profile_id}::uuid, ${input.kind}::dispute_kind,
+                'open'::dispute_status, ${title.body}, ${description.body},
+                ${actor?.sub ?? null})
+        RETURNING id, reference
+      `);
+
+      const row = created.rows[0];
+
+      if (!row) throw notFound(ERROR.DISPUTE_NOT_FOUND);
+
+      /*
+        The status carries the FROM state in its predicate, so two staff opening disputes at once
+        cannot both move it — the second matches nothing and leaves the first's move standing. It
+        is not an error: the second dispute is legitimately recorded, and the booking is already
+        where it needs to be.
+      */
+      await tx.execute(sql`
+        UPDATE bookings SET status = 'disputed', updated_at = now()
+        WHERE id = ${booking.id}::uuid AND status = ${booking.status}::booking_status
+      `);
+
+      await tx.execute(sql`
+        INSERT INTO timeline_events (subject_type, subject_id, event_type, actor_type, actor_user_id, payload)
+        VALUES ('booking', ${booking.id}::uuid, 'booking.disputed', 'staff',
+                ${actor?.sub ?? null}, ${JSON.stringify({ dispute: row.reference, kind: input.kind })}::jsonb)
+      `);
+
+      await this.audit.record(
+        {
+          actorUserId: actor?.sub,
+          actorRole: actor?.role,
+          action: 'dispute.opened_by_staff',
+          subjectType: 'dispute',
+          subjectId: row.id,
+          before: { status: booking.status },
+          after: { status: 'disputed', kind: input.kind },
+        },
+        tx as unknown as Database,
+      );
+
+      return row.reference;
+    });
+
+    const reread = await this.list({ limit: 1, page: 1, q: reference });
+    const view = reread.items[0];
+
+    if (!view) throw notFound(ERROR.DISPUTE_NOT_FOUND);
+
+    return view;
+  }
+
+  /**
+   * Puts a booking back where it was once its last open dispute closes.
+   *
+   * ## Derived from the booking's own stamps, never remembered in a column
+   *
+   * `completed_at` → the stay finished; `checked_in_at` → the guest had arrived; otherwise
+   * `confirmed`. Those three columns already record where the booking got to, and they cannot
+   * drift from themselves. A `status_before_dispute` column would be a second thing to keep true,
+   * and the first time it disagreed nobody would know which one was the booking.
+   *
+   * ## Only when the LAST one closes
+   *
+   * A booking may carry more than one dispute — the schema says so and both open routes allow a
+   * second of a different kind. Lifting the overlay while another complaint is still open would
+   * put the booking back in the payout accrual with a live dispute against it. The accrual's own
+   * `NOT EXISTS` clause would still catch it, but relying on the second guard to cover the first
+   * one being wrong is how both end up wrong.
+   *
+   * ## A cancelled booking is left alone
+   *
+   * `cancelled` is terminal and `disputed → cancelled` is a decision somebody made deliberately.
+   * If the booking is not `disputed` when this runs there is nothing to lift, and saying so by
+   * matching on the status in the predicate is cheaper than asking first.
+   */
+  private async restoreBookingStatus(
+    tx: Database,
+    disputeId: string,
+    actor: AccessTokenClaims | undefined,
+  ): Promise<void> {
+    const rows = await tx.execute<{ id: string; restored: BookingStatus }>(sql`
+      UPDATE bookings b
+      SET status = CASE
+            WHEN b.completed_at  IS NOT NULL THEN 'completed'::booking_status
+            WHEN b.checked_in_at IS NOT NULL THEN 'checked_in'::booking_status
+            ELSE 'confirmed'::booking_status
+          END,
+          updated_at = now()
+      FROM disputes d
+      WHERE d.id = ${disputeId}::uuid
+        AND b.id = d.booking_id
+        AND b.status = 'disputed'
+        AND NOT EXISTS (
+          SELECT 1 FROM disputes other
+          WHERE other.booking_id = b.id
+            AND other.id <> d.id
+            AND other.status IN ${UNRESOLVED}
+            AND other.deleted_at IS NULL
+        )
+      RETURNING b.id, b.status::text AS restored
+    `);
+
+    const booking = rows.rows[0];
+
+    /* Nothing moved: another dispute is still open, or the booking was cancelled out of it. */
+    if (!booking) return;
+
+    await tx.execute(sql`
+      INSERT INTO timeline_events (subject_type, subject_id, event_type, actor_type, actor_user_id, payload)
+      VALUES ('booking', ${booking.id}::uuid, 'booking.dispute_closed', 'staff',
+              ${actor?.sub ?? null}, ${JSON.stringify({ status: booking.restored })}::jsonb)
+    `);
+
+    await this.audit.record(
+      {
+        actorUserId: actor?.sub,
+        actorRole: actor?.role,
+        action: 'booking.dispute_closed',
+        subjectType: 'booking',
+        subjectId: booking.id,
+        before: { status: 'disputed' },
+        after: { status: booking.restored },
+      },
+      tx,
+    );
   }
 }
 

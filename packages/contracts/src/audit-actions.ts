@@ -79,6 +79,8 @@ export const AUDIT_ACTIONS = [
   'booking.staff_confirmed',
   /** A stay ended — written by the hourly sweep as `system`, and by staff as the exception. */
   'booking.completed',
+  /** The `disputed` overlay lifting when a booking's last open dispute closed. */
+  'booking.dispute_closed',
   'payment.started',
   'payment.failed',
   'refund.created',
@@ -171,6 +173,14 @@ export const AUDIT_ACTIONS = [
   'review.report_dismissed',
   'dispute.resolved',
   'dispute.rejected',
+  /*
+    A complaint SAFRA recorded, as opposed to one the customer filed themselves.
+
+    Its own action rather than a shared `dispute.opened`, for the reason `partner.onboarded_in_person`
+    has one: «who raised this» is the first question asked of a dispute, and an action that fits both
+    a customer in the app and a staff member on the telephone answers it for neither.
+  */
+  'dispute.opened_by_staff',
 
   // ── Advertising ───────────────────────────────────────────────────────────
   'ad_campaign.paused',
