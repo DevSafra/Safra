@@ -1947,7 +1947,7 @@ export const ar = {
       coverSet: 'وصورة الغلاف محددة',
       coverMissing: 'ولم تُحدَّد صورة غلاف',
       unitLine:
-        'حتى {guests, plural, one {ضيف واحد} two {ضيفين} few {# ضيوف} many {# ضيفًا} other {# ضيف}} · {price} / الليلة · الحد الأدنى {minNights, plural, one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}}',
+        'حتى {guests, plural, one {ضيف واحد} two {ضيفين} few {# ضيوف} many {# ضيفًا} other {# ضيف}} · {price} {currency} / الليلة · الحد الأدنى {minNights, plural, one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}}',
       notAwaitingReview: 'حالة هذا العقار {status} وهو ليس بانتظار المراجعة.',
       reviewThePartner: 'راجع الشريك',
       noDescription: 'لا يوجد وصف.',
@@ -1955,6 +1955,11 @@ export const ar = {
         'لا صور مرفوعة. يتوقع البند §5.6 معرضاً، وعدد الصور يرفع ترتيب العقار — النشر بلا صور ممكن لكنه نادراً ما يكون صحيحاً.',
       /* The previews are shown now (2026-08-26); this marks which image leads the listing. */
       coverBadge: 'الغلاف',
+      /* The lightbox. Every control is named, because a glyph read aloud is not an instruction. */
+      openPhoto: 'عرض الصورة',
+      previousPhoto: 'الصورة السابقة',
+      nextPhoto: 'الصورة التالية',
+      closePhoto: 'إغلاق المعاينة',
       /* Said plainly — a truncated gallery that says nothing reads as the whole gallery. */
       morePhotos: 'و{n} صورة أخرى غير معروضة هنا.',
       noUnits: 'لا وحدات. عقار بلا وحدة لا يمكن حجزه ولا يجب نشره.',

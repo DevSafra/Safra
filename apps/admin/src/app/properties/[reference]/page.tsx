@@ -3,6 +3,8 @@ import { notFound } from 'next/navigation';
 
 import { mediaBase, mediaUrl } from '@safra/session';
 
+import { PhotoGallery } from '@/components/photo-gallery';
+
 import { getProperty } from '@/lib/api';
 import { ReviewProperty } from '@/components/review-property';
 import { BackLink, type BackTarget } from '@/components/back-link';
@@ -231,51 +233,24 @@ export default async function PropertyPage({
             {/*
               §8.1 — «سفرة تتحقق من العقارات قبل النشر عبر … الصور».
 
-              A reviewer approving a listing needs to SEE it. This printed a count and a note saying
-              previews were not built; the count is what a listing has, not what it looks like.
+              A reviewer approving a listing needs to SEE it, and needs to see ALL of it: this
+              printed a count, then briefly opened one photograph per tab, which on a listing with
+              twenty rooms is twenty round trips to reach one judgement. `PhotoGallery` pages
+              through them in place.
 
-              `mediaUrl` from `@safra/session`, the same helper the customer site renders through,
-              so the console cannot drift into asking for a variant that was never produced — the
-              pipeline does not upscale, and a guessed width is a guaranteed 404.
-
-              A plain `img`, not `next/image`: these are staff thumbnails behind a login, so the
-              optimiser would buy nothing and would need the media host in `remotePatterns`.
-              The cover is marked, because which image leads the listing is part of the review.
+              URLs are built HERE, server-side, with `mediaUrl` from `@safra/session` — the same
+              helper the customer site renders through, so the console cannot drift into asking for
+              a variant the pipeline never produced. The component receives finished strings and
+              knows nothing about media configuration.
             */}
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {property.images.slice(0, PHOTO_LIMIT).map((image) => (
-                <li key={image.fileKey} className="relative">
-                  <a
-                    href={mediaUrl(base, image, 1600, 'webp')}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block"
-                  >
-                    <img
-                      src={mediaUrl(base, image, 320, 'webp')}
-                      alt=""
-                      loading="lazy"
-                      className="h-24 w-32 rounded-lg border border-line object-cover"
-                    />
-                  </a>
-                  {image.isCover ? (
-                    <span className="absolute start-1 top-1 rounded bg-bg/80 px-1.5 py-0.5 text-[10px] text-gold">
-                      {t.sections.propertyDetail.coverBadge}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+            <PhotoGallery
+              photos={property.images.slice(0, PHOTO_LIMIT).map((image) => ({
+                src: mediaUrl(base, image, 320, 'webp'),
+                full: mediaUrl(base, image, 1600, 'webp'),
+                isCover: image.isCover,
+              }))}
+            />
 
-            {/*
-              BOUNDED, because a listing's gallery is not.
-
-              One seeded property carries 659 images, and rendering them all put 659 requests and
-              659 DOM nodes on a staff screen — rule 2's "nothing that degrades" applies to a
-              review page as much as to a query. A reviewer judges a listing from its cover and a
-              sample; the count above says how many there are, and this says what is not shown
-              rather than quietly truncating.
-            */}
             {property.images.length > PHOTO_LIMIT ? (
               <p className="mt-2 text-[12px] text-faint">
                 {fill(t.sections.propertyDetail.morePhotos, {
@@ -307,6 +282,8 @@ export default async function PropertyPage({
                   {plural(t.sections.propertyDetail.unitLine, {
                     guests: unit.maxGuests,
                     price: unit.basePrice,
+                    /* Never `?? ''` — the shape the standing rule exists to forbid. */
+                    currency: unit.currency.code,
                     minNights: unit.minNights,
                   })}
                 </span>
