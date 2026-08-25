@@ -1109,7 +1109,7 @@ export const ar = {
         Not a quality bar: a bar against «مخالفة» arriving at a real business owner as the entire
         explanation for why they cannot trade.
       */
-      reasonHint: 'عشرون حرفًا على الأقل — يقرأه صاحب العمل.',
+      reasonHint: 'عشرون حرفًا على الأقل — يقرأه الشريك.',
       suspending: 'جارٍ الإيقاف…',
       unsuspending: 'جارٍ رفع الإيقاف…',
       suspended: 'أُوقف الشريك وأُبلغ بالسبب.',
