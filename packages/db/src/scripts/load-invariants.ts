@@ -28,7 +28,7 @@ export const INVARIANTS: readonly Invariant[] = [
     name: 'no double-booked nights',
     consequence:
       'Two live bookings share a unit and an overlapping stay. The exclusion constraint ' +
-      'bookings_no_overlapping_stays_v2 did not hold, and two customers have been sold one room.',
+      'bookings_no_overlapping_stays_v3 did not hold, and two customers have been sold one room.',
     /*
       Overlap, not equality.
 
@@ -66,7 +66,9 @@ export const INVARIANTS: readonly Invariant[] = [
                    lag(check_in)   OVER w AS prev_check_in,
                    lag(check_out)  OVER w AS prev_check_out
             FROM bookings
-            WHERE status IN ('pending_payment','pending_confirmation','confirmed','checked_in')
+            /* disputed joined the blocking set on 2026-08-25 — see BLOCKING_STATUSES.
+               No backticks in here: this SQL is inside a template literal and one would end it. */
+            WHERE status IN ('pending_payment','pending_confirmation','confirmed','checked_in','disputed')
             WINDOW w AS (PARTITION BY unit_id ORDER BY check_in, check_out)
           ) ordered
           WHERE prev_check_out > check_in

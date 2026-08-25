@@ -120,6 +120,21 @@ export const TRANSITIONS: Transition[] = [
   { from: 'completed', to: 'disputed', actors: ['customer', 'staff'], label: 'disputed' },
   { from: 'disputed', to: 'completed', actors: ['staff'], label: 'dispute_resolved' },
   { from: 'disputed', to: 'cancelled', actors: ['staff'], label: 'dispute_cancelled' },
+  /**
+   * Back to where the booking WAS when the dispute opened — added 2026-08-25.
+   *
+   * §6.2 defines `Disputed` as «يوجد نزاع مفتوح على الحجز» — a booking that HAS an open dispute.
+   * That makes it an overlay on the lifecycle rather than a destination in it: when the dispute
+   * closes the overlay lifts, and the booking is wherever it actually was. Without these two edges
+   * the only ways out were `completed` and `cancelled`, so a dispute raised on a stay that had not
+   * happened yet could only be closed by declaring it finished or killing it.
+   *
+   * The pre-dispute state is DERIVED from the booking's own stamps rather than remembered in a
+   * column — see `DisputeService.restoreBookingStatus`. A column would be a second thing to keep
+   * true; `checked_in_at` and `confirmed_at` already say where it was.
+   */
+  { from: 'disputed', to: 'checked_in', actors: ['staff'], label: 'dispute_closed' },
+  { from: 'disputed', to: 'confirmed', actors: ['staff'], label: 'dispute_closed' },
 ];
 
 /**
@@ -142,6 +157,20 @@ export const BLOCKING_STATUSES: BookingStatus[] = [
   'pending_confirmation',
   'confirmed',
   'checked_in',
+  /**
+   * `disputed` HOLDS INVENTORY, and leaving it out would have been a double booking.
+   *
+   * Added 2026-08-25, with the status itself, and this is the implication that decided the design.
+   * Until then nothing could write `disputed`, so its absence here cost nothing. The moment a
+   * dispute moves a live booking out of `confirmed` or `checked_in`, those two statuses stop
+   * applying — and a status outside this list does not hold its dates. A guest disputing the room
+   * they are standing in (EC-006, EC-007) would have had their nights released for sale while they
+   * were still in it.
+   *
+   * Blocking a DEPARTED stay's dates costs nothing: they are in the past and nobody books
+   * backwards. Blocking a live one is the entire point.
+   */
+  'disputed',
 ];
 
 /** Terminal states: nothing leaves them except a dispute, which is handled above. */

@@ -24,7 +24,7 @@ import { INVARIANTS } from './load-invariants.js';
  *
  * ## Why the constraint is dropped inside the transaction
  *
- * There is no other way to create the state. `bookings_no_overlapping_stays_v2` refuses the INSERT,
+ * There is no other way to create the state. `bookings_no_overlapping_stays_v3` refuses the INSERT,
  * which is exactly right and exactly why a passing invariant proves nothing on its own — the
  * database, not the query, is what keeps the data clean today. The rollback harness makes the DDL
  * disposable: PostgreSQL rolls back `ALTER TABLE … DROP CONSTRAINT` like anything else, so the
@@ -70,7 +70,7 @@ describeIfDb('the double-booking invariant detects an overlap', () => {
       transaction, so it returns on rollback.
     */
     await db.execute(
-      sql`ALTER TABLE bookings DROP CONSTRAINT bookings_no_overlapping_stays_v2`,
+      sql`ALTER TABLE bookings DROP CONSTRAINT bookings_no_overlapping_stays_v3`,
     );
   });
 

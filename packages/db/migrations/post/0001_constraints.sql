@@ -502,3 +502,34 @@ $def$);
 CREATE UNIQUE INDEX IF NOT EXISTS partner_contracts_one_active_per_kind
   ON partner_contracts (partner_id, kind)
   WHERE status = 'active' AND deleted_at IS NULL;
+
+-- ----------------------------------------------------------------------------
+-- 9. A disputed stay still holds its dates (2026-08-25)
+--
+-- `bookings_no_overlapping_stays_v2` listed four statuses and `disputed` was not
+-- among them. That was harmless for exactly as long as nothing could write the
+-- status — no route and no job ever did. The booking screen now moves a booking to
+-- `disputed` when a dispute is opened on it (SRS §6.2, §9.4), and the moment it
+-- does, a live booking LEAVES `confirmed`/`checked_in` — and a status outside this
+-- predicate does not hold inventory.
+--
+-- The consequence would have been a double booking of the worst kind: EC-006 and
+-- EC-007 are disputes raised on arrival or during the stay, so the nights released
+-- for sale would be the ones a guest was standing in.
+--
+-- v3 rather than an ALTER: `add_constraint_if_missing` is a no-op against a name
+-- that already exists, so a redefinition needs a new name and an explicit drop of
+-- the old one. Both are stated here rather than left to inference.
+--
+-- Safe against existing data: nothing has ever written `disputed`, so no row can
+-- violate the widened predicate, and a re-run is a no-op.
+-- ----------------------------------------------------------------------------
+ALTER TABLE bookings DROP CONSTRAINT IF EXISTS bookings_no_overlapping_stays_v2;
+
+SELECT add_constraint_if_missing('bookings', 'bookings_no_overlapping_stays_v3', $def$
+  EXCLUDE USING gist (
+    unit_id WITH =,
+    daterange(check_in, check_out, '[)') WITH &&
+  )
+  WHERE (status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in', 'disputed'))
+$def$);

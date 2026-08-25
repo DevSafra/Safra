@@ -81,7 +81,7 @@ describe('BLOCKING_STATUSES matches the database exclusion constraint', () => {
     );
 
     const match =
-      /bookings_no_overlapping_stays_v2[\s\S]*?WHERE \(status IN \(([^)]*)\)\)/.exec(
+      /bookings_no_overlapping_stays_v3[\s\S]*?WHERE \(status IN \(([^)]*)\)\)/.exec(
         migration,
       );
 
