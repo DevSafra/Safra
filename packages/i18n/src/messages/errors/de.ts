@@ -111,6 +111,8 @@ export const de = {
   'payout.partner_not_screened':
     'Diese Auszahlung kann erst nach der Sanktionsprüfung des Partners freigegeben werden.',
   'partner.already_verified': 'Der Partner ist bereits verifiziert.',
+  'partner.documents_missing':
+    'Ein Partner kann nicht freigegeben werden, bevor die Prüfdokumente vorliegen: Ausweis oder Handelsregisterauszug sowie Eigentumsnachweis oder Verwaltungsvertrag.',
   'partner.profile_missing': 'Dieses Konto ist keinem Partnerprofil zugeordnet.',
   'partner.type_unknown': 'Unbekannter Partnertyp.',
   'property.not_found': 'Objekt nicht gefunden.',

@@ -121,7 +121,7 @@ describeIfDb('the sanctions screening policy', () => {
 
     staffUserId = actor.rows[0]?.id ?? '';
 
-    const made = await db.execute<{ reference: string }>(sql`
+    const made = await db.execute<{ id: string; reference: string }>(sql`
       WITH u AS (
         INSERT INTO users (email, phone, role, status)
         VALUES ('policy-' || gen_random_uuid() || '@safra.test', '+963900000210',
@@ -134,10 +134,23 @@ describeIfDb('the sanctions screening policy', () => {
              (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1), 'x',
              '+963900000210', 'policy-p-' || gen_random_uuid() || '@safra.test', 'pending'
       FROM u
-      RETURNING reference
+      RETURNING id, reference
     `);
 
     partnerReference = made.rows[0]?.reference ?? '';
+
+    /*
+      §8.1's verification documents, so this suite tests the SANCTIONS policy and nothing else.
+
+      Approval refuses without them since 2026-08-26 — one from each pair the SRS names. Seeded
+      here rather than relaxed in the service: a fixture that could not satisfy a real precondition
+      would make every assertion below pass for the wrong reason.
+    */
+    await db.execute(sql`
+      INSERT INTO partner_documents (partner_id, kind, file_key, file_name, status)
+      VALUES (${made.rows[0]?.id}, 'identity', 'k1', 'id.pdf', 'approved'),
+             (${made.rows[0]?.id}, 'ownership_proof', 'k2', 'deed.pdf', 'approved')
+    `);
   });
 
   afterEach(async () => {
@@ -158,6 +171,93 @@ describeIfDb('the sanctions screening policy', () => {
   };
 
   // ── required ────────────────────────────────────────────────────────────────
+
+  /**
+   * §8.1 — «يجب رفع وثائق التحقق قبل تفعيل الحساب».
+   *
+   * Approval is what activates a partner: it lets them publish and be paid. Nothing checked for a
+   * document until 2026-08-26, so a business could be switched on with an empty file.
+   *
+   * The fixture seeds both required classes, so the control is to REMOVE them — asserting the
+   * refusal against a partner who has documents proves the gate reads them, where a fresh partner
+   * with none would pass against a gate that refused everybody.
+   */
+  describe('the verification documents', () => {
+    it('refuses to approve a partner with nothing on file', async () => {
+      await db.execute(sql`
+        DELETE FROM partner_documents
+        WHERE partner_id = (SELECT id FROM partners WHERE reference = ${partnerReference})
+      `);
+
+      await expect(
+        review.verifyPartner(staff(), partnerReference, { decision: 'approve' }),
+      ).rejects.toMatchObject({
+        response: { code: ERROR.PARTNER_DOCUMENTS_MISSING },
+      });
+    });
+
+    it('refuses when only one of the two classes is on file', async () => {
+      await db.execute(sql`
+        DELETE FROM partner_documents
+        WHERE partner_id = (SELECT id FROM partners WHERE reference = ${partnerReference})
+          AND kind = 'ownership_proof'
+      `);
+
+      await expect(
+        review.verifyPartner(staff(), partnerReference, { decision: 'approve' }),
+      ).rejects.toMatchObject({
+        response: { code: ERROR.PARTNER_DOCUMENTS_MISSING },
+      });
+    });
+
+    /* «أو», not «و»: a commercial register and a management contract satisfy §8.1 just as well. */
+    it('accepts the other document from each pair', async () => {
+      await db.execute(sql`
+        UPDATE partner_documents SET kind = 'commercial_register'
+        WHERE partner_id = (SELECT id FROM partners WHERE reference = ${partnerReference})
+          AND kind = 'identity'
+      `);
+      await db.execute(sql`
+        UPDATE partner_documents SET kind = 'management_contract'
+        WHERE partner_id = (SELECT id FROM partners WHERE reference = ${partnerReference})
+          AND kind = 'ownership_proof'
+      `);
+
+      await expect(
+        review.verifyPartner(staff(), partnerReference, { decision: 'approve' }),
+      ).resolves.toBeDefined();
+    });
+
+    /* A REJECTED document is not on file — the gate must not count it. */
+    it('does not count a rejected document', async () => {
+      await db.execute(sql`
+        UPDATE partner_documents SET status = 'rejected'
+        WHERE partner_id = (SELECT id FROM partners WHERE reference = ${partnerReference})
+          AND kind = 'identity'
+      `);
+
+      await expect(
+        review.verifyPartner(staff(), partnerReference, { decision: 'approve' }),
+      ).rejects.toMatchObject({
+        response: { code: ERROR.PARTNER_DOCUMENTS_MISSING },
+      });
+    });
+
+    /* And a rejection needs no paperwork — the gate is only on the way IN. */
+    it('still allows a rejection with nothing on file', async () => {
+      await db.execute(sql`
+        DELETE FROM partner_documents
+        WHERE partner_id = (SELECT id FROM partners WHERE reference = ${partnerReference})
+      `);
+
+      await expect(
+        review.verifyPartner(staff(), partnerReference, {
+          decision: 'reject',
+          notes: 'وثائق ناقصة',
+        }),
+      ).resolves.toBeDefined();
+    });
+  });
 
   describe('required', () => {
     beforeEach(() => setPolicy('required'));

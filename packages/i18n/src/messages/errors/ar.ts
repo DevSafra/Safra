@@ -89,6 +89,8 @@ export const ar = {
   'payout.frozen_by_dispute': 'نزاع مفتوح يجمّد استحقاق التحويل لهذه الحجوزات.',
   'payout.partner_not_screened': 'لا يمكن إطلاق التحويل قبل فحص العقوبات لهذا الشريك.',
   'partner.already_verified': 'تم التحقق من هذا الشريك بالفعل.',
+  'partner.documents_missing':
+    'لا يمكن اعتماد الشريك قبل رفع وثائق التحقق: هوية أو سجل تجاري، وإثبات ملكية أو عقد إدارة.',
   'partner.profile_missing': 'هذا الحساب غير مرتبط بملف شريك.',
   'partner.type_unknown': 'نوع الشريك غير معروف.',
   'property.not_found': 'لم يُعثر على هذا العقار.',

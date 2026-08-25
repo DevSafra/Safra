@@ -171,6 +171,8 @@ export const ERROR = {
   PAYOUT_FROZEN_BY_DISPUTE: 'payout.frozen_by_dispute',
   PAYOUT_PARTNER_NOT_SCREENED: 'payout.partner_not_screened',
   PARTNER_ALREADY_VERIFIED: 'partner.already_verified',
+  /** §8.1 — «يجب رفع وثائق التحقق قبل تفعيل الحساب». */
+  PARTNER_DOCUMENTS_MISSING: 'partner.documents_missing',
   PARTNER_PROFILE_MISSING: 'partner.profile_missing',
   PARTNER_TYPE_UNKNOWN: 'partner.type_unknown',
   PROPERTY_NOT_FOUND: 'property.not_found',

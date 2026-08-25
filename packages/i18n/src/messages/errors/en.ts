@@ -95,6 +95,8 @@ export const en = {
   'payout.partner_not_screened':
     'This payout cannot be released before the partner has been screened.',
   'partner.already_verified': 'Partner is already verified.',
+  'partner.documents_missing':
+    'A partner cannot be approved before the verification documents are on file: an identity document or a commercial register, and proof of ownership or a management contract.',
   'partner.profile_missing': 'This account is not linked to a partner profile.',
   'partner.type_unknown': 'Unknown partner type.',
   'property.not_found': 'Property not found.',

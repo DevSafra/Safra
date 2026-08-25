@@ -67,6 +67,37 @@ export class ReviewService {
    * on purpose: `settings` is hand-editable, and a typo that silently made the platform stricter
    * would present as onboarding mysteriously stopping, with nothing on any screen to explain it.
    */
+  /**
+   * §8.1's precondition for activating a partner account.
+   *
+   * One document from each pair the SRS names, present and not rejected. Written as two `EXISTS`
+   * subqueries rather than counted, so the answer is "is there one of these" and adding a sixth
+   * document kind cannot silently change what activation requires.
+   */
+  private async assertDocumentsOnFile(partnerId: string): Promise<void> {
+    const rows = await this.db.execute<{ identity: boolean; right_to_let: boolean }>(sql`
+      SELECT
+        EXISTS (
+          SELECT 1 FROM partner_documents d
+          WHERE d.partner_id = ${partnerId}
+            AND d.kind IN ('identity', 'commercial_register')
+            AND d.status <> 'rejected' AND d.deleted_at IS NULL
+        ) AS identity,
+        EXISTS (
+          SELECT 1 FROM partner_documents d
+          WHERE d.partner_id = ${partnerId}
+            AND d.kind IN ('ownership_proof', 'management_contract')
+            AND d.status <> 'rejected' AND d.deleted_at IS NULL
+        ) AS right_to_let
+    `);
+
+    const found = rows.rows[0];
+
+    if (!found?.identity || !found.right_to_let) {
+      throw conflict(ERROR.PARTNER_DOCUMENTS_MISSING);
+    }
+  }
+
   private async sanctionsPolicy(): Promise<SanctionsPolicy> {
     const raw = await this.settings.get<unknown>(
       SANCTIONS_POLICY_SETTING,
@@ -683,6 +714,32 @@ export class ReviewService {
       the console, and an approval decided under a stale reading would be stamped below with a
       policy that was not actually in force — which is worse than no stamp at all.
     */
+    /*
+      §8.1 — «يجب رفع وثائق التحقق قبل تفعيل الحساب».
+
+      ## The rule had no enforcement at all
+
+      Approval activates the partner: it is what lets them publish (P-002) and be paid. §8.1 makes
+      the verification documents a precondition, and nothing checked for one — a business could be
+      approved with an empty document list. Found while reviewing طلبات الانضمام, 2026-08-26.
+
+      ## Two classes, not five documents
+
+      The SRS says «هوية **أو** سجل تجاري» and «إثبات ملكية **أو** عقد إدارة» — one of each pair,
+      not both, and it does not name a bank letter as a verification document at all. The stricter
+      set that `notifyStaffIfComplete` uses to congratulate a partner is a different question: that
+      one is «you have finished», this one is «we may switch you on».
+
+      ## Uploaded and not refused, rather than reviewed and approved
+      
+      §8.1's word is «رفع». A rejected document is not on file, so it does not count; a document
+      awaiting review does. Requiring `approved` would be a stricter rule than the SRS states, and
+      the document review has its own screen and its own decision.
+      
+      Only on APPROVE. A rejection needs no paperwork, and neither does re-rejecting.
+    */
+    if (input.decision === 'approve') await this.assertDocumentsOnFile(partner.id);
+
     const policy = await this.sanctionsPolicy();
 
     if (
