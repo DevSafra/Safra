@@ -427,6 +427,13 @@ export class ReviewService {
         email: true,
         phone: true,
         address: true,
+        /*
+          §8.1 lists «الموقع على الخريطة» among the registration data a verifier checks. The
+          columns existed and nothing read them — lat/lng were surfaced for PROPERTIES only, so
+          somebody approving a business could not see where it is.
+        */
+        latitude: true,
+        longitude: true,
         /* For the scope check, stripped before returning — see `propertyDetail`. */
         cityId: true,
         verification: true,
@@ -505,6 +512,27 @@ export class ReviewService {
      * alternative — widening `partnerDetail`'s relation set — would attach a user row to every
      * other caller that wants a partner.
      */
+    /*
+      §8.1's «بيانات التحويل المالي» — enough to VERIFY, never enough to pay someone else.
+
+      `account_number_encrypted` is deliberately not selected: this screen answers "are the transfer
+      details on file, and do they look like the right business", which the holder, the bank and the
+      last four settle. A full account number on a verification screen is a credential sitting in
+      front of every reader who can open a partner, and nothing here needs it.
+    */
+    const payoutAccounts = await this.db.execute<{
+      method: string;
+      account_holder: string;
+      account_number_last4: string;
+      bank_name: string | null;
+    }>(sql`
+      SELECT method, account_holder, account_number_last4, bank_name
+      FROM partner_payout_accounts
+      WHERE partner_id = (SELECT id FROM partners WHERE reference = ${reference})
+      ORDER BY created_at
+      LIMIT 5
+    `);
+
     const account = await this.db.execute<{
       two_factor_enabled: boolean;
       account_activated: boolean;
@@ -582,6 +610,13 @@ export class ReviewService {
             by: by?.rows[0]?.name ?? null,
           }
         : null,
+      /* §8.1 — the transfer details, masked. An empty list means none are on file. */
+      payoutAccounts: payoutAccounts.rows.map((row) => ({
+        method: row.method,
+        accountHolder: row.account_holder,
+        last4: row.account_number_last4,
+        bankName: row.bank_name,
+      })),
       /* No user account behind the partner reads as "not enrolled", which it is. */
       twoFactorEnabled: account.rows[0]?.two_factor_enabled ?? false,
       /*

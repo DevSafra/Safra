@@ -1942,6 +1942,11 @@ export const ar = {
       email: 'البريد الإلكتروني',
       phone: 'الهاتف',
       address: 'العنوان',
+      /* §8.1 — both are registration data a verifier checks before activating the account. */
+      mapLocation: 'الموقع على الخريطة',
+      noMapLocation: 'لم يُحدَّد',
+      payoutDetails: 'بيانات التحويل المالي',
+      noPayoutDetails: 'لا بيانات تحويل مسجّلة',
       applied: 'تاريخ التقديم',
       documents: 'الوثائق',
       noDocuments:

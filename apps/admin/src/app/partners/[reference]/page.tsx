@@ -158,9 +158,63 @@ export default async function PartnerPage({
             value={<Ltr>{partner.phone}</Ltr>}
           />
           <Row label={t.sections.partnerDetail.address} value={partner.address} />
+          {/*
+            §8.1's «الموقع على الخريطة».
+
+            A LINK, not an embedded map: a verifier opens it once, and an iframe would put a
+            third-party script on a staff screen for a field that is checked at approval and never
+            again. Coordinates that were never captured say so — «لم يُحدَّد» is a fact a verifier
+            has to act on, and a blank row reads as a rendering fault.
+          */}
+          <Row
+            label={t.sections.partnerDetail.mapLocation}
+            value={
+              partner.latitude && partner.longitude ? (
+                <a
+                  href={`https://www.openstreetmap.org/?mlat=${encodeURIComponent(partner.latitude)}&mlon=${encodeURIComponent(partner.longitude)}#map=17/${encodeURIComponent(partner.latitude)}/${encodeURIComponent(partner.longitude)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-h-10 items-center text-gold hover:underline lg:min-h-0"
+                >
+                  <Ltr>{`${partner.latitude}, ${partner.longitude}`}</Ltr>
+                </a>
+              ) : (
+                <span className="text-faint">
+                  {t.sections.partnerDetail.noMapLocation}
+                </span>
+              )
+            }
+          />
           <Row
             label={t.sections.partnerDetail.applied}
             value={partner.createdAt?.slice(0, 10) ?? '—'}
+          />
+          {/*
+            §8.1's «بيانات التحويل المالي» — on file, or not.
+
+            Masked at the API: the holder, the bank and the last four. A verifier is answering "can
+            this business be paid, and does the account look like theirs", and the full number would
+            be a credential on a screen every reader of الشركاء can open.
+          */}
+          <Row
+            label={t.sections.partnerDetail.payoutDetails}
+            value={
+              partner.payoutAccounts.length === 0 ? (
+                <span className="text-faint">
+                  {t.sections.partnerDetail.noPayoutDetails}
+                </span>
+              ) : (
+                <ul className="grid gap-1">
+                  {partner.payoutAccounts.map((acc) => (
+                    <li key={`${acc.method}-${acc.last4}`}>
+                      {acc.accountHolder}
+                      {acc.bankName ? ` · ${acc.bankName}` : ''} ·{' '}
+                      <Ltr>{`••••${acc.last4}`}</Ltr>
+                    </li>
+                  ))}
+                </ul>
+              )
+            }
           />
         </dl>
       </Section>

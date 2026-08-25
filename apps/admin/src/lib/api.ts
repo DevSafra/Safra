@@ -271,6 +271,21 @@ const partnerDetailSchema = z.object({
   email: z.string(),
   phone: z.string(),
   address: z.string(),
+  /*
+    §8.1's «الموقع على الخريطة». Nullable, not `.default()`: a partner whose coordinates were never
+    captured is a real state a verifier must SEE, and a default would invent a plausible location.
+  */
+  latitude: z.string().nullable(),
+  longitude: z.string().nullable(),
+  /* §8.1's «بيانات التحويل المالي», masked — never the full number. */
+  payoutAccounts: z.array(
+    z.object({
+      method: z.string(),
+      accountHolder: z.string(),
+      last4: z.string(),
+      bankName: z.string().nullable(),
+    }),
+  ),
   verification: z.string(),
   verifiedAt: timestamp,
   sanctionsScreenedAt: timestamp,
