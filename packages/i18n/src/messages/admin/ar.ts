@@ -1772,6 +1772,60 @@ export const ar = {
       completeHint: 'تُحتسب مستحقات الشريك بعد الإنهاء، ويصبح بإمكان النزيل كتابة تقييم.',
       stayCompleted: 'أُنهيت الإقامة.',
 
+      /* ── §9.4: فتح نزاع، استرداد، تعويض ────────────────────────────────── */
+      openDispute: 'فتح نزاع',
+      openingDispute: 'جارٍ الفتح…',
+      /*
+        Both consequences, because both surprise people. A dispute freezes the partner's money and
+        marks the booking — and an operator recording a telephone complaint should know that before
+        they press, not when the partner calls to ask why they were not paid.
+      */
+      disputeHint:
+        'يُجمّد استحقاق الشريك لهذا الحجز حتى الإغلاق، وتتغيّر حالة الحجز إلى «متنازع عليه».',
+      disputeKindLabel: 'نوع النزاع',
+      pickDisputeKind: 'اختر نوع النزاع…',
+      disputeTitleLabel: 'عنوان النزاع',
+      disputeTitleHint: 'سطر واحد يظهر في قائمة النزاعات.',
+      disputeDescriptionLabel: 'ما الذي حدث',
+      disputeDescriptionHint: 'عشرون حرفًا على الأقل — رواية العميل كما وصفها.',
+      disputeOpened: 'فُتح النزاع وجُمّد استحقاق الشريك.',
+
+      refund: 'استرداد',
+      refunding: 'جارٍ الاسترداد…',
+      /*
+        The FIGURE is not ours to choose and the screen says so. `RefundService` computes it from
+        the cancellation policy snapshotted on the booking, so an operator cannot type an amount —
+        and knowing that before opening the form stops them looking for the field.
+      */
+      refundHint: 'المبلغ يُحسب من سياسة الإلغاء المثبَّتة على الحجز، ولا يمكن تعديله.',
+      refundQuoteLine: '{amount} {currency} · {percent}% حسب سياسة «{tier}»',
+      refundToWallet: 'منها {amount} إلى محفظة العميل',
+      refundReasonLabel: 'سبب الاسترداد',
+      refundReasonHint: 'ثلاثة أحرف على الأقل، ويُحفظ مع الحركة المالية.',
+      /*
+        `refundIssued`, not `refunded` — that key was already taken, thirteen lines up, by the
+        template the payments section renders per refund row («استُرد {amount} {currency}»). A
+        second `refunded` silently WON, and the older one then took two placeholders it no longer
+        had. The typechecker caught it; the reader would have caught «استُرد {amount} {currency}»
+        printed literally on screen.
+      */
+      refundIssued: 'صدر الاسترداد.',
+      refundNothing: 'لا مبلغ قابلاً للاسترداد على هذا الحجز.',
+
+      compensate: 'تعويض العميل',
+      compensating: 'جارٍ التعويض…',
+      /*
+        Where the money goes and where it does NOT. A wallet credit is not a refund and the two get
+        confused: this one is SAFRA's own goodwill (§7 «تعويض محفظة»), not a return of the payment.
+      */
+      compensateHint:
+        'يُضاف رصيد إلى محفظة العميل من سفرة. ليس استرداداً للمبلغ المدفوع.',
+      compensateAmountLabel: 'المبلغ',
+      compensateCurrencyLabel: 'العملة',
+      compensateNoteLabel: 'سبب التعويض',
+      compensateNoteHint: 'عشرة أحرف على الأقل — يظهر في سجل محفظة العميل.',
+      compensated: 'أُضيف التعويض إلى محفظة العميل.',
+
       /* ── Where the rest of this booking lives ──────────────────────────── */
       /*
         Links, not an embedded inbox (Bashar, 2026-08-25). Each goes to the section that already
@@ -1785,6 +1839,16 @@ export const ar = {
         '{n, plural, zero {لا محادثات} one {محادثة واحدة} two {محادثتان} few {# محادثات} many {# محادثة} other {# محادثة}}',
       relatedNotifications:
         '{n, plural, zero {لا رسائل} one {رسالة واحدة} two {رسالتان} few {# رسائل} many {# رسالة} other {# رسالة}}',
+      /*
+        §6.4's «يتصل موظف سفرة بالعميل ويعرض عقارات مشابهة» — offering the customer alternatives
+        after a cancellation.
+
+        A LINK, not a form (Bashar, 2026-08-25). The conversation already has a home in الرسائل
+        with a thread, a reply box and the redaction every stored message goes through; a second
+        composer here would be a parallel messaging surface to keep in step with it. The link
+        carries this booking as the filter, so it lands on the conversation about this stay.
+      */
+      sendAlternatives: 'اقتراح بدائل للعميل',
     },
 
     propertyDetail: {
@@ -2175,6 +2239,12 @@ export const ar = {
     gift_card: 'بطاقة هدية',
     partner: 'شريك',
     partner_contract: 'عقد شراكة',
+    /*
+      A subject type that has existed since disputes were built and had never reached this
+      catalogue, because `audit-catalogue.integration.test.ts` reads the TABLE and no dispute had
+      ever been closed in a committed run. Found 2026-08-25 the first time one was.
+    */
+    dispute: 'نزاع',
     /* The role definition itself, not an employee — `EmployeeRolesService` audits against it. */
     partner_employee_role: 'دور موظف شريك',
     /* A role definition for SAFRA's OWN staff — «مدير عام», «مشرف حجوزات». */
@@ -2286,6 +2356,8 @@ export const ar = {
     'booking.internal_note_added': 'إضافة ملاحظة داخلية على حجز',
     'booking.staff_confirmed': 'تأكيد حجز نيابة عن الشريك',
     'booking.completed': 'إنهاء الإقامة',
+    'booking.dispute_closed': 'رفع حالة النزاع عن الحجز',
+    'dispute.opened_by_staff': 'فتح نزاع نيابة عن العميل',
     'booking.exported': 'تصدير حجوزات',
     'booking.export_requested': 'طلب تصدير حجوزات',
     'calendar.range_updated': 'تعديل مدى في التقويم',
@@ -2545,6 +2617,9 @@ export const ar = {
     payloadKey: {
       reason: 'السبب',
       reference: 'المرجع',
+      /* Written by `dispute.resolved` / `dispute.rejected` when a closure agrees compensation. */
+      compensationAmount: 'مبلغ التعويض',
+      compensationCurrency: 'عملة التعويض',
       /*
         Written by `staff.invited` and `staff.role_changed` since roles became rows a super admin
         defines. The catalogue test found it against the real `audit_log`, not by review — the
@@ -2816,6 +2891,15 @@ export const ar = {
       confirmed: 'مؤكد',
       checked_in: 'تم الوصول',
       completed: 'مكتمل',
+      /*
+        The dispute KINDS, reaching a payload because `dispute.opened_by_staff` records which
+        complaint was raised. All four, not only the one a run happened to produce — the same
+        lesson the violation kinds above record, learnt the same way on the same day.
+      */
+      property_unavailable: 'العقار غير متاح',
+      not_as_described: 'غير مطابق للوصف',
+      partner_no_response: 'الشريك لم يرد',
+      complaint: 'شكوى',
       contacted: 'تم الاتصال',
       accepted: 'مقبول',
       rejected: 'مرفوض',
@@ -2910,6 +2994,8 @@ export const ar = {
       'booking.checked_in': 'تسجيل وصول الضيف',
       'booking.check_in_undone': 'التراجع عن تسجيل الوصول',
       'booking.completed': 'انتهاء الإقامة',
+      'booking.disputed': 'فتح نزاع على الحجز',
+      'booking.dispute_closed': 'إغلاق النزاع',
       'booking.sla_expired': 'انتهاء مهلة التأكيد',
       'booking.refund_issued': 'إصدار استرداد',
       'partner.registered': 'تسجيل شريك',

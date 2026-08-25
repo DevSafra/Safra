@@ -18,6 +18,7 @@ import {
   plural,
 } from '@/lib/strings';
 import { refuseSection } from '@/components/section-refusal';
+import { COMPENSATION_CURRENCIES } from '@safra/contracts';
 import { readerPermissions } from '@/lib/gate';
 import { BookingActions } from '@/components/booking-actions';
 import { BookingNotes } from '@/components/booking-notes';
@@ -422,6 +423,13 @@ export default async function BookingPage({
             count={plural(t.sections.bookingDetail.relatedConversations, {
               n: booking.related.conversations,
             })}
+            /*
+              §6.4's «اعرض عقارات مشابهة» lives here rather than on this screen (Bashar,
+              2026-08-25): الرسائل already owns a thread, a reply box and the redaction every
+              stored message passes through, and a composer here would be a second messaging
+              surface to keep in step with it.
+            */
+            note={t.sections.bookingDetail.sendAlternatives}
           />
           <Elsewhere
             href={`/comms?q=${encodeURIComponent(booking.reference)}`}
@@ -462,7 +470,25 @@ export default async function BookingPage({
           */
           updateStatus: permissions.includes('booking.update_status'),
           checkIn: permissions.includes('booking.check_in'),
+          /*
+            Three more, and each is a DIFFERENT authority — §4 is explicit that a support agent
+            investigates disputes and must escalate a refund to finance. Reading them separately is
+            what keeps that true on the screen as well as at the endpoint.
+          */
+          manageDisputes: permissions.includes('dispute.manage'),
+          refund: permissions.includes('refund.create'),
+          adjustWallet: permissions.includes('wallet.adjust'),
         }}
+        /*
+          The booking's own currency first — a compensation for this stay is almost always in the
+          money the customer paid — then the rest, so an operator can still credit in SYP.
+        */
+        currencies={[
+          booking.money.currencyCode,
+          ...COMPENSATION_CURRENCIES.filter(
+            (code) => code !== booking.money.currencyCode,
+          ),
+        ]}
       />
     </Shell>
   );
@@ -478,10 +504,13 @@ function Elsewhere({
   href,
   section,
   count,
+  note,
 }: {
   href: string;
   section: string;
   count: string;
+  /** What else this destination is for, where the link answers more than one need. */
+  note?: string;
 }) {
   return (
     <li>
@@ -495,6 +524,7 @@ function Elsewhere({
       >
         <span className="text-sm text-sky">{section}</span>
         <span className="mt-0.5 text-xs text-faint">{count}</span>
+        {note ? <span className="mt-0.5 text-xs text-faint2">{note}</span> : null}
       </Link>
     </li>
   );

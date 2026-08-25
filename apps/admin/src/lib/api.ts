@@ -668,6 +668,9 @@ const bookingDetailSchema = z.object({
     undoCheckIn: z.boolean(),
     complete: z.boolean(),
     capturePayment: z.boolean(),
+    openDispute: z.boolean(),
+    refund: z.boolean(),
+    compensate: z.boolean(),
   }),
   /** How much there is on each screen this booking links out to, so a link can say. */
   related: z.object({

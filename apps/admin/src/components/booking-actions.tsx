@@ -1,12 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { BOOKING_CANCEL_REASON_MIN, ENFORCEMENT_REASON_MIN } from '@safra/contracts';
+import {
+  BOOKING_CANCEL_REASON_MIN,
+  DISPUTE_KINDS,
+  ENFORCEMENT_REASON_MIN,
+} from '@safra/contracts';
 
 import { text } from '@/lib/form';
-import { apiErrorOf, t } from '@/lib/strings';
+import { Ltr } from '@/components/admin-table';
+import { money } from '@/lib/format';
+import { apiErrorOf, fill, label, t } from '@/lib/strings';
 
 /** Which staff moves this booking's STATE permits, from the API's own transition table. */
 export type BookingActionAvailability = {
@@ -16,10 +22,13 @@ export type BookingActionAvailability = {
   undoCheckIn: boolean;
   complete: boolean;
   capturePayment: boolean;
+  openDispute: boolean;
+  refund: boolean;
+  compensate: boolean;
 };
 
-/** The two moves that must say WHY, and the field each one writes. */
-type Explained = 'cancel' | 'confirm';
+/** The moves that open a form, because each has something the operator must say or choose. */
+type Explained = 'cancel' | 'confirm' | 'dispute' | 'refund' | 'compensate';
 
 /**
  * Everything a staff actor can do to a booking (§6.3, §6.4, §9.4).
@@ -51,6 +60,7 @@ export function BookingActions({
   reference,
   available,
   can,
+  currencies,
 }: {
   reference: string;
   available: BookingActionAvailability;
@@ -59,7 +69,12 @@ export function BookingActions({
     cancel: boolean;
     updateStatus: boolean;
     checkIn: boolean;
+    manageDisputes: boolean;
+    refund: boolean;
+    adjustWallet: boolean;
   };
+  /** ISO codes the wallet accepts, for the compensation form. */
+  currencies: readonly string[];
 }) {
   const router = useRouter();
 
@@ -128,6 +143,9 @@ export function BookingActions({
     checkIn: available.checkIn && can.checkIn,
     undoCheckIn: available.undoCheckIn && can.checkIn,
     complete: available.complete && can.updateStatus,
+    dispute: available.openDispute && can.manageDisputes,
+    refund: available.refund && can.refund,
+    compensate: available.compensate && can.adjustWallet,
     cancel: available.cancel && can.cancel,
   };
 
@@ -207,6 +225,27 @@ export function BookingActions({
               onClick={() => void submit('complete', undefined, copy.stayCompleted)}
             />
           ) : null}
+          {offer.dispute ? (
+            <Toggle
+              label={copy.openDispute}
+              active={open === 'dispute'}
+              onClick={() => setOpen(open === 'dispute' ? null : 'dispute')}
+            />
+          ) : null}
+          {offer.refund ? (
+            <Toggle
+              label={copy.refund}
+              active={open === 'refund'}
+              onClick={() => setOpen(open === 'refund' ? null : 'refund')}
+            />
+          ) : null}
+          {offer.compensate ? (
+            <Toggle
+              label={copy.compensate}
+              active={open === 'compensate'}
+              onClick={() => setOpen(open === 'compensate' ? null : 'compensate')}
+            />
+          ) : null}
           {offer.cancel ? (
             <Toggle
               label={copy.cancelBooking}
@@ -247,6 +286,29 @@ export function BookingActions({
           min={BOOKING_CANCEL_REASON_MIN}
           submitLabel={busy ? copy.cancelling : copy.cancelBooking}
           onSubmit={(reason) => void submit('cancel', { reason }, copy.bookingCancelled)}
+        />
+      ) : null}
+
+      {open === 'dispute' ? (
+        <DisputeForm
+          busy={busy}
+          onSubmit={(body) => void submit('dispute', body, copy.disputeOpened)}
+        />
+      ) : null}
+
+      {open === 'refund' ? (
+        <RefundForm
+          busy={busy}
+          reference={reference}
+          onSubmit={(reason) => void submit('refund', { reason }, copy.refundIssued)}
+        />
+      ) : null}
+
+      {open === 'compensate' ? (
+        <CompensationForm
+          busy={busy}
+          currencies={currencies}
+          onSubmit={(body) => void submit('compensate', body, copy.compensated)}
         />
       ) : null}
     </section>
@@ -388,3 +450,322 @@ function Reasoned({
     </form>
   );
 }
+
+/**
+ * §9.4's «فتح نزاع» — a complaint SAFRA records on the customer's behalf.
+ *
+ * Three fields because a dispute is three decisions: which of §10's four kinds, the line the
+ * queue shows, and the customer's own account of what happened. The kind is a select with no
+ * default, for the reason `RaiseViolation`'s is: it decides what the partner is recorded as having
+ * done, and a pre-filled one invites recording the wrong thing against a real business.
+ */
+function DisputeForm({
+  busy,
+  onSubmit,
+}: {
+  busy: boolean;
+  onSubmit: (body: { kind: string; title: string; description: string }) => void;
+}) {
+  const copy = t.sections.bookingDetail;
+
+  return (
+    <form
+      className="grid gap-2 rounded-lg border border-gold/30 bg-gold/[0.06] p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+
+        onSubmit({
+          kind: text(form, 'kind'),
+          title: text(form, 'title').trim(),
+          description: text(form, 'description').trim(),
+        });
+      }}
+    >
+      {/* Both consequences before the first field: frozen money, and a changed booking status. */}
+      <p className="text-[11.5px] text-gold">{copy.disputeHint}</p>
+
+      <label className="grid gap-1">
+        <span className="text-[11px] text-faint">{copy.disputeKindLabel}</span>
+        <select
+          name="kind"
+          required
+          defaultValue=""
+          disabled={busy}
+          className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+        >
+          <option value="" disabled>
+            {copy.pickDisputeKind}
+          </option>
+          {DISPUTE_KINDS.map((kind) => (
+            <option key={kind} value={kind}>
+              {label(t.enums.disputeKind, kind)}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="grid gap-1">
+        <span className="text-[11px] text-faint">{copy.disputeTitleLabel}</span>
+        {/* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */}
+        <input
+          name="title"
+          required
+          minLength={4}
+          maxLength={120}
+          disabled={busy}
+          /*
+            `min-h-10 lg:min-h-0` stated here, unlike on a button.
+
+            `globals.css` gives the 40px touch floor to `button`, `select` and `summary` below
+            `lg` — a text INPUT is not in that list, so it comes out at 38px on a phone and misses
+            the rule by two pixels. Measured, not guessed.
+          */
+          className="min-h-10 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed lg:min-h-0"
+        />
+        <span className="text-[10.5px] text-faint">{copy.disputeTitleHint}</span>
+      </label>
+
+      <label className="grid gap-1">
+        <span className="text-[11px] text-faint">{copy.disputeDescriptionLabel}</span>
+        <textarea
+          name="description"
+          required
+          minLength={20}
+          maxLength={4000}
+          rows={3}
+          disabled={busy}
+          className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+        />
+        <span className="text-[10.5px] text-faint">{copy.disputeDescriptionHint}</span>
+      </label>
+
+      <Submit busy={busy} label={busy ? copy.openingDispute : copy.openDispute} />
+    </form>
+  );
+}
+
+/**
+ * §9.4's «استرداد» — issuing a refund at the figure the POLICY decides.
+ *
+ * ## The quote is fetched, not computed here
+ *
+ * `RefundService.quote` reads the cancellation policy snapshotted on the booking and applies §7.4's
+ * tiers to it. The console shows what it says and sends only a reason: an amount typed here would
+ * be an amount somebody could choose, which is exactly what the API refuses to accept.
+ *
+ * ## And it is shown BEFORE the button
+ *
+ * A refund is irreversible and its size depends on when the customer is cancelling. An operator who
+ * cannot see the figure until after they have issued it is guessing.
+ */
+function RefundForm({
+  busy,
+  reference,
+  onSubmit,
+}: {
+  busy: boolean;
+  reference: string;
+  onSubmit: (reason: string) => void;
+}) {
+  const copy = t.sections.bookingDetail;
+  const [quote, setQuote] = useState<RefundQuote | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/bookings/${encodeURIComponent(reference)}/refund`,
+        );
+
+        /*
+          A quote that cannot be fetched is NOT an error the operator has to resolve — it is one
+          line of guidance missing from a form that still works. `REFUND_READ` and `REFUND_CREATE`
+          are separate capabilities, so a finance member who may issue one and not quote it is a
+          configuration this must degrade gracefully under rather than refuse to render for.
+        */
+        if (!response.ok) {
+          if (live) setFailed(true);
+
+          return;
+        }
+
+        const body = (await response.json()) as RefundQuote;
+
+        if (live) setQuote(body);
+      } catch {
+        if (live) setFailed(true);
+      }
+    })();
+
+    return () => {
+      live = false;
+    };
+  }, [reference]);
+
+  /* Nothing left to give back: the policy allows none, or it has all been refunded already. */
+  const nothing = quote !== null && Number(quote.refundable) <= 0;
+
+  return (
+    <form
+      className="grid gap-1.5 rounded-lg border border-gold/30 bg-gold/[0.06] p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(text(new FormData(event.currentTarget), 'reason').trim());
+      }}
+    >
+      <p className="text-[11.5px] text-gold">{copy.refundHint}</p>
+
+      {/* The figure, as soon as it is known. `failed` is silent: the form still works. */}
+      {quote && !nothing ? (
+        <p className="text-[12.5px] text-text">
+          <Ltr>
+            {fill(copy.refundQuoteLine, {
+              amount: money(quote.refundable),
+              currency: quote.currencyCode,
+              percent: String(quote.refundPercent),
+              tier: quote.tierApplied,
+            })}
+          </Ltr>
+          {Number(quote.walletAmount) > 0 ? (
+            <span className="block text-[11px] text-faint">
+              {fill(copy.refundToWallet, { amount: money(quote.walletAmount) })}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+
+      {nothing ? <p className="text-[12px] text-faint">{copy.refundNothing}</p> : null}
+      {failed ? <p className="text-[12px] text-faint">{t.errors.unknown}</p> : null}
+
+      <label className="grid gap-1">
+        <span className="text-[11px] text-faint">{copy.refundReasonLabel}</span>
+        <textarea
+          name="reason"
+          required
+          minLength={3}
+          maxLength={500}
+          rows={2}
+          disabled={busy || nothing}
+          className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+        />
+        <span className="text-[10.5px] text-faint">{copy.refundReasonHint}</span>
+      </label>
+
+      <Submit busy={busy || nothing} label={busy ? copy.refunding : copy.refund} />
+    </form>
+  );
+}
+
+/**
+ * §9.4's «تعويض» — SAFRA's own goodwill credit, not a return of the payment.
+ *
+ * The currency is a SELECT over what the platform actually holds rates for, rather than a text
+ * box: an amount with a currency nobody can convert is money that cannot be paid, and «10» in the
+ * wrong one is wrong by four orders of magnitude between SYP and USD.
+ */
+function CompensationForm({
+  busy,
+  currencies,
+  onSubmit,
+}: {
+  busy: boolean;
+  currencies: readonly string[];
+  onSubmit: (body: { amount: string; currency: string; note: string }) => void;
+}) {
+  const copy = t.sections.bookingDetail;
+
+  return (
+    <form
+      className="grid gap-2 rounded-lg border border-gold/30 bg-gold/[0.06] p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const form = new FormData(event.currentTarget);
+
+        onSubmit({
+          amount: text(form, 'amount').trim(),
+          currency: text(form, 'currency'),
+          note: text(form, 'note').trim(),
+        });
+      }}
+    >
+      <p className="text-[11.5px] text-gold">{copy.compensateHint}</p>
+
+      <div className="flex flex-wrap gap-2">
+        <label className="grid gap-1">
+          <span className="text-[11px] text-faint">{copy.compensateAmountLabel}</span>
+          {/*
+            `inputMode="decimal"` rather than `type="number"`: a number input's spinner and its
+            locale-dependent parsing are both wrong for money, and the value is sent as a STRING
+            because a JSON number is an IEEE-754 double.
+          */}
+          <input
+            name="amount"
+            required
+            inputMode="decimal"
+            pattern="\d{1,10}(\.\d{1,2})?"
+            disabled={busy}
+            className="w-32 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed min-h-10 lg:min-h-0"
+          />
+        </label>
+
+        <label className="grid gap-1">
+          <span className="text-[11px] text-faint">{copy.compensateCurrencyLabel}</span>
+          <select
+            name="currency"
+            required
+            disabled={busy}
+            className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+          >
+            {currencies.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label className="grid gap-1">
+        <span className="text-[11px] text-faint">{copy.compensateNoteLabel}</span>
+        <textarea
+          name="note"
+          required
+          minLength={10}
+          maxLength={500}
+          rows={2}
+          disabled={busy}
+          className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+        />
+        <span className="text-[10.5px] text-faint">{copy.compensateNoteHint}</span>
+      </label>
+
+      <Submit busy={busy} label={busy ? copy.compensating : copy.compensate} />
+    </form>
+  );
+}
+
+/** The one submit button these three forms share, so their affordance cannot drift apart. */
+function Submit({ busy, label: text }: { busy: boolean; label: string }) {
+  return (
+    <button
+      type="submit"
+      disabled={busy}
+      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12.5px] font-bold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+    >
+      {text}
+    </button>
+  );
+}
+
+/** What `RefundService.quote` answers — the fields this form reads from it. */
+type RefundQuote = {
+  refundPercent: number;
+  refundable: string;
+  walletAmount: string;
+  currencyCode: string;
+  tierApplied: string;
+};
