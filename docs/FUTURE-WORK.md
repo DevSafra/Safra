@@ -4585,6 +4585,65 @@ asking the guest for a better one.
 
 ---
 
+### O-book-5 — What the final booking SRS audit found still open
+
+**Status:** open · **Severity:** one High, two Medium · **Owner:** engineering ·
+**Recorded:** 2026-08-25, by reading §5.2, §5.3, §6.1–§6.5 and §16 against the whole platform
+
+Bashar asked for one final booking-related pass across the platform once the voucher landed
+(2026-08-25). §6.1, §6.2's eight states and their writers, §6.3's ten steps, §6.4's four rows and
+§6.5 are otherwise met — see `O-book-1` through `O-book-4`. Three things are not, and one of them
+is about money.
+
+**1. §6.4's «تعيد المبلغ» has no writer — HIGH.**
+
+«الشريك لم يرد خلال ساعتين → إلغاء الحجز، استرداد كامل» and «الشريك رفض خلال ساعتين → تلغي سفرة
+الحجز وتعيد المبلغ». The cancellation happens, the §6.4 compensation is credited to the wallet, the
+violation and the fine are recorded and the partner's score is docked — **and the money the customer
+paid is not sent back by anything.** `BookingActionsService.cancel` returns `refundPending: true`
+and NOTHING reads that field, anywhere. `RefundService.issue` has exactly one caller,
+`payments.controller.ts`, which is a staff action on the console.
+
+So the refund depends on a person noticing, and nothing tells them: there is no
+«cancelled, paid, not refunded» counter on the dashboard beside the two EC counters, and no filter
+on الحجوزات. In the load database that shape is **5,245 bookings**, 5,226 of them
+`system.partner_no_response` — fixture-driven in that count, but the structure is real.
+
+It is expressible today. `ManualTransferProvider.refund()` deliberately reports `processing` and
+never `completed`, because a SEPA refund is an outbound transfer a human executes — so a refund row
+created by the sweep would sit open as an OBLIGATION until finance confirms it, which is exactly the
+right state for this. The work is: have the SLA sweep and the rejection path open the refund, and
+surface unrefunded cancellations as a counter.
+
+**2. §6.3 step 3 omits «عدد الضيوف» — MEDIUM.**
+
+The step names eight things the payment summary must show: «العقار، المدينة، التواريخ، عدد الليالي،
+عدد الضيوف، السعر، رسوم سفرة، الإجمالي». `/checkout` shows seven. The guest count is read from the
+query string and passed to the form for submission, and never rendered — so the last screen before
+somebody pays does not confirm how many people they are paying for.
+
+**3. §5.2's children and infants are unreachable — MEDIUM.**
+
+«عدد الأشخاص — يشمل البالغين والأطفال والرضع عند الحاجة». `bookingCreateSchema` accepts `adults`,
+`children` and `infants`; the customer journey only ever sends `adults`. The search form has one
+number field, the city and home links hard-code `adults=2`, and checkout carries that one value
+through. A family cannot say what it is, and `max_guests` is therefore checked against an
+undercount — the party that arrives is larger than the party the unit was matched against.
+
+The two defaults in the contract are `.default(0)`, which is correct for an OPTIONAL field and is
+why this is invisible from the API's side: nothing is missing, the caller genuinely says zero.
+
+**Known and blocked, not a finding.** §6.1 and §6.3 step 6 both say «Email وWhatsApp». WhatsApp is
+unwired pending the BSP decision (roadmap item 192, Bashar's) — the channel enum, the templates and
+the per-message delivery state are built; there is no transport. Email carries everything today.
+
+**A decision rather than a gap.** §6.5's «QR Code يستخدم للتحقق من الحجز» is met by a code the desk
+READS — it carries the six fields as text precisely so it works with no connection. There is no
+scanner in لوحة الشريك, so a partner verifies by reading the code or typing the reference into the
+lookup. Building a camera scanner is a product call, not an unimplemented requirement.
+
+---
+
 ### O-book-3 — §9.4's remaining actions, and what materialising `Disputed` cost
 
 **Status:** **BUILT 2026-08-25** — driven in a browser, held by 17 assertions ·
