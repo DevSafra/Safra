@@ -273,6 +273,20 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
           href: '/bookings?attention=no_check_in',
         }
       : null,
+    /*
+      §6.4 — money SAFRA owes back and has not started returning.
+
+      Above EC-004 and below EC-011 because it is a CUSTOMER's money: the sweep clears it within
+      five minutes in the ordinary case, so a row that persists here means the automatic path
+      cannot resolve it and a person has to.
+    */
+    counters.refunds_owed > 0
+      ? {
+          code: '§6.4',
+          text: `${count(counters.refunds_owed)} ${t.admin.attentionRefundsOwed}`,
+          href: '/bookings?attention=refund_owed',
+        }
+      : null,
     /* EC-004 — should be zero. A row here is a defect, not a queue. */
     counters.confirmed_not_recorded > 0
       ? {

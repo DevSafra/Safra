@@ -259,6 +259,6 @@ export type BookingVerificationInput = z.infer<typeof bookingVerificationSchema>
  * predicate — see `SLA_EXPIRY_WARNING_MINUTES`. These are the two added on 2026-08-25 with EC-004
  * and EC-011; `expiring=1` predates them and keeps its own parameter.
  */
-export const BOOKING_ATTENTION = ['no_check_in', 'unconfirmed'] as const;
+export const BOOKING_ATTENTION = ['no_check_in', 'unconfirmed', 'refund_owed'] as const;
 
 export type BookingAttention = (typeof BOOKING_ATTENTION)[number];

@@ -87,6 +87,57 @@ export class RefundService {
     const booking = await this.load(reference);
     const quote = await this.computeQuote(booking);
 
+    return this.post(booking, quote, reason, claims);
+  }
+
+  /**
+   * The WHOLE amount back, because the customer did nothing wrong (§6.4).
+   *
+   * ## Why this cannot go through `execute`
+   *
+   * `computeQuote` applies §7.4's cancellation tiers to `base_amount`, and both halves of that are
+   * wrong here. The tiers price a customer's CHANGE OF MIND — a late cancellation refunds less
+   * because the partner has lost the chance to re-sell the night. §6.4 is the opposite situation:
+   * «الشريك لم يرد خلال ساعتين → إلغاء الحجز، استرداد كامل». The stay did not happen because the
+   * PARTNER never answered, so a tier that returns 50% would fine the customer for the partner's
+   * silence.
+   *
+   * And it refunds `total_amount`, not `base_amount`. The service fee is described elsewhere in
+   * this file as «earned when the booking is made», which holds for a change of mind — the
+   * customer got a booking and gave it up. Here they got NOTHING, so there is nothing the fee was
+   * charged for, and keeping it would mean SAFRA profits from its own partner's failure.
+   *
+   * ## Idempotent by the amount, not by a flag
+   *
+   * `alreadyRefunded` is subtracted the same way `computeQuote` does it, so a second call after a
+   * partial refund tops it up to whole and a second call after a full one refunds zero and is
+   * refused. That is what makes it safe to call from a SWEEP that re-reads its own working set.
+   */
+  async refundInFull(
+    reference: string,
+    reason: string,
+  ): Promise<{ refundId: string; amount: string; status: string; percent: number }> {
+    const booking = await this.load(reference);
+    const quote = await this.fullQuote(booking);
+
+    return this.post(booking, quote, reason, undefined);
+  }
+
+  /**
+   * Everything after the figure is agreed — shared by both paths above.
+   *
+   * Extracted rather than duplicated because it is the part that MOVES money: the refund row, the
+   * wallet credit, the ledger legs, the timeline entry and the audit record. Two copies of this
+   * would drift, and the direction they drift in is one path forgetting a leg.
+   */
+  private async post(
+    booking: BookingRow,
+    quote: RefundQuote,
+    reason: string,
+    claims: AccessTokenClaims | undefined,
+  ): Promise<{ refundId: string; amount: string; status: string; percent: number }> {
+    const reference = booking.reference;
+
     if (toMinor(quote.refundAmount, MONEY_SCALE) <= 0n) {
       throw conflict(ERROR.BOOKING_NO_REFUNDABLE_AMOUNT);
     }
@@ -208,7 +259,8 @@ export class RefundService {
       await tx.execute(sql`
         INSERT INTO timeline_events
           (subject_type, subject_id, event_type, actor_type, actor_user_id, payload)
-        VALUES ('booking', ${booking.id}, 'booking.refund_issued', 'staff',
+        VALUES ('booking', ${booking.id}, 'booking.refund_issued',
+                ${claims ? 'staff' : 'system'},
                 ${claims?.sub ?? null},
                 ${JSON.stringify({
                   amount: quote.refundAmount,
@@ -395,6 +447,41 @@ export class RefundService {
     };
   }
 
+  /**
+   * 100% of the TOTAL, less whatever has already gone back.
+   *
+   * Shares `computeQuote`'s wallet-first split (§7.3) and its already-refunded arithmetic; what it
+   * does not share is the tier lookup, because there is no tier to apply — see `refundInFull`.
+   */
+  private async fullQuote(booking: BookingRow): Promise<RefundQuote> {
+    const gross = booking.total_amount;
+    const alreadyRefunded = await this.sumRefunded(booking.id);
+
+    const remaining = toMinor(gross, MONEY_SCALE) - toMinor(alreadyRefunded, MONEY_SCALE);
+    const refundAmountMinor = remaining > 0n ? remaining : 0n;
+
+    const walletHeadroom =
+      toMinor(booking.wallet_amount, MONEY_SCALE) -
+      toMinor(await this.sumRefundedToWallet(booking.id), MONEY_SCALE);
+    const cappedHeadroom = walletHeadroom > 0n ? walletHeadroom : 0n;
+
+    const toWalletMinor =
+      refundAmountMinor < cappedHeadroom ? refundAmountMinor : cappedHeadroom;
+
+    return {
+      refundPercent: 100,
+      refundAmount: fromMinor(refundAmountMinor, MONEY_SCALE),
+      walletAmount: fromMinor(toWalletMinor, MONEY_SCALE),
+      providerAmount: fromMinor(refundAmountMinor - toWalletMinor, MONEY_SCALE),
+      currencyCode: booking.currency_code,
+      hoursBeforeCheckIn: 0,
+      /* Named for the RULE rather than a tier, because that is what the audit row has to say. */
+      tierApplied: 'full refund (§6.4)',
+      alreadyRefunded,
+      refundable: gross,
+    };
+  }
+
   /** How much of this booking's refunds has already gone back to stored value. */
   private async sumRefundedToWallet(bookingId: string): Promise<string> {
     const rows = await this.db.execute<{ total: string }>(sql`
@@ -454,7 +541,7 @@ export class RefundService {
 
   private async load(reference: string): Promise<BookingRow> {
     const rows = await this.db.execute<BookingRow>(sql`
-      SELECT b.id, b.status::text AS status, b.check_in::text AS check_in,
+      SELECT b.id, b.reference, b.status::text AS status, b.check_in::text AS check_in,
              b.base_amount::text AS base_amount, b.total_amount::text AS total_amount,
              b.wallet_amount::text AS wallet_amount,
              b.currency_id, b.fx_rate_to_syp::text AS fx_rate_to_syp,
@@ -480,6 +567,7 @@ export class RefundService {
 /** A `type`, not an `interface` — see the note on PaymentRow in the webhook service. */
 type BookingRow = {
   id: string;
+  reference: string;
   status: string;
   check_in: string;
   base_amount: string;

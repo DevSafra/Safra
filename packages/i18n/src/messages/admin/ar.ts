@@ -197,6 +197,12 @@ export const ar = {
       answer and the status move are one transaction, so a row here means something is broken.
     */
     attentionUnconfirmed: 'حجز ردّ عليه الشريك ولم تتغيّر حالته — خلل يحتاج مراجعة',
+    /*
+      §6.4. «لم يبدأ» rather than «لم يُسترد»: the sweep issues the refund automatically and the
+      outbound transfer is a human step afterwards, so a row here means nothing has STARTED — which
+      is the state that needs somebody, not a refund merely still in flight.
+    */
+    attentionRefundsOwed: 'حجز ألغته سفرة ولم يبدأ استرداد مبلغه — يحتاج متابعة',
     attentionSla: 'حجز تنتهي مهلة تأكيده خلال 30 دقيقة',
     attentionPartners: 'شريك بانتظار التحقق من الوثائق',
     attentionProperties: 'عقار بانتظار المراجعة قبل النشر',

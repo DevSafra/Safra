@@ -47,6 +47,8 @@ export type DashboardCounterName =
   | 'arrivals_not_checked_in'
   /** EC-004 — the partner answered and the booking never moved. */
   | 'confirmed_not_recorded'
+  /** §6.4 — SAFRA cancelled a paid booking and the money has not started coming back. */
+  | 'refunds_owed'
   | 'cancelled_today'
   | 'cancelled_today_with_fine'
   | 'partners_pending_verification'
@@ -183,6 +185,40 @@ export class DashboardService {
         WHERE b.status = 'pending_confirmation'
           AND b.partner_responded_at IS NOT NULL
           AND b.deleted_at IS NULL
+          AND ${inScope('b')}
+      UNION ALL
+      /*
+        §6.4 — a paid booking SAFRA cancelled, with nothing on its way back to the customer.
+
+        ## Why a counter exists beside an automatic sweep
+
+        SystemRefundService issues these every five minutes, so the ordinary reading is ZERO and a
+        non-zero one clears itself within the next pass. What it is here for is the case the sweep
+        CANNOT resolve — a provider that no longer exists, a currency with no rate — where the
+        refund fails, backs off for an hour, fails again, and would otherwise be visible only to
+        whoever reads scheduled_job_runs. Bashar's instruction (2026-08-25) was that the customer's
+        refund must not depend on a member of staff noticing; a sweep satisfies that, and this
+        counter is what stops a sweep that is quietly failing from being the same defect again.
+
+        The predicate is deliberately the sweep's own, minus the backoff: the backoff decides WHEN
+        to retry, and a booking waiting out an hour is still a booking owed money.
+      */
+      SELECT 'refunds_owed', COUNT(*)::text
+        FROM bookings b
+        WHERE b.status = 'cancelled'
+          AND b.deleted_at IS NULL
+          AND b.paid_at IS NOT NULL
+          AND b.cancellation_reason LIKE 'system.%'
+          AND EXISTS (
+            SELECT 1 FROM payments p
+            WHERE p.booking_id = b.id
+              AND p.status IN ('captured', 'partially_refunded')
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM refunds r
+            WHERE r.booking_id = b.id
+              AND r.status IN ('pending', 'processing', 'completed')
+          )
           AND ${inScope('b')}
       UNION ALL
       SELECT 'cancelled_today', COUNT(*)::text

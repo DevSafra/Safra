@@ -876,6 +876,8 @@ const dashboardSchema = z.object({
     arrivals_not_checked_in: z.number(),
     /** EC-004 — answered by the partner and never moved. Should be zero; see the counter. */
     confirmed_not_recorded: z.number(),
+    /* §6.4 — a paid booking SAFRA cancelled with no refund on its way. */
+    refunds_owed: z.number(),
     cancelled_today: z.number(),
     cancelled_today_with_fine: z.number(),
     partners_pending_verification: z.number(),

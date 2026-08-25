@@ -170,6 +170,32 @@ export class BookingListService {
         AND b.partner_responded_at IS NOT NULL`);
     }
 
+    /*
+      §6.4 — SAFRA cancelled a paid booking and nothing is on its way back.
+
+      The SAME predicate as the dashboard's `refunds_owed` counter and as SystemRefundService's own
+      working set, minus the retry backoff: a booking waiting out an hour before its next attempt is
+      still a booking owed money, and an operator looking at this list wants to see it. Written out
+      rather than shared as a fragment because the three live in three packages; they are held in
+      step by `refund-owed-parity.integration.test.ts`, which fails if they ever disagree.
+    */
+    if (query.attention === 'refund_owed') {
+      conditions.push(sql`
+        b.status = 'cancelled'::booking_status
+        AND b.paid_at IS NOT NULL
+        AND b.cancellation_reason LIKE 'system.%'
+        AND EXISTS (
+          SELECT 1 FROM payments p2
+          WHERE p2.booking_id = b.id
+            AND p2.status IN ('captured', 'partially_refunded')
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM refunds r
+          WHERE r.booking_id = b.id
+            AND r.status IN ('pending', 'processing', 'completed')
+        )`);
+    }
+
     if (query.q) {
       const term = `%${query.q}%`;
 

@@ -31,6 +31,14 @@ export const SCHEDULED_JOBS = {
    * whatever is `completed` when it runs and is correct either way.
    */
   'stay-completion': '10 * * * *',
+  /**
+   * Returning the money on a booking SAFRA itself cancelled — §6.4, and `O-book-5`'s High.
+   *
+   * Five minutes rather than hourly: this is a customer's money, and the wait between «your
+   * booking is cancelled» and «the refund is on its way» is the whole experience of the failure.
+   * It costs one partial-index probe when there is nothing owed, which is the ordinary case.
+   */
+  'system-refunds': '*/5 * * * *',
   'ranking-recompute': '0 3 * * *',
   'webhook-retention': '0 3 * * *',
   /**

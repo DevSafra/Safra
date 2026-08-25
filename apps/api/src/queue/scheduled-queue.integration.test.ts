@@ -109,6 +109,8 @@ describeIfReady('the scheduled queue', () => {
       } as never,
       /* The one whose recording lives at the call site rather than in its service. */
       { run: () => stub('notification-redrive').run() } as never,
+      /* §6.4's refund sweep — records through `JobRunService` like the rest of them. */
+      { sweep: () => stub('system-refunds').run() } as never,
       runs,
       new DeadLetterService(db),
     );

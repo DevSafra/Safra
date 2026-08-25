@@ -8,6 +8,7 @@ import { PaymentWebhookService } from './payment-webhook.service.js';
 import { WebhookRetentionService } from './webhook-retention.service.js';
 import { PaymentsController } from './payments.controller.js';
 import { RefundService } from './refund.service.js';
+import { SystemRefundService } from './system-refund.service.js';
 import { ManualTransferProvider } from './providers/manual-transfer.provider.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import { WalletModule } from '../wallet/wallet.module.js';
@@ -34,6 +35,7 @@ import { WalletModule } from '../wallet/wallet.module.js';
     PaymentIntentService,
     PaymentWebhookService,
     RefundService,
+    SystemRefundService,
     // Provided per-module rather than globally, matching BookingsModule. It is
     // stateless, so a second instance costs nothing.
     AuditService,
@@ -44,6 +46,11 @@ import { WalletModule } from '../wallet/wallet.module.js';
     whether to offer «تأكيد استلام الحوالة», and offering that on a card would be a way to mark a
     booking paid mid-3-D-Secure. Read-only use — nothing outside this module registers a provider.
   */
-  exports: [RefundService, WebhookRetentionService, PaymentProviderRegistry],
+  exports: [
+    RefundService,
+    SystemRefundService,
+    WebhookRetentionService,
+    PaymentProviderRegistry,
+  ],
 })
 export class PaymentsModule {}
