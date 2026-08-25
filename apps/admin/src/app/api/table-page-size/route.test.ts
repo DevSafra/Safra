@@ -224,6 +224,75 @@ describe('the rows-per-page bar', () => {
     expect(response.headers.get('location')).toContain('page=3');
   });
 
+  /**
+   * A submit that could not change anything does NOTHING (Bashar, 2026-08-25, second report).
+   *
+   * On مخالفات in the console the section's path is `/partners` — the registry — because
+   * `TABLE_SECTION_PATHS` cannot hold a URL containing a record reference. That trade is right for a
+   * real submit and wrong for one that changes nothing: deleting the `disabled` attribute and
+   * pressing تطبيق took him off the violations he was reading and onto الشركاء.
+   *
+   * `204` and no `Location`, so the browser stays exactly where it is. Not a redirect back to the
+   * same URL: that is a navigation, it resets scroll, and it is a lie about something having happened.
+   */
+  it('answers a submit with nothing to apply by doing nothing', async () => {
+    const response = await POST(
+      submit({
+        section: 'partnerViolations',
+        vpage: '2',
+        vsize: '25',
+        /* One page, two rows — the state where every control is dead. */
+        pages: '1',
+        total: '2',
+      }),
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get('location')).toBeNull();
+    expect(response.headers.get('content-type')).toBeNull();
+    /* And nothing was written, because nothing was chosen. */
+    expect(proxy).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The opposite control, in both directions — without these the fix above is indistinguishable
+   * from an endpoint that has simply stopped working.
+   */
+  it('still applies a size when the table is one page but larger than the smallest size', async () => {
+    const response = await POST(
+      submit({ section: 'audit', size: '100', pages: '1', total: '40' }),
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toContain('size=100');
+    expect(proxy).toHaveBeenCalled();
+  });
+
+  it('still applies on a table with several pages', async () => {
+    const response = await POST(
+      submit({ section: 'bookings', page: '3', size: '25', pages: '40', total: '900' }),
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get('location')).toContain('page=3');
+  });
+
+  it('acts normally when the bar sent no counts at all', async () => {
+    /* Every caller that is not the bar — a script, an old cached page — keeps working. */
+    const response = await POST(submit({ section: 'bookings', size: '25' }));
+
+    expect(response.status).toBe(303);
+    expect(proxy).toHaveBeenCalled();
+  });
+
+  it('treats a capped total as never moot, so a huge table is never inert', async () => {
+    const response = await POST(
+      submit({ section: 'audit', size: '25', pages: '1', total: '10', capped: '1' }),
+    );
+
+    expect(response.status).toBe(303);
+  });
+
   it('carries the filters forward, so paging never widens the set', async () => {
     const response = await POST(
       submit({ section: 'bookings', size: '25', q: 'a&b', status: 'confirmed' }),

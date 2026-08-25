@@ -1,6 +1,7 @@
 import { seeOther } from '@safra/session';
 
 import {
+  DEFAULT_TABLE_PAGE_SIZE,
   TABLE_SECTIONS,
   TABLE_SECTION_PARAMS,
   TABLE_SECTION_PATHS,
@@ -9,6 +10,7 @@ import {
   tablePageSizeSchema,
 } from '@safra/contracts';
 
+import { barState } from '@/components/table-pagination-state';
 import { proxy } from '@/lib/proxy';
 import { MAX_PAGE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from '@/lib/search-params';
 
@@ -20,6 +22,14 @@ import { MAX_PAGE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from '@/lib/search-params';
  * redirect, and that is the one thing this route must never do.
  */
 const CONSOLE_ROOT = '/';
+
+/**
+ * The smallest size the bar offers, which is what makes every option identical below it.
+ *
+ * Ten, and it is `DEFAULT_TABLE_PAGE_SIZE` rather than a fourth literal — `SIZES[0]` in the bar is
+ * the same number, and two constants named "the smallest size" is one more than can stay in step.
+ */
+const SMALLEST_OFFERED_SIZE = DEFAULT_TABLE_PAGE_SIZE;
 
 /**
  * The pagination bar's submit: remember the page size, then show the page that was asked for.
@@ -87,6 +97,26 @@ export async function POST(request: Request): Promise<Response> {
   const section = candidate;
   const names = TABLE_SECTION_PARAMS[section];
 
+  /*
+    NOTHING TO APPLY means do nothing at all (Bashar, 2026-08-25, second report).
+
+    The page ceiling stopped the page moving, and he was still navigated off the record: on مخالفات
+    the section's path is `/partners` — the registry — because `TABLE_SECTION_PATHS` cannot express a
+    URL containing a record reference, and that trade is fine for a REAL submit and wrong for one
+    that changes nothing. Deleting the `disabled` attribute and pressing تطبيق took him from the
+    violations he was reading to الشركاء.
+
+    So the endpoint asks `barState` — the same function the bar asked — and when the answer is that
+    neither control could have done anything, it writes nothing and answers `204`. No body, no
+    navigation, no scroll: the page the reader is on stays exactly as it was, which is what "nothing
+    happens" means in a browser.
+
+    `pages`, `total` and `capped` come from the form, so this is a convenience like the ceiling above
+    and not a boundary. Someone who edits all three gets an ordinary submit — and an ordinary submit
+    is already safe: the section is allow-listed, the size is schema-validated, the path is a literal.
+  */
+  if (nothingToApply(field)) return new Response(null, { status: 204 });
+
   const parsed = tablePageSizeSchema.safeParse({ section, size: field(names.size) });
 
   /*
@@ -137,6 +167,28 @@ export async function POST(request: Request): Promise<Response> {
     in a URL the console then trusts. `TablePagination` writes the same id onto its `<nav>`.
   */
   return seeOther(`${target.pathname}${target.search}#pager-${section}`);
+}
+
+/**
+ * Whether the bar that submitted this could have changed anything at all.
+ *
+ * Reads the same three numbers the bar rendered from, through the same `barState` — so the endpoint
+ * and the component cannot disagree about when a control is dead. A missing or unparseable field
+ * falls through to "something might change", which keeps every caller that is not the bar working
+ * exactly as before.
+ */
+function nothingToApply(field: (name: string) => string | undefined): boolean {
+  const pages = Number(field('pages'));
+  const total = Number(field('total'));
+
+  if (!Number.isFinite(pages) || !Number.isFinite(total)) return false;
+
+  return barState({
+    pages: Math.trunc(pages),
+    total: Math.trunc(total),
+    capped: field('capped') !== undefined,
+    smallestSize: SMALLEST_OFFERED_SIZE,
+  }).nothingToApply;
 }
 
 /**

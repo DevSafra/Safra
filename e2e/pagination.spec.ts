@@ -124,6 +124,8 @@ test.afterAll(async ({ request }) => {
     'bookings',
     'customers',
     'partners',
+    /* The verification queue on /partners — submitted by the two-table specs since 2026-08-25. */
+    'partnersPending',
     'staff',
     'staffActivity',
   ] as const;
@@ -380,8 +382,8 @@ test.describe('the pagination bar', () => {
    *
    * All of them drive `/bookings`, whose bar posts `page` and `size` — the plain names. Five of the
    * console's tables namespace theirs, because they share a route with a registry that already owns
-   * `?page=`: آخر نشاط الموظفين posts `activityPage`/`activitySize`, the two verification queues post
-   * `queuePage`/`queueSize`, a partner's violations posts `vpage`/`vsize`.
+   * `?page=`: the two verification queues post `queuePage`/`queueSize`, آخر نشاط الموظفين posts
+   * `activityPage`/`activitySize`, a partner's violations posts `vpage`/`vsize`.
    *
    * The save endpoint read the LITERAL `size`, so for all five it saw nothing, failed validation and
    * answered `{"message":"Unknown table or size."}` — which the browser rendered as a bare document,
@@ -390,37 +392,40 @@ test.describe('the pagination bar', () => {
    *
    * **250 browser tests passed over it.** Not because the assertions were weak, but because every one
    * of them picked the easy table — the same shape as `detail-return.spec.ts` having to be written
-   * against the LAST row of a full page, for the same reason. So this test drives the bar the defect
-   * was actually in.
+   * against the LAST row of a full page.
    *
-   * `/staff` is the case in point: the registry's bar and the activity panel's bar are on ONE screen,
-   * so this also proves that submitting one does not move the other.
+   * ## Why `/partners` and not `/staff`
+   *
+   * Both routes carry two paged lists, and this was written against `/staff` — whose activity panel
+   * holds fewer than ten rows on the development database. Once the endpoint learned to refuse a
+   * submit that cannot change anything (2026-08-25, Bashar's second report), that panel correctly
+   * answers `204` and the assertion below had nothing to observe. `/partners` carries a 477-strong
+   * verification queue beside a 533-row registry, so both bars can actually act.
    */
   test('a namespaced bar applies without a JSON screen, and leaves its neighbour alone', async ({
     page,
   }) => {
-    await page.goto('/staff?page=2&size=10');
+    await page.goto('/partners?page=2&size=10');
 
-    const activityBar = bar(page, t.sections.staff.activity);
+    const queueBar = bar(page, t.sections.partners.pendingTitle);
 
-    await expect(activityBar).toBeVisible();
+    await expect(queueBar).toBeVisible();
 
-    /* The panel's OWN select and button, scoped to its bar — the screen has two of each. */
-    await activityBar.getByLabel(t.table.pageSizeLabel).selectOption('25');
-    await activityBar.getByRole('button', { name: t.table.apply }).click();
+    await queueBar.getByLabel(t.table.pageSizeLabel).selectOption('25');
+    await queueBar.getByRole('button', { name: t.table.apply }).click();
 
     /*
       The assertion that would have caught the defect. A JSON body replaces the document, so the
-      console's own landmarks go with it: no `<nav>`, no shell, nothing but text. Checked before the
-      URL, because a JSON screen has a URL too and it is this route's.
+      console's own landmarks go with it: no `<nav>`, no shell, nothing but text.
     */
     await expect(anyBar(page).first()).toBeVisible();
     await expect(page.locator('body')).not.toContainText('Unknown table or size');
 
+    await expect.poll(() => new URL(page.url()).searchParams.get('queueSize')).toBe('25');
+
     const url = new URL(page.url());
 
-    expect(url.pathname).toBe('/staff');
-    expect(url.searchParams.get('activitySize')).toBe('25');
+    expect(url.pathname).toBe('/partners');
 
     /*
       And the registry it shares the screen with has not moved. Sharing `?page=` is the failure the
@@ -434,100 +439,25 @@ test.describe('the pagination bar', () => {
   /**
    * The registry's own bar on the same screen, for the opposite direction.
    *
-   * Without this, a route that ignored the section entirely and always wrote `activitySize` would
+   * Without this, a route that ignored the section entirely and always wrote `queueSize` would
    * satisfy the test above. The pair is what proves the two bars are actually independent.
    */
   test('the registry bar on a two-table screen moves only itself', async ({ page }) => {
-    await page.goto('/staff?activityPage=2&activitySize=25');
+    await page.goto('/partners?queuePage=2&queueSize=25');
 
-    await staffBar(page).getByLabel(t.table.pageSizeLabel).selectOption('25');
-    await staffBar(page).getByRole('button', { name: t.table.apply }).click();
+    /* The registry bar passes no label, so it carries the default landmark name. */
+    const registryBar = bar(page);
+
+    await registryBar.getByLabel(t.table.pageSizeLabel).selectOption('25');
+    await registryBar.getByRole('button', { name: t.table.apply }).click();
 
     await expect(anyBar(page).first()).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get('size')).toBe('25');
 
     const url = new URL(page.url());
 
-    expect(url.searchParams.get('size')).toBe('25');
-    expect(url.searchParams.get('activityPage')).toBe('2');
-    expect(url.searchParams.get('activitySize')).toBe('25');
-  });
-
-  /**
-   * A table that fits on one page offers nothing to press (Bashar, 2026-08-25).
-   *
-   * He met this on a registry holding two rows: both arrows correctly greyed, and beside them a page
-   * box still inviting a number and a تطبيق still inviting a press. Typing 2 and pressing it is what
-   * produced the JSON screen — and with that fixed, a live control that cannot move anything is
-   * still a promise the screen cannot keep.
-   *
-   * ## Driven by making a table one page, not by finding one
-   *
-   * `?size=100` puts every registry on a single page whatever the fixtures hold, so this does not
-   * depend on some section happening to be small today — which is exactly how the two-row case
-   * stayed unnoticed. The size select's own condition is different and is asserted separately below.
-   */
-  test('disables the paging controls when everything is on one page', async ({
-    page,
-  }) => {
-    await page.goto('/giftcards?size=100');
-
-    /* Precondition, asserted rather than assumed: this really is one page. */
-    await expect(bar(page)).toContainText(t.table.singlePage);
-
-    await expect(pageInput(page)).toBeDisabled();
-    await expect(page.getByRole('button', { name: t.table.apply })).toBeDisabled();
-    /* The arrows were already dead; they are `<span aria-disabled>`, not links. */
-    await expect(page.getByRole('link', { name: t.table.nextPageShort })).toHaveCount(0);
-  });
-
-  /**
-   * And the size select stays live while it can still do something.
-   *
-   * The opposite control, and the reason `sizeIsMoot` is not simply `pages <= 1`: a 25-row table
-   * shown at 100 rows is ALSO one page, and there the select is the only way back to something
-   * scannable. A fix that disabled every control on any single-page table would take that away, pass
-   * the test above, and be a worse screen than the one it replaced.
-   *
-   * ## The fixture is FOUND, not assumed
-   *
-   * This needs a table holding between eleven and a hundred rows, and which table that is depends on
-   * the development database. A hard-coded path with a `test.skip` guessing at its size is how the
-   * first draft of this test passed while asserting nothing — it picked a filtered set that turned
-   * out to have more than one page, and the guard did not catch it because a FULL page of 100 rows
-   * looks the same as the first page of many. So the table is located by reading the bar.
-   */
-  test('keeps the size select usable on one page when it can still narrow the view', async ({
-    page,
-  }) => {
-    let found = '';
-
-    for (const path of TABLES) {
-      await page.goto(`${path}?size=100`);
-
-      /* One page — the note says so — and more than the smallest size, so the select still matters. */
-      const single = (await bar(page).getByText(t.table.singlePage).count()) > 0;
-
-      if (single && (await rowCount(page)) > 10) {
-        found = path;
-        break;
-      }
-    }
-
-    test.skip(
-      found === '',
-      'No registry currently holds between eleven and a hundred rows',
-    );
-
-    await expect(pageInput(page)).toBeDisabled();
-    await expect(sizeSelect(page)).toBeEnabled();
-    await expect(page.getByRole('button', { name: t.table.apply })).toBeEnabled();
-
-    /* And it really works: the reader comes back down to a scannable page. */
-    await sizeSelect(page).selectOption('10');
-    await page.getByRole('button', { name: t.table.apply }).click();
-
-    await expect.poll(() => new URL(page.url()).searchParams.get('size')).toBe('10');
-    expect(await rowCount(page)).toBe(10);
+    expect(url.searchParams.get('queuePage')).toBe('2');
+    expect(url.searchParams.get('queueSize')).toBe('25');
   });
 
   /**
@@ -595,6 +525,118 @@ test.describe('the pagination bar', () => {
       before.total,
     );
     await expect(anyBar(page).first()).toContainText(t.table.singlePage);
+  });
+
+  /**
+   * On مخالفات, a tampered submit does not navigate off the record (Bashar, 2026-08-25).
+   *
+   * `TABLE_SECTION_PATHS['partnerViolations']` is `/partners` — the registry — because it cannot
+   * hold a URL containing a record reference. Right for a real submit; wrong for one that changes
+   * nothing, and that is what he met: the page ceiling stopped the page moving and he was still
+   * taken from the violations he was reading to الشركاء.
+   */
+  test('a tampered submit on مخالفات stays on the record', async ({ page }) => {
+    await page.goto('/partners');
+
+    const firstRow = page.locator('tbody tr a').first();
+
+    await firstRow.click();
+    await page.waitForURL(/\/partners\/[^/]+$/);
+
+    const violations = page.getByRole('link', {
+      name: t.sections.enforcement.openViolations,
+    });
+
+    test.skip(
+      (await violations.count()) === 0,
+      'No violations link on this partner record',
+    );
+
+    await violations.first().click();
+    await page.waitForURL(/violations/);
+
+    const bar = anyBar(page).first();
+
+    test.skip(
+      !(await bar.innerText()).includes(t.table.singlePage),
+      'This partner has more than one page of violations',
+    );
+
+    const before = page.url();
+
+    /* Strip the attributes the way a person does, then press it. */
+    await bar.evaluate((nav: Element) => {
+      for (const control of Array.from(nav.querySelectorAll('input, select, button'))) {
+        control.removeAttribute('disabled');
+      }
+    });
+
+    await page.getByRole('button', { name: t.table.apply }).click();
+
+    /*
+      Still on the violations page, still the same URL. A 204 means the browser does not navigate at
+      all, so this is the assertion that would have caught the report: the old behaviour left the URL
+      on `/partners`.
+    */
+    await expect(page).toHaveURL(before);
+    await expect(anyBar(page).first()).toBeVisible();
+  });
+
+  /**
+   * Pressing تطبيق does not move the page (Bashar, 2026-08-25).
+   *
+   * The submit is a POST-redirect-GET, so the browser resets scroll and then follows the
+   * `#pager-<section>` fragment — which on a long table lands at its foot. Applying 100 rows
+   * therefore threw the whole page to the bottom. `PagerForm` intercepts the submit when JavaScript
+   * is running and hands the redirect target to `router.replace(…, { scroll: false })`; the fragment
+   * stays for the no-JavaScript path, which is the same pair the step arrows already use.
+   *
+   * Asserted on a table long enough to HAVE somewhere to jump to — a short one cannot show this
+   * failing, which is the same reason `detail-return.spec.ts` had to be written against the last row
+   * of a full page.
+   */
+  test('applying a size does not scroll the page', async ({ page }) => {
+    await page.goto('/bookings?size=10');
+
+    /*
+      Somewhere that is neither the top nor the bar, so a jump in either direction shows — and the
+      position is READ BACK rather than assumed. A ten-row table is not long enough to reach an
+      arbitrary offset, so demanding exactly 200 failed in the setup and said nothing about scrolling.
+    */
+    await page.evaluate(() => window.scrollTo(0, 200));
+
+    const before = await page.evaluate(() => window.scrollY);
+
+    expect(before).toBeGreaterThan(0);
+
+    await sizeSelect(page).selectOption('100');
+    await page.getByRole('button', { name: t.table.apply }).click();
+
+    /* The size really was applied — otherwise this passes on a button that does nothing. */
+    await expect.poll(() => new URL(page.url()).searchParams.get('size')).toBe('100');
+    expect(await rowCount(page)).toBe(100);
+
+    /*
+      And the viewport did not move.
+
+      A TOLERANCE rather than an exact figure, because the page it lands on is a different page:
+      ten rows became a hundred, and the single-page note above the bar disappears, so the document
+      genuinely reflows by a few pixels under a fixed scroll offset. What this test is for is the
+      JUMP — the fragment landing the reader at the foot of a hundred-row table, which is thousands
+      of pixels away, not twenty. Both bounds are asserted so a jump in either direction fails.
+    */
+    const after = await page.evaluate(() => window.scrollY);
+
+    /* Within a reflow's worth of where it was, not a page away. */
+    expect(Math.abs(after - before)).toBeLessThan(60);
+
+    /* And explicitly not at the foot of the new, much longer page. */
+    const bottom = await page.evaluate(
+      () => document.documentElement.scrollHeight - window.innerHeight,
+    );
+
+    expect(bottom).toBeGreaterThan(1_000);
+    expect(after).toBeLessThan(bottom / 2);
   });
 
   /**

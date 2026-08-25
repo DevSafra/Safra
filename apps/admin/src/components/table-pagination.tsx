@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { TABLE_SECTION_PARAMS, type TableSection } from '@safra/contracts';
 
 import { count } from '@/lib/format';
+import { PagerForm } from './pager-form';
 import { barState } from './table-pagination-state';
 import { MAX_PAGE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from '@/lib/search-params';
 import { fill, t, plural } from '@/lib/strings';
@@ -169,9 +170,8 @@ export function TablePagination({
         the reader ends up looking at is still a plain shareable GET. The arrows either side of the
         page number are still `<a href>`.
       */}
-      <form
+      <PagerForm
         action="/api/table-page-size"
-        method="post"
         className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2"
       >
         <input type="hidden" name="section" value={section} />
@@ -194,6 +194,20 @@ export function TablePagination({
           may see is decided by the API against their own permissions either way.
         */}
         <input type="hidden" name="pages" value={pages} />
+
+        {/*
+          The total, so the endpoint can reach the SAME verdict this bar did.
+
+          Bashar, 2026-08-25: on مخالفات, deleting the `disabled` attribute and pressing تطبيق
+          navigated him to الشركاء — off the record he was reading. The page ceiling stopped the
+          page moving but not the navigation, because a submit with nothing to apply was still a
+          submit. With `pages` and `total` the route runs `barState` itself and can refuse to do
+          anything at all.
+
+          Like `pages`, a convenience rather than a boundary: whoever edits one can edit this.
+        */}
+        <input type="hidden" name="total" value={total} />
+        <input type="hidden" name="capped" value={capped ? '1' : ''} />
 
         {Object.entries(query).map(([key, value]) =>
           value && key !== pageParam && key !== sizeParam ? (
@@ -289,7 +303,7 @@ export function TablePagination({
         >
           {t.table.apply}
         </button>
-      </form>
+      </PagerForm>
 
       {/*
         Why the controls are dead, said rather than left to be inferred.
