@@ -1,12 +1,15 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { mediaBase, mediaUrl } from '@safra/session';
+
 import { getProperty } from '@/lib/api';
 import { ReviewProperty } from '@/components/review-property';
 import { BackLink, type BackTarget } from '@/components/back-link';
 import { StatusPill } from '@/components/admin-table';
 import { backTarget, detailHref, origin } from '@/lib/search-params';
 import { statusTone } from '@/lib/status-tone';
+import { count } from '@/lib/format';
 import { fill, label, t, plural } from '@/lib/strings';
 import { refuseSection } from '@/components/section-refusal';
 
@@ -18,6 +21,14 @@ import { refuseSection } from '@/components/section-refusal';
  * can return it.
  */
 export const dynamic = 'force-dynamic';
+
+/**
+ * How many thumbnails the review screen renders.
+ *
+ * Enough to judge a listing — the cover and a spread of rooms — and small enough that a property
+ * with hundreds of images does not turn a staff page into hundreds of requests.
+ */
+const PHOTO_LIMIT = 24;
 
 export default async function PropertyPage({
   params,
@@ -52,6 +63,16 @@ export default async function PropertyPage({
   }
 
   if (property === 'failed') notFound();
+
+  /*
+    Resolved once per render, server-side. `NEXT_PUBLIC_MEDIA_URL` when the object store is
+    configured, and the API's development media route otherwise — `mediaBase` owns that choice, and
+    getting it wrong is the mismatch `docs/media-integrity.md` records.
+  */
+  const base = mediaBase({
+    NEXT_PUBLIC_MEDIA_URL: process.env['NEXT_PUBLIC_MEDIA_URL'],
+    API_URL: process.env['API_URL'],
+  });
 
   const partnerVerified = property.partner.verification === 'approved';
   const reviewable = property.status === 'pending_review';
@@ -197,17 +218,72 @@ export default async function PropertyPage({
             {t.sections.propertyDetail.noPhotos}
           </p>
         ) : (
-          <p className="text-sm text-muted">
-            {plural(t.sections.propertyDetail.photoCount, {
-              count: property.images.length,
-              cover: property.images.some((image) => image.isCover)
-                ? t.sections.propertyDetail.coverSet
-                : t.sections.propertyDetail.coverMissing,
-            })}{' '}
-            <span className="text-faint">
-              {t.sections.propertyDetail.previewsPending}
-            </span>
-          </p>
+          <>
+            <p className="text-sm text-muted">
+              {plural(t.sections.propertyDetail.photoCount, {
+                count: property.images.length,
+                cover: property.images.some((image) => image.isCover)
+                  ? t.sections.propertyDetail.coverSet
+                  : t.sections.propertyDetail.coverMissing,
+              })}
+            </p>
+
+            {/*
+              §8.1 — «سفرة تتحقق من العقارات قبل النشر عبر … الصور».
+
+              A reviewer approving a listing needs to SEE it. This printed a count and a note saying
+              previews were not built; the count is what a listing has, not what it looks like.
+
+              `mediaUrl` from `@safra/session`, the same helper the customer site renders through,
+              so the console cannot drift into asking for a variant that was never produced — the
+              pipeline does not upscale, and a guessed width is a guaranteed 404.
+
+              A plain `img`, not `next/image`: these are staff thumbnails behind a login, so the
+              optimiser would buy nothing and would need the media host in `remotePatterns`.
+              The cover is marked, because which image leads the listing is part of the review.
+            */}
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {property.images.slice(0, PHOTO_LIMIT).map((image) => (
+                <li key={image.fileKey} className="relative">
+                  <a
+                    href={mediaUrl(base, image, 1600, 'webp')}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block"
+                  >
+                    <img
+                      src={mediaUrl(base, image, 320, 'webp')}
+                      alt=""
+                      loading="lazy"
+                      className="h-24 w-32 rounded-lg border border-line object-cover"
+                    />
+                  </a>
+                  {image.isCover ? (
+                    <span className="absolute start-1 top-1 rounded bg-bg/80 px-1.5 py-0.5 text-[10px] text-gold">
+                      {t.sections.propertyDetail.coverBadge}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+
+            {/*
+              BOUNDED, because a listing's gallery is not.
+
+              One seeded property carries 659 images, and rendering them all put 659 requests and
+              659 DOM nodes on a staff screen — rule 2's "nothing that degrades" applies to a
+              review page as much as to a query. A reviewer judges a listing from its cover and a
+              sample; the count above says how many there are, and this says what is not shown
+              rather than quietly truncating.
+            */}
+            {property.images.length > PHOTO_LIMIT ? (
+              <p className="mt-2 text-[12px] text-faint">
+                {fill(t.sections.propertyDetail.morePhotos, {
+                  n: count(property.images.length - PHOTO_LIMIT),
+                })}
+              </p>
+            ) : null}
+          </>
         )}
       </Section>
 

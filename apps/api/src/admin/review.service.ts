@@ -274,7 +274,22 @@ export class ReviewService {
          * listing approved without looking at them is the whole of P-002 skipped.
          */
         images: {
-          columns: { fileKey: true, width: true, height: true, isCover: true },
+          /*
+            `variantWidths` as well, so the console can actually SHOW them (§8.1).
+
+            The screen printed a count and a note saying previews were not built yet, which meant a
+            reviewer approved a listing they had never seen — while §8.1 says SAFRA verifies a
+            property «عبر … الصور». Nothing architectural was missing: `mediaUrl` has been in
+            `@safra/session` all along and the customer site renders through it. What was missing
+            was this one column in the projection.
+          */
+          columns: {
+            fileKey: true,
+            variantWidths: true,
+            width: true,
+            height: true,
+            isCover: true,
+          },
         },
         /*
           `nameAr` as well as `nameEn`. The console is Arabic-only and was listing every room by

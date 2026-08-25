@@ -6,6 +6,7 @@ import {
   buildCsp,
   callAuth,
   createNonce,
+  mediaOrigins,
   decodeSession,
   encodeSession,
   hasTwoFactor,
@@ -61,12 +62,29 @@ export default async function middleware(request: NextRequest) {
    * server-rendered, so nothing that only checked a status code could see it — but in a
    * browser no form in this console worked.
    *
-   * `img-src` is narrower than the customer app's: this console renders identity
-   * documents through the API and needs no remote images at all.
+   * `img-src` names the MEDIA origins, and it did not until 2026-08-26.
+   *
+   * It read `'self' data: blob:` on the reasoning that "this console renders identity documents
+   * through the API and needs no remote images at all". That stopped being true the moment the
+   * property review screen started showing a listing's photographs — §8.1 has SAFRA verify a
+   * property «عبر … الصور», and with the object store missing from this list the browser blocked
+   * every one of them. Silently: zero requests, `complete` true, `naturalWidth` zero, and nothing
+   * an HTTP-level check could see.
+   *
+   * Named origins rather than a blanket `https:`, for the reason `mediaOrigins` records — a
+   * wildcard turns every image tag on a staff console into an exfiltration channel.
    */
   const csp = buildCsp({
     nonce: createNonce(),
-    imgSrc: "'self' data: blob:",
+    imgSrc: [
+      "'self'",
+      'data:',
+      'blob:',
+      ...mediaOrigins([
+        process.env['NEXT_PUBLIC_MEDIA_URL'],
+        process.env['API_URL'] ?? 'http://localhost:4000',
+      ]),
+    ].join(' '),
     /*
       TLS, not the BUILD MODE.
 

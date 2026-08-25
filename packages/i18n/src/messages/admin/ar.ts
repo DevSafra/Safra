@@ -1905,6 +1905,24 @@ export const ar = {
       sendAlternatives: 'اقتراح بدائل للعميل',
     },
 
+    /* §8.2 — «أنواع أخرى قابلة للإضافة من الإدارة». */
+    propertyTypes: {
+      title: 'أنواع الإقامة',
+      intro: 'الأنواع التي يختار منها الشريك عند تسجيل عقار.',
+      code: 'المعرّف',
+      nameAr: 'الاسم بالعربية',
+      nameEn: 'الاسم بالإنجليزية',
+      nameDe: 'الاسم بالألمانية',
+      hasMultipleUnits: 'يحتوي على أكثر من وحدة (فندق مثلًا)',
+      inUse: '{n} عقار',
+      add: 'إضافة نوع',
+      save: 'حفظ',
+      saving: 'جارٍ الحفظ…',
+      cancel: 'إلغاء',
+      retire: 'إيقاف',
+      restore: 'إعادة تفعيل',
+      retired: 'موقوف',
+    },
     propertyDetail: {
       listing: 'بيانات العقار',
       address: 'العنوان',
@@ -1935,7 +1953,10 @@ export const ar = {
       noDescription: 'لا يوجد وصف.',
       noPhotos:
         'لا صور مرفوعة. يتوقع البند §5.6 معرضاً، وعدد الصور يرفع ترتيب العقار — النشر بلا صور ممكن لكنه نادراً ما يكون صحيحاً.',
-      previewsPending: 'المعاينات غير معروضة بعد — البند 159a في خطة العمل.',
+      /* The previews are shown now (2026-08-26); this marks which image leads the listing. */
+      coverBadge: 'الغلاف',
+      /* Said plainly — a truncated gallery that says nothing reads as the whole gallery. */
+      morePhotos: 'و{n} صورة أخرى غير معروضة هنا.',
       noUnits: 'لا وحدات. عقار بلا وحدة لا يمكن حجزه ولا يجب نشره.',
     },
 

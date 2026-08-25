@@ -425,6 +425,8 @@ const propertyDetailSchema = z.object({
   images: z.array(
     z.object({
       fileKey: z.string(),
+      /* Which variants were actually rendered — `mediaUrl` picks from these, never guesses. */
+      variantWidths: z.array(z.number()),
       width: z.number().nullable(),
       height: z.number().nullable(),
       isCover: z.boolean(),
@@ -442,6 +444,24 @@ const propertyDetailSchema = z.object({
 });
 
 export type PropertyDetail = z.infer<typeof propertyDetailSchema>;
+
+/** §8.2's accommodation types, retired ones included — this is the management view. */
+const propertyTypeSchema = z.object({
+  code: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string(),
+  nameDe: z.string(),
+  hasMultipleUnits: z.boolean(),
+  isActive: z.boolean(),
+  /* How many listings would be affected by retiring it — shown before anybody does. */
+  inUse: z.number(),
+});
+
+export type PropertyType = z.infer<typeof propertyTypeSchema>;
+
+export async function getPropertyTypes() {
+  return staffFetch('/admin/property-types', z.array(propertyTypeSchema));
+}
 
 export async function getProperty(reference: string) {
   return staffFetch(
