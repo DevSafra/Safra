@@ -4585,62 +4585,57 @@ asking the guest for a better one.
 
 ---
 
-### O-book-5 — What the final booking SRS audit found still open
+### O-book-5 — What the final booking SRS audit found, and what closed it
 
-**Status:** open · **Severity:** one High, two Medium · **Owner:** engineering ·
-**Recorded:** 2026-08-25, by reading §5.2, §5.3, §6.1–§6.5 and §16 against the whole platform
+**Status:** **BUILT 2026-08-25** — all three, plus what closing them exposed ·
+**Owner:** engineering · **Recorded:** 2026-08-25
 
-Bashar asked for one final booking-related pass across the platform once the voucher landed
-(2026-08-25). §6.1, §6.2's eight states and their writers, §6.3's ten steps, §6.4's four rows and
-§6.5 are otherwise met — see `O-book-1` through `O-book-4`. Three things are not, and one of them
-is about money.
+**1. §6.4's «تعيد المبلغ» had no writer — was High, now built.** The cancellation happened, the
+compensation was credited, the fine recorded — and the money the customer paid was returned only if
+a member of staff noticed. `SystemRefundService` sweeps every five minutes, keyed on the
+`cancellation_reason` PREFIX (`system.%`) rather than on today's two call sites, so a system path
+added later is covered by construction. It refunds the **total**, not `base_amount` through §7.4's
+tiers: those tiers price a customer's change of mind, and here the customer got nothing.
 
-**1. §6.4's «تعيد المبلغ» has no writer — HIGH.**
+Two things the work itself exposed: a permanently-failing refund would have starved the queue
+behind it at the head of an oldest-first batch (fixed with an hour's backoff), and an unbounded
+sweep in the test suite locked several thousand shared rows and timed out `payments`. Visibility is
+`refunds_owed` on the dashboard and `?attention=refund_owed` on the registry, held to the sweep's
+own predicate by `refund-owed-parity.integration.test.ts`.
 
-«الشريك لم يرد خلال ساعتين → إلغاء الحجز، استرداد كامل» and «الشريك رفض خلال ساعتين → تلغي سفرة
-الحجز وتعيد المبلغ». The cancellation happens, the §6.4 compensation is credited to the wallet, the
-violation and the fine are recorded and the partner's score is docked — **and the money the customer
-paid is not sent back by anything.** `BookingActionsService.cancel` returns `refundPending: true`
-and NOTHING reads that field, anywhere. `RefundService.issue` has exactly one caller,
-`payments.controller.ts`, which is a staff action on the console.
+**2. §6.3 step 3's «عدد الضيوف» — built.** The payment summary showed seven of the eight things the
+step names. Each kind is listed separately, because «٤ ضيوف» cannot tell a family of four from two
+adults and two children and the partner prepares a room from it.
 
-So the refund depends on a person noticing, and nothing tells them: there is no
-«cancelled, paid, not refunded» counter on the dashboard beside the two EC counters, and no filter
-on الحجوزات. In the load database that shape is **5,245 bookings**, 5,226 of them
-`system.partner_no_response` — fixture-driven in that count, but the structure is real.
+**3. §5.2's children and infants — built.** The contract had taken all three since it was written;
+the customer app only ever sent `adults`, `PropertyCard` linked to a property with no query at all,
+and «احجز الآن» hard-coded two. So a family searched as four and reached checkout as two, and
+`max_guests` was matched against the undercount. `e2e/customer-guests.spec.ts` follows the whole
+journey, because every hop looked correct alone and the defect lived in the links.
 
-It is expressible today. `ManualTransferProvider.refund()` deliberately reports `processing` and
-never `completed`, because a SEPA refund is an outbound transfer a human executes — so a refund row
-created by the sweep would sit open as an OBLIGATION until finance confirms it, which is exactly the
-right state for this. The work is: have the SLA sweep and the rejection path open the refund, and
-surface unrefunded cancellations as a counter.
+**What closing them exposed, all now fixed:**
 
-**2. §6.3 step 3 omits «عدد الضيوف» — MEDIUM.**
+- **Nobody was told anything.** The SLA sweep sent NOTHING — a paid stay vanished, money moved
+  twice, and the first the customer could know was opening the app. `RefundService` was silent too.
+  Both now send, and the refund notice lives in the SERVICE so every path is covered.
+  `sla-expiry.integration.test.ts` is new: the §6.4 path had no end-to-end test at all.
+- **The voucher ignored §5.6 and §10.1.** It prints «هاتف الشريك» and served ANY status, so a
+  customer who had paid and was still waiting could fetch the partner's phone by typing the URL and
+  settle directly. Gated on `confirmed_at IS NOT NULL` — what the rule actually says.
+- **The confirmation email wrote no `notifications` row.** It used `MailService` directly, so §6.3
+  step 6's message — the one carrying the voucher and QR — was not on the timeline, showed in سجل
+  واتساب والبريد as never sent, and could not be re-driven. `MailService` is gone from that service.
+- **Three catalogue entries claimed `implemented: true` with no send path.**
+  `notification-catalogue.test.ts` now checks the claim against the source.
 
-The step names eight things the payment summary must show: «العقار، المدينة، التواريخ، عدد الليالي،
-عدد الضيوف، السعر، رسوم سفرة، الإجمالي». `/checkout` shows seven. The guest count is read from the
-query string and passed to the form for submission, and never rendered — so the last screen before
-somebody pays does not confirm how many people they are paying for.
+**Still open, and reported rather than built** (see §6.4 of this register's own rule on scope):
 
-**3. §5.2's children and infants are unreachable — MEDIUM.**
-
-«عدد الأشخاص — يشمل البالغين والأطفال والرضع عند الحاجة». `bookingCreateSchema` accepts `adults`,
-`children` and `infants`; the customer journey only ever sends `adults`. The search form has one
-number field, the city and home links hard-code `adults=2`, and checkout carries that one value
-through. A family cannot say what it is, and `max_guests` is therefore checked against an
-undercount — the party that arrives is larger than the party the unit was matched against.
-
-The two defaults in the contract are `.default(0)`, which is correct for an OPTIONAL field and is
-why this is invisible from the API's side: nothing is missing, the caller genuinely says zero.
-
-**Known and blocked, not a finding.** §6.1 and §6.3 step 6 both say «Email وWhatsApp». WhatsApp is
-unwired pending the BSP decision (roadmap item 192, Bashar's) — the channel enum, the templates and
-the per-message delivery state are built; there is no transport. Email carries everything today.
-
-**A decision rather than a gap.** §6.5's «QR Code يستخدم للتحقق من الحجز» is met by a code the desk
-READS — it carries the six fields as text precisely so it works with no connection. There is no
-scanner in لوحة الشريك, so a partner verifies by reading the code or typing the reference into the
-lookup. Building a camera scanner is a product call, not an unimplemented requirement.
+| Gap                                       | Why it is open                                                                                                                                                                                                 |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **§10.3's «الفاتورة» — no invoice email** | The invoice EXISTS and the customer can download the PDF; nothing mails it. No template, no send path. Marked `implemented: false` rather than left claiming otherwise. Bashar's call.                         |
+| **WhatsApp**                              | §6.1, §6.3 step 6 and §10.2 all name it. Enum, templates and per-message delivery state are built; there is no transport. Blocked on the BSP decision — roadmap item 192.                                      |
+| **`partner.deadline_reminder`**           | §6.3 step 5's first notice IS sent (`booking.needs_action`, the moment the money lands). A second nudge partway through the window does not exist.                                                             |
+| **§6.5's QR as a SCANNER**                | The code carries the six fields as text so it works with no connection, and الوصول اليوم looks a booking up by reference. A camera scanner in لوحة الشريك is a product call, not an unimplemented requirement. |
 
 ---
 
