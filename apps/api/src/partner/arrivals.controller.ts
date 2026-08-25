@@ -35,6 +35,27 @@ export class ArrivalsController {
   }
 
   /**
+   * §6.5's «أو اسم العميل» — the guest who has lost the reference too.
+   *
+   * Declared BEFORE `:reference`, or Nest would route `/search` into it as a reference.
+   * Throttled like the lookup and for the same reason: it answers questions about the caller's own
+   * guest list, and twenty a minute is more than a desk types.
+   */
+  @Get('search')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @RequirePermissions(P.BOOKING_CHECK_IN)
+  @AuditExempt('Searching your own bookings; changes nothing.')
+  async search(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Query('q') term: string,
+  ) {
+    const partnerId = requirePartnerId(user, P.BOOKING_CHECK_IN);
+
+    /* A miss is an empty list, not a 404 — this is a search, and finding nothing is an answer. */
+    return this.arrivals.search(partnerId, typeof term === 'string' ? term : '');
+  }
+
+  /**
    * One booking by reference — §6.5's paper-voucher case (SRS §6.5).
    *
    * ## Throttled harder than the list, because it is the enumerable one

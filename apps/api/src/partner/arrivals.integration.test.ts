@@ -345,6 +345,44 @@ describeIfDb('arrivals and violations', () => {
       });
     });
 
+    /** §6.5's «أو اسم العميل» — the guest who has lost the reference too. */
+    it('finds a booking by the guest’s name, and only within this business', async () => {
+      const mine = await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'confirmed',
+        fromDay: 5,
+      });
+
+      const hits = await arrivals.search(partnerId, 'ضيف');
+
+      expect(
+        hits.map((hit) => hit.reference),
+        'the name matches',
+      ).toContain(mine);
+
+      /* The control: the neighbour searching the same name finds nothing of ours. */
+      const theirs = await arrivals.search(neighbourId, 'ضيف');
+
+      expect(theirs.map((hit) => hit.reference)).not.toContain(mine);
+    });
+
+    it('takes a reference through the same box, and refuses a one-character term', async () => {
+      const mine = await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'confirmed',
+        fromDay: 6,
+      });
+
+      expect((await arrivals.search(partnerId, mine)).map((h) => h.reference)).toEqual([
+        mine,
+      ]);
+
+      /* Too short to be a search: one letter would return a slice of the whole guest list. */
+      expect(await arrivals.search(partnerId, 'ض')).toEqual([]);
+    });
+
     it('answers a malformed reference exactly as a missing one', async () => {
       const missing = await arrivals
         .find(partnerId, 'BKG-2026-999999')

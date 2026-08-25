@@ -276,6 +276,56 @@ export class ArrivalsService {
   }
 
   /**
+   * §6.5's other half: «يستطيع الشريك البحث برقم الحجز **أو اسم العميل**».
+   *
+   * Reference-only was built first and the name half was missed. A guest at the counter who has
+   * lost the reference entirely — the case the paper voucher does not cover — can still say their
+   * name, and that is the whole point of the sentence.
+   *
+   * ## Bounded, and never a browse
+   *
+   * A prefix match on the guest's name, scoped to the caller's partner, capped at ten. Not
+   * `%term%`: a leading wildcard cannot use an index and, more importantly, a two-letter substring
+   * would return a slice of the business's whole guest list. Two characters minimum for the same
+   * reason.
+   *
+   * A term shaped like a reference goes to `find` instead, so «BKG-…» does not become a name
+   * search that returns nothing.
+   */
+  async search(partnerId: string, term: string): Promise<Arrival[]> {
+    const trimmed = term.trim();
+
+    if (REFERENCE_PATTERN.test(trimmed)) {
+      /* A reference that is not theirs is «no results», not a refusal — this is a search box. */
+      return this.one(partnerId, trimmed).then(
+        (arrival) => [arrival],
+        () => [],
+      );
+    }
+
+    if (trimmed.length < 2) return [];
+
+    const rows = await this.db.execute<ArrivalRow>(sql`
+      SELECT b.reference, cp.full_name AS guest_name,
+             p.name_ar AS property_name, u.name_ar AS unit_name,
+             b.check_in::text, b.check_out::text, b.nights,
+             (b.guests_adults + b.guests_children + b.guests_infants)::int AS guests,
+             b.status::text AS status, b.checked_in_at::text
+      FROM bookings b
+      JOIN customer_profiles cp ON cp.id = b.customer_profile_id
+      JOIN units u ON u.id = b.unit_id
+      JOIN properties p ON p.id = b.property_id
+      WHERE b.partner_id = ${partnerId}::uuid
+        AND b.deleted_at IS NULL
+        AND cp.full_name ILIKE ${trimmed.slice(0, 60) + '%'}
+      ORDER BY b.check_in DESC
+      LIMIT 10
+    `);
+
+    return rows.rows.map(toArrival);
+  }
+
+  /**
    * A malformed reference is a 404, not a 400.
    *
    * "That is not a reference" and "that is not your booking" answer the same, so a caller cannot
@@ -287,18 +337,7 @@ export class ArrivalsService {
 
   /** One arrival, scoped to the partner, so the screen can replace a row without a refetch. */
   private async one(partnerId: string, reference: string): Promise<Arrival> {
-    const rows = await this.db.execute<{
-      reference: string;
-      guest_name: string;
-      property_name: string;
-      unit_name: string;
-      check_in: string;
-      check_out: string;
-      nights: number;
-      guests: number;
-      status: string;
-      checked_in_at: string | null;
-    }>(sql`
+    const rows = await this.db.execute<ArrivalRow>(sql`
       SELECT b.reference, cp.full_name AS guest_name,
              p.name_ar AS property_name, u.name_ar AS unit_name,
              b.check_in::text, b.check_out::text, b.nights,
@@ -317,17 +356,35 @@ export class ArrivalsService {
 
     if (!row) throw notFound(ERROR.BOOKING_NOT_FOUND);
 
-    return {
-      reference: row.reference,
-      guestName: row.guest_name,
-      propertyName: row.property_name,
-      unitName: row.unit_name,
-      checkIn: row.check_in,
-      checkOut: row.check_out,
-      nights: row.nights,
-      guests: row.guests,
-      status: row.status,
-      checkedInAt: row.checked_in_at,
-    };
+    return toArrival(row);
   }
+}
+
+/** One row as the screen reads it — shared by the single lookup and the name search. */
+export interface ArrivalRow extends Record<string, unknown> {
+  reference: string;
+  guest_name: string;
+  property_name: string;
+  unit_name: string;
+  check_in: string;
+  check_out: string;
+  nights: number;
+  guests: number;
+  status: string;
+  checked_in_at: string | null;
+}
+
+function toArrival(row: ArrivalRow): Arrival {
+  return {
+    reference: row.reference,
+    guestName: row.guest_name,
+    propertyName: row.property_name,
+    unitName: row.unit_name,
+    checkIn: row.check_in,
+    checkOut: row.check_out,
+    nights: row.nights,
+    guests: row.guests,
+    status: row.status,
+    checkedInAt: row.checked_in_at,
+  };
 }

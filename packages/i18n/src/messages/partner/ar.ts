@@ -1390,11 +1390,11 @@ export const ar = {
       them the same and a screen that split them would teach a caller which was which.
     */
     lookup: {
-      label: 'رقم الحجز',
+      label: 'رقم الحجز أو اسم الضيف',
       submit: 'بحث',
       result: 'نتيجة البحث',
       clear: 'عودة إلى قائمة اليوم',
-      notFound: 'لا حجز بهذا الرقم في منشأتك.',
+      notFound: 'لا حجز بهذا الرقم أو الاسم في منشأتك.',
       failed: 'تعذّر البحث. حاول مرة أخرى.',
     },
 

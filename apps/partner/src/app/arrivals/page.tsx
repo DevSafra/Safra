@@ -1,8 +1,8 @@
 import Link from 'next/link';
 
 import {
-  findArrival,
   getMyArrivals,
+  searchArrivals,
   sidebarBadges,
   type PartnerArrival,
 } from '@/lib/api';
@@ -93,7 +93,8 @@ export default async function ArrivalsPage({
 
   /* A search REPLACES the day's list rather than sitting above it — one answer on the screen. */
   if (reference !== '') {
-    const found = await findArrival(reference);
+    /* §6.5 takes either: the API routes a reference-shaped term to the exact lookup itself. */
+    const found = await searchArrivals(reference);
 
     if (found === 'unauthenticated') {
       return shell(<p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>);
@@ -105,14 +106,20 @@ export default async function ArrivalsPage({
 
         {found === 'failed' ? (
           <p className="text-sm text-bad">{t.arrivals.lookup.failed}</p>
-        ) : found === 'not-found' ? (
+        ) : found.length === 0 ? (
           <p className="text-sm text-faint">{t.arrivals.lookup.notFound}</p>
         ) : (
           <>
             <h2 className="text-sm font-semibold text-text">
               {t.arrivals.lookup.result}
             </h2>
-            <Row arrival={found} />
+            <ul id="arrivals-list" className="grid gap-2.5">
+              {found.map((arrival) => (
+                <li key={arrival.reference}>
+                  <Row arrival={arrival} />
+                </li>
+              ))}
+            </ul>
           </>
         )}
       </>,
