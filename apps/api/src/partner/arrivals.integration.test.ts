@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { PERMISSIONS as P } from '@safra/contracts';
+import { ERROR, PERMISSIONS as P } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { ArrivalsService } from './arrivals.service.js';
@@ -354,10 +354,20 @@ describeIfDb('arrivals and violations', () => {
         .catch((error: unknown) => error);
 
       expect(malformed).toMatchObject({ status: 404 });
-      /* Same CODE, not merely the same status — the code is what a client can read. */
-      expect((malformed as { code?: string }).code).toBe(
-        (missing as { code?: string }).code,
-      );
+
+      /*
+        Same CODE, not merely the same status — the code is what a client can read.
+
+        Read off `response`, which is where `app-error.ts` puts it. It was read off the exception's
+        own `.code`, which does not exist: both sides were `undefined`, so the comparison held for
+        every possible pair of errors and proved nothing. Pinned to the expected value as well as
+        to each other, so «both undefined» can never be the reason this passes again.
+      */
+      const codeOf = (error: unknown): unknown =>
+        (error as { response?: { code?: string } }).response?.code;
+
+      expect(codeOf(malformed)).toBe(ERROR.BOOKING_NOT_FOUND);
+      expect(codeOf(missing)).toBe(ERROR.BOOKING_NOT_FOUND);
     });
   });
 
