@@ -13,6 +13,7 @@ import { BookingsService } from './bookings.service.js';
 import { PricingService } from './pricing.service.js';
 import { SlaService } from './sla.service.js';
 import { BookingRecoveryService } from './booking-recovery.service.js';
+import { VoucherService } from './voucher.service.js';
 import { StayCompletionService } from './stay-completion.service.js';
 import { WalletModule } from '../wallet/wallet.module.js';
 
@@ -30,6 +31,7 @@ import { WalletModule } from '../wallet/wallet.module.js';
     SlaService,
     StayCompletionService,
     BookingRecoveryService,
+    VoucherService,
     IdempotencyService,
     AuditService,
     /* markPaid tells the partner their booking is waiting — see `S-2`. */
@@ -41,6 +43,7 @@ import { WalletModule } from '../wallet/wallet.module.js';
     SlaService,
     StayCompletionService,
     BookingRecoveryService,
+    VoucherService,
     BookingAccessService,
     BookingCreationService,
     BookingActionsService,

@@ -12,6 +12,10 @@ export const en = {
     subject: 'Your verification code — SAFRA',
     body: 'A SAFRA staff member has asked to verify your identity before discussing booking {reference}.\n\nVerification code: {code}\n\nIt expires in {minutes} minutes. Read it only to the person you are speaking to right now.\n\nIf you are not on a call with SAFRA, ignore this message and give the code to nobody — nothing about your booking has been disclosed.\n\nThe SAFRA team',
   },
+  bookingConfirmed: {
+    subject: 'Your booking is confirmed — {reference}',
+    body: 'Your SAFRA booking is confirmed.\n\nBooking number: {reference}\nProperty: {property}\nCheck-in: {checkIn}\nCheck-out: {checkOut}\n\nYour voucher is attached, with a QR code for verification on arrival. Show it, or quote the booking number to your host.\n\nThe SAFRA team',
+  },
   passwordReset: {
     subject: 'Reset your SAFRA password',
     body: 'You asked to reset the password for your SAFRA account.\n\nOpen this link to choose a new one:\n{url}\n\nThe link expires in {expiresInMinutes} minutes and can be used once.\n\nIf you did not ask for this, ignore this email — nothing about your account has changed.\n\nThe SAFRA team',

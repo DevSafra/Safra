@@ -499,7 +499,9 @@
     "disputesNoBookings": "A dispute can only be raised about a booking you have paid for.",
     "disputesRedacted": "{count} contact detail(s) were masked.",
     "disputesResolution": "SAFRA’s answer",
-    "disputesOpened": "Raised"
+    "disputesOpened": "Raised",
+    "voucherOpen": "Open voucher (PDF)",
+    "voucherHint": "It carries a QR code for verification on arrival."
   },
   "reviews": {
     "title": "Review your stay",

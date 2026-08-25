@@ -11,6 +11,15 @@ export interface OutgoingMail {
   readonly text: string;
   readonly html?: string | undefined;
   /**
+   * Files that travel WITH the message — the booking voucher, and nothing else so far (§6.3 step 6).
+   *
+   * A voucher is attached rather than linked because §6.5 is explicit about the case it exists
+   * for: «إذا لم يكن لدى العميل إنترنت» — a desk with no connection. A link is useless there, and a
+   * customer who opened the mail on the aeroplane has the PDF either way.
+   */
+  readonly attachments?:
+    readonly { filename: string; content: Buffer; contentType: string }[] | undefined;
+  /**
    * The body carries a SECRET that is worth more than the convenience of reading it in a log.
    *
    * With no SMTP transport configured the branch below prints whole bodies, which is right for a
@@ -89,6 +98,8 @@ export class MailService {
         subject: mail.subject,
         text: mail.text,
         ...(mail.html ? { html: mail.html } : {}),
+        /* Spread only when present, so a message with none carries no empty array. */
+        ...(mail.attachments?.length ? { attachments: [...mail.attachments] } : {}),
       });
     } catch (error) {
       /**

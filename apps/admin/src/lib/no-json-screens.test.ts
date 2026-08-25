@@ -97,7 +97,16 @@ function isNavigatedTo(pattern: string, markup: string): boolean {
     )
     .join('/');
 
-  return new RegExp(`(?:href|action)=(?:"|\\{\`)[^"\`]*${escaped}(?:[/"\`?#]|$)`).test(
+  /*
+    A trailing `/` is NOT a terminator, and that correction is worth stating.
+
+    It was, and `/api/bookings/${x}/voucher` then matched the route `/api/bookings` — so adding the
+    voucher link made booking CREATION look like a navigation, which it is not: it is a `fetch`
+    from the checkout form and answers JSON correctly. A pattern must match the whole path, not a
+    prefix of a longer one; anything else reports a route as navigated-to because a different route
+    beneath it is.
+  */
+  return new RegExp(`(?:href|action)=(?:"|\\{\`)[^"\`]*${escaped}(?:["\`?#]|$)`).test(
     markup,
   );
 }
@@ -159,6 +168,8 @@ describe('routes a browser navigates to', () => {
       'partner/api/auth/logout',
       'partner/api/contracts/*/file',
       'web/account/invoices/*/pdf',
+      /* §6.5's voucher — an `<a href>`, so every failure path redirects rather than answering. */
+      'web/api/bookings/*/voucher',
       'web/currency',
     ]);
   });

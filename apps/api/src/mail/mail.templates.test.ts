@@ -47,6 +47,21 @@ const RENDERERS: {
   readonly render: (locale: string) => { subject: string; text: string };
   readonly shows: string;
 }[] = [
+  {
+    name: 'bookingConfirmedMail',
+    entry: 'bookingConfirmed',
+    render: (locale) =>
+      templates.bookingConfirmedMail({
+        ...SAMPLE,
+        locale,
+        reference: 'BKG-2026-000042',
+        property: 'فندق قصر الشرق',
+        checkIn: '2026-09-01',
+        checkOut: '2026-09-04',
+        voucher: Buffer.from('%PDF-1.4 test'),
+      }),
+    shows: 'BKG-2026-000042',
+  },
   /*
     EC-010's two. `bookingRecoveryMail` has TWO bodies behind one export — references and none —
     and this row exercises the one with references, because the empty one has no placeholder to

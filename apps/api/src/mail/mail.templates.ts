@@ -41,6 +41,43 @@ import type { OutgoingMail } from './mail.service.js';
  * to whoever opens the mailbox. A single template with «{references}» left empty would have
  * printed a heading over nothing.
  */
+/**
+ * §6.3 step 6 — «إذا أكد الشريك، تؤكد سفرة الحجز وترسل Email وWhatsApp وVoucher وQR Code».
+ *
+ * Nothing sent this until 2026-08-25. The template existed in `NOTIFICATION_TEMPLATES` marked
+ * `implemented: true`, and no code path called it — so a customer whose booking was confirmed
+ * learnt of it by opening the site.
+ *
+ * The voucher is ATTACHED rather than linked, because §6.5's own case is a desk with no
+ * connection. The QR is on the voucher; the message says so rather than embedding a second copy.
+ */
+export function bookingConfirmedMail(input: {
+  to: string;
+  reference: string;
+  property: string;
+  checkIn: string;
+  checkOut: string;
+  locale: string;
+  voucher: Buffer;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.bookingConfirmed, input.locale, {
+      reference: input.reference,
+      property: input.property,
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+    }),
+    attachments: [
+      {
+        filename: `${input.reference}.pdf`,
+        content: input.voucher,
+        contentType: 'application/pdf',
+      },
+    ],
+  };
+}
+
 export function bookingRecoveryMail(input: {
   to: string;
   references: readonly string[];

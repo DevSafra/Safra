@@ -1,11 +1,14 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { ENV, type Env } from '../config/env.js';
-import { bookingNeedsActionMail } from '../mail/mail.templates.js';
+import { bookingConfirmedMail, bookingNeedsActionMail } from '../mail/mail.templates.js';
+import { MailService } from '../mail/mail.service.js';
+import { VoucherService } from './voucher.service.js';
+import { describeError } from '../common/errors/safe-error.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { MONEY_SCALE, toMinor } from '../common/money.js';
@@ -33,6 +36,8 @@ import { conflict } from '../common/errors/app-error.js';
  */
 @Injectable()
 export class BookingActionsService {
+  private readonly logger = new Logger(BookingActionsService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly settings: SettingsService,
@@ -41,6 +46,8 @@ export class BookingActionsService {
     private readonly wallet: WalletService,
     private readonly notifications: NotificationService,
     @Inject(ENV) private readonly env: Env,
+    private readonly mail: MailService,
+    private readonly vouchers: VoucherService,
   ) {}
 
   /**
@@ -289,7 +296,7 @@ export class BookingActionsService {
     const target: BookingStatus = decision === 'confirm' ? 'confirmed' : 'cancelled';
     this.assertTransition(booking.status, target, 'partner');
 
-    return this.db.transaction(async (tx) => {
+    const result = await this.db.transaction(async (tx) => {
       if (decision === 'confirm') {
         await tx.execute(sql`
           UPDATE bookings
@@ -390,6 +397,18 @@ export class BookingActionsService {
 
       return { reference, status: target };
     });
+
+    /*
+      §6.3 step 6, AFTER the commit — «تؤكد سفرة الحجز وترسل Email وWhatsApp وVoucher وQR Code».
+
+      Nothing sent this until 2026-08-25: the template was in the catalogue marked implemented and
+      no code path called it, so a customer whose booking was confirmed found out by opening the
+      site. Sent outside the transaction and swallowed on failure, exactly as the partner's
+      needs-action notice is — a mail server must never roll back a confirmation.
+    */
+    if (decision === 'confirm') await this.sendConfirmation(reference);
+
+    return result;
   }
 
   /**
@@ -489,7 +508,7 @@ export class BookingActionsService {
     reason: string,
     claims: AccessTokenClaims | undefined,
   ) {
-    return this.move(
+    const moved = await this.move(
       reference,
       'confirmed',
       sql`partner_responded_at = now(), confirmed_at = now(),
@@ -499,6 +518,71 @@ export class BookingActionsService {
       claims,
       reason,
     );
+
+    /*
+      The customer gets the same message whether the partner confirmed or SAFRA did on their behalf.
+
+      §6.3 step 6 describes the OUTCOME — the booking is confirmed and the customer is told, with a
+      voucher. Who pressed the button is an internal distinction, and sending a different message
+      for it would leak an operational detail the customer has no use for.
+    */
+    await this.sendConfirmation(reference);
+
+    return moved;
+  }
+
+  /**
+   * The confirmation, its voucher and its QR — §6.3 step 6.
+   *
+   * ## Swallowed, always
+   *
+   * The booking IS confirmed by the time this runs; the transaction has committed. A mail server
+   * that is down, or a PDF render that times out, must not turn a confirmed stay into an error the
+   * partner sees — they would press again, and the second press meets a booking that has already
+   * moved. Logged instead, and `notification-redrive` is the recovery path for the notice.
+   */
+  private async sendConfirmation(reference: string): Promise<void> {
+    try {
+      const rows = await this.db.execute<{
+        email: string;
+        property: string;
+        check_in: string;
+        check_out: string;
+        locale: string | null;
+      }>(sql`
+        SELECT cp.email, coalesce(pr.name_ar, pr.name_en) AS property,
+               b.check_in::text AS check_in, b.check_out::text AS check_out,
+               u.preferred_locale AS locale
+        FROM bookings b
+        JOIN customer_profiles cp ON cp.id = b.customer_profile_id
+        JOIN properties pr        ON pr.id = b.property_id
+        LEFT JOIN users u         ON u.id = cp.user_id
+        WHERE b.reference = ${reference}
+      `);
+
+      const row = rows.rows[0];
+
+      if (!row) return;
+
+      const { pdf } = await this.vouchers.pdf(reference);
+
+      await this.mail.send(
+        bookingConfirmedMail({
+          to: row.email,
+          reference,
+          property: row.property,
+          checkIn: row.check_in,
+          checkOut: row.check_out,
+          locale: row.locale ?? 'ar',
+          voucher: pdf,
+        }),
+      );
+    } catch (error) {
+      /* The reference, never the address — a log line is where PII leaks without a decision. */
+      this.logger.error(
+        `Confirmation mail for ${reference} failed: ${describeError(error)}`,
+      );
+    }
   }
 
   /**

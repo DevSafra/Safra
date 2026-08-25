@@ -499,7 +499,9 @@
     "disputesNoBookings": "Ein Streitfall ist nur zu einer bezahlten Buchung möglich.",
     "disputesRedacted": "{count} Kontaktangabe(n) wurden maskiert.",
     "disputesResolution": "Antwort von SAFRA",
-    "disputesOpened": "Eröffnet"
+    "disputesOpened": "Eröffnet",
+    "voucherOpen": "Voucher öffnen (PDF)",
+    "voucherHint": "Enthält einen QR-Code zur Prüfung bei der Ankunft."
   },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",

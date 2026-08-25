@@ -12,6 +12,10 @@ export const de = {
     subject: 'Ihr Bestätigungscode — SAFRA',
     body: 'Ein SAFRA-Mitarbeiter möchte Ihre Identität prüfen, bevor über die Buchung {reference} gesprochen wird.\n\nBestätigungscode: {code}\n\nEr läuft in {minutes} Minuten ab. Nennen Sie ihn nur der Person, mit der Sie gerade sprechen.\n\nFalls Sie nicht mit SAFRA telefonieren, ignorieren Sie diese Nachricht und geben Sie den Code an niemanden weiter — zu Ihrer Buchung wurde nichts offengelegt.\n\nIhr SAFRA-Team',
   },
+  bookingConfirmed: {
+    subject: 'Ihre Buchung ist bestätigt — {reference}',
+    body: 'Ihre SAFRA-Buchung ist bestätigt.\n\nBuchungsnummer: {reference}\nUnterkunft: {property}\nAnreise: {checkIn}\nAbreise: {checkOut}\n\nIhr Voucher ist angehängt, mit einem QR-Code zur Prüfung bei der Ankunft. Zeigen Sie ihn vor oder nennen Sie die Buchungsnummer.\n\nIhr SAFRA-Team',
+  },
   passwordReset: {
     subject: 'SAFRA-Passwort zurücksetzen',
     body: 'Sie haben angefordert, das Passwort für Ihr SAFRA-Konto zurückzusetzen.\n\nÖffnen Sie diesen Link, um ein neues zu wählen:\n{url}\n\nDer Link läuft in {expiresInMinutes} Minuten ab und ist einmal verwendbar.\n\nFalls Sie das nicht angefordert haben, ignorieren Sie diese E-Mail — an Ihrem Konto hat sich nichts geändert.\n\nIhr SAFRA-Team',

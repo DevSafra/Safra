@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDatabase, type Database } from '@safra/db';
 
 import { BookingAccessService } from '../bookings/booking-access.service.js';
+import { VoucherService } from '../bookings/voucher.service.js';
 import { BookingActionsService } from '../bookings/booking-actions.service.js';
 
 /* Set by the test proving a failed notice still records, and consumed by the stub transport. */
@@ -162,6 +163,16 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       wallet,
       notifications,
       { PARTNER_URL: 'http://localhost:3002' } as unknown as Env,
+      /*
+        The same mailer these tests already capture, and a REAL voucher service.
+
+        A stubbed voucher would let §6.3 step 6's confirmation pass here while the PDF render was
+        broken — and this suite drives a real capture-then-confirm, so it is one of the few places
+        that would notice. The render is swallowed on failure by design, so a browserless
+        environment degrades to «no attachment» rather than a failing capture.
+      */
+      mail,
+      new VoucherService(db),
     );
 
     /**

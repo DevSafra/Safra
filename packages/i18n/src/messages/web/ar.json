@@ -499,7 +499,9 @@
     "disputesNoBookings": "النزاع متاح فقط على حجز دفعت ثمنه.",
     "disputesRedacted": "حُجبت {count} من بيانات الاتصال.",
     "disputesResolution": "ردّ سفرة",
-    "disputesOpened": "فُتح"
+    "disputesOpened": "فُتح",
+    "voucherOpen": "فتح القسيمة (PDF)",
+    "voucherHint": "تحتوي على رمز QR للتحقق عند الوصول."
   },
   "reviews": {
     "title": "قيّم إقامتك",

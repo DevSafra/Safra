@@ -170,6 +170,33 @@ export default async function BookingDetailPage({
         </>
       ) : null}
 
+      {/*
+        §6.3 step 6 / §6.5 — the voucher, on the screen the customer already opens for this booking.
+
+        Only once the stay is confirmed: before that there is nothing to show a desk, and a voucher
+        for a booking the partner has not accepted would be a document that says «مؤكد» about
+        something that is not.
+
+        A plain link, not a fetch. The endpoint answers `Content-Disposition: inline`, so a browser
+        opens it in a tab and a phone hands it to the PDF viewer — and it works with no JavaScript,
+        which is the state the customer is most likely to be in at an airport.
+      */}
+      {booking.status === 'confirmed' ||
+      booking.status === 'checked_in' ||
+      booking.status === 'completed' ? (
+        <div className="mt-8 rounded-card border border-line bg-card p-4">
+          <a
+            href={`/${locale}/api/bookings/${encodeURIComponent(booking.reference)}/voucher`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-10 items-center text-sm font-bold text-gold hover:underline lg:min-h-0"
+          >
+            {t('voucherOpen')}
+          </a>
+          <p className="mt-1 text-xs text-muted">{t('voucherHint')}</p>
+        </div>
+      ) : null}
+
       <div className="mt-8">
         <BackLink href={back} locale={locale} />
       </div>

@@ -8,9 +8,10 @@ import {
   Post,
   Query,
   Req,
+  Res,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 
 import {
   PERMISSIONS as P,
@@ -40,6 +41,7 @@ import { requirePartnerId } from '../rbac/ownership.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { BookingActionsService } from './booking-actions.service.js';
 import { BookingRecoveryService } from './booking-recovery.service.js';
+import { VoucherService } from './voucher.service.js';
 import { BookingCreationService } from './booking-creation.service.js';
 import { BookingsService } from './bookings.service.js';
 
@@ -66,6 +68,7 @@ export class BookingsController {
     private readonly creation: BookingCreationService,
     private readonly actions: BookingActionsService,
     private readonly recovery: BookingRecoveryService,
+    private readonly vouchers: VoucherService,
     private readonly idempotency: IdempotencyService,
   ) {}
 
@@ -294,6 +297,44 @@ export class BookingsController {
     @Body(new ZodValidationPipe(bookingCancelSchema)) body: BookingCancelInput,
   ) {
     return this.actions.cancel(reference, body.reason, 'staff', user);
+  }
+
+  /**
+   * The booking voucher, as a PDF (SRS §6.3 step 6, §6.5).
+   *
+   * ## Scoped like every other booking read, not `@Public()`
+   *
+   * `BookingsService` resolves an AccessScope — a customer sees their own, staff see all — and
+   * this reads through the same door by asking that service first. A public voucher endpoint keyed
+   * on the reference alone would be exactly the enumeration hole §13.2 warns about: the reference
+   * is a year-scoped sequence, so anybody can guess a live one.
+   *
+   * A GUEST with no account reaches their voucher the way they reach everything else about their
+   * booking — the access token minted at creation, checked by `BookingAccessService`.
+   */
+  @Get(':reference/voucher')
+  async voucher(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Res() response: Response,
+  ) {
+    /* The scope check, first and by the same service every other read uses. */
+    await this.bookings.findByReference(user, reference);
+
+    const { pdf } = await this.vouchers.pdf(reference);
+
+    response.setHeader('Content-Type', 'application/pdf');
+    /*
+      `inline`, not `attachment`. A voucher is shown at a desk far more often than it is filed, and
+      a phone that downloads it puts it behind a file manager at exactly the wrong moment.
+    */
+    response.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(reference)}.pdf"`,
+    );
+    /* Never cached: a voucher is a VIEW of a booking and its status can change. */
+    response.setHeader('Cache-Control', 'no-store');
+    response.send(pdf);
   }
 
   @Get()
