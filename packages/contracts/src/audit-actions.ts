@@ -128,6 +128,8 @@ export const AUDIT_ACTIONS = [
     for "how did this partner get here" must never come back with an answer that fits both.
   */
   'partner.onboarded_in_person',
+  /* §8.1's map location, recorded when it is set during onboarding. */
+  'partner.location_set',
   /* ── Partner employees and the roles a super admin names for them (Bashar, 2026-08-23) ── */
   /** A super admin created a role and named it. The payload carries the capabilities. */
   'partner_employee_role.created',

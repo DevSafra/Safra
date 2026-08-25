@@ -490,6 +490,8 @@ export const ERROR = {
   GIFT_CARD_CASH_ONLY: 'gift_card.cash_only',
   WALLET_INSUFFICIENT_BALANCE: 'wallet.insufficient_balance',
   VALIDATION_TOO_LONG: 'validation.too_long',
+  /** A number outside the range the field allows — §8.1's coordinates, for one. */
+  VALIDATION_OUT_OF_RANGE: 'validation.out_of_range',
   /*
     الدعم. A too-short message gets its own code rather than the generic one: "say a bit more" is
     actionable, where "invalid" on a free-text box tells somebody nothing about what to change.

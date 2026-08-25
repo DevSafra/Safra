@@ -149,6 +149,7 @@ export const ar = {
   'support.ticket_not_found': 'لم يُعثر على طلب الدعم هذا.',
   'support.ticket_closed': 'طلب الدعم هذا مغلق. يرجى فتح طلب جديد.',
   'validation.too_long': 'هذه القيمة طويلة جداً.',
+  'validation.out_of_range': 'القيمة خارج النطاق المسموح.',
   'wallet.not_found': 'لا توجد محفظة لهذا العميل.',
   'wallet.amount_not_positive': 'يجب أن تكون حركة المحفظة بمبلغ أكبر من صفر.',
   'customer.profile_missing': 'لا يوجد ملف عميل لهذا الحساب.',

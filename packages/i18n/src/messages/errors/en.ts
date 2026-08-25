@@ -158,6 +158,7 @@ export const en = {
   'support.ticket_not_found': 'That support request could not be found.',
   'support.ticket_closed': 'This support request is closed. Please open a new one.',
   'validation.too_long': 'This value is too long.',
+  'validation.out_of_range': 'The value is outside the allowed range.',
   'wallet.not_found': 'This customer has no wallet.',
   'wallet.amount_not_positive': 'A wallet movement must be a positive amount.',
   'customer.profile_missing': 'This account has no customer profile.',

@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 import {
   ERROR,
+  type PartnerLocationInput,
   type PartnerOnboardInput,
   type PartnerOnboardResult,
 } from '@safra/contracts';
@@ -242,6 +243,47 @@ export class PartnerOnboardingService {
    * credential to an address for an account that is already in use — so it is a conflict, not a
    * no-op. Losing a password is what password RESET is for.
    */
+  /**
+   * §8.1's «الموقع على الخريطة» — recorded while the partner is being onboarded.
+   *
+   * The columns existed on `partners` and nothing wrote them, so the field the SRS lists as
+   * registration data could only ever read «لم يُحدَّد». One `UPDATE`, scoped by reference, with
+   * the coordinates already bounded by `partnerLocationSchema` at the boundary.
+   *
+   * Stored as text because the columns are text. Written from a NUMBER the schema parsed rather
+   * than from the caller's string, so «36.2765 or drop table» is not a value that reaches the
+   * column — the coercion is the sanitiser.
+   */
+  async setLocation(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+    input: PartnerLocationInput,
+  ): Promise<{ latitude: string; longitude: string }> {
+    const rows = await this.db.execute<{ id: string }>(sql`
+      UPDATE partners
+      SET latitude = ${String(input.latitude)},
+          longitude = ${String(input.longitude)},
+          updated_at = now()
+      WHERE reference = ${reference} AND deleted_at IS NULL
+      RETURNING id
+    `);
+
+    const partner = rows.rows[0];
+
+    if (!partner) throw notFound(ERROR.PARTNER_NOT_FOUND);
+
+    await this.audit.record({
+      actorUserId: claims?.sub,
+      actorRole: claims?.role,
+      action: 'partner.location_set',
+      subjectType: 'partner',
+      subjectId: partner.id,
+      after: { latitude: String(input.latitude), longitude: String(input.longitude) },
+    });
+
+    return { latitude: String(input.latitude), longitude: String(input.longitude) };
+  }
+
   async resendInvitation(
     claims: AccessTokenClaims | undefined,
     reference: string,

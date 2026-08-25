@@ -46,6 +46,31 @@ import { PARTNER_DOCUMENT_KINDS, type PartnerDocumentKind } from './property.js'
  * approval step, from its own screen, with its own permission — so there is no field here that
  * could arrive from a request and land the partner approved without a reviewer.
  */
+/**
+ * §8.1's «الموقع على الخريطة», captured during onboarding.
+ *
+ * The columns existed on `partners` from the beginning and nothing ever wrote them, so the field
+ * the SRS lists as registration data was permanently empty. Numbers rather than strings: the
+ * column is `text`, but a coordinate is a NUMBER and validating it as one is what makes «36.2765»
+ * and «not a place» different at the boundary rather than at the map.
+ *
+ * Bounded to the real ranges. A longitude of 900 is not a typo the database should keep.
+ */
+export const partnerLocationSchema = z
+  .object({
+    latitude: z.coerce
+      .number()
+      .min(-90, ERROR.VALIDATION_OUT_OF_RANGE)
+      .max(90, ERROR.VALIDATION_OUT_OF_RANGE),
+    longitude: z.coerce
+      .number()
+      .min(-180, ERROR.VALIDATION_OUT_OF_RANGE)
+      .max(180, ERROR.VALIDATION_OUT_OF_RANGE),
+  })
+  .strict();
+
+export type PartnerLocationInput = z.infer<typeof partnerLocationSchema>;
+
 export const partnerOnboardSchema = z
   .object({
     /** The person in the room. Recorded because a legal entity does not answer a telephone. */

@@ -186,6 +186,7 @@ export const de = {
   'support.ticket_closed':
     'Diese Support-Anfrage ist geschlossen. Bitte eröffnen Sie eine neue.',
   'validation.too_long': 'Dieser Wert ist zu lang.',
+  'validation.out_of_range': 'Der Wert liegt außerhalb des zulässigen Bereichs.',
   'wallet.not_found': 'Dieser Kunde hat kein Guthabenkonto.',
   'wallet.amount_not_positive': 'Eine Guthabenbuchung muss einen positiven Betrag haben.',
   'customer.profile_missing': 'Dieses Konto hat kein Kundenprofil.',

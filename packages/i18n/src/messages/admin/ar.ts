@@ -702,6 +702,16 @@ export const ar = {
       جالس مع الشريك، فتقول ما سيحدث للطرف الآخر بصيغة يستطيع أن يقرأها بصوت عالٍ: «سيصل الشريك
       رابط…» لا «تم إنشاء الحساب».
     */
+    /* §8.1's «الموقع على الخريطة» — collected on the onboarding screen, shown on the record. */
+    partnerLocation: {
+      title: 'الموقع على الخريطة',
+      intro: 'أدخل إحداثيات موقع النشاط. تظهر على سجل الشريك ويستخدمها فريق التحقق.',
+      latitude: 'خط العرض',
+      longitude: 'خط الطول',
+      save: 'حفظ الموقع',
+      saving: 'جارٍ الحفظ…',
+      saved: 'حُفظ الموقع.',
+    },
     partnerOnboarding: {
       title: 'تسجيل شريك جديد',
       subtitle:
@@ -2430,6 +2440,7 @@ export const ar = {
       السجل can tell a partner a super admin created from one who asked to join.
     */
     'partner.onboarded_in_person': 'تسجيل شريك مباشرةً من المدير العام',
+    'partner.location_set': 'تحديد موقع الشريك على الخريطة',
     'partner.invitation_resent': 'إعادة إرسال دعوة شريك مُسجَّل مباشرةً',
     'partner_contract.viewed': 'عرض عقد شراكة',
     'partner_payout.released': 'الإفراج عن مستحقات شريك',

@@ -3,7 +3,9 @@ import { Throttle } from '@nestjs/throttler';
 
 import {
   PERMISSIONS as P,
+  type PartnerLocationInput,
   type PartnerOnboardInput,
+  partnerLocationSchema,
   partnerOnboardSchema,
 } from '@safra/contracts';
 
@@ -62,6 +64,24 @@ export class AdminPartnerOnboardingController {
    * Throttled harder than onboarding itself. A partner who has genuinely lost their link needs one
    * or two; a loop pointed at this endpoint is a mail flood with SAFRA's name on it.
    */
+  /**
+   * §8.1's map location, set from the onboarding screen.
+   *
+   * `PARTNER_ONBOARD`, the same capability as everything else on that screen: this is registration
+   * data being completed, not an approval. Throttled with it for the same reason.
+   */
+  @Post(':reference/location')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @RequirePermissions(P.PARTNER_ONBOARD)
+  @AuditExempt('PartnerOnboardingService records partner.location_set itself.')
+  async setLocation(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(partnerLocationSchema)) body: PartnerLocationInput,
+  ) {
+    return this.onboarding.setLocation(user, reference, body);
+  }
+
   @Post(':reference/resend-invitation')
   @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @RequirePermissions(P.PARTNER_ONBOARD)

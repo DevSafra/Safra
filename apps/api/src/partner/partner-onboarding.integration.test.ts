@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
-import { ERROR, type PartnerOnboardInput } from '@safra/contracts';
+import { ERROR, partnerLocationSchema, type PartnerOnboardInput } from '@safra/contracts';
 
 import type { AuditService } from '../common/audit/audit.service.js';
 import type { AuthTokenService } from '../auth/auth-token.service.js';
@@ -421,6 +421,53 @@ describeIfDb('PartnerOnboardingService', () => {
 
       expect(account.rows[0]?.locale).toBe('de');
       expect(sent[0]?.to).toBe(STRANGER_EMAIL);
+    });
+  });
+
+  /**
+   * §8.1's «الموقع على الخريطة» — the field that existed in the schema and had no writer.
+   *
+   * The positive case alone would pass against a service that wrote any two numbers, so the
+   * boundary is asserted too: a longitude of 900 is not a typo the database should keep, and the
+   * partner it belongs to is the one that changes.
+   */
+  describe('the map location', () => {
+    it('stores the coordinates on the partner', async () => {
+      /* The service's own creation path, so the fixture is a partner the product made. */
+      const created = await service.onboard(superAdmin, onboarding());
+      const reference = created.reference;
+
+      await service.setLocation(superAdmin, reference, {
+        latitude: 33.5138,
+        longitude: 36.2765,
+      });
+
+      const rows = await db.execute<{ latitude: string; longitude: string }>(sql`
+        SELECT latitude, longitude FROM partners WHERE reference = ${reference}
+      `);
+
+      expect(rows.rows[0]).toStrictEqual({ latitude: '33.5138', longitude: '36.2765' });
+    });
+
+    it('refuses a reference that does not exist', async () => {
+      await expect(
+        service.setLocation(superAdmin, 'PAR-000000', { latitude: 0, longitude: 0 }),
+      ).rejects.toMatchObject({ status: 404 });
+    });
+
+    /* The boundary belongs to the schema, so it is asserted where a request would meet it. */
+    it('rejects coordinates outside the real ranges', () => {
+      expect(
+        partnerLocationSchema.safeParse({ latitude: 91, longitude: 0 }).success,
+      ).toBe(false);
+      expect(
+        partnerLocationSchema.safeParse({ latitude: 0, longitude: 900 }).success,
+      ).toBe(false);
+      /* The control: a real place still parses, so the bound is a bound and not a refusal. */
+      expect(
+        partnerLocationSchema.safeParse({ latitude: 33.5138, longitude: 36.2765 })
+          .success,
+      ).toBe(true);
     });
   });
 });

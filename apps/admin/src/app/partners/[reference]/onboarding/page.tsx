@@ -12,6 +12,7 @@ import { Ltr, StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
 import { DocumentReview } from '@/components/document-review';
 import { PartnerContractPanel } from '@/components/partner-contract-panel';
+import { PartnerLocation } from '@/components/partner-location';
 import { PartnerAccountState } from '@/components/partner-account-state';
 import { PartnerDocumentUpload } from '@/components/partner-document-upload';
 import { ScreeningPanel } from '@/components/screening-panel';
@@ -197,7 +198,12 @@ export default async function PartnerOnboardingPage({
       <Step
         number={1}
         title={t.sections.partnerOnboarding.step1}
-        state="done"
+        /*
+          NOT unconditionally done. §8.1 counts the map location as registration data, and a step
+          headed «بيانات الشريك» that reports itself finished while a required field is empty is
+          the "true sentence in the wrong place" this codebase keeps producing.
+        */
+        state={partner.latitude && partner.longitude ? 'done' : 'outstanding'}
         note={fill(t.sections.partnerDetail.tradingAs, {
           name: `${partner.displayName} · ${
             partner.partnerType.nameAr ?? partner.partnerType.nameEn
@@ -216,6 +222,16 @@ export default async function PartnerOnboardingPage({
           email={partner.email}
           activated={partner.accountActivated}
           invitationPending={partner.invitationPending}
+        />
+
+        {/*
+          §8.1's map location. Under step ① because it is «بيانات الشريك» — registration data — and
+          this is the sitting where the rest of it is completed.
+        */}
+        <PartnerLocation
+          reference={partner.reference}
+          latitude={partner.latitude}
+          longitude={partner.longitude}
         />
       </Step>
 
