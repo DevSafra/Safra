@@ -8,6 +8,8 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
 import { actorName } from '../common/actor-name.sql.js';
+import { AuditService } from '../common/audit/audit.service.js';
+import { allowedTransitions, type BookingStatus } from '../bookings/booking-state.js';
 
 /**
  * Renders a `timestamptz` as an explicit UTC ISO-8601 string.
@@ -43,7 +45,10 @@ function utc(column: string) {
  */
 @Injectable()
 export class BookingDetailService {
-  constructor(@Inject(DATABASE) private readonly db: Database) {}
+  constructor(
+    @Inject(DATABASE) private readonly db: Database,
+    private readonly audit: AuditService,
+  ) {}
 
   async detail(reference: string, claims: AccessTokenClaims | undefined) {
     const rows = await this.db.execute<Record<string, unknown>>(sql`
@@ -106,6 +111,17 @@ export class BookingDetailService {
     `);
 
     const canSeePayments = (claims?.permissions ?? []).includes('payment.read');
+    /*
+      Reading the notes takes the same capability as writing one.
+
+      There is no separate `booking.read_internal_note`, and inventing one would put a permission
+      in the role form that no built-in role carries. Both roles that work bookings — support and
+      operations — already hold this, so the practical effect is that FINANCE, which holds
+      `booking.read_all` for the money, does not see staff prose about a named customer it has no
+      reason to read. Least privilege, and absent rather than redacted for the same reason the
+      payment section is: a row of asterisks still says how many notes there are.
+    */
+    const canSeeNotes = (claims?.permissions ?? []).includes('booking.add_internal_note');
 
     return {
       reference: booking['reference'],
@@ -177,9 +193,152 @@ export class BookingDetailService {
         payload: row.payload,
         createdAt: row.created_at,
       })),
+      /*
+        What a STAFF actor may do to this booking from here, decided by the state machine that
+        will enforce it rather than by a second list in the console.
+
+        `allowedTransitions` has carried the docblock "for building a UI" since it was written and
+        has never had a caller. The console cannot import it — it lives in this app — and a copy
+        of the transition table over there would be a second source of truth for the one question
+        where disagreeing means offering a control the API is about to refuse.
+
+        This says only what the BOOKING allows. Whether this reader may do it is the console's
+        half, from their own capabilities; both are re-checked by the endpoints themselves, so
+        neither is a security boundary — they decide what is worth offering.
+      */
+      actions: {
+        cancel: allowedTransitions(booking['status'] as BookingStatus, 'staff').includes(
+          'cancelled',
+        ),
+        /*
+          Not from the transition table, and the asymmetry is real: `capture-payment` calls
+          `markPaid`, which asserts the move as SYSTEM rather than as staff — it is standing in
+          for a gateway webhook, not exercising a staff authority. So the state that permits it is
+          `pending_payment` and only that, which is what `markPaid` itself asserts.
+        */
+        capturePayment: booking['status'] === 'pending_payment',
+      },
+      /*
+        How much there is to find on the three screens this booking links out to.
+
+        The links go to the existing registries with this reference as their search term — no
+        embedded messaging here (Bashar, 2026-08-25). The counts exist so a link says whether it
+        leads anywhere: «المحادثات (٠)» is an answer, and a link that silently lands on an empty
+        list is the one thing worse than no link.
+
+        Three equality counts, each on its own index — `disputes_booking_idx`,
+        `conversations_booking_idx`, `notifications_booking_idx`. Uncapped deliberately, unlike a
+        registry total: these are bounded by ONE booking, not by the size of a table.
+      */
+      related: await this.related(bookingId),
       // Absent, not redacted, for a caller without PAYMENT_READ — see the class note.
       ...(canSeePayments ? { payments: await this.payments(bookingId) } : {}),
+      // Absent for the same reason, and on its own capability — see `canSeeNotes`.
+      ...(canSeeNotes ? { notes: await this.notes(bookingId) } : {}),
     };
+  }
+
+  /**
+   * Every internal note on one booking, OLDEST first.
+   *
+   * Oldest first because the section is a history and reads downwards: what was learnt, then what
+   * was learnt next. Newest-first would put the latest note above the one that explains it.
+   *
+   * No `LIMIT`. A booking accumulates notes during one support case and then stops — unlike a
+   * registry, which grows for as long as the business does. If that assumption ever breaks it
+   * breaks visibly, on a screen somebody is reading, rather than by silently hiding the newest
+   * notes the way a capped ascending scan would.
+   */
+  private async notes(bookingId: string) {
+    const rows = await this.db.execute<{
+      note: string;
+      author: string | null;
+      created_at: string;
+    }>(sql`
+      SELECT n.note,
+             ${actorName(sql`us.email`, sql`us.role`)} AS author,
+             ${utc('n.created_at')} AS created_at
+      FROM booking_internal_notes n
+      LEFT JOIN users us ON us.id = n.author_user_id
+      WHERE n.booking_id = ${bookingId}
+      ORDER BY n.created_at ASC
+    `);
+
+    return rows.rows.map((row) => ({
+      note: row.note,
+      author: row.author,
+      createdAt: row.created_at,
+    }));
+  }
+
+  /** What else exists against this booking, for the cross-links — see the note at the call site. */
+  private async related(bookingId: string) {
+    const rows = await this.db.execute<{
+      disputes: number;
+      conversations: number;
+      notifications: number;
+    }>(sql`
+      SELECT
+        (SELECT count(*)::int FROM disputes      d WHERE d.booking_id = ${bookingId}) AS disputes,
+        (SELECT count(*)::int FROM conversations c WHERE c.booking_id = ${bookingId}) AS conversations,
+        (SELECT count(*)::int FROM notifications n WHERE n.booking_id = ${bookingId}) AS notifications
+    `);
+
+    const row = rows.rows[0];
+
+    return {
+      disputes: row?.disputes ?? 0,
+      conversations: row?.conversations ?? 0,
+      notifications: row?.notifications ?? 0,
+    };
+  }
+
+  /**
+   * Adds a note. Append-only — see `booking_internal_notes`.
+   *
+   * ## The note does not reach the audit log
+   *
+   * `booking.internal_note_added` records THAT one was written, by whom, against which booking.
+   * The text is free prose about a named customer; `audit_log` is append-only by trigger with no
+   * redaction path, so copying it there would put those sentences somewhere §14 cannot follow
+   * them. The note itself lives in one table, which erasure can reach.
+   */
+  async addNote(
+    reference: string,
+    note: string,
+    claims: AccessTokenClaims | undefined,
+  ): Promise<{ reference: string }> {
+    const rows = await this.db.execute<{ id: string }>(sql`
+      SELECT id FROM bookings WHERE reference = ${reference} AND deleted_at IS NULL
+    `);
+
+    const booking = rows.rows[0];
+
+    if (!booking) throw notFound(ERROR.BOOKING_NOT_FOUND);
+
+    /*
+      One transaction, so a note that was written and an audit row that says so cannot disagree.
+      The insert alone would leave a note nobody can attribute if the audit write failed.
+    */
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        INSERT INTO booking_internal_notes (booking_id, author_user_id, note)
+        VALUES (${booking.id}, ${claims?.sub ?? null}, ${note})
+      `);
+
+      await this.audit.record(
+        {
+          actorUserId: claims?.sub,
+          actorRole: claims?.role,
+          action: 'booking.internal_note_added',
+          subjectType: 'booking',
+          subjectId: booking.id,
+        },
+        tx as unknown as Database,
+      );
+    });
+
+    return { reference };
   }
 
   /** Payments and refunds, for finance (§4). */

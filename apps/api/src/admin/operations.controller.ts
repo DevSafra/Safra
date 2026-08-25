@@ -1,7 +1,24 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { z } from 'zod';
 
-import { ERROR, PERMISSIONS as P, pageQuerySchema } from '@safra/contracts';
+import {
+  ERROR,
+  PERMISSIONS as P,
+  bookingInternalNoteSchema,
+  pageQuerySchema,
+  type BookingInternalNoteInput,
+} from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { notFound } from '../common/errors/app-error.js';
@@ -117,6 +134,31 @@ export class AdminOperationsController {
     @CurrentUser() user: AccessTokenClaims | undefined,
   ) {
     return this.bookings.detail(reference, user);
+  }
+
+  /**
+   * A staff note against one booking (§9.4), never shown to the customer or the partner.
+   *
+   * `BOOKING_ADD_INTERNAL_NOTE` — support and operations. It was a capability with a column and
+   * no route: `bookings.internal_notes` existed, nothing ever wrote it, and ticking the box in
+   * the role form delegated nothing (found 2026-08-25).
+   *
+   * Appends rather than replaces — see `booking_internal_notes` for why the column it replaces
+   * was the wrong shape.
+   */
+  @Post('bookings/:reference/notes')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermissions(P.BOOKING_ADD_INTERNAL_NOTE)
+  @AuditExempt(
+    'BookingDetailService records booking.internal_note_added transactionally.',
+  )
+  async addBookingNote(
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(bookingInternalNoteSchema))
+    body: BookingInternalNoteInput,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+  ) {
+    return this.bookings.addNote(reference, body.note, user);
   }
 
   /**
