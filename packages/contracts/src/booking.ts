@@ -56,12 +56,37 @@ export const partnerBookingDecisionSchema = z
 
 export type PartnerBookingDecisionInput = z.infer<typeof partnerBookingDecisionSchema>;
 
+/**
+ * The floor on a cancellation reason, EXPORTED so the form and the schema cannot disagree.
+ *
+ * Same reasoning as `ENFORCEMENT_REASON_MIN` and a different number: this reason is written on a
+ * record the customer already has, beside dates and an amount that supply the context, so it does
+ * not carry the whole explanation the way «مخالفة» would. What it must not be is empty.
+ *
+ * It was a literal inside the schema and a literal the console would have had to copy — two places
+ * knowing one number, which is the shape `DEFAULT_TABLE_PAGE_SIZE` exists to avoid.
+ */
+export const BOOKING_CANCEL_REASON_MIN = 3;
+
 /** Cancellation by the customer or by staff on their behalf. */
 export const bookingCancelSchema = z
-  .object({ reason: z.string().trim().min(3).max(1000) })
+  .object({ reason: z.string().trim().min(BOOKING_CANCEL_REASON_MIN).max(1000) })
   .strict();
 
 export type BookingCancelInput = z.infer<typeof bookingCancelSchema>;
+
+/**
+ * A staff note against a booking, never shown to the customer or the partner (§9.4).
+ *
+ * `min(2)` matches the call log's floor rather than the cancellation reason's `min(3)`: a note is
+ * an aide-mémoire on a record somebody already has open, not a decision that has to explain itself
+ * to the person it affects. `.trim()` first, so a note of spaces is refused rather than stored.
+ */
+export const bookingInternalNoteSchema = z
+  .object({ note: z.string().trim().min(2).max(2000) })
+  .strict();
+
+export type BookingInternalNoteInput = z.infer<typeof bookingInternalNoteSchema>;
 
 /** A price quote for a unit and date range, with nothing created. */
 export const bookingQuoteSchema = z

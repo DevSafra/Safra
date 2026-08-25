@@ -231,6 +231,62 @@ export const bookings = pgTable(
 );
 
 /**
+ * Staff prose about one booking, never shown to the customer or the partner (§9.4).
+ *
+ * ## Why a table and not `bookings.internal_notes`
+ *
+ * That column exists and is a single `text`, so the second person to write a note would
+ * OVERWRITE the first — losing what it said, when it was written and who wrote it. That exact
+ * defect was reported on a different screen (`O-partner-7`, 2026-08-20: "a second telephone call
+ * erased the first one's note") and answered by `partner_application_contacts`. This is the same
+ * answer to the same shape, and the column is left alone: it holds nothing, no route ever wrote
+ * it, and dropping it is a migration that buys nothing today.
+ *
+ * ## Append-only, deliberately
+ *
+ * `createdAt` rather than `...timestamps`, which is this codebase's marker for a table nobody may
+ * amend — "a row that can be amended is not an audit trail" (`_shared.ts`). Support notes are the
+ * record of what was known when a decision was taken, so a note that was wrong is corrected by
+ * writing another one rather than by editing it into agreement with the outcome.
+ *
+ * ## It carries the same erasure tension as the call log
+ *
+ * This is staff prose ABOUT a named customer, attached by foreign key to a booking that carries
+ * their name, address and telephone number — the same collision `O-sec-8` records for
+ * `partner_application_contacts`. It is one more table for the retention and erasure
+ * reconciliation, and better recorded there now than discovered during it.
+ */
+export const bookingInternalNotes = pgTable(
+  'booking_internal_notes',
+  {
+    id: primaryId(),
+    bookingId: foreignId('booking_id')
+      .notNull()
+      .references(() => bookings.id),
+    /**
+     * Who wrote it. Nullable for the reason the call log's author column is: a staff account can
+     * be removed, and losing the note because we lost its author is the worse trade.
+     */
+    authorUserId: foreignId('author_user_id').references(() => users.id),
+    /** What they wrote. Never empty — the endpoint rejects a blank note before it reaches here. */
+    note: text('note').notNull(),
+    ...createdAt,
+  },
+  (t) => [
+    /**
+     * The notes on one booking, oldest first.
+     *
+     * ASCENDING, and that is deliberate rather than careless. `booking_id` is an equality
+     * predicate, so the remaining order is `created_at` alone and PostgreSQL reads this index
+     * BACKWARD when a caller wants the newest. Writing it `.desc()` would emit `DESC NULLS LAST`,
+     * which does not match PostgreSQL's own `ORDER BY … DESC` (`NULLS FIRST`) — the mismatch that
+     * cost `partner_application_contacts` a sequential scan at 765 buffers on 2026-08-20.
+     */
+    index('booking_internal_notes_booking_idx').on(t.bookingId, t.createdAt),
+  ],
+);
+
+/**
  * SRS §13.1 "Timeline Event" + P-004 (everything traceable). Append-only: the
  * SQL migration revokes UPDATE and DELETE. Polymorphic by design so a booking,
  * partner or customer timeline all read from one place.

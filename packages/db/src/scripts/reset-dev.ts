@@ -78,6 +78,7 @@ const CLEAR_TABLES = [
   'audit_log',
   'auth_tokens',
   'availability_days',
+  'booking_internal_notes',
   'bookings',
   'conversations',
   'coupon_redemptions',
@@ -134,6 +135,7 @@ const APPEND_ONLY = [
   'gift_card_transactions',
   'settings_history',
   'messages',
+  'booking_internal_notes',
 ];
 
 function assertSafe(connectionString: string): void {

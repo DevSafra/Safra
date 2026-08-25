@@ -172,7 +172,14 @@ BEGIN
     -- window and what it was before. It is evidence in exactly the same sense as
     -- audit_log, so it gets the same protection rather than relying on the parallel
     -- audit_log row surviving.
-    'settings_history'
+    'settings_history',
+    -- A support note is the record of what was known when a decision was taken, so
+    -- it is evidence too. The table it replaces was a single text column that the
+    -- second writer overwrote; enforcing that here means the schema refuses the
+    -- defect rather than trusting every future caller to remember not to UPDATE.
+    -- `partner_application_contacts` is append-only by CONVENTION only and is not
+    -- in this list — see O-sec-8.
+    'booking_internal_notes'
   ]
   LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', t || '_immutable', t);

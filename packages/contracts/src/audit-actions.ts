@@ -59,6 +59,15 @@ export const AUDIT_ACTIONS = [
   'booking.export_requested',
   'booking.checked_in',
   'booking.check_in_undone',
+  /*
+    That a note was written, by whom, against which booking — and never the note ITSELF.
+
+    The text is free prose about a named customer and it already lives in
+    `booking_internal_notes`, which erasure can reach. Copying it into `audit_log` — append-only by
+    trigger, with no redaction path — would put the same sentences somewhere §14 cannot follow
+    them. The same reasoning `partner_application.contacted` gives for the call log.
+  */
+  'booking.internal_note_added',
   'payment.started',
   'payment.failed',
   'refund.created',
