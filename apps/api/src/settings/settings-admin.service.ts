@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -259,10 +259,8 @@ function validate(value: unknown, valueSchema: string, key: string): unknown {
       const money = normalise(value);
 
       if (!money) {
-        throw new BadRequestException(
-          `${key} must be a positive amount, either a number or ` +
-            `{ "amount": "10.00", "currency": "USD" }.`,
-        );
+        /* The KEY travels as a param, so the sentence around it is the reader's. */
+        throw badRequest(ERROR.SETTING_VALUE_NOT_POSITIVE_MONEY, { key });
       }
 
       return value;
@@ -309,10 +307,8 @@ function validate(value: unknown, valueSchema: string, key: string): unknown {
        * way to break payment routing with a typo, so it is refused here and stays a
        * deliberate, reviewed change.
        */
-      throw new BadRequestException(
-        `${key} has schema "${valueSchema}", which this editor cannot validate. ` +
-          `It must be changed deliberately rather than through the settings form.`,
-      );
+      /* Both the key and the schema name travel as params — see `O-api-2`. */
+      throw badRequest(ERROR.SETTING_SCHEMA_NOT_EDITABLE, { key, schema: valueSchema });
     }
   }
 }

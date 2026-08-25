@@ -488,6 +488,43 @@ export const ERROR = {
   SUPPORT_MESSAGE_TOO_SHORT: 'support.message_too_short',
   SUPPORT_TICKET_NOT_FOUND: 'support.ticket_not_found',
   SUPPORT_TICKET_CLOSED: 'support.ticket_closed',
+
+  /*
+    `O-api-2`, closed 2026-08-25 — the last refusals that answered a hand-written English sentence.
+
+    Each replaces prose passed to an `HttpException` constructor, which `safra/no-hardcoded-text`
+    cannot see because the string is a function argument rather than JSX. Five codes, and the two
+    that carry NUMBERS carry them in `params` rather than in the sentence: a translator must be able
+    to put the figure where their grammar wants it.
+  */
+
+  /**
+   * A wallet debit larger than the balance, WITH the figures.
+   *
+   * Distinct from `wallet.insufficient_balance`, which the gift-card paths raise without any: this
+   * one states the shortfall, because "insufficient balance" with no numbers is the error that
+   * opens a support ticket instead of closing one. The generic code keeps its generic message.
+   */
+  WALLET_BALANCE_BELOW_AMOUNT: 'wallet.balance_below_amount',
+  /**
+   * The second factor is not enrolled yet, on an otherwise valid session.
+   *
+   * NOT `auth.two_factor_setup_required`, which means "you called enable before setup". This one
+   * means "enrol before using anything", and the two reach different screens.
+   */
+  AUTH_TWO_FACTOR_ENROLMENT_REQUIRED: 'auth.two_factor_enrolment_required',
+  /** A money setting given something that is not a positive amount. Carries the setting KEY. */
+  SETTING_VALUE_NOT_POSITIVE_MONEY: 'setting.value_not_positive_money',
+  /** A setting whose schema the generic editor cannot validate. Carries the key and the schema. */
+  SETTING_SCHEMA_NOT_EDITABLE: 'setting.schema_not_editable',
+  /**
+   * Screening cannot run: no list imported, or the one there is too old to be called current.
+   *
+   * ONE code for both reasons, deliberately. The distinction between `missing` and `stale` is
+   * already drawn for staff by `GET /admin/sanctions/status`, which is where the console reads it;
+   * splitting it here would put the platform's screening posture in a body a direct caller can read.
+   */
+  SANCTIONS_LIST_UNAVAILABLE: 'sanctions.list_unavailable',
 } as const;
 
 export type ErrorCode = (typeof ERROR)[keyof typeof ERROR];

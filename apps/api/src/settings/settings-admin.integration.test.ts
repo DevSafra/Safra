@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { ERROR } from '@safra/contracts';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
@@ -150,7 +151,10 @@ describeIfDb('SettingsAdminService', () => {
     it('refuses a schema it cannot validate rather than accepting it', async () => {
       await expect(
         admin.update('payment.provider_routing', { '*': [] }, undefined, {}),
-      ).rejects.toThrow(/cannot validate/i);
+        /* The code, not the sentence — `O-api-2`. The key and the schema travel as params. */
+      ).rejects.toMatchObject({
+        response: { code: ERROR.SETTING_SCHEMA_NOT_EDITABLE },
+      });
     });
 
     it('leaves the stored value untouched after a rejection', async () => {

@@ -330,4 +330,16 @@ export const en = {
     'A booking cannot move to that state from its current one.',
   'request.idempotency_key_reused':
     'This idempotency key was already used with a different request.',
+
+  /* `O-api-2`, 2026-08-25 — the last refusals that answered a bare English sentence. */
+  'wallet.balance_below_amount':
+    'Your wallet holds {balance} {currency}, which is less than the {requested} {currency} needed.',
+  'auth.two_factor_enrolment_required':
+    'Two-factor authentication is required for this account. Enrol before continuing.',
+  'setting.value_not_positive_money':
+    '{key} must be a positive amount — either a number, or an amount with a currency.',
+  'setting.schema_not_editable':
+    '{key} has the schema "{schema}", which this editor cannot check. Change it deliberately rather than through this form.',
+  'sanctions.list_unavailable':
+    'Screening is unavailable: the sanctions list is missing or out of date. Refresh it before screening.',
 } as const;

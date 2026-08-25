@@ -4,10 +4,11 @@ import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import type { SanctionsSource } from '@safra/contracts';
+import { ERROR, type SanctionsSource } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
+import { unavailable } from '../common/errors/app-error.js';
 import { normaliseName, tokenOverlap } from './name-normalisation.js';
 
 /** The source SAFRA is legally obliged to screen against (ADR 0002). */
@@ -93,13 +94,18 @@ export interface ScreeningOutcome {
  */
 export class SanctionsListUnavailableError extends ServiceUnavailableException {
   constructor(readonly reason: 'missing' | 'stale') {
-    super(
-      reason === 'missing'
-        ? 'No sanctions list has been imported. Screening is unavailable until one ' +
-            'is: set SANCTIONS_FEED_URL, or POST the export to /admin/sanctions/import.'
-        : 'The sanctions list is older than the 7-day limit, so it cannot be shown ' +
-            'to be current. Refresh it before screening.',
-    );
+    /*
+      ONE code for both reasons (`O-api-2`, 2026-08-25).
+
+      The two sentences this used to answer told a caller whether SAFRA has ever imported a list and
+      how old it is — the platform's compliance posture, in a body anybody who can reach the endpoint
+      can read. Staff get the distinction where it belongs: `GET /admin/sanctions/status` reports
+      `missing` and `stale` separately, and the console's `ScreeningPanel` renders it from there.
+
+      `reason` stays a property so the log line and the status endpoint keep it. It just stops being
+      the response.
+    */
+    super(unavailable(ERROR.SANCTIONS_LIST_UNAVAILABLE).getResponse());
     this.name = 'SanctionsListUnavailableError';
   }
 }

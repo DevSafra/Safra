@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { ERROR } from '@safra/contracts';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
@@ -83,9 +84,19 @@ describeIfDb('sanctions screening', () => {
      * the opposite.
      */
     it('refuses rather than reporting a clean result', async () => {
-      await expect(sanctions.screen(['Bashar Al-Assad'])).rejects.toThrow(
-        /no sanctions list/i,
-      );
+      /*
+        The CODE and the `reason`, not the sentence (`O-api-2`, 2026-08-25).
+
+        These matched English prose, which is what made the prose hard to remove — a test pinned to
+        a message asserts the wording rather than the behaviour. The refusal now answers one code for
+        both reasons, deliberately, so that a direct caller cannot read the platform's screening
+        posture out of a 503 body; `reason` stays a property, which is where the distinction between
+        "never imported" and "too old" belongs and where the status endpoint reads it.
+      */
+      await expect(sanctions.screen(['Bashar Al-Assad'])).rejects.toMatchObject({
+        response: { code: ERROR.SANCTIONS_LIST_UNAVAILABLE },
+        reason: 'missing',
+      });
     });
 
     it('refuses when the newest snapshot is too old', async () => {
@@ -94,9 +105,11 @@ describeIfDb('sanctions screening', () => {
       await db.execute(sql`
         UPDATE sanctions_snapshots SET fetched_at = now() - interval '30 days'`);
 
-      await expect(sanctions.screen(['Bashar Al-Assad'])).rejects.toThrow(
-        /older than the 7-day limit/i,
-      );
+      /* The same code, and `reason` is what says it is STALE rather than absent. */
+      await expect(sanctions.screen(['Bashar Al-Assad'])).rejects.toMatchObject({
+        response: { code: ERROR.SANCTIONS_LIST_UNAVAILABLE },
+        reason: 'stale',
+      });
     });
 
     /**
@@ -108,9 +121,19 @@ describeIfDb('sanctions screening', () => {
       await importSample(sanctions);
       await db.execute(sql`UPDATE sanctions_snapshots SET completed_at = NULL`);
 
-      await expect(sanctions.screen(['Bashar Al-Assad'])).rejects.toThrow(
-        /no sanctions list/i,
-      );
+      /*
+        The CODE and the `reason`, not the sentence (`O-api-2`, 2026-08-25).
+
+        These matched English prose, which is what made the prose hard to remove — a test pinned to
+        a message asserts the wording rather than the behaviour. The refusal now answers one code for
+        both reasons, deliberately, so that a direct caller cannot read the platform's screening
+        posture out of a 503 body; `reason` stays a property, which is where the distinction between
+        "never imported" and "too old" belongs and where the status endpoint reads it.
+      */
+      await expect(sanctions.screen(['Bashar Al-Assad'])).rejects.toMatchObject({
+        response: { code: ERROR.SANCTIONS_LIST_UNAVAILABLE },
+        reason: 'missing',
+      });
     });
 
     it('reports status honestly when nothing is imported', async () => {
@@ -139,18 +162,29 @@ describeIfDb('sanctions screening', () => {
     it('does not satisfy screening', async () => {
       await importFixture(sanctions);
 
-      await expect(sanctions.screen(['Bashar Al-Assad'])).rejects.toThrow(
-        /no sanctions list/i,
-      );
+      /*
+        The CODE and the `reason`, not the sentence (`O-api-2`, 2026-08-25).
+
+        These matched English prose, which is what made the prose hard to remove — a test pinned to
+        a message asserts the wording rather than the behaviour. The refusal now answers one code for
+        both reasons, deliberately, so that a direct caller cannot read the platform's screening
+        posture out of a 503 body; `reason` stays a property, which is where the distinction between
+        "never imported" and "too old" belongs and where the status endpoint reads it.
+      */
+      await expect(sanctions.screen(['Bashar Al-Assad'])).rejects.toMatchObject({
+        response: { code: ERROR.SANCTIONS_LIST_UNAVAILABLE },
+        reason: 'missing',
+      });
     });
 
     /** Not even for a name that IS in the fixture — the file is not consulted at all. */
     it('does not answer for a name it contains', async () => {
       await importFixture(sanctions);
 
-      await expect(sanctions.screen(['Commercial Bank of Syria'])).rejects.toThrow(
-        /no sanctions list/i,
-      );
+      await expect(sanctions.screen(['Commercial Bank of Syria'])).rejects.toMatchObject({
+        response: { code: ERROR.SANCTIONS_LIST_UNAVAILABLE },
+        reason: 'missing',
+      });
     });
 
     /** The console must be able to tell "nothing imported" from "a fixture is loaded". */

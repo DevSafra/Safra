@@ -378,4 +378,16 @@ export const de = {
     'Eine Buchung kann von ihrem aktuellen Status nicht in diesen Status wechseln.',
   'request.idempotency_key_reused':
     'Dieser Idempotenzschlüssel wurde bereits für eine andere Anfrage verwendet.',
+
+  /* `O-api-2`, 2026-08-25 — the last refusals that answered a bare English sentence. */
+  'wallet.balance_below_amount':
+    'Ihr Guthaben beträgt {balance} {currency} und liegt damit unter den benötigten {requested} {currency}.',
+  'auth.two_factor_enrolment_required':
+    'Für dieses Konto ist eine Zwei-Faktor-Authentisierung erforderlich. Richten Sie sie ein, bevor Sie fortfahren.',
+  'setting.value_not_positive_money':
+    '{key} muss ein positiver Betrag sein — eine Zahl oder ein Betrag mit Währung.',
+  'setting.schema_not_editable':
+    '{key} hat das Schema "{schema}", das dieser Editor nicht prüfen kann. Ändern Sie es bewusst und nicht über dieses Formular.',
+  'sanctions.list_unavailable':
+    'Screening nicht möglich: Die Sanktionsliste fehlt oder ist veraltet. Aktualisieren Sie sie vor dem Screening.',
 } as const;

@@ -1,8 +1,9 @@
-import { ConflictException, Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
+import { conflict } from '../common/errors/app-error.js';
 import {
   ERROR,
   type CursorPage,
@@ -200,10 +201,20 @@ export class WalletService {
        * balance" without the numbers is the kind of error that generates a support
        * ticket instead of resolving one.
        */
-      throw new ConflictException(
-        `Wallet balance is ${wallet.balance} ${wallet.currencyCode}, which is less ` +
-          `than the ${applied} ${wallet.currencyCode} requested.`,
-      );
+      /*
+        A CODE with the figures in `params`, not a sentence (`O-api-2`, 2026-08-25).
+
+        The reasoning above still holds — the numbers belong in the refusal — but they belong as
+        VALUES. `${balance} ${currency}, which is less than…` freezes English word order and clause
+        order into the API, and a customer reads this one: it is the only refusal on this list that
+        a paying person meets. `wallet.balance_below_amount` places the same three values wherever
+        each language wants them.
+      */
+      throw conflict(ERROR.WALLET_BALANCE_BELOW_AMOUNT, {
+        balance: wallet.balance,
+        currency: wallet.currencyCode,
+        requested: applied,
+      });
     }
 
     const nextBalance = fromMinor(nextMinor, MONEY_SCALE);

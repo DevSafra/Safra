@@ -1,15 +1,11 @@
-import {
-  type CanActivate,
-  type ExecutionContext,
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import { requiresAuthenticator } from '@safra/contracts';
+import { ERROR, requiresAuthenticator } from '@safra/contracts';
 
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ALLOWS_UNENROLLED_KEY, PUBLIC_KEY } from './decorators.js';
+import { forbidden } from '../common/errors/app-error.js';
 
 /**
  * Refuses requests from an account that must hold a second factor and has not enrolled one.
@@ -96,9 +92,15 @@ export class TwoFactorGuard implements CanActivate {
      * what they lack is enrolment, and saying so is not a disclosure — they are already
      * authenticated as themselves.
      */
-    throw new ForbiddenException(
-      'Two-factor authentication is required for this account. ' +
-        'Enrol at /auth/2fa/setup before using this endpoint.',
-    );
+    /*
+      A code, not a sentence (`O-api-2`, 2026-08-25).
+
+      The remedy is still named — `auth.two_factor_enrolment_required` says "enrol before
+      continuing" in all three languages. What it deliberately drops is the PATH: `/auth/2fa/setup`
+      is this API's route, and the screen that shows this message is a console or portal page whose
+      own enrolment URL is different. Naming our route in a message a person reads sent them
+      somewhere that is not where they enrol.
+    */
+    throw forbidden(ERROR.AUTH_TWO_FACTOR_ENROLMENT_REQUIRED);
   }
 }

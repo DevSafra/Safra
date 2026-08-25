@@ -299,4 +299,16 @@ export const ar = {
     'الرفض يتطلب ملاحظات توضح الخطأ في المستند.',
   'booking.transition_invalid': 'لا يمكن نقل الحجز إلى هذه الحالة من حالته الحالية.',
   'request.idempotency_key_reused': 'مفتاح العملية مستخدم بالفعل لطلب مختلف.',
+
+  /* `O-api-2`, 2026-08-25 — the last refusals that answered a bare English sentence. */
+  'wallet.balance_below_amount':
+    'رصيد محفظتك {balance} {currency}، وهو أقل من {requested} {currency} المطلوبة.',
+  'auth.two_factor_enrolment_required':
+    'هذا الحساب يتطلب المصادقة الثنائية. سجّلها قبل المتابعة.',
+  'setting.value_not_positive_money':
+    '{key} يجب أن يكون مبلغًا موجبًا — رقمًا أو مبلغًا مع عملة.',
+  'setting.schema_not_editable':
+    '{key} مخطّطه "{schema}"، ولا يستطيع هذا المحرّر التحقق منه. غيّره عن قصد وليس من هذا النموذج.',
+  'sanctions.list_unavailable':
+    'الفحص غير متاح: قائمة العقوبات مفقودة أو قديمة. حدّثها قبل الفحص.',
 } as const;
