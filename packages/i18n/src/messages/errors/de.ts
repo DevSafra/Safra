@@ -187,6 +187,11 @@ export const de = {
     'Diese Support-Anfrage ist geschlossen. Bitte eröffnen Sie eine neue.',
   'validation.too_long': 'Dieser Wert ist zu lang.',
   'validation.out_of_range': 'Der Wert liegt außerhalb des zulässigen Bereichs.',
+  'validation.code_invalid':
+    'Die Kennung muss mit einem Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Unterstriche enthalten.',
+  'property_type.code_taken':
+    'Diese Kennung wird bereits von einer anderen Unterkunftsart verwendet.',
+  'property_type.not_found': 'Keine Unterkunftsart mit dieser Kennung.',
   'wallet.not_found': 'Dieser Kunde hat kein Guthabenkonto.',
   'wallet.amount_not_positive': 'Eine Guthabenbuchung muss einen positiven Betrag haben.',
   'customer.profile_missing': 'Dieses Konto hat kein Kundenprofil.',

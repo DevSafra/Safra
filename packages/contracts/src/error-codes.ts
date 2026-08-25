@@ -492,6 +492,11 @@ export const ERROR = {
   VALIDATION_TOO_LONG: 'validation.too_long',
   /** A number outside the range the field allows — §8.1's coordinates, for one. */
   VALIDATION_OUT_OF_RANGE: 'validation.out_of_range',
+  /** A machine identifier that is not lower-case letters, digits and underscores. */
+  VALIDATION_CODE_INVALID: 'validation.code_invalid',
+  /** §8.2 — an accommodation type whose code is already taken. */
+  PROPERTY_TYPE_CODE_TAKEN: 'property_type.code_taken',
+  PROPERTY_TYPE_NOT_FOUND: 'property_type.not_found',
   /*
     الدعم. A too-short message gets its own code rather than the generic one: "say a bit more" is
     actionable, where "invalid" on a free-text box tells somebody nothing about what to change.

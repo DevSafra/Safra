@@ -159,6 +159,11 @@ export const en = {
   'support.ticket_closed': 'This support request is closed. Please open a new one.',
   'validation.too_long': 'This value is too long.',
   'validation.out_of_range': 'The value is outside the allowed range.',
+  'validation.code_invalid':
+    'The identifier must start with a lower-case letter and contain only lower-case letters, digits and underscores.',
+  'property_type.code_taken':
+    'That identifier is already used by another accommodation type.',
+  'property_type.not_found': 'No accommodation type with that identifier.',
   'wallet.not_found': 'This customer has no wallet.',
   'wallet.amount_not_positive': 'A wallet movement must be a positive amount.',
   'customer.profile_missing': 'This account has no customer profile.',

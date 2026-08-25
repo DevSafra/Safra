@@ -201,6 +201,59 @@ export type PropertyReviewInput = z.infer<typeof propertyReviewSchema>;
  * nobody recognises cannot contribute to that answer — it just sits in the queue
  * looking like progress.
  */
+/**
+ * §8.2 — «أنواع أخرى قابلة للإضافة من الإدارة».
+ *
+ * The seven types the SRS lists exist as rows, and adding an eighth required a migration and a
+ * deploy: `property-types` was a single public `GET` and nothing wrote the table. That is exactly
+ * what the sentence says must not be necessary.
+ *
+ * Deliberately small. This adds a type and can retire one; it is not a catalogue editor. Renaming,
+ * reordering and glyphs are edits to a row that already exists and nobody is blocked on them.
+ */
+export const propertyTypeCreateSchema = z
+  .object({
+    /*
+      The stable identifier, and the one field that can never be corrected later — it is written
+      into `properties.property_type_id`'s row and read by the customer site's filters. Bounded to
+      the shape the existing seven already use so a new one cannot arrive as «Hotel » or «hôtel».
+    */
+    code: z
+      .string()
+      .trim()
+      .min(2, ERROR.VALIDATION_REQUIRED)
+      .max(40, ERROR.VALIDATION_TOO_LONG)
+      .regex(/^[a-z][a-z0-9_]*$/, ERROR.VALIDATION_CODE_INVALID),
+    nameAr: z
+      .string()
+      .trim()
+      .min(1, ERROR.VALIDATION_REQUIRED)
+      .max(80, ERROR.VALIDATION_TOO_LONG),
+    nameEn: z
+      .string()
+      .trim()
+      .min(1, ERROR.VALIDATION_REQUIRED)
+      .max(80, ERROR.VALIDATION_TOO_LONG),
+    /* All three languages, because §8.2's list is customer-facing and the catalogue rule is total. */
+    nameDe: z
+      .string()
+      .trim()
+      .min(1, ERROR.VALIDATION_REQUIRED)
+      .max(80, ERROR.VALIDATION_TOO_LONG),
+    /** «hotels have rooms under one roof; a villa is a single unit» — it changes the booking UX. */
+    hasMultipleUnits: z.coerce.boolean().default(false),
+  })
+  .strict();
+
+export type PropertyTypeCreateInput = z.infer<typeof propertyTypeCreateSchema>;
+
+/** Retiring a type: it stops being offered and the properties already using it are untouched. */
+export const propertyTypeActiveSchema = z
+  .object({ isActive: z.coerce.boolean() })
+  .strict();
+
+export type PropertyTypeActiveInput = z.infer<typeof propertyTypeActiveSchema>;
+
 export const PARTNER_DOCUMENT_KINDS = [
   /** Passport or national ID of the signing person. */
   'identity',

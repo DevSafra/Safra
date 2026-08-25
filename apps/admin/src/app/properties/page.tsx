@@ -3,6 +3,7 @@ import Link from 'next/link';
 import {
   getPendingProperties,
   getPropertyRegistry,
+  getPropertyTypes,
   type PropertyListItem,
 } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
@@ -17,6 +18,7 @@ import {
   type AdminColumn,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
+import { PropertyTypes } from '@/components/property-types';
 import { fill, label, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { returnQuery } from '@/lib/search-params';
@@ -58,9 +60,11 @@ export default async function PropertiesPage({
   // Carried into every row link, so «رجوع» on the detail screen comes back here.
   const back = returnQuery({ page, size, q });
 
-  const [registry, pending, counts] = await Promise.all([
+  const [registry, pending, types, counts] = await Promise.all([
     getPropertyRegistry({ q, page, limit: size }),
     getPendingProperties({ page: queue.page, limit: queue.size }),
+    /* §8.2's list. Small and bounded by the business — see the note on the panel below. */
+    getPropertyTypes(),
     sidebarCounts(),
   ]);
 
@@ -168,6 +172,29 @@ export default async function PropertiesPage({
                 section: t.dashboard.propertiesPending,
               })}
             />
+          )}
+        </ConsolePanel>
+
+        {/*
+          §8.2 — «أنواع أخرى قابلة للإضافة من الإدارة».
+
+          On العقارات rather than in a page of its own: an accommodation type is what a listing IS,
+          and this is the screen where somebody is already thinking about listings. It is also the
+          smallest thing that satisfies the sentence — a section, not a catalogue-management area.
+
+          NOT paginated, and that is the geography screen's documented exception rather than an
+          oversight: the list is bounded by the business at seven, it exists to show the COMPLETE
+          set, and a pager over seven rows is worse than seven rows.
+        */}
+        <ConsolePanel title={t.sections.propertyTypes.title}>
+          <p className="mb-3 text-[12.5px] text-muted">
+            {t.sections.propertyTypes.intro}
+          </p>
+
+          {types === 'unauthenticated' || types === 'failed' ? (
+            <p className="text-sm text-bad">{t.sections.panels.failed}</p>
+          ) : (
+            <PropertyTypes types={types} />
           )}
         </ConsolePanel>
       </div>

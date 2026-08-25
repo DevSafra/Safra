@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { PropertyTypesController } from './property-types.controller.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { PaymentsModule } from '../payments/payments.module.js';
 import { WalletModule } from '../wallet/wallet.module.js';
@@ -55,6 +56,7 @@ import { StaffScopeService } from './staff-scope.service.js';
   */
   imports: [AuthModule, LedgerModule, FxModule, PaymentsModule, WalletModule],
   controllers: [
+    PropertyTypesController,
     AdminController,
     RegistriesController,
     CommsController,
