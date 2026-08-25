@@ -1726,14 +1726,51 @@ export const ar = {
       cancelReasonLabel: 'سبب الإلغاء (يقرأه العميل)',
       cancelReasonHint: 'ثلاثة أحرف على الأقل.',
       bookingCancelled: 'أُلغي الحجز.',
-      capturePayment: 'تأكيد استلام الدفعة',
+      /*
+        «حوالة», not «دفعة». The control exists for ONE rail — an offline bank transfer, which sends
+        no webhook — and naming the rail is what stops it reading as a general "mark this paid".
+        A card is captured by its provider and no operator is involved (Bashar's question,
+        2026-08-25); the screen only offers this where there is a transfer to match.
+      */
+      capturePayment: 'تأكيد استلام الحوالة',
       capturing: 'جارٍ التأكيد…',
       /*
-        What it DOES, not what it is called. Confirming a payment starts the partner's two-hour
-        window, and an operator pressing this needs to know that a clock begins.
+        What it DOES and what it ASSUMES, in that order. Confirming starts the partner's window,
+        and the assumption — that finance has seen the credit — is the one an operator must not
+        make casually.
       */
-      captureHint: 'يُسجَّل الحجز مدفوعاً وتبدأ مهلة تأكيد الشريك.',
-      paymentCaptured: 'سُجِّلت الدفعة وبدأت مهلة الشريك.',
+      captureHint:
+        'للحوالات المصرفية فقط: أكّد بعد ظهور المبلغ في كشف الحساب. يُسجَّل الحجز مدفوعاً وتبدأ مهلة تأكيد الشريك.',
+      paymentCaptured: 'سُجِّلت الحوالة وبدأت مهلة الشريك.',
+
+      /* ── The rest of the staff lifecycle (§6.3) ────────────────────────── */
+      /*
+        «نيابة عن الشريك» is in the label, not only in the hint. It is a different act from the
+        partner confirming, it is recorded as one, and the operator should read that before
+        pressing rather than after.
+      */
+      confirmBooking: 'تأكيد الحجز نيابة عن الشريك',
+      confirming: 'جارٍ التأكيد…',
+      confirmHint:
+        'يُستخدم حين يؤكّد الشريك عبر الهاتف أو تعذّر عليه الدخول. يُسجَّل باسمك في سجل التدقيق.',
+      confirmReasonLabel: 'سبب التأكيد نيابة عنه',
+      confirmReasonHint: 'عشرون حرفًا على الأقل — يقرأه زميل يراجع القرار لاحقاً.',
+      bookingConfirmed: 'أُكّد الحجز وأُبلغ العميل.',
+      checkIn: 'تسجيل وصول الضيف',
+      checkingIn: 'جارٍ التسجيل…',
+      checkedIn: 'سُجّل وصول الضيف.',
+      undoCheckIn: 'التراجع عن تسجيل الوصول',
+      undoingCheckIn: 'جارٍ التراجع…',
+      checkInUndone: 'أُلغي تسجيل الوصول.',
+      completeStay: 'إنهاء الإقامة',
+      completing: 'جارٍ الإنهاء…',
+      /*
+        Says what it UNLOCKS. «إنهاء الإقامة» sounds administrative; the consequence is that the
+        partner becomes payable and the guest may review — and an operator ending a stay early
+        should know both.
+      */
+      completeHint: 'تُحتسب مستحقات الشريك بعد الإنهاء، ويصبح بإمكان النزيل كتابة تقييم.',
+      stayCompleted: 'أُنهيت الإقامة.',
 
       /* ── Where the rest of this booking lives ──────────────────────────── */
       /*
@@ -2247,6 +2284,8 @@ export const ar = {
     'booking.check_in_undone': 'التراجع عن تسجيل الوصول',
     /* The ACT, not its content: the note itself never reaches the audit log — see the action. */
     'booking.internal_note_added': 'إضافة ملاحظة داخلية على حجز',
+    'booking.staff_confirmed': 'تأكيد حجز نيابة عن الشريك',
+    'booking.completed': 'إنهاء الإقامة',
     'booking.exported': 'تصدير حجوزات',
     'booking.export_requested': 'طلب تصدير حجوزات',
     'calendar.range_updated': 'تعديل مدى في التقويم',
@@ -2764,6 +2803,19 @@ export const ar = {
       */
       pending_payment: 'بانتظار الدفع',
       pending_confirmation: 'قيد التأكيد',
+      /*
+        The three the lifecycle work of 2026-08-25 made reachable.
+
+        `checked_in` failed `audit-catalogue.integration.test.ts` the first time a staff check-in
+        was recorded — the catalogue was complete to the DATA and the data had never contained one,
+        because no route could produce it. Exactly the shape the note above `no_response` describes,
+        and the reason all three are added together rather than one at a time.
+
+        `confirmed` and `completed` are here for the same reason and were one run behind.
+      */
+      confirmed: 'مؤكد',
+      checked_in: 'تم الوصول',
+      completed: 'مكتمل',
       contacted: 'تم الاتصال',
       accepted: 'مقبول',
       rejected: 'مرفوض',
@@ -2855,6 +2907,9 @@ export const ar = {
       'booking.confirmed': 'تأكيد الحجز',
       'booking.rejected_by_partner': 'رفض الشريك للحجز',
       'booking.cancelled': 'إلغاء الحجز',
+      'booking.checked_in': 'تسجيل وصول الضيف',
+      'booking.check_in_undone': 'التراجع عن تسجيل الوصول',
+      'booking.completed': 'انتهاء الإقامة',
       'booking.sla_expired': 'انتهاء مهلة التأكيد',
       'booking.refund_issued': 'إصدار استرداد',
       'partner.registered': 'تسجيل شريك',

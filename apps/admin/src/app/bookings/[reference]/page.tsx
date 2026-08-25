@@ -451,10 +451,18 @@ export default async function BookingPage({
       */}
       <BookingActions
         reference={booking.reference}
-        canCancel={booking.actions.cancel && permissions.includes('booking.cancel')}
-        canCapture={
-          booking.actions.capturePayment && permissions.includes('booking.update_status')
-        }
+        available={booking.actions}
+        can={{
+          cancel: permissions.includes('booking.cancel'),
+          /*
+            One capability covers confirming, completing and confirming receipt of a transfer —
+            all three are `booking.update_status` on the API, because all three are SAFRA moving a
+            booking through its own lifecycle. Checking a guest in is `booking.check_in`, the same
+            capability the partner's front desk holds, because it is the same act.
+          */
+          updateStatus: permissions.includes('booking.update_status'),
+          checkIn: permissions.includes('booking.check_in'),
+        }}
       />
     </Shell>
   );
