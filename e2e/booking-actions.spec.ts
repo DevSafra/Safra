@@ -31,6 +31,8 @@ const copy = t.sections.bookingDetail;
 const NOTE_ONE = 'اتصل العميل وطلب تأكيد موعد الوصول بعد العاشرة مساءً.';
 const NOTE_TWO = 'الشريك وافق على الوصول المتأخر، ولا حاجة لإجراء إضافي.';
 const CANCEL_REASON = 'أُلغي بطلب العميل بعد تعذّر السفر، وأُبلغ الشريك.';
+const CONFIRM_REASON =
+  'اتصل الشريك هاتفياً وأكّد توفر الوحدة، وتعذّر عليه الدخول إلى لوحته.';
 
 /**
  * Two notes, and the assertion is that the FIRST one is still there.
@@ -80,95 +82,196 @@ test('a second internal note does not erase the first', async ({ page }) => {
 });
 
 /**
- * The whole staff lifecycle in one pass: capture, then cancel.
+ * The whole staff lifecycle, driven in one pass (SRS §6.2, §6.3).
  *
- * ## Why both in one test
+ * ## Why one test and not five
  *
- * Capturing is what MAKES the booking cancellable — staff are not an actor on
- * `pending_payment → cancelled`, so the cancel control cannot legitimately exist before the
- * capture. Splitting them would mean the cancel half hunting for a booking in the right state and
- * finding whatever the fixture happened to leave, which is how `enforcement.spec.ts` ended up
- * passing three runs in four against a defect.
+ * Each move is what MAKES the next one available — §6.2's table is a sequence, and the controls
+ * follow it. Splitting them would mean each half hunting for a booking in the right state and
+ * finding whatever the fixture happened to leave, which is how the first test in this file passed
+ * three runs in four against a real defect.
  *
  * ## The control appearing and DISAPPEARING are both assertions
  *
- * A screen that offered both buttons in every state would pass any test that only ever checks the
- * one it is about to press.
+ * A screen that offered every button in every state would pass any test that only ever checks the
+ * one it is about to press. So each step asserts the pair: what is now offered, and what is gone.
+ *
+ * ## What it costs, knowingly
+ *
+ * It consumes one `pending_confirmation` booking per run and leaves it `completed`. There are ~950
+ * of them and `db:testbed` seeds more; the test SKIPS rather than fails if the pool ever empties,
+ * because a suite that goes red for want of a fixture teaches everyone to ignore it.
  */
-test('capturing payment opens the cancellation, and cancelling closes the booking', async ({
+test('a booking walks its whole lifecycle, and each control appears only in its own state', async ({
   page,
 }) => {
-  await page.goto('/bookings?status=pending_payment&size=10');
+  await page.goto('/bookings?status=pending_confirmation&size=5');
 
   const row = page.locator('a[href^="/bookings/BKG-"]').first();
 
   test.skip(
     (await row.count()) === 0,
-    'No booking is awaiting payment — reseed with `pnpm db:testbed` to replenish the pool.',
+    'No booking awaits confirmation — reseed with `pnpm db:testbed`.',
   );
 
   const reference = (await row.innerText()).trim();
+  const pill = page.locator('[data-status-pill]').first();
+  const button = (name: string) => page.getByRole('button', { name, exact: true });
 
   await page.goto(`/bookings/${reference}`);
 
-  /* Before: capture is offered and cancellation is NOT — staff cannot cancel an unpaid booking. */
-  await expect(page.getByRole('button', { name: copy.capturePayment })).toBeVisible();
-  await expect(page.getByRole('button', { name: copy.cancelBooking })).toHaveCount(0);
-  /* The clock this starts, stated before it is started. */
-  await expect(page.getByText(copy.captureHint)).toBeVisible();
+  /* ── Awaiting the partner: SAFRA may answer for them, or cancel. Nothing else. ── */
+  await expect(button(copy.confirmBooking)).toBeVisible();
+  await expect(button(copy.cancelBooking)).toBeVisible();
+  await expect(
+    button(copy.checkIn),
+    'nobody arrives at an unconfirmed booking',
+  ).toHaveCount(0);
+  await expect(button(copy.completeStay)).toHaveCount(0);
 
-  await page.getByRole('button', { name: copy.capturePayment }).click();
-  await expect(page.getByText(copy.paymentCaptured)).toBeVisible({ timeout: 20_000 });
+  await button(copy.confirmBooking).click();
+  await expect(page.getByText(copy.confirmHint)).toBeVisible();
+  await page.getByLabel(copy.confirmReasonLabel).fill(CONFIRM_REASON);
+  await button(copy.confirmBooking).last().click();
+  await expect(page.getByText(copy.bookingConfirmed)).toBeVisible({ timeout: 20_000 });
+  await expect(pill).toHaveText(t.bookingStatus['confirmed'] ?? '');
 
-  /*
-    The status moved on the SCREEN, not merely in a message.
+  /* ── Confirmed: the guest may now arrive, and SAFRA may not answer twice. ── */
+  await page.reload();
+  await expect(button(copy.checkIn)).toBeVisible();
+  await expect(button(copy.confirmBooking), 'it is already confirmed').toHaveCount(0);
+  await expect(button(copy.completeStay), 'nobody has arrived yet').toHaveCount(0);
 
-    A confirmation that appears while the pill still reads «بانتظار الدفع» is the shape this
-    codebase keeps meeting — a true sentence describing an intention rather than a change.
-  */
-  await expect(page.locator('[data-status-pill]').first()).toHaveText(
-    t.bookingStatus['pending_confirmation'] ?? '',
+  await button(copy.checkIn).click();
+  await expect(page.getByText(copy.checkedIn)).toBeVisible({ timeout: 20_000 });
+  await page.reload();
+  await expect(pill).toHaveText(t.bookingStatus['checked_in'] ?? '');
+
+  /* ── Checked in: the undo is offered, and it works — the desk clerk's ordinary mistake. ── */
+  await expect(button(copy.undoCheckIn)).toBeVisible();
+  await expect(button(copy.completeStay)).toBeVisible();
+
+  await button(copy.undoCheckIn).click();
+  await expect(page.getByText(copy.checkInUndone)).toBeVisible({ timeout: 20_000 });
+  await page.reload();
+  await expect(pill, 'the undo goes back to confirmed and no further').toHaveText(
+    t.bookingStatus['confirmed'] ?? '',
   );
 
+  /* ── And forward again, to the end. ── */
+  await button(copy.checkIn).click();
+  await expect(page.getByText(copy.checkedIn)).toBeVisible({ timeout: 20_000 });
   await page.reload();
 
-  /* And now the pair has swapped: capture is spent, cancellation is available. */
-  await expect(page.getByRole('button', { name: copy.capturePayment })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: copy.cancelBooking })).toBeVisible();
+  await button(copy.completeStay).click();
+  await expect(page.getByText(copy.stayCompleted)).toBeVisible({ timeout: 20_000 });
+  await expect(pill).toHaveText(t.bookingStatus['completed'] ?? '');
 
-  /* ── Cancel ─────────────────────────────────────────────────────────── */
-  await page.getByRole('button', { name: copy.cancelBooking }).first().click();
+  /*
+    A completed stay offers nothing, and that is the assertion.
 
-  /* The consequence is on screen before the field, as on «تعليق الحساب». */
+    §6.2 gives `completed` no outgoing edge except a dispute, and there is no route for that yet
+    (`O-book-3`). Every control being gone is what a terminal state looks like — and the
+    confirmation above survived the refresh that removed the last of them, which is `O-staff-6`.
+  */
+  await page.reload();
+  for (const label of [
+    copy.confirmBooking,
+    copy.checkIn,
+    copy.undoCheckIn,
+    copy.completeStay,
+    copy.cancelBooking,
+    copy.capturePayment,
+  ]) {
+    await expect(button(label), `${label} must be gone`).toHaveCount(0);
+  }
+});
+
+/**
+ * Confirming receipt of a transfer is offered for an OFFLINE rail and no other.
+ *
+ * Bashar asked (2026-08-25) why a human confirms a payment a provider has verified. He is right,
+ * and the SRS agrees: §6.2 gives `Payment Pending` to «النظام/بوابة الدفع» — the system and the
+ * payment gateway — and names no human. The control exists only because ADR 0002 leaves SAFRA one
+ * operable rail with no gateway behind it: a SEPA transfer, which sends no webhook.
+ *
+ * So the assertion in a browser is the ABSENCE: an ordinary unpaid booking, whose attempt is on a
+ * rail that reports for itself, must not offer it. The presence case needs an offline attempt and
+ * is asserted in `booking-actions-offered.integration.test.ts`, where one can be created.
+ */
+test('confirming receipt is not offered on a booking whose rail reports for itself', async ({
+  page,
+}) => {
+  await page.goto('/bookings?status=pending_payment&size=5');
+
+  const row = page.locator('a[href^="/bookings/BKG-"]').first();
+
+  test.skip((await row.count()) === 0, 'No booking is awaiting payment.');
+
+  await page.goto(`/bookings/${(await row.innerText()).trim()}`);
+
+  await expect(page.locator('[data-status-pill]').first()).toHaveText(
+    t.bookingStatus['pending_payment'] ?? '',
+  );
+  await expect(
+    page.getByRole('button', { name: copy.capturePayment, exact: true }),
+    'a card is captured by its webhook, never by an operator',
+  ).toHaveCount(0);
+});
+
+/**
+ * Cancelling, on a booking that can be cancelled.
+ *
+ * Its own test because cancellation is terminal: folding it into the lifecycle walk above would
+ * end that booking before it could reach `completed`, and completing a stay is the move that had
+ * no writer at all until 2026-08-25.
+ */
+test('a staff cancellation closes the booking and puts its reason on the record', async ({
+  page,
+}) => {
+  await page.goto('/bookings?status=pending_confirmation&size=5');
+
+  /*
+    DISTINCT references, not the second anchor.
+
+    Every row carries TWO links to the same booking — the reference and «فتح الملف» — so
+    `nth(1)` is the first booking's other link, which is the booking the lifecycle test has just
+    walked to `completed`. It offered no cancel control and this timed out waiting for one.
+  */
+  const references = [
+    ...new Set(
+      (
+        await page
+          .locator('a[href^="/bookings/BKG-"]')
+          .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''))
+      )
+        .map((href) => /BKG-[\w-]+/.exec(href)?.[0] ?? '')
+        .filter(Boolean),
+    ),
+  ];
+
+  test.skip(references.length < 2, 'Not enough bookings awaiting confirmation.');
+
+  const reference = references[1] ?? '';
+
+  await page.goto(`/bookings/${reference}`);
+  await page.getByRole('button', { name: copy.cancelBooking, exact: true }).click();
   await expect(page.getByText(copy.cancelHint)).toBeVisible();
-
   await page.getByLabel(copy.cancelReasonLabel).fill(CANCEL_REASON);
-  await page.getByRole('button', { name: copy.cancelBooking }).last().click();
+  await page
+    .getByRole('button', { name: copy.cancelBooking, exact: true })
+    .last()
+    .click();
   await expect(page.getByText(copy.bookingCancelled)).toBeVisible({ timeout: 20_000 });
 
   await page.reload();
-
   await expect(page.locator('[data-status-pill]').first()).toHaveText(
     t.bookingStatus['cancelled'] ?? '',
   );
-
-  /*
-    The reason reaches the RECORD, not just the request — and it is asserted on the الإلغاء
-    section rather than anywhere on the page.
-
-    A bare `getByText` matched TWO elements: this section and the timeline's `booking.cancelled`
-    payload. Both are correct and they prove different things — the timeline says the event carried
-    a reason, this says the BOOKING did. The record is the one a support agent reads first, and
-    scoping the assertion is what keeps it about that rather than about whichever element happened
-    to render.
-  */
+  /* The reason reaches the RECORD, not just the request — the customer reads it. */
   await expect(
     page.locator('section').filter({ hasText: copy.cancellation }).last(),
   ).toContainText(CANCEL_REASON);
-
-  /* Nothing is left to offer on a cancelled booking, and the screen says so by offering nothing. */
-  await expect(page.getByRole('button', { name: copy.cancelBooking })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: copy.capturePayment })).toHaveCount(0);
 });
 
 /**
