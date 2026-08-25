@@ -1,5 +1,5 @@
 /**
- * The five recurring jobs, and the cron expressions they run on.
+ * The recurring jobs, and the cron expressions they run on.
  *
  * ## Why the schedule lives here and not on a decorator
  *
@@ -22,6 +22,15 @@
 export const SCHEDULED_JOBS = {
   'booking-sla-sweep': '* * * * *',
   'payout-accrual': '0 * * * *',
+  /**
+   * Ending stays whose departure has passed — the gap found on 2026-08-25.
+   *
+   * Ten past the hour, so it runs BEFORE the accrual it feeds rather than fifty minutes after it:
+   * a stay that ended overnight is then payable on the next accrual rather than the one after.
+   * Both are hourly, and the ten minutes is the ordering, not a race — `payout-accrual` reads
+   * whatever is `completed` when it runs and is correct either way.
+   */
+  'stay-completion': '10 * * * *',
   'ranking-recompute': '0 3 * * *',
   'webhook-retention': '0 3 * * *',
   /**

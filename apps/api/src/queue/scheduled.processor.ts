@@ -12,6 +12,7 @@ import { JobRunService } from '../common/jobs/job-run.service.js';
 import { QUEUE } from './queue.definitions.js';
 import { DeadLetterService } from './dead-letter.service.js';
 import { SCHEDULED_JOBS, type ScheduledJobData } from './scheduled.job.js';
+import { StayCompletionService } from '../bookings/stay-completion.service.js';
 
 /**
  * The `scheduled` queue's worker-side body: five recurring jobs, dispatched by name.
@@ -55,6 +56,7 @@ export class ScheduledProcessor {
   constructor(
     private readonly sla: SlaService,
     private readonly payouts: PayoutScheduler,
+    private readonly stays: StayCompletionService,
     private readonly ranking: RankingScheduler,
     private readonly sanctions: SanctionsRefreshService,
     private readonly retention: WebhookRetentionService,
@@ -88,6 +90,8 @@ export class ScheduledProcessor {
         return this.sla.sweep();
       case 'payout-accrual':
         return this.payouts.run();
+      case 'stay-completion':
+        return this.stays.sweep();
       case 'ranking-recompute':
         return this.ranking.nightlyRecompute();
       case 'sanctions-refresh':

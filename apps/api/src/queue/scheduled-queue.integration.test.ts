@@ -83,6 +83,7 @@ describeIfReady('the scheduled queue', () => {
     const processor = new ScheduledProcessor(
       { sweep: () => stub('booking-sla-sweep').run() } as never,
       { run: () => stub('payout-accrual').run() } as never,
+      { sweep: () => stub('stay-completion').run() } as never,
       { nightlyRecompute: () => stub('ranking-recompute').run() } as never,
       { refresh: () => stub('sanctions-refresh').run() } as never,
       /*
