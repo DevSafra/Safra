@@ -311,6 +311,50 @@ describeIfDb('PropertyImageService', () => {
    * is a guarantee nobody has checked.
    */
   describe('the cover invariant', () => {
+    /**
+     * ONE cover, enforced by the DATABASE (2026-08-26).
+     *
+     * `is_cover` was a plain boolean and seventy-two properties carried more than one — one
+     * carried five. Which image then led the listing was whatever order a query returned, so the
+     * same property could present differently in search, on its page and in the console, and the
+     * partner's own choice was honoured on none of them.
+     *
+     * Asserted against a raw `UPDATE` rather than through `setCover`, deliberately: the service
+     * clears before it sets and would satisfy this by construction. What is being proved is that
+     * the rule survives a writer that does NOT — the seed, a migration, a future endpoint — which
+     * is the only reason to put it in the schema rather than in a service.
+     */
+    it('refuses a second cover at the database level', async () => {
+      const first = await add();
+      const second = await add();
+
+      expect(first.id).not.toBe(second.id);
+
+      await expect(
+        db.execute(sql`
+          UPDATE property_images SET is_cover = true WHERE id = ${second.id}
+        `),
+      ).rejects.toThrow();
+
+      /* The control: the property still has exactly the one cover it started with. */
+      const list = await service.list(partner(), reference);
+
+      expect(list.filter((image) => image.isCover)).toHaveLength(1);
+    });
+
+    /** And the ordinary path still works — clearing before setting is not caught by the index. */
+    it('still lets the partner move the cover to another image', async () => {
+      await add();
+      const second = await add();
+
+      await service.setCover(partner(), reference, second.id);
+
+      const list = await service.list(partner(), reference);
+
+      expect(list.filter((image) => image.isCover)).toHaveLength(1);
+      expect(list.find((image) => image.isCover)?.id).toBe(second.id);
+    });
+
     it('promotes the next image when the cover is archived', async () => {
       const first = await add();
       await add();
