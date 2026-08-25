@@ -49,13 +49,11 @@ export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
     channels: ['email'],
     locales: ALL_LOCALES,
     /*
-      NOT implemented, corrected 2026-08-25 by the final booking audit.
-
-      §10.3 lists «الفاتورة» among the mails that must exist and nothing sends one — there is no
-      template and no send path. The flag said otherwise, so سجل القوالب told staff a mail was
-      working that has never been written. `notification-catalogue.test.ts` now holds this honest.
+      Built 2026-08-25. `markPaid` sends it the moment the payment is captured, which is when a
+      receipt is owed — a link to the customer's own invoice screen rather than an attachment, so
+      no PDF is rendered on the capture path. `notification-catalogue.test.ts` holds the claim.
     */
-    implemented: false,
+    implemented: true,
   },
   {
     key: 'booking.cancelled_refund',

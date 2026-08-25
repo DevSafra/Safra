@@ -62,6 +62,21 @@ const RENDERERS: {
       }),
     shows: 'BKG-2026-000042',
   },
+  {
+    name: 'bookingInvoiceMail',
+    entry: 'bookingInvoice',
+    render: (locale) =>
+      templates.bookingInvoiceMail({
+        ...SAMPLE,
+        locale,
+        reference: 'BKG-2026-000042',
+        property: 'فندق قصر الشرق',
+        amount: '436.00',
+        currency: 'USD',
+        url: 'https://safra.test/ar/account/invoices/BKG-2026-000042',
+      }),
+    shows: 'BKG-2026-000042',
+  },
   /*
     §6.4's pair — the cancellation and the refund.
 

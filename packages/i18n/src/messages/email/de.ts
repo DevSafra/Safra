@@ -152,6 +152,10 @@ export const de = {
     subject: 'Erstattung für Buchung {reference} gestartet — SAFRA',
     body: 'Wir haben die Erstattung Ihrer Buchung gestartet.\n\nReferenz: {reference}\nErstatteter Betrag: {amount} {currency}\n\nWas in Ihr Guthaben zurückgeht, ist sofort verfügbar. Was über Ihre Zahlungsart zurückgeht, kann einige Tage dauern.\n\nBuchungsdetails:\n{url}\n\nIhr SAFRA-Team',
   },
+  bookingInvoice: {
+    subject: 'Ihre Rechnung zur Buchung {reference} — SAFRA',
+    body: 'Wir haben Ihre Zahlung erhalten. Dies ist die Rechnung zu Ihrer Buchung.\n\nReferenz: {reference}\nUnterkunft: {property}\nGezahlter Gesamtbetrag: {amount} {currency}\n\nRechnung hier öffnen oder herunterladen:\n{url}\n\nIhr SAFRA-Team',
+  },
   bookingNeedsAction: {
     subject: 'Eine Buchung wartet auf Sie — {reference}',
     body: 'Eine neue Buchungsanfrage wartet auf Ihre Entscheidung.\n\nReferenz: {reference}\nUnterkunft: {property}\nAnreise: {checkIn}\nAbreise: {checkOut}\n\nSie haben bis {deadline} Zeit zu antworten. Eine Anfrage, die bis dahin unbeantwortet bleibt, wird automatisch storniert und ein Verstoß wegen "keine Antwort" wird Ihrem Konto zugeordnet.\n\nAnfrage hier öffnen:\n{url}\n\nIhr SAFRA-Team',

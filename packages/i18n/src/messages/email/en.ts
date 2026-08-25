@@ -152,6 +152,10 @@ export const en = {
     subject: 'A refund has started for booking {reference} — SAFRA',
     body: 'We have started refunding your booking.\n\nReference: {reference}\nAmount refunded: {amount} {currency}\n\nAnything returning to your wallet is there immediately. Anything returning via your payment method may take a few days to appear.\n\nBooking details:\n{url}\n\nThe SAFRA team',
   },
+  bookingInvoice: {
+    subject: 'Your invoice for booking {reference} — SAFRA',
+    body: 'We have received your payment. This is the invoice for your booking.\n\nReference: {reference}\nProperty: {property}\nTotal paid: {amount} {currency}\n\nOpen or download your invoice here:\n{url}\n\nThe SAFRA team',
+  },
   bookingNeedsAction: {
     subject: 'A booking is waiting for you — {reference}',
     body: 'You have a new booking request waiting for your decision.\n\nReference: {reference}\nProperty: {property}\nCheck-in: {checkIn}\nCheck-out: {checkOut}\n\nYou have until {deadline} to respond. A request left unanswered past that time is cancelled automatically and a "no response" violation is recorded against your account.\n\nOpen the request here:\n{url}\n\nThe SAFRA team',

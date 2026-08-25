@@ -5,7 +5,11 @@ import type { Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { ENV, type Env } from '../config/env.js';
-import { bookingConfirmedMail, bookingNeedsActionMail } from '../mail/mail.templates.js';
+import {
+  bookingInvoiceMail,
+  bookingConfirmedMail,
+  bookingNeedsActionMail,
+} from '../mail/mail.templates.js';
 import { VoucherService } from './voucher.service.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { NotificationService } from '../notifications/notification.service.js';
@@ -208,8 +212,66 @@ export class BookingActionsService {
       transaction that has just written ledger entries.
     */
     await this.notifyPartnerOfPendingBooking(booking.id);
+    /* §10.3's «الفاتورة» — the receipt, owed the moment the money is captured. */
+    await this.sendInvoice(booking.id);
 
     return result;
+  }
+
+  /**
+   * «فاتورة حجزك» — §10.3, sent once the payment is captured.
+   *
+   * Swallowed on failure, outside the transaction, like every other notice here: the money is
+   * already captured and the booking has already moved, and a mail server that is down must not
+   * undo either. A notice that fails is a `notifications` row the re-drive sweep picks up.
+   */
+  private async sendInvoice(bookingId: string): Promise<void> {
+    try {
+      const rows = await this.db.execute<{
+        email: string | null;
+        locale: string | null;
+        reference: string;
+        property: string | null;
+        total_amount: string;
+        currency_code: string;
+        customer_profile_id: string;
+      }>(sql`
+        SELECT cp.email, u.preferred_locale AS locale, b.reference,
+               coalesce(pr.name_ar, pr.name_en) AS property,
+               b.total_amount::text AS total_amount,
+               cur.code AS currency_code, b.customer_profile_id
+        FROM bookings b
+        JOIN customer_profiles cp ON cp.id = b.customer_profile_id
+        JOIN properties pr        ON pr.id = b.property_id
+        JOIN currencies cur       ON cur.id = b.currency_id
+        LEFT JOIN users u         ON u.id = cp.user_id
+        WHERE b.id = ${bookingId}
+        LIMIT 1
+      `);
+
+      const row = rows.rows[0];
+
+      if (!row?.email) return;
+
+      const locale = row.locale ?? 'ar';
+
+      await this.notifications.notify(
+        'booking.invoice',
+        bookingInvoiceMail({
+          to: row.email,
+          locale,
+          reference: row.reference,
+          property: row.property ?? '',
+          amount: row.total_amount,
+          currency: row.currency_code,
+          url: `${this.env.APP_URL}/${locale}/account/invoices/${encodeURIComponent(row.reference)}`,
+        }),
+        locale,
+        { bookingId, customerProfileId: row.customer_profile_id },
+      );
+    } catch (error: unknown) {
+      this.logger.error(`Invoice mail for ${bookingId} failed: ${describeError(error)}`);
+    }
   }
 
   /**

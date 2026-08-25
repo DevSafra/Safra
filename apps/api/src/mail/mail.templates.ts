@@ -776,6 +776,42 @@ export function bookingRefundedMail(input: {
   };
 }
 
+/**
+ * «فاتورة حجزك» — §10.3 lists «الفاتورة» among the mails that must exist, and none did.
+ *
+ * ## A link, not an attachment
+ *
+ * An invoice on this platform is a VIEW of a booking rather than a stored document — there is no
+ * `invoices` table — and the customer's own screen already renders it and offers the PDF. Attaching
+ * one would mean rendering a PDF on the payment-capture path, which adds a headless browser to the
+ * hot path and a second way for capture to look like it failed. The voucher is attached because
+ * §6.5 exists for a desk with no connection; an invoice is read at home.
+ *
+ * Sent when the money is CAPTURED, which is when a receipt is owed — not at confirmation, because
+ * the customer has paid either way and a partner who never answers still owes them the record.
+ */
+export function bookingInvoiceMail(input: {
+  to: string;
+  locale: string;
+  reference: string;
+  property: string;
+  amount: string;
+  currency: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.bookingInvoice, input.locale, {
+      reference: input.reference,
+      property: input.property,
+      amount: input.amount,
+      /* The currency beside the figure — the standing rule, in a message about money. */
+      currency: input.currency,
+      url: input.url,
+    }),
+  };
+}
+
 export function bookingNeedsActionMail(input: {
   to: string;
   locale: string;

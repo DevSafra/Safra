@@ -60,8 +60,18 @@ describe('the notification catalogue', () => {
   it('can actually find a send path, so the check above can fail', () => {
     expect(sends(source, 'booking.confirmed'), 'booking.confirmed is sent').toBe(true);
     expect(sends(source, 'booking.refunded'), 'booking.refunded is sent').toBe(true);
-    /* And a key nothing sends is NOT found, so the matcher is not simply saying yes. */
-    expect(sends(source, 'booking.invoice'), 'booking.invoice is not').toBe(false);
+    /*
+      And a key nothing sends is NOT found, so the matcher is not simply saying yes.
+
+      This named `booking.invoice` until that mail was built — the control has to point at
+      something genuinely unsent, and swapping it when the gap closes is the maintenance this kind
+      of assertion costs. `partner.deadline_reminder` is the remaining one: §6.3 step 5's FIRST
+      notice is sent as `booking.needs_action`, and a second nudge mid-window does not exist.
+    */
+    expect(
+      sends(source, 'partner.deadline_reminder'),
+      'partner.deadline_reminder is not',
+    ).toBe(false);
   });
 
   /** Every entry marked unimplemented is a real gap somebody can look up. */
