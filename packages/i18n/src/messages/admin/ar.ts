@@ -1138,6 +1138,15 @@ export const ar = {
       raising: 'جارٍ التسجيل…',
       raised: 'سُجّلت المخالفة.',
       kindLabel: 'نوع المخالفة',
+      /*
+        The select's own placeholder, not `staff.pickRole`.
+
+        It borrowed the staff invitation's «اختر الدور…», so the field that decides what a real
+        business is recorded as having done asked the reader to pick a ROLE. The select has no
+        default on purpose — see the component — which is exactly what makes its placeholder the
+        only word there while the choice is being made.
+      */
+      pickViolationKind: 'اختر نوع المخالفة…',
       violationReasonLabel: 'الوصف (يقرأه الشريك)',
       bookingLabel: 'مرجع الحجز (اختياري)',
 

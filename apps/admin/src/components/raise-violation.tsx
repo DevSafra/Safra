@@ -127,7 +127,7 @@ export function RaiseViolation({ reference }: { reference: string }) {
               className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
             >
               <option value="" disabled>
-                {t.sections.staff.pickRole}
+                {t.sections.enforcement.pickViolationKind}
               </option>
               {VIOLATION_KINDS.map((kind) => (
                 <option key={kind} value={kind}>
