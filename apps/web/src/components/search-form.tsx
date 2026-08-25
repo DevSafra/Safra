@@ -31,6 +31,8 @@ export async function SearchForm({
   locale: Locale;
   cities: City[];
   defaults?: {
+    children?: number | undefined;
+    infants?: number | undefined;
     citySlug?: string | undefined;
     checkIn?: string | undefined;
     checkOut?: string | undefined;
@@ -92,9 +94,21 @@ export async function SearchForm({
         />
       </label>
 
+      {/*
+        §5.2: «عدد الأشخاص — يشمل البالغين والأطفال والرضع عند الحاجة».
+
+        Three fields, not one. The API has taken `adults`, `children` and `infants` since the
+        booking contract was written and this form only ever sent the first, so a family could not
+        say what it was — and `max_guests` was then matched against an undercount, which is how a
+        party of four ends up in a unit that sleeps two. Found by the SRS audit, 2026-08-25.
+
+        Infants are asked for and deliberately do NOT count toward occupancy: both the search and
+        the booking service compute `adults + children` and say so. They are carried because the
+        PARTNER needs to know a cot is coming, not because they need a bed.
+      */}
       <label className="flex flex-col gap-1.5 text-sm">
         <span className="text-muted">
-          {t('guests')} <span className="text-gold">*</span>
+          {t('adults')} <span className="text-gold">*</span>
         </span>
         <select
           name="adults"
@@ -104,6 +118,37 @@ export async function SearchForm({
           {[1, 2, 3, 4, 5, 6, 8].map((count) => (
             <option key={count} value={count}>
               {t('guestsCount', { count })}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1.5 text-sm">
+        <span className="text-muted">{t('children')}</span>
+        <select
+          name="children"
+          defaultValue={String(defaults?.children ?? 0)}
+          className="rounded-lg border border-line bg-field px-3 py-2.5 text-text"
+        >
+          {[0, 1, 2, 3, 4, 5, 6].map((count) => (
+            <option key={count} value={count}>
+              {t('childrenCount', { count })}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1.5 text-sm">
+        {/* Said plainly, because «0» beside «الرضع» otherwise reads as a bed they are not getting. */}
+        <span className="text-muted">{t('infants')}</span>
+        <select
+          name="infants"
+          defaultValue={String(defaults?.infants ?? 0)}
+          className="rounded-lg border border-line bg-field px-3 py-2.5 text-text"
+        >
+          {[0, 1, 2, 3].map((count) => (
+            <option key={count} value={count}>
+              {t('infantsCount', { count })}
             </option>
           ))}
         </select>

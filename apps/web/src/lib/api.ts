@@ -128,6 +128,8 @@ export interface SearchParams {
   // `| undefined` is required by exactOptionalPropertyTypes: callers build these
   // from query strings where an absent parameter is genuinely undefined.
   children?: number | undefined;
+  /* §5.2. Sent, and deliberately NOT counted toward occupancy — see `search.service.ts`. */
+  infants?: number | undefined;
   citySlug?: string | undefined;
   propertyTypeCode?: string | undefined;
   attributes?: string[] | undefined;

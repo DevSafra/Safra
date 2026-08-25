@@ -29,9 +29,23 @@ import { dynamicMessage } from '@/lib/dynamic-message';
 export async function PropertyCard({
   item,
   locale,
+  stay,
 }: {
   item: SearchResultItem;
   locale: Locale;
+  /**
+   * The party and the dates the reader searched for, as a ready-made `?…` string.
+   *
+   * Passed in rather than assembled here, and that is the security half of it: a card that read
+   * the current URL would reflect whatever a crafted link happened to carry into an anchor on our
+   * own page. The caller builds it from values it has already parsed and clamped — the same
+   * reasoning `returnQuery` records on the console.
+   *
+   * Without it the search's party was simply LOST here. The property page then fell back to two
+   * adults and no children, so a family of four reached checkout as a party of two and the
+   * occupancy check ran against the wrong number — §5.2, found by the SRS audit on 2026-08-25.
+   */
+  stay?: string | undefined;
 }) {
   const t = await getTranslations('property');
   const tt = await getTranslations('propertyTypes');
@@ -88,7 +102,7 @@ export async function PropertyCard({
               reach it, exactly as the responsive rule warns. It is not exempt as an "inline"
               link either: it is a card's main action, not a word inside a sentence. */}
           <Link
-            href={`/${locale}/property/${item.slug}`}
+            href={`/${locale}/property/${item.slug}${stay ?? ''}`}
             className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
           >
             {name}

@@ -25,6 +25,20 @@ import { convertForDisplay, displayCurrency } from '@/lib/currency';
  */
 export const revalidate = 60;
 
+/** The first value of a repeatable query parameter, or nothing. */
+function first(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** A whole number inside its bounds, or the fallback — never NaN, never negative. */
+function whole(raw: string | undefined, fallback: number, max: number): number {
+  const value = Number(raw);
+
+  if (!Number.isFinite(value)) return fallback;
+
+  return Math.min(Math.max(Math.trunc(value), 0), max);
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -61,12 +75,25 @@ export async function generateMetadata({
 
 export default async function PropertyPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale, slug } = await params;
+  const query = await searchParams;
   if (!isLocale(locale)) notFound();
   setRequestLocale(locale);
+
+  /*
+    §5.2 — the party the reader searched with, clamped on the way through.
+
+    Absent when somebody arrives here from a bookmark or a city page, which is why every one has a
+    fallback: this screen must render for a reader who has not searched at all.
+  */
+  const adults = whole(first(query['adults']), 2, 30) || 2;
+  const children = whole(first(query['children']), 0, 20);
+  const infants = whole(first(query['infants']), 0, 10);
 
   const property = await getProperty(slug);
   if (!property) notFound();
@@ -387,7 +414,7 @@ export default async function PropertyPage({
                   used as the default so the link always lands on something valid.
                 */}
                 <Link
-                  href={`/${locale}/checkout?property=${property.slug}&unitId=${cheapest.id}&checkIn=${defaultStay.checkIn}&checkOut=${defaultStay.checkOut}&adults=${Math.min(2, cheapest.maxGuests)}`}
+                  href={`/${locale}/checkout?property=${property.slug}&unitId=${cheapest.id}&checkIn=${defaultStay.checkIn}&checkOut=${defaultStay.checkOut}&adults=${Math.min(adults, cheapest.maxGuests)}&children=${children}&infants=${infants}`}
                   className="mt-5 block rounded-lg bg-gold px-5 py-3 text-center font-semibold text-bg transition-opacity hover:opacity-90"
                 >
                   {t('bookNow')}

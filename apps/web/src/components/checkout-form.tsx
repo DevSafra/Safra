@@ -31,6 +31,8 @@ export function CheckoutForm({
   checkIn,
   checkOut,
   adults,
+  children,
+  infants,
   propertySlug,
   methods,
   wallet,
@@ -41,6 +43,9 @@ export function CheckoutForm({
   checkIn: string;
   checkOut: string;
   adults: number;
+  /* §5.2. Both travel to the API; only `children` counts toward occupancy there. */
+  children: number;
+  infants: number;
   propertySlug: string;
   /**
    * Resolved server-side from provider routing (§7.1). May legitimately be empty
@@ -108,6 +113,8 @@ export function CheckoutForm({
           checkIn,
           checkOut,
           adults,
+          children,
+          infants,
           guest: {
             fullName: text(form, 'fullName'),
             email: text(form, 'email'),

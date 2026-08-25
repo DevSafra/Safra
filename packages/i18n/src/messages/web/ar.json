@@ -62,7 +62,13 @@
     "sortRecommended": "موصى به من سفرة",
     "sortPriceAsc": "السعر: الأقل أولاً",
     "sortPriceDesc": "السعر: الأعلى أولاً",
-    "sortRatingDesc": "الأعلى تقييماً"
+    "sortRatingDesc": "الأعلى تقييماً",
+    "adults": "البالغون",
+    "children": "الأطفال",
+    "infants": "الرضّع",
+    "childrenCount": "{count, plural, zero {لا أطفال} one {طفل واحد} two {طفلان} few {# أطفال} many {# طفلًا} other {# طفل}}",
+    "infantsCount": "{count, plural, zero {لا رضّع} one {رضيع واحد} two {رضيعان} few {# رضّع} many {# رضيعًا} other {# رضيع}}",
+    "infantsHint": "الرضّع لا يُحتسبون ضمن سعة الوحدة"
   },
   "attributes": {
     "sea": "بحر",
@@ -186,7 +192,8 @@
     "walletApply": "استخدم {amount} من رصيدي",
     "walletRemaining": "المتبقي للدفع",
     "walletCoversAll": "رصيدك يغطي هذا الحجز بالكامل.",
-    "walletSignedOut": "سجّل الدخول لاستخدام رصيدك في سفرة."
+    "walletSignedOut": "سجّل الدخول لاستخدام رصيدك في سفرة.",
+    "guestsSummary": "عدد الضيوف"
   },
   "bookingPending": {
     "title": "تم الدفع — حجزك قيد التأكيد",

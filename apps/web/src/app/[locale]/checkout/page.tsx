@@ -30,6 +30,15 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+/** A whole number inside its bounds, or the fallback — never NaN, never negative. */
+function whole(raw: string | undefined, fallback: number, max: number): number {
+  const value = Number(raw);
+
+  if (!Number.isFinite(value)) return fallback;
+
+  return Math.min(Math.max(Math.trunc(value), 0), max);
+}
+
 export default async function CheckoutPage({
   params,
   searchParams,
@@ -44,12 +53,20 @@ export default async function CheckoutPage({
   const query = await searchParams;
   const t = await getTranslations('checkout');
   const tp = await getTranslations('property');
+  /* The guest plurals live with the search form that collects them, not with the summary. */
+  const ts = await getTranslations('search');
 
   const slug = first(query['property']);
   const unitId = first(query['unitId']);
   const checkIn = first(query['checkIn']);
   const checkOut = first(query['checkOut']);
   const adults = Number(first(query['adults']) ?? 2);
+  /*
+    §5.2's other two, clamped the way the search page clamps them: the API bounds them again, but
+    an unclamped `?children=abc` would reach the quote as NaN and turn a typo into an error page.
+  */
+  const children = whole(first(query['children']), 0, 20);
+  const infants = whole(first(query['infants']), 0, 10);
 
   // Missing parameters mean the customer arrived here by a broken link rather than
   // through a property page. Say so plainly instead of rendering an empty form.
@@ -139,6 +156,8 @@ export default async function CheckoutPage({
           checkIn={checkIn}
           checkOut={checkOut}
           adults={adults}
+          children={children}
+          infants={infants}
           propertySlug={slug}
           methods={methods}
           wallet={
@@ -163,6 +182,20 @@ export default async function CheckoutPage({
             <p className="text-sm text-faint">
               <DateRange from={checkIn} to={checkOut} locale={locale} /> ·{' '}
               {tp('totalFor', { nights: priced.nights })}
+            </p>
+            {/*
+              §6.3 step 3 names EIGHT things this panel must show, and «عدد الضيوف» was the one it
+              did not. The count was read off the query string and submitted, never rendered — so
+              the last screen before somebody pays did not confirm how many people they were paying
+              for. Found by the SRS audit, 2026-08-25.
+
+              Each kind on its own, not a single total: «٤ ضيوف» cannot tell a family of four from
+              two adults and two children, and the partner is preparing a room from this.
+            */}
+            <p className="text-sm text-faint">
+              {t('guestsSummary')}: {ts('guestsCount', { count: adults })}
+              {children > 0 ? <> · {ts('childrenCount', { count: children })}</> : null}
+              {infants > 0 ? <> · {ts('infantsCount', { count: infants })}</> : null}
             </p>
 
             <div className="gold-rule my-4" />

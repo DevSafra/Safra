@@ -62,7 +62,13 @@
     "sortRecommended": "Recommended by SAFRA",
     "sortPriceAsc": "Price: lowest first",
     "sortPriceDesc": "Price: highest first",
-    "sortRatingDesc": "Highest rated"
+    "sortRatingDesc": "Highest rated",
+    "adults": "Adults",
+    "children": "Children",
+    "infants": "Infants",
+    "childrenCount": "{count, plural, =0 {no children} one {1 child} other {# children}}",
+    "infantsCount": "{count, plural, =0 {no infants} one {1 infant} other {# infants}}",
+    "infantsHint": "Infants do not count toward the unit’s capacity"
   },
   "attributes": {
     "sea": "Sea",
@@ -186,7 +192,8 @@
     "walletApply": "Use {amount} from my balance",
     "walletRemaining": "Remaining to pay",
     "walletCoversAll": "Your balance covers this booking in full.",
-    "walletSignedOut": "Sign in to use your SAFRA balance."
+    "walletSignedOut": "Sign in to use your SAFRA balance.",
+    "guestsSummary": "Guests"
   },
   "bookingPending": {
     "title": "Paid — your booking is pending confirmation",
