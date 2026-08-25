@@ -38,6 +38,12 @@ import { WalletModule } from '../wallet/wallet.module.js';
     // stateless, so a second instance costs nothing.
     AuditService,
   ],
-  exports: [RefundService, WebhookRetentionService],
+  /*
+    `PaymentProviderRegistry` is exported so the CONSOLE can ask one question of it: is the rail a
+    booking is waiting on one that reports for itself? `BookingDetailService` uses it to decide
+    whether to offer «تأكيد استلام الحوالة», and offering that on a card would be a way to mark a
+    booking paid mid-3-D-Secure. Read-only use — nothing outside this module registers a provider.
+  */
+  exports: [RefundService, WebhookRetentionService, PaymentProviderRegistry],
 })
 export class PaymentsModule {}

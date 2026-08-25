@@ -10,6 +10,7 @@ import { notFound } from '../common/errors/app-error.js';
 import { actorName } from '../common/actor-name.sql.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { allowedTransitions, type BookingStatus } from '../bookings/booking-state.js';
+import { PaymentProviderRegistry } from '../payments/providers/provider.registry.js';
 
 /**
  * Renders a `timestamptz` as an explicit UTC ISO-8601 string.
@@ -26,6 +27,38 @@ function utc(column: string) {
   return sql.raw(
     `to_char(${column} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
   );
+}
+
+/**
+ * The staff moves available from one status, named the way the screen thinks about them.
+ *
+ * ## Derived, never listed
+ *
+ * Each flag asks `allowedTransitions(status, 'staff')` rather than restating a rule. The
+ * transition table is the thing `assertTransition` enforces with, so a control offered here and
+ * refused there is a disagreement that cannot arise — and adding a transition to the table lights
+ * up the control that goes with it, rather than leaving a second list to remember.
+ *
+ * ## `confirm` and `undoCheckIn` both mean `→ confirmed`, and they are not the same button
+ *
+ * The destination alone does not identify the act: reaching `confirmed` from
+ * `pending_confirmation` is SAFRA answering for the partner, and reaching it from `checked_in` is
+ * a desk clerk undoing a mistake. Same edge in the table, two different endpoints, two different
+ * consequences — so the FROM state is what separates them here.
+ */
+function staffMoves(status: BookingStatus) {
+  const to = allowedTransitions(status, 'staff');
+
+  return {
+    cancel: to.includes('cancelled'),
+    /** §6.3 step 7, and only out of the partner's own window. */
+    confirm: status === 'pending_confirmation' && to.includes('confirmed'),
+    checkIn: to.includes('checked_in'),
+    /** The reverse move, which the table did not name until 2026-08-25 — see `booking-state.ts`. */
+    undoCheckIn: status === 'checked_in' && to.includes('confirmed'),
+    /** What a partner is paid for, and what a customer may review. */
+    complete: to.includes('completed'),
+  };
 }
 
 /**
@@ -48,6 +81,7 @@ export class BookingDetailService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly providers: PaymentProviderRegistry,
   ) {}
 
   async detail(reference: string, claims: AccessTokenClaims | undefined) {
@@ -207,16 +241,43 @@ export class BookingDetailService {
         neither is a security boundary — they decide what is worth offering.
       */
       actions: {
-        cancel: allowedTransitions(booking['status'] as BookingStatus, 'staff').includes(
-          'cancelled',
-        ),
         /*
-          Not from the transition table, and the asymmetry is real: `capture-payment` calls
-          `markPaid`, which asserts the move as SYSTEM rather than as staff — it is standing in
-          for a gateway webhook, not exercising a staff authority. So the state that permits it is
-          `pending_payment` and only that, which is what `markPaid` itself asserts.
+          Every move the state machine gives a STAFF actor from here, asked once.
+
+          `allowedTransitions` has carried the docblock "for building a UI" since it was written
+          and had no caller until this screen. Asking it per action rather than restating each
+          rule means the console cannot disagree with `assertTransition`, which is the one
+          disagreement that would show a control the API is about to refuse.
         */
-        capturePayment: booking['status'] === 'pending_payment',
+        ...staffMoves(booking['status'] as BookingStatus),
+        /*
+          ── Confirming receipt is for an OFFLINE rail, and only for one ──────────────────────
+
+          Bashar's question, 2026-08-25: if a PSP verifies a payment, why would a human confirm it?
+          He is right, and for a card or Klarna nobody should: the webhook calls `markPaid` and no
+          operator is involved. Offering the control there is not merely redundant, it is a way to
+          mark a booking paid while the customer is mid-3-D-Secure and no money has moved.
+
+          But an offline rail has no webhook to wait for. `ManualTransferProvider` — SEPA credit
+          transfer, `isOffline = true` — is the ONE rail the GmbH can operate with no PSP contract
+          at all, which ADR 0002 makes the current reality rather than a fallback: Stripe and PayPal
+          both bar Syria-originating services whatever the merchant's jurisdiction. Its own docblock
+          has always said how it settles: «the customer is given a remittance reference and
+          transfers the money themselves. Finance matches the incoming credit and confirms it
+          through the staff capture endpoint.» Banks do not send webhooks; `parseWebhook()` returns
+          null on purpose.
+
+          So the control is scoped to the provider that cannot report for itself, decided here from
+          the LATEST attempt's provider rather than from its method — offline-ness is a property of
+          the rail, and the day Sham Cash is contracted it will be answered by the same flag with no
+          second list to update.
+
+          A booking with no attempt at all gets nothing: there is no rail yet, so there is nothing
+          to confirm receipt OF.
+        */
+        capturePayment:
+          booking['status'] === 'pending_payment' &&
+          (await this.awaitsOfflineTransfer(bookingId)),
       },
       /*
         How much there is to find on the three screens this booking links out to.
@@ -269,6 +330,31 @@ export class BookingDetailService {
       author: row.author,
       createdAt: row.created_at,
     }));
+  }
+
+  /**
+   * Whether the money for this booking is coming down a rail that cannot report for itself.
+   *
+   * The LATEST attempt, not any attempt: a customer who abandoned a card payment and then chose a
+   * bank transfer is waiting on the transfer, and one who did the reverse is waiting on the card.
+   * Ordering by `created_at DESC LIMIT 1` answers "what are we waiting for now".
+   *
+   * A provider slug the registry does not know — one retired since the row was written — is treated
+   * as NOT offline. That is the safe direction: the failure of an absent control is an operator who
+   * has to ask, and the failure of a wrongly-present one is a booking marked paid with no money.
+   */
+  private async awaitsOfflineTransfer(bookingId: string): Promise<boolean> {
+    const rows = await this.db.execute<{ provider: string }>(sql`
+      SELECT provider::text AS provider
+      FROM payments
+      WHERE booking_id = ${bookingId}
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+
+    const slug = rows.rows[0]?.provider;
+
+    return slug ? (this.providers.bySlug(slug)?.isOffline ?? false) : false;
   }
 
   /** What else exists against this booking, for the cross-links — see the note at the call site. */

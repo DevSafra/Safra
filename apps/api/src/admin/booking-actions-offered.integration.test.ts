@@ -5,6 +5,8 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { BookingDetailService } from './booking-detail.service.js';
+import { PaymentProviderRegistry } from '../payments/providers/provider.registry.js';
+import { ManualTransferProvider } from '../payments/providers/manual-transfer.provider.js';
 import { canTransition } from '../bookings/booking-state.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -50,12 +52,29 @@ const STATUSES = [
 describeIfDb('the actions a booking offers staff', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
-  const bookings = new BookingDetailService(db, new AuditService(db));
+  const bookings = new BookingDetailService(
+    db,
+    new AuditService(db),
+    /*
+      A REAL registry — the manual-transfer provider and nothing else.
+
+      Neither of these suites is about payment rails, but a stub that answered `isOffline` however
+      it liked would make the capture control's scope a fiction here. This is the registry the
+      application builds with the simulator disabled, which is also the production shape.
+    */
+    new PaymentProviderRegistry(
+      { PAYMENT_SIMULATOR_ENABLED: false } as never,
+      null as never,
+      new ManualTransferProvider(),
+    ),
+  );
 
   let reference = '';
+  let attempts = 0;
 
   beforeEach(async () => {
     await harness.begin();
+    attempts = 0;
     await seed();
   });
 
@@ -91,19 +110,82 @@ describeIfDb('the actions a booking offers staff', () => {
     expect(detail.actions.cancel).toBe(false);
   });
 
-  /** Capturing is the payment window and nothing else — it stands in for a gateway webhook. */
-  it('offers capture only while payment is outstanding', async () => {
-    for (const status of STATUSES) {
+  /**
+   * ── Confirming receipt is for the rail that cannot report for itself ────────────────────
+   *
+   * Bashar asked (2026-08-25) why a human would confirm a payment a provider has already
+   * verified. He is right, and these three cases are the answer written down: it depends
+   * entirely on whether the rail sends a webhook.
+   *
+   * The offline case is the one that must be TRUE, and the online case beside it is what makes
+   * that assertion mean anything — an implementation that simply returned `status ===
+   * 'pending_payment'` would pass the first on its own.
+   */
+  describe('confirming receipt of a payment', () => {
+    beforeEach(async () => {
+      /*
+        The seed leaves the booking in `pending_confirmation`, which is the right default for the
+        transition cases above and the wrong one here: confirming receipt is a question about the
+        PAYMENT window, so these cases have to be asked inside it.
+      */
       await db.execute(sql`
-        UPDATE bookings SET status = ${status}::booking_status WHERE reference = ${reference}
+        UPDATE bookings SET status = 'pending_payment' WHERE reference = ${reference}
       `);
+    });
+
+    it('is not offered when no payment has been attempted', async () => {
+      const detail = await bookings.detail(reference, READER);
+
+      expect(
+        detail.actions.capturePayment,
+        'there is no rail to confirm receipt on',
+      ).toBe(false);
+    });
+
+    it('is not offered for a rail that reports for itself', async () => {
+      await attempt('visa', 'simulator');
 
       const detail = await bookings.detail(reference, READER);
 
-      expect(detail.actions.capturePayment, `capture from ${status}`).toBe(
-        status === 'pending_payment',
+      expect(
+        detail.actions.capturePayment,
+        'a card is captured by its webhook, never by an operator',
+      ).toBe(false);
+    });
+
+    it('IS offered for an offline transfer', async () => {
+      await attempt('bank_transfer', 'manual_transfer');
+
+      const detail = await bookings.detail(reference, READER);
+
+      expect(
+        detail.actions.capturePayment,
+        'banks send no webhook — finance matches the credit and says so',
+      ).toBe(true);
+    });
+
+    /** The LATEST attempt decides, so a customer who switched rails is answered correctly. */
+    it('follows the latest attempt when the customer changed rails', async () => {
+      await attempt('bank_transfer', 'manual_transfer');
+      await attempt('visa', 'simulator');
+
+      expect(
+        (await bookings.detail(reference, READER)).actions.capturePayment,
+        'they abandoned the transfer and are now paying by card',
+      ).toBe(false);
+    });
+
+    /** And it is still a question about the payment WINDOW: a paid booking has nothing to confirm. */
+    it('is not offered once the booking has left pending_payment', async () => {
+      await attempt('bank_transfer', 'manual_transfer');
+      await db.execute(sql`
+        UPDATE bookings SET status = 'confirmed' WHERE reference = ${reference}
+      `);
+
+      expect((await bookings.detail(reference, READER)).actions.capturePayment).toBe(
+        false,
       );
-    }
+    });
   });
 
   /** The counts behind the cross-links: zero is an answer, and it has to be the right one. */
@@ -141,6 +223,25 @@ describeIfDb('the actions a booking offers staff', () => {
     expect(detail.related.conversations).toBe(1);
     expect(detail.related.notifications, 'and only what actually exists').toBe(0);
   });
+
+  /**
+   * One payment attempt on the fixture booking.
+   *
+   * `created_at` is advanced by hand per call so "the latest attempt" is unambiguous: two rows
+   * inserted inside one transaction share `now()` — every statement in a transaction sees the same
+   * clock — so an ORDER BY on it would be a coin toss rather than a sequence. The same trap
+   * `mutation-test the assertion` records for `now()` ties.
+   */
+  async function attempt(method: string, provider: string): Promise<void> {
+    attempts += 1;
+
+    await db.execute(sql`
+      INSERT INTO payments (booking_id, method, provider, amount, currency_id, status, created_at)
+      SELECT b.id, ${method}::payment_method, ${provider}, '201.99', b.currency_id,
+             'initiated'::payment_status, now() + (${attempts}::int * INTERVAL '1 second')
+      FROM bookings b WHERE b.reference = ${reference}
+    `);
+  }
 
   /** One booking, moved through statuses by the tests above. */
   async function seed(): Promise<void> {

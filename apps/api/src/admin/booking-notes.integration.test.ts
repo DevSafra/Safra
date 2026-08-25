@@ -5,6 +5,8 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { BookingDetailService } from './booking-detail.service.js';
+import { PaymentProviderRegistry } from '../payments/providers/provider.registry.js';
+import { ManualTransferProvider } from '../payments/providers/manual-transfer.provider.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
@@ -48,7 +50,22 @@ const WITHOUT_NOTES = (sub: string): AccessTokenClaims =>
 describeIfDb('internal notes on a booking', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
-  const bookings = new BookingDetailService(db, new AuditService(db));
+  const bookings = new BookingDetailService(
+    db,
+    new AuditService(db),
+    /*
+      A REAL registry — the manual-transfer provider and nothing else.
+
+      Neither of these suites is about payment rails, but a stub that answered `isOffline` however
+      it liked would make the capture control's scope a fiction here. This is the registry the
+      application builds with the simulator disabled, which is also the production shape.
+    */
+    new PaymentProviderRegistry(
+      { PAYMENT_SIMULATOR_ENABLED: false } as never,
+      null as never,
+      new ManualTransferProvider(),
+    ),
+  );
 
   let reference = '';
   let staffId = '';
