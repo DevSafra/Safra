@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 
@@ -12,7 +12,12 @@ import { MONEY_SCALE, toMinor } from '../common/money.js';
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
-import { canTransition, type Actor, type BookingStatus } from './booking-state.js';
+import {
+  canTransition,
+  transitionLabel,
+  type Actor,
+  type BookingStatus,
+} from './booking-state.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
@@ -385,6 +390,166 @@ export class BookingActionsService {
 
       return { reference, status: target };
     });
+  }
+
+  /**
+   * The staff moves the transition table has always named and no route ever offered.
+   *
+   * ## Why one method and not four
+   *
+   * Confirming on the partner's behalf, checking a guest in, undoing that, and completing a stay
+   * are the same operation with a different pair of states: guard the move, write the status and
+   * its stamp inside one predicate, record a timeline event and an audit row. Four copies would be
+   * four places for the predicate to drift, and the predicate is the safety — see below.
+   *
+   * ## The status is in the WHERE clause, never read-then-written
+   *
+   * `AND status = <from>` means two operators pressing at once cannot both succeed: the second
+   * `UPDATE` matches no rows and answers a conflict. Reading the status, comparing it in TypeScript
+   * and then writing would let both through, and the second would silently overwrite the first's
+   * stamp. Lifted from `ArrivalsService`, which got this right for the partner side first.
+   *
+   * ## `assertTransition` as well, and it is not redundant
+   *
+   * The predicate stops a race; `assertTransition` gives the CALLER a truthful answer about why a
+   * move was refused — «this booking is cancelled» rather than «nothing happened». Without it a
+   * completed booking and a nonexistent one would be indistinguishable to the console.
+   */
+  private async move(
+    reference: string,
+    to: BookingStatus,
+    stamps: SQL,
+    action: string,
+    claims: AccessTokenClaims | undefined,
+    reason?: string,
+  ): Promise<{ reference: string; status: BookingStatus }> {
+    const booking = await this.load(reference);
+
+    this.assertTransition(booking.status, to, 'staff');
+
+    return this.db.transaction(async (tx) => {
+      const changed = await tx.execute<{ id: string }>(sql`
+        UPDATE bookings
+        SET status = ${to}::booking_status, ${stamps}, updated_at = now()
+        WHERE id = ${booking.id} AND status = ${booking.status}::booking_status
+        RETURNING id
+      `);
+
+      /*
+        Nothing matched, so somebody else moved it between the load and the write. A conflict, not
+        a 404: the booking is there and its state is no longer the one this decision was made
+        against, and the operator needs to re-read the screen rather than think it vanished.
+      */
+      if (!changed.rows[0]) throw conflict(ERROR.BOOKING_TRANSITION_INVALID);
+
+      await tx.execute(sql`
+        INSERT INTO timeline_events (subject_type, subject_id, event_type, actor_type, actor_user_id, payload)
+        VALUES ('booking', ${booking.id}, ${`booking.${transitionLabel(booking.status, to) ?? to}`},
+                'staff', ${claims?.sub ?? null},
+                ${JSON.stringify(reason ? { reason } : {})}::jsonb)
+      `);
+
+      await this.audit.record(
+        {
+          actorUserId: claims?.sub,
+          actorRole: claims?.role,
+          action,
+          subjectType: 'booking',
+          subjectId: booking.id,
+          before: { status: booking.status },
+          after: { status: to },
+          ...(reason ? { reason } : {}),
+        },
+        tx as unknown as Database,
+      );
+
+      return { reference, status: to };
+    });
+  }
+
+  /**
+   * SAFRA confirms to the customer on the partner's behalf (§6.3 step 7).
+   *
+   * §6.3 puts SAFRA in the middle of the confirmation, which is why `pending_confirmation →
+   * confirmed` names `staff` alongside `system` and has since the table was written. The route for
+   * it did not exist: `partner-decision` requires `BOOKING_RESPOND_AS_PARTNER` and a partner id
+   * from the token, so a support agent taking the partner's telephone call had no way to record
+   * the answer they were just given.
+   *
+   * The reason is REQUIRED, and it is the whole difference between this and the partner's own
+   * confirmation. A booking confirmed by SAFRA rather than by the business hosting it is an
+   * exception, and an exception nobody can explain later is one nobody should be able to make.
+   *
+   * `confirmation_deadline_at` is cleared for the same reason `partnerDecision` clears it: the
+   * window is answered, and leaving it set would keep the booking in the SLA sweep's sights and in
+   * the dashboard's «تنتهي مهلتها قريباً» count.
+   */
+  async staffConfirm(
+    reference: string,
+    reason: string,
+    claims: AccessTokenClaims | undefined,
+  ) {
+    return this.move(
+      reference,
+      'confirmed',
+      sql`partner_responded_at = now(), confirmed_at = now(),
+          confirmed_by_user_id = ${claims?.sub ?? null},
+          confirmation_deadline_at = NULL`,
+      'booking.staff_confirmed',
+      claims,
+      reason,
+    );
+  }
+
+  /**
+   * Staff record that a guest arrived, for a partner who cannot.
+   *
+   * The partner's own `ArrivalsService` is the ordinary path and stays it. This is the exception —
+   * a partner without the portal to hand, or a front desk that phoned it in — and it differs in
+   * exactly one way: there is no `partner_id` in the predicate, because staff are not acting for
+   * one business. That is the whole reason it cannot simply reuse the partner method.
+   */
+  async staffCheckIn(reference: string, claims: AccessTokenClaims | undefined) {
+    return this.move(
+      reference,
+      'checked_in',
+      sql`checked_in_at = now()`,
+      'booking.checked_in',
+      claims,
+    );
+  }
+
+  /** Undoes it, bounded the same way — `checked_in` is in the predicate, so this cannot reach into `completed`. */
+  async staffUndoCheckIn(reference: string, claims: AccessTokenClaims | undefined) {
+    return this.move(
+      reference,
+      'confirmed',
+      sql`checked_in_at = NULL`,
+      'booking.check_in_undone',
+      claims,
+    );
+  }
+
+  /**
+   * The stay is over (§6.3's last step), and this is what a partner gets paid for.
+   *
+   * ## Nothing could reach this state before 2026-08-25
+   *
+   * `checked_in → completed` names `system` and `staff` and **neither had a writer** — no route, no
+   * scheduled job. The 1,247 completed bookings in the dev database are all seed rows, written
+   * directly. That mattered far beyond this screen: `payout.service` accrues over
+   * `b.status = 'completed'` and `review.service` refuses a review on anything else, so on a real
+   * deployment no partner would ever have been paid and no customer could ever have left a review.
+   * `StayCompletionService` is the ordinary path; this is the manual one.
+   */
+  async staffComplete(reference: string, claims: AccessTokenClaims | undefined) {
+    return this.move(
+      reference,
+      'completed',
+      sql`completed_at = now()`,
+      'booking.completed',
+      claims,
+    );
   }
 
   /** Customer or staff cancellation of a live booking. */

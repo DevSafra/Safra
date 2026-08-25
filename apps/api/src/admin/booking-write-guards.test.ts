@@ -58,6 +58,38 @@ describe('the capabilities behind a booking write', () => {
   });
 
   /**
+   * The three lifecycle moves added on 2026-08-25, and the capability each carries.
+   *
+   * Confirming on the partner's behalf and completing a stay are `BOOKING_UPDATE_STATUS` because
+   * both are SAFRA moving a booking through its own lifecycle. **Checking a guest in is not**: it
+   * is `BOOKING_CHECK_IN`, the capability the partner's own front desk holds, because it is the
+   * same act performed by somebody else. Merging the two would hand every operations manager the
+   * front desk, and every front desk the lifecycle.
+   */
+  it('gates confirming on the partner behalf on booking.update_status alone', () => {
+    expect(required(BookingsController.prototype, 'staffConfirm')).toEqual([
+      P.BOOKING_UPDATE_STATUS,
+    ]);
+  });
+
+  it('gates completing a stay on booking.update_status alone', () => {
+    expect(required(BookingsController.prototype, 'complete')).toEqual([
+      P.BOOKING_UPDATE_STATUS,
+    ]);
+  });
+
+  it('gates checking a guest in on booking.check_in, not on the lifecycle capability', () => {
+    for (const method of ['checkIn', 'undoCheckIn']) {
+      expect(required(BookingsController.prototype, method)).toEqual([
+        P.BOOKING_CHECK_IN,
+      ]);
+      expect(required(BookingsController.prototype, method)).not.toContain(
+        P.BOOKING_UPDATE_STATUS,
+      );
+    }
+  });
+
+  /**
    * And reading a booking is NOT enough to write to one.
    *
    * The control on the two assertions above: if every handler carried `BOOKING_READ_ALL` they
@@ -69,6 +101,10 @@ describe('the capabilities behind a booking write', () => {
       [AdminOperationsController.prototype, 'addBookingNote'],
       [BookingsController.prototype, 'cancel'],
       [BookingsController.prototype, 'capturePayment'],
+      [BookingsController.prototype, 'staffConfirm'],
+      [BookingsController.prototype, 'checkIn'],
+      [BookingsController.prototype, 'undoCheckIn'],
+      [BookingsController.prototype, 'complete'],
     ] as const) {
       expect(required(target, method)).not.toContain(P.BOOKING_READ_ALL);
     }

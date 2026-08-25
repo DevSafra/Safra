@@ -88,6 +88,22 @@ export const bookingInternalNoteSchema = z
 
 export type BookingInternalNoteInput = z.infer<typeof bookingInternalNoteSchema>;
 
+/**
+ * SAFRA confirming a booking the partner should have confirmed (§6.3 step 7).
+ *
+ * The reason is REQUIRED, and it is the entire difference between this and the partner pressing
+ * their own button. A confirmation made by the platform rather than by the business hosting the
+ * stay is an exception; an exception nobody can explain afterwards is one nobody should be able to
+ * make. Twenty characters, matching the enforcement floor rather than the cancellation one —
+ * «تم الاتصال» is not an explanation, and unlike a cancellation reason this one is read by a
+ * colleague reconstructing a decision rather than by the customer beside the dates and the amount.
+ */
+export const bookingStaffConfirmSchema = z
+  .object({ reason: z.string().trim().min(20).max(1000) })
+  .strict();
+
+export type BookingStaffConfirmInput = z.infer<typeof bookingStaffConfirmSchema>;
+
 /** A price quote for a unit and date range, with nothing created. */
 export const bookingQuoteSchema = z
   .object({

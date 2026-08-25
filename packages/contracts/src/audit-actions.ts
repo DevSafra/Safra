@@ -68,6 +68,17 @@ export const AUDIT_ACTIONS = [
     them. The same reasoning `partner_application.contacted` gives for the call log.
   */
   'booking.internal_note_added',
+  /*
+    SAFRA confirming a booking the PARTNER should have confirmed (§6.3 step 7).
+
+    Its own action rather than reusing `booking.confirmed`, because the question an auditor asks
+    later is not "was it confirmed" — it is "who confirmed it, and why was it not the business
+    hosting the stay". A shared action would make the exception indistinguishable from the norm in
+    the one record that exists to tell them apart.
+  */
+  'booking.staff_confirmed',
+  /** A stay ended — written by the hourly sweep as `system`, and by staff as the exception. */
+  'booking.completed',
   'payment.started',
   'payment.failed',
   'refund.created',

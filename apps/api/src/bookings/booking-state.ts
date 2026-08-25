@@ -77,6 +77,25 @@ export const TRANSITIONS: Transition[] = [
     actors: ['partner', 'staff'],
     label: 'checked_in',
   },
+  /**
+   * Undoing a check-in, which the platform has always DONE and this table never named.
+   *
+   * `ArrivalsService.undoCheckIn` has performed this move since the arrivals screen was built —
+   * with a direct `UPDATE` carrying `status = 'checked_in'` in its predicate and no consultation
+   * of this table at all. So the table has been incomplete rather than restrictive, and reading it
+   * to answer "what may staff do from here" gave an answer the platform's own behaviour
+   * contradicted. Added 2026-08-25 when the console started deriving its controls from here.
+   *
+   * A desk clerk checking in the wrong room is the most ordinary mistake the screen produces, and
+   * the reverse move stops at `confirmed`: `completed` and `disputed` are states other parts of
+   * the platform have acted on, and reversing those is not a front-desk decision.
+   */
+  {
+    from: 'checked_in',
+    to: 'confirmed',
+    actors: ['partner', 'staff'],
+    label: 'check_in_undone',
+  },
   {
     from: 'confirmed',
     to: 'cancelled',

@@ -15,11 +15,13 @@ import type { Request } from 'express';
 import {
   PERMISSIONS as P,
   type BookingCancelInput,
+  type BookingStaffConfirmInput,
   type BookingCreateInput,
   type BookingQuoteInput,
   type CursorQuery,
   type PartnerBookingDecisionInput,
   bookingCancelSchema,
+  bookingStaffConfirmSchema,
   bookingCreateSchema,
   bookingQuoteSchema,
   cursorQuerySchema,
@@ -138,6 +140,76 @@ export class BookingsController {
     @Param('reference') reference: string,
   ) {
     return this.actions.simulateCapture(reference, user);
+  }
+
+  /**
+   * SAFRA confirms on the partner's behalf (§6.3 step 7) — the staff half of `partner-decision`.
+   *
+   * `BOOKING_UPDATE_STATUS`, not `BOOKING_RESPOND_AS_PARTNER`: this is not somebody acting AS the
+   * partner, it is SAFRA exercising the position §6.3 gives it in the middle of the confirmation.
+   * The partner route needs a partner id from the token and a support agent has none, which is why
+   * the call a partner makes to support could not be recorded anywhere until now.
+   */
+  @Post(':reference/staff-confirm')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.BOOKING_UPDATE_STATUS)
+  @AuditExempt('Audited transactionally inside BookingActionsService.')
+  async staffConfirm(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(bookingStaffConfirmSchema))
+    body: BookingStaffConfirmInput,
+  ) {
+    return this.actions.staffConfirm(reference, body.reason, user);
+  }
+
+  /**
+   * Staff record an arrival, for a partner who cannot reach their own portal.
+   *
+   * `BOOKING_CHECK_IN` — the same capability the partner's front desk holds, because it is the
+   * same act. The ordinary path stays `POST /partner/arrivals/:reference/check-in`; this differs
+   * only in having no `partner_id` in its predicate, since staff are not acting for one business.
+   */
+  @Post(':reference/check-in')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.BOOKING_CHECK_IN)
+  @AuditExempt('Audited transactionally inside BookingActionsService.')
+  async checkIn(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.actions.staffCheckIn(reference, user);
+  }
+
+  /** Undoes it. Bounded to `checked_in`, so it cannot reach into a completed or disputed stay. */
+  @Post(':reference/undo-check-in')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.BOOKING_CHECK_IN)
+  @AuditExempt('Audited transactionally inside BookingActionsService.')
+  async undoCheckIn(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.actions.staffUndoCheckIn(reference, user);
+  }
+
+  /**
+   * Ends a stay by hand — the exception to `stay-completion`, which is the ordinary path.
+   *
+   * `checked_in → completed` had no writer of any kind before 2026-08-25, and `completed` is what
+   * `PayoutService` accrues over and `ReviewService` requires. The hourly sweep does this for
+   * every departed stay; this exists for the one whose dates say it is still running and whose
+   * guest has demonstrably gone.
+   */
+  @Post(':reference/complete')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.BOOKING_UPDATE_STATUS)
+  @AuditExempt('Audited transactionally inside BookingActionsService.')
+  async complete(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.actions.staffComplete(reference, user);
   }
 
   /** Staff cancellation (§9.4). Customers cancel through their own bookings view. */
