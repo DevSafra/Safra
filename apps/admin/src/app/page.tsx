@@ -259,6 +259,28 @@ function Overview({
  */
 function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
   const rows = [
+    /*
+      EC-011 first, above the SLA row, and deliberately.
+
+      A window about to lapse is urgent and self-correcting — the sweep cancels it and compensates
+      the customer. A stay whose arrival nobody recorded corrects itself NEVER: it sits at
+      confirmed, no payout accrual will ever pick it up, and nothing else on this console says so.
+    */
+    counters.arrivals_not_checked_in > 0
+      ? {
+          code: 'EC-011',
+          text: `${count(counters.arrivals_not_checked_in)} ${t.admin.attentionArrivals}`,
+          href: '/bookings?attention=no_check_in',
+        }
+      : null,
+    /* EC-004 — should be zero. A row here is a defect, not a queue. */
+    counters.confirmed_not_recorded > 0
+      ? {
+          code: 'EC-004',
+          text: `${count(counters.confirmed_not_recorded)} ${t.admin.attentionUnconfirmed}`,
+          href: '/bookings?attention=unconfirmed',
+        }
+      : null,
     counters.sla_expiring_soon > 0
       ? {
           code: 'EC-008',

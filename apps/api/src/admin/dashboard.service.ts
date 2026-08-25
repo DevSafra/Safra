@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { SLA_EXPIRY_WARNING_MINUTES } from '@safra/contracts';
+import { ARRIVAL_ALERT_HOURS, SLA_EXPIRY_WARNING_MINUTES } from '@safra/contracts';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -43,6 +43,10 @@ export type DashboardCounterName =
   | 'bookings_yesterday'
   | 'pending_confirmation'
   | 'sla_expiring_soon'
+  /** EC-011 — arrived (by the calendar) and nobody recorded it. */
+  | 'arrivals_not_checked_in'
+  /** EC-004 — the partner answered and the booking never moved. */
+  | 'confirmed_not_recorded'
   | 'cancelled_today'
   | 'cancelled_today_with_fine'
   | 'partners_pending_verification'
@@ -136,6 +140,48 @@ export class DashboardService {
         WHERE b.status = 'pending_confirmation'
           AND b.confirmation_deadline_at IS NOT NULL
           AND b.confirmation_deadline_at <= now() + (${SLA_EXPIRY_WARNING_MINUTES}::int * INTERVAL '1 minute')
+          AND b.deleted_at IS NULL
+          AND ${inScope('b')}
+      UNION ALL
+      /*
+        EC-011 — «الشريك نسي Check-in»: a confirmed stay whose arrival date passed and which nobody
+        recorded an arrival for.
+
+        Counted in the PROPERTY's timezone, as StayCompletionService decides departure in: "has
+        the arrival passed" is a question about where the property is, and a UTC comparison alerts
+        on a Damascus booking up to three hours early.
+
+        This is the alert the completion sweep deliberately does not act on. A confirmed booking
+        whose dates have gone is ambiguous — the guest may never have turned up — so the SRS asks
+        for a person to look rather than for the platform to guess.
+      */
+      SELECT 'arrivals_not_checked_in', COUNT(*)::text
+        FROM bookings b
+        JOIN cities c ON c.id = b.city_id
+        WHERE b.status = 'confirmed'
+          AND b.checked_in_at IS NULL
+          AND b.check_in < ((now() AT TIME ZONE c.timezone) - (${ARRIVAL_ALERT_HOURS}::int * INTERVAL '1 hour'))::date
+          AND b.deleted_at IS NULL
+          AND ${inScope('b')}
+      UNION ALL
+      /*
+        EC-004 — «الشريك أكد والموظف نسي تأكيد العميل»: the partner answered and the status did not
+        move.
+
+        ## This should always be zero, and that is the point
+
+        partnerDecision writes partner_responded_at and the status in ONE transaction, so the
+        two cannot diverge through any path this codebase has. The count is therefore an INVARIANT
+        rather than a queue: a non-zero here means a booking was answered and left waiting, which is
+        a defect, and the SRS asks for it to be visible rather than assumed impossible.
+
+        Deliberately not written as "alert after a short delay" — there is no delay to wait out when
+        the two writes are atomic. If they are ever not, the alert should fire immediately.
+      */
+      SELECT 'confirmed_not_recorded', COUNT(*)::text
+        FROM bookings b
+        WHERE b.status = 'pending_confirmation'
+          AND b.partner_responded_at IS NOT NULL
           AND b.deleted_at IS NULL
           AND ${inScope('b')}
       UNION ALL

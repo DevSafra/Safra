@@ -187,6 +187,16 @@ export const ar = {
     ofWhich: 'منها',
     attention: '⚑ يحتاج انتباهك الآن',
     attentionEmpty: 'لا شيء يحتاج انتباهاً عاجلاً.',
+    /*
+      EC-011 — «الشريك نسي Check-in». Says what to DO, not only what is wrong: the row links to the
+      same predicate the counter used, and the operator's next move is to ring the property.
+    */
+    attentionArrivals: 'حجز مؤكد مضى موعد وصوله ولم يُسجَّل — راجع الشريك',
+    /*
+      EC-004. Phrased as a fault rather than a queue, because it should be zero: the partner's
+      answer and the status move are one transaction, so a row here means something is broken.
+    */
+    attentionUnconfirmed: 'حجز ردّ عليه الشريك ولم تتغيّر حالته — خلل يحتاج مراجعة',
     attentionSla: 'حجز تنتهي مهلة تأكيده خلال 30 دقيقة',
     attentionPartners: 'شريك بانتظار التحقق من الوثائق',
     attentionProperties: 'عقار بانتظار المراجعة قبل النشر',

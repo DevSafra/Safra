@@ -201,3 +201,26 @@ export type BookingQuoteInput = z.infer<typeof bookingQuoteSchema>;
  * queue is not everything still pending.
  */
 export const SLA_EXPIRY_WARNING_MINUTES = 30;
+
+/**
+ * How long after an arrival date a stay with no check-in becomes an administrative alert (EC-011).
+ *
+ * «الشريك نسي Check-in — تنبيه إداري بعد ٢٤ ساعة من موعد الوصول». Twenty-four hours is the SRS's
+ * own number, and it is chosen rather than arbitrary: a guest arriving late in the evening may not
+ * be recorded until the next morning, so anything shorter alerts on the ordinary case.
+ *
+ * Exported for the same reason `SLA_EXPIRY_WARNING_MINUTES` is — the dashboard counter and the
+ * registry filter it links to must agree, or the operator is told twelve and shown nine.
+ */
+export const ARRIVAL_ALERT_HOURS = 24;
+
+/**
+ * The attention filters الحجوزات accepts, and the codes they answer to.
+ *
+ * A booking's registry needs a destination for every alert the dashboard raises, on the SAME
+ * predicate — see `SLA_EXPIRY_WARNING_MINUTES`. These are the two added on 2026-08-25 with EC-004
+ * and EC-011; `expiring=1` predates them and keeps its own parameter.
+ */
+export const BOOKING_ATTENTION = ['no_check_in', 'unconfirmed'] as const;
+
+export type BookingAttention = (typeof BOOKING_ATTENTION)[number];

@@ -1,3 +1,4 @@
+import { BOOKING_ATTENTION } from '@safra/contracts';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
@@ -105,6 +106,12 @@ export default async function BookingsPage({
     should read `?expiring=1`, and any other value is simply not the filter.
   */
   const expiring = first('expiring') === '1';
+  /*
+    The dashboard's EC-004 and EC-011 rows land here. `oneOf` DROPS an unknown value rather than
+    forwarding it, so a crafted `?attention=everything` is simply not the filter — the API would
+    refuse it anyway, and a 400 on a link somebody pasted is a worse answer than the plain table.
+  */
+  const attention = oneOf(params['attention'], BOOKING_ATTENTION);
   const page = pageNumber(first('page'));
   // The URL wins, then this reader's saved size for bookings, then ten — see `resolvePageSize`.
   const size = await resolvePageSize('bookings', first('size'));
@@ -113,7 +120,7 @@ export default async function BookingsPage({
   const back = returnQuery({ page, size, q, status });
 
   const [result, counts] = await Promise.all([
-    getBookings({ q, status, expiring, page, limit: size }),
+    getBookings({ q, status, expiring, attention, page, limit: size }),
     sidebarCounts(),
   ]);
 
@@ -227,7 +234,12 @@ export default async function BookingsPage({
             <TablePagination
               basePath="/bookings"
               section="bookings"
-              query={{ q, status, ...(expiring ? { expiring: '1' } : {}) }}
+              query={{
+                q,
+                status,
+                ...(expiring ? { expiring: '1' } : {}),
+                ...(attention ? { attention } : {}),
+              }}
               page={result.page}
               pages={result.pages}
               total={result.total}

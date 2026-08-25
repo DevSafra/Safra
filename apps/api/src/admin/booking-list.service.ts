@@ -3,6 +3,8 @@ import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import {
+  ARRIVAL_ALERT_HOURS,
+  type BookingAttention,
   COUNT_CAP,
   SLA_EXPIRY_WARNING_MINUTES,
   type OffsetPage,
@@ -39,6 +41,13 @@ export interface BookingListQuery {
    * ROWS in this list have to agree. `SLA_EXPIRY_WARNING_MINUTES` is the single definition both read.
    */
   readonly expiring?: boolean | undefined;
+  /**
+   * The dashboard alert this view answers, if any (EC-004, EC-011).
+   *
+   * Same contract as `expiring`: every predicate here is the one the counter uses, from the same
+   * constant, so an alert saying nine and a list showing six is not expressible.
+   */
+  readonly attention?: BookingAttention | undefined;
 }
 
 /**
@@ -132,6 +141,33 @@ export class BookingListService {
         AND b.confirmation_deadline_at IS NOT NULL
         AND b.confirmation_deadline_at
               <= now() + (${SLA_EXPIRY_WARNING_MINUTES}::int * INTERVAL '1 minute')`);
+    }
+
+    /*
+      EC-011 — arrived by the calendar, and nobody recorded it.
+
+      In the PROPERTY's timezone, exactly as the counter computes it.
+
+      A correlated subquery rather than a join, deliberately: `fromWhere` is shared by the list and
+      its count (the house rule — a total must never describe a different set), and adding a join
+      there would make every OTHER view of this registry pay for a filter that is usually off. The
+      status term bounds this to the few hundred `confirmed` rows, which is what makes an unindexed
+      date comparison acceptable here and would not be over the whole table.
+    */
+    if (query.attention === 'no_check_in') {
+      conditions.push(sql`
+        b.status = 'confirmed'::booking_status
+        AND b.checked_in_at IS NULL
+        AND b.check_in < ((now() AT TIME ZONE
+              (SELECT ci.timezone FROM cities ci WHERE ci.id = b.city_id))
+              - (${ARRIVAL_ALERT_HOURS}::int * INTERVAL '1 hour'))::date`);
+    }
+
+    /* EC-004 — answered by the partner and never moved. Should be empty; see the counter. */
+    if (query.attention === 'unconfirmed') {
+      conditions.push(sql`
+        b.status = 'pending_confirmation'::booking_status
+        AND b.partner_responded_at IS NOT NULL`);
     }
 
     if (query.q) {

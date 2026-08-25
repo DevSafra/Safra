@@ -14,6 +14,7 @@ import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 
 import {
+  BOOKING_ATTENTION,
   PERMISSIONS as P,
   pageQuerySchema,
   setStaffScopeSchema,
@@ -82,6 +83,14 @@ const bookingListQuerySchema = listQuerySchema.extend({
     .literal('1')
     .optional()
     .transform((value) => value === '1'),
+  /**
+   * Which dashboard alert this view answers — EC-004 or EC-011.
+   *
+   * An enum rather than a free string: the predicates live in the service, and a value it does not
+   * know would silently return the UNFILTERED list — an operator told «٤٢٨ لم يُسجَّل وصولهم» and
+   * shown every booking there is. That is the failure every attention link exists to prevent.
+   */
+  attention: z.enum(BOOKING_ATTENTION).optional(),
 });
 
 const deactivateEmergencySchema = z

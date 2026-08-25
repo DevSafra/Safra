@@ -872,6 +872,10 @@ const dashboardSchema = z.object({
     bookings_yesterday: z.number(),
     pending_confirmation: z.number(),
     sla_expiring_soon: z.number(),
+    /** EC-011 — arrived by the calendar and nobody recorded it. */
+    arrivals_not_checked_in: z.number(),
+    /** EC-004 — answered by the partner and never moved. Should be zero; see the counter. */
+    confirmed_not_recorded: z.number(),
     cancelled_today: z.number(),
     cancelled_today_with_fine: z.number(),
     partners_pending_verification: z.number(),
@@ -936,6 +940,7 @@ function listQuery(params: {
   status?: string | undefined;
   limit?: number | undefined;
   expiring?: boolean | undefined;
+  attention?: string | undefined;
 }): string {
   const search = new URLSearchParams();
 
@@ -943,6 +948,8 @@ function listQuery(params: {
   if (params.status) search.set('status', params.status);
   /* Only sent when it is on: the API's schema coerces, and `expiring=false` would coerce to TRUE. */
   if (params.expiring) search.set('expiring', '1');
+  /* EC-004 / EC-011. The API's enum refuses anything it does not know, so nothing is coerced. */
+  if (params.attention) search.set('attention', params.attention);
   search.set('page', String(params.page ?? 1));
   search.set('limit', String(params.limit ?? DEFAULT_PAGE_SIZE));
 
@@ -988,7 +995,12 @@ export type BookingListItem = z.infer<typeof bookingListItemSchema>;
 export type BookingList = z.infer<typeof bookingListSchema>;
 
 export async function getBookings(
-  params: ListParams & { status?: string | undefined; expiring?: boolean | undefined },
+  params: ListParams & {
+    status?: string | undefined;
+    expiring?: boolean | undefined;
+    /** EC-004 / EC-011 — which dashboard alert this view answers. */
+    attention?: string | undefined;
+  },
 ) {
   return staffFetch(`/admin/bookings${listQuery(params)}`, bookingListSchema);
 }
