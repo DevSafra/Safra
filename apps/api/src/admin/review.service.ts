@@ -306,6 +306,15 @@ export class ReviewService {
             basePrice: true,
             minNights: true,
           },
+          /*
+            The unit's CURRENCY, because «95 / الليلة» is a number nobody can act on.
+
+            SAFRA prices in five currencies and settles in SYP, which differ by four orders of
+            magnitude — the standing rule is that no figure a person reads as money appears without
+            it. Per UNIT rather than per property: `units.currency_id` is the column the price is
+            denominated in, and two units of one property are free to differ.
+          */
+          with: { currency: { columns: { code: true } } },
         },
       },
     });

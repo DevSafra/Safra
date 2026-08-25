@@ -438,6 +438,12 @@ const propertyDetailSchema = z.object({
       nameEn: z.string(),
       maxGuests: z.number(),
       basePrice: z.string(),
+      /*
+        The currency the rate is IN. Not optional and not defaulted: a nightly rate with no
+        currency is «95 / الليلة», which is four orders of magnitude of ambiguity on a platform
+        that prices in five currencies and settles in SYP.
+      */
+      currency: z.object({ code: z.string() }),
       minNights: z.number(),
     }),
   ),
