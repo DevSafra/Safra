@@ -4259,6 +4259,56 @@ the portal link, each addressed to `users.email`.
 
 ---
 
+### O-staff-6 — An enforcement action's confirmation is unmounted by the refresh that succeeds
+
+**Status:** open · **Severity:** Medium · **Owner:** engineering · **Recorded:** 2026-08-25
+
+Found while verifying an unrelated copy change on مخالفات. `ViolationActions` holds its success
+message in its own state and renders it INSIDE the guard that decides whether the component exists
+at all — `apps/admin/src/components/violation-actions.tsx:130` and `:139`:
+
+```tsx
+if (!canWarn && !canFine && !waivable && !escalatable) return null;
+…
+{done ? <p className="text-[11.5px] text-ok">{done}</p> : null}
+```
+
+`submit()` ends `setDone(success); setOpen(null); router.refresh()`. The refresh re-renders the row
+with the write applied, and the write is precisely what turns the last remaining flag false: a waive
+sets `violation.waiver`, so `waivable` goes false. On a row that was already warned and already
+fined, belonging to a partner already suspended, all four flags are then false, the component
+returns `null`, and **the confirmation the operator was owed disappears in the same tick it was
+written.**
+
+**Why it looks random and is not.** Whether the message survives depends on whether any OTHER action
+remains offerable on that row, which is data — not timing. A waive on a row that can still be
+escalated keeps the block mounted and the message shows; the same waive on a fully-progressed row on
+a suspended partner shows nothing at all. `e2e/enforcement.spec.ts:264` failed on this once in four
+runs on 2026-08-25 and passed the other three, which is what a data-dependent branch looks like from
+the outside. The captured DOM in `test-results/…/error-context.md` from the failing run shows the
+row in exactly the all-four-false state: warning note present, fine present, waiver applied, partner
+suspended — and no message.
+
+**Impact.** The operator gets no confirmation for the one enforcement action that moves money back
+to a partner. The ledger entries are correct and visible on reload, so nothing is lost; what is lost
+is the acknowledgement, and the likely reaction to a control that vanishes silently is to do it
+again. `O-staff-5` was the mirror image of this — a message that claimed more than had happened;
+this is a change that happened and says nothing.
+
+**What unblocks it.** Nothing external. The fix is to stop letting the guard own the message: either
+render `error`/`done` above the `return null` (a small wrapper that renders the two notices whether
+or not any control remains), or hold the notice on the row rather than in the per-action component.
+Prefer the first — it keeps one component responsible. Both directions of the pair need it: `error`
+is behind the same guard and disappears the same way, though a failed write leaves the flags
+unchanged so it is much harder to hit.
+
+**How to hold it.** Watch the assertion fail first. Drive warn → fine → suspend → waive on one row
+in a browser; before the fix the confirmation is absent, after it the confirmation stands with no
+controls beside it. The existing spec covers the happy path only by accident, so give it a row that
+is deliberately exhausted rather than whichever row the fixture happens to offer.
+
+---
+
 ### O-cons-2 — The rows-per-page bar answered a JSON document on five of the console's tables
 
 **Status:** **RESOLVED 2026-08-25** — the bar, the sibling table it sits beside, and every other
