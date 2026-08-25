@@ -4508,41 +4508,80 @@ state this codebase produces routinely, and only a browser pass finds it.
 
 ---
 
-### O-book-2 — Three SRS exceptional cases the booking area still does not implement
+### O-book-2 — Three SRS exceptional cases the booking area did not implement
 
-**Status:** open · **Severity:** Medium · **Owner:** engineering ·
+**Status:** **BUILT 2026-08-25** — all three, driven in a browser · **Owner:** engineering ·
 **Recorded:** 2026-08-25, by reading the SRS against the finished screen
 
-Bashar asked for a final pass over the bookings area against the SRS (2026-08-25). §6, §7, §9.4 and
-§17.1 are now met — see `O-book-1` and `O-book-3`. §16's table names three cases that are not, and
-one of them ANSWERS a question this work had left open.
+Bashar asked for a final pass over the bookings area against the SRS (2026-08-25). §16's table named
+three cases that were not implemented; all three now are.
 
-**EC-011 — «الشريك نسي Check-in»: تنبيه إداري بعد 24 ساعة من موعد الوصول.**
-
-This is the answer to the gap `StayCompletionService` deliberately refused to guess at. A
-`confirmed` booking whose arrival date has passed with no check-in is a stay nobody recorded, and
-the sweep must not complete it — completing it would pay a partner with no evidence anyone arrived.
-The SRS does not want it completed either: it wants **an administrative alert 24 hours after the
-arrival date**, so a person looks. Nothing produces one.
-
-Until it exists, such a booking sits at `confirmed` for ever, is never payable, and nothing says so.
-The dashboard's «يحتاج انتباهك الآن» box is where the alert belongs — it already carries
-`bookings_awaiting_confirmation` and `bookings_sla_expiring_within_30m`, so this is a third counter
-and a filter on the registry, not new machinery.
+**EC-011 — «الشريك نسي Check-in»: تنبيه إداري بعد 24 ساعة من موعد الوصول.** This was the answer to
+the gap `StayCompletionService` deliberately refused to guess at: a `confirmed` booking whose
+arrival date has passed with no check-in is a stay nobody recorded, and completing it would pay a
+partner with no evidence anyone arrived. The SRS wants **a person to look**, not a sweep to decide.
+Built as `arrivals_not_checked_in` on the dashboard's «يحتاج انتباهك الآن» box, beside the two
+counters already there, with a filter into the registry — a counter, not new machinery.
 
 **EC-004 — «الشريك أكد والموظف نسي تأكيد العميل»: تنبيه إداري إذا وصل تأكيد الشريك ولم تتغير حالة
-الحجز.** The same shape and the same home. Not built.
+الحجز.** The same shape and the same home: `confirmed_not_recorded`.
 
-**EC-010 — «العميل أضاع رقم الحجز»: يسترجعه بالبريد أو الهاتف بعد تحقق آمن.** الحجوزات looks a
-booking up by REFERENCE (`?reference=` redirects to the detail screen) and its search matches
-reference, property and customer name — but a support agent holding only an email address or a
-telephone number has no lookup. The search predicate is the whole change; the «تحقق آمن» half is a
-process question for Bashar, since matching on an email address is exactly how somebody else's
-booking gets read out over the telephone.
+**EC-010 — «العميل أضاع رقم الحجز»: يسترجعه بالبريد أو الهاتف بعد تحقق آمن.** Built as the two tiers
+Bashar approved, and the shape of it is the point. **No lookup anywhere returns a booking for an
+email address or a telephone number** — his instruction, and the reason is that matching on an
+address is exactly how somebody else's booking gets read out over the telephone.
 
-**Not blocked on anything.** All three are small, and none of them is a booking-screen control —
-two are dashboard counters and one is a search predicate, which is why they are recorded here
-rather than built alongside the write surface.
+| Tier               | What it is                                                                                                                                                                                                             |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 · self-service   | `/find-booking` takes an address and MAILS the references to it. The page answers identically whether or not anything was found, so it is not an oracle — asserted by COMPARING the two renderings, not by reading one |
+| 2 · staff-assisted | `/bookings/verify` sends a one-time code to the contact details ON the booking and stays SEALED until it is read back. The agent sees a MASKED destination and nothing else — no property, no dates, no name           |
+
+`BookingRecoveryService` holds both. One error for every failure, attempts incremented on all live
+codes, and the code never stored in the clear.
+
+---
+
+### O-book-4 — §6.3 step 6 and §6.5: the voucher, its QR, and the desk that has to read it
+
+**Status:** **BUILT 2026-08-25** — driven in a browser on both sides · **Owner:** engineering ·
+**Recorded:** 2026-08-25
+
+Bashar: «The QR code and voucher requirement in §6.3 step 6 and §6.5 is not optional.» Nothing
+implemented either. A confirmation email went out with no document attached, and a guest arriving
+with a dead phone had nothing to show.
+
+**The voucher.** `VoucherService` renders A4 HTML through the same headless Chromium the partner
+contracts use — `pdfkit` does no Arabic shaping or bidi layout, so the guest's name and the
+property's would have printed as disconnected letterforms on the one document they carry to a desk.
+Arabic first, English underneath, on one page, for the reason the email rule gives: this is a
+surface where we do not get to ask which language the reader wants.
+
+**The QR carries §6.5's six fields and NO money.** «ولا يجب أن يكشف بيانات دفع حساسة» is the one
+prohibition the section states, so the query selects no money column at all — a template cannot
+print what it was not given, and an edit that wants a total has to come back and read the rule. The
+test asks the GENERAL question over every figure the booking holds rather than naming a field
+somebody thought of, against a fixture priced deliberately oddly so its absence means something.
+
+**It holds the fields rather than a link**, which is not the smaller choice. §6.5 exists for «إذا لم
+يكن لدى العميل إنترنت», and a QR that must be fetched to mean anything fails exactly there.
+
+**Where it reaches people.** Attached to `bookingConfirmed` at both confirmation paths — the
+partner's decision and staff's — and linked from the customer's own booking screen for `confirmed`,
+`checked_in` and `completed` only. Asserted as a BICONDITIONAL over every row: a voucher offered on
+a `pending_payment` booking would be a document reading «مؤكد» about a stay nobody has accepted.
+
+**And the half §6.5 puts on the PARTNER.** «إذا لم يكن لدى العميل إنترنت، يستطيع الشريك البحث برقم
+الحجز» — الوصول اليوم had no search at all, while its own intro had been promising «ابحث بالاسم أو
+برقم الحجز» for months. A true sentence describing a capability nobody had built, which is the
+`O-book-1` class exactly. `GET /partner/arrivals/:reference` scopes by the token's partner in the
+`WHERE`, throttled at twenty a minute because a reference is a year plus a sequence and therefore
+guessable. The screen now searches by REFERENCE and the intro says so.
+
+One thing this needed that the codebase did not have: a fetch helper whose MISS is a RESULT.
+`partnerFetch` folds 404 into `failed`, correctly, because every existing caller asks for something
+it already has a handle on. A lookup is the opposite — «لا حجز بهذا الرقم» and «تعذّر البحث» are
+different facts, and a clerk told the second when the first is true retypes the number instead of
+asking the guest for a better one.
 
 ---
 
