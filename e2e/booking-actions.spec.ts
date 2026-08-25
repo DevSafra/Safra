@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { COMPENSATION_CURRENCIES } from '../packages/contracts/src/booking.js';
 import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
@@ -343,3 +344,146 @@ async function addNote(page: Page, note: string): Promise<void> {
   await page.getByRole('button', { name: copy.addNote }).click();
   await expect(page.getByText(copy.noteAdded)).toBeVisible({ timeout: 20_000 });
 }
+
+/**
+ * §9.4's three remaining actions: a dispute, a refund and a compensation.
+ *
+ * ## The dispute is the one with consequences
+ *
+ * Opening it moves the booking to `disputed`, freezes the partner's payout, and — the part that
+ * decided the design — must NOT release the nights. `booking-dispute.integration.test.ts` asks the
+ * database that question directly, because it is the only place it can be asked. What this adds is
+ * the half a browser can see: the warning appears before the field, the status moves on screen, and
+ * the cross-link's count follows.
+ *
+ * ## It leaves the booking disputed
+ *
+ * Closing it needs النزاعات, which is a different screen and a different test's business. One
+ * dispute per run on one fixture booking, which is the same trade `enforcement.spec.ts` documents.
+ */
+test('a dispute opened here moves the booking and shows on its links', async ({
+  page,
+}) => {
+  await page.goto('/bookings?status=confirmed&size=5');
+
+  const references = [
+    ...new Set(
+      (
+        await page
+          .locator('a[href^="/bookings/BKG-"]')
+          .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''))
+      )
+        .map((href) => /BKG-[\w-]+/.exec(href)?.[0] ?? '')
+        .filter(Boolean),
+    ),
+  ];
+
+  test.skip(references.length === 0, 'No confirmed booking to dispute.');
+
+  const reference = references[0] ?? '';
+
+  await page.goto(`/bookings/${reference}`);
+
+  const before = await page.locator(`a[href="/disputes?q=${reference}"]`).innerText();
+
+  await page.getByRole('button', { name: copy.openDispute, exact: true }).click();
+
+  /* Both consequences on screen before the first field — frozen money, and a changed status. */
+  await expect(page.getByText(copy.disputeHint)).toBeVisible();
+
+  const form = page
+    .locator('main form')
+    .filter({ has: page.locator('select[name="kind"]') });
+
+  await form.locator('select[name="kind"]').selectOption('not_as_described');
+  await form.locator('input[name="title"]').fill('الغرفة لا تطابق الصور المنشورة');
+  await form
+    .locator('textarea[name="description"]')
+    .fill('اتصل العميل وأفاد بأن الغرفة أصغر بكثير مما ظهر في صور الإعلان.');
+  await form.getByRole('button', { name: copy.openDispute }).click();
+
+  await expect(page.getByText(copy.disputeOpened)).toBeVisible({ timeout: 20_000 });
+
+  await page.reload();
+
+  await expect(page.locator('[data-status-pill]').first()).toHaveText(
+    t.bookingStatus['disputed'] ?? '',
+  );
+
+  /* The count moved with it — a link that still said «لا نزاعات» would be the failure it exists to prevent. */
+  await expect(page.locator(`a[href="/disputes?q=${reference}"]`)).not.toHaveText(before);
+});
+
+/**
+ * The refund quote is on screen BEFORE the button that issues it.
+ *
+ * A refund is irreversible and its size depends on when the customer is cancelling, so an operator
+ * who cannot see the figure until afterwards is guessing. The amount is never sent — `RefundService`
+ * computes it from the policy snapshotted on the booking — and the hint says so, which is what stops
+ * somebody looking for a field that does not exist.
+ *
+ * Deliberately does NOT issue one: a refund moves real money and cannot be undone, and the endpoint
+ * itself is covered by `payments.integration.test.ts`. What was missing was the surface.
+ */
+test('the refund form shows what the policy would return, before issuing anything', async ({
+  page,
+}) => {
+  await page.goto('/bookings?status=confirmed&size=5');
+
+  const row = page.locator('a[href^="/bookings/BKG-"]').first();
+
+  test.skip((await row.count()) === 0, 'No paid booking to quote a refund on.');
+
+  await page.goto(`/bookings/${(await row.innerText()).trim()}`);
+  await page.getByRole('button', { name: copy.refund, exact: true }).click();
+
+  await expect(page.getByText(copy.refundHint)).toBeVisible();
+
+  const form = page.locator('main form').filter({ hasText: copy.refundReasonLabel });
+
+  /* The quote arrives from `refund-quote`; the currency code is the part that proves it landed. */
+  await expect(form).toContainText(/USD|EUR|SYP/, { timeout: 20_000 });
+});
+
+/**
+ * Compensation credits the wallet, and the currency is a CHOICE from what SAFRA compensates in.
+ *
+ * The select is asserted against the three codes rather than merely being present: a text box here
+ * would accept `JOD`, and `COMPENSATION_CURRENCIES` exists because a menu that offers three while
+ * the endpoint takes any code is a restriction in appearance only.
+ */
+test('compensating a customer credits their wallet in one of the three currencies', async ({
+  page,
+}) => {
+  await page.goto('/bookings?status=confirmed&size=5');
+
+  const row = page.locator('a[href^="/bookings/BKG-"]').first();
+
+  test.skip((await row.count()) === 0, 'No booking to compensate against.');
+
+  await page.goto(`/bookings/${(await row.innerText()).trim()}`);
+  await page.getByRole('button', { name: copy.compensate, exact: true }).click();
+
+  await expect(page.getByText(copy.compensateHint)).toBeVisible();
+
+  /*
+    Scoped to the compensation form, and it has to be: the internal-notes textarea is also
+    `name="note"`, it is earlier in the DOM, and an unscoped locator fills the wrong one.
+  */
+  const form = page
+    .locator('main form')
+    .filter({ has: page.locator('input[name="amount"]') });
+
+  expect(
+    await form.locator('select[name="currency"] option').allInnerTexts(),
+    'the three SAFRA compensates in, and no free-text code',
+  ).toEqual([...COMPENSATION_CURRENCIES]);
+
+  await form.locator('input[name="amount"]').fill('10.00');
+  await form
+    .locator('textarea[name="note"]')
+    .fill('تعويض اختباري عن عدم مطابقة الوصف، من مجموعة الاختبارات.');
+  await form.getByRole('button', { name: copy.compensate }).click();
+
+  await expect(page.getByText(copy.compensated)).toBeVisible({ timeout: 20_000 });
+});
