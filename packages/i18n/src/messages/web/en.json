@@ -414,6 +414,7 @@
     "passwordConfirm": "Confirm new password",
     "passwordMismatch": "The two passwords do not match.",
     "invoiceDownload": "Download PDF",
+    "invoiceDownloadFailed": "The invoice file could not be downloaded. Refresh the page and try again.",
     "giftsIntro": "Redeem a gift card code into your wallet balance, or buy a card to give away.",
     "giftRedeemTitle": "Redeem a code",
     "giftCodeLabel": "Card code",

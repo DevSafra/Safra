@@ -77,6 +77,16 @@ export const ar = {
     contractSigned: 'تاريخ التوقيع',
     contractExpires: 'ينتهي في',
     download: 'تنزيل العقد',
+    /**
+     * The download refused, said in the partner's own language on their own screen.
+     *
+     * Until 2026-08-25 this route answered `{"code":"contract.not_found"}` and the browser rendered
+     * it: a partner clicking «تنزيل العقد» met a JSON document. An error CODE is the right thing for
+     * the API to return and the wrong thing for a person to READ — the code exists so that a screen
+     * can say this sentence.
+     */
+    downloadUnavailable:
+      'تعذّر تنزيل العقد. حدِّث الصفحة وحاول مرة أخرى، أو راسل الدعم إن تكرر ذلك.',
     /*
       Names WHICH copy, because after 2026-08-21 it is not always the same document: before SAFRA
       signs there is nothing for the partner to fetch, and afterwards the link serves the copy

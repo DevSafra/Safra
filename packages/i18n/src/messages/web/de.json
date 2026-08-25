@@ -414,6 +414,7 @@
     "passwordConfirm": "Neues Passwort bestätigen",
     "passwordMismatch": "Die beiden Passwörter stimmen nicht überein.",
     "invoiceDownload": "PDF herunterladen",
+    "invoiceDownloadFailed": "Die Rechnungsdatei konnte nicht heruntergeladen werden. Laden Sie die Seite neu und versuchen Sie es erneut.",
     "giftsIntro": "Einen Geschenkkarten-Code in Ihr Guthaben einlösen oder eine Karte zum Verschenken kaufen.",
     "giftRedeemTitle": "Code einlösen",
     "giftCodeLabel": "Kartencode",

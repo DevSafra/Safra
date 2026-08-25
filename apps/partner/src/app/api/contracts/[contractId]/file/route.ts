@@ -1,10 +1,17 @@
-import { NextResponse } from 'next/server';
-
-import { ERROR } from '@safra/contracts';
+import { seeOther } from '@safra/session';
 
 import { getPartnerSession } from '@/lib/session-server';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
+
+/**
+ * Where a partner who cannot have the file is sent: back to the screen the link is on.
+ *
+ * A literal path with one flag. العقود والمستندات is where they clicked from, so nothing is lost —
+ * and unlike the console's file routes this one has somewhere exact to go, because the portal shows
+ * a partner their OWN contracts and there is only one such screen.
+ */
+const UNAVAILABLE = '/contracts?file=unavailable';
 
 /**
  * Downloading the partnership contract SAFRA sent (Bashar, 2026-08-19, step 4).
@@ -18,6 +25,14 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
  * `Content-Disposition` and `X-Content-Type-Options` are set by the API, which knows the filename
  * from its own column. Copying them across rather than composing new ones keeps ONE decision about
  * whether a partner's commercial agreement renders inline — and it decided `attachment`.
+ *
+ * ## A failure is a REDIRECT, never a body
+ *
+ * «تنزيل العقد» is an `<a href>`, so the browser navigates and renders whatever comes back. It used
+ * to answer `{"code":"contract.not_found"}` and a partner met that JSON document (Bashar,
+ * 2026-08-25: no JSON screen, ever). The code was right for a machine and unreadable for a person;
+ * the screen it redirects to says the same thing in Arabic. Every refusal shares one destination, so
+ * a contract id that exists and one that does not are indistinguishable from outside.
  */
 export async function GET(
   _request: Request,
@@ -26,9 +41,8 @@ export async function GET(
   const { contractId } = await params;
   const session = await getPartnerSession();
 
-  if (!session) {
-    return NextResponse.json({ code: ERROR.AUTH_REQUIRED }, { status: 401 });
-  }
+  /* `/api/*` is outside the middleware's matcher, so an expired session reaches here. */
+  if (!session) return seeOther('/login');
 
   try {
     const response = await fetch(
@@ -39,12 +53,7 @@ export async function GET(
       },
     );
 
-    if (!response.ok) {
-      return NextResponse.json(
-        { code: ERROR.CONTRACT_NOT_FOUND },
-        { status: response.status },
-      );
-    }
+    if (!response.ok) return seeOther(UNAVAILABLE);
 
     const headers = new Headers();
 
@@ -63,9 +72,6 @@ export async function GET(
 
     return new Response(await response.arrayBuffer(), { status: 200, headers });
   } catch {
-    return NextResponse.json(
-      { code: ERROR.REQUEST_UPSTREAM_UNREACHABLE },
-      { status: 502 },
-    );
+    return seeOther(UNAVAILABLE);
   }
 }

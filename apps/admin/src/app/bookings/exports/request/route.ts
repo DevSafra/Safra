@@ -28,9 +28,15 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request): Promise<Response> {
   const session = await getStaffSession();
 
-  if (!session) return new Response('Not signed in.', { status: 401 });
+  /*
+    A redirect, not a body. The operator pressed «تصدير CSV» on a form, so the browser navigates:
+    `Not signed in.` rendered as a bare English document with no console around it. Sign-in is the
+    honest destination, and the middleware sends them here anyway on the next page they open.
+  */
+  if (!session) return seeOther('/login');
 
-  const form = await request.formData();
+  /* A malformed body means no filters, not an error page — the export is still valid. */
+  const form = await request.formData().catch(() => new FormData());
   const body: Record<string, string> = {};
 
   for (const key of ['q', 'status'] as const) {

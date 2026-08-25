@@ -71,7 +71,20 @@ const MAX_UPLOAD_MB = 10;
 /** The stage the account is in, decided once and rendered once. */
 type Stage = 'empty' | 'partial' | 'waiting' | 'fix' | 'done';
 
-export default async function ContractsPage() {
+export default async function ContractsPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  /*
+    Set by `/api/contracts/[contractId]/file` when «تنزيل العقد» could not be served.
+
+    The route redirects here rather than answering a body, because it is a plain `<a href>` and the
+    browser renders what it gets — a partner used to meet `{"code":"contract.not_found"}`. Read as a
+    flag rather than a message: a sentence in a query string is a sentence an attacker can put on
+    our page.
+  */
+  const fileUnavailable = (await searchParams)['file'] === 'unavailable';
   /*
     The reader's ROLE decides whether this page has anything to show them at all.
 
@@ -103,7 +116,14 @@ export default async function ContractsPage() {
       badges={sidebarBadges(profile)}
       locked={locked}
     >
-      <div className="grid gap-5">{children}</div>
+      <div className="grid gap-5">
+        {fileUnavailable ? (
+          <p role="alert" className="text-[12.5px] text-bad">
+            {t.contracts.downloadUnavailable}
+          </p>
+        ) : null}
+        {children}
+      </div>
     </Shell>
   );
 

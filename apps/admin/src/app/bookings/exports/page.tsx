@@ -134,6 +134,12 @@ export default async function ExportsPage({
   const { page, size } = await listParamsFor('exports', searchParams);
   const params = await searchParams;
   const failed = params['failed'] === '1';
+  /*
+    Set by the DOWNLOAD route when the reader could not have the file. A second flag rather than
+    reusing `failed`, because the two say different things and suggest different actions — one is
+    "ask again", the other is "the file is gone or is not yours".
+  */
+  const unavailable = params['unavailable'] === '1';
 
   const [result, counts] = await Promise.all([
     getExports({ page, limit: size }),
@@ -158,6 +164,13 @@ export default async function ExportsPage({
         {failed ? (
           <p role="alert" className="mb-3 text-[12.5px] text-bad">
             {t.sections.exports.requestFailed}
+          </p>
+        ) : null}
+
+        {/* The COLLECTION failed: expired, missing, or not this reader's to take. */}
+        {unavailable ? (
+          <p role="alert" className="mb-3 text-[12.5px] text-bad">
+            {t.sections.exports.downloadUnavailable}
           </p>
         ) : null}
 

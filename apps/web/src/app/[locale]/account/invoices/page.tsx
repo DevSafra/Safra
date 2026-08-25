@@ -48,6 +48,11 @@ export default async function AccountInvoicesPage({
 
   const query = await searchParams;
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
+  /*
+    Set by `[reference]/pdf` when «تحميل PDF» could not be served. A flag, not a message: a sentence
+    carried in a query string is a sentence somebody else can put on our page.
+  */
+  const downloadFailed = query['file'] === 'unavailable';
 
   const t = await getTranslations('account');
   const invoices = await getMyInvoices(cursor || undefined);
@@ -60,6 +65,12 @@ export default async function AccountInvoicesPage({
       title={t('navInvoices')}
     >
       <p className="text-sm text-muted">{t('invoicesIntro')}</p>
+
+      {downloadFailed ? (
+        <p role="alert" className="mt-4 text-sm text-bad">
+          {t('invoiceDownloadFailed')}
+        </p>
+      ) : null}
 
       {invoices === 'failed' ? (
         <p className="mt-4 text-sm text-bad">{t('loadFailed')}</p>

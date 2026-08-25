@@ -2,7 +2,7 @@ import 'server-only';
 
 import { NextResponse } from 'next/server';
 
-import { isSameOrigin } from '@safra/session';
+import { isSameOrigin, seeOther } from '@safra/session';
 
 import {
   CURRENCY_COOKIE,
@@ -32,6 +32,13 @@ import { isLocale } from '@/i18n/routing';
  * A visitor whose form posted something unexpected gets the default and their page back. Refusing
  * with a 400 would replace a working page with an error screen over a display preference — and the
  * cookie is only ever read back through `isDisplayCurrency` anyway.
+ *
+ * ## And a refusal is a redirect, not a body either (2026-08-25)
+ *
+ * The cross-site guard below answered `Cross-site request refused.` — a bare English string, the one
+ * piece of user-facing text in this file, and a document a browser would render. It sends the visitor
+ * to the locale home instead: the cookie is not set, which IS the refusal, and nobody reads an
+ * English sentence on an Arabic site to learn that their currency did not change.
  */
 export const dynamic = 'force-dynamic';
 
@@ -66,11 +73,10 @@ export async function POST(
     2026-08-20: 403 with a correct same-origin header, 303 with the header removed. A check that
     refuses everyone is an outage wearing a security check's clothes.
   */
-  if (!isSameOrigin(request)) {
-    return new Response('Cross-site request refused.', { status: 403 });
-  }
+  if (!isSameOrigin(request)) return seeOther(home);
 
-  const form = await request.formData();
+  /* A malformed body is a missing choice, not an error page — same reasoning as an unknown currency above. */
+  const form = await request.formData().catch(() => new FormData());
   const chosen = form.get('currency');
   const next = form.get('next');
 

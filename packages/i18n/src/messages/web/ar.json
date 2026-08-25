@@ -414,6 +414,7 @@
     "passwordConfirm": "تأكيد كلمة المرور الجديدة",
     "passwordMismatch": "كلمتا المرور غير متطابقتين.",
     "invoiceDownload": "تحميل PDF",
+    "invoiceDownloadFailed": "تعذّر تحميل ملف الفاتورة. حدِّث الصفحة وحاول مرة أخرى.",
     "giftsIntro": "استبدل رمز بطاقة هدية ليُضاف رصيدها إلى محفظتك، أو اشترِ بطاقة لتهديها.",
     "giftRedeemTitle": "استبدال رمز",
     "giftCodeLabel": "رمز البطاقة",
