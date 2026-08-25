@@ -6,13 +6,20 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for who must act
 > on what, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-25 — **the pagination bar's JSON screen, and the sweep it started.**
+**Last updated:** 2026-08-25 — **the pagination bar's JSON screen, `O-sec-7` closed, and three
+register claims that had outlived themselves.**
 Bashar met a bare `{"message":"Unknown table or size."}` where a table should have been. The cause
 was one word — the save endpoint read the literal `size` while five namespaced tables post
 `queueSize`/`activitySize`/`vsize`/`scopeSize` — and sweeping for the SHAPE found seven routes
 across all three apps that answered a body to a browser navigation, plus two bars on every
-two-table screen that threw each other back to page one. See `O-cons-2`. `pnpm verify` 2,919
-(nothing skipped) · `pnpm e2e` 277.
+two-table screen that threw each other back to page one. See `O-cons-2`.
+
+**`O-sec-7` is closed the same day.** A failed query's bound parameters reached **four** columns, not
+the one the entry named, and 26 log sites across twenty files. One shared describer, applied
+uniformly, with a sweep that holds the class. And three claims in this document were corrected
+against the code rather than trusted: `O-sec-6` had been resolved for five days while still recorded
+as open, the "last pushed" line had been wrong for three weeks, and §2 still required approval before
+every commit. `pnpm verify` 2,939 (nothing skipped) · `pnpm e2e` 279.
 
 **Previously, 2026-08-20 — the console audit, and the locally-honest half of blocker #10.**
 Bashar asked for every page of the super admin console to be walked and made production-ready. Ten
@@ -139,21 +146,22 @@ difference.
 
 **Amended 2026-08-20.** The ten are unchanged, and none of the work done since has added or removed
 one. But "engineering-complete" is now carrying three unblocked items it did not have — `O-sec-7`,
-`O-api-2` — so the phrase is doing what the note above §1a warns about: describing
+`O-api-2` — so the phrase did what the note above §1a warns about: describing
 planned SCOPE, not correctness. All three were found by a security pass rather than by a test,
 which is the third time that has been the source (`O-ui-1`, `O-sec-4`, now these). None blocks a
 launch; `O-sec-7` should not wait for one either.
 
 **Classification of today's items:**
 
-| Item                 | Classification                                                |
-| -------------------- | ------------------------------------------------------------- |
-| `O-sec-3`            | **Completed** — approved, built, ceiling set to 300           |
-| `O-api-1`            | **Completed** — approved, built                               |
-| `O-page-1`           | **Completed** — ceiling set to 1,000                          |
-| `O-sec-5`            | **External dependency** — needs an edge, so it needs `M-1`    |
-| `O-sec-7`, `O-api-2` | **Engineering work remains**, both unblocked                  |
-| `O-sec-6`            | **Closed 2026-08-20**, recorded as open here until 2026-08-25 |
+| Item       | Classification                                                |
+| ---------- | ------------------------------------------------------------- |
+| `O-sec-3`  | **Completed** — approved, built, ceiling set to 300           |
+| `O-api-1`  | **Completed** — approved, built                               |
+| `O-page-1` | **Completed** — ceiling set to 1,000                          |
+| `O-sec-5`  | **External dependency** — needs an edge, so it needs `M-1`    |
+| `O-api-2`  | **Engineering work remains**, unblocked                       |
+| `O-sec-7`  | **Closed 2026-08-25** — four columns, not one; see the entry  |
+| `O-sec-6`  | **Closed 2026-08-20**, recorded as open here until 2026-08-25 |
 
 | #   | Blocker                                            | Owner               | Gated by 1 |
 | --- | -------------------------------------------------- | ------------------- | ---------- |
