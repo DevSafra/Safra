@@ -206,8 +206,23 @@ export default async function StaffPage({
               <TablePagination
                 basePath="/staff"
                 section="staff"
-                /* No second table on this page any more, so nothing to carry forward. */
-                query={{}}
+                /*
+                  آخر نشاط الموظفين's place, carried as hidden fields.
+
+                  This said «No second table on this page any more, so nothing to carry forward» and
+                  was true when the scope map left on 2026-08-23 — for one day. The activity panel
+                  arrived on 2026-08-24 and is a second paged table, so submitting THIS bar threw it
+                  back to page one, silently and below the fold. The panel already carries the
+                  registry's place in the other direction (`carry`, below); this is the return leg.
+
+                  A false comment outliving what it described is the same failure this page's own
+                  docblock produced once already — see `O-staff-2`.
+                */
+                query={{
+                  ...(activity.page > 1 ? { activityPage: String(activity.page) } : {}),
+                  activitySize: String(activity.size),
+                  ...(activityTerm ? { activityQ: activityTerm } : {}),
+                }}
                 page={result.page}
                 pages={result.pages}
                 total={result.total}

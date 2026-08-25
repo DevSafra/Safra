@@ -310,6 +310,18 @@ export const ar = {
      */
     foundCapped:
       'أكثر من {n, plural, one {نتيجة واحدة} two {نتيجتين} few {# نتائج} many {# نتيجة} other {# نتيجة}}',
+    /**
+     * Why the paging controls are inert: everything is already on one page.
+     *
+     * Added 2026-08-25, with the disabled state it explains (Bashar, from a table with two rows).
+     * It says where the reader IS — one page holds all of it — rather than what they cannot do, so
+     * a small table reads as complete rather than as a screen with four broken controls on it.
+     *
+     * Deliberately WITHOUT the word «نتائج»: the total sits beside it and is found by matching on
+     * that root, so «كل النتائج في صفحة واحدة» made two elements answer to one locator and broke an
+     * assertion about the total. The note is about PAGES, so naming results was never its job.
+     */
+    singlePage: 'الكل في صفحة واحدة',
     previousPage: 'الصفحة السابقة',
     nextPageShort: 'الصفحة التالية',
     /** Names the whole bar for a screen reader, which lands on it as a landmark. */
@@ -438,6 +450,17 @@ export const ar = {
       filtersNone: 'كل الحجوزات',
       failed: 'تعذّر إنشاء الملف.',
       requestFailed: 'تعذّر إرسال الطلب. حاول مرة أخرى.',
+      /**
+       * The DOWNLOAD failed, which is a different sentence from `failed` above.
+       *
+       * `failed` is a status on a row: the worker could not build the file. This is the collection
+       * refusing — the file expired, or the reader's permission does not carry it. Distinct copy
+       * because the actions differ: one is «اطلب تصديراً جديداً», the other is «اسأل من يملك
+       * الصلاحية». Before 2026-08-25 the second answered `Export unavailable.` as a bare English
+       * body, which the browser rendered as a document.
+       */
+      downloadUnavailable:
+        'تعذّر تنزيل الملف. قد تكون صلاحيته انتهت أو لا تملك صلاحية تنزيله.',
       back: 'رجوع إلى الحجوزات',
     },
     bookings: {
@@ -633,6 +656,20 @@ export const ar = {
       title: 'سجل الشركاء',
       suspended: 'موقوف مؤقتاً',
       searchPlaceholder: 'بحث عن شريك…',
+      /**
+       * A document or a contract PDF the reader clicked and could not have.
+       *
+       * ONE sentence for every reason — expired, missing, or a permission this reader does not
+       * hold — deliberately. `/api/documents/[id]/file` answers the same way whether a document
+       * exists or not, so that an id cannot be probed for existence; copy that distinguished the
+       * cases would hand back exactly what the flat answer withholds.
+       *
+       * It reads on سجل الشركاء rather than on the record the link was on, because the file routes
+       * redirect to the registry — see the routes for why they cannot name the record. The same
+       * trade `TABLE_SECTION_PATHS` already accepts for `partnerViolations`.
+       */
+      fileUnavailable:
+        'تعذّر فتح الملف المطلوب. قد يكون غير متاح أو لا تملك صلاحية الوصول إليه.',
       colPartner: 'الشريك',
       colScore: 'Score',
       colTier: 'التصنيف',

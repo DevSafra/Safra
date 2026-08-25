@@ -71,6 +71,14 @@ export default async function PartnersPage({
   // Carried into every row link, so «رجوع» on the detail screen comes back here.
   const back = returnQuery({ page, size, q });
 
+  /*
+    Set by the two file routes — a verification document, or a contract PDF — when the reader could
+    not have the file. They cannot redirect to the RECORD the link was on, because they are given an
+    id and nothing else and a reference taken from the request would be caller input in a redirect
+    target. So the message reads here, one click from where they were.
+  */
+  const fileUnavailable = (await searchParams)['file'] === 'unavailable';
+
   const [registry, pending, counts] = await Promise.all([
     getPartnerRegistry({ q, page, limit: size }),
     getPendingPartners({ page: queue.page, limit: queue.size }),
@@ -80,6 +88,12 @@ export default async function PartnersPage({
   return (
     <ConsoleShell title={t.nav.partners} subtitle={t.partners.subtitle} counts={counts}>
       <div className="grid gap-4">
+        {fileUnavailable ? (
+          <p role="alert" className="text-[12.5px] text-bad">
+            {t.sections.partners.fileUnavailable}
+          </p>
+        ) : null}
+
         <ConsolePanel title={t.sections.partners.title}>
           {/*
             تسجيل شريك جديد — the way in to the in-person flow (Bashar, 2026-08-23).
@@ -125,7 +139,18 @@ export default async function PartnersPage({
               <TablePagination
                 basePath="/partners"
                 section="partners"
-                query={{ q }}
+                /*
+                  The OTHER list's place on this screen, as hidden fields (2026-08-25).
+
+                  الشركاء carries two paged lists, and each bar posted only `q` — so applying a size
+                  to either one silently sent the other back to page one. The queue is below the
+                  registry, so the reader touching the registry never sees it happen.
+                */
+                query={{
+                  q,
+                  ...(queue.page > 1 ? { queuePage: String(queue.page) } : {}),
+                  queueSize: String(queue.size),
+                }}
                 page={registry.page}
                 pages={registry.pages}
                 total={registry.total}
@@ -194,7 +219,12 @@ export default async function PartnersPage({
             <TablePagination
               basePath="/partners"
               section="partnersPending"
-              query={{ q }}
+              /* The registry's place, the other way round — see the note on its bar above. */
+              query={{
+                q,
+                ...(page > 1 ? { page: String(page) } : {}),
+                size: String(size),
+              }}
               page={pending.page}
               pages={pending.pages}
               total={pending.total}

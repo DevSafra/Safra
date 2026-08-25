@@ -96,7 +96,12 @@ export default async function PropertiesPage({
               <TablePagination
                 basePath="/properties"
                 section="properties"
-                query={{ q }}
+                /* The queue's place, as hidden fields — same reasoning as /partners (2026-08-25). */
+                query={{
+                  q,
+                  ...(queue.page > 1 ? { queuePage: String(queue.page) } : {}),
+                  queueSize: String(queue.size),
+                }}
                 page={registry.page}
                 pages={registry.pages}
                 total={registry.total}
@@ -147,7 +152,12 @@ export default async function PropertiesPage({
             <TablePagination
               basePath="/properties"
               section="propertiesPending"
-              query={{ q }}
+              /* And the registry's place, the other way round. */
+              query={{
+                q,
+                ...(page > 1 ? { page: String(page) } : {}),
+                size: String(size),
+              }}
               page={pending.page}
               pages={pending.pages}
               total={pending.total}

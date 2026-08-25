@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { TABLE_SECTION_PARAMS, type TableSection } from '@safra/contracts';
 
 import { count } from '@/lib/format';
+import { barState } from './table-pagination-state';
 import { MAX_PAGE, MAX_PAGE_SIZE, MIN_PAGE_SIZE } from '@/lib/search-params';
 import { fill, t, plural } from '@/lib/strings';
 
@@ -91,6 +92,29 @@ export function TablePagination({
   const { page: pageParam, size: sizeParam } = TABLE_SECTION_PARAMS[section];
   /** One per section, so the two bars on `/staff` cannot send a reader to each other. */
   const anchorId = `pager-${section}`;
+
+  /*
+    A control that cannot change anything is DISABLED, not merely ignored (Bashar, 2026-08-25).
+
+    He met this on a table with two rows in it: both arrows correctly greyed, and beside them a page
+    box still inviting a number and a تطبيق still inviting a press. Typing 2 and pressing it was the
+    request that produced the JSON screen — but even with that fixed, a live control on a table with
+    one page is a promise the screen cannot keep, which is the same class of defect as a capability
+    with no feature behind it.
+
+    Disabled rather than REMOVED, because the bar's five parts are a standing instruction of his own
+    (2026-08-05): the same bar under every list, so a reader recognises it. A control that vanishes on
+    small tables and returns on large ones is a different bar.
+
+    The DECISION is `barState`, and it is a function so it can be asked directly — see the note there
+    on the one case a browser test cannot reach on a development database.
+  */
+  const { onlyPage, sizeIsMoot, nothingToApply } = barState({
+    pages,
+    total,
+    capped,
+    smallestSize: SIZES[0],
+  });
   const href = (target: number): string => {
     const params = new URLSearchParams();
 
@@ -197,7 +221,13 @@ export function TablePagination({
             key={`page-${page}`}
             defaultValue={page}
             aria-label={t.table.pageLabel}
-            className="w-14 rounded-[9px] border border-line bg-field px-2 py-1.5 text-center text-[12.5px] text-text"
+            /*
+              One page means one legal value, so the box is read-only rather than a form field that
+              accepts a number and then declines to go there. `disabled` also takes it out of the
+              submitted form, which is what stops the endpoint being asked for page 2 of 1.
+            */
+            disabled={onlyPage}
+            className="w-14 rounded-[9px] border border-line bg-field px-2 py-1.5 text-center text-[12.5px] text-text disabled:cursor-not-allowed disabled:opacity-40"
           />
 
           <Step
@@ -220,7 +250,9 @@ export function TablePagination({
             key={`size-${size}`}
             defaultValue={String(size)}
             aria-label={t.table.pageSizeLabel}
-            className="cursor-pointer rounded-[9px] border border-line bg-field px-2 py-1.5 text-[12.5px] text-text"
+            /* Only when every option would show the same rows — see `sizeIsMoot`. */
+            disabled={sizeIsMoot}
+            className="cursor-pointer rounded-[9px] border border-line bg-field px-2 py-1.5 text-[12.5px] text-text disabled:cursor-not-allowed disabled:opacity-40"
           >
             {sizeOptions(size).map((option) => (
               <option key={option} value={option}>
@@ -233,13 +265,37 @@ export function TablePagination({
 
         <button
           type="submit"
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-line px-3 py-1.5 text-[12px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
+          disabled={nothingToApply}
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-line px-3 py-1.5 text-[12px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-line disabled:hover:text-muted"
         >
           {t.table.apply}
         </button>
       </form>
 
-      <span className="whitespace-nowrap text-faint">
+      {/*
+        Why the controls are dead, said rather than left to be inferred.
+
+        Four greyed controls with no explanation read as a broken screen; the same four with a line
+        saying everything is already on one page read as a screen that has nothing left to do. It is
+        `role="status"` rather than plain text because it appears and disappears as a table grows
+        past its page size, and a change nobody is told about is a change a screen-reader user meets
+        by finding a control they were using has stopped responding.
+      */}
+      {onlyPage ? (
+        <span role="status" className="whitespace-nowrap text-faint">
+          {t.table.singlePage}
+        </span>
+      ) : null}
+
+      {/*
+        `data-table-total` so a browser sweep finds the TOTAL and nothing else.
+
+        The same reasoning as `data-status-pill`: the total was found by matching Arabic text on the
+        root «نتيج», which any neighbouring sentence mentioning results also answers to — and one
+        did, the day the single-page note was added. A marker names the element rather than hoping
+        its wording stays unique.
+      */}
+      <span data-table-total className="whitespace-nowrap text-faint">
         {plural(capped ? t.table.foundCapped : t.table.found, { n: total })}
       </span>
     </nav>

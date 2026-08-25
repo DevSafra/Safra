@@ -1,7 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
-import { DEFAULT_TABLE_PAGE_SIZE } from '../packages/contracts/src/table-preferences.js';
+import {
+  DEFAULT_TABLE_PAGE_SIZE,
+  TABLE_SECTION_PARAMS,
+} from '../packages/contracts/src/table-preferences.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -117,9 +120,30 @@ const staffBar = (page: Page) => bar(page, t.sections.staff.listLabel);
   with no relationship to the code that caused it. So the sections these tests submit are put back.
 */
 test.afterAll(async ({ request }) => {
-  for (const section of ['bookings', 'customers', 'partners']) {
+  const submitted = [
+    'bookings',
+    'customers',
+    'partners',
+    'staff',
+    'staffActivity',
+  ] as const;
+
+  for (const section of submitted) {
+    /*
+      The section's OWN size parameter, not the literal `size`.
+
+      A namespaced table posts `activitySize`/`queueSize`/`vsize`, and since 2026-08-25 the endpoint
+      reads the name belonging to the section — correctly, because that is what the bar sends. So a
+      put-back hard-coding `size` is silently ignored for exactly the namespaced sections, and this
+      cleanup reported success while leaving 25 rows saved for the next run. It did precisely that on
+      the run that first added `staffActivity` to this list.
+    */
+    const { size } = TABLE_SECTION_PARAMS[section];
+
     await request
-      .post('/api/table-page-size', { form: { section, size: '10' } })
+      .post('/api/table-page-size', {
+        form: { section, [size]: String(DEFAULT_TABLE_PAGE_SIZE) },
+      })
       .catch(() => null);
   }
 });
@@ -142,6 +166,17 @@ test.afterAll(async ({ request }) => {
  * `نتيج` covers the singular, the dual and both capped duals; `نتائج` is the separate broken plural.
  */
 const RESULT_COUNT = /نتيج|نتائج/;
+
+/**
+ * The total, by MARKER rather than by matching its words.
+ *
+ * `RESULT_COUNT` above still describes the wording, and is still used to prove the total READS as a
+ * count in one of Arabic's forms. But addressing the element by its text made every neighbouring
+ * sentence a candidate: the single-page note added on 2026-08-25 contained «النتائج» and two elements
+ * then answered to one locator. `data-table-total` is on exactly one span per bar.
+ */
+const total = (page: Page, section?: string) =>
+  bar(page, section).locator('[data-table-total]');
 
 test.describe('the pagination bar', () => {
   /**
@@ -181,8 +216,19 @@ test.describe('the pagination bar', () => {
       }
 
       // The total is what the bar exists to report, and "0 نتيجة" on a full table is the bug.
-      if ((await bars.first().getByText(RESULT_COUNT).count()) === 0)
+      const totals = bars.first().locator('[data-table-total]');
+
+      if ((await totals.count()) === 0) {
         missing.push(`${path}: no total shown`);
+      } else if (!RESULT_COUNT.test(await totals.innerText())) {
+        /*
+          Found by MARKER, then checked for WORDING — both, and neither is enough alone. The marker
+          alone would pass on a span rendering a bare number; the wording alone matched any
+          neighbouring sentence that mentioned results, which is how the single-page note added on
+          2026-08-25 broke this assertion by existing.
+        */
+        missing.push(`${path}: total reads "${await totals.innerText()}", not a count`);
+      }
     }
 
     expect(missing).toStrictEqual([]);
@@ -325,6 +371,163 @@ test.describe('the pagination bar', () => {
     await page.getByRole('button', { name: new RegExp(`^${t.table.search}$`) }).click();
 
     await expect.poll(() => new URL(page.url()).searchParams.get('expiring')).toBeNull();
+  });
+
+  /**
+   * A NAMESPACED bar submits, and does not answer a JSON document.
+   *
+   * ## Why this is separate from every other submit test above
+   *
+   * All of them drive `/bookings`, whose bar posts `page` and `size` — the plain names. Five of the
+   * console's tables namespace theirs, because they share a route with a registry that already owns
+   * `?page=`: آخر نشاط الموظفين posts `activityPage`/`activitySize`, the two verification queues post
+   * `queuePage`/`queueSize`, a partner's violations posts `vpage`/`vsize`.
+   *
+   * The save endpoint read the LITERAL `size`, so for all five it saw nothing, failed validation and
+   * answered `{"message":"Unknown table or size."}` — which the browser rendered as a bare document,
+   * because the bar is a plain HTML form and a form submit is a navigation. Bashar met it on a table
+   * with two rows in it, 2026-08-25, by both controls: page number and size, since they share a form.
+   *
+   * **250 browser tests passed over it.** Not because the assertions were weak, but because every one
+   * of them picked the easy table — the same shape as `detail-return.spec.ts` having to be written
+   * against the LAST row of a full page, for the same reason. So this test drives the bar the defect
+   * was actually in.
+   *
+   * `/staff` is the case in point: the registry's bar and the activity panel's bar are on ONE screen,
+   * so this also proves that submitting one does not move the other.
+   */
+  test('a namespaced bar applies without a JSON screen, and leaves its neighbour alone', async ({
+    page,
+  }) => {
+    await page.goto('/staff?page=2&size=10');
+
+    const activityBar = bar(page, t.sections.staff.activity);
+
+    await expect(activityBar).toBeVisible();
+
+    /* The panel's OWN select and button, scoped to its bar — the screen has two of each. */
+    await activityBar.getByLabel(t.table.pageSizeLabel).selectOption('25');
+    await activityBar.getByRole('button', { name: t.table.apply }).click();
+
+    /*
+      The assertion that would have caught the defect. A JSON body replaces the document, so the
+      console's own landmarks go with it: no `<nav>`, no shell, nothing but text. Checked before the
+      URL, because a JSON screen has a URL too and it is this route's.
+    */
+    await expect(anyBar(page).first()).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('Unknown table or size');
+
+    const url = new URL(page.url());
+
+    expect(url.pathname).toBe('/staff');
+    expect(url.searchParams.get('activitySize')).toBe('25');
+
+    /*
+      And the registry it shares the screen with has not moved. Sharing `?page=` is the failure the
+      namespacing exists to prevent, and a fix that read the right field but wrote the wrong one
+      would pass every assertion above.
+    */
+    expect(url.searchParams.get('page')).toBe('2');
+    expect(url.searchParams.get('size')).toBe('10');
+  });
+
+  /**
+   * The registry's own bar on the same screen, for the opposite direction.
+   *
+   * Without this, a route that ignored the section entirely and always wrote `activitySize` would
+   * satisfy the test above. The pair is what proves the two bars are actually independent.
+   */
+  test('the registry bar on a two-table screen moves only itself', async ({ page }) => {
+    await page.goto('/staff?activityPage=2&activitySize=25');
+
+    await staffBar(page).getByLabel(t.table.pageSizeLabel).selectOption('25');
+    await staffBar(page).getByRole('button', { name: t.table.apply }).click();
+
+    await expect(anyBar(page).first()).toBeVisible();
+
+    const url = new URL(page.url());
+
+    expect(url.searchParams.get('size')).toBe('25');
+    expect(url.searchParams.get('activityPage')).toBe('2');
+    expect(url.searchParams.get('activitySize')).toBe('25');
+  });
+
+  /**
+   * A table that fits on one page offers nothing to press (Bashar, 2026-08-25).
+   *
+   * He met this on a registry holding two rows: both arrows correctly greyed, and beside them a page
+   * box still inviting a number and a تطبيق still inviting a press. Typing 2 and pressing it is what
+   * produced the JSON screen — and with that fixed, a live control that cannot move anything is
+   * still a promise the screen cannot keep.
+   *
+   * ## Driven by making a table one page, not by finding one
+   *
+   * `?size=100` puts every registry on a single page whatever the fixtures hold, so this does not
+   * depend on some section happening to be small today — which is exactly how the two-row case
+   * stayed unnoticed. The size select's own condition is different and is asserted separately below.
+   */
+  test('disables the paging controls when everything is on one page', async ({
+    page,
+  }) => {
+    await page.goto('/giftcards?size=100');
+
+    /* Precondition, asserted rather than assumed: this really is one page. */
+    await expect(bar(page)).toContainText(t.table.singlePage);
+
+    await expect(pageInput(page)).toBeDisabled();
+    await expect(page.getByRole('button', { name: t.table.apply })).toBeDisabled();
+    /* The arrows were already dead; they are `<span aria-disabled>`, not links. */
+    await expect(page.getByRole('link', { name: t.table.nextPageShort })).toHaveCount(0);
+  });
+
+  /**
+   * And the size select stays live while it can still do something.
+   *
+   * The opposite control, and the reason `sizeIsMoot` is not simply `pages <= 1`: a 25-row table
+   * shown at 100 rows is ALSO one page, and there the select is the only way back to something
+   * scannable. A fix that disabled every control on any single-page table would take that away, pass
+   * the test above, and be a worse screen than the one it replaced.
+   *
+   * ## The fixture is FOUND, not assumed
+   *
+   * This needs a table holding between eleven and a hundred rows, and which table that is depends on
+   * the development database. A hard-coded path with a `test.skip` guessing at its size is how the
+   * first draft of this test passed while asserting nothing — it picked a filtered set that turned
+   * out to have more than one page, and the guard did not catch it because a FULL page of 100 rows
+   * looks the same as the first page of many. So the table is located by reading the bar.
+   */
+  test('keeps the size select usable on one page when it can still narrow the view', async ({
+    page,
+  }) => {
+    let found = '';
+
+    for (const path of TABLES) {
+      await page.goto(`${path}?size=100`);
+
+      /* One page — the note says so — and more than the smallest size, so the select still matters. */
+      const single = (await bar(page).getByText(t.table.singlePage).count()) > 0;
+
+      if (single && (await rowCount(page)) > 10) {
+        found = path;
+        break;
+      }
+    }
+
+    test.skip(
+      found === '',
+      'No registry currently holds between eleven and a hundred rows',
+    );
+
+    await expect(pageInput(page)).toBeDisabled();
+    await expect(sizeSelect(page)).toBeEnabled();
+    await expect(page.getByRole('button', { name: t.table.apply })).toBeEnabled();
+
+    /* And it really works: the reader comes back down to a scannable page. */
+    await sizeSelect(page).selectOption('10');
+    await page.getByRole('button', { name: t.table.apply }).click();
+
+    await expect.poll(() => new URL(page.url()).searchParams.get('size')).toBe('10');
+    expect(await rowCount(page)).toBe(10);
   });
 
   /**
@@ -473,11 +676,11 @@ test.describe('pagination itself', () => {
   test('the total is the same on page one and page two', async ({ page }) => {
     await page.goto('/customers?size=5');
 
-    const onFirst = await bar(page).getByText(RESULT_COUNT).innerText();
+    const onFirst = await total(page).innerText();
 
     await nextArrow(page).click();
 
-    expect(await bar(page).getByText(RESULT_COUNT).innerText()).toBe(onFirst);
+    expect(await total(page).innerText()).toBe(onFirst);
   });
 
   /**
@@ -494,11 +697,11 @@ test.describe('pagination itself', () => {
   test('the total describes the filtered set, not the table', async ({ page }) => {
     await page.goto('/partners');
 
-    const unfiltered = await bar(page).getByText(RESULT_COUNT).innerText();
+    const unfiltered = await total(page).innerText();
 
     await page.goto('/partners?q=zzzzzznomatchzzzzzz');
 
-    const filtered = await bar(page).getByText(RESULT_COUNT).innerText();
+    const filtered = await total(page).innerText();
 
     expect(filtered).not.toBe(unfiltered);
     // Zero rows, and a total that says so.

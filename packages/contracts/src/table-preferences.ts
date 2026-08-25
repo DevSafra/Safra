@@ -16,8 +16,8 @@ export const DEFAULT_TABLE_PAGE_SIZE = 10;
  *
  * This is the security boundary of the whole preference. The value lands in a `jsonb` column, so
  * without it a caller could write arbitrary keys and arbitrary depth into a row on the `users`
- * table — a column that is read on every authenticated request. Fourteen literals means the worst
- * a crafted request can do is set a number this person could have set from the UI anyway.
+ * table — a column that is read on every authenticated request. A closed list of literals means the
+ * worst a crafted request can do is set a number this person could have set from the UI anyway.
  *
  * Each entry is also a console route, which is what lets the save endpoint redirect back to the
  * list from a LITERAL path rather than one supplied by the caller.
@@ -161,6 +161,20 @@ export const TABLE_SECTION_PARAMS: Readonly<
     NAMESPACED[section] ?? { page: 'page', size: 'size' },
   ]),
 ) as Readonly<Record<TableSection, { page: string; size: string }>>;
+
+/**
+ * Whether a value names a table this reader may have a preference for.
+ *
+ * Separate from `tablePageSizeSchema` because the two answers are needed at different MOMENTS. The
+ * save endpoint has to know the section before it can know what the size field is CALLED — a
+ * namespaced table posts `queueSize`, not `size` — so a schema that validates both at once cannot
+ * be the first thing it asks. Reading them together is what broke the five namespaced bars.
+ */
+export function isTableSection(value: unknown): value is TableSection {
+  return (
+    typeof value === 'string' && (TABLE_SECTIONS as readonly string[]).includes(value)
+  );
+}
 
 /**
  * A saved size, bounded by the same floor and ceiling the list endpoints enforce.
