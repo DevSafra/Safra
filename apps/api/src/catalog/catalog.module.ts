@@ -43,8 +43,6 @@ class CatalogController {
 
   @Public()
   @Get('property-types')
-  @Public()
-  @Get('property-types')
   async propertyTypes() {
     return this.catalog.propertyTypes();
   }
