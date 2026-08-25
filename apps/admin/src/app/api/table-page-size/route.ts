@@ -162,9 +162,27 @@ function listUrl(
   */
   const names = TABLE_SECTION_PARAMS[section];
 
+  /*
+    The page count the bar was showing, as a CEILING on what can be asked for.
+
+    Bashar, 2026-08-25: deleting the `disabled` attribute in DevTools and pressing تطبيق should do
+    nothing. Without this it redirected to page 2 of a one-page table — an empty table under a total
+    that still read «نتيجة واحدة», which is the worst of the three possible answers because it looks
+    like the rows went missing rather than like the request was ignored.
+
+    A CONVENIENCE, not a security boundary: the value comes from the form, so whoever removed the
+    attribute can edit this too, and if they do they get the documented behaviour for a hand-typed
+    URL — an empty table, never an error. `MAX_PAGE` still applies underneath it, and what rows the
+    reader may actually see is the API's decision against their own permissions.
+  */
+  const declared = Number(field('pages'));
+  const ceiling = Number.isFinite(declared)
+    ? Math.min(MAX_PAGE, Math.max(1, Math.trunc(declared)))
+    : MAX_PAGE;
+
   const page = Number(field(names.page));
   const clampedPage = Number.isFinite(page)
-    ? Math.min(MAX_PAGE, Math.max(1, Math.trunc(page)))
+    ? Math.min(ceiling, MAX_PAGE, Math.max(1, Math.trunc(page)))
     : 1;
 
   if (clampedPage > 1) url.searchParams.set(names.page, String(clampedPage));

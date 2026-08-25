@@ -186,6 +186,44 @@ describe('the rows-per-page bar', () => {
     expect(location).not.toContain('drop');
   });
 
+  /**
+   * A page beyond the last one is clamped to the last one (Bashar, 2026-08-25).
+   *
+   * The bar posts how many pages it was showing, so deleting the `disabled` attribute in DevTools
+   * and asking for page 2 of one page lands back on page 1 — no `page` in the redirect at all,
+   * which is what "nothing happens" looks like in a URL.
+   */
+  it('clamps a page beyond the declared last page', async () => {
+    const response = await POST(
+      submit({ section: 'reviews', page: '2', size: '25', pages: '1' }),
+    );
+
+    const location = response.headers.get('location') ?? '';
+
+    expect(location).not.toContain('page=');
+    expect(location).toContain('size=25');
+  });
+
+  it('lets a real page through when the table has the pages', async () => {
+    const response = await POST(
+      submit({ section: 'bookings', page: '3', size: '25', pages: '40' }),
+    );
+
+    expect(response.headers.get('location')).toContain('page=3');
+  });
+
+  it('ignores a declared ceiling that is not a number, rather than trusting it', async () => {
+    /*
+      `pages` comes from the form, so it is not a boundary — but a junk value must not become one
+      either. Falling back to `MAX_PAGE` keeps the pre-existing behaviour for a hand-made request.
+    */
+    const response = await POST(
+      submit({ section: 'bookings', page: '3', size: '25', pages: 'lots' }),
+    );
+
+    expect(response.headers.get('location')).toContain('page=3');
+  });
+
   it('carries the filters forward, so paging never widens the set', async () => {
     const response = await POST(
       submit({ section: 'bookings', size: '25', q: 'a&b', status: 'confirmed' }),

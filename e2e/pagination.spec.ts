@@ -531,6 +531,92 @@ test.describe('the pagination bar', () => {
   });
 
   /**
+   * Deleting the `disabled` attribute and pressing تطبيق does NOTHING (Bashar, 2026-08-25).
+   *
+   * His question, and the right one to ask: "if I changed the html + style in dev tools of the
+   * button and fields and then removed the disabled tag from it and click on it, I should get
+   * nothing and nothing should happen."
+   *
+   * It did not. It redirected to `?page=2` of a one-page table, and the reader met an EMPTY table
+   * under a total that still read «نتيجة واحدة» — the worst of the three possible answers, because
+   * a table with no rows beneath a count of one looks like the rows went missing rather than like
+   * the request was ignored.
+   *
+   * ## Why this is a test and not a note about client-side guards
+   *
+   * A `disabled` attribute is a courtesy. The endpoint is the control, and the only way to know what
+   * the endpoint does when the courtesy is gone is to take it away and press the button — which is
+   * exactly what this does, in the DOM, the way a person would.
+   */
+  test('a tampered submit on a one-page table changes nothing', async ({ page }) => {
+    await page.goto('/reviews');
+
+    const bar = anyBar(page).first();
+
+    /* Precondition: this really is the state where the controls are dead. */
+    await expect(bar).toContainText(t.table.singlePage);
+    await expect(pageInput(page)).toBeDisabled();
+
+    const before = {
+      url: page.url(),
+      rows: await rowCount(page),
+      total: await bar.locator('[data-table-total]').innerText(),
+    };
+
+    /*
+      What a person does in DevTools: strip the attribute off all three controls.
+
+      Typed as `Element` rather than left to inference — `querySelectorAll` inside `evaluate` widens
+      to `any` under this eslint config, and an `any` in a test is how an assertion stops asserting.
+    */
+    await bar.evaluate((nav: Element) => {
+      for (const control of Array.from(nav.querySelectorAll('input, select, button'))) {
+        control.removeAttribute('disabled');
+      }
+    });
+
+    await expect(pageInput(page)).toBeEnabled();
+
+    /* And ask for a page that does not exist. */
+    await pageInput(page).fill('2');
+    await page.getByRole('button', { name: t.table.apply }).click();
+
+    /* Never a body: the console is still here. */
+    await expect(anyBar(page).first()).toBeVisible();
+
+    /*
+      Nothing happened. Specifically: no `page=2` in the URL, the same rows, the same total — and
+      still the same one-page state, so the reader is not left looking at an empty table.
+    */
+    await expect.poll(() => new URL(page.url()).searchParams.get('page')).toBeNull();
+
+    expect(await rowCount(page)).toBe(before.rows);
+    expect(await anyBar(page).first().locator('[data-table-total]').innerText()).toBe(
+      before.total,
+    );
+    await expect(anyBar(page).first()).toContainText(t.table.singlePage);
+  });
+
+  /**
+   * The opposite control: the ceiling narrows nothing on a table that HAS the pages.
+   *
+   * Every assertion above would also pass on an endpoint that had simply stopped honouring page
+   * numbers altogether — which would break the box on every large registry and is a far worse bug
+   * than the one being fixed. So a real multi-page table must still jump.
+   */
+  test('the page ceiling does not interfere with a table that has the pages', async ({
+    page,
+  }) => {
+    await page.goto('/bookings?size=10');
+
+    await pageInput(page).fill('3');
+    await page.getByRole('button', { name: t.table.apply }).click();
+
+    await expect.poll(() => new URL(page.url()).searchParams.get('page')).toBe('3');
+    await expect(pageInput(page)).toHaveValue('3');
+  });
+
+  /**
    * A hand-edited URL cannot break the page.
    *
    * The API rejects a limit over 100 and a page over 100,000 with a 400, so an unclamped

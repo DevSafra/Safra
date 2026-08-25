@@ -176,6 +176,25 @@ export function TablePagination({
       >
         <input type="hidden" name="section" value={section} />
 
+        {/*
+          How many pages there are, so a request for one that does not exist lands nowhere new
+          (Bashar, 2026-08-25).
+
+          His question was the right one: remove the `disabled` attribute in DevTools, press تطبيق,
+          and what happens? It used to redirect to `?page=2` of a one-page table — an empty table
+          under a total that still said «نتيجة واحدة», which is worse than a refusal because it
+          reads as data loss. He asked for nothing to happen, and this is what makes nothing happen:
+          the endpoint clamps the requested page to this ceiling.
+
+          **A convenience, not a boundary, and the difference matters.** The value comes from the
+          form, so anybody who can delete a `disabled` attribute can also edit this — and if they
+          do they get the documented behaviour for a hand-typed URL, which is an empty table and
+          never an error. It is here so the ORDINARY tampered case is a no-op, not to defend
+          anything: `page` is clamped to `MAX_PAGE` server-side regardless, and the page a reader
+          may see is decided by the API against their own permissions either way.
+        */}
+        <input type="hidden" name="pages" value={pages} />
+
         {Object.entries(query).map(([key, value]) =>
           value && key !== pageParam && key !== sizeParam ? (
             <input key={key} type="hidden" name={key} value={value} />
