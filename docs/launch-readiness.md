@@ -36,11 +36,11 @@ the second factor that changed with it.
 were opened on 2026-08-20, none was planned scope, and every one came out of a security pass rather
 than a test:
 
-| Item      | What                                                                                     | Severity     |
-| --------- | ---------------------------------------------------------------------------------------- | ------------ |
-| `O-sec-7` | **Closed 2026-08-25** — one shared describer, every call site, FOUR columns not one      | was **High** |
-| `O-sec-6` | **Closed 2026-08-20** — swept nightly, and ten sessions per account. The cap owes a test | Low          |
-| `O-api-2` | Seven refusals answer an English sentence with no error code                             | Low–Medium   |
+| Item      | What                                                                                | Severity     |
+| --------- | ----------------------------------------------------------------------------------- | ------------ |
+| `O-sec-7` | **Closed 2026-08-25** — one shared describer, every call site, FOUR columns not one | was **High** |
+| `O-sec-6` | **Closed 2026-08-20** — swept nightly, ten sessions per account, both tested        | Low          |
+| `O-api-2` | Seven refusals answer an English sentence with no error code                        | Low–Medium   |
 
 None of them blocks a launch and none needs anything external. They are listed here rather than
 folded away because this line read "No unblocked engineering item remains" until they were found,

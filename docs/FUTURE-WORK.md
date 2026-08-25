@@ -19,7 +19,15 @@ the one the entry named, and 26 log sites across twenty files. One shared descri
 uniformly, with a sweep that holds the class. And three claims in this document were corrected
 against the code rather than trusted: `O-sec-6` had been resolved for five days while still recorded
 as open, the "last pushed" line had been wrong for three weeks, and §2 still required approval before
-every commit. `pnpm verify` 2,939 (nothing skipped) · `pnpm e2e` 279.
+every commit.
+
+**And a correction of a correction.** I reported `O-sec-6`'s session cap as having no test, on the
+strength of grepping test files for the symbol names — the suite drives it through `issue()` and names
+neither, so five existing cases were invisible to the search. **A grep for a symbol is not a search
+for a behaviour.** Mutation testing then found the real gap: four of those five could not fail,
+because every `created_at` ties inside one rollback transaction, so no assertion about WHICH session
+was retired could bite. Retiring the NEWEST session — signing somebody out as they sign in — was
+green. `pnpm verify` 2,946 (nothing skipped) · `pnpm e2e` 280.
 
 **Previously, 2026-08-20 — the console audit, and the locally-honest half of blocker #10.**
 Bashar asked for every page of the super admin console to be walked and made production-ready. Ten
@@ -2526,9 +2534,10 @@ proxy produces, and forging the header to somebody else's address spent THEIR bu
 the targeted lockout the file's own header says it eliminated. Now `req.ip`, which Express computes
 under `trust proxy`. See `O-sec-1` and the results document, F-11.
 
-### O-sec-6 — Closed: `refresh_tokens` is swept and sessions are capped — but the cap has no test
+### O-sec-6 — Closed: swept, capped, and the cap's test can now see what it retires
 
-**Status:** **the work is DONE; one test is owed** · **Severity:** Low ·
+**Status:** **CLOSED** — both halves built and tested; the suite made discriminating 2026-08-25 ·
+**Severity:** Low ·
 **Owner:** engineering · **Recorded:** 2026-08-20, during `O-sec-3`'s security pass ·
 **Corrected:** 2026-08-25
 
@@ -2542,17 +2551,42 @@ entry that closed it sat two hundred lines above.
 
 What is actually true, verified against the code on 2026-08-25:
 
-| Half      | Where                                                                                                                                                                  | State                                                                                       |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| The sweep | `CredentialRetentionService.pruneRefreshTokens` — `revoked_at IS NOT NULL OR expires_at <= now()`, older than `REFRESH_TOKEN_RETENTION_DAYS` (90), batched             | **Built and TESTED** (`credential-retention.integration.test.ts`), running nightly at 03:30 |
-| The cap   | `TokenService.retireOldestSessions` — `MAX_CONCURRENT_SESSIONS` (10), newest kept, applied only on a NEW session so a rotation cannot retire one every fifteen minutes | **Built, and under NO test**                                                                |
+| Half      | Where                                                                                                                                                      | State                                                                                             |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| The sweep | `CredentialRetentionService.pruneRefreshTokens` — `revoked_at IS NOT NULL OR expires_at <= now()`, older than `REFRESH_TOKEN_RETENTION_DAYS` (90), batched | **Built and TESTED** (`credential-retention.integration.test.ts`), running nightly at 03:30       |
+| The cap   | `TokenService.retireOldestSessions` — `MAX_CONCURRENT_SESSIONS` (10), newest kept                                                                          | **Built and TESTED** (`session-cap.integration.test.ts`, five cases from the day the cap shipped) |
 
-**So the remaining work is a test, not a feature**, and it is worth writing rather than waving
-through: the cap is a security control — the docblock's own reasoning is that "a session list that
-only grows is a blast radius" — and rule 4 asks for a test on every security-relevant path. Two
-assertions and their opposites: an eleventh sign-in retires the oldest and leaves ten live, and a
-ROTATION retires nothing. The second is the one that matters, because getting `isNewSession` wrong
-signs a working account out every fifteen minutes and no existing test would notice.
+**Corrected again on 2026-08-25, and this correction is the useful part.** The row above read
+"Built, and under NO test", which was WRONG — `session-cap.integration.test.ts` shipped with the cap
+and holds five cases. The claim came from grepping test files for `retireOldestSessions` and
+`MAX_CONCURRENT_SESSIONS`; the suite exercises the cap through `issue()` and names neither, so the
+search missed it. **A grep for a symbol is not a search for a behaviour**, and reporting "no
+coverage" on that basis pointed Bashar's priorities at something already done.
+
+**What WAS wrong is subtler and worse, and mutation testing found it.** Four of the five cases could
+not fail:
+
+| Mutation                                                                                                                                                  | Before 2026-08-25  | Now                                |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ---------------------------------- |
+| Retire the NEWEST family rather than the oldest — signing somebody out at the instant they sign in, which the third case's docblock calls "THE assertion" | **all five green** | fails                              |
+| Remove the cap entirely                                                                                                                                   | one case fails     | two fail                           |
+| Drop the `isNewSession` guard                                                                                                                             | all five green     | still green — correctly, see below |
+
+**The cause is a trap this repository had already written down.** `created_at` defaults to `now()`,
+`now()` is the TRANSACTION timestamp, and the suite runs inside one rollback transaction — so every
+row it wrote carried the identical instant, `ORDER BY min(created_at)` over ties is arbitrary, and no
+assertion about WHICH session was retired could bite. `.claude/CLAUDE.md` records exactly this under
+"`now()` is the TRANSACTION timestamp, so rows written in one test all tie". The suite now ages the
+existing rows by a minute after each sign-in, so the ordering is real, and asserts the surviving
+FAMILY IDS rather than their count. Two cases added, seven in total.
+
+**And one guard turned out to be defensive rather than load-bearing.** Dropping `isNewSession` leaves
+every assertion green even with the ordering observable — because `retireOldestSessions` offsets over
+FAMILIES and a rotation adds a row to an existing family, never a family, so there is never anything
+past the cap for it to find. The comment in `token.service.ts` claimed it prevented "retiring a
+session every fifteen minutes for anybody signed in"; it does not, and it now says what it really is
+— a saved `UPDATE` per refresh per session, and clarity. A comment that overstates a guard is how the
+next person concludes a test exists that does not.
 
 **The original finding, kept because it is why the two halves exist:**
 
