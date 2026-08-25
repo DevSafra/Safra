@@ -4142,6 +4142,72 @@ the portal link, each addressed to `users.email`.
 
 ---
 
+### O-cons-2 — The rows-per-page bar answered a JSON document on five of the console's tables
+
+**Status:** **RESOLVED 2026-08-25** — the bar, the sibling table it sits beside, and every other
+browser navigation · **Found by** Bashar, using a table with two rows in it ·
+**Severity:** Medium as a defect, **High as an experience** — the console vanished and left a raw body
+
+**What he met.** On a small table, choosing 25 rows instead of 10 — or typing a page number —
+produced a bare document reading `{"message":"Unknown table or size."}`. No shell, no sidebar, the
+back button the only way out.
+
+**The cause was one word.** `/api/table-page-size` read `field('size')`, the literal name. Five of
+the console's tables NAMESPACE their parameters, because they share a route with a registry that
+already owns `?page=`: the two verification queues post `queueSize`, آخر نشاط الموظفين posts
+`activitySize`, a partner's violations posts `vsize`, the staff scope map posts `scopeSize`. For all
+five `field('size')` was `undefined`, so a perfectly well-formed submission failed validation. Both
+controls live in one form, which is why the page number died with the size.
+
+**`listParamsFor` had already learned this exact lesson on the READ side**, in almost these words —
+it "took a section and then ignored it for the parameter names". This was the write side of the same
+mistake, unfixed, one file away. The section must be parsed FIRST, because the size field's NAME
+depends on it; a single `safeParse` of both cannot be the first question asked.
+
+**Why 250 browser tests passed over it.** Every existing submit assertion drove `/bookings`, which is
+not namespaced. Not weak assertions — the easy table, which is the same shape as
+`detail-return.spec.ts` having to be written against the LAST row of a full page. The spec added here
+drives a namespaced bar.
+
+**Three more defects came out of it, none of them what was reported:**
+
+| Found                           | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| In a browser, from the new spec | **Submitting either bar on a two-table screen threw the OTHER list back to page one.** The redirect forwarded only `q` and `status`; and `/staff`'s registry bar passed `query={{}}` under a comment saying there was no second table — true for one day, until the activity panel arrived on 2026-08-24. `/partners` and `/properties` both carried `{ q }` and had the same gap. «Every paging control carries the filters forward» failing where two tables make it invisible, because the list that moves is not the list being touched |
+| Sweeping for the reported shape | **Seven routes across all three apps answered a body to a browser navigation** — the export download and request, a verification document, a contract PDF on both the console and the portal, the currency switcher, and the invoice PDF. Four of them also forwarded the API's STATUS, so a 403 and a 404 were distinguishable from outside: fixing the screen closed a small enumeration oracle as a side effect                                                                                                                          |
+| Bashar, mid-fix                 | **Controls that cannot do anything were still live.** Both arrows correctly greyed on a one-page table, and beside them a page box inviting a number and a تطبيق inviting a press. His instinct and his own standing rule agreed on the remedy: DISABLE, never remove, because the bar's five parts are the same under every list                                                                                                                                                                                                           |
+
+**What the fix is, in one line each.**
+
+- **The section is parsed first**, then `TABLE_SECTION_PARAMS[section]` names the size field.
+  `isTableSection` in `@safra/contracts` exists so the two questions can be asked in that order.
+- **No exit carries a body.** Every refusal on every browser-navigated route is a `303` to a LITERAL
+  path — the console root, `/login`, or the list the reader came from with one flag that a page turns
+  into a catalogued Arabic sentence. `apps/admin/src/lib/no-json-screens.test.ts` asks the general
+  question: it reads every `<form action>` and `href` in the three apps, resolves them to route
+  handlers, and fails if one can produce a body. Nine navigations found; watched to report all seven.
+- **An unusable size is IGNORED, not refused.** The redirect then carries no size and `resolvePageSize`
+  falls through to what the reader had saved — rather than shrinking a hundred-row audit view to ten
+  because one field was malformed.
+- **The sibling table's place travels**, as clamped integers under names taken from
+  `TABLE_SECTION_PARAMS` and never from the form.
+- **`barState` decides which controls are dead**, and it is a function so the one case a browser
+  cannot reach on this database can be asked directly: **a 25-row table shown at 100 is also one
+  page, and there the size select is the only way back down.** `sizeIsMoot` is therefore
+  `total <= smallest offered size`, not `pages <= 1` — collapsing the two was the tempting wrong
+  answer and the unit test catches it.
+
+**The lesson worth keeping.** A skipped test reports coverage it does not have. The first draft of the
+25-rows-at-100 assertion hunted the development database for a qualifying table, found none, and
+**skipped** — green, and proving nothing. A full page of 100 rows looks exactly like the first page of
+many, so the guard could not tell. Moving the decision into a pure function is what made the
+assertion askable.
+
+**Where:** `apps/admin/src/app/api/table-page-size/route.ts`,
+`apps/admin/src/components/table-pagination.tsx` + `table-pagination-state.ts`,
+`packages/contracts/src/table-preferences.ts`, the three two-table pages, and the seven routes listed
+above. `pnpm verify` 2,919 (nothing skipped, `DATABASE_URL` exported) · `pnpm e2e` 277.
+
 ### O-staff-2 — صفحة الموظف shows no per-person activity
 
 **Status:** open · **Owner:** engineering · **Recorded:** 2026-08-23
