@@ -4585,6 +4585,23 @@ asking the guest for a better one.
 
 ---
 
+### O-partner-1 — Two observations left open on الشركاء
+
+**Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-25
+
+§8.1 is met — see the commits of 2026-08-25 that added the map location and the transfer details.
+Bashar agreed the page is complete against that section. Two things were noticed while doing it and
+deliberately NOT investigated, so they are recorded rather than assumed:
+
+- **§8.2's «أنواع أخرى قابلة للإضافة من الإدارة».** Whether the console can add a new accommodation
+  type was not checked — it is a different screen. Unknown, not missing.
+- **The map location is READ-ONLY on the partner record.** §8.1 lists it as registration data and the
+  screen now shows it; nothing lets staff correct a wrong pin. Whether that is wanted is a decision.
+
+Neither is a blocker for anything.
+
+---
+
 ### O-book-5 — What the final booking SRS audit found, and what closed it
 
 **Status:** **BUILT 2026-08-25** — all three, plus what closing them exposed ·
