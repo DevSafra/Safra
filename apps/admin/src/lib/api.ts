@@ -652,6 +652,25 @@ const bookingDetailSchema = z.object({
     cancelledAt: z.string().nullable(),
   }),
   cancellationReason: z.string().nullable(),
+  /*
+    What a staff actor may do to this booking, decided by the API's own state machine.
+
+    REQUIRED, not `.default({…})`. A default here would invent a plausible value for something the
+    API never sent — every control would quietly disappear and the screen would look like a
+    booking that simply has no actions available, which is indistinguishable from the truth. A
+    missing field is a console built against an API that does not have this yet, and that should
+    fail loudly rather than render a lie.
+  */
+  actions: z.object({
+    cancel: z.boolean(),
+    capturePayment: z.boolean(),
+  }),
+  /** How much there is on each screen this booking links out to, so a link can say. */
+  related: z.object({
+    disputes: z.number(),
+    conversations: z.number(),
+    notifications: z.number(),
+  }),
   timeline: z.array(
     z.object({
       eventType: z.string(),
@@ -661,6 +680,22 @@ const bookingDetailSchema = z.object({
       createdAt: z.string(),
     }),
   ),
+  /**
+   * Present only for callers holding BOOKING_ADD_INTERNAL_NOTE — absent, not redacted.
+   *
+   * `.optional()` and NOT `.nullable().default(…)`: absent and empty are different facts here.
+   * Absent means this reader may not see notes; `[]` means there are none. The screen says
+   * different things for each, so the schema has to keep them apart.
+   */
+  notes: z
+    .array(
+      z.object({
+        note: z.string(),
+        author: z.string().nullable(),
+        createdAt: z.string(),
+      }),
+    )
+    .optional(),
   /** Present only for callers holding PAYMENT_READ — absent, not redacted (§4). */
   payments: z
     .object({

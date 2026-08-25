@@ -18,6 +18,9 @@ import {
   plural,
 } from '@/lib/strings';
 import { refuseSection } from '@/components/section-refusal';
+import { readerPermissions } from '@/lib/gate';
+import { BookingActions } from '@/components/booking-actions';
+import { BookingNotes } from '@/components/booking-notes';
 
 /**
  * One booking, end to end (SRS §9.4).
@@ -60,7 +63,19 @@ export default async function BookingPage({
   const { reference } = await params;
   const query = await searchParams;
   const back = backTarget('/bookings', query, reference);
-  const booking = await getBooking(reference);
+  /*
+    What this reader may DO, as opposed to which section they may open.
+
+    Read alongside the booking rather than after it: two round trips in sequence for two things
+    the screen needs together is a wasted one. `booking.cancel` and `booking.update_status` are
+    read separately because they ARE separate — §4 gives operations both and neither to support,
+    and the API refuses either way. This only decides whether a control that would be refused is
+    offered at all.
+  */
+  const [booking, permissions] = await Promise.all([
+    getBooking(reference),
+    readerPermissions(),
+  ]);
 
   if (booking === 'unauthenticated') {
     return (
@@ -377,7 +392,103 @@ export default async function BookingPage({
           </p>
         </Section>
       ) : null}
+
+      {/*
+        ── Where the rest of this booking lives ──────────────────────────────
+
+        Links to the sections that already own these records, not an inbox rebuilt here (Bashar,
+        2026-08-25). Each registry's search already matches a booking reference — `messaging.ts`
+        matches `b.reference` for both conversations and notifications, and النزاعات searches by
+        booking too — so the link is the existing screen with this booking as its filter.
+
+        The counts come from the payload and are what makes a link honest: «لا محادثات» is an
+        answer, where a link that silently lands on an empty list is not.
+
+        The cross-link used to run one way only. النزاعات has linked to its booking since it was
+        built; nothing led back, so an agent on a disputed booking had to go and find it.
+      */}
+      <Section title={t.sections.bookingDetail.elsewhere}>
+        <ul className="grid gap-2 sm:grid-cols-3">
+          <Elsewhere
+            href={`/disputes?q=${encodeURIComponent(booking.reference)}`}
+            section={t.nav.disputes}
+            count={plural(t.sections.bookingDetail.relatedDisputes, {
+              n: booking.related.disputes,
+            })}
+          />
+          <Elsewhere
+            href={`/messages?q=${encodeURIComponent(booking.reference)}`}
+            section={t.nav.messages}
+            count={plural(t.sections.bookingDetail.relatedConversations, {
+              n: booking.related.conversations,
+            })}
+          />
+          <Elsewhere
+            href={`/comms?q=${encodeURIComponent(booking.reference)}`}
+            section={t.nav.whatsapp}
+            count={plural(t.sections.bookingDetail.relatedNotifications, {
+              n: booking.related.notifications,
+            })}
+          />
+        </ul>
+      </Section>
+
+      {/*
+        Absent, not empty, for a reader without `booking.add_internal_note` — the API omits the
+        key rather than sending `[]`, so «لا ملاحظات» is never shown to somebody who simply may
+        not see them. The two facts are different and the screen keeps them different.
+      */}
+      {booking.notes ? (
+        <BookingNotes reference={booking.reference} notes={booking.notes} />
+      ) : null}
+
+      {/*
+        The state's answer AND this reader's, and both have to be true.
+
+        `booking.actions` says what the booking permits, from the API's own transition table;
+        `permissions` says what this person may do. Neither is the security boundary — the
+        endpoints re-check both — they decide what is worth offering.
+      */}
+      <BookingActions
+        reference={booking.reference}
+        canCancel={booking.actions.cancel && permissions.includes('booking.cancel')}
+        canCapture={
+          booking.actions.capturePayment && permissions.includes('booking.update_status')
+        }
+      />
     </Shell>
+  );
+}
+
+/**
+ * One link out to the section that owns a related record.
+ *
+ * The COUNT is the second line rather than a badge: it is the thing that decides whether the link
+ * is worth following, and a reader scanning three cards reads the section name first.
+ */
+function Elsewhere({
+  href,
+  section,
+  count,
+}: {
+  href: string;
+  section: string;
+  count: string;
+}) {
+  return (
+    <li>
+      {/*
+        `min-h-10` and `inline-flex`: an anchor styled as a control is an inline element, and
+        `min-height` does nothing to one — the 40px floor below `lg` needs both.
+      */}
+      <Link
+        href={href}
+        className="flex min-h-10 flex-col justify-center rounded-lg border border-line bg-card px-4 py-3 hover:border-gold/50 lg:min-h-0"
+      >
+        <span className="text-sm text-sky">{section}</span>
+        <span className="mt-0.5 text-xs text-faint">{count}</span>
+      </Link>
+    </li>
   );
 }
 

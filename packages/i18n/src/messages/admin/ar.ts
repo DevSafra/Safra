@@ -1692,6 +1692,62 @@ export const ar = {
       timeline: 'الخط الزمني',
       nothingRecorded: 'لا يوجد شيء مسجَّل بعد.',
       cancellation: 'الإلغاء',
+
+      /* ── Internal notes (§9.4) ─────────────────────────────────────────── */
+      notes: 'ملاحظات داخلية',
+      /*
+        Says who does NOT see it, because that is the only thing a reader needs to know before
+        typing. «داخلية» alone is a word people read past.
+      */
+      notesHint: 'لا يراها العميل ولا الشريك.',
+      noNotes: 'لا ملاحظات على هذا الحجز.',
+      noteLabel: 'ملاحظة جديدة',
+      /*
+        The floor the API enforces, stated before the refusal — the same courtesy the enforcement
+        screens give their reason fields.
+      */
+      noteHint: 'حرفان على الأقل. تُضاف ولا تُعدَّل: لتصحيح ملاحظة اكتب واحدة جديدة.',
+      addNote: 'إضافة ملاحظة',
+      addingNote: 'جارٍ الإضافة…',
+      noteAdded: 'أُضيفت الملاحظة.',
+      /** The author line under a note. `{who}` is a staff address or a role, never a customer. */
+      noteBy: '{who} · {when}',
+
+      /* ── Actions (§9.4) ────────────────────────────────────────────────── */
+      actions: 'إجراءات',
+      /*
+        The consequence stated before the field, as on «تعليق الحساب»: this one stops a stay from
+        happening and the customer reads the reason.
+      */
+      cancelHint:
+        'يُلغى الحجز نهائياً ويُبلَّغ العميل والشريك. السبب المكتوب هنا يقرأه العميل.',
+      cancelBooking: 'إلغاء الحجز',
+      cancelling: 'جارٍ الإلغاء…',
+      cancelReasonLabel: 'سبب الإلغاء (يقرأه العميل)',
+      cancelReasonHint: 'ثلاثة أحرف على الأقل.',
+      bookingCancelled: 'أُلغي الحجز.',
+      capturePayment: 'تأكيد استلام الدفعة',
+      capturing: 'جارٍ التأكيد…',
+      /*
+        What it DOES, not what it is called. Confirming a payment starts the partner's two-hour
+        window, and an operator pressing this needs to know that a clock begins.
+      */
+      captureHint: 'يُسجَّل الحجز مدفوعاً وتبدأ مهلة تأكيد الشريك.',
+      paymentCaptured: 'سُجِّلت الدفعة وبدأت مهلة الشريك.',
+
+      /* ── Where the rest of this booking lives ──────────────────────────── */
+      /*
+        Links, not an embedded inbox (Bashar, 2026-08-25). Each goes to the section that already
+        owns that record, with this booking's reference as the search term — so the reader lands
+        on the existing screen, filtered, rather than on a second half-built copy of it.
+      */
+      elsewhere: 'مرتبط بهذا الحجز',
+      relatedDisputes:
+        '{n, plural, zero {لا نزاعات} one {نزاع واحد} two {نزاعان} few {# نزاعات} many {# نزاعاً} other {# نزاع}}',
+      relatedConversations:
+        '{n, plural, zero {لا محادثات} one {محادثة واحدة} two {محادثتان} few {# محادثات} many {# محادثة} other {# محادثة}}',
+      relatedNotifications:
+        '{n, plural, zero {لا رسائل} one {رسالة واحدة} two {رسالتان} few {# رسائل} many {# رسالة} other {# رسالة}}',
     },
 
     propertyDetail: {
@@ -2189,6 +2245,8 @@ export const ar = {
     'booking.payment_captured': 'تحصيل دفعة حجز',
     'booking.checked_in': 'تسجيل وصول الضيف',
     'booking.check_in_undone': 'التراجع عن تسجيل الوصول',
+    /* The ACT, not its content: the note itself never reaches the audit log — see the action. */
+    'booking.internal_note_added': 'إضافة ملاحظة داخلية على حجز',
     'booking.exported': 'تصدير حجوزات',
     'booking.export_requested': 'طلب تصدير حجوزات',
     'calendar.range_updated': 'تعديل مدى في التقويم',
