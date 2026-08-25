@@ -113,6 +113,27 @@ export type BookingStaffConfirmInput = z.infer<typeof bookingStaffConfirmSchema>
 export const COMPENSATION_CURRENCIES = ['USD', 'EUR', 'SYP'] as const;
 
 /**
+ * What an amount is denominated in when the row does not say.
+ *
+ * ## Why a fallback exists at all
+ *
+ * Standing rule from Bashar (2026-08-25): **no amount is ever written without its currency,
+ * anywhere in the system.** Several rows can carry a null currency — a coupon with no fixed value,
+ * a wallet balance on a profile that has never transacted — and the code used to print
+ * `{money(x)} {currency ?? ''}`, which renders a bare number precisely when nobody can tell what
+ * it is.
+ *
+ * ## Why USD, and why this is a fallback rather than a guess
+ *
+ * Every one of those rows is null because NOTHING has been denominated yet — a zero balance, an
+ * unset minimum — so there is no other currency it could be. `currencies` carries USD as the
+ * platform's reference rail and every fine and compensation is levied in it. A row that has a
+ * currency always uses its own; this is only ever reached where the alternative is printing
+ * nothing.
+ */
+export const DEFAULT_MONEY_CURRENCY = 'USD';
+
+/**
  * §9.4's «تعويض» — a wallet credit made because of a booking.
  *
  * ## Credit only, unlike the general wallet adjustment

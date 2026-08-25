@@ -1,6 +1,7 @@
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 import { getCoupons, type CouponItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { count, money, shortDate } from '@/lib/format';
+import { amount, count, shortDate } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import {
@@ -132,7 +133,7 @@ const COLUMNS: readonly AdminColumn<CouponItem>[] = [
       <Ltr className="font-bold whitespace-nowrap text-gold">
         {row.valueKind === 'percent'
           ? `${Number(row.value).toLocaleString('en-US')}${t.percentSign}`
-          : `${money(row.value)} ${row.currency ?? ''}`}
+          : amount(row.value, row.currency ?? DEFAULT_MONEY_CURRENCY)}
       </Ltr>
     ),
   },
@@ -141,7 +142,9 @@ const COLUMNS: readonly AdminColumn<CouponItem>[] = [
     header: t.sections.coupons.colMin,
     render: (row) => (
       <Ltr className="text-muted">
-        {row.minBookingAmount === null ? t.admin.noData : money(row.minBookingAmount)}
+        {row.minBookingAmount === null
+          ? t.admin.noData
+          : amount(row.minBookingAmount, row.currency ?? DEFAULT_MONEY_CURRENCY)}
       </Ltr>
     ),
   },

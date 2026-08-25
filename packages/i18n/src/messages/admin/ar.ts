@@ -1660,7 +1660,8 @@ export const ar = {
       fxSnapshot: '{amount} ل.س بسعر صرف {rate}، مثبَّت لحظة إنشاء الحجز.',
       attemptVia: '{method} عبر {provider} · {status}',
       refunded: 'استُرد {amount} {currency}',
-      refundedToWallet: 'استُرد {amount} {currency} ({walletAmount} إلى المحفظة)',
+      refundedToWallet:
+        'استُرد {amount} {currency} ({walletAmount} {currency} إلى المحفظة)',
       actorLine: 'بواسطة {who}',
       customer: 'العميل',
       partner: 'الشريك',
@@ -1799,7 +1800,7 @@ export const ar = {
       */
       refundHint: 'المبلغ يُحسب من سياسة الإلغاء المثبَّتة على الحجز، ولا يمكن تعديله.',
       refundQuoteLine: '{amount} {currency} · {percent}% حسب سياسة «{tier}»',
-      refundToWallet: 'منها {amount} إلى محفظة العميل',
+      refundToWallet: 'منها {amount} {currency} إلى محفظة العميل',
       refundReasonLabel: 'سبب الاسترداد',
       refundReasonHint: 'ثلاثة أحرف على الأقل، ويُحفظ مع الحركة المالية.',
       /*
@@ -2620,6 +2621,15 @@ export const ar = {
       /* Written by `dispute.resolved` / `dispute.rejected` when a closure agrees compensation. */
       compensationAmount: 'مبلغ التعويض',
       compensationCurrency: 'عملة التعويض',
+      /*
+        `refund.created`'s four, uncatalogued until the console gained a refund control and one was
+        actually issued (2026-08-25). `audit-catalogue.integration.test.ts` reads the TABLE, so a
+        payload nothing could write was a payload nothing could flag.
+      */
+      refundId: 'معرّف الاسترداد',
+      provider: 'مزوّد الدفع',
+      providerAmount: 'إلى مزود الدفع',
+      walletAmount: 'إلى المحفظة',
       /*
         Written by `staff.invited` and `staff.role_changed` since roles became rows a super admin
         defines. The catalogue test found it against the real `audit_log`, not by review — the

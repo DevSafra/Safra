@@ -632,7 +632,10 @@ function RefundForm({
           </Ltr>
           {Number(quote.walletAmount) > 0 ? (
             <span className="block text-[11px] text-faint">
-              {fill(copy.refundToWallet, { amount: money(quote.walletAmount) })}
+              {fill(copy.refundToWallet, {
+                amount: money(quote.walletAmount),
+                currency: quote.currencyCode,
+              })}
             </span>
           ) : null}
         </p>

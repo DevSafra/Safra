@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
-import { GIFT_CARD_AMOUNTS, isErrorCode } from '@safra/contracts';
+import { GIFT_CARD_AMOUNTS, isErrorCode, DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 import { errorMessage } from '@safra/i18n';
 
 import { formatMoney } from '@/lib/localise';
@@ -334,7 +334,7 @@ export function BuyForm({
           >
             {GIFT_CARD_AMOUNTS.map((value) => (
               <option key={value} value={value}>
-                {walletCurrency === '' ? value : money(value, walletCurrency, locale)}
+                {money(value, walletCurrency || DEFAULT_MONEY_CURRENCY, locale)}
               </option>
             ))}
           </select>

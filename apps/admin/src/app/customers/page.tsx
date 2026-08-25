@@ -1,6 +1,7 @@
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 import { getCustomers, type CustomerListItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { count, money, shortDate } from '@/lib/format';
+import { amount, count, shortDate } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import {
@@ -139,7 +140,7 @@ const COLUMNS: readonly AdminColumn<CustomerListItem>[] = [
         <span className="text-faint">{t.admin.noData}</span>
       ) : (
         <Ltr className="font-bold whitespace-nowrap text-gold">
-          {money(row.walletBalance)} {row.walletCurrency ?? ''}
+          {amount(row.walletBalance, row.walletCurrency ?? DEFAULT_MONEY_CURRENCY)}
         </Ltr>
       ),
   },

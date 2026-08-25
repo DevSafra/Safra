@@ -214,6 +214,15 @@ export class RefundService {
                   amount: quote.refundAmount,
                   toWallet: quote.walletAmount,
                   toProvider: quote.providerAmount,
+                  /*
+                    The CURRENCY, without which the three figures above mean nothing.
+
+                    Bashar read «المبلغ 200.00» on a booking's timeline (2026-08-25) and could not
+                    tell what it was 200 of — and on this platform that is not pedantry: SYP and USD
+                    differ by four orders of magnitude, so an unlabelled amount is a number nobody
+                    can act on. The console renders a money key together with this one.
+                  */
+                  currency: quote.currencyCode,
                   percent: quote.refundPercent,
                   tier: quote.tierApplied,
                 })}::jsonb)
@@ -231,6 +240,8 @@ export class RefundService {
             amount: quote.refundAmount,
             walletAmount: quote.walletAmount,
             providerAmount: quote.providerAmount,
+            /* Same reason as the timeline payload above — three amounts, one currency. */
+            currency: quote.currencyCode,
             percent: quote.refundPercent,
             provider: payment.provider,
           },

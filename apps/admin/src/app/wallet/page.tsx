@@ -159,7 +159,10 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
     header: t.sections.wallet.colBalanceAfter,
     render: (row) => (
       <div className="grid gap-0.5">
-        <Ltr className="font-bold text-text2">{money(row.balanceAfter)}</Ltr>
+        {/* The currency, on the balance as on the movement above it — an amount never stands alone. */}
+        <Ltr className="font-bold text-text2">
+          {money(row.balanceAfter)} {row.currency}
+        </Ltr>
         <Ltr className="text-[10.5px] text-muted">{shortDateTime(row.at)}</Ltr>
       </div>
     ),
