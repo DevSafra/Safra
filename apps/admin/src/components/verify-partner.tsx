@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SanctionsPolicy } from '@safra/contracts';
 
-import { t } from '@/lib/strings';
+import { apiErrorOf, t } from '@/lib/strings';
 
 /**
  * The approve/reject decision (§8.1).
@@ -69,7 +69,17 @@ export function VerifyPartner({
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? t.sections.panels.failed);
+        /*
+          The CODE, resolved into Arabic — never the body's `message`.
+
+          This read `message`, which `app-error.ts` documents as English prose kept for logs. On an
+          Arabic-only console that put an English sentence in front of an operator, and §8.1's new
+          document refusal was the one that made it visible (2026-08-26): «A partner cannot be
+          approved before the verification documents are on file…». `apiErrorOf` is the shared
+          helper that already does this, and it falls back to a generic Arabic line rather than to
+          prose nobody here can read.
+        */
+        setError(apiErrorOf(body));
         setBusy(false);
         return;
       }
@@ -180,11 +190,4 @@ export function VerifyPartner({
       )}
     </div>
   );
-}
-
-function messageOf(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
-
-  const { message } = body;
-  return typeof message === 'string' ? message : null;
 }
