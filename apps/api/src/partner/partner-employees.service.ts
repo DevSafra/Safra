@@ -22,6 +22,7 @@ import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import { findLiveEmployment } from './live-employment.js';
 import { partnerEmployeeInvitationMail } from '../mail/mail.templates.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /** How long an employee has to accept. The same 72 hours a partner's own invitation lasts. */
 const INVITATION_TTL_HOURS = 72;
@@ -552,8 +553,7 @@ export class PartnerEmployeesService {
   private async revoke(userId: string, why: string): Promise<void> {
     await this.tokens.revokeAllForUser(userId).catch((error: unknown) => {
       this.logger.error(
-        `Could not revoke sessions for a ${why} employee: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+        `Could not revoke sessions for a ${why} employee: ` + `${describeError(error)}`,
       );
     });
   }
@@ -585,8 +585,7 @@ export class PartnerEmployeesService {
       )
       .catch((error: unknown) => {
         this.logger.error(
-          `Could not send an employee invitation: ` +
-            `${error instanceof Error ? error.message : String(error)}`,
+          `Could not send an employee invitation: ` + `${describeError(error)}`,
         );
       });
   }

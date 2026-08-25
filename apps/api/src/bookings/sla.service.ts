@@ -9,6 +9,7 @@ import { MONEY_SCALE, toMinor } from '../common/money.js';
 import { MoneySettingsService } from '../settings/money-settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
 /**
@@ -93,9 +94,7 @@ export class SlaService {
           down when the next minute would have retried anyway. Catching after the row is written
           keeps both properties.
         */
-        this.logger.error(
-          `SLA sweep failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        this.logger.error(`SLA sweep failed: ${describeError(error)}`);
       });
   }
 
@@ -189,7 +188,7 @@ export class SlaService {
     } catch (error) {
       this.logger.error(
         `Could not return the wallet hold on ${booking.reference}: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+          `${describeError(error)}`,
       );
     }
   }
@@ -384,9 +383,7 @@ export class SlaService {
       } catch (error) {
         // One booking failing must not abandon the rest of the batch.
         this.logger.error(
-          `Failed to expire booking ${booking.reference}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          `Failed to expire booking ${booking.reference}: ${describeError(error)}`,
         );
       }
     }

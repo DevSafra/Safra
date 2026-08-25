@@ -16,6 +16,7 @@ import { PaymentProviderUnavailableError } from './payment-provider.port.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import { ERROR } from '@safra/contracts';
 import { conflict, forbidden } from '../common/errors/app-error.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /** Statuses from which a fresh payment attempt is legitimate. */
 const PAYABLE_BOOKING_STATUSES = ['pending_payment'];
@@ -304,7 +305,7 @@ export class PaymentIntentService {
 
       this.logger.warn(
         `Wallet hold of ${amount} for ${booking.reference} failed: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+          `${describeError(error)}`,
       );
 
       throw conflict(ERROR.WALLET_BALANCE_CHANGED);

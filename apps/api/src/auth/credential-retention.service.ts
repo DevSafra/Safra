@@ -5,6 +5,7 @@ import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
 const RETENTION_LOCK_KEY = 8_421_005;
@@ -104,8 +105,7 @@ export class CredentialRetentionService {
           another day, and an unhandled rejection would be a worse outcome than that.
         */
         this.logger.error(
-          `Credential retention pass failed: ` +
-            `${error instanceof Error ? error.message : String(error)}`,
+          `Credential retention pass failed: ` + `${describeError(error)}`,
         );
       });
   }

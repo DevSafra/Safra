@@ -8,6 +8,7 @@ import type { Database } from '@safra/db';
 import { BookingActionsService } from '../bookings/booking-actions.service.js';
 import { BookingAccessService } from '../bookings/booking-access.service.js';
 import { DATABASE } from '../database/database.module.js';
+import { describeError, framesOnly } from '../common/errors/safe-error.js';
 import type { NormalisedEvent } from './payment-provider.port.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 
@@ -85,7 +86,20 @@ export class PaymentWebhookService {
 
       return verdict;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      /*
+        `describeError`, not `error.message` (`O-sec-7`, fixed 2026-08-25).
+
+        `processing_error` is a COLUMN, and the SECOND one this finding reaches — the register named
+        `scheduled_job_runs.error` and missed this. It matters more here than there: this handler runs
+        inside a transaction against `payments`, `bookings` and the ledger, so a `DrizzleQueryError`
+        raised in it carries the bound parameters of a MONEY statement — amounts, a booking reference,
+        a customer's id — and `drizzle-orm` interpolates those values into the message rather than the
+        placeholders.
+
+        Same shape as `AppExceptionFilter` and `JobRunService`, from the one shared module: name,
+        SQLSTATE, the SQL, and a count of the parameters withheld.
+      */
+      const described = describeError(error);
 
       /**
        * The error is recorded on the event row and re-raised as a 5xx so the
@@ -94,11 +108,15 @@ export class PaymentWebhookService {
        */
       await this.db.execute(sql`
         UPDATE payment_provider_events
-        SET processing_error = ${message}
+        SET processing_error = ${described}
         WHERE id = ${claimed}
       `);
 
-      this.logger.error(`Webhook ${event.providerEventId} failed: ${message}`);
+      /* Frames only: a stack starts with `name: message`, which is what was just taken out. */
+      this.logger.error(
+        `Webhook ${event.providerEventId} failed: ${described}`,
+        error instanceof Error ? framesOnly(error) : undefined,
+      );
       throw error;
     }
   }

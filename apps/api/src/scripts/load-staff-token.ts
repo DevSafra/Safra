@@ -1,4 +1,5 @@
 import { authenticator } from 'otplib';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * Prints an access token for the load-test staff account, and nothing else.
@@ -82,6 +83,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(`\n${error instanceof Error ? error.message : String(error)}\n`);
+  console.error(`\n${describeError(error)}\n`);
   process.exitCode = 1;
 });

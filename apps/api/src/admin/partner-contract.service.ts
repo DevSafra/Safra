@@ -25,6 +25,7 @@ import { SettingsService } from '../settings/settings.service.js';
 import { renderContractHtml } from './contract-template.js';
 import { renderContractPdf } from './contract-pdf.js';
 import { actorName } from '../common/actor-name.sql.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /** The handoff's ceiling: PDF ≤ 10MB. Also a database CHECK, for every other writer. */
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -1165,7 +1166,7 @@ export class PartnerContractService {
       (error: unknown) => {
         this.logger.error(
           `Could not tell ${contract.partner_reference} their contract was re-opened: ` +
-            `${error instanceof Error ? error.message : String(error)}`,
+            `${describeError(error)}`,
         );
       },
     );
@@ -1198,7 +1199,7 @@ export class PartnerContractService {
     await this.notifyPartnerContractSent(partnerReference).catch((error: unknown) => {
       this.logger.error(
         `Could not tell ${partnerReference} their contract is ready: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+          `${describeError(error)}`,
       );
     });
 
@@ -1394,7 +1395,7 @@ export class PartnerContractService {
       (error: unknown) => {
         this.logger.error(
           `Could not send ${contract.partner_reference} their countersigned contract: ` +
-            `${error instanceof Error ? error.message : String(error)}`,
+            `${describeError(error)}`,
         );
       },
     );
@@ -1428,7 +1429,7 @@ export class PartnerContractService {
     await this.notifyStaffContractReturned(partnerReference).catch((error: unknown) => {
       this.logger.error(
         `Could not tell staff that ${partnerReference} returned their contract: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+          `${describeError(error)}`,
       );
     });
   }

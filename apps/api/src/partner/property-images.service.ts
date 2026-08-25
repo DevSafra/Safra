@@ -22,6 +22,7 @@ import { MEDIA_JOB, mediaJobId } from '../queue/media.job.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /** §5.5 rewards photo count in the ranking, so a cap keeps that from being gamed. */
 const MAX_IMAGES_PER_PROPERTY = 30;
@@ -212,7 +213,7 @@ export class PropertyImageService {
     } catch (error) {
       this.logger.error(
         `Could not enqueue rendering for image ${inserted.id}: ` +
-          `${error instanceof Error ? error.message : String(error)}. ` +
+          `${describeError(error)}. ` +
           'The row stays processing and is recoverable by re-drive.',
       );
     }

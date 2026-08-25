@@ -3,6 +3,7 @@ import type { ThrottlerStorage } from '@nestjs/throttler';
 import type { Redis } from 'ioredis';
 
 import { REDIS } from './redis.tokens.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * The record `ThrottlerStorage.increment` must return.
@@ -163,7 +164,7 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
     } catch (error) {
       this.logger.error(
         `Rate limiting is DEGRADED — Redis unreachable, allowing the request: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+          `${describeError(error)}`,
       );
 
       // Fail open. See the class note: a cache outage must not become an outage.
@@ -201,7 +202,7 @@ export class RedisThrottlerStorage implements ThrottlerStorage {
     } catch (error) {
       this.logger.warn(
         `Could not refund a rate-limit hit; it stays counted. ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+          `${describeError(error)}`,
       );
     }
   }

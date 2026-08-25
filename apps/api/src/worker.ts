@@ -15,6 +15,7 @@ import { ExportProcessor } from './queue/export.processor.js';
 import { QUEUE } from './queue/queue.definitions.js';
 import { startWorker, stopWorkers } from './queue/queue.runtime.js';
 import { QUEUE_REDIS } from './queue/queue.tokens.js';
+import { describeError } from './common/errors/safe-error.js';
 
 /**
  * The worker entrypoint. Same image as the API, different command.
@@ -94,9 +95,7 @@ async function bootstrap(): Promise<void> {
           log.log('Worker stopped cleanly.');
           process.exit(0);
         } catch (error) {
-          log.error(
-            `Shutdown failed: ${error instanceof Error ? error.message : String(error)}`,
-          );
+          log.error(`Shutdown failed: ${describeError(error)}`);
           process.exit(1);
         }
       })();

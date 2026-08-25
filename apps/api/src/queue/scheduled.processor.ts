@@ -143,7 +143,7 @@ export class ScheduledProcessor {
       jobId: String(job.id ?? ''),
       /* One field, and it is a name from a closed set. Nothing to redact and nothing to leak. */
       payload: job.data,
-      error: error.message,
+      error,
       attempts: job.attemptsMade,
     });
   }

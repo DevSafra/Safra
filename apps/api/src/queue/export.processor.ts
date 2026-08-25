@@ -13,6 +13,7 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import { QUEUE } from './queue.definitions.js';
 import { DeadLetterService } from './dead-letter.service.js';
 import { EXPORT_JOB, type ExportJobData } from './export.job.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * Where a built CSV lives.
@@ -165,7 +166,7 @@ export class ExportProcessor {
       jobId: String(job.id ?? ''),
       /* One row id. Nothing a person typed, no customer data, nothing to redact. */
       payload: job.data,
-      error: error.message,
+      error,
       attempts: job.attemptsMade,
     });
   }
@@ -236,8 +237,7 @@ export class ExportProcessor {
         worker process down — and with it every other queue on the host.
       */
       this.logger.error(
-        `Could not mark export ${exportId} failed: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+        `Could not mark export ${exportId} failed: ` + `${describeError(error)}`,
       );
     }
   }

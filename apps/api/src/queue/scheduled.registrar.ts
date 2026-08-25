@@ -8,6 +8,7 @@ import {
   type ScheduledJobName,
 } from './scheduled.job.js';
 import { SCHEDULED_QUEUE } from './queue.tokens.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * Declares the five repeatable jobs at boot, and removes any that no longer exist.
@@ -51,7 +52,7 @@ export class ScheduledRegistrar implements OnApplicationBootstrap {
       */
       this.logger.error(
         `Could not declare the recurring jobs: ` +
-          `${error instanceof Error ? error.message : String(error)}. ` +
+          `${describeError(error)}. ` +
           'Recurring work will not run until this succeeds.',
       );
     }

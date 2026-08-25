@@ -12,6 +12,7 @@ import { redactContactDetails } from '../messaging/redaction.js';
 import { JOB_OPTIONS } from '../queue/queue.definitions.js';
 import { MAIL_JOB, mailJobId, type MailJobData } from '../queue/mail.job.js';
 import { MAIL_QUEUE } from '../queue/queue.tokens.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * Telling somebody that something happened, and RECORDING that we told them.
@@ -135,9 +136,7 @@ export class NotificationService {
         redacting since it was written; this path was missed because an ENQUEUE failure is a Redis
         problem in the imagination and a mail-server problem in practice.
       */
-      const reason = redactContactDetails(
-        error instanceof Error ? error.message : String(error),
-      ).body.slice(0, 300);
+      const reason = redactContactDetails(describeError(error)).body.slice(0, 300);
 
       this.logger.error(
         `Could not enqueue notification ${templateKey} (${row.id}): ${reason}. ` +
@@ -216,8 +215,7 @@ export class NotificationService {
       return true;
     } catch (error) {
       this.logger.error(
-        `Could not re-drive notification ${notificationId}: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+        `Could not re-drive notification ${notificationId}: ` + `${describeError(error)}`,
       );
 
       return false;
@@ -263,9 +261,16 @@ export class NotificationService {
         rather than assumed, because the string comes from somebody else's server and there is no
         format to rely on.
       */
-      const reason = redactContactDetails(
-        error instanceof Error ? error.message : 'unknown',
-      ).body.slice(0, 300);
+      /*
+        BOTH masks, and in this order (`O-sec-7`, 2026-08-25).
+
+        The note above is about the PROVIDER's words. `describeError` covers the other source: this
+        method also writes a row, so a `DrizzleQueryError` is reachable here and its message carries
+        the bound VALUES rather than the placeholders. `failure_reason` is the FOURTH column this
+        finding reached, after `scheduled_job_runs.error`, `payment_provider_events.processing_error`
+        and `dead_letter_jobs.error` — the register had named only the first.
+      */
+      const reason = redactContactDetails(describeError(error)).body.slice(0, 300);
 
       /*
         `failed` is written on EVERY attempt, not only the last one, and `attempts` counts up. So a

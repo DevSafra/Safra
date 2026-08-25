@@ -5,6 +5,7 @@ import { schema } from '@safra/db';
 import type { Role } from '@safra/contracts';
 
 import { DATABASE } from '../../database/database.module.js';
+import { describeError } from '../errors/safe-error.js';
 
 /**
  * Optional fields accept `undefined` as well as `null` so callers can spread a
@@ -72,9 +73,7 @@ export class AuditService {
   recordDetached(entry: AuditEntry): void {
     void this.record(entry).catch((error: unknown) => {
       this.logger.error(
-        `Failed to write audit entry "${entry.action}": ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Failed to write audit entry "${entry.action}": ${describeError(error)}`,
       );
     });
   }

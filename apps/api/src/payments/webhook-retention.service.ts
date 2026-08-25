@@ -5,6 +5,7 @@ import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
 const RETENTION_LOCK_KEY = 8_421_004;
@@ -76,10 +77,7 @@ export class WebhookRetentionService {
          * Recorded first, then swallowed — an unhandled rejection on the `@Cron` fallback path
          * kills the process, and a failed prune only means the table stays larger for another day.
          */
-        this.logger.error(
-          `Webhook retention pass failed: ` +
-            `${error instanceof Error ? error.message : String(error)}`,
-        );
+        this.logger.error(`Webhook retention pass failed: ` + `${describeError(error)}`);
       });
   }
 

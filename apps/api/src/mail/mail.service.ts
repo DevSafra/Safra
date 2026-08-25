@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { createTransport, type Transporter } from 'nodemailer';
 
 import { ENV, type Env } from '../config/env.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 export interface OutgoingMail {
   readonly to: string;
@@ -96,8 +97,7 @@ export class MailService {
        * email itself never goes.
        */
       this.logger.error(
-        `Failed to send "${mail.subject}" to ${mail.to}: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+        `Failed to send "${mail.subject}" to ${mail.to}: ` + `${describeError(error)}`,
       );
     }
   }

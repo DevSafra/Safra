@@ -6,6 +6,7 @@ import { createDatabase } from '@safra/db';
 import type { Env } from '../config/env.js';
 import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import { PasswordService } from '../common/crypto/password.service.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * The accounts and the exchange rate that scenarios 2, 3 and 4 of `docs/load-testing.md` cannot run
@@ -309,6 +310,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(`\n${error instanceof Error ? error.message : String(error)}`);
+  console.error(`\n${describeError(error)}`);
   process.exitCode = 1;
 });

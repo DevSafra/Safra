@@ -5,6 +5,7 @@ import type { Database } from '@safra/db';
 
 import { DATABASE } from '../database/database.module.js';
 import { redactContactDetails } from '../messaging/redaction.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /** What a worker knows about a job that has run out of attempts. */
 export interface DeadLetter {
@@ -12,7 +13,21 @@ export interface DeadLetter {
   readonly name: string;
   readonly jobId: string;
   readonly payload: unknown;
-  readonly error: string;
+  /**
+   * The caught error ITSELF, not a message taken off it.
+   *
+   * `unknown` on purpose (`O-sec-7`, 2026-08-25). Every one of the five processors used to pass
+   * `error.message`, which for a `DrizzleQueryError` is `Failed query: <sql>\nparams: <the bound
+   * VALUES>` — so `dead_letter_jobs.error` held bound parameters AT REST, on a row a support screen
+   * shows. `redactContactDetails` below caught an address in an SMTP rejection and could never catch
+   * an Argon2id hash or an encrypted TOTP secret.
+   *
+   * Taking the error rather than a string moves the guarantee to the BOUNDARY: five callers cannot
+   * each get it right, and the sixth one added later would not know there was anything to get right.
+   * Same reasoning as the payload mask on the line below — "the mask belongs in the row, not in the
+   * renderer".
+   */
+  readonly error: unknown;
   readonly attempts: number;
 }
 
@@ -52,8 +67,19 @@ export class DeadLetterService {
       */
       const payload = redactedJson(letter.payload);
 
-      /* The provider's words get the same treatment: an SMTP rejection quotes the address. */
-      const error = redactContactDetails(letter.error).body.slice(0, 2_000);
+      /*
+        BOTH masks, in this order, because they catch different things.
+
+        `describeError` removes the bound parameters and keeps the SQL, the error name and the
+        SQLSTATE — the standard shape everything else in the API logs. `redactContactDetails` then
+        handles what that cannot: an SMTP rejection quoting a recipient's address, which is a plain
+        message and not a query at all. Neither is sufficient alone, and the 2,000-character bound
+        stays so one enormous statement cannot fill the column.
+      */
+      const error = redactContactDetails(describeError(letter.error)).body.slice(
+        0,
+        2_000,
+      );
 
       await this.db.execute(sql`
         INSERT INTO dead_letter_jobs (queue, name, job_id, payload, error, attempts)
@@ -72,7 +98,7 @@ export class DeadLetterService {
     } catch (cause) {
       this.logger.error(
         `Could not record a dead letter for ${letter.queue}/${letter.name} job ` +
-          `${letter.jobId}: ${cause instanceof Error ? cause.message : String(cause)}`,
+          `${letter.jobId}: ${describeError(cause)}`,
       );
     }
   }

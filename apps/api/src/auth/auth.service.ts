@@ -27,6 +27,7 @@ import { LoginCodeService } from './login-code.service.js';
 import { TokenService, type IssuedTokens } from './token.service.js';
 import { TwoFactorService } from './two-factor.service.js';
 import { unauthorized, unavailable } from '../common/errors/app-error.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * Thrown when credentials were ACCEPTED and only the second factor is outstanding.
@@ -371,7 +372,7 @@ export class AuthService {
               `configuration fault, not a bad code: FIELD_ENCRYPTION_KEY does not ` +
               `match the key the secret was encrypted with. Every staff sign-in will ` +
               `fail until it does. ` +
-              `(${error instanceof Error ? error.message : String(error)})`,
+              `(${describeError(error)})`,
           );
 
           throw unavailable(ERROR.AUTH_UNAVAILABLE);
@@ -543,7 +544,7 @@ export class AuthService {
       this.logger.error(
         `Could not re-encrypt the TOTP secret for user ${userId}; it remains under ` +
           `the previous key and will be retried on the next sign-in. ` +
-          `(${error instanceof Error ? error.message : String(error)})`,
+          `(${describeError(error)})`,
       );
     }
   }

@@ -73,7 +73,7 @@ export class MailProcessor {
       name: job.name,
       jobId: String(job.id ?? ''),
       payload: job.data,
-      error: error.message,
+      error,
       attempts: job.attemptsMade,
     });
   }

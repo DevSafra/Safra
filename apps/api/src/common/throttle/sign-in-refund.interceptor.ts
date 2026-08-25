@@ -13,6 +13,7 @@ import { ERROR } from '@safra/contracts';
 import { codeOf } from '../errors/app-error.js';
 import { RedisThrottlerStorage } from '../../redis/redis-throttler.storage.js';
 import { throttleKeyOf } from './throttle-keys.js';
+import { describeError } from '../errors/safe-error.js';
 
 /**
  * The per-IP throttler this refunds against — the shared, address-wide one.
@@ -115,7 +116,7 @@ export class SignInRefundInterceptor implements NestInterceptor {
     this.storage.refund(key, IP_THROTTLER).catch((error: unknown) => {
       this.logger.warn(
         `Could not refund the per-IP sign-in hit; it stays counted. ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+          `${describeError(error)}`,
       );
     });
   }

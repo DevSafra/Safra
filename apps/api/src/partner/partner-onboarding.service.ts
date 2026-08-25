@@ -13,6 +13,7 @@ import { DATABASE } from '../database/database.module.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { PartnerInvitationService } from './partner-invitation.service.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * The account this onboarding will attach a partner to — found, or still to be created.
@@ -210,7 +211,7 @@ export class PartnerOnboardingService {
       .catch((error: unknown) => {
         this.logger.error(
           `Partner ${created.reference} was onboarded but the invitation did not send: ` +
-            `${error instanceof Error ? error.message : String(error)}`,
+            `${describeError(error)}`,
         );
       });
 

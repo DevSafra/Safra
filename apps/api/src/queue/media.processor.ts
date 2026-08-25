@@ -12,6 +12,7 @@ import { StorageService } from '../storage/storage.service.js';
 import { QUEUE } from './queue.definitions.js';
 import { DeadLetterService } from './dead-letter.service.js';
 import { MEDIA_JOB, type MediaJobData } from './media.job.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * The `media` queue's worker-side body: decode, re-encode, publish, tidy up.
@@ -124,7 +125,7 @@ export class MediaProcessor {
     await this.storage.remove(originalKey).catch((error: unknown) => {
       this.logger.warn(
         `Image ${imageId} published, but ${originalKey} could not be removed: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+          `${describeError(error)}`,
       );
     });
 
@@ -161,7 +162,7 @@ export class MediaProcessor {
       */
       jobId: String(job.id ?? ''),
       payload: job.data,
-      error: error.message,
+      error,
       attempts: job.attemptsMade,
     });
   }
@@ -225,8 +226,7 @@ export class MediaProcessor {
         dead letter is recorded separately and is the durable record.
       */
       this.logger.error(
-        `Could not mark image ${imageId} failed: ` +
-          `${error instanceof Error ? error.message : String(error)}`,
+        `Could not mark image ${imageId} failed: ` + `${describeError(error)}`,
       );
     }
   }

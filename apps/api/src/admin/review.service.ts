@@ -31,6 +31,7 @@ import {
   offsetPage,
 } from '@safra/contracts';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
+import { describeError } from '../common/errors/safe-error.js';
 import {
   assertCanRead,
   assertCanWrite,
@@ -736,8 +737,7 @@ export class ReviewService {
     if (input.decision === 'approve') {
       await this.notifyPartnerApproved(partner.id, reference).catch((error: unknown) => {
         this.logger.error(
-          `Could not tell ${reference} they were approved: ` +
-            `${error instanceof Error ? error.message : String(error)}`,
+          `Could not tell ${reference} they were approved: ` + `${describeError(error)}`,
         );
       });
     }

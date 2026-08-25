@@ -5,6 +5,7 @@ import { createDatabase, schema, type Database, type Transaction } from '@safra/
 import { FieldEncryptionService } from '../common/crypto/field-encryption.service.js';
 import { PasswordService } from '../common/crypto/password.service.js';
 import type { Env } from '../config/env.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * A small, hand-built dataset you can actually test against — three شركاء, one customer, and
@@ -1969,6 +1970,11 @@ async function selfCheck(db: Seeder): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(error instanceof Error ? error.message : error);
+  /*
+    `describeError` here too, for consistency rather than for secrecy: this prints to a developer's
+    terminal against a development database. It costs nothing and it stops this line being the
+    pattern somebody copies into a service, which is how the twenty other instances happened.
+  */
+  console.error(describeError(error));
   process.exit(1);
 });

@@ -12,6 +12,7 @@ import { ERROR, type ErrorCode } from '@safra/contracts';
 import { errorMessage } from '@safra/i18n';
 
 import { tagResponseErrorCode } from '../logging/response-error-code.js';
+import { chain, describeError, framesOnly } from './safe-error.js';
 
 /**
  * The last thing that touches an error before it becomes a response.
@@ -96,23 +97,6 @@ const CONNECTION_REFUSED_SQLSTATES: ReadonlySet<string> = new Set([
 const RETRY_AFTER_MIN_SECONDS = 1;
 const RETRY_AFTER_MAX_SECONDS = 5;
 
-/** How far down a `cause` chain to look. `pg-pool` wraps once; nothing here wraps deeper. */
-const MAX_CAUSE_DEPTH = 3;
-
-/** Every error in a `cause` chain, outermost first, bounded so a cycle cannot hang the filter. */
-function chain(error: unknown): unknown[] {
-  const seen: unknown[] = [];
-  let current = error;
-
-  for (let depth = 0; depth < MAX_CAUSE_DEPTH && current != null; depth += 1) {
-    if (seen.includes(current)) break;
-    seen.push(current);
-    current = (current as { cause?: unknown }).cause;
-  }
-
-  return seen;
-}
-
 /**
  * Whether this error means the request never reached the database.
  *
@@ -168,7 +152,7 @@ export class AppExceptionFilter implements ExceptionFilter {
     if (response.headersSent) {
       this.logger.error(
         `Error after the response had started; the client sees a truncated body. ` +
-          `${describe(exception)}`,
+          `${describeError(exception)}`,
       );
       return;
     }
@@ -184,7 +168,7 @@ export class AppExceptionFilter implements ExceptionFilter {
       succeed.
     */
     if (isBodyTooLarge(exception)) {
-      this.logger.warn(`Refused an oversized request body. ${describe(exception)}`);
+      this.logger.warn(`Refused an oversized request body. ${describeError(exception)}`);
 
       response.status(HttpStatus.PAYLOAD_TOO_LARGE).json({
         statusCode: HttpStatus.PAYLOAD_TOO_LARGE,
@@ -241,7 +225,7 @@ export class AppExceptionFilter implements ExceptionFilter {
     this.logger.warn(
       `At capacity — no database connection could be acquired, so the request was ` +
         `refused before it started. Answered 503, retry after ${seconds}s. ` +
-        `${describe(exception)}`,
+        `${describeError(exception)}`,
     );
 
     tagResponseErrorCode(response, ERROR.REQUEST_CAPACITY);
@@ -261,7 +245,7 @@ export class AppExceptionFilter implements ExceptionFilter {
    */
   private unexpected(exception: unknown, response: Response): void {
     this.logger.error(
-      `Unhandled error; answered 500. ${describe(exception)}`,
+      `Unhandled error; answered 500. ${describeError(exception)}`,
       exception instanceof Error ? framesOnly(exception) : undefined,
     );
 
@@ -281,78 +265,4 @@ export class AppExceptionFilter implements ExceptionFilter {
  */
 function bodyFor(status: number, code: ErrorCode): Record<string, unknown> {
   return { statusCode: status, code, message: errorMessage(code, 'en') };
-}
-
-/** Long enough to identify a statement, short enough that one error cannot flood a log. */
-const MAX_LOGGED_MESSAGE = 600;
-
-function truncate(text: string): string {
-  return text.length <= MAX_LOGGED_MESSAGE
-    ? text
-    : `${text.slice(0, MAX_LOGGED_MESSAGE)}… (${text.length} chars)`;
-}
-
-/**
- * One error's message, with the BOUND PARAMETERS removed.
- *
- * ## The finding this exists for (2026-08-20, live)
- *
- * `DrizzleQueryError`'s message is built as `Failed query: <sql>\nparams: <values>` — the values,
- * not the placeholders. Verified against the running API while proving the 503 path: a failing
- * sign-in wrote `params: someone@safra.test,1` to the log. On the paths that write a user row the
- * same line would carry the Argon2id hash and the encrypted TOTP secret.
- *
- * `JsonLogger` cannot help. Its redaction works on object KEYS, and this is one flat string.
- *
- * This is not new — Nest's default filter logged the exception too — but this filter is what logs
- * it now, and rule 1 is explicit that full PII never goes to a log.
- *
- * **The SQL itself is kept.** It is the useful half, it names no person, and an error line that
- * cannot say which statement failed is not worth writing. Only the values go.
- */
-function safeMessage(error: Error): string {
-  const { query, params } = error as { query?: unknown; params?: unknown };
-
-  if (typeof query === 'string' && Array.isArray(params)) {
-    return `Failed query: ${truncate(query)} — ${params.length} bound parameter(s), NOT logged`;
-  }
-
-  return truncate(error.message);
-}
-
-/**
- * For the LOG only. Never reaches a client — see the note on the generic body.
- *
- * Walks the `cause` chain so the underlying driver error is described too: its `code` is the
- * SQLSTATE, which is the single most useful thing in a database failure and is not personal data.
- */
-function describe(exception: unknown): string {
-  if (!(exception instanceof Error)) return `Non-Error thrown: ${typeof exception}`;
-
-  return chain(exception)
-    .filter((link): link is Error => link instanceof Error)
-    .map((link) => {
-      const code = (link as { code?: unknown }).code;
-      const sqlstate = typeof code === 'string' ? ` [${code}]` : '';
-
-      return `${link.name}${sqlstate}: ${safeMessage(link)}`;
-    })
-    .join(' ← ');
-}
-
-/**
- * A stack with its first line removed.
- *
- * `Error.prototype.stack` begins with `name: message`, so logging the stack of a
- * `DrizzleQueryError` re-introduces exactly the bound parameters `safeMessage` just took out. The
- * frames are what a stack is FOR; the message is already on the line above it.
- */
-function framesOnly(error: Error): string | undefined {
-  const stack = error.stack;
-
-  if (!stack) return undefined;
-
-  const firstFrame = stack.indexOf('\n    at ');
-
-  return firstFrame === -1 ? undefined : stack.slice(firstFrame + 1);
 }

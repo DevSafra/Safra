@@ -16,6 +16,7 @@ import { StorageService } from '../storage/storage.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR } from '@safra/contracts';
 import { badRequest, notFound } from '../common/errors/app-error.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /** §8.1 requires proof of identity and of the right to let the property. */
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -163,7 +164,7 @@ export class PartnerDocumentsService {
       (error: unknown) => {
         this.logger.error(
           `Could not notify staff about ${partnerId}'s documents: ` +
-            `${error instanceof Error ? error.message : String(error)}`,
+            `${describeError(error)}`,
         );
       },
     );

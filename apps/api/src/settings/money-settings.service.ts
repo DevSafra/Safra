@@ -9,6 +9,7 @@ import {
   toMinor,
 } from '../common/money.js';
 import { SettingsService } from './settings.service.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * The currency a bare money setting is assumed to be in.
@@ -128,7 +129,7 @@ export class MoneySettingsService {
 
       this.logger.error(
         `Could not convert ${key} from ${setting.currency} to ${targetCurrency}: ` +
-          `${error instanceof Error ? error.message : String(error)}. ` +
+          `${describeError(error)}. ` +
           `Applying ${setting.amount} as ${targetCurrency} instead — set an FX rate ` +
           `via POST /admin/fx-rates to make this exact.`,
       );

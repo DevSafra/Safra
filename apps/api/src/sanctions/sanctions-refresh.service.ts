@@ -4,6 +4,7 @@ import { ENV, type Env } from '../config/env.js';
 import { parseEuSanctionsXml } from './eu-list.parser.js';
 import { EU_SOURCE, SanctionsService } from './sanctions.service.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /** Distinct advisory-lock key per job; see RankingScheduler for the rationale. */
 const SANCTIONS_LOCK_KEY = 8_421_003;
@@ -78,9 +79,7 @@ export class SanctionsRefreshService {
          * it lacked was a row saying WHEN it last succeeded, which is the difference between
          * "verification is blocked" and "verification is blocked because this stopped on Tuesday".
          */
-        this.logger.error(
-          `Sanctions refresh failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        this.logger.error(`Sanctions refresh failed: ${describeError(error)}`);
       });
   }
 

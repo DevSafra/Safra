@@ -5,6 +5,7 @@ import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 
 import { DATABASE } from '../../database/database.module.js';
+import { describeError, framesOnly } from '../errors/safe-error.js';
 
 /**
  * Runs a scheduled job exactly once across the fleet, and records what happened.
@@ -75,11 +76,41 @@ export class JobRunService {
       this.logger.log(`${job}: completed in ${durationMs}ms — ${JSON.stringify(detail)}`);
     } catch (error) {
       const durationMs = Date.now() - startedAt;
-      const message = error instanceof Error ? error.message : String(error);
 
-      /* The MESSAGE here; the stack goes to the log, where the redaction rules apply. */
-      await this.record(job, 'failed', null, message, durationMs).catch(() => undefined);
-      this.logger.error(`${job}: FAILED after ${durationMs}ms — ${message}`, error);
+      /*
+        `describeError`, not `error.message` (`O-sec-7`, fixed 2026-08-25).
+
+        This was the worst instance of that finding, and the reason is the line below it: the message
+        is written into `scheduled_job_runs.error`, a COLUMN — read by `GET /admin/jobs`, shown in the
+        console, and queried by the runbook. So a failing scheduled query put its BOUND PARAMETERS at
+        rest and on somebody's screen, not merely into a log stream that rotates.
+
+        `drizzle-orm` builds `DrizzleQueryError`'s message as `Failed query: <sql>\nparams: <values>`
+        — the values. On the accrual and the SLA sweep those values are booking references and money;
+        on any path that touches `users` they would be an Argon2id hash and an encrypted TOTP secret.
+        `JsonLogger`'s redaction cannot see it, because that works on object KEYS and this is one flat
+        string.
+
+        `describeError` is the same shape `AppExceptionFilter` has answered with since 2026-08-20 and
+        is now shared — name, SQLSTATE, the SQL, and a COUNT of the parameters withheld. Bashar chose
+        that over inventing a structured column (2026-08-25): the operator reading this row and the
+        one reading the log should not have to learn two formats.
+      */
+      const described = describeError(error);
+
+      await this.record(job, 'failed', null, described, durationMs).catch(
+        () => undefined,
+      );
+
+      /*
+        FRAMES only. A stack begins with `name: message`, so logging it whole would put back exactly
+        the parameters `describeError` just took out — and the second argument to `logger.error` IS
+        the stack.
+      */
+      this.logger.error(
+        `${job}: FAILED after ${durationMs}ms — ${described}`,
+        error instanceof Error ? framesOnly(error) : undefined,
+      );
 
       throw error;
     } finally {

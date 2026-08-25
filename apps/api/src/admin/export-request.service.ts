@@ -19,6 +19,7 @@ import { EXPORTS_QUEUE } from '../queue/queue.tokens.js';
 import { StorageService } from '../storage/storage.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, forbidden, notFound } from '../common/errors/app-error.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /** `EXP-000112`. Bounded before it reaches a query; the lookup is parameterised regardless. */
 const REFERENCE_PATTERN = /^EXP-\d{1,12}$/;
@@ -145,7 +146,7 @@ export class ExportRequestService {
       */
       this.logger.error(
         `Could not enqueue export ${row.reference}: ` +
-          `${error instanceof Error ? error.message : String(error)}. ` +
+          `${describeError(error)}. ` +
           'The row stays queued and is recoverable by re-drive.',
       );
     }
