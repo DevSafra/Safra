@@ -315,6 +315,15 @@ describeIfDb('partner verification documents', () => {
    * None of this is visible to a test that only checks "an email was sent".
    */
   describe('notifying staff when the documents are complete', () => {
+    /*
+      Every kind that MAY be uploaded — not the set that completes anything.
+
+      §8.1 asks for one from each «أو» pair: identity OR commercial_register, and ownership_proof
+      OR management_contract. `bank_confirmation` is not a verification document at all. The
+      completion notice demanded all five until 2026-08-26, so a partner who had satisfied §8.1 —
+      and whom the console would activate — was never told they had finished. See
+      `required-documents.ts`, which both this notice and the approval gate now read.
+    */
     const KINDS = [
       'identity',
       'commercial_register',
@@ -322,6 +331,9 @@ describeIfDb('partner verification documents', () => {
       'management_contract',
       'bank_confirmation',
     ] as const;
+
+    /** One from each pair: what §8.1 actually requires. */
+    const SUFFICIENT = ['identity', 'ownership_proof'] as const;
 
     beforeEach(async () => {
       /*
@@ -348,19 +360,45 @@ describeIfDb('partner verification documents', () => {
         STAFF,
       );
 
-    /** THE assertion: silent until the last one lands, then exactly one message. */
-    it('sends nothing until the final document arrives, then sends once', async () => {
-      for (const kind of KINDS.slice(0, 4)) await send(kind);
+    /** THE assertion: silent until §8.1 is satisfied, then exactly one message. */
+    it('sends nothing until both pairs are covered, then sends once', async () => {
+      await send('identity');
 
-      expect(sent, 'four of five must not notify anybody').toEqual([]);
+      expect(sent, 'one pair covered is not a complete set').toEqual([]);
 
-      await send(KINDS[4]);
+      await send('ownership_proof');
 
       expect(sent).toHaveLength(1);
       expect(sent[0]?.subject).toContain('PAR-');
     });
 
-    /** A partner who sends the same kind twice has not completed anything. */
+    /**
+     * The OTHER document from each pair does just as well — «أو», not «و».
+     *
+     * Without this the rule could be "identity and ownership_proof specifically" and every other
+     * assertion here would still hold, which is the reading the SRS does not support.
+     */
+    it('accepts the second option in each pair', async () => {
+      await send('commercial_register');
+      await send('management_contract');
+
+      expect(sent).toHaveLength(1);
+    });
+
+    /**
+     * And the kind §8.1 never asks for cannot complete anything on its own.
+     *
+     * `bank_confirmation` is «when finance asks for confirmation» — it was in the old five-kind
+     * set and is not a verification document.
+     */
+    it('does not treat a bank confirmation as a verification document', async () => {
+      await send('identity');
+      await send('bank_confirmation');
+
+      expect(sent, 'the right-to-let pair is still uncovered').toEqual([]);
+    });
+
+    /** A partner who sends the same kind twice has not covered the other pair. */
     it('does not count one kind sent five times as a complete set', async () => {
       for (let i = 0; i < 5; i += 1) await send('identity');
 
@@ -369,7 +407,7 @@ describeIfDb('partner verification documents', () => {
 
     /** Replacing a document that was already fine is not new work, so it stays quiet. */
     it('stays silent when a settled document is replaced', async () => {
-      for (const kind of KINDS) await send(kind);
+      for (const kind of SUFFICIENT) await send(kind);
       expect(sent).toHaveLength(1);
 
       await send('identity');
@@ -385,7 +423,7 @@ describeIfDb('partner verification documents', () => {
      * of a review is the round nobody is told about.
      */
     it('notifies again when a rejected document is replaced', async () => {
-      for (const kind of KINDS) await send(kind);
+      for (const kind of SUFFICIENT) await send(kind);
       expect(sent).toHaveLength(1);
 
       const rows = await db.execute<{ id: string }>(sql`
@@ -408,7 +446,7 @@ describeIfDb('partner verification documents', () => {
                (${`gone-${randomUUID().slice(0, 8)}@safra.test`}, 'super_admin', 'suspended', 'ar')
       `);
 
-      for (const kind of KINDS) await send(kind);
+      for (const kind of SUFFICIENT) await send(kind);
 
       /* Two active super admins: the one from beforeEach and the one added here. */
       expect(sent).toHaveLength(2);

@@ -32,6 +32,7 @@ import {
 } from '@safra/contracts';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import { describeError } from '../common/errors/safe-error.js';
+import { hasRequiredDocuments } from '../partner/required-documents.js';
 import {
   assertCanRead,
   assertCanWrite,
@@ -70,30 +71,11 @@ export class ReviewService {
   /**
    * §8.1's precondition for activating a partner account.
    *
-   * One document from each pair the SRS names, present and not rejected. Written as two `EXISTS`
-   * subqueries rather than counted, so the answer is "is there one of these" and adding a sixth
-   * document kind cannot silently change what activation requires.
+   * The RULE itself lives in `required-documents.ts`, because the completion notice on the partner
+   * side has to answer the same question and two copies would drift — see the note there.
    */
   private async assertDocumentsOnFile(partnerId: string): Promise<void> {
-    const rows = await this.db.execute<{ identity: boolean; right_to_let: boolean }>(sql`
-      SELECT
-        EXISTS (
-          SELECT 1 FROM partner_documents d
-          WHERE d.partner_id = ${partnerId}
-            AND d.kind IN ('identity', 'commercial_register')
-            AND d.status <> 'rejected' AND d.deleted_at IS NULL
-        ) AS identity,
-        EXISTS (
-          SELECT 1 FROM partner_documents d
-          WHERE d.partner_id = ${partnerId}
-            AND d.kind IN ('ownership_proof', 'management_contract')
-            AND d.status <> 'rejected' AND d.deleted_at IS NULL
-        ) AS right_to_let
-    `);
-
-    const found = rows.rows[0];
-
-    if (!found?.identity || !found.right_to_let) {
+    if (!(await hasRequiredDocuments(this.db, partnerId))) {
       throw conflict(ERROR.PARTNER_DOCUMENTS_MISSING);
     }
   }

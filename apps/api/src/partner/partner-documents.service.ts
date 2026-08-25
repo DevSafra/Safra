@@ -5,13 +5,14 @@ import { sql } from 'drizzle-orm';
 import sharp from 'sharp';
 
 import type { Database } from '@safra/db';
-import { PARTNER_DOCUMENT_KINDS, type PartnerDocumentKind } from '@safra/contracts';
+import type { PartnerDocumentKind } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
 import { MailService } from '../mail/mail.service.js';
 import { partnerDocumentsCompleteMail } from '../mail/mail.templates.js';
+import { hasRequiredDocuments, pairsSatisfied } from './required-documents.js';
 import { StorageService } from '../storage/storage.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR } from '@safra/contracts';
@@ -106,12 +107,19 @@ export class PartnerDocumentsService {
     }
 
     /*
-      Whether this KIND was already covered, read before the insert.
+      Whether §8.1 was ALREADY satisfied, read before the insert.
 
-      It is half of "did this upload complete the set" — see `notifyStaffIfComplete`. Taken here
-      rather than inferred afterwards because after the insert the answer is always yes.
+      It used to ask whether this KIND was covered, which was the right half-question while the set
+      was "all five kinds": every kind was required, so a new kind could only ever be a step toward
+      completion. Under §8.1's «أو» pairs it is wrong — `bank_confirmation` and the second option in
+      a pair are both new kinds that complete NOTHING, and the notice fired again for each of them.
+
+      Asking about the SET is the question that was always meant: notify when this upload moved the
+      partner from incomplete to complete, and at no other time. It subsumes the old check —
+      replacing a settled document leaves the set already satisfied, so it stays quiet — while
+      still firing after a rejection, because a rejected document stops counting.
     */
-    const kindWasSettled = await this.hasSettledDocument(partnerId, kind);
+    const wasComplete = await hasRequiredDocuments(this.db, partnerId);
 
     const { body, contentType, extension } = await this.normalise(file.buffer, detected);
 
@@ -160,14 +168,12 @@ export class PartnerDocumentsService {
       duplicate instead of a notification. `MailService.send` already resolves on failure; the
       catch here covers the QUERIES, which do not.
     */
-    await this.notifyStaffIfComplete(partnerId, kindWasSettled).catch(
-      (error: unknown) => {
-        this.logger.error(
-          `Could not notify staff about ${partnerId}'s documents: ` +
-            `${describeError(error)}`,
-        );
-      },
-    );
+    await this.notifyStaffIfComplete(partnerId, wasComplete).catch((error: unknown) => {
+      this.logger.error(
+        `Could not notify staff about ${partnerId}'s documents: ` +
+          `${describeError(error)}`,
+      );
+    });
 
     return {
       id: inserted.id,
@@ -415,22 +421,6 @@ export class PartnerDocumentsService {
     }
   }
 
-  /** Whether this kind already has a document nobody has sent back. */
-  private async hasSettledDocument(
-    partnerId: string,
-    kind: PartnerDocumentKind,
-  ): Promise<boolean> {
-    const rows = await this.db.execute<{ present: boolean }>(sql`
-      SELECT EXISTS (
-        SELECT 1 FROM partner_documents
-        WHERE partner_id = ${partnerId} AND kind = ${kind}
-          AND status <> 'rejected' AND deleted_at IS NULL
-      ) AS present
-    `);
-
-    return rows.rows[0]?.present === true;
-  }
-
   /**
    * Tells staff, ONCE, that a partner's documents are all in (Bashar, 2026-08-21).
    *
@@ -467,21 +457,19 @@ export class PartnerDocumentsService {
    */
   private async notifyStaffIfComplete(
     partnerId: string,
-    kindWasSettled: boolean,
+    wasComplete: boolean,
   ): Promise<void> {
-    /* Already covered before this upload, so nothing transitioned. Cheapest check first. */
-    if (kindWasSettled) return;
+    /* Already complete before this upload, so nothing transitioned. Cheapest check first. */
+    if (wasComplete) return;
 
     const state = await this.db.execute<{
-      settled: string;
+      settled: boolean;
       pending: string;
       reference: string;
       display_name: string;
     }>(sql`
       SELECT
-        (SELECT COUNT(DISTINCT kind)::text FROM partner_documents
-          WHERE partner_id = ${partnerId} AND status <> 'rejected' AND deleted_at IS NULL)
-          AS settled,
+        ${pairsSatisfied(sql`${partnerId}`)} AS settled,
         (SELECT COUNT(*)::text FROM partner_documents
           WHERE partner_id = ${partnerId} AND status = 'pending' AND deleted_at IS NULL)
           AS pending,
@@ -493,7 +481,16 @@ export class PartnerDocumentsService {
     const row = state.rows[0];
 
     if (!row) return;
-    if (Number(row.settled) < PARTNER_DOCUMENT_KINDS.length) return;
+    /*
+      §8.1's rule, not "all five kinds" — corrected 2026-08-26.
+
+      This required every kind in `PARTNER_DOCUMENT_KINDS`, including `bank_confirmation`, which
+      the SRS does not name as a verification document, and BOTH halves of each «أو» pair. So a
+      partner who had satisfied §8.1 — and whom the console would now happily activate — was never
+      told they had finished, and staff were never told either. `required-documents.ts` holds the
+      one definition both sides read.
+    */
+    if (!row.settled) return;
 
     const staff = await this.db.execute<{ email: string; locale: string }>(sql`
       SELECT email, preferred_locale AS locale
