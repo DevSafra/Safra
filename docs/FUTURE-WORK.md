@@ -2508,6 +2508,16 @@ behind, reachable by anybody who can read the table.
 the same tension, deliberately. What is new is one more place that has to appear in the retention
 and erasure reconciliation, and it is better recorded now than discovered during it.
 
+**A SECOND table joined it on 2026-08-25.** `booking_internal_notes` is the same shape for the same
+reason: staff prose, append-only, attached by foreign key to a record carrying a named customer's
+address and telephone number. It is enforced harder than the call log — a `deny_mutation` trigger
+refuses UPDATE, DELETE and TRUNCATE, where `partner_application_contacts` is append-only by
+convention alone and is in no trigger list. Both belong in the same reconciliation and both take the
+same answer: **redaction in place**, keeping that a note was written and when, is the shape that
+preserves the log's purpose. The note text deliberately never reaches `audit_log`, so redacting one
+table is sufficient — that is what `booking-notes.integration.test.ts` walks the whole audit row to
+prove.
+
 **To unblock:** blocker #6. The engineering question that follows the legal answer is narrow —
 whether erasure REDACTS the note text in place (keeping the fact that a call happened, and when)
 or removes the row. Redaction is the shape that preserves the log's purpose, and it is a mutation
@@ -4498,6 +4508,67 @@ state this codebase produces routinely, and only a browser pass finds it.
 
 ---
 
+### O-book-1 — الحجوزات was read-only, and three staff capabilities had no way to be used
+
+**Status:** **BUILT 2026-08-25** — driven in a browser, held by 25 assertions ·
+**Owner:** engineering · **Recorded:** 2026-08-25
+
+Bashar asked what was missing on الحجوزات (2026-08-25). The registry was complete; the booking
+RECORD was read-only — zero buttons, zero forms, zero textareas — while the page's own footnote
+promised internal notes, a status change, and the messages/WhatsApp/email history. Behind it sat
+three staff capabilities nobody could exercise; see the update on `O-staff-1` for why the capability
+sweep missed them.
+
+**What was built.**
+
+| Piece              | Where it lives                                                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Internal notes     | New `booking_internal_notes` table, `POST /admin/bookings/:reference/notes`, the section on §9.4                                        |
+| Staff cancellation | `app/api/bookings/[reference]/cancel` → the endpoint that already existed. Reason required, stored verbatim, read by the customer       |
+| Capture payment    | `app/api/bookings/[reference]/capture-payment` → likewise. Offered only from `pending_payment`, which is what `markPaid` asserts        |
+| Cross-links        | Three cards to النزاعات / الرسائل / واتساب والبريد, each filtered by this booking's reference, each carrying the COUNT of what is there |
+
+**A table, not the column that was waiting for it.** `bookings.internal_notes` is a single `text`,
+so the second writer would have erased the first — the defect `partner_application_contacts` exists
+to fix on another screen (`O-partner-7`). The new table is append-only, and enforced: a
+`deny_mutation` trigger refuses UPDATE, DELETE and TRUNCATE. The column is left alone; it holds
+nothing and never did.
+
+**The console does not own the state machine.** `allowedTransitions` has carried the docblock "for
+building a UI" since it was written and had never had a caller. The detail payload now returns
+`actions: { cancel, capturePayment }` computed from it, so the console draws what the API will
+permit rather than from a second copy of the transition table. `booking-actions-offered` asserts the
+field against `canTransition` for all seven statuses rather than against a written-out list — a list
+here would be a THIRD copy and would keep passing when the table changed.
+
+**Notes are absent, not redacted, for a reader without the capability** — the same rule the payment
+section follows, keyed on `booking.add_internal_note` since there is no separate read capability.
+FINANCE holds `booking.read_all` for the money and does not see staff prose about a named customer.
+
+**No embedded messaging** (Bashar, 2026-08-25): the links go to the sections that already own those
+records. Each carries a count so a link says whether it leads anywhere — verified against the
+destination, not merely rendered: the e2e asserts the number on the card equals the number of
+`DSP-` references the filtered screen lists.
+
+**Held by 25 assertions across four files**, and the four that matter were watched to fail against
+the defect they describe: a read that returned only the newest note, a missing capability gate, the
+note text copied into `audit_log`, and `cancel: true` for every status. Plus a fifth, on the guard
+metadata: weakening the note endpoint to `BOOKING_READ_ALL` fails
+`booking-write-guards.test.ts`.
+
+**Driven, not only green.** Two notes added and both kept; capture on a `pending_payment` booking
+moving it to `قيد التأكيد` and the cancel control appearing as the capture one left; cancellation
+with a reason landing on the record; the dispute card claiming «٧ نزاعات» above a filtered screen
+listing exactly seven. 390 / 768 / 1024 / 1440 with no horizontal overflow.
+
+**What this leaves open.** `booking_internal_notes` joins the erasure reconciliation — recorded on
+`O-sec-8`. The status actions are the two the API exposes; the transition table has more staff moves
+(`confirmed → checked_in`, `checked_in → completed`, the dispute edges) and **no endpoint offers
+them**, so they are not reachable from anywhere and were out of scope for "use the existing
+endpoints". Whether they should get endpoints is a product question for Bashar.
+
+---
+
 ### O-staff-1 — Three capabilities are still grantable with nothing behind them
 
 **Status:** open · **Owner:** **Bashar** (a product decision, then engineering) ·
@@ -4536,6 +4607,29 @@ set — a CHECK constraint, since the column must stay nullable for un-waived ro
 them and accept that ticking one does nothing. Leaving them visible is the current state and it is the
 worse one; hiding them is a small change to `STAFF_ASSIGNABLE_PERMISSIONS` and
 `PARTNER_EMPLOYEE_PERMISSIONS` and can be done the day Bashar says so.
+
+**Update, 2026-08-25 — the table above is stale in both directions, and the sweep had a blind spot.**
+
+The three rows marked OPEN are all CLOSED: `violation.manage`, `violation.waive` and
+`partner.suspend` were built by the enforcement work of 2026-08-24 (`O-staff-4`). Left uncorrected
+they read as three outstanding promise gaps that no longer exist.
+
+More usefully, **the sweep asked the wrong question of the booking capabilities.** It looked for
+capabilities with no ROUTE, and these three had routes:
+
+| Capability                  | What was actually missing on 2026-08-25                                                                                                               |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `booking.cancel`            | `POST /bookings/:reference/cancel` existed, staff-gated, commented "Staff cancellation (§9.4)" — and **no console screen called it**                  |
+| `booking.update_status`     | `POST /bookings/:reference/capture-payment` existed, staff-gated — and **no console screen called it**                                                |
+| `booking.add_internal_note` | Worse: a COLUMN (`bookings.internal_notes`), a role-form checkbox, an Arabic label — and **no route at all**, so nothing could ever have written it** |
+
+All three shipped in the built-in `OPERATIONS_MANAGER` role, so a super admin naming an operations
+role has been delegating them since the role existed. The console had no `app/api/bookings`
+directory whatsoever, which is the single fact that would have found all three in one look.
+
+**The lesson for the next sweep:** "does a route exist" is not the question. The question is **can a
+person reach it**, and the cheapest proxy for it in this codebase is whether the console has a proxy
+route for the section. All three are now built — see `O-book-1`.
 
 ---
 
