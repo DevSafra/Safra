@@ -4508,6 +4508,105 @@ state this codebase produces routinely, and only a browser pass finds it.
 
 ---
 
+### O-book-2 — Three SRS exceptional cases the booking area still does not implement
+
+**Status:** open · **Severity:** Medium · **Owner:** engineering ·
+**Recorded:** 2026-08-25, by reading the SRS against the finished screen
+
+Bashar asked for a final pass over the bookings area against the SRS (2026-08-25). §6, §7, §9.4 and
+§17.1 are now met — see `O-book-1` and `O-book-3`. §16's table names three cases that are not, and
+one of them ANSWERS a question this work had left open.
+
+**EC-011 — «الشريك نسي Check-in»: تنبيه إداري بعد 24 ساعة من موعد الوصول.**
+
+This is the answer to the gap `StayCompletionService` deliberately refused to guess at. A
+`confirmed` booking whose arrival date has passed with no check-in is a stay nobody recorded, and
+the sweep must not complete it — completing it would pay a partner with no evidence anyone arrived.
+The SRS does not want it completed either: it wants **an administrative alert 24 hours after the
+arrival date**, so a person looks. Nothing produces one.
+
+Until it exists, such a booking sits at `confirmed` for ever, is never payable, and nothing says so.
+The dashboard's «يحتاج انتباهك الآن» box is where the alert belongs — it already carries
+`bookings_awaiting_confirmation` and `bookings_sla_expiring_within_30m`, so this is a third counter
+and a filter on the registry, not new machinery.
+
+**EC-004 — «الشريك أكد والموظف نسي تأكيد العميل»: تنبيه إداري إذا وصل تأكيد الشريك ولم تتغير حالة
+الحجز.** The same shape and the same home. Not built.
+
+**EC-010 — «العميل أضاع رقم الحجز»: يسترجعه بالبريد أو الهاتف بعد تحقق آمن.** الحجوزات looks a
+booking up by REFERENCE (`?reference=` redirects to the detail screen) and its search matches
+reference, property and customer name — but a support agent holding only an email address or a
+telephone number has no lookup. The search predicate is the whole change; the «تحقق آمن» half is a
+process question for Bashar, since matching on an email address is exactly how somebody else's
+booking gets read out over the telephone.
+
+**Not blocked on anything.** All three are small, and none of them is a booking-screen control —
+two are dashboard counters and one is a search predicate, which is why they are recorded here
+rather than built alongside the write surface.
+
+---
+
+### O-book-3 — §9.4's remaining actions, and what materialising `Disputed` cost
+
+**Status:** **BUILT 2026-08-25** — driven in a browser, held by 17 assertions ·
+**Owner:** engineering · **Recorded:** 2026-08-25
+
+Bashar's instruction: the booking page is a booking-MANAGEMENT page, not a read screen with two
+buttons. §9.4's list is «فتح نزاع أو استرداد أو تعويض أو إرسال بدائل للعميل», and none of the four
+existed on it.
+
+| Action      | What was built                                                                                                                                                   |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| فتح نزاع    | `POST /admin/disputes` — `DisputeService.openForBooking`. Moves the booking to `disputed`, freezes the payout, records `opened_by_user_id`                       |
+| استرداد     | The console's first caller for `GET/POST /payments/:reference/refund…`, which had existed with none. The quote is shown BEFORE the button                        |
+| تعويض       | `POST /admin/bookings/:reference/compensate` — booking-shaped door onto `WalletAdjustmentService`, so no profile uuid reaches the browser                        |
+| إرسال بدائل | A LINK to الرسائل, per Bashar: the conversation has a home with a thread, a reply box and redaction, and a second composer would be a parallel messaging surface |
+
+**What materialising `Disputed` cost, and it was nearly a double booking.**
+
+`disputed` was in the enum, in four transitions, in the registry's filter — and in **no** writer, so
+its absence from `BLOCKING_STATUSES` had never mattered. The moment a dispute moves a live booking
+out of `confirmed`/`checked_in`, those statuses stop applying, and a status outside the exclusion
+constraint does not hold its dates. EC-006 and EC-007 are raised ON ARRIVAL or during the stay, so
+the ordinary case would have been **releasing for sale the nights a guest was standing in**.
+
+`disputed` therefore joins `BLOCKING_STATUSES` and the constraint's predicate
+(`bookings_no_overlapping_stays_v3`, replacing v2), and `booking-state.test.ts`'s invariant now
+reads v3. Held by an assertion that asks the DATABASE — an overlapping insert against a disputed
+booking must be refused — and watched to fail by rebuilding the constraint without `disputed`.
+
+**The overlay has to lift, or the booking is never paid.** §6.2 defines `Disputed` as «يوجد نزاع
+مفتوح على الحجز» — a booking that HAS an open dispute — which makes it an overlay on the lifecycle
+rather than a destination in it. Closing the last dispute restores the booking, in the SAME
+transaction, to where its own stamps say it was (`completed_at` → `checked_in_at` → `confirmed`).
+Derived rather than remembered in a column, so there is nothing to keep in step. Two edges were
+added to the table for it — `disputed → checked_in` and `disputed → confirmed` — because the only
+ways out were `completed` and `cancelled`, which would have forced a dispute on a future stay to be
+closed by declaring it finished.
+
+Without that, a closed dispute would leave the booking outside `PayoutService`'s
+`status = 'completed'` predicate for ever, silently, and the partner would never be paid for a stay
+resolved in their favour.
+
+**A bug the test found before a person did.** The first version refused a SECOND dispute of a
+different kind, because it asked `canTransition(status, 'disputed', …)` and a state never
+transitions to itself — so a booking already carrying one could not take another, which is exactly
+what the "one live dispute per KIND" rule exists to permit.
+
+**Driven end to end:** `مؤكد` → open dispute → `متنازع عليه`, payout frozen, and an overlapping
+insert refused by name; close it on النزاعات → back to `مؤكد` with every control restored.
+Compensation credited a wallet to `20.00` with the booking named in the note; the refund form quoted
+«70.00 USD · 50% حسب سياسة policy minimum (50%)» from the snapshotted policy. 390/768/1024/1440 with
+every form open — no overflow, no control under 40px below `lg` (the compensation amount input was
+38px and needed `min-h-10`, since `globals.css` gives the floor to `button`/`select`/`summary` and
+not to a text input).
+
+**Three catalogue gaps the sweep caught**, all pre-existing and all exposed by producing the first
+real dispute closure in a committed run: the `dispute` subject type, the `compensationAmount` /
+`compensationCurrency` payload keys, and the dispute kinds as payload values.
+
+---
+
 ### O-book-1 — الحجوزات was read-only, and three staff capabilities had no way to be used
 
 **Status:** **BUILT 2026-08-25** — driven in a browser, held by 25 assertions ·
