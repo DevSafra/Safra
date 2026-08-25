@@ -156,6 +156,10 @@ export const en = {
     subject: 'Your invoice for booking {reference} — SAFRA',
     body: 'We have received your payment. This is the invoice for your booking.\n\nReference: {reference}\nProperty: {property}\nTotal paid: {amount} {currency}\n\nOpen or download your invoice here:\n{url}\n\nThe SAFRA team',
   },
+  bookingDeadlineReminder: {
+    subject: '30 minutes left to answer booking {reference} — SAFRA',
+    body: 'A reminder: the window to answer this booking is about to close.\n\nReference: {reference}\nProperty: {property}\nCheck-in: {checkIn}\nCheck-out: {checkOut}\n\nDeadline: {deadline}. If the window closes with no answer the booking is cancelled automatically, the customer is refunded in full, and a «no response» violation is recorded against your account.\n\nOpen the request now:\n{url}\n\nThe SAFRA team',
+  },
   bookingNeedsAction: {
     subject: 'A booking is waiting for you — {reference}',
     body: 'You have a new booking request waiting for your decision.\n\nReference: {reference}\nProperty: {property}\nCheck-in: {checkIn}\nCheck-out: {checkOut}\n\nYou have until {deadline} to respond. A request left unanswered past that time is cancelled automatically and a "no response" violation is recorded against your account.\n\nOpen the request here:\n{url}\n\nThe SAFRA team',

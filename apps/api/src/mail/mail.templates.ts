@@ -812,6 +812,43 @@ export function bookingInvoiceMail(input: {
   };
 }
 
+/**
+ * «تبقّت ٣٠ دقيقة للردّ» — §6.3 step 5's «تتواصل سفرة مع الشريك لتسريع التأكيد».
+ *
+ * ## Why a second message rather than resending the first
+ *
+ * `bookingNeedsActionMail` goes out the moment the money is captured and says a booking is
+ * waiting. This one says the window is about to CLOSE, and it is sent to a partner who has already
+ * had that first mail and not acted on it — so it names the consequences §6.4 attaches: the
+ * booking is cancelled, the customer refunded in full, and a violation recorded. A resend of the
+ * first mail would arrive looking like a duplicate and read as one.
+ *
+ * Its own key, `partner.deadline_reminder`, which the console's catalogue has carried since design
+ * handoff §8 and nothing sent until 2026-08-26.
+ */
+export function bookingDeadlineReminderMail(input: {
+  to: string;
+  locale: string;
+  reference: string;
+  property: string;
+  checkIn: string;
+  checkOut: string;
+  deadline: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.bookingDeadlineReminder, input.locale, {
+      reference: input.reference,
+      property: input.property,
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+      deadline: input.deadline,
+      url: input.url,
+    }),
+  };
+}
+
 export function bookingNeedsActionMail(input: {
   to: string;
   locale: string;

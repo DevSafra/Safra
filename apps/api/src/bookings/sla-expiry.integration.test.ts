@@ -42,16 +42,30 @@ describeIfDb('the confirmation window lapsing', () => {
   /** Every notice the sweep asked to send, as (template, bookingId). */
   const sent: { template: string; bookingId: string | undefined }[] = [];
 
+  /**
+   * A stub that RECORDS, because the real service does.
+   *
+   * It used to only push onto `sent`, and that made one behaviour untestable: the deadline
+   * reminder decides "have I already chased this partner" by reading `notifications` rather than
+   * by adding a column. Against a stub that wrote nothing the sweep re-sent on every run and the
+   * test reported a defect the product does not have.
+   *
+   * So the row goes in — the same three fields the reminder's `NOT EXISTS` reads. Everything else
+   * `notify` does (the queue, the transport, the redaction) is genuinely out of scope here.
+   */
   const notifications = {
-    notify: (
+    notify: async (
       template: string,
       _mail: unknown,
-      _locale: string,
+      locale: string,
       subject?: { bookingId?: string },
     ) => {
       sent.push({ template, bookingId: subject?.bookingId });
 
-      return Promise.resolve();
+      await db.execute(sql`
+        INSERT INTO notifications (channel, template_key, locale, status, booking_id)
+        VALUES ('email', ${template}, ${locale}, 'queued', ${subject?.bookingId ?? null})
+      `);
     },
   } as unknown as NotificationService;
 
@@ -147,6 +161,102 @@ describeIfDb('the confirmation window lapsing', () => {
 
     expect(after.rows[0]?.status).toBe('pending_confirmation');
     expect(sent.filter((notice) => notice.bookingId === bookingId)).toHaveLength(0);
+  });
+
+  /**
+   * §6.3 step 5 — «تتواصل سفرة مع الشريك لتسريع التأكيد».
+   *
+   * The fixture's window is already PAST, so each test here moves the deadline to where it wants
+   * it. That is the point: the reminder is about a window still open, and the expiry pass runs
+   * first — a booking whose time is up must be cancelled, not chased.
+   */
+  describe('chasing the partner before the window closes', () => {
+    /*
+      Every OTHER candidate pushed out of the window first.
+
+      The sweep is global and takes 100 a pass, and the development database has more than that
+      inside the warning threshold — so «no reminder was sent» could mean the rule worked or
+      merely that the fixture was not in the batch. It caught exactly that: removing the threshold
+      altogether left this suite green. Inside the rollback harness, so the database is unchanged
+      a moment later.
+    */
+    beforeEach(async () => {
+      await db.execute(sql`
+        UPDATE bookings SET confirmation_deadline_at = now() + INTERVAL '10 hours'
+        WHERE status = 'pending_confirmation' AND id <> ${bookingId}
+      `);
+    });
+
+    /** Inside the warning threshold, still open. */
+    const closingSoon = () =>
+      db.execute(sql`
+        UPDATE bookings SET confirmation_deadline_at = now() + INTERVAL '10 minutes'
+        WHERE id = ${bookingId}
+      `);
+
+    it('reminds the partner when the deadline is close', async () => {
+      await closingSoon();
+      await sla.sweep();
+
+      const mine = sent.filter((notice) => notice.bookingId === bookingId);
+
+      expect(mine).toHaveLength(1);
+      expect(mine[0]?.template).toBe('partner.deadline_reminder');
+    });
+
+    /**
+     * The control. A booking with an hour left is not chased — otherwise the reminder is just a
+     * second copy of the notice sent when the money landed, and every assertion above would still
+     * hold.
+     */
+    it('leaves a booking with plenty of time alone', async () => {
+      await db.execute(sql`
+        UPDATE bookings SET confirmation_deadline_at = now() + INTERVAL '90 minutes'
+        WHERE id = ${bookingId}
+      `);
+
+      await sla.sweep();
+
+      expect(sent.filter((notice) => notice.bookingId === bookingId)).toHaveLength(0);
+    });
+
+    /** Once per booking. A sweep runs every minute; thirty reminders is not a reminder. */
+    it('reminds once, however often the sweep runs', async () => {
+      await closingSoon();
+      await sla.sweep();
+      await sla.sweep();
+      await sla.sweep();
+
+      expect(sent.filter((notice) => notice.bookingId === bookingId)).toHaveLength(1);
+    });
+
+    /** A partner who has already answered is not chased about a decision they made. */
+    it('does not chase a partner who has already responded', async () => {
+      await closingSoon();
+      await db.execute(sql`
+        UPDATE bookings SET partner_responded_at = now() WHERE id = ${bookingId}
+      `);
+
+      await sla.sweep();
+
+      expect(sent.filter((notice) => notice.bookingId === bookingId)).toHaveLength(0);
+    });
+
+    /**
+     * And a window that has already closed is a cancellation, never a reminder.
+     *
+     * The fixture arrives in exactly this state, so this asserts the ordering inside `sweep()`:
+     * the expiry pass runs first and takes the booking out of `pending_confirmation` before the
+     * reminder pass can look at it.
+     */
+    it('cancels rather than reminds when the window has already closed', async () => {
+      await sla.sweep();
+
+      const mine = sent.filter((notice) => notice.bookingId === bookingId);
+
+      expect(mine).toHaveLength(1);
+      expect(mine[0]?.template).toBe('booking.cancelled_refund');
+    });
   });
 
   /** A paid booking whose partner never answered, with its window already past. */

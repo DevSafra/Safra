@@ -156,6 +156,10 @@ export const de = {
     subject: 'Ihre Rechnung zur Buchung {reference} — SAFRA',
     body: 'Wir haben Ihre Zahlung erhalten. Dies ist die Rechnung zu Ihrer Buchung.\n\nReferenz: {reference}\nUnterkunft: {property}\nGezahlter Gesamtbetrag: {amount} {currency}\n\nRechnung hier öffnen oder herunterladen:\n{url}\n\nIhr SAFRA-Team',
   },
+  bookingDeadlineReminder: {
+    subject: 'Noch 30 Minuten für Buchung {reference} — SAFRA',
+    body: 'Erinnerung: Die Frist zur Beantwortung dieser Buchung läuft bald ab.\n\nReferenz: {reference}\nUnterkunft: {property}\nAnreise: {checkIn}\nAbreise: {checkOut}\n\nFrist: {deadline}. Läuft sie unbeantwortet ab, wird die Buchung automatisch storniert, der Kunde vollständig erstattet und ein Verstoß «keine Reaktion» auf Ihrem Konto vermerkt.\n\nAnfrage jetzt öffnen:\n{url}\n\nIhr SAFRA-Team',
+  },
   bookingNeedsAction: {
     subject: 'Eine Buchung wartet auf Sie — {reference}',
     body: 'Eine neue Buchungsanfrage wartet auf Ihre Entscheidung.\n\nReferenz: {reference}\nUnterkunft: {property}\nAnreise: {checkIn}\nAbreise: {checkOut}\n\nSie haben bis {deadline} Zeit zu antworten. Eine Anfrage, die bis dahin unbeantwortet bleibt, wird automatisch storniert und ein Verstoß wegen "keine Antwort" wird Ihrem Konto zugeordnet.\n\nAnfrage hier öffnen:\n{url}\n\nIhr SAFRA-Team',

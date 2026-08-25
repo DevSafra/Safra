@@ -2678,6 +2678,9 @@ export const ar = {
      */
     payloadKey: {
       reason: 'السبب',
+      /* §8.1's map location, recorded by `partner.location_set`. */
+      latitude: 'خط العرض',
+      longitude: 'خط الطول',
       reference: 'المرجع',
       /* Written by `dispute.resolved` / `dispute.rejected` when a closure agrees compensation. */
       compensationAmount: 'مبلغ التعويض',

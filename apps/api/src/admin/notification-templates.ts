@@ -80,12 +80,11 @@ export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
     channels: ['whatsapp', 'email'],
     locales: ALL_LOCALES,
     /*
-      §6.3 step 5's «تتواصل سفرة مع الشريك لتسريع التأكيد» IS implemented — but under a different
-      key. `markPaid` sends `booking.needs_action` the moment the money lands, which is the notice
-      this entry describes. What does not exist is a REMINDER: a second nudge partway through the
-      two-hour window. So the entry stays and the flag becomes honest.
+      Built 2026-08-26. The SLA sweep chases the partner when `SLA_EXPIRY_WARNING_MINUTES` remain —
+      the same threshold at which the console starts warning staff — and once per booking, decided
+      from the delivery log rather than from a new column.
     */
-    implemented: false,
+    implemented: true,
   },
   {
     key: 'ad.single_offer',

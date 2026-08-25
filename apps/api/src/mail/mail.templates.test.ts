@@ -77,6 +77,22 @@ const RENDERERS: {
       }),
     shows: 'BKG-2026-000042',
   },
+  {
+    name: 'bookingDeadlineReminderMail',
+    entry: 'bookingDeadlineReminder',
+    render: (locale) =>
+      templates.bookingDeadlineReminderMail({
+        ...SAMPLE,
+        locale,
+        reference: 'BKG-2026-000042',
+        property: 'فندق قصر الشرق',
+        checkIn: '2026-09-01',
+        checkOut: '2026-09-04',
+        deadline: '2026-08-26 14:30',
+        url: 'https://partner.safra.test/',
+      }),
+    shows: 'BKG-2026-000042',
+  },
   /*
     §6.4's pair — the cancellation and the refund.
 

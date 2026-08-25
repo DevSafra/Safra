@@ -63,15 +63,15 @@ describe('the notification catalogue', () => {
     /*
       And a key nothing sends is NOT found, so the matcher is not simply saying yes.
 
-      This named `booking.invoice` until that mail was built — the control has to point at
-      something genuinely unsent, and swapping it when the gap closes is the maintenance this kind
-      of assertion costs. `partner.deadline_reminder` is the remaining one: §6.3 step 5's FIRST
-      notice is sent as `booking.needs_action`, and a second nudge mid-window does not exist.
+      This named `booking.invoice`, then `partner.deadline_reminder` — both have since been built.
+      The control has to point at something genuinely unsent, and swapping it as each gap closes is
+      the maintenance this kind of assertion costs. `wallet.compensation` is the remaining one, and
+      deliberately so: §6.4's compensation is announced inside `booking.cancelled_refund`, one
+      event and one message, so nothing sends it on its own.
     */
-    expect(
-      sends(source, 'partner.deadline_reminder'),
-      'partner.deadline_reminder is not',
-    ).toBe(false);
+    expect(sends(source, 'wallet.compensation'), 'wallet.compensation is not').toBe(
+      false,
+    );
   });
 
   /** Every entry marked unimplemented is a real gap somebody can look up. */

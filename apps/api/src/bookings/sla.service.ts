@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
+import { SLA_EXPIRY_WARNING_MINUTES } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { LedgerService } from '../ledger/ledger.service.js';
@@ -9,7 +10,10 @@ import { MONEY_SCALE, toMinor } from '../common/money.js';
 import { MoneySettingsService } from '../settings/money-settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
-import { bookingCancelledBySafraMail } from '../mail/mail.templates.js';
+import {
+  bookingCancelledBySafraMail,
+  bookingDeadlineReminderMail,
+} from '../mail/mail.templates.js';
 import { ENV, type Env } from '../config/env.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
 import { describeError } from '../common/errors/safe-error.js';
@@ -85,8 +89,17 @@ export class SlaService {
       .runExclusively('booking-sla-sweep', SLA_LOCK_KEY, async () => {
         const expiredPayments = await this.expireUnpaidBookings();
         const expiredConfirmations = await this.expireUnconfirmedBookings();
+        /*
+          AFTER the expiries, deliberately.
 
-        return { expiredPayments, expiredConfirmations };
+          A booking whose window has just closed is cancelled by the pass above, so it is no longer
+          `pending_confirmation` and this one cannot send a partner a reminder about a deadline
+          that has already passed — which would be the platform asking for a decision it had just
+          taken away.
+        */
+        const reminded = await this.remindPartners();
+
+        return { expiredPayments, expiredConfirmations, reminded };
       })
       .catch((error: unknown) => {
         /*
@@ -196,6 +209,110 @@ export class SlaService {
           `${describeError(error)}`,
       );
     }
+  }
+
+  /**
+   * §6.3 step 5 — «تتواصل سفرة مع الشريك لتسريع التأكيد».
+   *
+   * ## What was missing
+   *
+   * The partner is told once, when the money lands (`booking.needs_action`). The SRS asks SAFRA to
+   * CHASE that, and `partner.deadline_reminder` sat in the console's template catalogue with
+   * nothing sending it — a template staff could see and no partner ever received.
+   *
+   * ## Thirty minutes, and not a new number
+   *
+   * `SLA_EXPIRY_WARNING_MINUTES` already decides when the console starts warning staff that a
+   * window is closing. Reusing it means the partner is chased at the same moment an operator is
+   * told to chase them, rather than two thresholds drifting apart — which is the whole reason that
+   * constant was extracted from three copies.
+   *
+   * ## Sent once, decided from the delivery log
+   *
+   * There is no `reminded_at` column and this does not add one: `notifications` already records
+   * every message with its template key and its booking, so "has this partner been reminded about
+   * this booking" is a question the log can answer. A `failed` row still counts as sent — the
+   * re-drive sweep owns retrying delivery, and reminding somebody twice because the first attempt
+   * bounced is a worse outcome than the bounce.
+   */
+  private async remindPartners(): Promise<number> {
+    const due = await this.db.execute<{
+      id: string;
+      reference: string;
+      partner_id: string;
+      email: string | null;
+      locale: string | null;
+      property: string | null;
+      check_in: string;
+      check_out: string;
+      deadline: string;
+    }>(sql`
+      SELECT b.id, b.reference, b.partner_id, u.email, u.preferred_locale AS locale,
+             coalesce(pr.name_ar, pr.name_en) AS property,
+             b.check_in::text, b.check_out::text,
+             to_char(b.confirmation_deadline_at, 'YYYY-MM-DD HH24:MI') AS deadline
+      FROM bookings b
+      JOIN partners pa   ON pa.id = b.partner_id
+      JOIN users u       ON u.id = pa.user_id
+      JOIN properties pr ON pr.id = b.property_id
+      WHERE b.status = 'pending_confirmation'
+        AND b.deleted_at IS NULL
+        AND b.partner_responded_at IS NULL
+        AND b.confirmation_deadline_at IS NOT NULL
+        AND b.confirmation_deadline_at > now()
+        AND b.confirmation_deadline_at
+              <= now() + (${SLA_EXPIRY_WARNING_MINUTES}::int * INTERVAL '1 minute')
+        AND NOT EXISTS (
+          SELECT 1 FROM notifications n
+          WHERE n.booking_id = b.id AND n.template_key = 'partner.deadline_reminder'
+        )
+      /*
+        Most urgent first, and the ordering is not cosmetic.
+
+        There are more bookings inside the warning window than one batch takes — 118 against a
+        LIMIT of 100 on the development database alone — and with no ORDER BY, which 100 the
+        planner returns is undefined. A booking could be passed over minute after minute while its
+        own window ran out, which is the one failure a reminder exists to prevent. Ordering by the
+        deadline means the closest to lapsing is always in the batch.
+      */
+      ORDER BY b.confirmation_deadline_at
+      LIMIT 100
+    `);
+
+    let sent = 0;
+
+    for (const booking of due.rows) {
+      if (!booking.email) continue;
+
+      const locale = booking.locale ?? 'ar';
+
+      try {
+        await this.notifications.notify(
+          'partner.deadline_reminder',
+          bookingDeadlineReminderMail({
+            to: booking.email,
+            locale,
+            reference: booking.reference,
+            property: booking.property ?? '',
+            checkIn: booking.check_in,
+            checkOut: booking.check_out,
+            deadline: booking.deadline,
+            url: `${this.env.PARTNER_URL}/`,
+          }),
+          locale,
+          { bookingId: booking.id, partnerId: booking.partner_id },
+        );
+
+        sent += 1;
+      } catch (error: unknown) {
+        /* One partner unreachable must not cost the rest of the batch their reminder. */
+        this.logger.error(
+          `Could not remind the partner about ${booking.reference}: ${describeError(error)}`,
+        );
+      }
+    }
+
+    return sent;
   }
 
   /**
