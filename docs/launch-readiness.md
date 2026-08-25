@@ -32,14 +32,15 @@ accepted partner was stranded and every partner on the platform had come from th
 exists now and the journey was walked end to end in a browser. See `O-partner-8`, and `O-sec-9` for
 the second factor that changed with it.
 
-**Three unblocked engineering items remain**, all opened on 2026-08-20 and none of them planned
-scope — every one came out of a security pass rather than a test:
+**Two unblocked engineering items remain**, plus one closed item and one test that is owed. All
+were opened on 2026-08-20, none was planned scope, and every one came out of a security pass rather
+than a test:
 
-| Item      | What                                                                              | Severity                 |
-| --------- | --------------------------------------------------------------------------------- | ------------------------ |
-| `O-sec-7` | A failed query's bound parameters reach the logs; one path writes them to a table | **High** (§14 / GDPR)    |
-| `O-sec-6` | `refresh_tokens` is never swept, and nothing caps sessions per account            | Low now, Medium at scale |
-| `O-api-2` | Seven refusals answer an English sentence with no error code                      | Low–Medium               |
+| Item      | What                                                                                     | Severity              |
+| --------- | ---------------------------------------------------------------------------------------- | --------------------- |
+| `O-sec-7` | A failed query's bound parameters reach the logs; one path writes them to a table        | **High** (§14 / GDPR) |
+| `O-sec-6` | **Closed 2026-08-20** — swept nightly, and ten sessions per account. The cap owes a test | Low                   |
+| `O-api-2` | Seven refusals answer an English sentence with no error code                             | Low–Medium            |
 
 None of them blocks a launch and none needs anything external. They are listed here rather than
 folded away because this line read "No unblocked engineering item remains" until they were found,

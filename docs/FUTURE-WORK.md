@@ -6,7 +6,15 @@
 > **How to use it in a new session:** read §1 for where things stand, §3 for who must act
 > on what, then §4–§9 for the item you are picking up, and §10 for the security position.
 
-**Last updated:** 2026-08-20 — **the console audit, and the locally-honest half of blocker #10.**
+**Last updated:** 2026-08-25 — **the pagination bar's JSON screen, and the sweep it started.**
+Bashar met a bare `{"message":"Unknown table or size."}` where a table should have been. The cause
+was one word — the save endpoint read the literal `size` while five namespaced tables post
+`queueSize`/`activitySize`/`vsize`/`scopeSize` — and sweeping for the SHAPE found seven routes
+across all three apps that answered a body to a browser navigation, plus two bars on every
+two-table screen that threw each other back to page one. See `O-cons-2`. `pnpm verify` 2,919
+(nothing skipped) · `pnpm e2e` 277.
+
+**Previously, 2026-08-20 — the console audit, and the locally-honest half of blocker #10.**
 Bashar asked for every page of the super admin console to be walked and made production-ready. Ten
 findings, all fixed: an English 404 under RTL, 43 untranslated audit actions, all four notification
 templates missing, 477 partners unreachable behind an unpaginated queue, a CSRF guard that answered
@@ -38,8 +46,9 @@ answers, the enforcement rules and all 17 documented deviations: **`docs/design-
 **Unblocked infrastructure work is otherwise complete.** From here the project waits on
 external decisions; see §3 for who must act on what.
 **Branch:** `main` (the only branch — see `.claude/CLAUDE.md` §5)
-**Last pushed:** `90b188c`. Everything after it is committed locally and **not pushed** —
-3 commits as of 2026-08-04, plus the uncommitted Arabic/dashboard work.
+**Pushed:** `main` and `origin/main` are level. This line used to name a specific commit and a
+count of unpushed ones, and it was wrong for three weeks — a number that has to be edited by hand
+after every push is a number that will be stale by the next one. Run `git status -sb` instead.
 
 ---
 
@@ -130,20 +139,21 @@ difference.
 
 **Amended 2026-08-20.** The ten are unchanged, and none of the work done since has added or removed
 one. But "engineering-complete" is now carrying three unblocked items it did not have — `O-sec-7`,
-`O-sec-6` and `O-api-2` — so the phrase is doing what the note above §1a warns about: describing
+`O-api-2` — so the phrase is doing what the note above §1a warns about: describing
 planned SCOPE, not correctness. All three were found by a security pass rather than by a test,
 which is the third time that has been the source (`O-ui-1`, `O-sec-4`, now these). None blocks a
 launch; `O-sec-7` should not wait for one either.
 
 **Classification of today's items:**
 
-| Item                            | Classification                                             |
-| ------------------------------- | ---------------------------------------------------------- |
-| `O-sec-3`                       | **Completed** — approved, built, ceiling set to 300        |
-| `O-api-1`                       | **Completed** — approved, built                            |
-| `O-page-1`                      | **Completed** — ceiling set to 1,000                       |
-| `O-sec-5`                       | **External dependency** — needs an edge, so it needs `M-1` |
-| `O-sec-7`, `O-sec-6`, `O-api-2` | **Engineering work remains**, all unblocked                |
+| Item                 | Classification                                                |
+| -------------------- | ------------------------------------------------------------- |
+| `O-sec-3`            | **Completed** — approved, built, ceiling set to 300           |
+| `O-api-1`            | **Completed** — approved, built                               |
+| `O-page-1`           | **Completed** — ceiling set to 1,000                          |
+| `O-sec-5`            | **External dependency** — needs an edge, so it needs `M-1`    |
+| `O-sec-7`, `O-api-2` | **Engineering work remains**, both unblocked                  |
+| `O-sec-6`            | **Closed 2026-08-20**, recorded as open here until 2026-08-25 |
 
 | #   | Blocker                                            | Owner               | Gated by 1 |
 | --- | -------------------------------------------------- | ------------------- | ---------- |
@@ -193,27 +203,27 @@ document that makes it executable without further discovery.**
 These are not open questions. They are settled, and changing one is a decision for
 Bashar, not an implementation detail.
 
-| Decision                                                          | Date           | Detail                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Work directly on `main`; never branch                             | 2026-07-29     | No feature branches, no PR flow, never force-push                                                                                                                                                                                                                                                                                                                           |
-| Commit messages are exactly one line, typed prefix                | 2026-07-29     | No body, no `Co-Authored-By`, no tool footers                                                                                                                                                                                                                                                                                                                               |
-| Ask before every commit and every push                            | standing       | No batching of approval                                                                                                                                                                                                                                                                                                                                                     |
-| Merchant of record: Safra Technologies GmbH (Germany)             | 2026-07-29     | ADR 0002                                                                                                                                                                                                                                                                                                                                                                    |
-| Payment rails and payouts deferred to end of project              | 2026-08-01     | Items 84, 135                                                                                                                                                                                                                                                                                                                                                               |
-| Money settings carry a currency, plus `money.always_usd`          | 2026-08-01     | Toggle ON by default; ADR 0006                                                                                                                                                                                                                                                                                                                                              |
-| ID documents: store, restrict access, defer retention policy      | 2026-08-01     | Retention is now item **S-4** below                                                                                                                                                                                                                                                                                                                                         |
-| FX management: `super_admin` only, with a toggle for finance      | 2026-08-01     | `rbac.finance_can_manage_fx`                                                                                                                                                                                                                                                                                                                                                |
-| **No new product scope until must-haves M-1…M-6 have a plan**     | **2026-08-02** | Bashar, explicit                                                                                                                                                                                                                                                                                                                                                            |
-| **No user-facing text is hardcoded**                              | **2026-08-04** | Every word a person reads comes from `@safra/i18n`; enforced by `safra/no-hardcoded-text` in `pnpm lint`. See `docs/i18n.md`                                                                                                                                                                                                                                                |
-| **Every UI is responsive on every device**                        | **2026-08-05** | No page scrolls sideways at 390 / 768 / 1024 / 1440 px. Enforced by `e2e/responsive.spec.ts` and a zero-specificity `min-width: 0` rule in both apps' `globals.css`                                                                                                                                                                                                         |
-| **The console sidebar collapses at every size**                   | **2026-08-05** | Hamburger always available, choice persisted, content reclaims the space, nav still reachable. `e2e/sidebar.spec.ts`                                                                                                                                                                                                                                                        |
-| **Every table carries a numbered pagination bar**                 | **2026-08-05** | `TablePagination`: prev/next, a page-number input, the page count, a rows-per-page select, the total found — under the table. Console registries use `OFFSET` with a count capped at 10,000; everything customer-facing keeps keyset. Exception: geography's bounded reference tables, held by `geo-bounds.integration.test.ts`. `e2e/pagination.spec.ts`                   |
-| The API answers with an error CODE, not a sentence                | **2026-08-04** | 154 codes in `@safra/contracts`. `message` is English for logs only and must never be displayed                                                                                                                                                                                                                                                                             |
-| Staff scope is ENFORCED server-side, two modes                    | **2026-08-04** | `none` \| `read_only` outside scope; writes refused in both. See gap report §4a                                                                                                                                                                                                                                                                                             |
-| **The audit log is never scoped**                                 | **2026-08-04** | Bashar: "a scoped audit log is not a trustworthy audit log"                                                                                                                                                                                                                                                                                                                 |
-| **Violation fines are RECORDED, never deducted — pending a rule** | **2026-08-07** | Bashar, explicit. `partner_violations` records the fine; `partner_payouts.fine_amount` stays zero and nothing subtracts it. The subtraction already exists in the accrual (`net = gross − fine`) and is deliberately left unwired until the business rule is defined. The partner dashboard says «غرامة ١٠$ مسجَّلة», NOT the handoff's «خُصمت من المستحقات» — see D-fine-1 |
-| **Auth throttling is keyed on IP + account, not IP alone**        | **2026-08-07** | Bashar, approved. One person behind carrier-grade NAT could lock out everyone sharing their egress address — a real problem for Syrian partners. Two limits now: ten a minute per (IP, account) and forty per IP on auth routes. The five-attempt account lockout is unchanged and is what bounds a distributed attack. See `account-tracker.ts`                            |
-| Every booking export writes an audit row                          | **2026-08-04** | who · when · filters · row count; immutable                                                                                                                                                                                                                                                                                                                                 |
+| Decision                                                          | Date           | Detail                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Work directly on `main`; never branch                             | 2026-07-29     | No feature branches, no PR flow, never force-push                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Commit messages are exactly one line, typed prefix                | 2026-07-29     | No body, no `Co-Authored-By`, no tool footers                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Committing and pushing need no approval                           | **2026-08-24** | Standing grant from Bashar, in his words: "approves your commits and pushes from now on. You don't need to ask me again." It SUPERSEDES the previous row here, which required approval before every commit and every push. Everything the approval was gating still applies: `pnpm verify` before committing, commits split by concern, explicit paths because the index is shared, and a browser pass for a client-side change. Only Bashar can amend it. See `.claude/CLAUDE.md` §5 |
+| Merchant of record: Safra Technologies GmbH (Germany)             | 2026-07-29     | ADR 0002                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Payment rails and payouts deferred to end of project              | 2026-08-01     | Items 84, 135                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Money settings carry a currency, plus `money.always_usd`          | 2026-08-01     | Toggle ON by default; ADR 0006                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ID documents: store, restrict access, defer retention policy      | 2026-08-01     | Retention is now item **S-4** below                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| FX management: `super_admin` only, with a toggle for finance      | 2026-08-01     | `rbac.finance_can_manage_fx`                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **No new product scope until must-haves M-1…M-6 have a plan**     | **2026-08-02** | Bashar, explicit                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **No user-facing text is hardcoded**                              | **2026-08-04** | Every word a person reads comes from `@safra/i18n`; enforced by `safra/no-hardcoded-text` in `pnpm lint`. See `docs/i18n.md`                                                                                                                                                                                                                                                                                                                                                          |
+| **Every UI is responsive on every device**                        | **2026-08-05** | No page scrolls sideways at 390 / 768 / 1024 / 1440 px. Enforced by `e2e/responsive.spec.ts` and a zero-specificity `min-width: 0` rule in both apps' `globals.css`                                                                                                                                                                                                                                                                                                                   |
+| **The console sidebar collapses at every size**                   | **2026-08-05** | Hamburger always available, choice persisted, content reclaims the space, nav still reachable. `e2e/sidebar.spec.ts`                                                                                                                                                                                                                                                                                                                                                                  |
+| **Every table carries a numbered pagination bar**                 | **2026-08-05** | `TablePagination`: prev/next, a page-number input, the page count, a rows-per-page select, the total found — under the table. Console registries use `OFFSET` with a count capped at 10,000; everything customer-facing keeps keyset. Exception: geography's bounded reference tables, held by `geo-bounds.integration.test.ts`. `e2e/pagination.spec.ts`                                                                                                                             |
+| The API answers with an error CODE, not a sentence                | **2026-08-04** | 154 codes in `@safra/contracts`. `message` is English for logs only and must never be displayed                                                                                                                                                                                                                                                                                                                                                                                       |
+| Staff scope is ENFORCED server-side, two modes                    | **2026-08-04** | `none` \| `read_only` outside scope; writes refused in both. See gap report §4a                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **The audit log is never scoped**                                 | **2026-08-04** | Bashar: "a scoped audit log is not a trustworthy audit log"                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| **Violation fines are RECORDED, never deducted — pending a rule** | **2026-08-07** | Bashar, explicit. `partner_violations` records the fine; `partner_payouts.fine_amount` stays zero and nothing subtracts it. The subtraction already exists in the accrual (`net = gross − fine`) and is deliberately left unwired until the business rule is defined. The partner dashboard says «غرامة ١٠$ مسجَّلة», NOT the handoff's «خُصمت من المستحقات» — see D-fine-1                                                                                                           |
+| **Auth throttling is keyed on IP + account, not IP alone**        | **2026-08-07** | Bashar, approved. One person behind carrier-grade NAT could lock out everyone sharing their egress address — a real problem for Syrian partners. Two limits now: ten a minute per (IP, account) and forty per IP on auth routes. The five-attempt account lockout is unchanged and is what bounds a distributed attack. See `account-tracker.ts`                                                                                                                                      |
+| Every booking export writes an audit row                          | **2026-08-04** | who · when · filters · row count; immutable                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ---
 
@@ -2508,14 +2518,39 @@ proxy produces, and forging the header to somebody else's address spent THEIR bu
 the targeted lockout the file's own header says it eliminated. Now `req.ip`, which Express computes
 under `trust proxy`. See `O-sec-1` and the results document, F-11.
 
-### O-sec-6 — `refresh_tokens` has no expiry sweep, and nothing caps sessions per account
+### O-sec-6 — Closed: `refresh_tokens` is swept and sessions are capped — but the cap has no test
 
-**Status:** open · **Severity:** Low now, Medium at scale · **Owner:** engineering ·
-**Recorded:** 2026-08-20, during `O-sec-3`'s security pass
+**Status:** **the work is DONE; one test is owed** · **Severity:** Low ·
+**Owner:** engineering · **Recorded:** 2026-08-20, during `O-sec-3`'s security pass ·
+**Corrected:** 2026-08-25
 
-Every successful sign-in inserts a row into `refresh_tokens` and **nothing ever deletes one**.
-There is no scheduled sweep of expired or revoked rows, and no cap on concurrent sessions per
-account. The table therefore grows monotonically with sign-ins, for ever, and rule 2 forbids
+**This entry described the world as it was on 2026-08-20 and was still doing so on 2026-08-25**,
+five days after both halves were built. Read as written it would send somebody to build a nightly
+sweep that already runs and a session cap that already holds. `O-sec-11` recorded BOTH halves correctly — its
+heading says it "closes `O-sec-6` too" and its body names `MAX_CONCURRENT_SESSIONS` — and none of it
+was ever carried down to here, or to §1a, or to `docs/launch-readiness.md`. The register's own rule
+is that a resolved item moves to §10 with a date; this one stayed put in three places while the
+entry that closed it sat two hundred lines above.
+
+What is actually true, verified against the code on 2026-08-25:
+
+| Half      | Where                                                                                                                                                                  | State                                                                                       |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| The sweep | `CredentialRetentionService.pruneRefreshTokens` — `revoked_at IS NOT NULL OR expires_at <= now()`, older than `REFRESH_TOKEN_RETENTION_DAYS` (90), batched             | **Built and TESTED** (`credential-retention.integration.test.ts`), running nightly at 03:30 |
+| The cap   | `TokenService.retireOldestSessions` — `MAX_CONCURRENT_SESSIONS` (10), newest kept, applied only on a NEW session so a rotation cannot retire one every fifteen minutes | **Built, and under NO test**                                                                |
+
+**So the remaining work is a test, not a feature**, and it is worth writing rather than waving
+through: the cap is a security control — the docblock's own reasoning is that "a session list that
+only grows is a blast radius" — and rule 4 asks for a test on every security-relevant path. Two
+assertions and their opposites: an eleventh sign-in retires the oldest and leaves ten live, and a
+ROTATION retires nothing. The second is the one that matters, because getting `isNewSession` wrong
+signs a working account out every fifteen minutes and no existing test would notice.
+
+**The original finding, kept because it is why the two halves exist:**
+
+Every successful sign-in inserted a row into `refresh_tokens` and **nothing ever deleted one**.
+There was no scheduled sweep of expired or revoked rows, and no cap on concurrent sessions per
+account. The table therefore grew monotonically with sign-ins, for ever, and rule 2 forbids
 exactly that shape.
 
 **Why it surfaced now.** `O-sec-3` changed what bounds the insert rate from ONE address. It used to
