@@ -298,6 +298,69 @@ describeIfDb('arrivals and violations', () => {
     });
   });
 
+  /**
+   * §6.5's lookup — the reason the day's list is not the whole screen.
+   *
+   * The case is a guest holding a printed voucher for a stay that is NOT today, which the list is
+   * built to exclude. So the first assertion here is deliberately the one the list would fail.
+   */
+  describe('looking a booking up by its reference', () => {
+    it('finds a booking the day’s list deliberately does not show', async () => {
+      const future = await makeBooking({
+        unit: unitId,
+        partner: partnerId,
+        status: 'confirmed',
+        fromDay: 3,
+      });
+
+      /* The control: the list really does exclude it, so the lookup is doing the work. */
+      await expect(arrivals.list(partnerId, { limit: 20 })).resolves.toMatchObject({
+        items: [],
+      });
+
+      await expect(arrivals.find(partnerId, future)).resolves.toMatchObject({
+        reference: future,
+        status: 'confirmed',
+      });
+    });
+
+    it("cannot find another business's booking, and its owner still can", async () => {
+      const theirs = await makeBooking({
+        unit: neighbourUnitId,
+        partner: neighbourId,
+        status: 'confirmed',
+        fromDay: 0,
+      });
+
+      await expect(arrivals.find(partnerId, theirs)).rejects.toMatchObject({
+        status: 404,
+      });
+
+      /*
+        The opposite control, without which the refusal above is indistinguishable from a lookup
+        that finds nothing for anybody.
+      */
+      await expect(arrivals.find(neighbourId, theirs)).resolves.toMatchObject({
+        reference: theirs,
+      });
+    });
+
+    it('answers a malformed reference exactly as a missing one', async () => {
+      const missing = await arrivals
+        .find(partnerId, 'BKG-2026-999999')
+        .catch((error: unknown) => error);
+      const malformed = await arrivals
+        .find(partnerId, 'not-a-reference')
+        .catch((error: unknown) => error);
+
+      expect(malformed).toMatchObject({ status: 404 });
+      /* Same CODE, not merely the same status — the code is what a client can read. */
+      expect((malformed as { code?: string }).code).toBe(
+        (missing as { code?: string }).code,
+      );
+    });
+  });
+
   describe('checking a guest in', () => {
     it('moves a confirmed booking to checked in, and back', async () => {
       const reference = await makeBooking({

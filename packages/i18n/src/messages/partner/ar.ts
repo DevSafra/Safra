@@ -1354,8 +1354,12 @@ export const ar = {
    */
   arrivals: {
     title: 'الوصول اليوم',
-    intro:
-      'الحجوزات المؤكّدة التي وصل موعدها. ابحث بالاسم أو برقم الحجز، ثم سجّل الوصول.',
+    /*
+      The old wording promised «ابحث بالاسم أو برقم الحجز» while the screen had no search at all —
+      a true-sounding sentence describing a capability nobody had built. It now says what the page
+      does: the day's list, plus a lookup by REFERENCE, which is the one §6.5 names.
+    */
+    intro: 'الحجوزات المؤكّدة التي وصل موعدها. أو ابحث برقم الحجز عن أي حجز في منشأتك.',
     empty: 'لا وصول متوقّع الآن.',
     loadFailed: 'تعذّر تحميل قائمة الوصول.',
     loadMore: 'عرض المزيد',
@@ -1378,6 +1382,22 @@ export const ar = {
       meaning underneath their finger.
     */
     undoConfirm: 'التراجع عن تسجيل وصول {name}؟',
+    /*
+      §6.5's lookup — the guest with a paper voucher and a flat phone.
+
+      `notFound` is one sentence for every kind of miss: a reference that never existed, one that
+      belongs to another business, and one typed wrong all answer the same, because the API answers
+      them the same and a screen that split them would teach a caller which was which.
+    */
+    lookup: {
+      label: 'رقم الحجز',
+      submit: 'بحث',
+      result: 'نتيجة البحث',
+      clear: 'عودة إلى قائمة اليوم',
+      notFound: 'لا حجز بهذا الرقم في منشأتك.',
+      failed: 'تعذّر البحث. حاول مرة أخرى.',
+    },
+
     /* The API refuses a second press with 404 rather than writing twice; this is what that reads as. */
     gone: 'تغيّرت حالة هذا الحجز. حدّث الصفحة.',
     failed: 'تعذّر تنفيذ الطلب. حاول مرة أخرى.',

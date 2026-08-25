@@ -57,6 +57,53 @@ export async function partnerFetch<T>(
     than a line smuggled in beside others.
   */
   if (response.status === 401 || response.status === 403) return 'unauthenticated';
+
+  /*
+    404 is folded into `failed` HERE and separated by `partnerLookup` below.
+
+    Every existing caller asks for something it already has a handle on — a property it listed, a
+    contract it linked to — so "not there" and "the request broke" call for the same rendering and
+    a fourth variant would have made 18 call sites handle a case none of them can reach. A LOOKUP
+    is the opposite: a miss is the ordinary answer and must not read as an outage.
+  */
+  if (response.status === 404) return 'failed';
+  if (!response.ok) return 'failed';
+
+  const parsed = schema.safeParse(await response.json().catch(() => null));
+
+  return parsed.success ? parsed.data : 'failed';
+}
+
+/**
+ * A fetch whose MISS is a result rather than a failure — for searching by a value somebody typed.
+ *
+ * The distinction is the whole point: «لا حجز بهذا الرقم» and «تعذّر تنفيذ الطلب» are different
+ * facts, and a desk clerk told the second when the first is true will retype the number instead of
+ * asking the guest for a better one.
+ */
+export async function partnerLookup<T>(
+  path: string,
+  schema: z.ZodType<T>,
+): Promise<ApiResult<T> | 'not-found'> {
+  const session = await getPartnerSession();
+  if (!session) return 'unauthenticated';
+
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_URL}/api/v1${path}`, {
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+      cache: 'no-store',
+    });
+  } catch {
+    return 'failed';
+  }
+
+  if (response.status === 401 || response.status === 403) return 'unauthenticated';
+  if (response.status === 404) return 'not-found';
   if (!response.ok) return 'failed';
 
   const parsed = schema.safeParse(await response.json().catch(() => null));
@@ -892,6 +939,20 @@ export async function getMyArrivals(cursor?: string) {
   return partnerFetch(
     `/partner/arrivals?${query.toString()}`,
     z.object({ items: z.array(arrivalSchema), nextCursor: z.string().nullable() }),
+  );
+}
+
+/**
+ * ONE booking by its reference — §6.5's «يستطيع الشريك البحث برقم الحجز».
+ *
+ * The reference is encoded rather than interpolated raw: it lands in a URL PATH, and a typed value
+ * that reaches a path unencoded is how a `..` or a `?` turns a lookup into a different request.
+ * The API bounds the shape again on its side and answers a miss and a malformed value identically.
+ */
+export async function findArrival(reference: string) {
+  return partnerLookup(
+    `/partner/arrivals/${encodeURIComponent(reference)}`,
+    arrivalSchema,
   );
 }
 

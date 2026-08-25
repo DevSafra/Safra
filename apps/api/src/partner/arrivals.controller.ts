@@ -35,6 +35,33 @@ export class ArrivalsController {
   }
 
   /**
+   * One booking by reference — §6.5's paper-voucher case (SRS §6.5).
+   *
+   * ## Throttled harder than the list, because it is the enumerable one
+   *
+   * A reference is a year plus a sequence, so it is GUESSABLE, and this route answers "yes, that
+   * is one of yours" for anything a caller sends. The partner scope bounds the damage to the
+   * caller's own bookings — but a receptionist holding `booking.check_in` can see today's arrivals
+   * and nothing else, and unthrottled this would let them walk the whole year's guest list. Twenty
+   * a minute is more than any desk types and far less than a scrape needs.
+   *
+   * Declared AFTER the collection route and with no conflicting sibling: `:reference` is the only
+   * `GET` path segment this controller claims.
+   */
+  @Get(':reference')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @RequirePermissions(P.BOOKING_CHECK_IN)
+  @AuditExempt('Reading one of your own bookings; changes nothing.')
+  async one(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    const partnerId = requirePartnerId(user, P.BOOKING_CHECK_IN);
+
+    return this.arrivals.find(partnerId, reference);
+  }
+
+  /**
    * Throttled at sixty a minute — generous for a desk, useless as a way to churn booking rows.
    *
    * Higher than the employee-management writes because this is the ordinary work of the screen: a

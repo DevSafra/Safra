@@ -1,6 +1,11 @@
 import Link from 'next/link';
 
-import { getMyArrivals, sidebarBadges, type PartnerArrival } from '@/lib/api';
+import {
+  findArrival,
+  getMyArrivals,
+  sidebarBadges,
+  type PartnerArrival,
+} from '@/lib/api';
 import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { SectionRefusal } from '@/components/section-refusal';
@@ -24,9 +29,17 @@ import { fill, t } from '@/lib/strings';
  * withheld the dashboard's takings. The endpoint does not send it, so it cannot leak through a
  * forgotten field.
  *
- * **No search box yet.** The list is today's arrivals and the ones overdue, which at any real
- * property is a screenful; a filter over a screenful is furniture. It becomes necessary when a
- * partner is large enough to page, and the pager is already here for that day.
+ * ## The lookup, added for §6.5
+ *
+ * There was no search here, on the reasoning that today's list is a screenful and a filter over a
+ * screenful is furniture. That reasoning covers FILTERING and misses what §6.5 actually asks for:
+ * «إذا لم يكن لدى العميل إنترنت، يستطيع الشريك البحث برقم الحجز» — a guest at the counter with a
+ * printed voucher, for a stay the day's list does not contain. The intro had been promising that
+ * search for months while nothing implemented it.
+ *
+ * It searches by REFERENCE only. A name search over a partner's whole history is a different
+ * screen with different privacy questions; the voucher carries the reference, so the reference is
+ * what the case needs.
  *
  * ## «اليوم» carries yesterday too, on purpose
  *
@@ -45,6 +58,16 @@ export default async function ArrivalsPage({
   const params = await searchParams;
   const raw = params['cursor'];
   const cursor = Array.isArray(raw) ? raw[0] : raw;
+
+  /*
+    Trimmed but not otherwise reshaped — no upper-casing, no stripping.
+
+    A console screen that upper-cased a reference could not find any of the fixtures, because the
+    format is not all-caps. Whatever the desk typed goes to the API, which bounds the SHAPE itself
+    and answers anything else as a miss.
+  */
+  const typed = params['reference'];
+  const reference = (Array.isArray(typed) ? (typed[0] ?? '') : (typed ?? '')).trim();
 
   /* Guarded before the fetch, so the refusal is never a 403 reported as a dead session. */
   const [access, profile] = await Promise.all([
@@ -68,6 +91,34 @@ export default async function ArrivalsPage({
 
   if (access !== 'open') return shell(<SectionRefusal access={access} />);
 
+  /* A search REPLACES the day's list rather than sitting above it — one answer on the screen. */
+  if (reference !== '') {
+    const found = await findArrival(reference);
+
+    if (found === 'unauthenticated') {
+      return shell(<p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>);
+    }
+
+    return shell(
+      <>
+        <Lookup reference={reference} />
+
+        {found === 'failed' ? (
+          <p className="text-sm text-bad">{t.arrivals.lookup.failed}</p>
+        ) : found === 'not-found' ? (
+          <p className="text-sm text-faint">{t.arrivals.lookup.notFound}</p>
+        ) : (
+          <>
+            <h2 className="text-sm font-semibold text-text">
+              {t.arrivals.lookup.result}
+            </h2>
+            <Row arrival={found} />
+          </>
+        )}
+      </>,
+    );
+  }
+
   const page = await getMyArrivals(cursor);
 
   if (page === 'unauthenticated') {
@@ -81,6 +132,8 @@ export default async function ArrivalsPage({
   return shell(
     <>
       <p className="text-[12.5px] leading-relaxed text-muted">{t.arrivals.intro}</p>
+
+      <Lookup reference="" />
 
       {page.items.length === 0 ? (
         <p className="text-sm text-faint">{t.arrivals.empty}</p>
@@ -103,6 +156,50 @@ export default async function ArrivalsPage({
         </Link>
       ) : null}
     </>,
+  );
+}
+
+/**
+ * §6.5's lookup — a plain GET form, so the result is a shareable, reload-safe URL.
+ *
+ * No `dir` on the input: the page is RTL and a reference is a Latin RUN inside it, which the bidi
+ * algorithm lays out correctly on its own. `dir="ltr"` would move the field's START edge and put
+ * the caret at the far side of its own label — the standing rule on fields somebody types into.
+ */
+function Lookup({ reference }: { reference: string }) {
+  return (
+    <form
+      action="/arrivals"
+      method="get"
+      className="flex flex-wrap items-end gap-2 rounded-xl border border-line bg-card p-3"
+    >
+      <label className="grid min-w-0 flex-1 gap-1 text-[12px] text-muted">
+        {t.arrivals.lookup.label}
+        <input
+          type="search"
+          name="reference"
+          defaultValue={reference}
+          maxLength={32}
+          className="min-h-10 w-full rounded-lg border border-line bg-bg px-3 text-sm text-text lg:min-h-0 lg:py-2"
+        />
+      </label>
+
+      <button
+        type="submit"
+        className="min-h-10 cursor-pointer rounded-lg border border-line px-4 text-sm text-text lg:min-h-0 lg:py-2"
+      >
+        {t.arrivals.lookup.submit}
+      </button>
+
+      {reference === '' ? null : (
+        <Link
+          href="/arrivals"
+          className="inline-flex min-h-10 items-center px-2 text-[12.5px] text-muted lg:min-h-0"
+        >
+          {t.arrivals.lookup.clear}
+        </Link>
+      )}
+    </form>
   );
 }
 

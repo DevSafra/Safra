@@ -254,6 +254,28 @@ export class ArrivalsService {
   }
 
   /**
+   * ONE booking by its reference — §6.5's «يستطيع الشريك البحث برقم الحجز».
+   *
+   * ## Why the arrivals list is not enough
+   *
+   * That list is TIME-BOUNDED — today and the overdue — and §6.5 describes precisely the guest it
+   * cannot show: one whose phone is flat, holding a paper voucher, for a stay that is not today.
+   * A desk with no way to look that up sends the guest away, which is the failure the voucher and
+   * this lookup exist together to prevent.
+   *
+   * ## Scoped by the same WHERE clause as everything else here
+   *
+   * `one()` carries `partner_id` from the TOKEN into the predicate, so another business's booking
+   * answers exactly as one that does not exist, and a malformed reference answers the same again.
+   * The lookup therefore reveals whether a reference is one of YOUR OWN bookings and nothing more.
+   */
+  async find(partnerId: string, reference: string): Promise<Arrival> {
+    this.assertReference(reference);
+
+    return this.one(partnerId, reference);
+  }
+
+  /**
    * A malformed reference is a 404, not a 400.
    *
    * "That is not a reference" and "that is not your booking" answer the same, so a caller cannot
