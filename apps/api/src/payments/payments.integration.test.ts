@@ -164,14 +164,13 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       notifications,
       { PARTNER_URL: 'http://localhost:3002' } as unknown as Env,
       /*
-        The same mailer these tests already capture, and a REAL voucher service.
+        A REAL voucher service, and no mailer — the confirmation goes through `notifications` now.
 
         A stubbed voucher would let §6.3 step 6's confirmation pass here while the PDF render was
-        broken — and this suite drives a real capture-then-confirm, so it is one of the few places
+        broken, and this suite drives a real capture-then-confirm, so it is one of the few places
         that would notice. The render is swallowed on failure by design, so a browserless
         environment degrades to «no attachment» rather than a failing capture.
       */
-      mail,
       new VoucherService(db),
     );
 

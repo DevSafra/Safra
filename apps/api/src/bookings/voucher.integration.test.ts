@@ -81,6 +81,35 @@ describeIfDb('the booking voucher', () => {
     expect(pdf.byteLength, 'a real page, not an empty one').toBeGreaterThan(2_000);
   });
 
+  /**
+   * §5.6 / §10.1 — no partner contact details before the booking is confirmed.
+   *
+   * The voucher prints «هاتف الشريك». A customer who has PAID and is waiting for the partner could
+   * reach it by typing the URL: the account screen links it only for three statuses, and a link is
+   * a courtesy while the endpoint is the control. Handing over the phone number there would let the
+   * pair settle directly and cut SAFRA out of the relationship the SRS puts it in the middle of.
+   *
+   * Asserted BOTH ways in one test, because «refuses» alone is satisfied by a service that refuses
+   * everybody: the same booking is moved back to `pending_confirmation`, refused, then restored,
+   * and served.
+   */
+  it('refuses a booking that has not been confirmed, and serves it once it is', async () => {
+    await db.execute(sql`
+      UPDATE bookings SET status = 'pending_confirmation', confirmed_at = NULL
+      WHERE reference = ${reference}
+    `);
+
+    await expect(vouchers.qr(reference)).rejects.toMatchObject({ status: 404 });
+
+    /* The control. Same reference, same service — only confirmation changed. */
+    await db.execute(sql`
+      UPDATE bookings SET status = 'confirmed', confirmed_at = now()
+      WHERE reference = ${reference}
+    `);
+
+    await expect(vouchers.qr(reference)).resolves.toContain('data:image/png;base64,');
+  });
+
   it('refuses a reference that does not exist', async () => {
     await expect(vouchers.qr('BKG-NOT-A-BOOKING')).rejects.toThrow();
   });

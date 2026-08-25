@@ -84,6 +84,25 @@ export class VoucherService {
       query never to fetch any — a template cannot print what it was not given, and a future edit
       that wants a total has to come back here and read the rule.
     */
+    /*
+      ## `confirmed_at IS NOT NULL` — §5.6 and §10.1, not a tidiness check
+
+      This document prints «هاتف الشريك», and both sections forbid exactly that before the booking
+      is confirmed: «لا تظهر أي وسيلة تواصل مباشرة مع الشريك قبل تأكيد الحجز», «لا يجوز تبادل أرقام
+      هواتف أو بيانات تواصل مباشرة قبل تأكيد الحجز». The relationship runs through SAFRA until the
+      partner has accepted, and a customer who has paid but is still waiting could reach this by
+      TYPING the URL — the customer screen only links it for three statuses, and a link is a
+      courtesy while the endpoint is the control.
+
+      Keyed on `confirmed_at` rather than on a list of statuses because that is what the rule
+      actually says: the question is whether confirmation has HAPPENED. It admits `checked_in`,
+      `completed` and `disputed` without naming them — a guest mid-dispute still has to check in
+      somewhere — and it excludes `draft`, `pending_payment` and `pending_confirmation` for ever,
+      including any status added later that has not been through confirmation.
+
+      A booking that fails this answers exactly as one that does not exist, so nobody can learn a
+      reference is real by watching which refusal they get.
+    */
     const rows = await this.db.execute<VoucherRow>(sql`
       SELECT b.reference, b.status::text AS status,
              b.check_in::text AS check_in, b.check_out::text AS check_out,
@@ -100,6 +119,7 @@ export class VoucherService {
       JOIN units u              ON u.id = b.unit_id
       JOIN cities ci            ON ci.id = b.city_id
       WHERE b.reference = ${reference} AND b.deleted_at IS NULL
+        AND b.confirmed_at IS NOT NULL
       LIMIT 1
     `);
 

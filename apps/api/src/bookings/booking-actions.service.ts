@@ -6,7 +6,6 @@ import type { Database } from '@safra/db';
 import { AuditService } from '../common/audit/audit.service.js';
 import { ENV, type Env } from '../config/env.js';
 import { bookingConfirmedMail, bookingNeedsActionMail } from '../mail/mail.templates.js';
-import { MailService } from '../mail/mail.service.js';
 import { VoucherService } from './voucher.service.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { NotificationService } from '../notifications/notification.service.js';
@@ -46,7 +45,13 @@ export class BookingActionsService {
     private readonly wallet: WalletService,
     private readonly notifications: NotificationService,
     @Inject(ENV) private readonly env: Env,
-    private readonly mail: MailService,
+    /*
+      `MailService` is GONE from here (2026-08-25).
+
+      The confirmation was the only thing that used it, and it now goes through `notify` like every
+      other message so it is recorded, linked to its booking, and re-drivable. A service that can
+      still reach the transport directly is a service where the next message quietly skips the log.
+    */
     private readonly vouchers: VoucherService,
   ) {}
 
@@ -543,7 +548,19 @@ export class BookingActionsService {
    */
   private async sendConfirmation(reference: string): Promise<void> {
     try {
+      /*
+        Through `notify`, not `mail.send` — corrected by the final booking audit (2026-08-25).
+
+        It sent directly, which meant §6.3 step 6's confirmation — the one carrying the voucher and
+        the QR — wrote NO `notifications` row. Three consequences, none of them visible from the
+        code that sent it: §10.3 requires every mail to be linked to its booking on the timeline and
+        this one was not; سجل واتساب والبريد showed the most important message the platform sends as
+        having never been sent; and a failure could not be re-driven, because the re-drive sweep
+        reads exactly the rows this path did not write.
+      */
       const rows = await this.db.execute<{
+        id: string;
+        customer_profile_id: string;
         email: string;
         property: string;
         check_in: string;
@@ -552,7 +569,8 @@ export class BookingActionsService {
       }>(sql`
         SELECT cp.email, coalesce(pr.name_ar, pr.name_en) AS property,
                b.check_in::text AS check_in, b.check_out::text AS check_out,
-               u.preferred_locale AS locale
+               u.preferred_locale AS locale,
+               b.id, b.customer_profile_id
         FROM bookings b
         JOIN customer_profiles cp ON cp.id = b.customer_profile_id
         JOIN properties pr        ON pr.id = b.property_id
@@ -566,7 +584,8 @@ export class BookingActionsService {
 
       const { pdf } = await this.vouchers.pdf(reference);
 
-      await this.mail.send(
+      await this.notifications.notify(
+        'booking.confirmed',
         bookingConfirmedMail({
           to: row.email,
           reference,
@@ -576,6 +595,8 @@ export class BookingActionsService {
           locale: row.locale ?? 'ar',
           voucher: pdf,
         }),
+        row.locale ?? 'ar',
+        { bookingId: row.id, customerProfileId: row.customer_profile_id },
       );
     } catch (error) {
       /* The reference, never the address — a log line is where PII leaks without a decision. */

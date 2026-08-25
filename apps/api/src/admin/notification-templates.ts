@@ -48,7 +48,14 @@ export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
     key: 'booking.invoice',
     channels: ['email'],
     locales: ALL_LOCALES,
-    implemented: true,
+    /*
+      NOT implemented, corrected 2026-08-25 by the final booking audit.
+
+      §10.3 lists «الفاتورة» among the mails that must exist and nothing sends one — there is no
+      template and no send path. The flag said otherwise, so سجل القوالب told staff a mail was
+      working that has never been written. `notification-catalogue.test.ts` now holds this honest.
+    */
+    implemented: false,
   },
   {
     key: 'booking.cancelled_refund',
@@ -60,13 +67,27 @@ export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
     key: 'wallet.compensation',
     channels: ['whatsapp', 'email'],
     locales: ALL_LOCALES,
-    implemented: true,
+    /*
+      Not a message of its own, and marking it implemented claimed one existed.
+
+      §6.4's compensation is announced INSIDE `booking.cancelled_refund` — one event, one mail, as
+      that template's own note explains. Nothing sends a separate «تعويض المحفظة» notice. The
+      honest options were to build one or to stop claiming it; a second mail a minute after the
+      first would read as a second problem.
+    */
+    implemented: false,
   },
   {
     key: 'partner.deadline_reminder',
     channels: ['whatsapp', 'email'],
     locales: ALL_LOCALES,
-    implemented: true,
+    /*
+      §6.3 step 5's «تتواصل سفرة مع الشريك لتسريع التأكيد» IS implemented — but under a different
+      key. `markPaid` sends `booking.needs_action` the moment the money lands, which is the notice
+      this entry describes. What does not exist is a REMINDER: a second nudge partway through the
+      two-hour window. So the entry stays and the flag becomes honest.
+    */
+    implemented: false,
   },
   {
     key: 'ad.single_offer',
