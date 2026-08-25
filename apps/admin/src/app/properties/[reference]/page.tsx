@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { MAX_PROPERTY_IMAGES } from '@safra/contracts';
 import { mediaBase, mediaUrl } from '@safra/session';
 
 import { PhotoGallery } from '@/components/photo-gallery';
@@ -27,10 +28,12 @@ export const dynamic = 'force-dynamic';
 /**
  * How many thumbnails the review screen renders.
  *
- * Enough to judge a listing — the cover and a spread of rooms — and small enough that a property
- * with hundreds of images does not turn a staff page into hundreds of requests.
+ * The platform's own cap, so a listing within the rules is never truncated on the screen that
+ * judges it. The bound still matters: rows predating the cap exist — one seeded listing carries
+ * 659 images — and rendering those put 659 requests and 659 DOM nodes on a staff page, which rule
+ * 2's "nothing that degrades" forbids as much for a review screen as for a query.
  */
-const PHOTO_LIMIT = 24;
+const PHOTO_LIMIT = MAX_PROPERTY_IMAGES;
 
 export default async function PropertyPage({
   params,

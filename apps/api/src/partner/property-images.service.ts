@@ -6,6 +6,7 @@ import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
 import {
   ERROR,
+  MAX_PROPERTY_IMAGES,
   PERMISSIONS as P,
   type PropertyImageAltInput,
   type PropertyImageOrderInput,
@@ -24,8 +25,7 @@ import { requirePartnerId } from '../rbac/ownership.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import { describeError } from '../common/errors/safe-error.js';
 
-/** §5.5 rewards photo count in the ranking, so a cap keeps that from being gamed. */
-const MAX_IMAGES_PER_PROPERTY = 30;
+/* The cap lives in `@safra/contracts` — the partner's screen and the console read the same one. */
 
 /**
  * A property's photographs — the gallery §5.6 renders and §7.2 manages.
@@ -115,8 +115,8 @@ export class PropertyImageService {
 
     const existing = await this.countLive(property.id);
 
-    if (existing >= MAX_IMAGES_PER_PROPERTY) {
-      throw badRequest(ERROR.PROPERTY_IMAGE_LIMIT, { max: MAX_IMAGES_PER_PROPERTY });
+    if (existing >= MAX_PROPERTY_IMAGES) {
+      throw badRequest(ERROR.PROPERTY_IMAGE_LIMIT, { max: MAX_PROPERTY_IMAGES });
     }
 
     /*

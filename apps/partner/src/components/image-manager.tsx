@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { isErrorCode } from '@safra/contracts';
+import { MAX_PROPERTY_IMAGES, isErrorCode } from '@safra/contracts';
 import { errorMessage } from '@safra/i18n';
 
 import type { PropertyImage } from '@/lib/api';
@@ -11,8 +11,14 @@ import { count } from '@/lib/format';
 import { refusalFor } from '@/lib/refusal';
 import { fill, t } from '@/lib/strings';
 
-/** Matches `MAX_IMAGES_PER_PROPERTY` on the API — §5.5 rewards photo count, so it is capped. */
-const MAX = 30;
+/*
+  THE cap, imported rather than restated.
+
+  This was a local `const MAX = 30` with a comment promising it matched the API. Two copies of a
+  number that must agree drift, and the failure is a partner told they have room for one more and
+  then refused by the server.
+*/
+const MAX = MAX_PROPERTY_IMAGES;
 
 /**
  * صور العقار — upload, order, cover, describe, archive.

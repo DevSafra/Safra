@@ -254,6 +254,26 @@ export const propertyTypeActiveSchema = z
 
 export type PropertyTypeActiveInput = z.infer<typeof propertyTypeActiveSchema>;
 
+/**
+ * How many photographs one listing may carry.
+ *
+ * ## Why there is a cap at all
+ *
+ * §5.5 rewards photo count in the recommendation ranking, so an uncapped gallery is a lever a
+ * partner can pull instead of improving the listing. It also bounds what the review screen and the
+ * customer gallery have to render.
+ *
+ * ## Why it lives here
+ *
+ * It was 30, written twice — once in `property-images.service.ts` and once in the partner app's
+ * `image-manager.tsx`, kept in step by a comment saying "matches the API". Two copies of a number
+ * that MUST agree is the drift this package exists to prevent: the API refusing at a figure the
+ * screen has not heard of is a partner told they may upload one more and then refused.
+ *
+ * Raised to 40 on Bashar's instruction (2026-08-26).
+ */
+export const MAX_PROPERTY_IMAGES = 40;
+
 export const PARTNER_DOCUMENT_KINDS = [
   /** Passport or national ID of the signing person. */
   'identity',
