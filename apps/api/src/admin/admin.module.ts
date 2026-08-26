@@ -4,6 +4,7 @@ import { PropertyTypesController } from './property-types.controller.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { PaymentsModule } from '../payments/payments.module.js';
 import { WalletModule } from '../wallet/wallet.module.js';
+import { GiftCardModule } from '../gift-cards/gift-card.module.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { PartnerTwoFactorService } from '../auth/partner-two-factor.service.js';
 import { AdminGrantsController, AdminGrantsService } from './grants.controller.js';
@@ -54,7 +55,15 @@ import { StaffScopeService } from './staff-scope.service.js';
     already here through `AuthModule`'s exports — the comment at the providers list below says so,
     and importing a second copy would give this module a second nodemailer transport.
   */
-  imports: [AuthModule, LedgerModule, FxModule, PaymentsModule, WalletModule],
+  /* `GiftCardModule` for the issue route on `RegistriesController` — §9.3's «+ إنشاء بطاقة هدية». */
+  imports: [
+    AuthModule,
+    LedgerModule,
+    FxModule,
+    PaymentsModule,
+    WalletModule,
+    GiftCardModule,
+  ],
   controllers: [
     PropertyTypesController,
     AdminController,

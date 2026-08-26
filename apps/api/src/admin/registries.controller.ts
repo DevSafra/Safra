@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
@@ -17,8 +19,10 @@ import { z } from 'zod';
 import {
   BOOKING_ATTENTION,
   PERMISSIONS as P,
+  giftCardIssueSchema,
   pageQuerySchema,
   setStaffScopeSchema,
+  type GiftCardIssueInput,
   type PageQuery,
   type SetStaffScopeInput,
 } from '@safra/contracts';
@@ -38,6 +42,7 @@ import { ReportsService } from './reports.service.js';
 import { StaffOverviewService } from './staff-overview.service.js';
 import { ExportRequestService } from './export-request.service.js';
 import { StaffScopeService } from './staff-scope.service.js';
+import { GiftCardService } from '../gift-cards/gift-card.service.js';
 import {
   EmergencyService,
   activateEmergencySchema,
@@ -130,6 +135,7 @@ export class RegistriesController {
     private readonly emergency: EmergencyService,
     private readonly exportRequests: ExportRequestService,
     private readonly staffScope: StaffScopeService,
+    private readonly giftCardIssuer: GiftCardService,
   ) {}
 
   // ── الحجوزات ───────────────────────────────────────────────────────────────
@@ -353,6 +359,35 @@ export class RegistriesController {
     @Query(new ZodValidationPipe(listQuerySchema)) query: z.infer<typeof listQuerySchema>,
   ) {
     return this.promotions.giftCards(query);
+  }
+
+  /**
+   * Issues a card SAFRA is giving away — §9.3's «+ إنشاء بطاقة هدية».
+   *
+   * `GIFT_CARD_MANAGE`, which finance and super admin hold and which had no route behind it at all:
+   * the permission, the `issued_by_user_id` column and the disabled button on بطاقات الهدايا were
+   * three halves of a feature nobody had finished.
+   *
+   * Throttled like the wallet adjustment, and for the same reason — this creates a liability out
+   * of nothing, so a loop that gets loose is expensive rather than merely noisy.
+   *
+   * `AuditExempt` because `GiftCardService` writes `gift_card.issued` INSIDE the transaction, with
+   * the amount, the currency and the reason. The interceptor resolves its subject from a route
+   * param and this route has none — the card does not exist until the body is handled.
+   */
+  @Post('gift-cards')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermissions(P.GIFT_CARD_MANAGE)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @AuditExempt(
+    'GiftCardService records gift_card.issued inside the transaction, with the amount, ' +
+      'the currency and the reason — none of which the interceptor can see.',
+  )
+  async issueGiftCard(
+    @Body(new ZodValidationPipe(giftCardIssueSchema)) body: GiftCardIssueInput,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+  ) {
+    return this.giftCardIssuer.issue(user, body);
   }
 
   @Get('coupons')

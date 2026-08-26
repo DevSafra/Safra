@@ -1,4 +1,4 @@
-import { getGiftCards, type GiftCardItem } from '@/lib/api';
+import { getGeography, getGiftCards, type GiftCardItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { money, shortDate } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
@@ -15,6 +15,8 @@ import { t, label } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { listParamsFor } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
+import { IssueGiftCardForm } from '@/components/issue-gift-card-form';
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /**
  * بطاقات الهدايا (design handoff §8).
@@ -57,10 +59,21 @@ export default async function GiftCardsPage({
 
   const { q, page, size } = await listParamsFor('giftcards', searchParams);
 
-  const [result, counts] = await Promise.all([
+  const [result, counts, geo] = await Promise.all([
     getGiftCards({ q, page, limit: size }),
     sidebarCounts(),
+    /*
+      For the issue form's currency list. A failed read must not take the registry down — a screen
+      that refuses to show gift cards because it could not list currencies is worse than one whose
+      form offers the accounting currency only.
+    */
+    getGeography(),
   ]);
+
+  const currencies =
+    geo === 'unauthenticated' || geo === 'failed'
+      ? [DEFAULT_MONEY_CURRENCY]
+      : geo.currencies.map((entry) => entry.code);
 
   return (
     <ConsoleShell title={t.nav.giftCards} counts={counts}>
@@ -70,19 +83,22 @@ export default async function GiftCardsPage({
           query={q}
           size={size}
           placeholder={t.sections.giftcards.searchPlaceholder}
-          end={
-            <>
-              <ToolbarNote>{t.sections.giftcards.hint}</ToolbarNote>
-              <span
-                aria-disabled="true"
-                title={t.nav.notBuilt}
-                className="cursor-not-allowed rounded-[9px] border border-line px-4 py-1.5 text-[12.5px] font-extrabold text-faint2"
-              >
-                {t.sections.giftcards.create}
-              </span>
-            </>
-          }
+          end={<ToolbarNote>{t.sections.giftcards.hint}</ToolbarNote>}
         />
+
+        {/*
+          The form, above the table.
+
+          The button was `aria-disabled` with its reasoning written beside it — an amount, a
+          currency, an expiry, a recipient, an audit entry and a delivery email, and the wrong
+          currency creates a debt in the wrong denomination. That was honest, and it was still a
+          capability with nothing behind it: `GIFT_CARD_MANAGE`, `issued_by_user_id` and this button
+          were three halves of one feature.
+
+          The currencies come from geography rather than a literal list, so a currency the platform
+          deactivates stops being offerable here without anybody remembering this screen.
+        */}
+        <IssueGiftCardForm currencies={currencies} />
 
         {result === 'unauthenticated' ? (
           <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>

@@ -156,6 +156,19 @@ export interface GiftCardSummary {
  * loses it before passing it on, the card has to be cancelled and reissued by staff; that is the cost
  * of the card being a bearer instrument, and it is the same trade every gift card makes.
  */
+/**
+ * What an ISSUE returns — a card and its code, and no wallet.
+ *
+ * Not `GiftCardPurchaseResult` with two fields ignored: nobody paid for this card, so there is no
+ * balance to report and inventing `walletBalance: '0.00'` would state something false about a
+ * customer who may not even have a wallet.
+ */
+export interface GiftCardIssueResult {
+  readonly card: GiftCardSummary;
+  /** Grouped for reading: `A1B2C-3D4E5-F6G7H-8J9KM`. Shown ONCE and never recoverable. */
+  readonly code: string;
+}
+
 export interface GiftCardPurchaseResult {
   readonly card: GiftCardSummary;
   /** Grouped for reading: `A1B2C-3D4E5-F6G7H-8J9KM`. Shown once. */
@@ -175,3 +188,62 @@ export interface GiftCardRedeemResult {
   readonly walletBalance: string;
   readonly walletCurrency: string;
 }
+
+/**
+ * The most a single staff-issued card may carry.
+ *
+ * A TYPO GUARD, not a price list: a finance officer meaning 100 and typing 1000 creates a real
+ * liability that a customer may spend before anybody reads the audit row. Customer purchases are
+ * limited to `GIFT_CARD_AMOUNTS`, whose largest is 200 — this sits well above that so goodwill is
+ * not cramped, and well below the figure where a slip stops being recoverable.
+ *
+ * It is a number worth revisiting with the business rather than a rule derived from one.
+ */
+export const MAX_ISSUED_GIFT_CARD_AMOUNT = 1000;
+
+/**
+ * A card issued by SAFRA rather than bought — §9.3's «+ إنشاء بطاقة هدية».
+ *
+ * ## A free amount, unlike a purchase
+ *
+ * A customer buys one of four denominations; staff are compensating for something specific, and
+ * rounding goodwill to the nearest 25 is not a kindness. The scale allowed here is the money
+ * boundary's three decimals, and whether THIS amount may carry three depends on its currency —
+ * which a field schema cannot see, so `GiftCardService` refuses an amount finer than its currency
+ * rather than quantising it silently. Same rule as a wallet adjustment.
+ *
+ * ## The expiry is optional because the column is
+ *
+ * `gift_cards.expires_at` is nullable and a card without one does not expire. That is a product
+ * decision the schema already carries, and inventing a default horizon here would quietly make it
+ * for the business. The console asks for a date; the contract does not force one.
+ */
+export const giftCardIssueSchema = z
+  .object({
+    amount: z
+      .string()
+      .regex(/^\d{1,7}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING)
+      .refine((v) => Number(v) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE)
+      .refine(
+        (v) => Number(v) <= MAX_ISSUED_GIFT_CARD_AMOUNT,
+        ERROR.GIFT_CARD_AMOUNT_INVALID,
+      ),
+    currency: z.string().regex(/^[A-Z]{3}$/, ERROR.VALIDATION_CURRENCY_CODE),
+    /** ISO date. Absent means the card does not expire — see the note above. */
+    expiresOn: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, ERROR.VALIDATION_DATE_FORMAT)
+      .optional(),
+    recipientName: z.string().trim().min(1).max(120).optional(),
+    recipientEmail: z
+      .string()
+      .trim()
+      .email(ERROR.VALIDATION_EMAIL_INVALID)
+      .max(254)
+      .optional(),
+    /** Why it was issued. Goes on the audit row, never into the customer's email. */
+    reason: z.string().trim().min(3).max(500),
+  })
+  .strict();
+
+export type GiftCardIssueInput = z.infer<typeof giftCardIssueSchema>;

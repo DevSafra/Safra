@@ -9,6 +9,8 @@ import {
   GIFT_CODE_GROUPS,
   GIFT_CODE_GROUP_SIZE,
   type GiftCardPurchaseInput,
+  type GiftCardIssueInput,
+  type GiftCardIssueResult,
   type GiftCardPurchaseResult,
   type GiftCardQuery,
   type GiftCardRedeemResult,
@@ -19,6 +21,8 @@ import {
 } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { quantise } from '../common/money.js';
+import { DEFAULT_LOCALE } from '@safra/i18n';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
@@ -440,6 +444,130 @@ export class GiftCardService {
       purchase that already succeeded.
     */
     await this.deliver(result, claims);
+
+    return result;
+  }
+
+  /**
+   * Issues a card SAFRA is giving away — §9.3's «+ إنشاء بطاقة هدية».
+   *
+   * ## Not a purchase with the payment removed
+   *
+   * `purchase()` debits a customer's wallet; nobody pays for this one. It is a liability SAFRA
+   * creates deliberately — goodwill, a service failure, a campaign — so the things that matter are
+   * different: WHO issued it (`issued_by_user_id`, a column that had no writer at all until now),
+   * WHY (on the audit row), and that the amount is what the person meant.
+   *
+   * `purchased_by_customer_id` stays null, which is exactly true: nobody bought it.
+   *
+   * ## The code is returned ONCE and can never be recovered
+   *
+   * Only `code_hash` is stored. The plaintext exists in this return value and, if an address was
+   * given, in one email. A staff member who loses it reissues rather than looks it up — the same
+   * rule the console screen already states, and the reason بطاقات الهدايا shows four characters.
+   *
+   * ## The reason never reaches the customer
+   *
+   * It goes on the audit row and nowhere else. `giftCardReceivedMail` carries no free text by
+   * design — see the note on that template — because a mail SAFRA sends to an address a caller
+   * chose, carrying words a caller wrote, is a phishing primitive that costs the price of a card.
+   */
+  async issue(
+    claims: AccessTokenClaims | undefined,
+    input: GiftCardIssueInput,
+  ): Promise<GiftCardIssueResult> {
+    if (!claims?.sub) throw badRequest(ERROR.INTERNAL_ACTOR_REQUIRED);
+
+    const currency = await this.db.execute<{ id: string; decimals: number }>(sql`
+      SELECT id, decimals FROM currencies WHERE code = ${input.currency} AND is_active
+    `);
+
+    const found = currency.rows.at(0);
+
+    if (!found) throw badRequest(ERROR.GEO_CURRENCY_UNKNOWN);
+
+    /*
+      Refused, not rounded, when the amount is finer than its currency.
+
+      The field schema allows three decimals because JOD needs three and cannot see WHICH currency
+      this is. An operator who typed 10.005 USD is told, rather than discovering afterwards that
+      SAFRA issued 10.01. Same rule, and the same reasoning, as a wallet adjustment.
+    */
+    if (Number(quantise(input.amount, Number(found.decimals))) !== Number(input.amount)) {
+      throw badRequest(ERROR.VALIDATION_DECIMAL_STRING);
+    }
+
+    const result = await this.db.transaction(async (tx) => {
+      const code = generateCode();
+
+      const created = await tx.execute<CardRow>(sql`
+        INSERT INTO gift_cards
+          (code_hash, code_last4, original_amount, remaining_amount, currency_id,
+           status, issued_by_user_id, expires_at, recipient_name, recipient_email)
+        VALUES (${hashCode(code)}, ${code.slice(-4)},
+                ${input.amount}::numeric, ${input.amount}::numeric, ${found.id}::uuid,
+                'active', ${claims.sub}::uuid,
+                ${input.expiresOn ?? null}::date,
+                ${input.recipientName ?? null}, ${input.recipientEmail ?? null})
+        RETURNING id, reference, code_last4,
+                  original_amount::text  AS original_amount,
+                  remaining_amount::text AS remaining_amount,
+                  currency_id,
+                  status::text     AS status,
+                  expires_at::text AS expires_at,
+                  recipient_name, recipient_email,
+                  created_at::text AS created_at,
+                  purchased_by_customer_id
+      `);
+
+      const row = created.rows.at(0);
+
+      if (!row) throw badRequest(ERROR.GIFT_CARD_AMOUNT_INVALID);
+
+      await this.audit.record(
+        {
+          actorUserId: claims.sub,
+          actorRole: claims.role,
+          action: 'gift_card.issued',
+          subjectType: 'gift_card',
+          subjectId: row.id,
+          /* The amount, the currency and the reason — never the code, never the hash. */
+          after: {
+            amount: input.amount,
+            currency: input.currency,
+            expiresAt: input.expiresOn ?? null,
+            recipientEmail: input.recipientEmail ?? null,
+          },
+          reason: input.reason,
+        },
+        tx as unknown as Database,
+      );
+
+      return {
+        card: this.summaryOf({ ...row, currency_code: input.currency }),
+        code: group(code),
+      };
+    });
+
+    /* Outside the transaction: a mail server refusing must not undo an issued card. */
+    if (input.recipientEmail) {
+      await this.mail.send(
+        giftCardReceivedMail({
+          to: input.recipientEmail,
+          /* The platform's own default: an issued card has no account to read a preference from. */
+          locale: DEFAULT_LOCALE,
+          code: result.code,
+          reference: result.card.reference,
+          amount: `${result.card.originalAmount} ${input.currency}`,
+          url: new URL(`/${DEFAULT_LOCALE}/account/gifts`, this.env.APP_URL).toString(),
+        }),
+      );
+    }
+
+    this.logger.log(
+      `Gift card ${result.card.reference} issued for ${input.amount} ${input.currency} ` +
+        `by ${claims.sub}.`,
+    );
 
     return result;
   }

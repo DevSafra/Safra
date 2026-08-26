@@ -96,6 +96,8 @@ export const AUDIT_ACTIONS = [
   'fx_rate.set',
   'wallet.adjusted',
   'gift_card.purchase',
+  /* Staff issuing a card SAFRA gives away — §9.3's «+ إنشاء بطاقة هدية». */
+  'gift_card.issued',
   'gift_card.redeem',
 
   // ── Partners ──────────────────────────────────────────────────────────────
