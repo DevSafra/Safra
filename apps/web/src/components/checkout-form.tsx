@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+
+import { useCoupon } from './coupon-context';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
@@ -92,6 +94,9 @@ export function CheckoutForm({
    */
   const [idempotencyKey] = useState(() => `co-${crypto.randomUUID()}`);
 
+  /* Shared with the summary, where the coupon is entered — see `CouponProvider`. */
+  const { applied } = useCoupon();
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitting) return;
@@ -120,6 +125,15 @@ export function CheckoutForm({
             email: text(form, 'email'),
             phone: text(form, 'phone'),
           },
+          /*
+            Only the CODE, never a discount.
+
+            What the coupon is worth is decided again on the server, against prices the server
+            computed, under the coupon's row lock — so a preview that has gone stale, or a browser
+            that edited the figure, buys nothing. `applied` is what the customer was SHOWN; this is
+            what they are asking for.
+          */
+          ...(applied ? { couponCode: applied.code } : {}),
           idempotencyKey,
         }),
       });

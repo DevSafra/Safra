@@ -4,6 +4,10 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { CheckoutForm } from '@/components/checkout-form';
+import { CouponProvider } from '@/components/coupon-context';
+import { CouponField } from '@/components/coupon-field';
+import { CheckoutTotal } from '@/components/checkout-total';
+import { couponMessages } from '@/lib/coupon-messages';
 import { DateRange } from '@/components/date-range';
 import { isLocale } from '@/i18n/routing';
 import { getMyWallet } from '@/lib/account';
@@ -149,101 +153,132 @@ export default async function CheckoutPage({
       <h1 className="font-display text-3xl font-bold text-gold">{t('title')}</h1>
       <p className="mt-2 text-sm text-muted">{t('subtitle')}</p>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_22rem]">
-        <CheckoutForm
-          locale={locale}
-          unitId={unitId}
-          checkIn={checkIn}
-          checkOut={checkOut}
-          adults={adults}
-          children={children}
-          infants={infants}
-          propertySlug={slug}
-          methods={methods}
-          wallet={
-            applicable
-              ? {
-                  balance: applicable,
-                  currencyCode: priced.currencyCode,
-                  total: priced.totalAmount,
-                }
-              : null
-          }
-          signedIn={session !== null}
-        />
+      {/*
+        Both columns inside one provider: the coupon is ENTERED in the summary, where the money
+        is, and SUBMITTED by the form. Without something between them the customer would see one
+        total and pay another.
+      */}
+      <CouponProvider>
+        <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_22rem]">
+          <CheckoutForm
+            locale={locale}
+            unitId={unitId}
+            checkIn={checkIn}
+            checkOut={checkOut}
+            adults={adults}
+            children={children}
+            infants={infants}
+            propertySlug={slug}
+            methods={methods}
+            wallet={
+              applicable
+                ? {
+                    balance: applicable,
+                    currencyCode: priced.currencyCode,
+                    total: priced.totalAmount,
+                  }
+                : null
+            }
+            signedIn={session !== null}
+          />
 
-        {/* ── Payment summary (§6.3 step 3) ──────────────────────────────── */}
-        <aside className="lg:sticky lg:top-24 lg:self-start">
-          <div className="rounded-card border border-line bg-card p-5">
-            <h2 className="font-display text-lg text-text">{t('summary')}</h2>
-            <p className="mt-1 text-sm text-faint">
-              {name} · {cityName}
-            </p>
-            <p className="text-sm text-faint">
-              <DateRange from={checkIn} to={checkOut} locale={locale} /> ·{' '}
-              {tp('totalFor', { nights: priced.nights })}
-            </p>
-            {/*
-              §6.3 step 3 names EIGHT things this panel must show, and «عدد الضيوف» was the one it
-              did not. The count was read off the query string and submitted, never rendered — so
-              the last screen before somebody pays did not confirm how many people they were paying
-              for. Found by the SRS audit, 2026-08-25.
+          {/* ── Payment summary (§6.3 step 3) ──────────────────────────────── */}
+          <aside className="lg:sticky lg:top-24 lg:self-start">
+            <div className="rounded-card border border-line bg-card p-5">
+              <h2 className="font-display text-lg text-text">{t('summary')}</h2>
+              <p className="mt-1 text-sm text-faint">
+                {name} · {cityName}
+              </p>
+              <p className="text-sm text-faint">
+                <DateRange from={checkIn} to={checkOut} locale={locale} /> ·{' '}
+                {tp('totalFor', { nights: priced.nights })}
+              </p>
+              {/*
+                §6.3 step 3 names EIGHT things this panel must show, and «عدد الضيوف» was the one it
+                did not. The count was read off the query string and submitted, never rendered — so
+                the last screen before somebody pays did not confirm how many people they were paying
+                for. Found by the SRS audit, 2026-08-25.
 
-              Each kind on its own, not a single total: «٤ ضيوف» cannot tell a family of four from
-              two adults and two children, and the partner is preparing a room from this.
-            */}
-            <p className="text-sm text-faint">
-              {t('guestsSummary')}: {ts('guestsCount', { count: adults })}
-              {children > 0 ? <> · {ts('childrenCount', { count: children })}</> : null}
-              {infants > 0 ? <> · {ts('infantsCount', { count: infants })}</> : null}
-            </p>
+                Each kind on its own, not a single total: «٤ ضيوف» cannot tell a family of four from
+                two adults and two children, and the partner is preparing a room from this.
+              */}
+              <p className="text-sm text-faint">
+                {t('guestsSummary')}: {ts('guestsCount', { count: adults })}
+                {children > 0 ? <> · {ts('childrenCount', { count: children })}</> : null}
+                {infants > 0 ? <> · {ts('infantsCount', { count: infants })}</> : null}
+              </p>
 
-            <div className="gold-rule my-4" />
+              <div className="gold-rule my-4" />
 
-            {/* Every night listed, so an override is visible rather than buried. */}
-            <ul className="space-y-1 text-sm">
-              {priced.nightly.map((night) => (
-                <li key={night.date} className="flex justify-between text-muted">
-                  <span>{night.date}</span>
-                  <span>{formatMoney(night.amount, priced.currencyCode, locale)}</span>
-                </li>
-              ))}
-            </ul>
+              {/* Every night listed, so an override is visible rather than buried. */}
+              <ul className="space-y-1 text-sm">
+                {priced.nightly.map((night) => (
+                  <li key={night.date} className="flex justify-between text-muted">
+                    <span>{night.date}</span>
+                    <span>{formatMoney(night.amount, priced.currencyCode, locale)}</span>
+                  </li>
+                ))}
+              </ul>
 
-            <div className="gold-rule my-4" />
+              <div className="gold-rule my-4" />
 
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted">{t('subtotal')}</dt>
-                <dd className="text-text">
-                  {formatMoney(priced.baseAmount, priced.currencyCode, locale)}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted">{tp('serviceFeeLabel')}</dt>
-                <dd className="text-text">
-                  {formatMoney(priced.customerFeeAmount, priced.currencyCode, locale)}
-                </dd>
-              </div>
-              <div className="flex justify-between border-t border-line pt-2 text-base">
-                <dt className="font-semibold text-text">{t('dueNow')}</dt>
-                <dd className="font-semibold text-gold">
-                  {formatMoney(priced.totalAmount, priced.currencyCode, locale)}
-                </dd>
-              </div>
-            </dl>
+              <dl className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <dt className="text-muted">{t('subtotal')}</dt>
+                  <dd className="text-text">
+                    {formatMoney(priced.baseAmount, priced.currencyCode, locale)}
+                  </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-muted">{tp('serviceFeeLabel')}</dt>
+                  <dd className="text-text">
+                    {formatMoney(priced.customerFeeAmount, priced.currencyCode, locale)}
+                  </dd>
+                </div>
+                {/* Falls when a coupon applies — see `CheckoutTotal`. */}
+                <CheckoutTotal
+                  total={priced.totalAmount}
+                  currencyCode={priced.currencyCode}
+                  locale={locale}
+                  label={t('dueNow')}
+                  discountLabel={t('couponApplied')}
+                />
+              </dl>
 
-            {/*
-              §6.1: booking is not instant, and saying so BEFORE payment is the point.
-              A customer who learns this after paying feels misled; one who knows in
-              advance understands why SAFRA sits in the middle.
-            */}
-            <p className="mt-4 rounded-lg border border-sky/30 bg-sky/10 p-3 text-xs text-sky">
-              {t('notInstant')}
-            </p>
-          </div>
-        </aside>
-      </div>
+              <CouponField
+                locale={locale}
+                unitId={unitId}
+                checkIn={checkIn}
+                checkOut={checkOut}
+                currencyCode={priced.currencyCode}
+                copy={{
+                  label: t('couponLabel'),
+                  placeholder: t('couponPlaceholder'),
+                  apply: t('couponApply'),
+                  applying: t('couponApplying'),
+                  remove: t('couponRemove'),
+                  applied: t('couponApplied'),
+                  invalid: t('couponInvalid'),
+                  /*
+                    Resolved HERE, on the server, so the field carries no catalogue of its own and a
+                    refusal reads in the customer's language rather than in the API's English.
+                  */
+                  messages: couponMessages(locale),
+                }}
+              />
+
+              {/*
+                §6.1: booking is not instant, and saying so BEFORE payment is the point.
+                A customer who learns this after paying feels misled; one who knows in
+                advance understands why SAFRA sits in the middle.
+              */}
+              <p className="mt-4 rounded-lg border border-sky/30 bg-sky/10 p-3 text-xs text-sky">
+                {t('notInstant')}
+              </p>
+            </div>
+          </aside>
+        </div>
+      </CouponProvider>
     </div>
   );
 }
