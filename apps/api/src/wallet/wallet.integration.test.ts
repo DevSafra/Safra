@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { sql } from 'drizzle-orm';
+import { inArray, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, type Database } from '@safra/db';
+import { createDatabase, schema, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { WalletAdjustmentService } from './wallet-adjustment.service.js';
@@ -67,6 +67,20 @@ describeIfDb('customer wallet', () => {
   /** A fresh customer per test, so balances never leak between cases. */
   let profileId: string;
 
+  /**
+   * Every customer this file created, so it can take them away again.
+   *
+   * This suite COMMITS — it needs a real pool of six, because a rollback harness pins one
+   * connection inside one transaction and the concurrency test would then pass trivially. The
+   * price is that every fixture it makes is permanent, and nothing was removing them: 12,048
+   * «Wallet Test» profiles had accumulated since 2026-08-07, roughly a dozen per run, and العملاء
+   * was mostly them. Found on 2026-08-26.
+   *
+   * Cleaned by ID rather than by `full_name = 'Wallet Test'`: vitest runs files in parallel, and a
+   * predicate on the marker would delete rows out from under another worker running this same file.
+   */
+  const created: string[] = [];
+
   beforeAll(async () => {
     // A pool of one would serialise the concurrency test into passing trivially.
     db = createDatabase(DATABASE_URL as string, 6);
@@ -87,11 +101,31 @@ describeIfDb('customer wallet', () => {
   });
 
   afterAll(async () => {
+    /*
+      SOFT-deleted, and that is the only correct option rather than a softer one.
+
+      A hard delete was tried and the database refused it: `ledger_entries` is append-only, guarded
+      by `deny_mutation`, because §13.3 requires an immutable record of every financial movement.
+      The wallet movements these tests make are real ledger entries, so the profiles they belong to
+      can never be removed — and they should not be.
+
+      `deleted_at` is what the platform already uses for «this record should no longer appear». The
+      registry filters on it, so العملاء stops showing the fixtures while the ledger keeps every
+      reference it is required to keep.
+    */
+    if (created.length > 0) {
+      await db.execute(
+        sql`UPDATE customer_profiles SET deleted_at = now()
+            WHERE ${inArray(schema.customerProfiles.id, created)}`,
+      );
+    }
+
     await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
   });
 
   beforeEach(async () => {
     profileId = await createCustomer(db);
+    created.push(profileId);
   });
 
   // ── Crediting ───────────────────────────────────────────────────────────────
