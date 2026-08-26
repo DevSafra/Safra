@@ -193,7 +193,14 @@
     "walletRemaining": "المتبقي للدفع",
     "walletCoversAll": "رصيدك يغطي هذا الحجز بالكامل.",
     "walletSignedOut": "سجّل الدخول لاستخدام رصيدك في سفرة.",
-    "guestsSummary": "عدد الضيوف"
+    "guestsSummary": "عدد الضيوف",
+    "couponLabel": "هل لديك كود خصم؟",
+    "couponPlaceholder": "أدخل الكود",
+    "couponApply": "تطبيق",
+    "couponApplying": "جارٍ التحقق…",
+    "couponRemove": "إزالة",
+    "couponApplied": "خصم {code}",
+    "couponInvalid": "تعذّر تطبيق هذا الكود."
   },
   "bookingPending": {
     "title": "تم الدفع — حجزك قيد التأكيد",

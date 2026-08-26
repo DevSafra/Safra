@@ -483,6 +483,25 @@ export const ERROR = {
     out.
   */
   GIFT_CARD_CODE_INVALID: 'gift_card.code_invalid',
+  /* ── Coupons (§9.3's الكوبونات) ─────────────────────────────────────────────────────────── */
+  /** The code matches nothing. Deliberately the same answer as "expired" — see CouponService. */
+  COUPON_INVALID: 'coupon.invalid',
+  COUPON_NOT_STARTED: 'coupon.not_started',
+  COUPON_EXPIRED: 'coupon.expired',
+  COUPON_INACTIVE: 'coupon.inactive',
+  COUPON_EXHAUSTED: 'coupon.exhausted',
+  COUPON_CUSTOMER_LIMIT: 'coupon.customer_limit',
+  COUPON_MINIMUM_NOT_MET: 'coupon.minimum_not_met',
+  COUPON_NOT_FOR_CITY: 'coupon.not_for_city',
+  COUPON_NOT_FOR_PARTNER: 'coupon.not_for_partner',
+  COUPON_FIRST_BOOKING_ONLY: 'coupon.first_booking_only',
+  COUPON_CURRENCY_MISMATCH: 'coupon.currency_mismatch',
+  COUPON_CODE_TAKEN: 'coupon.code_taken',
+  COUPON_NOT_FOUND: 'coupon.not_found',
+  COUPON_WINDOW_ORDER: 'coupon.window_order',
+  COUPON_PERCENT_RANGE: 'coupon.percent_range',
+  COUPON_FIXED_NEEDS_CURRENCY: 'coupon.fixed_needs_currency',
+
   GIFT_CARD_ALREADY_USED: 'gift_card.already_used',
   GIFT_CARD_EXPIRED: 'gift_card.expired',
   GIFT_CARD_CANCELLED: 'gift_card.cancelled',

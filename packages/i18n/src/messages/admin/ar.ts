@@ -1064,6 +1064,29 @@ export const ar = {
     coupons: {
       searchPlaceholder: 'بحث بالكود أو النوع…',
       create: '+ كوبون جديد',
+      /* ── The create form (Bashar, 2026-08-26) ────────────────────────────────────────────── */
+      newTitle: 'كوبون جديد',
+      fCode: 'الكود',
+      fCodeHint: 'أحرف وأرقام فقط — يُحوَّل إلى أحرف كبيرة.',
+      fType: 'النوع',
+      fValueKind: 'نوع القيمة',
+      fValue: 'القيمة',
+      fCurrency: 'العملة',
+      fMaxDiscount: 'أقصى خصم (اختياري)',
+      fMinBooking: 'أدنى قيمة حجز (اختياري)',
+      fStarts: 'يبدأ في',
+      fEnds: 'ينتهي في',
+      fMaxRedemptions: 'أقصى عدد استخدامات (اختياري)',
+      fPerCustomer: 'لكل عميل',
+      fCitySlug: 'مدينة محددة (اختياري)',
+      fPartnerRef: 'شريك محدد (اختياري)',
+      submit: 'إنشاء الكوبون',
+      cancel: 'إلغاء',
+      /* Switching a live campaign on and off, without touching its dates. */
+      deactivate: 'إيقاف',
+      activate: 'تفعيل',
+      kindPercent: 'نسبة مئوية',
+      kindFixed: 'قيمة ثابتة',
       hint: 'منفصلة تماماً عن بطاقات الهدايا · أنواعها: أول حجز، موسمية، مدينة، شريك، حملة تسويقية',
       colDiscount: 'الخصم',
       colMin: 'حد أدنى',
@@ -2397,6 +2420,7 @@ export const ar = {
    * evidence, so it is translated HERE and never at the source.
    */
   auditSubject: {
+    coupon: 'كوبون',
     partner_application: 'طلب شراكة',
     booking: 'حجز',
     booking_export: 'تصدير حجوزات',
@@ -2533,6 +2557,10 @@ export const ar = {
     'city_image.archived': 'أرشفة صورة مدينة',
     'customer.profile_updated': 'تعديل ملف عميل',
     'gift_card.purchase': 'شراء بطاقة هدية',
+    'coupon.created': 'إنشاء كوبون',
+    'coupon.updated': 'تعديل كوبون',
+    'coupon.activated': 'تفعيل كوبون',
+    'coupon.deactivated': 'إيقاف كوبون',
     'gift_card.issued': 'إصدار بطاقة هدية',
     'gift_card.cancelled': 'إلغاء بطاقة هدية',
     'gift_card.redeem': 'استخدام بطاقة هدية',
@@ -2876,6 +2904,11 @@ export const ar = {
       walletCurrency: 'عملة المحفظة',
       expiresAt: 'تاريخ الانتهاء',
       returnedToBuyer: 'أُعيدت القيمة للمشتري',
+      code: 'الكود',
+      isActive: 'مفعّل',
+      valueKind: 'نوع القيمة',
+      startsAt: 'يبدأ في',
+      maxRedemptions: 'أقصى عدد استخدامات',
       walletBalance: 'رصيد المحفظة',
 
       /*

@@ -28,6 +28,15 @@ export const bookingCreateSchema = z
       .strict(),
     attributes: z.array(tripAttributeSchema).max(10).default([]),
     /**
+     * A coupon code the customer typed, if any — §9.3's الكوبونات.
+     *
+     * Sent as they typed it and normalised by `CouponService`, so `safra-20` from a poster reaches
+     * the same coupon as `SAFRA20`. The discount is NEVER sent by the client: what a coupon is
+     * worth is decided on the server against the stay, and a client-supplied amount would be a
+     * price the customer chose.
+     */
+    couponCode: z.string().trim().min(1).max(64).optional(),
+    /**
      * EC-003. The client generates this once per checkout attempt, so a double-click
      * or a retried request cannot create two bookings or two charges.
      */

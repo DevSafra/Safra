@@ -193,7 +193,14 @@
     "walletRemaining": "Restbetrag",
     "walletCoversAll": "Ihr Guthaben deckt diese Buchung vollständig ab.",
     "walletSignedOut": "Melden Sie sich an, um Ihr SAFRA-Guthaben zu verwenden.",
-    "guestsSummary": "Gäste"
+    "guestsSummary": "Gäste",
+    "couponLabel": "Haben Sie einen Rabattcode?",
+    "couponPlaceholder": "Code eingeben",
+    "couponApply": "Anwenden",
+    "couponApplying": "Wird geprüft…",
+    "couponRemove": "Entfernen",
+    "couponApplied": "Rabatt {code}",
+    "couponInvalid": "Dieser Code konnte nicht angewendet werden."
   },
   "bookingPending": {
     "title": "Bezahlt — Ihre Buchung wird bestätigt",

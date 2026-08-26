@@ -274,6 +274,15 @@ export const ledgerAccount = pgEnum('ledger_account', [
    * this month» should not require reading descriptions.
    */
   'gift_card_issued',
+  /**
+   * Revenue SAFRA gave up to win a booking — the other side of a coupon discount.
+   *
+   * The capture group's identity is `total = fee + commission + payable`. A discount makes the
+   * customer pay less while the partner is still owed the same, so without a leg of its own the
+   * group would not balance. This is that leg, and it says the true thing: the discount is SAFRA's
+   * cost of acquisition, not a reduction of what the partner earned.
+   */
+  'coupon_discount',
 ]);
 
 export const ledgerDirection = pgEnum('ledger_direction', ['debit', 'credit']);

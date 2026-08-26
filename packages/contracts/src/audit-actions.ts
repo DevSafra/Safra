@@ -97,6 +97,11 @@ export const AUDIT_ACTIONS = [
   'wallet.adjusted',
   'gift_card.purchase',
   /* Staff issuing a card SAFRA gives away — §9.3's «+ إنشاء بطاقة هدية». */
+  /* ── الكوبونات (§9.3) ─────────────────────────────────────────────────────────────────── */
+  'coupon.created',
+  'coupon.updated',
+  'coupon.activated',
+  'coupon.deactivated',
   'gift_card.issued',
   /* Staff voiding a live card — the fourth status finally has a writer. */
   'gift_card.cancelled',

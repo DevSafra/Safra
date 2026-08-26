@@ -200,7 +200,17 @@ export const couponRedemptions = pgTable(
     ...createdAt,
   },
   (t) => [
-    // Enforces maxRedemptionsPerCustomer = 1 at the database level for the common case.
+    /*
+      One redemption of one coupon per BOOKING — idempotency, not a per-customer limit.
+      
+      The comment here used to claim it enforced `max_redemptions_per_customer = 1` at the database
+      level. It does not and cannot: the limit is a column on `coupons`, so no static index over
+      this table can express it. What this actually prevents is a retried request redeeming the same
+      coupon twice against one booking, which is worth having on its own.
+
+      The per-customer limit is enforced in `CouponService`, under the coupon's row lock — see the
+      note there on why the lock is what makes the count safe.
+    */
     uniqueIndex('coupon_redemptions_booking_unique').on(t.couponId, t.bookingId),
     index('coupon_redemptions_customer_idx').on(t.couponId, t.customerProfileId),
   ],

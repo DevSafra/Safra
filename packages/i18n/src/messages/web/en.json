@@ -193,7 +193,14 @@
     "walletRemaining": "Remaining to pay",
     "walletCoversAll": "Your balance covers this booking in full.",
     "walletSignedOut": "Sign in to use your SAFRA balance.",
-    "guestsSummary": "Guests"
+    "guestsSummary": "Guests",
+    "couponLabel": "Have a discount code?",
+    "couponPlaceholder": "Enter code",
+    "couponApply": "Apply",
+    "couponApplying": "Checking…",
+    "couponRemove": "Remove",
+    "couponApplied": "{code} discount",
+    "couponInvalid": "That code could not be applied."
   },
   "bookingPending": {
     "title": "Paid — your booking is pending confirmation",
