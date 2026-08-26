@@ -522,6 +522,11 @@ const customerDetailSchema = z.object({
       templateKey: z.string(),
       channel: z.string(),
       status: z.string(),
+      /*
+        The TEMPLATE's wording, not the message. `null` where no copy is mapped — nullable rather
+        than defaulted, because «this template has no copy» is a fact a reader should see.
+      */
+      template: z.object({ subject: z.string(), body: z.string() }).nullable(),
       at: z.string(),
     }),
   ),

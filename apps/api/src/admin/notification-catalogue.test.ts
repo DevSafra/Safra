@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { NOTIFICATION_TEMPLATES } from './notification-templates.js';
+import { NOTIFICATION_TEMPLATES, TEMPLATE_COPY_KEYS } from './notification-templates.js';
 
 /**
  * A template may only claim to be implemented if something actually sends it.
@@ -72,6 +72,27 @@ describe('the notification catalogue', () => {
     expect(sends(source, 'wallet.compensation'), 'wallet.compensation is not').toBe(
       false,
     );
+  });
+
+  /**
+   * Every key that is SENT can show its wording.
+   *
+   * The customer record expands a notice to show what that kind of message says, and it finds the
+   * copy through `TEMPLATE_COPY_KEYS` — `support.replied` → `supportReplied`. The two names differ
+   * by construction, so a template sent under a key nobody mapped renders «لا نص محفوظ لهذا النوع»
+   * on a message the platform really did send. Silently: the row is still there, it just stops
+   * explaining itself.
+   */
+  it('can show the wording of every template it sends', () => {
+    const unmapped = NOTIFICATION_TEMPLATES.filter(
+      (template) => template.implemented && !(template.key in TEMPLATE_COPY_KEYS),
+    ).map((template) => template.key);
+
+    expect(
+      unmapped,
+      'These are sent and have no copy mapped, so the console cannot show what they say. ' +
+        'Add them to TEMPLATE_COPY_KEYS.',
+    ).toStrictEqual([]);
   });
 
   /** Every entry marked unimplemented is a real gap somebody can look up. */

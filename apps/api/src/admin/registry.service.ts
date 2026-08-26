@@ -19,6 +19,8 @@ import {
 const RECENT = 10;
 
 import { DATABASE } from '../database/database.module.js';
+import { TEMPLATE_COPY_KEYS } from './notification-templates.js';
+import { emailMessages, isLocale } from '@safra/i18n';
 import { notFound } from '../common/errors/app-error.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -392,11 +394,12 @@ export class RegistryService {
         template_key: string;
         channel: string;
         status: string;
+        locale: string;
         created_at: string;
         total: string;
       }>(sql`
         SELECT n.template_key, n.channel::text AS channel, n.status::text AS status,
-               n.created_at::text, count(*) OVER ()::text AS total
+               n.locale, n.created_at::text, count(*) OVER ()::text AS total
         FROM notifications n
         WHERE n.customer_profile_id = ${id}
         ORDER BY n.created_at DESC
@@ -466,6 +469,14 @@ export class RegistryService {
           templateKey: row.template_key,
           channel: row.channel,
           status: row.status,
+          /*
+            The TEMPLATE this kind of message uses, in the language it went out in — not the
+            message that was sent. `notifications` stores no subject and no body by design (see the
+            table's own note), so there is no way to show the real one and several templates carry
+            live credentials that must never be persisted. What a reader gets is the wording,
+            placeholders and all, which answers «what does this kind of email say».
+          */
+          template: previewOf(row.template_key, row.locale),
           at: row.created_at,
         })),
       },
@@ -611,4 +622,34 @@ export interface CustomerRow {
   readonly walletBalance: string | null;
   readonly walletCurrency: string | null;
   readonly lastActivity: string;
+}
+
+/**
+ * The wording of a template, in one locale — never a message that was sent.
+ *
+ * `notifications` deliberately stores no subject and no body: the table is read by every support
+ * agent, and templates like `bookingVerification`, `partnerLoginCode` and `giftCardPurchased`
+ * carry one-time codes and links whose whole value is that only the recipient has them. The gift
+ * card copy even promises «لا نحتفظ بنسخة منه». So a real body is not available and must not be.
+ *
+ * What this returns is the CATALOGUE entry, placeholders intact — `{reference}` rather than a
+ * booking number. A reader can see what the message says without anybody's message being kept.
+ *
+ * `null` when the key has no copy behind it, which the screen renders as a plain row: a template
+ * nothing sends, or one whose mapping is missing, must look like an absence rather than a blank.
+ */
+function previewOf(
+  templateKey: string,
+  locale: string,
+): { subject: string; body: string } | null {
+  const entry = TEMPLATE_COPY_KEYS[templateKey];
+
+  if (!entry) return null;
+
+  const messages = emailMessages(isLocale(locale) ? locale : 'ar');
+  const copy = messages[entry] as { subject?: string; body?: string } | undefined;
+
+  if (typeof copy?.subject !== 'string' || typeof copy.body !== 'string') return null;
+
+  return { subject: copy.subject, body: copy.body };
 }

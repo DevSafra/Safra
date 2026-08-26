@@ -1930,6 +1930,17 @@ export const ar = {
       none: 'لا شيء بعد',
       rating: '{n} من 5',
       nights: 'الوصول {date}',
+      /* The collapse under a sent message. */
+      showTemplate: 'نص هذا النوع من الرسائل',
+      templateSubject: 'الموضوع',
+      /*
+        Said on every preview, because the difference matters: this is the القالب, not the message
+        that was sent. The bodies are deliberately not stored — several carry one-time codes.
+      */
+      templateNote:
+        'هذا نص القالب بصيغته، لا نص الرسالة المُرسلة. لا يحتفظ النظام بنصوص الرسائل.',
+      noTemplate: 'لا نص محفوظ لهذا النوع.',
+      openThread: 'فتح المحادثة',
     },
     propertyTypes: {
       title: 'أنواع الإقامة',

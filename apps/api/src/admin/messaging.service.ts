@@ -139,6 +139,16 @@ export class MessagingService {
         sql`(c.reference ILIKE ${query.q + '%'}
              OR b.reference ILIKE ${query.q + '%'}
              OR d.reference ILIKE ${query.q + '%'}
+             /*
+               The CUSTOMER's reference — cust, not c, which is the conversation.
+
+               Every other reference this list holds was searchable and the customer's was not, so
+               «CUS-1069556» found nothing while that customer had sixty-six conversations. Found
+               when the customer record grew a link here (2026-08-26): searching by NAME instead
+               would have worked and been wrong, because two people share a name and a link built
+               from one would open the other's threads.
+             */
+             OR cust.reference ILIKE ${query.q + '%'}
              OR cust.full_name ILIKE ${term}
              OR p.display_name ILIKE ${term})`,
       );
