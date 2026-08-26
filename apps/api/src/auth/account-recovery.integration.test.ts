@@ -8,6 +8,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { AuditService } from '../common/audit/audit.service.js';
 import { PasswordService } from '../common/crypto/password.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
+import { LedgerService } from '../ledger/ledger.service.js';
 import { AccountRecoveryService } from './account-recovery.service.js';
 import { AuthTokenService } from './auth-token.service.js';
 import type { FxRateService } from '../fx/fx-rate.service.js';
@@ -79,11 +80,29 @@ describeIfDb('account recovery', () => {
      * FX throws because every wallet here is USD: a conversion would mean the
      * same-currency path had been skipped, and a loud failure says so.
      */
-    const wallet = new WalletService(db, {
-      rateToSyp: () => {
-        throw new Error('FX must not be consulted for a same-currency transfer.');
+    /*
+      A rate IS needed now, and not for a conversion.
+
+      This stub threw on any call, on the premise that a same-currency transfer never consults FX.
+      That stopped being true when the claim started posting ledger legs: every ledger entry carries
+      `amount_syp`, so the group needs the rate whatever the currencies are. The stub still proves
+      the original point — it answers only for USD, so a conversion between two different currencies
+      would still fail loudly here.
+    */
+    const fxStub = {
+      rateToSyp: (code: string) => {
+        if (code !== 'USD') {
+          throw new Error(
+            `FX must not be consulted for ${code} — every wallet here is USD.`,
+          );
+        }
+
+        return Promise.resolve('13000.00000000');
       },
-    } as unknown as FxRateService);
+      decimalsOf: () => Promise.resolve(2),
+    } as unknown as FxRateService;
+
+    const wallet = new WalletService(db, fxStub);
 
     recovery = new AccountRecoveryService(
       db,
@@ -94,6 +113,8 @@ describeIfDb('account recovery', () => {
       mail,
       new AuditService(db),
       wallet,
+      new LedgerService(db),
+      fxStub,
     );
   });
 
@@ -392,6 +413,70 @@ describeIfDb('account recovery', () => {
       await recovery.confirmEmailVerification(tokenFrom(outbox.at(-1)));
 
       expect(await balanceOfUser(db, user.id)).toBe('42.500');
+    });
+
+    /**
+     * The transfer is in the LEDGER, not only in the two wallets (Bashar, 2026-08-26).
+     *
+     * It was argued off the books on the grounds that a claim changes nothing SAFRA owes — the
+     * same money, the same person, a different profile. That is true of the TOTAL and beside the
+     * point: an account is how a movement is traced, and «where did this balance come from» had no
+     * answer in the ledger at all. 36 movements had already been made this way.
+     *
+     * The group balances to zero in SYP, which is the shape a transfer should have — liability
+     * leaves one wallet and arrives at another.
+     */
+    it('posts a balanced ledger group for the transfer', async () => {
+      const guest = await createGuestBooking(db, user.email);
+
+      await fundWallet(db, guest.profileId, '30.000');
+
+      await recovery.requestEmailVerification(user.id, {});
+      await recovery.confirmEmailVerification(tokenFrom(outbox.at(-1)));
+
+      const legs = await db.execute<{
+        account: string;
+        direction: string;
+        amount: string;
+        amount_syp: string;
+        group: string;
+      }>(sql`
+        SELECT l.account::text, l.direction::text, l.amount::text,
+               l.amount_syp::text, l.entry_group_id::text AS group
+        FROM ledger_entries l
+        JOIN customer_profiles c ON c.id = l.customer_profile_id
+        JOIN users u ON u.id = c.user_id
+        WHERE u.id = ${user.id}::uuid
+          AND l.account IN ('wallet_debit', 'wallet_credit')
+        /* By the TEXT, not the enum: an enum orders by declaration, which is not obvious here. */
+        ORDER BY l.account::text
+      `);
+
+      const rows = legs.rows;
+
+      expect(rows, 'a group was posted at all').toHaveLength(2);
+      /* One group, or they are not two legs of one movement. */
+      expect(new Set(rows.map((leg) => leg.group)).size).toBe(1);
+
+      expect(rows.map((leg) => `${leg.account}:${leg.direction}`)).toStrictEqual([
+        'wallet_credit:credit',
+        'wallet_debit:debit',
+      ]);
+
+      for (const leg of rows) {
+        expect(Number(leg.amount), 'each leg is the balance that moved').toBe(30);
+      }
+
+      /*
+        Net zero in SYP — the unit the balance trigger checks, and the reason this movement is
+        allowed to be on the books at all without changing what SAFRA owes.
+      */
+      const net = rows.reduce(
+        (sum, leg) => sum + (leg.direction === 'debit' ? 1 : -1) * Number(leg.amount_syp),
+        0,
+      );
+
+      expect(net, 'a transfer nets to nothing').toBe(0);
     });
 
     it('leaves an empty guest wallet alone rather than writing a zero movement', async () => {

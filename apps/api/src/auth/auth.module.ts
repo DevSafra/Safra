@@ -6,6 +6,8 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import { SignInRefundInterceptor } from '../common/throttle/sign-in-refund.interceptor.js';
 import { MailService } from '../mail/mail.service.js';
 import { WalletModule } from '../wallet/wallet.module.js';
+import { LedgerModule } from '../ledger/ledger.module.js';
+import { FxModule } from '../fx/fx.module.js';
 import { AccountRecoveryService } from './account-recovery.service.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
@@ -21,7 +23,11 @@ import { TwoFactorService } from './two-factor.service.js';
 @Module({
   // Claiming a guest profile carries its wallet balance across, so a customer who
   // was compensated as a guest does not lose it on registering.
-  imports: [WalletModule],
+  /*
+    `LedgerModule` and `FxModule` are here for `AccountRecoveryService`: claiming a guest profile
+    moves a balance between two wallets, and that transfer posts a balanced ledger group.
+  */
+  imports: [WalletModule, LedgerModule, FxModule],
   controllers: [AuthController, TwoFactorController],
   providers: [
     AuthService,

@@ -14,6 +14,8 @@ import {
 } from '../mail/mail.templates.js';
 import { PasswordService } from '../common/crypto/password.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
+import { LedgerService } from '../ledger/ledger.service.js';
+import { FxRateService } from '../fx/fx-rate.service.js';
 import { AuthTokenService } from './auth-token.service.js';
 import { TokenService } from './token.service.js';
 import { ERROR, WALLET_NOTE } from '@safra/contracts';
@@ -57,6 +59,8 @@ export class AccountRecoveryService {
     private readonly mail: MailService,
     private readonly audit: AuditService,
     private readonly wallet: WalletService,
+    private readonly ledger: LedgerService,
+    private readonly fx: FxRateService,
   ) {}
 
   /**
@@ -369,7 +373,7 @@ export class AccountRecoveryService {
     const wallet = rows.rows[0];
     if (!wallet) return;
 
-    await this.wallet.debit(tx, {
+    const taken = await this.wallet.debit(tx, {
       customerProfileId: orphanId,
       amount: wallet.balance,
       currencyId: wallet.currency_id,
@@ -384,6 +388,52 @@ export class AccountRecoveryService {
       reason: 'profile_claim',
       note: WALLET_NOTE.CARRIED_TO_ACCOUNT,
     });
+
+    /*
+      And the ledger says so too (Bashar, 2026-08-26).
+
+      A claim does not change what SAFRA owes — the same money is owed to the same person, under a
+      different profile — and that was the argument for leaving it off the ledger. It is a weak one:
+      an account is how a movement is TRACED, not only how a total is reached, and «where did this
+      balance come from» had no answer in the books at all. 36 movements had been made this way.
+
+      `wallet_debit` ↔ `wallet_credit`, which is the pair a transfer between two customer wallets
+      is: liability leaves one and arrives at another. Net zero in SYP, exactly as it should be.
+
+      ## The group names the DESTINATION, and is denominated in the SOURCE currency
+
+      A ledger group carries one `customer_profile_id` and one currency, and a transfer has two of
+      each. The destination is the profile a person will read a statement for — the guest profile is
+      being retired — so it carries the group, and the description names where the money came from.
+
+      The currency is the SOURCE wallet's, at the amount that actually LEFT. Where the destination
+      wallet is denominated differently, `credit()` converts and the figure that landed differs;
+      that figure lives in `wallet_transactions`, which is the per-wallet record. The ledger's job
+      here is the movement of liability, and in SYP — the unit the balance trigger checks — the two
+      are the same number. Same reasoning `postPartnerFine` gives for a cross-currency compensation.
+    */
+    await this.ledger.post(
+      tx,
+      [
+        {
+          account: 'wallet_debit',
+          direction: 'debit',
+          amount: taken.appliedAmount,
+          description: `Balance claimed from guest profile ${orphanId}`,
+        },
+        {
+          account: 'wallet_credit',
+          direction: 'credit',
+          amount: taken.appliedAmount,
+          description: 'Balance carried onto the account that claimed it',
+        },
+      ],
+      {
+        currencyId: taken.currencyId,
+        fxRateToSyp: await this.fx.rateToSyp(taken.currencyCode),
+        customerProfileId: destination,
+      },
+    );
 
     this.logger.log(
       `Carried ${wallet.balance} from guest profile ${orphanId} to ${destination}.`,
