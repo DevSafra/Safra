@@ -1002,7 +1002,41 @@ export const ar = {
       colRemaining: 'الرصيد المتبقي',
       colBuyer: 'الشراء بواسطة',
       colExpiry: 'الصلاحية',
-      note: 'تُستخدم للحجوزات والمطاعم والأنشطة الشريكة. الرصيد المتبقي يبقى في البطاقة إذا فاقت قيمتها العملية. بطاقة منتهية أثناء الدفع؟ تُعاد الحسبة قبل التأكيد (EC-012).',
+      /**
+       * The copy follows the CODE (Bashar, 2026-08-26).
+       *
+       * This said «الرصيد المتبقي يبقى في البطاقة إذا فاقت قيمتها العملية» — the remaining balance
+       * stays on the card. It does not: `redeem()` zeroes the card, marks it `used`, and moves the
+       * whole value into the customer's wallet in one movement. The leftover is spendable, and it
+       * is in the WALLET.
+       *
+       * An operator reading the old sentence would tell a customer their card still had value, and
+       * the customer would find it marked مستخدمة. The value is the same either way — better, if
+       * anything, since a wallet balance does not expire — but the screen has to say which.
+       */
+      note: 'تُستخدم للحجوزات والمطاعم والأنشطة الشريكة. عند الاستخدام تُحوَّل قيمة البطاقة كاملةً إلى محفظة العميل وتُصبح البطاقة مستخدمة؛ ما تبقّى بعد العملية يظل في المحفظة. بطاقة منتهية أثناء الدفع؟ تُعاد الحسبة قبل التأكيد (EC-012).',
+      /* ── The issue form (Bashar, 2026-08-26) ─────────────────────────────────────────────── */
+      issueTitle: 'إصدار بطاقة هدية',
+      issueAmount: 'القيمة',
+      issueCurrency: 'العملة',
+      issueExpiry: 'تاريخ الانتهاء (اختياري)',
+      issueRecipientName: 'اسم المستلم (اختياري)',
+      issueRecipientEmail: 'بريد المستلم (اختياري)',
+      issueReason: 'سبب الإصدار',
+      issueReasonHint: 'يُسجَّل في سجل التدقيق ولا يصل العميل.',
+      issueSubmit: 'إصدار البطاقة',
+      issueCancel: 'إلغاء',
+      /**
+       * The code is shown ONCE, and the screen has to say so before it is dismissed.
+       *
+       * Only `code_hash` is stored: nothing can recover this string afterwards, and a staff member
+       * who closes the panel without copying it has to issue another card. Saying that after the
+       * fact would be an apology; saying it beside the code is the only useful moment.
+       */
+      issuedTitle: 'صدرت البطاقة',
+      issuedCodeOnce: 'انسخ الكود الآن — يُعرض مرة واحدة فقط ولا يمكن استرجاعه لاحقاً.',
+      issuedEmailed: 'أُرسل الكود أيضاً إلى بريد المستلم.',
+      issuedDone: 'تم',
       /** Codes are hashed and never returned — see PromotionsService. */
       codeNote: 'يُعرض آخر أربعة أحرف فقط — الأكواد مُعمَّاة ولا تُسترجع من هنا.',
     },
@@ -2479,6 +2513,7 @@ export const ar = {
     'city_image.archived': 'أرشفة صورة مدينة',
     'customer.profile_updated': 'تعديل ملف عميل',
     'gift_card.purchase': 'شراء بطاقة هدية',
+    'gift_card.issued': 'إصدار بطاقة هدية',
     'gift_card.redeem': 'استخدام بطاقة هدية',
     'partner.invitation_accepted': 'قبول دعوة شريك',
     'partner.two_factor_reset': 'إعادة تعيين المصادقة الثنائية لشريك',
@@ -2818,6 +2853,7 @@ export const ar = {
       creditedAmount: 'المبلغ المضاف',
       creditedCurrency: 'عملة الإضافة',
       walletCurrency: 'عملة المحفظة',
+      expiresAt: 'تاريخ الانتهاء',
       walletBalance: 'رصيد المحفظة',
 
       /*
