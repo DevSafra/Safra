@@ -8,7 +8,7 @@ import { getCustomer } from '@/lib/api';
 import { Ltr, StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
 import { BackLink, type BackTarget } from '@/components/back-link';
-import { backTarget, returnQuery } from '@/lib/search-params';
+import { backTarget, origin } from '@/lib/search-params';
 import { amount, count, shortDate, shortDateTime } from '@/lib/format';
 import { bookingStatus, fill, label, t } from '@/lib/strings';
 import { refuseSection } from '@/components/section-refusal';
@@ -132,7 +132,10 @@ export default async function CustomerPage({
               applies to a record's lists as much as to a registry.
             */}
             <Link
-              href={`/bookings/${booking.reference}?${returnQuery({})}`}
+              href={`/bookings/${booking.reference}?from=${origin(
+                'customers',
+                customer.reference,
+              )}`}
               className="text-sky hover:underline"
             >
               <Ltr>{booking.reference}</Ltr>
@@ -184,7 +187,10 @@ export default async function CustomerPage({
             */}
             {dispute.bookingReference ? (
               <Link
-                href={`/bookings/${dispute.bookingReference}?from=customers`}
+                href={`/bookings/${dispute.bookingReference}?from=${origin(
+                  'customers',
+                  customer.reference,
+                )}`}
                 className="text-sky hover:underline"
               >
                 <Ltr>{dispute.reference}</Ltr>

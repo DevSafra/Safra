@@ -199,6 +199,16 @@ const ORIGINS = {
   messages: { path: '/messages', rows: true },
   disputes: { path: '/disputes', rows: false },
   dashboard: { path: '/', rows: false },
+  /*
+    `customers` carries a RECORD, which is why `rows` is true: a booking opened from a customer's
+    record comes back to that customer, not to the registry. The customer screen was already
+    writing `?from=customers` and this list did not have the key, so `resolveOrigin` discarded it
+    and every dispute opened from a customer returned to الحجوزات instead. Silent, because the
+    fallback is a valid link to a real screen.
+  */
+  customers: { path: '/customers', rows: true },
+  /* المحفظة is a list — a movement has no record of its own to come back to. */
+  wallet: { path: '/wallet', rows: false },
 } as const;
 
 export type OriginKey = keyof typeof ORIGINS;

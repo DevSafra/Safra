@@ -288,6 +288,8 @@ export const ar = {
       messages: 'المحادثة',
       disputes: 'النزاعات',
       dashboard: 'لوحة الإدارة',
+      customers: 'العميل',
+      wallet: 'المحفظة',
     } as Record<string, string>,
     /** The submit and the busy label on an inline action form, shared across sections. */
     confirm: 'تأكيد',
