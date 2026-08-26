@@ -1,5 +1,5 @@
 import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
-import { getCoupons, type CouponItem } from '@/lib/api';
+import { getCoupons, getGeography, type CouponItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { amount, count, shortDate } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
@@ -11,10 +11,12 @@ import {
   type AdminColumn,
   type Tone,
 } from '@/components/admin-table';
-import { TableToolbar, ToolbarNote } from '@/components/table-toolbar';
+
 import { t, label } from '@/lib/strings';
 import { listParamsFor } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
+import { CouponsToolbar } from '@/components/coupons-toolbar';
+import { CouponActiveToggle } from '@/components/coupon-active-toggle';
 
 /**
  * الكوبونات (design handoff §8).
@@ -48,31 +50,33 @@ export default async function CouponsPage({
 
   const { q, page, size } = await listParamsFor('coupons', searchParams);
 
-  const [result, counts] = await Promise.all([
+  const [result, counts, geo] = await Promise.all([
     getCoupons({ q, page, limit: size }),
     sidebarCounts(),
+    /* For the fixed-value currency picker; a failed read must not take the registry down. */
+    getGeography(),
   ]);
+
+  const currencies =
+    geo === 'unauthenticated' || geo === 'failed'
+      ? [DEFAULT_MONEY_CURRENCY]
+      : geo.currencies.map((entry) => entry.code);
 
   return (
     <ConsoleShell title={t.nav.coupons} counts={counts}>
       <ConsolePanel>
-        <TableToolbar
+        {/*
+          The toolbar is drawn by the FORM, which owns the state the trigger and the panel share —
+          see `CouponsToolbar`. The «+ كوبون جديد» button was `aria-disabled` with `notBuilt`: the
+          `COUPON_MANAGE` permission, the `coupons` table and that button were a feature that
+          existed only in the data model.
+        */}
+        <CouponsToolbar
           action="/coupons"
           query={q}
           size={size}
           placeholder={t.sections.coupons.searchPlaceholder}
-          end={
-            <>
-              <ToolbarNote>{t.sections.coupons.hint}</ToolbarNote>
-              <span
-                aria-disabled="true"
-                title={t.nav.notBuilt}
-                className="cursor-not-allowed rounded-[9px] border border-line px-4 py-1.5 text-[12.5px] font-extrabold text-faint2"
-              >
-                {t.sections.coupons.create}
-              </span>
-            </>
-          }
+          currencies={currencies}
         />
 
         {result === 'unauthenticated' ? (
@@ -167,6 +171,21 @@ const COLUMNS: readonly AdminColumn<CouponItem>[] = [
         {shortDate(row.startsAt)} ← {shortDate(row.endsAt)}
       </Ltr>
     ),
+  },
+  {
+    /*
+      Pausing a campaign. Not offered on an EXPIRED coupon: switching one on changes nothing a
+      customer can use, and a control that does nothing suggests otherwise. The API refuses the
+      same way, so this is a courtesy rather than the guard.
+    */
+    key: 'action',
+    header: t.table.colAction,
+    render: (row) =>
+      row.expired ? (
+        <span className="text-faint">{t.admin.noData}</span>
+      ) : (
+        <CouponActiveToggle code={row.code} isActive={row.isActive} />
+      ),
   },
   {
     key: 'status',
