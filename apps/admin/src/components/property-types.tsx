@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 
 import { apiErrorOf, fill, t } from '@/lib/strings';
 import type { PropertyType } from '@/lib/api';
-import { Ltr } from '@/components/admin-table';
 
 /**
  * §8.2 — «أنواع أخرى قابلة للإضافة من الإدارة».
@@ -63,8 +62,19 @@ export function PropertyTypes({ types }: { types: readonly PropertyType[] }) {
             key={type.code}
             className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-card px-3 py-2"
           >
+            {/*
+              The NAME identifies a type here; the code does not appear.
+
+              It did, as its own element — and that is precisely the leak
+              `navigation.spec.ts` exists to catch: «rural_house» down a column on this very route
+              is the defect that sweep was written for. A machine identifier is not a word in any
+              of the three languages this console serves.
+
+              Nobody loses anything. The code matters when ADDING one, and a collision there is
+              answered by «هذا المعرّف مستخدم بالفعل لنوع إقامة آخر» rather than by scanning a list.
+            */}
             <span className="min-w-0 text-[13px] text-text">
-              {type.nameAr} <Ltr className="text-[11px] text-faint">{type.code}</Ltr>
+              {type.nameAr}
               {type.isActive ? null : (
                 <span className="ms-2 text-[11px] text-faint">{copy.retired}</span>
               )}
