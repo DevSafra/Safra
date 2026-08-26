@@ -343,4 +343,48 @@ test.describe('the back control', () => {
     expect(labelBox).not.toBeNull();
     expect(arrowBox!.x).toBeGreaterThan(labelBox!.x);
   });
+
+  /**
+   * The customer record, added 2026-08-26 when it grew a way in.
+   *
+   * A second registry through the same machinery, and worth its own case rather than trusting that
+   * `returnQuery` behaves identically everywhere: العملاء builds its columns as a function of the
+   * back query — a shape الحجوزات does not use — so the link is assembled in a different place and
+   * could carry a different thing.
+   *
+   * The trip is asserted on the URL, and then on the FRAGMENT: `rowAnchor` writes both the row's
+   * `id` and the `#…` the back link points at, and when those two drift the browser silently lands
+   * at the top of the list, which is the bug.
+   */
+  test('returns to the same page of العملاء, and to the row', async ({ page }) => {
+    const size = 2;
+
+    await page.goto(`/customers?size=${size}&page=3`);
+
+    const link = page.locator('tbody a[href^="/customers/CUS-"]').first();
+    const reference =
+      /CUS-[\w-]+/.exec((await link.getAttribute('href')) ?? '')?.[0] ?? '';
+
+    expect(reference, 'a customer on page three').not.toBe('');
+
+    await link.click();
+    await page.waitForURL(/\/customers\/CUS-/);
+
+    const detail = new URL(page.url()).searchParams;
+
+    expect(detail.get('page')).toBe('3');
+    expect(detail.get('size')).toBe(String(size));
+
+    await backTo(page, t.nav.customers).click();
+    await page.waitForURL(/\/customers\?/);
+
+    const returned = new URL(page.url());
+
+    expect(returned.pathname).toBe('/customers');
+    expect(returned.searchParams.get('page')).toBe('3');
+    expect(returned.searchParams.get('size')).toBe(String(size));
+    /* The row it was opened from, so the reader lands on it rather than at the top. */
+    expect(returned.hash).toBe(`#row-${reference}`);
+    await expect(page.locator(`#row-${reference}`)).toHaveCount(1);
+  });
 });

@@ -182,6 +182,42 @@ test.describe('the staff console', () => {
     });
   }
 
+  /**
+   * A DETAIL screen, which the sweep above cannot reach.
+   *
+   * `CONSOLE` is a list of static paths and every detail route needs a live reference, so no
+   * record had ever been requested at any width — the same blind spot the property page's
+   * breadcrumb sat in until 2026-08-12. The customer record is the widest of them: six sections,
+   * each a row of a name, a truncating middle, a status pill and a timestamp, which is exactly the
+   * shape that stops wrapping and pushes a page sideways.
+   *
+   * One test over all the widths rather than one per width: it resolves the reference once and the
+   * whole point is the comparison across sizes.
+   */
+  test('a customer record scrolls sideways at no width', async ({ page }) => {
+    await page.goto('/customers?size=5');
+
+    const href = await page
+      .locator('tbody a[href^="/customers/CUS-"]')
+      .first()
+      .getAttribute('href');
+
+    expect(href, 'a customer to open').not.toBeNull();
+
+    const broken: string[] = [];
+
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(href ?? '');
+
+      const result = await overflow(page);
+
+      if (result) broken.push(`${width}px ${result}`);
+    }
+
+    expect(broken).toStrictEqual([]);
+  });
+
   /** Controls are thumb-sized where the input is a thumb. */
   for (const width of [390, 768]) {
     test(`controls meet the ${TOUCH_FLOOR}px floor at ${width}px`, async ({ page }) => {
