@@ -345,6 +345,14 @@ export class SlaService {
         AND b.confirmation_deadline_at IS NOT NULL
         AND b.confirmation_deadline_at < now()
         AND b.deleted_at IS NULL
+      -- Most overdue first, for the reason the reminder sweep above states and this one did not.
+      --
+      -- With no ORDER BY, which 100 the planner returns is undefined, so past a backlog of 100 a
+      -- booking can be passed over sweep after sweep while others are cancelled — indefinitely,
+      -- and silently, because the job reports success every time. This is the more consequential
+      -- of the two: a reminder that arrives late is a worse experience, but a cancellation that
+      -- never happens holds the customer's money and the unit's nights for ever.
+      ORDER BY b.confirmation_deadline_at
       LIMIT 100
     `);
 
