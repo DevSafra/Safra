@@ -68,7 +68,7 @@ describeIfDb('FavouritesService', () => {
       nameDe: 'Favoritentest',
     });
     expect(page.items[0]?.isAvailable).toBe(true);
-    expect(page.items[0]?.fromPrice).toBe('120.00');
+    expect(page.items[0]?.fromPrice).toBe('120.000');
     expect(page.items[0]?.currencyCode).toBe('USD');
   });
 
@@ -334,7 +334,7 @@ async function seed(db: Database): Promise<void> {
   }
 
   /* Two units, so the "from" price has to be the CHEAPER one rather than whichever comes first. */
-  for (const price of ['180.00', '120.00'] as const) {
+  for (const price of ['180.00', '120.000'] as const) {
     await db.execute(sql`
       INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests,
                          base_price, currency_id, min_nights)

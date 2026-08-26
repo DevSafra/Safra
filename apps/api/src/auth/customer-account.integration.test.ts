@@ -138,11 +138,11 @@ describeIfDb('CustomerAccountService.summary', () => {
 
     await db.execute(sql`
       INSERT INTO wallets (customer_profile_id, balance, currency_id)
-      SELECT ${PROFILE_ID}::uuid, '35.00', cu.id FROM currencies cu WHERE cu.code = 'USD' LIMIT 1`);
+      SELECT ${PROFILE_ID}::uuid, '35.000', cu.id FROM currencies cu WHERE cu.code = 'USD' LIMIT 1`);
 
     const view = await service.summary(customer());
 
-    expect(view.counters.walletBalance).toBe('35.00');
+    expect(view.counters.walletBalance).toBe('35.000');
     expect(view.counters.walletCurrency).toBe('USD');
   });
 

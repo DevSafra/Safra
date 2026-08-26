@@ -172,8 +172,8 @@ describeIfDb('arrivals and violations', () => {
       INSERT INTO partner_violations (partner_id, kind, occurrence_number, fine_amount,
                                       fine_currency_id, customer_compensation_amount,
                                       score_penalty, waived_at, waived_reason)
-      SELECT ${partner}::uuid, 'no_response', 1, '50.00',
-             (SELECT id FROM currencies WHERE code = 'USD'), '50.00', 5,
+      SELECT ${partner}::uuid, 'no_response', 1, '50.000',
+             (SELECT id FROM currencies WHERE code = 'USD'), '50.000', 5,
              ${waived ? sql`now()` : sql`NULL`},
              ${waived ? 'عذر مقبول' : null}
     `);
@@ -186,7 +186,7 @@ describeIfDb('arrivals and violations', () => {
                                       description, fine_amount, fine_currency_id,
                                       fine_reason, score_penalty)
       VALUES (${partner}::uuid, 'stale_calendar', 1, 'fined',
-              ${'تقويم الوحدة ١٠١ لم يُحدَّث منذ أحد عشر يوماً.'}, '50.00',
+              ${'تقويم الوحدة ١٠١ لم يُحدَّث منذ أحد عشر يوماً.'}, '50.000',
               (SELECT id FROM currencies WHERE code = 'USD'),
               ${'مخالفة متكررة بعد إشعارين سابقين.'}, 0)
     `);
@@ -549,9 +549,9 @@ describeIfDb('arrivals and violations', () => {
       expect(page.moneyHidden).toBe(false);
       expect(page.items).toHaveLength(1);
       expect(page.items[0]?.kind).toBe('no_response');
-      expect(page.items[0]?.fineAmount).toBe('50.00');
+      expect(page.items[0]?.fineAmount).toBe('50.000');
       expect(page.items[0]?.fineCurrency).toBe('USD');
-      expect(page.items[0]?.customerCompensationAmount).toBe('50.00');
+      expect(page.items[0]?.customerCompensationAmount).toBe('50.000');
       expect(page.items[0]?.scorePenalty).toBe(5);
     });
 

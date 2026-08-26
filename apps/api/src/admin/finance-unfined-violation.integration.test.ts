@@ -141,7 +141,8 @@ describeIfDb('الدفع and a violation with no fine', () => {
       whether fines still arrive. A control has to fail only when the thing it protects is gone.
     */
     const mine = page.items.filter(
-      (row) => row.kind === 'fine' && row.amount === '50.00',
+      /* By value: a money string's spelling depends on the column's scale, not on the amount. */
+      (row) => row.kind === 'fine' && Number(row.amount) === 50,
     );
 
     expect(

@@ -374,24 +374,24 @@ describeIfDb('account recovery', () => {
      */
     it('carries a guest wallet balance across to the account', async () => {
       const guest = await createGuestBooking(db, user.email);
-      await fundWallet(db, guest.profileId, '30.00');
+      await fundWallet(db, guest.profileId, '30.000');
 
       await recovery.requestEmailVerification(user.id, {});
       await recovery.confirmEmailVerification(tokenFrom(outbox.at(-1)));
 
-      expect(await balanceOf(db, guest.profileId)).toBe('0.00');
-      expect(await balanceOfUser(db, user.id)).toBe('30.00');
+      expect(await balanceOf(db, guest.profileId)).toBe('0.000');
+      expect(await balanceOfUser(db, user.id)).toBe('30.000');
     });
 
     it('adds the carried balance to one the account already had', async () => {
       const guest = await createGuestBooking(db, user.email);
-      await fundWallet(db, guest.profileId, '30.00');
+      await fundWallet(db, guest.profileId, '30.000');
       await fundWalletOfUser(db, user.id, '12.50');
 
       await recovery.requestEmailVerification(user.id, {});
       await recovery.confirmEmailVerification(tokenFrom(outbox.at(-1)));
 
-      expect(await balanceOfUser(db, user.id)).toBe('42.50');
+      expect(await balanceOfUser(db, user.id)).toBe('42.500');
     });
 
     it('leaves an empty guest wallet alone rather than writing a zero movement', async () => {

@@ -124,7 +124,7 @@ describeIfDb('CalendarService.updateRange — field-level upsert semantics', () 
     expect(days.find((d) => d.date === '2030-02-01')?.status).toBe('closed');
     expect(days.find((d) => d.date === '2030-02-02')?.status).toBe('closed');
     expect(days.find((d) => d.date === '2030-02-03')?.status).toBe('closed');
-    expect(days.find((d) => d.date === '2030-02-01')?.price).toBe('200.00');
+    expect(days.find((d) => d.date === '2030-02-01')?.price).toBe('200.000');
   });
 
   it('preserves status when only minNights is edited', async () => {
@@ -194,7 +194,7 @@ describeIfDb('CalendarService.updateRange — field-level upsert semantics', () 
 
     // Falls back to the unit's base price, and says so.
     expect(days[0]?.isPriceOverridden).toBe(false);
-    expect(days[0]?.price).toBe('80.00');
+    expect(days[0]?.price).toBe('80.000');
   });
 
   it('refuses a unit belonging to another partner', async () => {
@@ -635,7 +635,7 @@ describeIfDb(
                             confirmed_at)
       SELECT cp.id, un.id, un.property_id, ${PARTNER_ID}::uuid, pr.city_id,
              '2030-01-15'::date, '2030-01-17'::date, 2, 'confirmed'::booking_status,
-             '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+             '200.000', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
              un.currency_id, '12500.00000000', '2524875.00', '{"code":"flex"}'::jsonb,
              now()
       FROM cp, units un JOIN properties pr ON pr.id = un.property_id

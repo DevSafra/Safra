@@ -51,11 +51,19 @@ const RATES: Record<string, string> = {
   SYP: '1',
 };
 
+/** Two for everything here; JOD's three is exercised by the currency tests that need it. */
+const DECIMALS: Record<string, number> = { USD: 2, EUR: 2, JOD: 3, SYP: 2 };
+
 const fxStub = {
   rateToSyp: (code: string) => {
     const rate = RATES[code];
     if (!rate) throw new Error(`No stub rate for ${code}`);
     return Promise.resolve(rate);
+  },
+  decimalsOf: (code: string) => {
+    const decimals = DECIMALS[code];
+    if (decimals === undefined) throw new Error(`No stub decimals for ${code}`);
+    return Promise.resolve(decimals);
   },
 } as unknown as FxRateService;
 
@@ -134,14 +142,14 @@ describeIfDb('customer wallet', () => {
     it('creates the wallet on first use and records the movement', async () => {
       const result = await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: await currencyId(db, 'USD'),
         reason: 'sla_compensation',
       });
 
-      expect(result.balance).toBe('10.00');
+      expect(result.balance).toBe('10.000');
       expect(result.currencyCode).toBe('USD');
-      expect(await wallet.sumTransactions(result.walletId)).toBe('10.00');
+      expect(await wallet.sumTransactions(result.walletId)).toBe('10.000');
     });
 
     it('accumulates across movements', async () => {
@@ -149,7 +157,7 @@ describeIfDb('customer wallet', () => {
 
       await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: usd,
         reason: 'sla_compensation',
       });
@@ -160,7 +168,7 @@ describeIfDb('customer wallet', () => {
         reason: 'refund',
       });
 
-      expect(second.balance).toBe('15.55');
+      expect(second.balance).toBe('15.550');
     });
 
     /**
@@ -183,8 +191,8 @@ describeIfDb('customer wallet', () => {
 
       const current = await wallet.findByCustomer(profileId);
 
-      expect(current?.balance).toBe('33.71');
-      expect(await wallet.sumTransactions(current?.walletId ?? '')).toBe('33.71');
+      expect(current?.balance).toBe('33.710');
+      expect(await wallet.sumTransactions(current?.walletId ?? '')).toBe('33.710');
     });
 
     it('rejects a zero or negative movement', async () => {
@@ -193,7 +201,7 @@ describeIfDb('customer wallet', () => {
       await expect(
         wallet.credit(db, {
           customerProfileId: profileId,
-          amount: '0.00',
+          amount: '0.000',
           currencyId: usd,
           reason: 'refund',
         }),
@@ -220,7 +228,7 @@ describeIfDb('customer wallet', () => {
     it('refuses an admin adjustment with no acting user', async () => {
       const attempt = wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: await currencyId(db, 'USD'),
         reason: 'admin_adjustment',
       });
@@ -238,7 +246,7 @@ describeIfDb('customer wallet', () => {
 
       await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '50.00',
+        amount: '50.000',
         currencyId: usd,
         reason: 'sla_compensation',
       });
@@ -250,7 +258,7 @@ describeIfDb('customer wallet', () => {
         reason: 'booking_payment',
       });
 
-      expect(spent.balance).toBe('30.01');
+      expect(spent.balance).toBe('30.010');
     });
 
     /**
@@ -262,7 +270,7 @@ describeIfDb('customer wallet', () => {
 
       await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: usd,
         reason: 'sla_compensation',
       });
@@ -276,7 +284,7 @@ describeIfDb('customer wallet', () => {
         }),
       ).rejects.toThrow(/less than/i);
 
-      expect((await wallet.findByCustomer(profileId))?.balance).toBe('10.00');
+      expect((await wallet.findByCustomer(profileId))?.balance).toBe('10.000');
     });
 
     it('allows spending the balance down to exactly zero', async () => {
@@ -284,19 +292,19 @@ describeIfDb('customer wallet', () => {
 
       await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: usd,
         reason: 'sla_compensation',
       });
 
       const spent = await wallet.debit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: usd,
         reason: 'booking_payment',
       });
 
-      expect(spent.balance).toBe('0.00');
+      expect(spent.balance).toBe('0.000');
     });
   });
 
@@ -319,7 +327,7 @@ describeIfDb('customer wallet', () => {
           db.transaction((tx) =>
             wallet.credit(tx as unknown as Database, {
               customerProfileId: profileId,
-              amount: '10.00',
+              amount: '10.000',
               currencyId: usd,
               reason: 'sla_compensation',
             }),
@@ -329,8 +337,8 @@ describeIfDb('customer wallet', () => {
 
       const current = await wallet.findByCustomer(profileId);
 
-      expect(current?.balance).toBe('50.00');
-      expect(await wallet.sumTransactions(current?.walletId ?? '')).toBe('50.00');
+      expect(current?.balance).toBe('50.000');
+      expect(await wallet.sumTransactions(current?.walletId ?? '')).toBe('50.000');
     });
 
     /**
@@ -343,7 +351,7 @@ describeIfDb('customer wallet', () => {
 
       await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: usd,
         reason: 'sla_compensation',
       });
@@ -353,7 +361,7 @@ describeIfDb('customer wallet', () => {
           db.transaction((tx) =>
             wallet.debit(tx as unknown as Database, {
               customerProfileId: profileId,
-              amount: '10.00',
+              amount: '10.000',
               currencyId: usd,
               reason: 'booking_payment',
             }),
@@ -362,7 +370,7 @@ describeIfDb('customer wallet', () => {
       );
 
       expect(attempts.filter((a) => a.status === 'fulfilled')).toHaveLength(1);
-      expect((await wallet.findByCustomer(profileId))?.balance).toBe('0.00');
+      expect((await wallet.findByCustomer(profileId))?.balance).toBe('0.000');
     });
 
     /**
@@ -390,8 +398,8 @@ describeIfDb('customer wallet', () => {
 
       const current = await wallet.findByCustomer(profileId);
 
-      expect(current?.balance).toBe('16.65');
-      expect(await wallet.sumTransactions(current?.walletId ?? '')).toBe('16.65');
+      expect(current?.balance).toBe('16.650');
+      expect(await wallet.sumTransactions(current?.walletId ?? '')).toBe('16.650');
     });
 
     /** Two first-ever movements racing must not both try to create the wallet. */
@@ -416,7 +424,7 @@ describeIfDb('customer wallet', () => {
         WHERE customer_profile_id = ${profileId}`);
 
       expect(rows.rows[0]?.count).toBe('1');
-      expect((await wallet.findByCustomer(profileId))?.balance).toBe('21.00');
+      expect((await wallet.findByCustomer(profileId))?.balance).toBe('21.000');
     });
   });
 
@@ -433,35 +441,35 @@ describeIfDb('customer wallet', () => {
     it('converts a foreign-currency credit instead of adding it as-is', async () => {
       await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: await currencyId(db, 'USD'),
         reason: 'sla_compensation',
       });
 
       const second = await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: await currencyId(db, 'JOD'),
         reason: 'sla_compensation',
       });
 
       // 10 JOD -> 188,000 SYP -> 14.46 USD. NOT 10.00.
-      expect(second.appliedAmount).toBe('14.46');
-      expect(second.balance).toBe('24.46');
+      expect(second.appliedAmount).toBe('14.460');
+      expect(second.balance).toBe('24.460');
       expect(second.currencyCode).toBe('USD');
     });
 
     it('never changes the wallet currency after creation', async () => {
       await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: await currencyId(db, 'EUR'),
         reason: 'sla_compensation',
       });
 
       await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: await currencyId(db, 'USD'),
         reason: 'sla_compensation',
       });
@@ -472,14 +480,14 @@ describeIfDb('customer wallet', () => {
     it('records the converted amount on the transaction, not the requested one', async () => {
       await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: await currencyId(db, 'USD'),
         reason: 'sla_compensation',
       });
 
       const movement = await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: await currencyId(db, 'JOD'),
         reason: 'sla_compensation',
       });
@@ -488,7 +496,7 @@ describeIfDb('customer wallet', () => {
         SELECT amount::text AS amount FROM wallet_transactions
         WHERE id = ${movement.transactionId}`);
 
-      expect(rows.rows[0]?.amount).toBe('14.46');
+      expect(rows.rows[0]?.amount).toBe('14.460');
     });
   });
 
@@ -510,8 +518,8 @@ describeIfDb('customer wallet', () => {
       const current = await wallet.findByCustomer(profileId);
       const page = await wallet.listTransactions(current?.walletId ?? '', { limit: 20 });
 
-      expect(page.items.map((i) => i.amount)).toStrictEqual(['3.00', '2.00', '1.00']);
-      expect(page.items[0]?.balanceAfter).toBe('6.00');
+      expect(page.items.map((i) => i.amount)).toStrictEqual(['3.000', '2.000', '1.000']);
+      expect(page.items[0]?.balanceAfter).toBe('6.000');
       expect(page.nextCursor).toBeNull();
     });
 
@@ -524,7 +532,7 @@ describeIfDb('customer wallet', () => {
       const usd = await currencyId(db, 'USD');
 
       await db.transaction(async (tx) => {
-        for (const amount of ['1.00', '2.00', '3.00', '4.00']) {
+        for (const amount of ['1.000', '2.000', '3.000', '4.000']) {
           await wallet.credit(tx as unknown as Database, {
             customerProfileId: profileId,
             amount,
@@ -549,7 +557,7 @@ describeIfDb('customer wallet', () => {
       const seen = [...first.items, ...second.items].map((i) => i.amount);
 
       expect(new Set(seen).size).toBe(4);
-      expect(seen.sort()).toStrictEqual(['1.00', '2.00', '3.00', '4.00']);
+      expect(seen.sort()).toStrictEqual(['1.000', '2.000', '3.000', '4.000']);
     });
 
     it('rejects a malformed cursor rather than restarting from page one', async () => {
@@ -577,7 +585,7 @@ describeIfDb('customer wallet', () => {
     it('refuses to rewrite a recorded movement', async () => {
       const movement = await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: await currencyId(db, 'USD'),
         reason: 'sla_compensation',
       });
@@ -591,7 +599,7 @@ describeIfDb('customer wallet', () => {
     it('refuses to delete a recorded movement', async () => {
       const movement = await wallet.credit(db, {
         customerProfileId: profileId,
-        amount: '10.00',
+        amount: '10.000',
         currencyId: await currencyId(db, 'USD'),
         reason: 'sla_compensation',
       });
@@ -611,7 +619,7 @@ describeIfDb('customer wallet', () => {
       const result = await adjustments.adjust(
         profileId,
         {
-          amount: '25.00',
+          amount: '25.000',
           direction: 'credit',
           currency: 'USD',
           note: 'Goodwill for a delayed check-in.',
@@ -619,7 +627,7 @@ describeIfDb('customer wallet', () => {
         { userId: ACTOR_ID, role: 'finance_officer' },
       );
 
-      expect(result.balance).toBe('25.00');
+      expect(result.balance).toBe('25.000');
 
       /**
        * The deferred balance trigger would already have rejected an unbalanced
@@ -643,7 +651,7 @@ describeIfDb('customer wallet', () => {
       await adjustments.adjust(
         profileId,
         {
-          amount: '25.00',
+          amount: '25.000',
           direction: 'credit',
           currency: 'USD',
           note: 'First goodwill payment.',
@@ -670,8 +678,8 @@ describeIfDb('customer wallet', () => {
       const before = rows.rows[0]?.before as { balance?: string } | null;
       const after = rows.rows[0]?.after as { balance?: string; note?: string } | null;
 
-      expect(before?.balance).toBe('25.00');
-      expect(after?.balance).toBe('20.00');
+      expect(before?.balance).toBe('25.000');
+      expect(after?.balance).toBe('20.000');
       expect(after?.note).toBe('Correcting an over-credit.');
     });
 
@@ -683,7 +691,7 @@ describeIfDb('customer wallet', () => {
       await adjustments.adjust(
         profileId,
         {
-          amount: '10.00',
+          amount: '10.000',
           direction: 'credit',
           currency: 'USD',
           note: 'Seed balance for the rollback case.',
@@ -704,7 +712,7 @@ describeIfDb('customer wallet', () => {
         ),
       ).rejects.toThrow(/less than/i);
 
-      expect((await wallet.findByCustomer(profileId))?.balance).toBe('10.00');
+      expect((await wallet.findByCustomer(profileId))?.balance).toBe('10.000');
 
       const legs = await db.execute<{ count: string }>(sql`
         SELECT COUNT(*)::text AS count FROM ledger_entries
@@ -719,7 +727,7 @@ describeIfDb('customer wallet', () => {
         adjustments.adjust(
           profileId,
           {
-            amount: '10.00',
+            amount: '10.000',
             direction: 'credit',
             currency: 'ZZZ',
             note: 'Should never be applied.',

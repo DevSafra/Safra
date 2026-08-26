@@ -378,7 +378,7 @@ describeIfDb('PropertiesService.readOwn', () => {
       const read = await service.readOwn(partner(), reference);
 
       expect(read.units).toHaveLength(2);
-      expect(read.units[0]?.basePrice).toBe('120.00');
+      expect(read.units[0]?.basePrice).toBe('120.000');
     });
   });
 

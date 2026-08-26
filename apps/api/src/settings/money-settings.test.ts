@@ -12,8 +12,8 @@ import { DEFAULT_MONEY_CURRENCY, normalise } from './money-settings.service.js';
  */
 describe('normalise', () => {
   it('reads a bare number as the default currency', () => {
-    expect(normalise(10)).toStrictEqual({ amount: '10.00', currency: 'USD' });
-    expect(normalise(1.99)).toStrictEqual({ amount: '1.99', currency: 'USD' });
+    expect(normalise(10)).toStrictEqual({ amount: '10.000', currency: 'USD' });
+    expect(normalise(1.99)).toStrictEqual({ amount: '1.990', currency: 'USD' });
   });
 
   it('uses the documented default currency rather than a literal', () => {
@@ -21,15 +21,15 @@ describe('normalise', () => {
   });
 
   it('reads the explicit shape', () => {
-    expect(normalise({ amount: '8.50', currency: 'JOD' })).toStrictEqual({
-      amount: '8.50',
+    expect(normalise({ amount: '8.500', currency: 'JOD' })).toStrictEqual({
+      amount: '8.500',
       currency: 'JOD',
     });
   });
 
   it('accepts a numeric amount inside the explicit shape', () => {
     expect(normalise({ amount: 8.5, currency: 'EUR' })).toStrictEqual({
-      amount: '8.50',
+      amount: '8.500',
       currency: 'EUR',
     });
   });
@@ -71,10 +71,19 @@ describe('normalise', () => {
   });
 
   /**
-   * Truncated at the column's scale, not rounded up, matching `toMinor`. A setting
-   * cannot hold sub-cent precision the database would drop anyway.
+   * Truncated at the carrying scale, not rounded up, matching `toMinor`.
+   *
+   * Three decimals now rather than two — that is `MONEY_SCALE`, the widest any currency SAFRA
+   * lists needs, so a JOD setting keeps its fils. The input carries a FOURTH decimal, which no
+   * currency here can express and which the column would drop anyway; asserting against an input
+   * the scale already fits would prove nothing.
    */
   it('truncates precision beyond the money scale', () => {
-    expect(normalise({ amount: '10.999', currency: 'USD' })?.amount).toBe('10.99');
+    expect(normalise({ amount: '10.9999', currency: 'USD' })?.amount).toBe('10.999');
+  });
+
+  /** And a three-decimal currency keeps the decimal that two would have flattened. */
+  it('keeps the third decimal a JOD amount needs', () => {
+    expect(normalise({ amount: '10.125', currency: 'JOD' })?.amount).toBe('10.125');
   });
 });

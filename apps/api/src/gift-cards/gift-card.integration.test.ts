@@ -130,7 +130,7 @@ describeIfDb('GiftCardService', () => {
         (code_hash, code_last4, original_amount, remaining_amount, currency_id,
          status, expires_at, purchased_by_customer_id)
       SELECT ${hash}, ${normalised.slice(-4)},
-             ${options.amount ?? '50.00'}::numeric, ${options.amount ?? '50.00'}::numeric,
+             ${options.amount ?? '50.000'}::numeric, ${options.amount ?? '50.000'}::numeric,
              cur.id, ${options.status ?? 'active'}::gift_card_status,
              ${options.expiresAt ?? null}::timestamptz,
              ${options.purchaser ?? null}::uuid
@@ -145,24 +145,24 @@ describeIfDb('GiftCardService', () => {
   // ─── Redeeming ─────────────────────────────────────────────────────────────
 
   it('credits the wallet with the whole card and empties it', async () => {
-    await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '75.00' });
+    await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '75.000' });
 
     const result = await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX');
 
-    expect(result.creditedAmount).toBe('75.00');
+    expect(result.creditedAmount).toBe('75.000');
     expect(result.creditedCurrency).toBe('USD');
-    expect(result.walletBalance).toBe('75.00');
+    expect(result.walletBalance).toBe('75.000');
 
     const card = await db.execute<{ remaining: string; status: string }>(sql`
       SELECT remaining_amount::text AS remaining, status::text AS status
       FROM gift_cards WHERE reference = ${result.reference}`);
 
-    expect(card.rows[0]).toStrictEqual({ remaining: '0.00', status: 'used' });
+    expect(card.rows[0]).toStrictEqual({ remaining: '0.000', status: 'used' });
   });
 
   /** The card's own history, append-only by trigger. */
   it('records the draw-down on the card', async () => {
-    const reference = await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '40.00' });
+    const reference = await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '40.000' });
 
     await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX');
 
@@ -174,7 +174,7 @@ describeIfDb('GiftCardService', () => {
       WHERE g.reference = ${reference}`);
 
     expect(txns.rows).toHaveLength(1);
-    expect(txns.rows[0]).toStrictEqual({ amount: '40.00', balance_after: '0.00' });
+    expect(txns.rows[0]).toStrictEqual({ amount: '40.000', balance_after: '0.000' });
   });
 
   it('moves the balance under the gift_card_transfer reason', async () => {
@@ -241,16 +241,16 @@ describeIfDb('GiftCardService', () => {
 
     const result = await giftCards.redeem(customer(), typed);
 
-    expect(result.creditedAmount).toBe('25.00');
+    expect(result.creditedAmount).toBe('25.000');
   });
 
   /* `O` for `0` and `I`/`L` for `1` — the alphabet excludes those letters, so the mapping is safe. */
   it('maps the confusable letters onto their digits', async () => {
-    await issue({ code: '01234-56789-ABCDE-FGHJK', amount: '30.00' });
+    await issue({ code: '01234-56789-ABCDE-FGHJK', amount: '30.000' });
 
     const result = await giftCards.redeem(customer(), 'OI234-56789-ABCDE-FGHJK');
 
-    expect(result.creditedAmount).toBe('30.00');
+    expect(result.creditedAmount).toBe('30.000');
   });
 
   it('refuses an unknown code', async () => {
@@ -297,13 +297,13 @@ describeIfDb('GiftCardService', () => {
   it('accepts a card whose expiry is still ahead', async () => {
     await issue({
       code: 'ABCDE-FGHJK-MNPQR-STVWX',
-      amount: '60.00',
+      amount: '60.000',
       expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
     });
 
     expect(
       (await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX')).creditedAmount,
-    ).toBe('60.00');
+    ).toBe('60.000');
   });
 
   it('refuses a cancelled card distinctly, so support can be told', async () => {
@@ -338,7 +338,7 @@ describeIfDb('GiftCardService', () => {
     expect(result.creditedCurrency).toBe('USD');
     expect(result.walletCurrency).toBe('EUR');
     /* 14 USD × 13000 ÷ 14000 = 13.00 EUR, on top of the 10.00 already there. */
-    expect(result.walletBalance).toBe('23.00');
+    expect(result.walletBalance).toBe('23.000');
   });
 
   it('refuses an anonymous caller', async () => {
@@ -360,17 +360,17 @@ describeIfDb('GiftCardService', () => {
 
     const result = await giftCards.purchase(customer(), { amount: '100.00' });
 
-    expect(result.card.originalAmount).toBe('100.00');
-    expect(result.card.remainingAmount).toBe('100.00');
+    expect(result.card.originalAmount).toBe('100.000');
+    expect(result.card.remainingAmount).toBe('100.000');
     expect(result.card.status).toBe('active');
-    expect(result.walletBalance).toBe('20.00');
+    expect(result.walletBalance).toBe('20.000');
     /* Four groups of five, hyphenated, for reading off a screen. */
     expect(result.code).toMatch(/^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/);
   });
 
   /** The plaintext must not be recoverable from the row it created. */
   it('stores only a hash and the last four symbols', async () => {
-    await fund('60.00');
+    await fund('60.000');
 
     const result = await giftCards.purchase(customer(), { amount: '50.00' });
     const normalised = normaliseGiftCode(result.code);
@@ -390,7 +390,7 @@ describeIfDb('GiftCardService', () => {
    * otherwise present as "no card anybody buys ever works".
    */
   it('issues a code that redeems for the amount it was bought for', async () => {
-    await fund('60.00');
+    await fund('60.000');
 
     const bought = await giftCards.purchase(customer(), { amount: '50.00' });
 
@@ -400,8 +400,8 @@ describeIfDb('GiftCardService', () => {
       bought.code,
     );
 
-    expect(redeemed.creditedAmount).toBe('50.00');
-    expect(redeemed.walletBalance).toBe('50.00');
+    expect(redeemed.creditedAmount).toBe('50.000');
+    expect(redeemed.walletBalance).toBe('50.000');
   });
 
   it('refuses a purchase the wallet cannot cover, and creates no card', async () => {
@@ -435,7 +435,7 @@ describeIfDb('GiftCardService', () => {
    * a card nobody can open.
    */
   it('emails the code to the purchaser', async () => {
-    await fund('50.00');
+    await fund('50.000');
 
     const result = await giftCards.purchase(customer(), { amount: '25.00' });
 
@@ -454,7 +454,7 @@ describeIfDb('GiftCardService', () => {
    * keep no copy of the code, so a gift sent to the wrong inbox cannot be recovered any other way.
    */
   it('sends the gift to its recipient and a copy to the buyer', async () => {
-    await fund('50.00');
+    await fund('50.000');
 
     const result = await giftCards.purchase(customer(), {
       amount: '25.00',
@@ -478,7 +478,7 @@ describeIfDb('GiftCardService', () => {
    * profile name is no safer than the recipient name — both are free text — so neither appears.
    */
   it('puts no caller-supplied text in either mail', async () => {
-    await fund('50.00');
+    await fund('50.000');
 
     await giftCards.purchase(customer(), {
       amount: '25.00',
@@ -496,7 +496,7 @@ describeIfDb('GiftCardService', () => {
 
   /* A buyer who names their own address gets one mail, not two of the same thing. */
   it('does not send twice when the recipient is the buyer', async () => {
-    await fund('50.00');
+    await fund('50.000');
 
     await giftCards.purchase(customer(), {
       amount: '25.00',
@@ -515,7 +515,7 @@ describeIfDb('GiftCardService', () => {
    * a dev log is at rest. The purchase RESPONSE still carries the code, so nothing is lost.
    */
   it('marks both gift mails as carrying a secret', async () => {
-    await fund('50.00');
+    await fund('50.000');
 
     await giftCards.purchase(customer(), {
       amount: '25.00',
@@ -542,7 +542,7 @@ describeIfDb('GiftCardService', () => {
    * a card the customer has already paid for.
    */
   it('keeps the card when the mail cannot be sent', async () => {
-    await fund('50.00');
+    await fund('50.000');
 
     const failing = new GiftCardService(
       db,
@@ -565,7 +565,7 @@ describeIfDb('GiftCardService', () => {
   });
 
   it('audits the purchase without recording the code', async () => {
-    await fund('60.00');
+    await fund('60.000');
 
     const bought = await giftCards.purchase(customer(), { amount: '50.00' });
 
@@ -581,7 +581,7 @@ describeIfDb('GiftCardService', () => {
   });
 
   it('keeps the recipient as a label when one is given', async () => {
-    await fund('30.00');
+    await fund('30.000');
 
     const result = await giftCards.purchase(customer(), {
       amount: '25.00',
@@ -609,18 +609,18 @@ describeIfDb('GiftCardService', () => {
     const split = await wallet.composition(PROFILE_ID);
 
     /* Bashar's own example: a $25 card on a $10 refund balance reads 25 and 10, total 35. */
-    expect(split?.balance).toBe('35.00');
-    expect(split?.giftBalance).toBe('25.00');
+    expect(split?.balance).toBe('35.000');
+    expect(split?.giftBalance).toBe('25.000');
     expect(Number(split?.balance) - Number(split?.giftBalance)).toBe(10);
   });
 
   it('has no gift part when nothing came from a card', async () => {
-    await fund('40.00');
+    await fund('40.000');
 
     const split = await wallet.composition(PROFILE_ID);
 
-    expect(split?.giftBalance).toBe('0.00');
-    expect(split?.balance).toBe('40.00');
+    expect(split?.giftBalance).toBe('0.000');
+    expect(split?.balance).toBe('40.000');
   });
 
   /** Gift money goes first on ordinary spending, which is the conservative order. */
@@ -631,15 +631,15 @@ describeIfDb('GiftCardService', () => {
 
     await wallet.debit(db, {
       customerProfileId: PROFILE_ID,
-      amount: '20.00',
+      amount: '20.000',
       currencyId: await idOfCurrency(db, 'USD'),
       reason: 'booking_payment',
     });
 
     const split = await wallet.composition(PROFILE_ID);
 
-    expect(split?.balance).toBe('15.00');
-    expect(split?.giftBalance).toBe('5.00');
+    expect(split?.balance).toBe('15.000');
+    expect(split?.giftBalance).toBe('5.000');
   });
 
   it('never reports a negative gift part once the gift is used up', async () => {
@@ -649,15 +649,15 @@ describeIfDb('GiftCardService', () => {
 
     await wallet.debit(db, {
       customerProfileId: PROFILE_ID,
-      amount: '30.00',
+      amount: '30.000',
       currencyId: await idOfCurrency(db, 'USD'),
       reason: 'booking_payment',
     });
 
     const split = await wallet.composition(PROFILE_ID);
 
-    expect(split?.balance).toBe('5.00');
-    expect(split?.giftBalance).toBe('0.00');
+    expect(split?.balance).toBe('5.000');
+    expect(split?.giftBalance).toBe('0.000');
   });
 
   /**
@@ -667,7 +667,7 @@ describeIfDb('GiftCardService', () => {
    * read 5 and 25 — claiming a purchase came from money it was forbidden to use. It must read 25 and 5.
    */
   it('does not let a card purchase consume the gift part', async () => {
-    await fund('30.00');
+    await fund('30.000');
     await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '25.00' });
     await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX');
 
@@ -675,9 +675,9 @@ describeIfDb('GiftCardService', () => {
 
     const split = await wallet.composition(PROFILE_ID);
 
-    expect(split?.balance).toBe('30.00');
+    expect(split?.balance).toBe('30.000');
     expect(split?.giftBalance, 'the gift part must be untouched by a purchase').toBe(
-      '25.00',
+      '25.000',
     );
   });
 
@@ -719,37 +719,37 @@ describeIfDb('GiftCardService', () => {
   });
 
   it('allows a card bought entirely from the cash part', async () => {
-    await fund('30.00');
+    await fund('30.000');
     await issue({ code: 'ABCDE-FGHJK-MNPQR-STVWX', amount: '50.00' });
     await giftCards.redeem(customer(), 'ABCDE-FGHJK-MNPQR-STVWX');
 
     const bought = await giftCards.purchase(customer(), { amount: '25.00' });
 
-    expect(bought.card.originalAmount).toBe('25.00');
+    expect(bought.card.originalAmount).toBe('25.000');
 
     const split = await wallet.composition(PROFILE_ID);
 
     /* 80 − 25 = 55, and the gift part is untouched at 50, so the cash part fell from 30 to 5. */
-    expect(split?.balance).toBe('55.00');
-    expect(split?.giftBalance).toBe('50.00');
+    expect(split?.balance).toBe('55.000');
+    expect(split?.giftBalance).toBe('50.000');
   });
 
   // ─── Listing ───────────────────────────────────────────────────────────────
 
   it('lists the cards this customer bought and nobody else’s', async () => {
-    await fund('60.00');
+    await fund('60.000');
     await giftCards.purchase(customer(), { amount: '50.00' });
     await issue({ code: 'ZZZZZ-ZZZZZ-ZZZZZ-ZZZZZ', purchaser: OTHER_PROFILE_ID });
 
     const page = await giftCards.list(customer(), { limit: 20 });
 
     expect(page.items).toHaveLength(1);
-    expect(page.items[0]?.originalAmount).toBe('50.00');
+    expect(page.items[0]?.originalAmount).toBe('50.000');
   });
 
   /** No code, in any form, on a read. */
   it('never returns a code from the list', async () => {
-    await fund('60.00');
+    await fund('60.000');
     await giftCards.purchase(customer(), { amount: '50.00' });
 
     const page = await giftCards.list(customer(), { limit: 20 });

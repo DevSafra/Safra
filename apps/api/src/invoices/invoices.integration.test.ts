@@ -107,7 +107,7 @@ describeIfDb('InvoicesService', () => {
     const page = await service.list(customer(), { limit: 20 });
     const paid = page.items.find((item) => item.reference === PAID);
 
-    expect(paid?.totalAmount).toBe('201.99');
+    expect(paid?.totalAmount).toBe('201.990');
     expect(paid?.currencyCode).toBe('USD');
     expect(typeof paid?.totalAmount).toBe('string');
   });
@@ -185,11 +185,11 @@ describeIfDb('InvoicesService', () => {
     const invoice = await service.one(customer(), PAID);
 
     expect(invoice.reference).toBe(PAID);
-    expect(invoice.totalAmount).toBe('201.99');
+    expect(invoice.totalAmount).toBe('201.990');
     expect(invoice.nights).toBe(2);
     expect(invoice.lines).toStrictEqual([
-      { key: 'accommodation', amount: '200.00', deduction: false },
-      { key: 'serviceFee', amount: '1.99', deduction: false },
+      { key: 'accommodation', amount: '200.000', deduction: false },
+      { key: 'serviceFee', amount: '1.990', deduction: false },
     ]);
   });
 
@@ -203,10 +203,10 @@ describeIfDb('InvoicesService', () => {
     const invoice = await service.one(customer(), DISCOUNTED);
 
     expect(invoice.lines).toStrictEqual([
-      { key: 'accommodation', amount: '200.00', deduction: false },
-      { key: 'serviceFee', amount: '1.99', deduction: false },
-      { key: 'discount', amount: '25.00', deduction: true },
-      { key: 'wallet', amount: '10.00', deduction: true },
+      { key: 'accommodation', amount: '200.000', deduction: false },
+      { key: 'serviceFee', amount: '1.990', deduction: false },
+      { key: 'discount', amount: '25.000', deduction: true },
+      { key: 'wallet', amount: '10.000', deduction: true },
     ]);
     /* `gift_card_amount` is 0 on this booking, so no gift-card line at all. */
     expect(invoice.lines.map((line) => line.key)).not.toContain('giftCard');
@@ -228,7 +228,7 @@ describeIfDb('InvoicesService', () => {
     );
 
     expect(summed).not.toBeCloseTo(Number(invoice.totalAmount));
-    expect(invoice.totalAmount).toBe('176.99');
+    expect(invoice.totalAmount).toBe('176.990');
   });
 
   it('lists every payment attempt, failures included, oldest first', async () => {
@@ -238,7 +238,7 @@ describeIfDb('InvoicesService', () => {
       'failed',
       'captured',
     ]);
-    expect(invoice.payments[1]?.amount).toBe('201.99');
+    expect(invoice.payments[1]?.amount).toBe('201.990');
     expect(invoice.payments[1]?.currencyCode).toBe('USD');
     expect(invoice.payments[1]?.capturedAt).not.toBeNull();
     expect(invoice.payments[0]?.capturedAt).toBeNull();
@@ -361,7 +361,7 @@ async function seed(db: Database): Promise<void> {
       discount: '0.00',
       gift: '0.00',
       wallet: '0.00',
-      total: '201.99',
+      total: '201.990',
     },
     {
       reference: UNPAID,
@@ -372,7 +372,7 @@ async function seed(db: Database): Promise<void> {
       discount: '0.00',
       gift: '0.00',
       wallet: '0.00',
-      total: '201.99',
+      total: '201.990',
     },
     {
       reference: DISCOUNTED,
@@ -383,7 +383,7 @@ async function seed(db: Database): Promise<void> {
       discount: '25.00',
       gift: '0.00',
       wallet: '10.00',
-      total: '176.99',
+      total: '176.990',
     },
     {
       reference: DRAFT,
@@ -394,7 +394,7 @@ async function seed(db: Database): Promise<void> {
       discount: '0.00',
       gift: '0.00',
       wallet: '0.00',
-      total: '201.99',
+      total: '201.990',
     },
     {
       reference: DELETED,
@@ -405,7 +405,7 @@ async function seed(db: Database): Promise<void> {
       discount: '0.00',
       gift: '0.00',
       wallet: '0.00',
-      total: '201.99',
+      total: '201.990',
     },
     {
       reference: OTHERS,
@@ -416,7 +416,7 @@ async function seed(db: Database): Promise<void> {
       discount: '0.00',
       gift: '0.00',
       wallet: '0.00',
-      total: '201.99',
+      total: '201.990',
     },
   ] as const;
 
@@ -462,7 +462,7 @@ async function seed(db: Database): Promise<void> {
     await db.execute(sql`
       INSERT INTO payments (reference, booking_id, method, provider, amount, currency_id,
                             status, captured_at, created_at)
-      SELECT ${reference}, b.id, 'visa', 'test', '201.99', b.currency_id,
+      SELECT ${reference}, b.id, 'visa', 'test', '201.990', b.currency_id,
              ${status}::payment_status, ${captured ? sql`now()` : sql`NULL`},
              now() - ((${captured ? 1 : 2}) * interval '1 minute')
       FROM bookings b

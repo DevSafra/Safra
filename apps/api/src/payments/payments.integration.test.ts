@@ -538,7 +538,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
       // Check-in is well over 168h out, so the 100% tier applies to the 200.00 base.
       expect(quote.refundPercent).toBe(100);
-      expect(quote.refundAmount).toBe('200.00');
+      expect(quote.refundAmount).toBe('200.000');
     });
 
     it('posts a balanced two-leg group and completes the refund', async () => {
@@ -549,7 +549,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       );
 
       expect(result.status).toBe('completed');
-      expect(result.amount).toBe('200.00');
+      expect(result.amount).toBe('200.000');
 
       const legs = await db.execute<{ count: string; balanced: boolean }>(sql`
         SELECT COUNT(*)::text AS count,
@@ -589,8 +589,8 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
       // Booking total is 201.99 = 200.00 base + 1.99 service fee. Only the base
       // is refundable: the fee is earned when the booking is made.
-      expect(quote.refundAmount).toBe('200.00');
-      expect(quote.refundAmount).not.toBe('201.99');
+      expect(quote.refundAmount).toBe('200.000');
+      expect(quote.refundAmount).not.toBe('201.990');
     });
   });
 
@@ -605,7 +605,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
     } as unknown as AccessTokenClaims;
 
     it('reduces the gateway amount by the balance applied', async () => {
-      await credit(db, wallet, '50.00');
+      await credit(db, wallet, '50.000');
 
       const token = await access.mint(db, booking.id, minutesFromNow(60));
 
@@ -618,16 +618,16 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       });
 
       // Booking total is 201.99; 50.00 comes from the balance.
-      expect(result.walletApplied).toBe('50.00');
-      expect(result.amount.value).toBe('151.99');
+      expect(result.walletApplied).toBe('50.000');
+      expect(result.amount.value).toBe('151.990');
 
       // And the gateway is asked for exactly that, not the full total.
       const rows = await db.execute<{ amount: string }>(sql`
         SELECT amount::text AS amount FROM payments
         WHERE booking_id = ${booking.id}::uuid ORDER BY created_at DESC LIMIT 1`);
 
-      expect(rows.rows[0]?.amount).toBe('151.99');
-      expect(await balanceOf(wallet)).toBe('0.00');
+      expect(rows.rows[0]?.amount).toBe('151.990');
+      expect(await balanceOf(wallet)).toBe('0.000');
     });
 
     /**
@@ -640,7 +640,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
      * real failure at the right moment can demonstrate it.
      */
     it('does not touch the balance when the provider refuses the intent', async () => {
-      await credit(db, wallet, '50.00');
+      await credit(db, wallet, '50.000');
 
       const unavailable = {
         resolveForCountry: () =>
@@ -677,14 +677,14 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         }),
       ).rejects.toThrow(/temporarily unavailable/i);
 
-      expect(await balanceOf(wallet)).toBe('50.00');
+      expect(await balanceOf(wallet)).toBe('50.000');
 
       // And the booking records no hold either.
       const held = await db.execute<{ wallet_amount: string }>(sql`
         SELECT wallet_amount::text AS wallet_amount FROM bookings
         WHERE id = ${booking.id}::uuid`);
 
-      expect(held.rows[0]?.wallet_amount).toBe('0.00');
+      expect(held.rows[0]?.wallet_amount).toBe('0.000');
     });
 
     it('captures with no provider at all when the balance covers the total', async () => {
@@ -701,11 +701,11 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       });
 
       expect(result.status).toBe('captured');
-      expect(result.amount.value).toBe('0.00');
-      expect(result.walletApplied).toBe('201.99');
+      expect(result.amount.value).toBe('0.000');
+      expect(result.walletApplied).toBe('201.990');
 
       // 250.00 - 201.99. The surplus stays spendable.
-      expect(await balanceOf(wallet)).toBe('48.01');
+      expect(await balanceOf(wallet)).toBe('48.010');
 
       const status = await db.execute<{ status: string }>(sql`
         SELECT status::text AS status FROM bookings WHERE id = ${booking.id}::uuid`);
@@ -719,7 +719,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
      * holds. The deferred trigger would reject it otherwise.
      */
     it('posts both funding legs and still balances', async () => {
-      await credit(db, wallet, '50.00');
+      await credit(db, wallet, '50.000');
 
       const token = await access.mint(db, booking.id, minutesFromNow(60));
       const ref = `sim_${booking.id}`;
@@ -736,7 +736,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         UPDATE payments SET provider_ref = ${ref}
         WHERE booking_id = ${booking.id}::uuid`);
 
-      await deliver(webhooks, eventId(), ref, '151.99');
+      await deliver(webhooks, eventId(), ref, '151.990');
 
       const legs = await db.execute<{ account: string; amount: string }>(sql`
         SELECT account::text AS account, amount::text AS amount
@@ -745,8 +745,8 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         ORDER BY account`);
 
       expect(legs.rows).toStrictEqual([
-        { account: 'customer_payment', amount: '151.99' },
-        { account: 'wallet_debit', amount: '50.00' },
+        { account: 'customer_payment', amount: '151.990' },
+        { account: 'wallet_debit', amount: '50.000' },
       ]);
     });
 
@@ -755,7 +755,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
      * every booking on the profile, so spending it needs a session.
      */
     it('refuses to spend a balance for a guest holding only the access token', async () => {
-      await credit(db, wallet, '50.00');
+      await credit(db, wallet, '50.000');
 
       const token = await access.mint(db, booking.id, minutesFromNow(60));
 
@@ -768,11 +768,11 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         }),
       ).rejects.toThrow(/sign in/i);
 
-      expect(await balanceOf(wallet)).toBe('50.00');
+      expect(await balanceOf(wallet)).toBe('50.000');
     });
 
     it('refuses a signed-in customer who does not own the booking', async () => {
-      await credit(db, wallet, '50.00');
+      await credit(db, wallet, '50.000');
 
       const token = await access.mint(db, booking.id, minutesFromNow(60));
 
@@ -786,7 +786,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         }),
       ).rejects.toThrow(/sign in/i);
 
-      expect(await balanceOf(wallet)).toBe('50.00');
+      expect(await balanceOf(wallet)).toBe('50.000');
     });
 
     /**
@@ -797,7 +797,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
      * loses money to split payment, so it is swept rather than left to support.
      */
     it('returns the balance when the booking expires unpaid', async () => {
-      await credit(db, wallet, '50.00');
+      await credit(db, wallet, '50.000');
 
       const token = await access.mint(db, booking.id, minutesFromNow(60));
 
@@ -809,7 +809,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         locale: 'en',
       });
 
-      expect(await balanceOf(wallet)).toBe('0.00');
+      expect(await balanceOf(wallet)).toBe('0.000');
 
       // Push the payment window into the past so the sweep picks it up.
       await db.execute(sql`
@@ -834,14 +834,14 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         FROM wallet_transactions wt
         WHERE wt.booking_id = ${booking.id}::uuid AND wt.reason = 'refund'`);
 
-      expect(released.rows).toStrictEqual([{ amount: '50.00', direction: 'credit' }]);
+      expect(released.rows).toStrictEqual([{ amount: '50.000', direction: 'credit' }]);
 
       // And the hold is cleared, so a later sweep cannot return it twice.
       const held = await db.execute<{ wallet_amount: string }>(sql`
         SELECT wallet_amount::text AS wallet_amount FROM bookings
         WHERE id = ${booking.id}::uuid`);
 
-      expect(held.rows[0]?.wallet_amount).toBe('0.00');
+      expect(held.rows[0]?.wallet_amount).toBe('0.000');
     });
 
     /**
@@ -852,7 +852,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
      * state machine before it ever reaches the wallet.
      */
     it('returns the balance when the booking is cancelled before payment', async () => {
-      await credit(db, wallet, '50.00');
+      await credit(db, wallet, '50.000');
 
       const token = await access.mint(db, booking.id, minutesFromNow(60));
 
@@ -866,11 +866,11 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
       await actions.cancel(booking.reference, 'Changed plans', 'customer', undefined);
 
-      expect(await balanceOf(wallet)).toBe('50.00');
+      expect(await balanceOf(wallet)).toBe('50.000');
     });
 
     it('charges the full total when the balance is not asked for', async () => {
-      await credit(db, wallet, '50.00');
+      await credit(db, wallet, '50.000');
 
       const token = await access.mint(db, booking.id, minutesFromNow(60));
 
@@ -881,9 +881,9 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         locale: 'en',
       });
 
-      expect(result.amount.value).toBe('201.99');
-      expect(result.walletApplied).toBe('0.00');
-      expect(await balanceOf(wallet)).toBe('50.00');
+      expect(result.amount.value).toBe('201.990');
+      expect(result.walletApplied).toBe('0.000');
+      expect(await balanceOf(wallet)).toBe('50.000');
     });
 
     /** An empty wallet is not an error — checkout proceeds at the full price. */
@@ -898,8 +898,8 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         locale: 'en',
       });
 
-      expect(result.amount.value).toBe('201.99');
-      expect(result.walletApplied).toBe('0.00');
+      expect(result.amount.value).toBe('201.990');
+      expect(result.walletApplied).toBe('0.000');
     });
   });
 
@@ -911,7 +911,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
     } as unknown as AccessTokenClaims;
 
     it('returns stored value first, and the rest through the gateway', async () => {
-      await credit(db, wallet, '50.00');
+      await credit(db, wallet, '50.000');
 
       const token = await access.mint(db, booking.id, minutesFromNow(60));
       const ref = `sim_${booking.id}`;
@@ -928,19 +928,19 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         UPDATE payments SET provider_ref = ${ref}
         WHERE booking_id = ${booking.id}::uuid`);
 
-      await deliver(webhooks, eventId(), ref, '151.99');
+      await deliver(webhooks, eventId(), ref, '151.990');
 
       const quote = await refunds.quote(booking.reference);
 
       // 200.00 refundable base: 50.00 back to the wallet, 150.00 to the card.
-      expect(quote.refundAmount).toBe('200.00');
-      expect(quote.walletAmount).toBe('50.00');
-      expect(quote.providerAmount).toBe('150.00');
+      expect(quote.refundAmount).toBe('200.000');
+      expect(quote.walletAmount).toBe('50.000');
+      expect(quote.providerAmount).toBe('150.000');
 
       await refunds.execute(booking.reference, 'Customer request', undefined);
 
       // The wallet was emptied paying for this booking; 50.00 comes straight back.
-      expect(await balanceOf(wallet)).toBe('50.00');
+      expect(await balanceOf(wallet)).toBe('50.000');
     });
 
     /**
@@ -964,10 +964,10 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       const result = await refunds.execute(booking.reference, 'Changed plans', undefined);
 
       expect(result.status).toBe('completed');
-      expect(result.amount).toBe('200.00');
+      expect(result.amount).toBe('200.000');
 
       // 48.01 left over from the payment, plus the 200.00 base returned.
-      expect(await balanceOf(wallet)).toBe('248.01');
+      expect(await balanceOf(wallet)).toBe('248.010');
     });
 
     it('does not return the same stored value twice across two partial refunds', async () => {
@@ -990,7 +990,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
         refunds.execute(booking.reference, 'Second', undefined),
       ).rejects.toThrow(/no refundable amount/i);
 
-      expect(await balanceOf(wallet)).toBe('248.01');
+      expect(await balanceOf(wallet)).toBe('248.010');
     });
   });
 
@@ -1170,7 +1170,7 @@ function eventBody(
     id,
     type: 'payment.captured',
     payment_ref: paymentRef,
-    amount: '201.99',
+    amount: '201.990',
     currency: 'USD',
     ...overrides,
   });
@@ -1210,7 +1210,7 @@ async function credit(
 }
 
 async function balanceOf(wallet: WalletService): Promise<string> {
-  return (await wallet.findByCustomer(PROFILE_ID))?.balance ?? '0.00';
+  return (await wallet.findByCustomer(PROFILE_ID))?.balance ?? '0.000';
 }
 
 /**
@@ -1223,7 +1223,14 @@ async function balanceOf(wallet: WalletService): Promise<string> {
  */
 async function resetWallet(db: Database, wallet: WalletService): Promise<void> {
   const current = await wallet.findByCustomer(PROFILE_ID);
-  if (!current || current.balance === '0.00') return;
+  /*
+    Compared as a NUMBER, not as a string.
+
+    This read `=== '0.000'` and stopped matching the moment money columns went to scale 3 — the
+    balance reads `0.000`, the guard missed, and every test in this file failed on a debit of zero.
+    A money string has no canonical spelling; only its value is stable.
+  */
+  if (!current || Number(current.balance) === 0) return;
 
   await wallet.debit(db, {
     customerProfileId: PROFILE_ID,

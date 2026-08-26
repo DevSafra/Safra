@@ -107,7 +107,7 @@ describeIfDb('the system refund sweep', () => {
   /** Distinct on purpose — see the note on the fixture above. */
   const BASE = '400.00';
   const FEE = '36.00';
-  const TOTAL = '436.00';
+  const TOTAL = '436.000';
 
   let systemCancelled = '';
   let customerCancelled = '';

@@ -102,7 +102,7 @@ describeIfDb("a customer's record", () => {
 
     const withWallet = await registry.customerDetail(mine);
 
-    expect(withWallet.wallet).toStrictEqual({ balance: '0.00', currency: 'USD' });
+    expect(withWallet.wallet).toStrictEqual({ balance: '0.000', currency: 'USD' });
   });
 
   /**

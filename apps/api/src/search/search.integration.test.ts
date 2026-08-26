@@ -110,7 +110,7 @@ describeIfDb('SearchService', () => {
 
     /* Two units, 100 and 250 a night; the search must quote the 100 one. */
     expect(cheap?.unitId).toBe(cheapUnitId);
-    expect(cheap?.stayTotal).toBe('200.00');
+    expect(cheap?.stayTotal).toBe('200.000');
   });
 
   it('excludes a unit whose days are closed in the range', async () => {
@@ -207,7 +207,7 @@ describeIfDb('SearchService', () => {
     const cheap = result.items.find((item) => item.slug === cheapPropertySlug);
 
     /* 175 for the overridden night + 100 for the plain one. */
-    expect(cheap?.stayTotal).toBe('275.00');
+    expect(cheap?.stayTotal).toBe('275.000');
     expect(cheap?.nightlyFrom).toBe('137.50');
   });
 
@@ -222,7 +222,7 @@ describeIfDb('SearchService', () => {
     const result = await search.search(query());
 
     expect(result.items.find((item) => item.slug === cheapPropertySlug)?.stayTotal).toBe(
-      '200.00',
+      '200.000',
     );
   });
 
@@ -237,7 +237,7 @@ describeIfDb('SearchService', () => {
     const result = await search.search(query());
 
     expect(result.items.find((item) => item.slug === cheapPropertySlug)?.stayTotal).toBe(
-      '200.00',
+      '200.000',
     );
   });
 
@@ -290,7 +290,7 @@ describeIfDb('SearchService', () => {
     const cheap = result.items.find((item) => item.slug === cheapPropertySlug);
 
     expect(cheap?.unitId).toBe(secondUnitId);
-    expect(cheap?.stayTotal).toBe('500.00');
+    expect(cheap?.stayTotal).toBe('500.000');
   });
 
   it('filters on trip attributes, requiring ALL of them', async () => {
@@ -478,7 +478,7 @@ describeIfDb('SearchService', () => {
                             fx_rate_to_syp, total_syp, cancellation_policy_snapshot)
       SELECT cp.id, u.id, u.property_id, ${partnerId}::uuid, p.city_id,
              ${isoDate(IN)}::date, ${isoDate(OUT)}::date, 2, ${status}::booking_status,
-             '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+             '200.000', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
              u.currency_id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
       FROM units u
       JOIN properties p ON p.id = u.property_id
