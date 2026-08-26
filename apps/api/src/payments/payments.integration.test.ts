@@ -1237,7 +1237,7 @@ async function resetWallet(db: Database, wallet: WalletService): Promise<void> {
     amount: current.balance,
     currencyId: current.currencyId,
     reason: 'booking_payment',
-    note: 'Test fixture reset.',
+    note: 'إعادة ضبط بيانات الاختبار.',
   });
 }
 

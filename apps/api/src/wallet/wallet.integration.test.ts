@@ -622,7 +622,7 @@ describeIfDb('customer wallet', () => {
           amount: '25.000',
           direction: 'credit',
           currency: 'USD',
-          note: 'Goodwill for a delayed check-in.',
+          note: 'تعويض ودّي عن تأخّر تسجيل الوصول.',
         },
         { userId: ACTOR_ID, role: 'finance_officer' },
       );
@@ -654,7 +654,7 @@ describeIfDb('customer wallet', () => {
           amount: '25.000',
           direction: 'credit',
           currency: 'USD',
-          note: 'First goodwill payment.',
+          note: 'أول دفعة ودّية.',
         },
         { userId: ACTOR_ID, role: 'finance_officer' },
       );
@@ -665,7 +665,7 @@ describeIfDb('customer wallet', () => {
           amount: '5.00',
           direction: 'debit',
           currency: 'USD',
-          note: 'Correcting an over-credit.',
+          note: 'تصحيح إضافة زائدة.',
         },
         { userId: ACTOR_ID, role: 'finance_officer' },
       );
@@ -680,7 +680,7 @@ describeIfDb('customer wallet', () => {
 
       expect(before?.balance).toBe('25.000');
       expect(after?.balance).toBe('20.000');
-      expect(after?.note).toBe('Correcting an over-credit.');
+      expect(after?.note).toBe('تصحيح إضافة زائدة.');
     });
 
     /**
@@ -694,7 +694,7 @@ describeIfDb('customer wallet', () => {
           amount: '10.000',
           direction: 'credit',
           currency: 'USD',
-          note: 'Seed balance for the rollback case.',
+          note: 'رصيد ابتدائي لحالة التراجع.',
         },
         { userId: ACTOR_ID, role: 'finance_officer' },
       );
