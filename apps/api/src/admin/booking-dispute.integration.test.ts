@@ -4,6 +4,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { FxRateService } from '../fx/fx-rate.service.js';
+import { WalletService } from '../wallet/wallet.service.js';
 import { DisputeService } from './dispute.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -43,7 +45,11 @@ const STAFF = (sub: string): AccessTokenClaims =>
 describeIfDb('a dispute opened on a booking', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
-  const disputes = new DisputeService(db, new AuditService(db));
+  const disputes = new DisputeService(
+    db,
+    new AuditService(db),
+    new WalletService(db, new FxRateService(db, new AuditService(db))),
+  );
 
   let reference = '';
   let staffId = '';

@@ -63,8 +63,13 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
                   compensationAmount: compensationAmount.trim(),
                   /*
                     USD, because that is the currency every operational amount on this console is
-                    denominated in and the wallet balances are held in. A currency picker would
-                    invite crediting SYP by accident, which is wrong by four orders of magnitude.
+                    denominated in. A currency picker would invite crediting SYP by accident,
+                    which is wrong by four orders of magnitude.
+
+                    NOT because every wallet is USD — this said so and it was false: 512 of the
+                    11,801 wallets are EUR. The API converts through SYP into whatever currency
+                    the customer's wallet actually holds, so what is sent here is the amount SAFRA
+                    decided to pay, not an assumption about where it lands.
                   */
                   compensationCurrency: 'USD',
                 }

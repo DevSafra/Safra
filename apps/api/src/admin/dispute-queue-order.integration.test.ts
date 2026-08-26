@@ -4,6 +4,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { FxRateService } from '../fx/fx-rate.service.js';
+import { WalletService } from '../wallet/wallet.service.js';
 import { DisputeService } from './dispute.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -84,7 +86,11 @@ describeIfDb('النزاعات ordering', () => {
   beforeEach(async () => {
     await harness.begin();
     db = harness.db;
-    service = new DisputeService(db, new AuditService(db));
+    service = new DisputeService(
+      db,
+      new AuditService(db),
+      new WalletService(db, new FxRateService(db, new AuditService(db))),
+    );
     run += 1;
 
     /* Clear the field, so the assertion is about THESE three and not about fixture history. */

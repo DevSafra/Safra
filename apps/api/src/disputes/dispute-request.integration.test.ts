@@ -6,6 +6,8 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { DisputeRequestService } from './dispute-request.service.js';
 import { DisputeService } from '../admin/dispute.service.js';
 import { AuditService } from '../common/audit/audit.service.js';
+import { FxRateService } from '../fx/fx-rate.service.js';
+import { WalletService } from '../wallet/wallet.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
@@ -45,7 +47,11 @@ describeIfDb('DisputeRequestService', () => {
     but a stub would be a claim about which methods audit — and that claim would be wrong the first
     time somebody adds a read that does.
   */
-  const console_ = new DisputeService(db, new AuditService(db));
+  const console_ = new DisputeService(
+    db,
+    new AuditService(db),
+    new WalletService(db, new FxRateService(db, new AuditService(db))),
+  );
 
   let profileId = '';
   let userId = '';

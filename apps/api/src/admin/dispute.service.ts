@@ -10,6 +10,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
+import { WalletService } from '../wallet/wallet.service.js';
 import { canTransition, type BookingStatus } from '../bookings/booking-state.js';
 import { redactIncomingMessage } from '../messaging/redaction.js';
 
@@ -113,7 +114,21 @@ export class DisputeService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly wallet: WalletService,
   ) {}
+
+  /** A currency code the platform knows, or a refusal a person can read. */
+  private async currencyIdOf(code: string): Promise<string> {
+    const rows = await this.db.execute<{ id: string }>(sql`
+      SELECT id FROM currencies WHERE code = ${code}
+    `);
+
+    const id = rows.rows[0]?.id;
+
+    if (!id) throw badRequest(ERROR.GEO_CURRENCY_UNKNOWN);
+
+    return id;
+  }
 
   /** The row count for a page, capped, over the same `FROM … WHERE` the list uses. */
   private async countOf(fromWhere: SQL): Promise<number> {
@@ -356,6 +371,19 @@ export class DisputeService {
       throw conflict(ERROR.DISPUTE_ALREADY_CLOSED);
     }
 
+    /*
+      Resolved BEFORE the transaction opens, so an unknown code is a translatable 400 rather than
+      a database error.
+
+      `disputes_compensation_needs_currency` already refuses the row, which is the right backstop
+      and the wrong first line: the subselect yields NULL, the CHECK fires mid-statement, and the
+      client gets the generic message every unhandled query error produces. A staff member who
+      mistyped a currency deserves to be told that.
+    */
+    const currencyId = input.compensationCurrency
+      ? await this.currencyIdOf(input.compensationCurrency)
+      : null;
+
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
         UPDATE disputes
@@ -364,44 +392,35 @@ export class DisputeService {
             closed_at = now(),
             closed_by_user_id = ${actor?.sub}::uuid,
             compensation_amount = ${input.compensationAmount ?? null},
-            compensation_currency_id = ${
-              input.compensationCurrency
-                ? sql`(SELECT id FROM currencies WHERE code = ${input.compensationCurrency})`
-                : sql`NULL`
-            }
+            compensation_currency_id = ${currencyId}::uuid
         WHERE id = ${dispute.id}::uuid
       `);
 
-      if (input.compensationAmount && input.compensationCurrency) {
+      if (input.compensationAmount && currencyId) {
         /*
-          The wallet is credited through the same table the customer app reads, and
-          `balance_after` is computed from the wallet's own current balance inside the
-          transaction — never from a value passed in, which could be stale by the time it
-          lands. `FOR UPDATE` serialises concurrent credits to the same wallet.
+          Through `WalletService`, which is the ONLY thing that may move a balance.
+
+          This used to be a hand-written INSERT beside a `balance = balance + amount`, and it was
+          the ADR's second defect back in the codebase: a wallet holds ONE currency forever, this
+          path let a staff member name a different one, and adding the two produces a figure in a
+          currency that does not exist. 512 of the 11,801 wallets on 2026-08-26 are EUR while the
+          console's close-dispute form posts a hardcoded `'USD'`, so every compensation paid to
+          one of those customers would have corrupted the balance — silently, because nothing
+          compared the two codes. No row had drifted yet; the path had simply not been walked.
+
+          `credit()` converts through SYP, takes the `FOR UPDATE` lock, computes `balance_after`
+          in integer minor units, and refuses what it cannot express. Called with the dispute's
+          own `tx`, so it nests as a SAVEPOINT and the credit still commits or rolls back with the
+          resolution.
         */
-        await tx.execute(sql`
-          WITH w AS (
-            SELECT wa.id, wa.balance
-            FROM wallets wa
-            WHERE wa.customer_profile_id = ${dispute.customer_profile_id}::uuid
-              AND wa.deleted_at IS NULL
-            FOR UPDATE
-          ), credited AS (
-            UPDATE wallets SET balance = balance + ${input.compensationAmount}::numeric
-            WHERE id = (SELECT id FROM w)
-            RETURNING id, balance
-          )
-          INSERT INTO wallet_transactions
-            (wallet_id, direction, reason, amount, currency_id, balance_after,
-             created_by_user_id, note)
-          SELECT credited.id, 'credit', 'sla_compensation',
-                 ${input.compensationAmount}::numeric,
-                 (SELECT id FROM currencies WHERE code = ${input.compensationCurrency}),
-                 credited.balance,
-                 ${actor?.sub}::uuid,
-                 ${`Dispute ${reference}: ${input.resolution}`.slice(0, 500)}
-          FROM credited
-        `);
+        await this.wallet.credit(tx as unknown as Database, {
+          customerProfileId: dispute.customer_profile_id,
+          amount: input.compensationAmount,
+          currencyId,
+          reason: 'sla_compensation',
+          note: `Dispute ${reference}: ${input.resolution}`.slice(0, 500),
+          createdByUserId: actor?.sub,
+        });
       }
 
       await this.audit.record(
