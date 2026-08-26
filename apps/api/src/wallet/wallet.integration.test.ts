@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { inArray, sql } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { sql } from 'drizzle-orm';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createDatabase, schema, type Database } from '@safra/db';
+import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { WalletAdjustmentService } from './wallet-adjustment.service.js';
@@ -68,30 +68,30 @@ const fxStub = {
 } as unknown as FxRateService;
 
 describeIfDb('customer wallet', () => {
-  let db: Database;
+  /*
+    ROLLED BACK, and the four tests that cannot be are in `wallet-concurrency.integration.test.ts`.
+
+    This whole suite used to commit, because a lost-update test needs a real pool of connections and
+    a rollback harness pins one. The cost was paid by all twenty-one tests here: every fixture they
+    made was permanent, and they surfaced on Bashar's console as rows at the top of المحفظة while he
+    was reviewing that screen — «Seed balance for the rollback case.» in English, on an Arabic-only
+    console, on 2026-08-26. 12,048 «Wallet Test» profiles had also accumulated since 2026-08-07.
+
+    Only the concurrency cases need to commit. Everything here is a property of one transaction —
+    the non-negative CHECK, the append-only trigger, the currency conversion, the balanced ledger
+    group — and a rollback harness asserts all of them while leaving nothing behind.
+  */
+  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  const db: Database = harness.db;
+
   let wallet: WalletService;
   let adjustments: WalletAdjustmentService;
 
-  /** A fresh customer per test, so balances never leak between cases. */
+  /** A fresh customer per test, so balances never carry between cases. */
   let profileId: string;
 
-  /**
-   * Every customer this file created, so it can take them away again.
-   *
-   * This suite COMMITS — it needs a real pool of six, because a rollback harness pins one
-   * connection inside one transaction and the concurrency test would then pass trivially. The
-   * price is that every fixture it makes is permanent, and nothing was removing them: 12,048
-   * «Wallet Test» profiles had accumulated since 2026-08-07, roughly a dozen per run, and العملاء
-   * was mostly them. Found on 2026-08-26.
-   *
-   * Cleaned by ID rather than by `full_name = 'Wallet Test'`: vitest runs files in parallel, and a
-   * predicate on the marker would delete rows out from under another worker running this same file.
-   */
-  const created: string[] = [];
-
-  beforeAll(async () => {
-    // A pool of one would serialise the concurrency test into passing trivially.
-    db = createDatabase(DATABASE_URL as string, 6);
+  beforeEach(async () => {
+    await harness.begin();
 
     wallet = new WalletService(db, fxStub);
     adjustments = new WalletAdjustmentService(
@@ -106,35 +106,12 @@ describeIfDb('customer wallet', () => {
       INSERT INTO users (id, email, role)
       VALUES (${ACTOR_ID}::uuid, 'wallet-test-finance@safra.test', 'finance_officer')
       ON CONFLICT DO NOTHING`);
-  });
 
-  afterAll(async () => {
-    /*
-      SOFT-deleted, and that is the only correct option rather than a softer one.
-
-      A hard delete was tried and the database refused it: `ledger_entries` is append-only, guarded
-      by `deny_mutation`, because §13.3 requires an immutable record of every financial movement.
-      The wallet movements these tests make are real ledger entries, so the profiles they belong to
-      can never be removed — and they should not be.
-
-      `deleted_at` is what the platform already uses for «this record should no longer appear». The
-      registry filters on it, so العملاء stops showing the fixtures while the ledger keeps every
-      reference it is required to keep.
-    */
-    if (created.length > 0) {
-      await db.execute(
-        sql`UPDATE customer_profiles SET deleted_at = now()
-            WHERE ${inArray(schema.customerProfiles.id, created)}`,
-      );
-    }
-
-    await (db as unknown as { $client: { end: () => Promise<void> } }).$client.end();
-  });
-
-  beforeEach(async () => {
     profileId = await createCustomer(db);
-    created.push(profileId);
   });
+
+  afterEach(() => harness.rollback());
+  afterAll(() => harness.close());
 
   // ── Crediting ───────────────────────────────────────────────────────────────
 
@@ -309,126 +286,6 @@ describeIfDb('customer wallet', () => {
   });
 
   // ── Concurrency ─────────────────────────────────────────────────────────────
-
-  describe('concurrent movements', () => {
-    /**
-     * The lost update, pinned.
-     *
-     * Without `FOR UPDATE` both transactions read the same balance, each computes
-     * its own successor, and the second write silently discards the first. On a
-     * balance that is money vanishing. This is the test that fails if the row lock
-     * is ever removed.
-     */
-    it('does not lose a credit when five arrive at once', async () => {
-      const usd = await currencyId(db, 'USD');
-
-      await Promise.all(
-        Array.from({ length: 5 }, () =>
-          db.transaction((tx) =>
-            wallet.credit(tx as unknown as Database, {
-              customerProfileId: profileId,
-              amount: '10.000',
-              currencyId: usd,
-              reason: 'sla_compensation',
-            }),
-          ),
-        ),
-      );
-
-      const current = await wallet.findByCustomer(profileId);
-
-      expect(current?.balance).toBe('50.000');
-      expect(await wallet.sumTransactions(current?.walletId ?? '')).toBe('50.000');
-    });
-
-    /**
-     * Two debits racing for one balance. Exactly one may win; the database CHECK
-     * would catch the other, but the point is that the lock refuses it cleanly
-     * first, with an error a customer-facing caller can act on.
-     */
-    it('cannot be double-spent by two concurrent debits', async () => {
-      const usd = await currencyId(db, 'USD');
-
-      await wallet.credit(db, {
-        customerProfileId: profileId,
-        amount: '10.000',
-        currencyId: usd,
-        reason: 'sla_compensation',
-      });
-
-      const attempts = await Promise.allSettled(
-        Array.from({ length: 2 }, () =>
-          db.transaction((tx) =>
-            wallet.debit(tx as unknown as Database, {
-              customerProfileId: profileId,
-              amount: '10.000',
-              currencyId: usd,
-              reason: 'booking_payment',
-            }),
-          ),
-        ),
-      );
-
-      expect(attempts.filter((a) => a.status === 'fulfilled')).toHaveLength(1);
-      expect((await wallet.findByCustomer(profileId))?.balance).toBe('0.000');
-    });
-
-    /**
-     * The same guarantee for a caller who did NOT open a transaction.
-     *
-     * Outside one, node-postgres hands each statement whichever pooled connection
-     * is free, so `SELECT … FOR UPDATE` and the `UPDATE` after it can land on
-     * different connections and the lock protects nothing. The service opens its
-     * own transaction rather than trusting callers to, and this is what proves it —
-     * remove the wrapping and these credits start losing each other.
-     */
-    it('is safe even when the caller passes no transaction', async () => {
-      const usd = await currencyId(db, 'USD');
-
-      await Promise.all(
-        Array.from({ length: 5 }, () =>
-          wallet.credit(db, {
-            customerProfileId: profileId,
-            amount: '3.33',
-            currencyId: usd,
-            reason: 'refund',
-          }),
-        ),
-      );
-
-      const current = await wallet.findByCustomer(profileId);
-
-      expect(current?.balance).toBe('16.650');
-      expect(await wallet.sumTransactions(current?.walletId ?? '')).toBe('16.650');
-    });
-
-    /** Two first-ever movements racing must not both try to create the wallet. */
-    it('creates exactly one wallet when two movements race on a new customer', async () => {
-      const usd = await currencyId(db, 'USD');
-
-      await Promise.all(
-        Array.from({ length: 3 }, () =>
-          db.transaction((tx) =>
-            wallet.credit(tx as unknown as Database, {
-              customerProfileId: profileId,
-              amount: '7.00',
-              currencyId: usd,
-              reason: 'refund',
-            }),
-          ),
-        ),
-      );
-
-      const rows = await db.execute<{ count: string }>(sql`
-        SELECT COUNT(*)::text AS count FROM wallets
-        WHERE customer_profile_id = ${profileId}`);
-
-      expect(rows.rows[0]?.count).toBe('1');
-      expect((await wallet.findByCustomer(profileId))?.balance).toBe('21.000');
-    });
-  });
-
-  // ── Currency ────────────────────────────────────────────────────────────────
 
   describe('single currency', () => {
     /**
