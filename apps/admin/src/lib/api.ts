@@ -1749,6 +1749,34 @@ export async function getCampaigns(params: ListParams) {
 }
 
 /**
+ * What advertisers owe — one row per billing period of a campaign.
+ *
+ * `amount` and `currency` are BOTH required rather than nullable, because an invoice exists only
+ * where a campaign named a price: «no amount without its currency» is enforced at the boundary
+ * where a missing one would otherwise arrive as a bare figure on the screen.
+ */
+const adInvoiceItemSchema = z.object({
+  reference: z.string(),
+  campaign: z.string(),
+  advertiser: z.string(),
+  city: z.string(),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  amount: z.string(),
+  currency: z.string(),
+  status: z.string(),
+  paidAt: z.string().nullable(),
+});
+
+const adInvoicesSchema = offsetPage(adInvoiceItemSchema);
+
+export type AdInvoiceItem = z.infer<typeof adInvoiceItemSchema>;
+
+export async function getAdInvoices(params: ListParams) {
+  return staffFetch(`/admin/ad-invoices${listQuery(params)}`, adInvoicesSchema);
+}
+
+/**
  * One copy either side sent, newest first — the same three fields the partner portal shows.
  *
  * Bashar asked for the same list on both screens (2026-08-23), so this deliberately does NOT carry

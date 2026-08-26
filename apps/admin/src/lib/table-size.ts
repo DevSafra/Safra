@@ -60,6 +60,16 @@ export async function resolvePageSize(
 export async function listParamsFor(
   section: TableSection,
   searchParams: Promise<Record<string, string | string[] | undefined>>,
+  /**
+   * What this table's search parameter is called — `q` for the registry on a route, something else
+   * for a second table beside it.
+   *
+   * `TABLE_SECTION_PARAMS` namespaces `page` and `size` but not the search term, because until
+   * `/ads` grew فواتير الإعلانات no second table on a route had its own search: `/staff`'s activity
+   * panel reads `activityQ` by hand. Passed rather than derived so the map keeps meaning exactly
+   * what the save endpoint needs it to mean — it is what that endpoint's REDIRECT is built from.
+   */
+  queryName = 'q',
 ): Promise<{ q: string | undefined; page: number; size: number }> {
   const params = await searchParams;
 
@@ -77,7 +87,7 @@ export async function listParamsFor(
   const names = TABLE_SECTION_PARAMS[section];
 
   return {
-    q: first(params, 'q'),
+    q: first(params, queryName),
     page: pageNumber(first(params, names.page)),
     size: await resolvePageSize(section, first(params, names.size)),
   };

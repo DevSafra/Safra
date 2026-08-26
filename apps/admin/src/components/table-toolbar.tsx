@@ -30,6 +30,9 @@ export function TableToolbar({
   children,
   end,
   below,
+  queryName = 'q',
+  sizeName = 'size',
+  carry,
 }: {
   /** Where the form submits — normally the section's own path. */
   readonly action: string;
@@ -50,6 +53,24 @@ export function TableToolbar({
    * search beside it. A panel is not a control at the end of a line — it is a row of its own.
    */
   readonly below?: ReactNode;
+  /**
+   * The parameter names, for the SECOND paged table on a route.
+   *
+   * `/ads` carries two — the campaign registry and فواتير الإعلانات beneath it — and they must not
+   * share `?q=` or `?size=`, for the same reason `TABLE_SECTION_PARAMS` namespaces `?page=`:
+   * searching one would silently filter the other. Defaulted, so the twenty single-table sections
+   * are unchanged and nothing has to be remembered at those call sites.
+   */
+  readonly queryName?: string;
+  readonly sizeName?: string;
+  /**
+   * The OTHER table's position on this route, carried as hidden fields.
+   *
+   * A form posts only its own fields, so a search here would otherwise drop the neighbour's page
+   * and size — the «bar that drops its neighbour's page» defect, in the search direction. Both
+   * bars carry the other's, because fixing the half you are looking at leaves the other half live.
+   */
+  readonly carry?: Readonly<Record<string, string | undefined>>;
 }) {
   return (
     <div className="mb-3.5 grid gap-2.5">
@@ -67,11 +88,16 @@ export function TableToolbar({
             rows — the size control now lives in the bar UNDER the table, so this form has no visible
             size input to carry it.
           */}
-          <input type="hidden" name="size" value={String(size)} />
+          <input type="hidden" name={sizeName} value={String(size)} />
+
+          {/* The neighbouring table's place, so searching this one does not move that one. */}
+          {Object.entries(carry ?? {}).map(([key, value]) =>
+            value ? <input key={key} type="hidden" name={key} value={value} /> : null,
+          )}
 
           <input
             type="search"
-            name="q"
+            name={queryName}
             defaultValue={query ?? ''}
             placeholder={placeholder}
             aria-label={placeholder}
