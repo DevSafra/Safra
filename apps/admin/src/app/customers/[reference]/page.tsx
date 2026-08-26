@@ -156,7 +156,7 @@ export default async function CustomerPage({
               {/* The sign says which way it went; the currency says what it was. */}
               {`${move.direction === 'credit' ? '+' : '−'}${amount(move.amount, move.currency)}`}
             </Ltr>
-            <Ltr className="text-[12px] text-faint">{shortDateTime(move.at)}</Ltr>
+            <Ltr className="text-[11.5px] text-faint">{shortDateTime(move.at)}</Ltr>
           </Line>
         ))}
       </Bounded>
@@ -168,7 +168,7 @@ export default async function CustomerPage({
               {fill(c.rating, { n: count(review.rating) })}
             </span>
             <span className="min-w-0 flex-1 truncate text-muted">{review.property}</span>
-            <Ltr className="text-[12px] text-faint">{shortDate(review.at)}</Ltr>
+            <Ltr className="text-[11.5px] text-faint">{shortDate(review.at)}</Ltr>
           </Line>
         ))}
       </Bounded>
@@ -198,7 +198,7 @@ export default async function CustomerPage({
             <StatusPill tone={statusTone(dispute.status)}>
               {label(t.enums.disputeStatus, dispute.status)}
             </StatusPill>
-            <Ltr className="text-[12px] text-faint">{shortDate(dispute.at)}</Ltr>
+            <Ltr className="text-[11.5px] text-faint">{shortDate(dispute.at)}</Ltr>
           </Line>
         ))}
       </Bounded>
@@ -224,7 +224,7 @@ export default async function CustomerPage({
             <StatusPill tone={statusTone(notice.status)}>
               {label(t.enums.notificationStatus, notice.status)}
             </StatusPill>
-            <Ltr className="text-[12px] text-faint">{shortDateTime(notice.at)}</Ltr>
+            <Ltr className="text-[11.5px] text-faint">{shortDateTime(notice.at)}</Ltr>
           </Line>
         ))}
       </Bounded>
@@ -282,7 +282,7 @@ function Bounded({
       <div className="mb-3 flex flex-wrap items-baseline gap-3">
         <h2 className="text-lg text-text">{title}</h2>
         {section.total > section.items.length ? (
-          <span className="text-[12px] text-faint">
+          <span className="text-[11.5px] text-faint">
             {/* `count()`, so the figures read in Arabic-Indic like every other number here. */}
             {fill(copy.showingRecent, {
               shown: count(section.items.length),
@@ -293,7 +293,7 @@ function Bounded({
       </div>
 
       {section.total === 0 ? (
-        <p className="text-sm text-faint">{copy.none}</p>
+        <p className="text-[11.5px] text-faint">{copy.none}</p>
       ) : (
         <ul className="grid gap-1.5">{children}</ul>
       )}
@@ -313,8 +313,9 @@ function Line({ children }: { children: ReactNode }) {
 function Row({ label: rowLabel, value }: { label: string; value: ReactNode }) {
   return (
     <div className="rounded-lg border border-line bg-card px-4 py-3">
-      <dt className="text-xs text-faint">{rowLabel}</dt>
-      <dd className="mt-0.5 break-words text-text">{value}</dd>
+      {/* 11.5 / 13 — the same label-and-value scale every other detail screen uses. */}
+      <dt className="text-[11.5px] text-faint">{rowLabel}</dt>
+      <dd className="mt-1 break-words text-[13px] text-text">{value}</dd>
     </div>
   );
 }
