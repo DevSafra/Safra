@@ -3,7 +3,13 @@ import { sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
 import type { Database } from '@safra/db';
-import { COUNT_CAP, ERROR, type OffsetPage, offsetPage } from '@safra/contracts';
+import {
+  COUNT_CAP,
+  ERROR,
+  WALLET_NOTE,
+  type OffsetPage,
+  offsetPage,
+} from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
@@ -11,6 +17,8 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import { WalletService, type WalletMovementResult } from '../wallet/wallet.service.js';
+import { LedgerService } from '../ledger/ledger.service.js';
+import { FxRateService } from '../fx/fx-rate.service.js';
 import { canTransition, type BookingStatus } from '../bookings/booking-state.js';
 import { redactIncomingMessage } from '../messaging/redaction.js';
 
@@ -115,6 +123,8 @@ export class DisputeService {
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
     private readonly wallet: WalletService,
+    private readonly ledger: LedgerService,
+    private readonly fx: FxRateService,
   ) {}
 
   /** A currency code the platform knows, or a refusal a person can read. */
@@ -342,9 +352,10 @@ export class DisputeService {
       id: string;
       status: string;
       customer_profile_id: string;
+      booking_id: string | null;
       city_id: string | null;
     }>(sql`
-      SELECT d.id, d.status::text AS status, d.customer_profile_id, b.city_id
+      SELECT d.id, d.status::text AS status, d.customer_profile_id, d.booking_id, b.city_id
       FROM disputes d
       LEFT JOIN bookings b ON b.id = d.booking_id
       WHERE d.reference = ${reference} AND d.deleted_at IS NULL
@@ -421,9 +432,50 @@ export class DisputeService {
           amount: input.compensationAmount,
           currencyId,
           reason: 'sla_compensation',
-          note: `Dispute ${reference}: ${input.resolution}`.slice(0, 500),
+          note: WALLET_NOTE.DISPUTE_RESOLVED,
           createdByUserId: actor?.sub,
         });
+
+        /*
+          And the books balance — a wallet credit with no matching debit is money appearing from
+          nowhere.
+
+          This path posted NOTHING, which made a dispute resolution the one compensation outside
+          the accounting model. The SLA sweep has always posted `partner_fine` ↔ `wallet_credit`
+          through `postPartnerFine`, because there the PARTNER funds it. Here nobody is fined:
+          SAFRA has decided to pay, so SAFRA's own account is the debit.
+
+          `wallet_compensation` rather than `wallet_adjustment` — that one is a finance CORRECTION,
+          and «what did compensation cost us this month» should not require grepping descriptions.
+
+          Posted at the APPLIED amount in the WALLET's currency, not the requested one: if a staff
+          member awards 10 USD to a EUR wallet, what SAFRA owes is the 9.29 that landed. Booking the
+          request would leave the ledger disagreeing with the balance it exists to explain.
+        */
+        await this.ledger.post(
+          tx as unknown as Database,
+          [
+            {
+              account: 'wallet_compensation',
+              direction: 'debit',
+              amount: credited.appliedAmount,
+              description: `Compensation for dispute ${reference}`,
+            },
+            {
+              account: 'wallet_credit',
+              direction: 'credit',
+              amount: credited.appliedAmount,
+              description: `Compensation credited for dispute ${reference}`,
+            },
+          ],
+          {
+            currencyId: credited.currencyId,
+            fxRateToSyp: await this.fx.rateToSyp(credited.currencyCode),
+            bookingId: dispute.booking_id ?? undefined,
+            customerProfileId: dispute.customer_profile_id,
+            createdByUserId: actor?.sub,
+          },
+        );
       }
 
       await this.audit.record(

@@ -5,6 +5,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
+import { LedgerService } from '../ledger/ledger.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { DisputeService } from './dispute.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -49,6 +50,8 @@ describeIfDb('a dispute opened on a booking', () => {
     db,
     new AuditService(db),
     new WalletService(db, new FxRateService(db, new AuditService(db))),
+    new LedgerService(db),
+    new FxRateService(db, new AuditService(db)),
   );
 
   let reference = '';

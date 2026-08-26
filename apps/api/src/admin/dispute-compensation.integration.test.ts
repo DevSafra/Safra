@@ -7,6 +7,7 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DisputeService } from './dispute.service.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
+import { LedgerService } from '../ledger/ledger.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 
 /**
@@ -52,6 +53,8 @@ describeIfDb('compensation paid on a resolved dispute', () => {
     db,
     new AuditService(db),
     new WalletService(db, new FxRateService(db, new AuditService(db))),
+    new LedgerService(db),
+    new FxRateService(db, new AuditService(db)),
   );
 
   let bookingReference = '';
@@ -101,14 +104,14 @@ describeIfDb('compensation paid on a resolved dispute', () => {
     const before = await walletNow();
 
     expect(before, 'the fixture wallet is EUR — the case that broke').toStrictEqual({
-      balance: '10.00',
+      balance: '10.000',
       currency: 'EUR',
     });
 
     await disputes.close(STAFF(staffId), dispute.reference, {
       outcome: 'resolved',
       resolution: 'عُوّض العميل عن الفارق في الوصف.',
-      compensationAmount: '10.00',
+      compensationAmount: '10.000',
       compensationCurrency: 'USD',
     });
 
@@ -134,7 +137,7 @@ describeIfDb('compensation paid on a resolved dispute', () => {
     await disputes.close(STAFF(staffId), dispute.reference, {
       outcome: 'resolved',
       resolution: 'عُوّض العميل عن الفارق في الوصف.',
-      compensationAmount: '10.00',
+      compensationAmount: '10.000',
       compensationCurrency: 'USD',
     });
 
@@ -186,12 +189,72 @@ describeIfDb('compensation paid on a resolved dispute', () => {
     await disputes.close(STAFF(staffId), dispute.reference, {
       outcome: 'resolved',
       resolution: 'عُوّض العميل عن الفارق في الوصف.',
-      compensationAmount: '10.00',
+      compensationAmount: '10.000',
       compensationCurrency: 'USD',
     });
 
     /* A wallet now exists, in the compensation's currency, holding the compensation. */
-    expect(await walletNow()).toStrictEqual({ balance: '10.00', currency: 'USD' });
+    expect(await walletNow()).toStrictEqual({ balance: '10.000', currency: 'USD' });
+  });
+
+  /**
+   * The books balance — a wallet credit with no matching debit is money from nowhere.
+   *
+   * This path posted NOTHING to `ledger_entries`, which made a dispute resolution the one
+   * compensation outside the accounting model. The SLA sweep has always posted `partner_fine` ↔
+   * `wallet_credit` through `postPartnerFine`, because there the PARTNER funds it. Here nobody is
+   * fined: SAFRA decided to pay, so SAFRA's own account carries the debit.
+   *
+   * The deferred constraint trigger already refuses an unbalanced GROUP, so this asserts what the
+   * trigger cannot: that a group was written at all, in the right accounts, at the amount that
+   * actually landed rather than the one that was asked for.
+   */
+  it('posts a balanced ledger group in the accounts that describe it', async () => {
+    const dispute = await open();
+
+    await disputes.close(STAFF(staffId), dispute.reference, {
+      outcome: 'resolved',
+      resolution: 'عُوّض العميل عن الفارق في الوصف.',
+      compensationAmount: '10.00',
+      compensationCurrency: 'USD',
+    });
+
+    const legs = await db.execute<{
+      account: string;
+      direction: string;
+      amount: string;
+      group: string;
+    }>(sql`
+      SELECT account::text, direction::text, amount::text, entry_group_id::text AS group
+      FROM ledger_entries
+      WHERE customer_profile_id = ${profileId}::uuid
+      ORDER BY account
+    `);
+
+    const rows = legs.rows;
+
+    expect(rows, 'a group was posted at all').toHaveLength(2);
+    /* One group, or they are not two legs of one movement. */
+    expect(new Set(rows.map((r) => r.group)).size).toBe(1);
+
+    expect(rows.map((r) => `${r.account}:${r.direction}`)).toStrictEqual([
+      'wallet_compensation:debit',
+      'wallet_credit:credit',
+    ]);
+
+    /*
+      At what LANDED — 10.00 USD into a EUR wallet is 9.29 EUR, and that is what SAFRA owes.
+      Booking the requested figure would leave the ledger disagreeing with the balance it exists
+      to explain.
+    */
+    const landed = (await walletNow()).balance;
+
+    for (const leg of rows) {
+      expect(
+        Number(leg.amount),
+        'the leg is the applied amount, not the requested one',
+      ).toBe(Number(landed) - 10);
+    }
   });
 
   /** A currency the platform does not know is refused, not silently skipped. */
@@ -202,13 +265,13 @@ describeIfDb('compensation paid on a resolved dispute', () => {
       disputes.close(STAFF(staffId), dispute.reference, {
         outcome: 'resolved',
         resolution: 'عُوّض العميل.',
-        compensationAmount: '10.00',
+        compensationAmount: '10.000',
         compensationCurrency: 'ZZZ',
       }),
     ).rejects.toMatchObject({ response: { code: 'geo.currency_unknown' } });
 
     /* And nothing moved: the refusal rolled the resolution back with it. */
-    expect((await walletNow()).balance).toBe('10.00');
+    expect((await walletNow()).balance).toBe('10.000');
   });
 
   async function seed(): Promise<void> {
@@ -259,7 +322,7 @@ describeIfDb('compensation paid on a resolved dispute', () => {
       ), wa AS (
         /* EUR, deliberately — 512 real wallets are, and the console pays in USD. */
         INSERT INTO wallets (customer_profile_id, currency_id, balance)
-        SELECT cp.id, ref.eur_id, '10.00' FROM cp, ref
+        SELECT cp.id, ref.eur_id, '10.000' FROM cp, ref
         RETURNING id
       ), pa AS (
         INSERT INTO partners (user_id, partner_type_id, legal_name, display_name, city_id,
