@@ -211,6 +211,25 @@ const SOURCES: Record<string, Source> = {
     label: sql`reference`,
     href: null,
   },
+  /*
+    The business that pays, distinct from a partner who sells.
+
+    `href: null` for the same reason as `ad_campaign`: الإعلانات is a registry with no per-record
+    screen, so a link would be to a page that does not exist. A reader gets the NAME rather than a
+    uuid, which is what this map is for.
+  */
+  advertiser: {
+    table: 'advertisers',
+    reference: sql`reference`,
+    label: sql`name`,
+    href: null,
+  },
+  ad_invoice: {
+    table: 'ad_invoices',
+    reference: sql`reference`,
+    label: sql`reference`,
+    href: null,
+  },
   unit: {
     table: 'units',
     reference: sql`NULL`,

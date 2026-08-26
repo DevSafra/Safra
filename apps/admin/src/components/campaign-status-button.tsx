@@ -6,12 +6,23 @@ import { useState } from 'react';
 import { t } from '@/lib/strings';
 
 /**
- * Pauses or resumes an ad campaign.
+ * Starts, pauses or resumes an ad campaign.
  *
  * A commercial act on something the advertiser paid for, so the API records who did it and why.
  * The reason here is fixed rather than prompted: the operator has already chosen a specific
  * campaign's button, and adding a modal between them and "stop showing this ad" is friction in the
  * wrong direction — an ad that must come down usually must come down now.
+ *
+ * ## A DRAFT starts here, and could not before
+ *
+ * `next` was `status === 'paused' ? 'active' : 'paused'`, so the only control on a freshly created
+ * campaign said «إيقاف» and would have moved it from `draft` to `paused`. Every campaign is created
+ * as a draft — deliberately, so the creative is confirmed before an advertiser's window begins —
+ * which meant a campaign made in the console could never be made LIVE from the console. Found by
+ * creating one and looking at the row.
+ *
+ * The question the button answers is «is it running?», not «was it ever running», so it is `active`
+ * that flips to paused and everything else that flips to active.
  */
 export function CampaignStatusButton({
   reference,
@@ -23,7 +34,7 @@ export function CampaignStatusButton({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
-  const next = status === 'paused' ? 'active' : 'paused';
+  const next = status === 'active' ? 'paused' : 'active';
 
   async function toggle(): Promise<void> {
     setBusy(true);

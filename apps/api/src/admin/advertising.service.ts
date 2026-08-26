@@ -280,7 +280,18 @@ export class AdvertisingService {
         {
           actorUserId: actor?.sub,
           actorRole: actor?.role,
-          action: `ad_campaign.${input.status === 'paused' ? 'paused' : 'resumed'}`,
+          /*
+            Three events, not two. A DRAFT going live for the first time is `activated`; a paused
+            campaign coming back is `resumed`. Recording both as «تشغيل حملة إعلانية» would make
+            سجل التدقيق unable to answer «when did this campaign first start delivering», which is
+            the question an advertiser asks when a bill is disputed.
+          */
+          action:
+            input.status === 'paused'
+              ? 'ad_campaign.paused'
+              : campaign.status === 'draft'
+                ? 'ad_campaign.activated'
+                : 'ad_campaign.resumed',
           subjectType: 'ad_campaign',
           subjectId: campaign.id,
           before: { status: campaign.status },

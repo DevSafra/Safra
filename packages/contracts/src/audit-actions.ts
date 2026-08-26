@@ -210,6 +210,8 @@ export const AUDIT_ACTIONS = [
   // ── Advertising ───────────────────────────────────────────────────────────
   'ad_campaign.paused',
   'ad_campaign.resumed',
+  /* A DRAFT going live for the first time — not the same event as resuming a paused one. */
+  'ad_campaign.activated',
 
   // ── Staff and configuration ───────────────────────────────────────────────
   'staff.invited',
