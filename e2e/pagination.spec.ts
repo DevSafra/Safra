@@ -536,24 +536,52 @@ test.describe('the pagination bar', () => {
    * taken from the violations he was reading to الشركاء.
    */
   test('a tampered submit on مخالفات stays on the record', async ({ page }) => {
-    await page.goto('/partners');
+    /*
+      A partner that actually HAS violations, found rather than assumed.
 
-    const firstRow = page.locator('tbody tr a').first();
+      This took the first row of الشركاء and went straight to its violations. That passed for as
+      long as the first partner happened to have one; the moment a newer fixture partner sorted
+      above it, the screen rendered «لا مخالفات مسجّلة على هذا الشريك» — an empty list has no
+      pagination bar at all, so the test hung for thirty seconds on a locator for a control that
+      correctly was not there, and reported a failure that had nothing to do with paging.
 
-    await firstRow.click();
-    await page.waitForURL(/\/partners\/[^/]+$/);
+      Bounded at eight rows so a registry of 535 does not turn this into a crawl, and it SKIPS with
+      a reason rather than passing if none of them has one — a test that cannot reach its subject
+      must say so, not report coverage.
+    */
+    await page.goto('/partners?size=10');
 
-    const violations = page.getByRole('link', {
-      name: t.sections.enforcement.openViolations,
-    });
+    const rows = page.locator('tbody tr a');
+    const hrefs = (
+      await rows.evaluateAll((nodes) =>
+        nodes.map((node) => (node as HTMLAnchorElement).getAttribute('href') ?? ''),
+      )
+    )
+      .filter((href) => /^\/partners\/[^/?]+/.test(href))
+      .slice(0, 8);
 
-    test.skip(
-      (await violations.count()) === 0,
-      'No violations link on this partner record',
-    );
+    let found = false;
 
-    await violations.first().click();
-    await page.waitForURL(/violations/);
+    for (const href of hrefs) {
+      await page.goto(href);
+
+      const violations = page.getByRole('link', {
+        name: t.sections.enforcement.openViolations,
+      });
+
+      if ((await violations.count()) === 0) continue;
+
+      await violations.first().click();
+      await page.waitForURL(/violations/);
+
+      /* The bar exists only where there is something to page — that is the real precondition. */
+      if ((await anyBar(page).count()) > 0) {
+        found = true;
+        break;
+      }
+    }
+
+    test.skip(!found, 'No partner in the first eight rows has a violation to page.');
 
     const bar = anyBar(page).first();
 

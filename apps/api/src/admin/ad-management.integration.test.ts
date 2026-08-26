@@ -226,9 +226,22 @@ describeIfDb('creating and billing a campaign', () => {
   it('books nothing until an invoice is paid, then a balanced pair', async () => {
     const created = await campaign({ priceAmount: '150.00', priceCurrency: 'USD' });
 
-    const before = await db.execute<{ n: string }>(sql`
-      SELECT count(*)::text AS n FROM ledger_entries
+    /*
+      Scoped to THIS campaign's own legs, by the reference the service writes into `description`.
+
+      This counted every `ad_payment`/`ad_revenue` row in the database and expected zero, which
+      passed only while nothing had ever paid an ad invoice — it went red the first time the
+      feature was actually driven in a browser. A global count is not an assertion about the
+      behaviour under test; it is an assertion about the fixture, and the fixture stopped being
+      empty as soon as the thing worked.
+    */
+    const mine = sql`
+      FROM ledger_entries
       WHERE account IN ('ad_payment', 'ad_revenue')
+        AND description LIKE ${`%${created.reference}%`}`;
+
+    const before = await db.execute<{ n: string }>(sql`
+      SELECT count(*)::text AS n ${mine}
     `);
 
     expect(before.rows[0]?.n, 'a due invoice is a claim, not revenue').toBe('0');
@@ -249,8 +262,7 @@ describeIfDb('creating and billing a campaign', () => {
       direction: string;
       amount: string;
     }>(sql`
-      SELECT account::text, direction::text, amount::text FROM ledger_entries
-      WHERE account IN ('ad_payment', 'ad_revenue') ORDER BY account::text
+      SELECT account::text, direction::text, amount::text ${mine} ORDER BY account::text
     `);
 
     expect(legs.rows.map((l) => `${l.account}:${l.direction}`)).toStrictEqual([
@@ -305,5 +317,88 @@ describeIfDb('creating and billing a campaign', () => {
     expect(entry.rows[0]?.actor).toBe(staffId);
     expect(entry.rows[0]?.reason).toContain('4471');
     expect(entry.rows[0]?.after).toContain('150.00');
+  });
+
+  /**
+   * A regional operator sees their own region's billing and nobody else's — BOTH halves.
+   *
+   * The second assertion is the one that makes the first mean anything. «Withheld» and «absent»
+   * are indistinguishable without a control that the invoice is visible to the right reader: a
+   * `list` that returned nothing to everybody would satisfy the refusal on its own.
+   */
+  it('shows an invoice to its own region and to nobody else', async () => {
+    const created = await campaign({ priceAmount: '150.00', priceCurrency: 'USD' });
+
+    const cities = await db.execute<{ id: string }>(sql`
+      SELECT id FROM cities WHERE deleted_at IS NULL AND slug <> ${citySlug} LIMIT 1
+    `);
+    const elsewhere = cities.rows[0]?.id;
+    const mine = await db.execute<{ id: string }>(sql`
+      SELECT id FROM cities WHERE slug = ${citySlug}
+    `);
+
+    /* The fixture has to be able to tell the two apart, or it is measuring nothing. */
+    expect(elsewhere, 'a second city exists to be scoped away from').toBeTruthy();
+
+    const scopedTo = (...cityIds: string[]): AccessTokenClaims =>
+      ({
+        sub: staffId,
+        role: 'operations_manager',
+        permissions: ['ad.read'],
+        scope: { kind: 'cities', cityIds, outside: 'none' },
+      }) as unknown as AccessTokenClaims;
+
+    const query = { limit: 25, page: 1, q: created.reference };
+
+    const withheld = await invoices.list({ ...query, actor: scopedTo(elsewhere ?? '') });
+
+    expect(withheld.items).toStrictEqual([]);
+
+    /* The control: the operator whose region it IS still sees it. */
+    const shown = await invoices.list({
+      ...query,
+      actor: scopedTo(mine.rows[0]?.id ?? ''),
+    });
+
+    expect(shown.items).toHaveLength(3);
+    expect(shown.items[0]?.campaign).toBe(created.reference);
+  });
+
+  /**
+   * And the write path is gated on the row, not on the list.
+   *
+   * A caller names a reference directly, so «it did not appear in your list» is not a refusal.
+   * `markPaid` re-checks the campaign's city before it posts anything to the ledger.
+   */
+  it('refuses a payment recorded from outside the campaign’s region', async () => {
+    const created = await campaign({ priceAmount: '150.00', priceCurrency: 'USD' });
+
+    const cities = await db.execute<{ id: string }>(sql`
+      SELECT id FROM cities WHERE deleted_at IS NULL AND slug <> ${citySlug} LIMIT 1
+    `);
+    const invoice = await db.execute<{ reference: string }>(sql`
+      SELECT i.reference FROM ad_invoices i
+      JOIN ad_campaigns c ON c.id = i.campaign_id
+      WHERE c.reference = ${created.reference} ORDER BY i.period_start LIMIT 1
+    `);
+
+    const reference = invoice.rows[0]?.reference ?? '';
+    const outsider = {
+      sub: staffId,
+      role: 'operations_manager',
+      permissions: ['ad.manage'],
+      scope: { kind: 'cities', cityIds: [cities.rows[0]?.id ?? ''], outside: 'none' },
+    } as unknown as AccessTokenClaims;
+
+    await expect(
+      invoices.markPaid(outsider, reference, 'حوالة من خارج النطاق.'),
+    ).rejects.toThrow();
+
+    /* Nothing was written on the way to the refusal — the invoice is still collectable. */
+    const after = await db.execute<{ status: string }>(sql`
+      SELECT status::text AS status FROM ad_invoices WHERE reference = ${reference}
+    `);
+
+    expect(after.rows[0]?.status).toBe('due');
   });
 });

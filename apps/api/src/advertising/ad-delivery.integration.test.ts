@@ -30,18 +30,36 @@ describeIfDb('what the customer app is served', () => {
   let citySlug = '';
   let otherSlug = '';
 
+  /**
+   * Two cities of this test's OWN, created inside the rolled-back transaction.
+   *
+   * This used to take the first two real cities and `DELETE FROM ad_campaigns` to make a count
+   * mean something. Two things were wrong with that. It broke the moment `ad_invoices` gained a
+   * foreign key to `ad_campaigns` — a real campaign with a real invoice cannot be deleted, and the
+   * whole file failed on the DELETE rather than on anything it was measuring. And before that it
+   * had been passing for the wrong reason: every assertion here counted rows in a table the test
+   * had just emptied, so «serves ONE campaign» proved nothing about scoping.
+   *
+   * A slug nothing else uses is the honest fixture. `forCity` keys on it, so what comes back is
+   * what this test made — whatever else the database holds.
+   */
+  async function makeCity(label: string): Promise<string> {
+    const slug = `ad-test-${label}-${globalThis.crypto.randomUUID()}`;
+
+    await db.execute(sql`
+      INSERT INTO cities (country_id, slug, name_ar, name_en, name_de, timezone)
+      SELECT id, ${slug}, 'مدينة اختبار', 'Test City', 'Teststadt', 'Asia/Damascus'
+      FROM countries ORDER BY id LIMIT 1
+    `);
+
+    return slug;
+  }
+
   beforeEach(async () => {
     await harness.begin();
 
-    const cities = await db.execute<{ slug: string }>(sql`
-      SELECT slug FROM cities WHERE deleted_at IS NULL ORDER BY id LIMIT 2
-    `);
-
-    citySlug = cities.rows[0]?.slug ?? '';
-    otherSlug = cities.rows[1]?.slug ?? '';
-
-    /* Nothing else's campaigns, so a count is this test's own. */
-    await db.execute(sql`DELETE FROM ad_campaigns`);
+    citySlug = await makeCity('own');
+    otherSlug = await makeCity('other');
   });
 
   afterEach(() => harness.rollback());

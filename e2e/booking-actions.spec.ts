@@ -10,6 +10,14 @@ test.use({ storageState: STAFF_STATE, viewport: { width: 1440, height: 1100 } })
 const copy = t.sections.bookingDetail;
 
 /**
+ * «لا نزاعات» — the ZERO branch of the related-disputes plural, taken from the catalogue.
+ *
+ * Read out of the ICU string rather than written here, so the day somebody rewords it this stops
+ * matching loudly instead of silently selecting a booking that already has a dispute.
+ */
+const NO_DISPUTES = /zero \{([^}]*)\}/.exec(copy.relatedDisputes)?.[1]?.trim() ?? '';
+
+/**
  * §9.4's write surface, driven — notes, the two status actions, and the cross-links.
  *
  * ## Why this file exists at all
@@ -380,9 +388,38 @@ test('a dispute opened here moves the booking and shows on its links', async ({
 
   test.skip(references.length === 0, 'No confirmed booking to dispute.');
 
-  const reference = references[0] ?? '';
+  /*
+    A booking with NO dispute on it yet, found rather than assumed.
 
-  await page.goto(`/bookings/${reference}`);
+    This took the first confirmed booking and opened a dispute on it. That works once: the API
+    answers `dispute.already_open` (409) to a second one, so every run after the first hit the same
+    fixture and failed with an error that has no relationship to what the test is about. Measured
+    2026-08-27 on `BKG-2026-077080`, which had accumulated FOUR open disputes from repeated runs
+    since 2026-08-23 while still listing as `confirmed`.
+
+    «لا نزاعات» is the zero case of the related-disputes plural, so the link text is the cheapest
+    reading of «has this one been used already» — and it is the same element the assertion at the
+    foot compares against, so nothing extra is loaded to find it.
+  */
+  let reference = '';
+
+  for (const candidate of references) {
+    await page.goto(`/bookings/${candidate}`);
+
+    const link = page.locator(`a[href="/disputes?q=${candidate}"]`);
+
+    if ((await link.count()) === 0) continue;
+
+    if ((await link.innerText()).includes(NO_DISPUTES)) {
+      reference = candidate;
+      break;
+    }
+  }
+
+  test.skip(
+    reference === '',
+    'Every confirmed booking on page one already has a dispute.',
+  );
 
   const before = await page.locator(`a[href="/disputes?q=${reference}"]`).innerText();
 
