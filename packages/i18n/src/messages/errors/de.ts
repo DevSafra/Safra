@@ -172,6 +172,14 @@ export const de = {
   'campaign.not_found': 'Kampagne nicht gefunden.',
   'gift_card.code_invalid':
     'Dieser Geschenkkarten-Code ist ungültig. Bitte prüfen und erneut versuchen.',
+  'ad.target_url_invalid':
+    'Dieser Link ist ungültig — er muss mit http oder https beginnen.',
+  'ad.window_order': 'Das Enddatum muss nach dem Startdatum liegen.',
+  'ad.price_needs_currency':
+    'Ein Preis benötigt eine Währung, und eine Währung einen Preis.',
+  'advertiser.not_found': 'Werbetreibender nicht gefunden.',
+  'ad_invoice.not_found': 'Rechnung nicht gefunden.',
+  'ad_invoice.not_due': 'Diese Rechnung ist nicht fällig.',
   'coupon.invalid': 'Dieser Code ist ungültig.',
   'coupon.not_started': 'Dieser Gutschein ist noch nicht gültig.',
   'coupon.expired': 'Dieser Gutschein ist abgelaufen.',

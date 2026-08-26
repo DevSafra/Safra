@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -17,8 +19,16 @@ import { z } from 'zod';
 import {
   ERROR,
   PERMISSIONS as P,
+  adInvoicePaySchema,
+  advertiserCreateSchema,
+  campaignCreateSchema,
+  campaignUpdateSchema,
   pageQuerySchema,
   staffDisputeOpenSchema,
+  type AdInvoicePayInput,
+  type AdvertiserCreateInput,
+  type CampaignCreateInput,
+  type CampaignUpdateInput,
   type StaffDisputeOpenInput,
 } from '@safra/contracts';
 
@@ -27,6 +37,8 @@ import { notFound } from '../common/errors/app-error.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { AdManagementService } from './ad-management.service.js';
+import { AdInvoiceService } from './ad-invoice.service.js';
 import {
   DisputeService,
   closeDisputeSchema,
@@ -98,6 +110,8 @@ export class CommsController {
     private readonly messaging: MessagingService,
     private readonly advertising: AdvertisingService,
     private readonly contracts: PartnerContractService,
+    private readonly adManagement: AdManagementService,
+    private readonly adInvoices: AdInvoiceService,
   ) {}
 
   // ── النزاعات ───────────────────────────────────────────────────────────────
@@ -231,6 +245,84 @@ export class CommsController {
     ]);
 
     return { ...page, counters };
+  }
+
+  /** Creating an advertiser — the business that pays. Distinct from a partner, who sells. */
+  @Post('advertisers')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermissions(P.AD_MANAGE)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @AuditExempt('AdManagementService records advertiser.created inside the transaction.')
+  async createAdvertiser(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(advertiserCreateSchema)) body: AdvertiserCreateInput,
+  ) {
+    return this.adManagement.createAdvertiser(user, body);
+  }
+
+  /**
+   * Creating a campaign — §9.3's «+ حملة جديدة».
+   *
+   * Issues every invoice the campaign will be billed for, in the same transaction: a campaign whose
+   * window is fixed has no periods left for a job to discover, and a job that generates them is one
+   * that can fail silently and leave a month unbilled.
+   */
+  @Post('ad-campaigns')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermissions(P.AD_MANAGE)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @AuditExempt('AdManagementService records ad_campaign.created inside the transaction.')
+  async createCampaign(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(campaignCreateSchema)) body: CampaignCreateInput,
+  ) {
+    return this.adManagement.createCampaign(user, body);
+  }
+
+  /** Editing the creative. The window and the price are not editable — see the contract. */
+  @Patch('ad-campaigns/:reference')
+  @RequirePermissions(P.AD_MANAGE)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @AuditExempt('AdManagementService records ad_campaign.updated inside the transaction.')
+  async updateCampaign(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(campaignUpdateSchema)) body: CampaignUpdateInput,
+  ) {
+    await this.adManagement.updateCampaign(user, reference, body);
+
+    return { ok: true };
+  }
+
+  /** What advertisers owe, scoped by the campaign's city. */
+  @Get('ad-invoices')
+  @RequirePermissions(P.AD_READ)
+  async listAdInvoices(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Query(new ZodValidationPipe(listQuerySchema)) query: z.infer<typeof listQuerySchema>,
+  ) {
+    return this.adInvoices.list({ ...query, actor: user });
+  }
+
+  /**
+   * Recording that an advertiser paid — the moment the revenue reaches the books.
+   *
+   * `AD_MANAGE` rather than a finance permission, deliberately: whoever runs the campaign is who
+   * knows it was paid for. The ledger pair is posted in the same transaction.
+   */
+  @Post('ad-invoices/:reference/paid')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.AD_MANAGE)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @AuditExempt('AdInvoiceService records ad_invoice.paid inside the transaction.')
+  async markInvoicePaid(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(adInvoicePaySchema)) body: AdInvoicePayInput,
+  ) {
+    await this.adInvoices.markPaid(user, reference, body.note);
+
+    return { ok: true };
   }
 
   @Patch('ad-campaigns/:reference/status')

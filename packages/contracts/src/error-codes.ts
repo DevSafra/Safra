@@ -485,6 +485,14 @@ export const ERROR = {
   GIFT_CARD_CODE_INVALID: 'gift_card.code_invalid',
   /* ── Coupons (§9.3's الكوبونات) ─────────────────────────────────────────────────────────── */
   /** The code matches nothing. Deliberately the same answer as "expired" — see CouponService. */
+  /* ── الإعلانات (§9.3) ─────────────────────────────────────────────────────────────────── */
+  AD_TARGET_URL_INVALID: 'ad.target_url_invalid',
+  AD_WINDOW_ORDER: 'ad.window_order',
+  AD_PRICE_NEEDS_CURRENCY: 'ad.price_needs_currency',
+  ADVERTISER_NOT_FOUND: 'advertiser.not_found',
+  AD_INVOICE_NOT_FOUND: 'ad_invoice.not_found',
+  AD_INVOICE_NOT_DUE: 'ad_invoice.not_due',
+
   COUPON_INVALID: 'coupon.invalid',
   COUPON_NOT_STARTED: 'coupon.not_started',
   COUPON_EXPIRED: 'coupon.expired',

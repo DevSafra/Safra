@@ -2421,6 +2421,8 @@ export const ar = {
    */
   auditSubject: {
     coupon: 'كوبون',
+    advertiser: 'معلن',
+    ad_invoice: 'فاتورة إعلان',
     partner_application: 'طلب شراكة',
     booking: 'حجز',
     booking_export: 'تصدير حجوزات',
@@ -2557,6 +2559,10 @@ export const ar = {
     'city_image.archived': 'أرشفة صورة مدينة',
     'customer.profile_updated': 'تعديل ملف عميل',
     'gift_card.purchase': 'شراء بطاقة هدية',
+    'advertiser.created': 'إضافة معلن',
+    'ad_campaign.created': 'إنشاء حملة إعلانية',
+    'ad_campaign.updated': 'تعديل حملة إعلانية',
+    'ad_invoice.paid': 'تحصيل فاتورة إعلان',
     'coupon.created': 'إنشاء كوبون',
     'coupon.updated': 'تعديل كوبون',
     'coupon.activated': 'تفعيل كوبون',
@@ -2909,6 +2915,12 @@ export const ar = {
       valueKind: 'نوع القيمة',
       startsAt: 'يبدأ في',
       maxRedemptions: 'أقصى عدد استخدامات',
+      /* الإعلانات — `kind` and `campaign` are already catalogued further down this same map. */
+      advertiser: 'المعلن',
+      billingPeriod: 'دورة الفوترة',
+      invoices: 'الفواتير',
+      headline: 'العنوان',
+      targetUrl: 'الرابط',
       walletBalance: 'رصيد المحفظة',
 
       /*

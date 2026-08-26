@@ -30,6 +30,7 @@ import { MetricsModule } from './metrics/metrics.module.js';
 import { HealthModule } from './health/health.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { DisputeModule } from './disputes/dispute.module.js';
+import { AdvertisingModule } from './advertising/advertising.module.js';
 import { QueueModule } from './queue/queue.module.js';
 import { JobsModule } from './common/jobs/jobs.module.js';
 import { WorkerModule } from './queue/worker.module.js';
@@ -52,6 +53,8 @@ import { VerifiedPartnerGuard } from './rbac/verified-partner.guard.js';
     /* Global: producers are injected across the app, and the worker resolves them too. */
     QueueModule,
     DisputeModule,
+    /* Customer-facing ad delivery and click tracking — §9.3 الإعلانات. */
+    AdvertisingModule,
     /* The mail worker's processor. Constructed in both processes; only worker.ts runs it. */
     JobsModule,
     WorkerModule,

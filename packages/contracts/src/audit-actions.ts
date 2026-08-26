@@ -98,6 +98,11 @@ export const AUDIT_ACTIONS = [
   'gift_card.purchase',
   /* Staff issuing a card SAFRA gives away — §9.3's «+ إنشاء بطاقة هدية». */
   /* ── الكوبونات (§9.3) ─────────────────────────────────────────────────────────────────── */
+  /* ── الإعلانات (§9.3) ─────────────────────────────────────────────────────────────────── */
+  'advertiser.created',
+  'ad_campaign.created',
+  'ad_campaign.updated',
+  'ad_invoice.paid',
   'coupon.created',
   'coupon.updated',
   'coupon.activated',

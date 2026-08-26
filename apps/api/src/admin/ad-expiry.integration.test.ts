@@ -73,10 +73,14 @@ describeIfDb('an ad campaign past its window', () => {
                (SELECT id FROM cities WHERE deleted_at IS NULL LIMIT 1)
         RETURNING id, city_id
       )
-      INSERT INTO ad_campaigns (advertiser_id, city_id, status, starts_at, ends_at)
+      INSERT INTO ad_campaigns (advertiser_id, city_id, status, starts_at, ends_at,
+                                headline_ar, headline_en, headline_de, target_url)
       SELECT adv.id, adv.city_id, ${status}::ad_status,
              now() - interval '30 days',
-             now() + (${days} * interval '1 day')
+             now() + (${days} * interval '1 day'),
+             -- A creative is required now: a campaign with nothing to show cannot be delivered.
+             'مطعم الاختبار', 'Test Restaurant', 'Testrestaurant',
+             'https://example.test/ad'
       FROM adv
       RETURNING reference
     `);

@@ -283,6 +283,16 @@ export const ledgerAccount = pgEnum('ledger_account', [
    * cost of acquisition, not a reduction of what the partner earned.
    */
   'coupon_discount',
+  /**
+   * An advertiser paying SAFRA for placement, and the revenue that pays for.
+   *
+   * Their own pair rather than `customer_payment`: an advertiser is not a customer, sells nothing
+   * through the platform and is billed on a period rather than per booking. الدفع's «حُصّل اليوم»
+   * counter filters on `customer_payment`, so folding ad money into it would overstate booking
+   * revenue with money that has nothing to do with a stay.
+   */
+  'ad_payment',
+  'ad_revenue',
 ]);
 
 export const ledgerDirection = pgEnum('ledger_direction', ['debit', 'credit']);

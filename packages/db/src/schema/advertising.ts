@@ -1,5 +1,13 @@
 import { relations, sql } from 'drizzle-orm';
-import { bigint, index, pgEnum, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  index,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 import { foreignId, money, primaryId, timestamps } from './_shared.js';
 import { adStatus } from './enums.js';
@@ -107,6 +115,30 @@ export const adCampaigns = pgTable(
     impressions: bigint('impressions', { mode: 'number' }).notNull().default(0),
     clicks: bigint('clicks', { mode: 'number' }).notNull().default(0),
 
+    /**
+     * The creative — what a customer actually SEES.
+     *
+     * Three columns, exactly as `properties` stores a name, because the customer app serves ar, en
+     * and de and an ad is operator-written text a person reads. One stored string for three
+     * readers is the failure `content.ts` documents at length; requiring all three is what stops a
+     * German customer being shown Arabic.
+     */
+    headlineAr: text('headline_ar').notNull(),
+    headlineEn: text('headline_en').notNull(),
+    headlineDe: text('headline_de').notNull(),
+
+    /**
+     * Where a click goes. Validated to http/https at the boundary.
+     *
+     * The click endpoint redirects to THIS column and never to anything in the request, so the
+     * redirect target is always something staff typed and never something a caller supplied — an
+     * open redirect on SAFRA's own domain would be a phishing primitive with our name on it.
+     */
+    targetUrl: text('target_url').notNull(),
+
+    /** Optional: an ad may be a line of text. Stored like every other media path. */
+    imagePath: text('image_path'),
+
     createdByUserId: foreignId('created_by_user_id').references(() => users.id),
     ...timestamps,
   },
@@ -129,3 +161,67 @@ export const adCampaignsRelations = relations(adCampaigns, ({ one }) => ({
   }),
   city: one(cities, { fields: [adCampaigns.cityId], references: [cities.id] }),
 }));
+
+/** Where an ad invoice stands. `void` is for one cancelled before it was ever paid. */
+export const adInvoiceStatus = pgEnum('ad_invoice_status', ['due', 'paid', 'void']);
+
+/**
+ * What an advertiser owes for one billing period of one campaign.
+ *
+ * ## Why this is its own table rather than a `payments` row
+ *
+ * `payments.booking_id` is NOT NULL: that table records money for a STAY, and it cannot express a
+ * payment that is not for one. The same wall stopped gift-card purchases going through it. An ad is
+ * billed per PERIOD rather than per transaction, so an invoice is the shape it actually has.
+ *
+ * ## One row per period, issued when the campaign is created
+ *
+ * A campaign has a fixed window, so every period it will ever be billed for is known the moment it
+ * exists — there is nothing for a scheduled job to discover later. Issuing them up front means an
+ * advertiser can be shown what the campaign will cost in total before it runs, and a period nobody
+ * can generate is a period nobody forgets to.
+ *
+ * ## Money is recorded when it is PAID, not when it is billed
+ *
+ * A `due` invoice is a claim, not revenue: SAFRA has not been paid and may never be. The ledger
+ * pair (`ad_payment` ↔ `ad_revenue`) is posted at the moment finance marks it paid, in the same
+ * transaction, so the books never carry revenue for a campaign that was never funded.
+ */
+export const adInvoices = pgTable(
+  'ad_invoices',
+  {
+    id: primaryId(),
+    reference: text('reference')
+      .notNull()
+      .unique()
+      .default(sql`'ADI-' || reference_number(nextval('ad_invoice_reference_seq'))`),
+    campaignId: foreignId('campaign_id')
+      .notNull()
+      .references(() => adCampaigns.id),
+
+    /** Inclusive start, exclusive end — the same shape a coupon window uses. */
+    periodStart: timestamp('period_start', { withTimezone: true }).notNull(),
+    periodEnd: timestamp('period_end', { withTimezone: true }).notNull(),
+
+    amount: money('amount').notNull(),
+    currencyId: foreignId('currency_id')
+      .notNull()
+      .references(() => currencies.id),
+
+    status: adInvoiceStatus('status').notNull().default('due'),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    paidByUserId: foreignId('paid_by_user_id').references(() => users.id),
+    ...timestamps,
+  },
+  (t) => [
+    /*
+      One invoice per campaign per period.
+
+      Issuing is idempotent because of this: a retried creation, or a repair script run twice,
+      cannot bill an advertiser for the same month twice. That is the whole reason it is a UNIQUE
+      index rather than a plain one.
+    */
+    uniqueIndex('ad_invoices_period_unique').on(t.campaignId, t.periodStart),
+    index('ad_invoices_status_idx').on(t.status, t.periodStart),
+  ],
+);

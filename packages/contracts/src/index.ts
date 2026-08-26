@@ -25,6 +25,7 @@ export * from './compliance.js';
 export * from './property.js';
 export * from './scope.js';
 export * from './search.js';
+export * from './advertising.js';
 export * from './coupon.js';
 export * from './dispute.js';
 export * from './support.js';

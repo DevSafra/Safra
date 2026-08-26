@@ -41,6 +41,8 @@ import { CommsController } from './comms.controller.js';
 import { DisputeService } from './dispute.service.js';
 import { CouponAdminService } from './coupon-admin.service.js';
 import { AdExpiryService } from './ad-expiry.service.js';
+import { AdManagementService } from './ad-management.service.js';
+import { AdInvoiceService } from './ad-invoice.service.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
 import { MessagingService } from './messaging.service.js';
 import { AdvertisingService } from './advertising.service.js';
@@ -108,6 +110,8 @@ import { StaffScopeService } from './staff-scope.service.js';
     DisputeService,
     CouponAdminService,
     AdExpiryService,
+    AdManagementService,
+    AdInvoiceService,
     JobRunService,
     MessagingService,
     // A staff reply on a ticket emails the asker. MailService comes from AuthModule's exports.

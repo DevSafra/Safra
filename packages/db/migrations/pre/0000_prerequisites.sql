@@ -18,6 +18,7 @@ CREATE SEQUENCE IF NOT EXISTS property_reference_seq  START 101;
 CREATE SEQUENCE IF NOT EXISTS booking_reference_seq   START 1;
 CREATE SEQUENCE IF NOT EXISTS payment_reference_seq   START 1;
 CREATE SEQUENCE IF NOT EXISTS gift_card_reference_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS ad_invoice_reference_seq START 1;
 CREATE SEQUENCE IF NOT EXISTS dispute_reference_seq   START 1;
 CREATE SEQUENCE IF NOT EXISTS ad_reference_seq        START 1;
 -- Added 2026-08-04 with the conversation and advertiser tables. `IF NOT EXISTS` means this
