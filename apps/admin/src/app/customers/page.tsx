@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 import { getCustomers, type CustomerListItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
@@ -12,6 +14,7 @@ import {
   type AdminColumn,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
+import { returnQuery } from '@/lib/search-params';
 import { t } from '@/lib/strings';
 import { listParamsFor } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
@@ -52,6 +55,9 @@ export default async function CustomersPage({
 
   const { q, page, size } = await listParamsFor('customers', searchParams);
 
+  /* Carried into every row link, so «رجوع» on the record comes back to this page of this search. */
+  const back = returnQuery({ page, size, q });
+
   const [result, counts] = await Promise.all([
     getCustomers({ q, page, limit: size }),
     sidebarCounts(),
@@ -74,7 +80,7 @@ export default async function CustomersPage({
         ) : (
           <>
             <AdminTable
-              columns={COLUMNS}
+              columns={columns(back)}
               rows={result.items}
               template={TEMPLATE}
               rowKey={(row) => row.reference}
@@ -100,11 +106,25 @@ export default async function CustomersPage({
   );
 }
 
-const COLUMNS: readonly AdminColumn<CustomerListItem>[] = [
+const columns = (back: string): readonly AdminColumn<CustomerListItem>[] => [
   {
     key: 'reference',
     header: t.table.colId,
-    render: (row) => <Ltr className="font-semibold text-sky">{row.reference}</Ltr>,
+    /*
+      Into the customer's record, carrying the reader's place in the list.
+
+      The registry had no way in at all until 2026-08-26: an agent who found somebody here had to
+      re-search their name in الحجوزات. `returnQuery` is the allow-list, so the link reflects only
+      the four fields the list owns and never whatever the URL happened to carry.
+    */
+    render: (row) => (
+      <Link
+        href={`/customers/${row.reference}${back}`}
+        className="font-semibold text-sky hover:underline"
+      >
+        <Ltr>{row.reference}</Ltr>
+      </Link>
+    ),
   },
   {
     key: 'name',

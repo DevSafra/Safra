@@ -465,6 +465,77 @@ const propertyTypeSchema = z.object({
 
 export type PropertyType = z.infer<typeof propertyTypeSchema>;
 
+/** A bounded section of a customer's record: the most recent rows, and the true total. */
+const recent = <T extends z.ZodTypeAny>(item: T) =>
+  z.object({ total: z.number(), items: z.array(item) });
+
+const customerDetailSchema = z.object({
+  reference: z.string(),
+  fullName: z.string(),
+  /* Shown because §9.4's booking screen has always shown them — see the service's note. */
+  email: z.string().nullable(),
+  phone: z.string().nullable(),
+  isGuest: z.boolean(),
+  createdAt: z.string(),
+  accountStatus: z.string().nullable(),
+  locale: z.string().nullable(),
+  /* `null` when there is no wallet at all — a different fact from a zero balance. */
+  wallet: z.object({ balance: z.string(), currency: z.string().nullable() }).nullable(),
+  bookings: recent(
+    z.object({
+      reference: z.string(),
+      status: z.string(),
+      checkIn: z.string(),
+      amount: z.string(),
+      currency: z.string(),
+      property: z.string().nullable(),
+    }),
+  ),
+  wallets: recent(
+    z.object({
+      direction: z.string(),
+      reason: z.string(),
+      amount: z.string(),
+      currency: z.string(),
+      at: z.string(),
+    }),
+  ),
+  reviews: recent(
+    z.object({
+      rating: z.number(),
+      status: z.string(),
+      property: z.string().nullable(),
+      at: z.string(),
+    }),
+  ),
+  disputes: recent(
+    z.object({
+      reference: z.string(),
+      kind: z.string(),
+      status: z.string(),
+      bookingReference: z.string().nullable(),
+      at: z.string(),
+    }),
+  ),
+  notifications: recent(
+    z.object({
+      templateKey: z.string(),
+      channel: z.string(),
+      status: z.string(),
+      at: z.string(),
+    }),
+  ),
+});
+
+export type CustomerDetail = z.infer<typeof customerDetailSchema>;
+
+export async function getCustomer(reference: string) {
+  return staffFetch(
+    `/admin/customers/${encodeURIComponent(reference)}`,
+    customerDetailSchema,
+  );
+}
+
 export async function getPropertyTypes() {
   return staffFetch('/admin/property-types', z.array(propertyTypeSchema));
 }

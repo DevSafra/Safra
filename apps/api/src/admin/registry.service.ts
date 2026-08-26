@@ -2,9 +2,24 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { COUNT_CAP, type OffsetPage, type PageQuery, offsetPage } from '@safra/contracts';
+import {
+  COUNT_CAP,
+  ERROR,
+  type OffsetPage,
+  type PageQuery,
+  offsetPage,
+} from '@safra/contracts';
+
+/**
+ * How many rows each section of a customer's record shows.
+ *
+ * A customer with four hundred bookings must not turn the screen into four hundred rows (rule 2).
+ * The true total is reported beside each list, so «the last ten» is never mistaken for «all ten».
+ */
+const RECENT = 10;
 
 import { DATABASE } from '../database/database.module.js';
+import { notFound } from '../common/errors/app-error.js';
 import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -233,6 +248,230 @@ export class RegistryService {
    * correlated subquery here would be an N+1 inside one statement, which is the shape that
    * looks fine at 4,891 customers and stops working at half a million.
    */
+  /**
+   * ONE customer, and everything the platform has recorded about them.
+   *
+   * ## Why this exists
+   *
+   * العملاء was a registry with no way in — a support agent who found somebody had to re-search
+   * their name in الحجوزات and had nowhere to see the wallet movements, the disputes or what the
+   * platform had sent them. Bashar asked for a record «where I can find, see and track all its
+   * information and moves on the system» (2026-08-26).
+   *
+   * ## Contact details are shown, and that is consistent rather than new
+   *
+   * `booking-detail.service.ts` has sent `cp.email` and `cp.phone` to any reader of a booking since
+   * §9.4 was built, so this discloses nothing the console did not already display one click away.
+   * It does NOT weaken EC-010: that flow verifies an INBOUND CALLER before booking details are read
+   * out, which is a different question from what a member of staff sees on a record they navigated
+   * to. Both are gated on `customer.read`.
+   *
+   * ## Every list is bounded, and says so
+   *
+   * A customer with four hundred bookings must not turn this into four hundred rows (rule 2). Each
+   * section takes the most recent `RECENT` and reports the true total beside it, so a reader can
+   * tell «the last ten» from «all ten». Five small indexed queries rather than one join: joining
+   * six one-to-many relations in a single statement multiplies the rows and then needs them
+   * de-duplicated in code.
+   */
+  async customerDetail(reference: string) {
+    const profile = await this.db.execute<{
+      id: string;
+      reference: string;
+      full_name: string;
+      email: string | null;
+      phone: string | null;
+      is_guest: boolean;
+      created_at: string;
+      account_status: string | null;
+      locale: string | null;
+      wallet_balance: string | null;
+      wallet_currency: string | null;
+    }>(sql`
+      SELECT c.id, c.reference, c.full_name, c.email, c.phone, c.is_guest,
+             to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+               AS created_at,
+             u.status::text AS account_status,
+             u.preferred_locale AS locale,
+             w.balance::text AS wallet_balance,
+             cur.code AS wallet_currency
+      FROM customer_profiles c
+      LEFT JOIN users u       ON u.id = c.user_id
+      LEFT JOIN wallets w     ON w.customer_profile_id = c.id AND w.deleted_at IS NULL
+      LEFT JOIN currencies cur ON cur.id = w.currency_id
+      WHERE c.reference = ${reference} AND c.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const customer = profile.rows[0];
+
+    if (!customer) throw notFound(ERROR.CUSTOMER_NOT_FOUND);
+
+    const id = customer.id;
+
+    const [bookings, wallet, reviews, disputes, notices] = await Promise.all([
+      this.db.execute<{
+        reference: string;
+        status: string;
+        check_in: string;
+        total_amount: string;
+        currency_code: string;
+        property: string | null;
+        created_at: string;
+        total: string;
+      }>(sql`
+        SELECT b.reference, b.status::text AS status, b.check_in::text,
+               b.total_amount::text AS total_amount, cur.code AS currency_code,
+               coalesce(pr.name_ar, pr.name_en) AS property,
+               b.created_at::text,
+               count(*) OVER ()::text AS total
+        FROM bookings b
+        JOIN currencies cur ON cur.id = b.currency_id
+        JOIN properties pr  ON pr.id = b.property_id
+        WHERE b.customer_profile_id = ${id} AND b.deleted_at IS NULL
+        ORDER BY b.created_at DESC
+        LIMIT ${RECENT}
+      `),
+      this.db.execute<{
+        direction: string;
+        reason: string;
+        amount: string;
+        currency_code: string;
+        created_at: string;
+        total: string;
+      }>(sql`
+        SELECT t.direction::text AS direction, t.reason::text AS reason,
+               t.amount::text AS amount, cur.code AS currency_code,
+               t.created_at::text, count(*) OVER ()::text AS total
+        FROM wallet_transactions t
+        JOIN wallets w      ON w.id = t.wallet_id
+        JOIN currencies cur ON cur.id = w.currency_id
+        WHERE w.customer_profile_id = ${id}
+        ORDER BY t.created_at DESC
+        LIMIT ${RECENT}
+      `),
+      this.db.execute<{
+        rating: number;
+        status: string;
+        created_at: string;
+        property: string | null;
+        total: string;
+      }>(sql`
+        SELECT r.rating, r.status::text AS status, r.created_at::text,
+               coalesce(pr.name_ar, pr.name_en) AS property,
+               count(*) OVER ()::text AS total
+        FROM reviews r
+        JOIN properties pr ON pr.id = r.property_id
+        WHERE r.customer_profile_id = ${id}
+        ORDER BY r.created_at DESC
+        LIMIT ${RECENT}
+      `),
+      this.db.execute<{
+        reference: string;
+        kind: string;
+        status: string;
+        created_at: string;
+        booking_reference: string | null;
+        total: string;
+      }>(sql`
+        SELECT d.reference, d.kind::text AS kind, d.status::text AS status,
+               d.created_at::text, b.reference AS booking_reference,
+               count(*) OVER ()::text AS total
+        FROM disputes d
+        LEFT JOIN bookings b ON b.id = d.booking_id
+        WHERE d.customer_profile_id = ${id}
+        ORDER BY d.created_at DESC
+        LIMIT ${RECENT}
+      `),
+      /*
+        What the platform SENT them — the half of «moves on the system» a customer never asks about
+        and support always needs. The row carries no recipient, subject or body by design, so this
+        is the template and its state, never the message.
+      */
+      this.db.execute<{
+        template_key: string;
+        channel: string;
+        status: string;
+        created_at: string;
+        total: string;
+      }>(sql`
+        SELECT n.template_key, n.channel::text AS channel, n.status::text AS status,
+               n.created_at::text, count(*) OVER ()::text AS total
+        FROM notifications n
+        WHERE n.customer_profile_id = ${id}
+        ORDER BY n.created_at DESC
+        LIMIT ${RECENT}
+      `),
+    ]);
+
+    /** The window function reports the unlimited total on every row; absent when there are none. */
+    const totalOf = (rows: { total: string }[]): number => Number(rows[0]?.total ?? 0);
+
+    return {
+      reference: customer.reference,
+      fullName: customer.full_name,
+      email: customer.email,
+      phone: customer.phone,
+      isGuest: customer.is_guest,
+      createdAt: customer.created_at,
+      accountStatus: customer.account_status,
+      locale: customer.locale,
+      wallet:
+        customer.wallet_balance === null
+          ? null
+          : { balance: customer.wallet_balance, currency: customer.wallet_currency },
+      bookings: {
+        total: totalOf(bookings.rows),
+        items: bookings.rows.map((row) => ({
+          reference: row.reference,
+          status: row.status,
+          checkIn: row.check_in,
+          amount: row.total_amount,
+          currency: row.currency_code,
+          property: row.property,
+        })),
+      },
+      wallets: {
+        total: totalOf(wallet.rows),
+        items: wallet.rows.map((row) => ({
+          direction: row.direction,
+          reason: row.reason,
+          amount: row.amount,
+          currency: row.currency_code,
+          at: row.created_at,
+        })),
+      },
+      reviews: {
+        total: totalOf(reviews.rows),
+        items: reviews.rows.map((row) => ({
+          rating: row.rating,
+          status: row.status,
+          property: row.property,
+          at: row.created_at,
+        })),
+      },
+      disputes: {
+        total: totalOf(disputes.rows),
+        items: disputes.rows.map((row) => ({
+          reference: row.reference,
+          kind: row.kind,
+          status: row.status,
+          bookingReference: row.booking_reference,
+          at: row.created_at,
+        })),
+      },
+      notifications: {
+        total: totalOf(notices.rows),
+        items: notices.rows.map((row) => ({
+          templateKey: row.template_key,
+          channel: row.channel,
+          status: row.status,
+          at: row.created_at,
+        })),
+      },
+    };
+  }
+
   async customers(query: {
     limit: number;
     page: number;

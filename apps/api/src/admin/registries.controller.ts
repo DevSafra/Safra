@@ -289,6 +289,23 @@ export class RegistriesController {
     return this.registry.customers(query);
   }
 
+  /**
+   * ONE customer's record — everything the platform holds about them.
+   *
+   * `customer.read`, the same capability as the registry it is opened from: this shows more DETAIL
+   * about somebody a reader can already find, not a different class of information. The contact
+   * details on it are the ones §9.4's booking screen has always displayed.
+   *
+   * The reference is looked up in a `WHERE` clause, so a reference that does not exist and one that
+   * is malformed answer identically.
+   */
+  @Get('customers/:reference')
+  @RequirePermissions(P.CUSTOMER_READ)
+  @AuditExempt('Reading a customer record; changes nothing.')
+  async customerDetail(@Param('reference') reference: string) {
+    return this.registry.customerDetail(reference);
+  }
+
   // ── الدفع والفواتير · المحفظة ───────────────────────────────────────────────
 
   /**

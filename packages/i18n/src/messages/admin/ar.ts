@@ -1906,6 +1906,31 @@ export const ar = {
     },
 
     /* §8.2 — «أنواع أخرى قابلة للإضافة من الإدارة». */
+    /* One customer's record — «كل معلوماته وحركاته على النظام» (Bashar, 2026-08-26). */
+    customerDetail: {
+      identity: 'بيانات العميل',
+      email: 'البريد الإلكتروني',
+      phone: 'الهاتف',
+      type: 'النوع',
+      guest: 'ضيف',
+      registered: 'حساب دائم',
+      accountStatus: 'حالة الحساب',
+      noAccount: 'لا حساب مرتبط',
+      locale: 'اللغة',
+      joined: 'تاريخ التسجيل',
+      wallet: 'المحفظة',
+      noWallet: 'لا محفظة',
+      bookings: 'الحجوزات',
+      walletMoves: 'حركات المحفظة',
+      reviews: 'التقييمات',
+      disputes: 'النزاعات',
+      notifications: 'ما أُرسل إليه',
+      /* Said on every section, so «آخر عشرة» is never mistaken for «كل العشرة». */
+      showingRecent: 'أحدث {shown} من {total}',
+      none: 'لا شيء بعد',
+      rating: '{n} من 5',
+      nights: 'الوصول {date}',
+    },
     propertyTypes: {
       title: 'أنواع الإقامة',
       intro: 'الأنواع التي يختار منها الشريك عند تسجيل عقار.',
@@ -3163,6 +3188,13 @@ export const ar = {
       fined: 'غرامة',
       suspension: 'رُفع إلى الإيقاف',
     } as Record<string, string>,
+
+    /* `user_status` — three values, so the customer record never prints a raw identifier. */
+    userStatus: {
+      active: 'نشط',
+      suspended: 'موقوف',
+      archived: 'مؤرشف',
+    },
 
     walletReason: {
       sla_compensation: 'تعويض مهلة',
