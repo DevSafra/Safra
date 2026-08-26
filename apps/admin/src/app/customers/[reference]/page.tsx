@@ -176,12 +176,22 @@ export default async function CustomerPage({
       <Bounded title={c.disputes} section={customer.disputes} copy={c}>
         {customer.disputes.items.map((dispute) => (
           <Line key={dispute.reference}>
-            <Link
-              href={`/disputes/${dispute.reference}`}
-              className="text-sky hover:underline"
-            >
-              <Ltr>{dispute.reference}</Ltr>
-            </Link>
+            {/*
+              To the BOOKING, which is where a dispute is worked — there is no `/disputes/:ref`
+              route and this linked to one, so every reference here was a dead end. الرسائل's own
+              registry has always linked disputes the same way. A dispute with no booking behind it
+              is plain text rather than a link to nowhere.
+            */}
+            {dispute.bookingReference ? (
+              <Link
+                href={`/bookings/${dispute.bookingReference}?from=customers`}
+                className="text-sky hover:underline"
+              >
+                <Ltr>{dispute.reference}</Ltr>
+              </Link>
+            ) : (
+              <Ltr className="text-text">{dispute.reference}</Ltr>
+            )}
             <span className="min-w-0 flex-1 truncate text-muted">
               {label(t.enums.disputeKind, dispute.kind)}
             </span>
@@ -195,31 +205,79 @@ export default async function CustomerPage({
 
       <Bounded title={c.notifications} section={customer.notifications} copy={c}>
         {customer.notifications.items.map((notice, index) => (
-          <Line key={`${notice.at}-${index}`}>
-            {/*
-              The TEMPLATE and its state, never the message. A `notifications` row carries no
-              recipient, subject or body by design — every support agent can read that table.
-            */}
-            {/*
-              WHAT was sent, in Arabic — «رد على طلب دعم», not `support.replied`.
+          <li
+            key={`${notice.at}-${index}`}
+            className="rounded-lg border border-line bg-card px-4 py-2.5 text-[13px]"
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              {/*
+                WHAT was sent, in Arabic — «رد على طلب دعم», not `support.replied`.
 
-              `label` falls back to the raw key by design, so a template with no catalogue entry
-              looks like the untranslated thing it is rather than being quietly prettified.
-            */}
-            <span className="font-semibold text-text">
-              {label(t.notificationTemplate, notice.templateKey)}
-            </span>
+                `label` falls back to the raw key by design, so a template with no catalogue entry
+                looks like the untranslated thing it is rather than being quietly prettified.
+              */}
+              <span className="font-semibold text-text">
+                {label(t.notificationTemplate, notice.templateKey)}
+              </span>
+              {/*
+                The channel as the enum value, matching سجل واتساب والبريد. An enum value is a
+                documented exception to the no-hardcoded-text rule, and inventing a second Arabic
+                vocabulary for it here would put two names on one thing.
+              */}
+              <Ltr className="min-w-0 flex-1 truncate text-muted">{notice.channel}</Ltr>
+              <StatusPill tone={statusTone(notice.status)}>
+                {label(t.enums.notificationStatus, notice.status)}
+              </StatusPill>
+              <Ltr className="text-[12px] text-faint">{shortDateTime(notice.at)}</Ltr>
+            </div>
+
             {/*
-              The channel as the enum value, matching سجل واتساب والبريد. An enum value is a
-              documented exception to the no-hardcoded-text rule, and inventing a second Arabic
-              vocabulary for it here would put two names on one thing.
+              A native `details`, not a client component.
+
+              The whole row is server-rendered and the only interaction is showing text that is
+              already on the page — a `useState` here would ship JavaScript to open a paragraph.
+              It also works before hydration, which is the state a reviewer meets on a slow console.
             */}
-            <Ltr className="min-w-0 flex-1 truncate text-muted">{notice.channel}</Ltr>
-            <StatusPill tone={statusTone(notice.status)}>
-              {label(t.enums.notificationStatus, notice.status)}
-            </StatusPill>
-            <Ltr className="text-[12px] text-faint">{shortDateTime(notice.at)}</Ltr>
-          </Line>
+            <details className="mt-1.5">
+              <summary className="cursor-pointer text-[12px] text-sky">
+                {c.showTemplate}
+              </summary>
+
+              {notice.template === null ? (
+                <p className="mt-2 text-[12px] text-faint">{c.noTemplate}</p>
+              ) : (
+                <div className="mt-2 grid gap-1.5">
+                  <p className="text-[12px] text-faint">
+                    {c.templateSubject}:{' '}
+                    <span className="text-text">{notice.template.subject}</span>
+                  </p>
+                  {/*
+                    `whitespace-pre-wrap`, because the body is written with real line breaks and
+                    collapsing them turns a laid-out message into a paragraph.
+                  */}
+                  <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-muted">
+                    {notice.template.body}
+                  </p>
+                  <p className="text-[11px] text-faint">{c.templateNote}</p>
+                </div>
+              )}
+            </details>
+
+            {/*
+              A support reply announces a thread, and the thread's messages ARE kept — redacted for
+              contact details, with the count of removed spans. So the substance of this notice is
+              readable, on الرسائل rather than here. Searched by the customer's reference, which is
+              what that registry's own search matches on.
+            */}
+            {notice.templateKey === 'support.replied' ? (
+              <Link
+                href={`/messages?q=${encodeURIComponent(customer.reference)}`}
+                className="mt-1.5 inline-block text-[12px] text-sky hover:underline"
+              >
+                {c.openThread}
+              </Link>
+            ) : null}
+          </li>
         ))}
       </Bounded>
     </Shell>
