@@ -200,7 +200,15 @@ export default async function CustomerPage({
               The TEMPLATE and its state, never the message. A `notifications` row carries no
               recipient, subject or body by design — every support agent can read that table.
             */}
-            <span className="text-text"></span>
+            {/*
+              WHAT was sent, in Arabic — «رد على طلب دعم», not `support.replied`.
+
+              `label` falls back to the raw key by design, so a template with no catalogue entry
+              looks like the untranslated thing it is rather than being quietly prettified.
+            */}
+            <span className="font-semibold text-text">
+              {label(t.notificationTemplate, notice.templateKey)}
+            </span>
             {/*
               The channel as the enum value, matching سجل واتساب والبريد. An enum value is a
               documented exception to the no-hardcoded-text rule, and inventing a second Arabic
