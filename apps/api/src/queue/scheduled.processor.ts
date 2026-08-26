@@ -14,6 +14,7 @@ import { DeadLetterService } from './dead-letter.service.js';
 import { SCHEDULED_JOBS, type ScheduledJobData } from './scheduled.job.js';
 import { SystemRefundService } from '../payments/system-refund.service.js';
 import { GiftCardExpiryService } from '../gift-cards/gift-card-expiry.service.js';
+import { AdExpiryService } from '../admin/ad-expiry.service.js';
 import { StayCompletionService } from '../bookings/stay-completion.service.js';
 
 /**
@@ -66,6 +67,7 @@ export class ScheduledProcessor {
     private readonly redrive: NotificationRedriveService,
     private readonly systemRefunds: SystemRefundService,
     private readonly giftCardExpiry: GiftCardExpiryService,
+    private readonly adExpiry: AdExpiryService,
     private readonly runs: JobRunService,
     private readonly deadLetters: DeadLetterService,
   ) {}
@@ -100,6 +102,8 @@ export class ScheduledProcessor {
         return this.systemRefunds.sweep();
       case 'gift-card-expiry':
         return this.giftCardExpiry.sweep();
+      case 'ad-campaign-expiry':
+        return this.adExpiry.sweep();
       case 'ranking-recompute':
         return this.ranking.nightlyRecompute();
       case 'sanctions-refresh':

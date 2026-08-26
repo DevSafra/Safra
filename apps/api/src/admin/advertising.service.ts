@@ -104,8 +104,10 @@ export class AdvertisingService {
       clicks_30d: string;
     }>(sql`
       SELECT
-        count(*) FILTER (WHERE c.status = 'active')::text  AS active,
-        count(*) FILTER (WHERE c.status = 'paused')::text  AS paused,
+        -- Counted on the same effective status the list shows, or the summary above a table
+        -- disagrees with the table: a lapsed campaign would be counted as running.
+        count(*) FILTER (WHERE c.status = 'active' AND c.ends_at > now())::text AS active,
+        count(*) FILTER (WHERE c.status = 'paused' AND c.ends_at > now())::text AS paused,
         count(*) FILTER (WHERE c.status = 'active'
                            AND c.ends_at <= now() + interval '7 days')::text
           AS ending_within_week,
@@ -166,7 +168,16 @@ export class AdvertisingService {
              a.name              AS advertiser,
              a.kind::text         AS advertiser_kind,
              ci.name_ar           AS city,
-             c.status::text       AS status,
+             -- The EFFECTIVE status, not only the stored one.
+             --
+             -- ad-campaign-expiry retires lapsed campaigns hourly, so the column is right within
+             -- the hour. Within the hour is a window where الإعلانات paints a campaign as running
+             -- while setStatus refuses to touch it and no impression should be served -- which is
+             -- the defect this replaces at a smaller size. The sweep makes the COLUMN right for
+             -- everything that queries it without knowing to compensate; this makes the SCREEN
+             -- right immediately. Same shape as الكوبونات and بطاقات الهدايا.
+             CASE WHEN c.status <> 'expired' AND c.ends_at <= now() THEN 'expired'
+                  ELSE c.status::text END AS status,
              c.billing_period::text AS billing_period,
              c.price_amount::text AS price_amount,
              cur.code             AS price_currency,
@@ -219,8 +230,13 @@ export class AdvertisingService {
       id: string;
       status: string;
       city_id: string | null;
+      lapsed: boolean;
     }>(sql`
-      SELECT id, status::text AS status, city_id FROM ad_campaigns
+      SELECT id, status::text AS status, city_id,
+             -- Whether its window has CLOSED, decided here rather than read from status.
+             -- (No backticks in a comment inside a sql template: one would end the string.)
+             (ends_at <= now()) AS lapsed
+      FROM ad_campaigns
       WHERE reference = ${reference} AND deleted_at IS NULL
       LIMIT 1
     `);
@@ -236,8 +252,21 @@ export class AdvertisingService {
       An expired campaign cannot be reactivated by flipping the status: its paid window has
       closed, and resuming it would deliver impressions nobody bought. A new campaign is the
       correct answer, and the refusal says so rather than appearing to work.
+
+      ## The CLOCK decides, not the column
+      
+      This read `status === 'expired'` alone — and NOTHING wrote that status. There was no ad sweep
+      among the scheduled jobs and the list selected `status` raw, so the guard could never fire:
+      a campaign whose paid window closed last month could be flipped straight back to `active`,
+      delivering exactly the impressions this refusal exists to prevent. The reasoning above was
+      right all along; the enforcement was reading a column no writer maintained.
+
+      `ad-campaign-expiry` now retires them hourly and `list()` computes the effective status, so
+      the column catches up and the screen never lies in the meantime. Both are belt to this brace,
+      not replacements for it: a campaign that lapses between the sweep and this call is refused
+      here, on the clock.
     */
-    if (campaign.status === 'expired') {
+    if (campaign.status === 'expired' || campaign.lapsed) {
       throw badRequest(ERROR.CAMPAIGN_EXPIRED);
     }
 

@@ -40,6 +40,8 @@ import { EmergencyService } from './emergency.service.js';
 import { CommsController } from './comms.controller.js';
 import { DisputeService } from './dispute.service.js';
 import { CouponAdminService } from './coupon-admin.service.js';
+import { AdExpiryService } from './ad-expiry.service.js';
+import { JobRunService } from '../common/jobs/job-run.service.js';
 import { MessagingService } from './messaging.service.js';
 import { AdvertisingService } from './advertising.service.js';
 import { PartnerContractService } from './partner-contract.service.js';
@@ -105,6 +107,8 @@ import { StaffScopeService } from './staff-scope.service.js';
     // §8's customer-facing and commercial domains — see CommsController.
     DisputeService,
     CouponAdminService,
+    AdExpiryService,
+    JobRunService,
     MessagingService,
     // A staff reply on a ticket emails the asker. MailService comes from AuthModule's exports.
     NotificationService,
@@ -122,6 +126,6 @@ import { StaffScopeService } from './staff-scope.service.js';
     what `awaiting_partner_signature` means. AdminModule does not import PartnerModule, so there
     is no cycle to create.
   */
-  exports: [ReviewService, BookingExportService, PartnerContractService],
+  exports: [ReviewService, BookingExportService, PartnerContractService, AdExpiryService],
 })
 export class AdminModule {}

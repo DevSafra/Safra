@@ -113,6 +113,8 @@ describeIfReady('the scheduled queue', () => {
       { sweep: () => stub('system-refunds').run() } as never,
       /* The hourly pass that retires gift cards past their expiry. */
       { sweep: () => stub('gift-card-expiry').run() } as never,
+      /* The hourly pass that retires ad campaigns past their paid window. */
+      { sweep: () => stub('ad-campaign-expiry').run() } as never,
       runs,
       new DeadLetterService(db),
     );

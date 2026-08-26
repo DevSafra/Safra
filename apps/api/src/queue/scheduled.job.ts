@@ -59,6 +59,13 @@ export const SCHEDULED_JOBS = {
    */
   'gift-card-expiry': '45 * * * *',
   /**
+   * Retiring ad campaigns whose paid window has closed — `expired` had no writer at all.
+   *
+   * Hourly at :20, clear of `payout-accrual` and `booking-sla-sweep` on the hour and of
+   * `gift-card-expiry` at :45.
+   */
+  'ad-campaign-expiry': '20 * * * *',
+  /**
    * Re-driving notifications whose jobs were lost — the recovery half of `O-notify-2`.
    *
    * Five minutes, which is the only cadence here that was chosen rather than inherited. A notice
