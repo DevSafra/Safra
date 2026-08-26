@@ -128,7 +128,19 @@ const COLUMNS: readonly AdminColumn<CouponItem>[] = [
       A coupon code IS public — it is printed in campaigns — so unlike a gift card code there is
       nothing to protect and showing it in full is correct.
     */
-    render: (row) => <Ltr className="font-bold text-sky">{row.code}</Ltr>,
+    /*
+      And it WRAPS rather than overflowing (2026-08-27).
+
+      The schema allows 4 to 40 characters, so no fixed track can be wide enough: `RACE588330621`
+      is thirteen and needed 100px in an 81px column at 1024, spilling into «النوع» beside it.
+      Widening the track only moves the ceiling — the next code is longer — and raising `minWidth`
+      brings back the horizontal scrollbar Bashar asked to be rid of.
+
+      `break-all` because a code is one unbroken Latin token: `break-words` has nowhere to break it
+      and does nothing. Two short lines are legible; a code sitting on top of the type beside it is
+      not. Found by `table-overflow.spec.ts` at 1024, which is the width that regresses silently.
+    */
+    render: (row) => <Ltr className="font-bold break-all text-sky">{row.code}</Ltr>,
   },
   {
     key: 'type',
