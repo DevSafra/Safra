@@ -42,7 +42,21 @@ export function requestIdMiddleware(
    * interceptors, controllers, services, and anything they await — runs within it.
    * Calling it outside would leave the context covering only this function.
    */
-  runWithRequestContext({ requestId }, () => {
-    next();
-  });
+  /*
+    The ORIGIN travels with the correlation ID, so `AuditService` can record §15's IP and device
+    without every administrative service taking a parameter it would only pass along.
+
+    `request.ip` honours Express's `trust proxy` setting, which is how it stays correct behind the
+    load balancer rather than recording the proxy on every row.
+  */
+  runWithRequestContext(
+    {
+      requestId,
+      ipAddress: request.ip,
+      userAgent: request.header('user-agent'),
+    },
+    () => {
+      next();
+    },
+  );
 }

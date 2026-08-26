@@ -5,6 +5,10 @@ import { schema } from '@safra/db';
 import type { Role } from '@safra/contracts';
 
 import { DATABASE } from '../../database/database.module.js';
+import {
+  currentRequestContext,
+  type RequestContext,
+} from '../logging/request-context.js';
 import { describeError } from '../errors/safe-error.js';
 
 /**
@@ -46,6 +50,18 @@ export class AuditService {
    */
   async record(entry: AuditEntry, tx?: Database): Promise<void> {
     const executor = tx ?? this.db;
+    /*
+      §15's origin, from the request that is running — unless the caller named one.
+
+      An explicit value still wins, because a few paths know better than the ambient context: the
+      staff routes pass it deliberately, and a job replaying work on somebody's behalf must not
+      inherit whatever request happens to be open. Everything else — forty-one services writing
+      administrative rows four calls deep — gets it without taking a parameter.
+
+      Outside a request there is no context and both stay null, which is the honest answer for a
+      scheduled sweep: nobody's device did it.
+    */
+    const origin: Partial<RequestContext> = currentRequestContext() ?? {};
 
     await executor.insert(schema.auditLog).values({
       actorUserId: entry.actorUserId ?? null,
@@ -55,8 +71,8 @@ export class AuditService {
       subjectId: entry.subjectId ?? null,
       before: entry.before ?? null,
       after: entry.after ?? null,
-      ipAddress: entry.ipAddress ?? null,
-      userAgent: entry.userAgent ?? null,
+      ipAddress: entry.ipAddress ?? origin.ipAddress ?? null,
+      userAgent: entry.userAgent ?? origin.userAgent ?? null,
       requestId: entry.requestId ?? null,
       reason: entry.reason ?? null,
     });

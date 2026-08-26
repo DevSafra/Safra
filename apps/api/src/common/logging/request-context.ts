@@ -5,6 +5,23 @@ export interface RequestContext {
   readonly requestId: string;
   /** Present once the request is authenticated. Never the email — see the note. */
   userId?: string | undefined;
+  /**
+   * Where the request came from — §15's «تسجيل IP والجهاز … في العمليات الحساسة».
+   *
+   * Here for the same reason the correlation ID is: an audit row is written four calls deep in a
+   * service that has no idea it is in a request, and the alternative is a parameter on every
+   * administrative method in forty-one files. Measured on 2026-08-26, threading it by hand had
+   * reached two of them.
+   *
+   * `AuditService` reads these when a caller passes nothing explicitly. A scheduled job runs
+   * outside any request and correctly records neither.
+   *
+   * Unlike `userId`, an IP address IS personal data, and it is stored on `audit_log` rather than
+   * shipped to log aggregation — which is what §15 asks for and what rule 1 permits: the audit
+   * trail is the one record that is allowed to say who did what from where.
+   */
+  ipAddress?: string | undefined;
+  userAgent?: string | undefined;
 }
 
 /**
