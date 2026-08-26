@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
@@ -28,6 +29,8 @@ import {
   staffStatusSchema,
   pageQuerySchema,
 } from '@safra/contracts';
+
+import type { Request } from 'express';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
@@ -164,8 +167,9 @@ export class StaffController {
   async invite(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Body(new ZodValidationPipe(staffInviteSchema)) body: StaffInviteInput,
+    @Req() request: Request,
   ) {
-    return this.staff.invite(user, body);
+    return this.staff.invite(user, body, origin(request));
   }
 
   @Post(':userId/resend-invitation')
@@ -175,8 +179,9 @@ export class StaffController {
   async resend(
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('userId', ParseUUIDPipe) userId: string,
+    @Req() request: Request,
   ): Promise<void> {
-    await this.staff.resendInvitation(user, userId);
+    await this.staff.resendInvitation(user, userId, origin(request));
   }
 
   /**
@@ -192,8 +197,9 @@ export class StaffController {
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('userId', ParseUUIDPipe) userId: string,
     @Body(new ZodValidationPipe(staffProfileSchema)) body: StaffProfileInput,
+    @Req() request: Request,
   ) {
-    await this.staff.rename(user, userId, body.fullName);
+    await this.staff.rename(user, userId, body.fullName, origin(request));
 
     return this.staff.detail(userId);
   }
@@ -205,8 +211,9 @@ export class StaffController {
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('userId', ParseUUIDPipe) userId: string,
     @Body(new ZodValidationPipe(staffRoleAssignSchema)) body: StaffRoleAssignInput,
+    @Req() request: Request,
   ): Promise<void> {
-    await this.staff.changeRole(user, userId, body.staffRoleId);
+    await this.staff.changeRole(user, userId, body.staffRoleId, origin(request));
   }
 
   @Patch(':userId/status')
@@ -216,8 +223,9 @@ export class StaffController {
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('userId', ParseUUIDPipe) userId: string,
     @Body(new ZodValidationPipe(staffStatusSchema)) body: StaffStatusInput,
+    @Req() request: Request,
   ): Promise<void> {
-    await this.staff.setStatus(user, userId, body.status);
+    await this.staff.setStatus(user, userId, body.status, origin(request));
   }
 }
 
@@ -246,7 +254,23 @@ export class StaffInvitationController {
   async accept(
     @Body(new ZodValidationPipe(staffInvitationAcceptSchema))
     body: StaffInvitationAcceptInput,
+    @Req() request: Request,
   ): Promise<void> {
-    await this.staff.acceptInvitation(body.token, body.password);
+    await this.staff.acceptInvitation(body.token, body.password, origin(request));
   }
+}
+
+/**
+ * Where a request came from — §15's «تسجيل IP والجهاز» on a sensitive operation.
+ *
+ * These routes are `@AuditExempt` because `StaffService` records them itself: it knows the role a
+ * staff member held BEFORE the change, which an interceptor reading the response cannot. The cost
+ * is that the service has no request to read, so the controller hands it over — the same shape
+ * `bookings.controller.ts` uses for booking creation.
+ */
+function origin(request: Request): {
+  ipAddress?: string | undefined;
+  userAgent?: string | undefined;
+} {
+  return { ipAddress: request.ip, userAgent: request.get('user-agent') };
 }

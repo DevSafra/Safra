@@ -299,4 +299,105 @@ describeIfDb('one staff member', () => {
       ).rejects.toMatchObject({ status: 404 });
     });
   });
+
+  /**
+   * §15 — «تسجيل IP والجهاز والوقت والموظف في العمليات الحساسة».
+   *
+   * ## What was missing
+   *
+   * These operations grant and revoke access to the whole platform, and their audit rows named the
+   * account and the moment and nothing else. Measured on 2026-08-26: all 253 `staff.invited` rows
+   * carried no IP, while every one of 10,338 `auth.login_failed` rows did — because the `@Audited`
+   * interceptor reads the request and these routes are `@AuditExempt`, the service recording them
+   * itself so it can capture the role a person held BEFORE the change.
+   *
+   * An administrator's stolen session used to invite a new super admin therefore left a record that
+   * could not say from where, which is the exact scenario §15 names IP and device for.
+   *
+   * ## Asserted per ACTION, not once
+   *
+   * Six call sites pass the context and each was edited by hand; one missed is one sensitive
+   * operation still anonymous, and a single sample would not find it.
+   */
+  describe('§15’s origin on a sensitive operation', () => {
+    /**
+     * A real super admin row, because these operations refuse an actor who is not one — and
+     * `audit_log.actor_user_id` has a foreign key, so an invented id fails the write rather than
+     * the assertion.
+     */
+    let superAdmin: { sub: string; role: string; permissions: string[]; locale: string };
+
+    beforeEach(async () => {
+      superAdmin = {
+        sub: await makeStaff('super_admin', 'origin-actor'),
+        role: 'super_admin',
+        permissions: [P.STAFF_MANAGE],
+        locale: 'ar',
+      };
+    });
+
+    async function originOf(action: string, userId: string) {
+      const rows = await db.execute<{ ip: string | null; agent: string | null }>(sql`
+        SELECT ip_address AS ip, user_agent AS agent FROM audit_log
+        WHERE action = ${action} AND subject_id = ${userId}::uuid
+        ORDER BY created_at DESC LIMIT 1
+      `);
+
+      return rows.rows[0];
+    }
+
+    const FROM = { ipAddress: '203.0.113.9', userAgent: 'SafraTest/1.0' };
+
+    it('records where a role change came from', async () => {
+      const target = await makeStaff('operations_manager', 'origin-role');
+      const roleId = await makeRole('Origin role', [P.BOOKING_READ_ALL]);
+
+      await service.changeRole(superAdmin as never, target, roleId, FROM);
+
+      expect(await originOf('staff.role_changed', target)).toStrictEqual({
+        ip: FROM.ipAddress,
+        agent: FROM.userAgent,
+      });
+    });
+
+    it('records where a suspension came from', async () => {
+      const target = await makeStaff('operations_manager', 'origin-status');
+
+      await service.setStatus(superAdmin as never, target, 'suspended', FROM);
+
+      expect(await originOf('staff.suspended', target)).toStrictEqual({
+        ip: FROM.ipAddress,
+        agent: FROM.userAgent,
+      });
+    });
+
+    it('records where a rename came from', async () => {
+      const target = await makeStaff('operations_manager', 'origin-name');
+
+      await service.rename(superAdmin as never, target, 'اسم جديد', FROM);
+
+      expect(await originOf('staff.renamed', target)).toStrictEqual({
+        ip: FROM.ipAddress,
+        agent: FROM.userAgent,
+      });
+    });
+
+    /**
+     * And an operation with no origin still records, with nulls.
+     *
+     * The parameter is optional because the invitation-acceptance route is reached by somebody who
+     * is not staff yet. What must NOT happen is the audit row disappearing because a caller had
+     * nothing to pass — a missing origin is less than §15 asks for; a missing row is worse.
+     */
+    it('still records when the caller has no origin to give', async () => {
+      const target = await makeStaff('operations_manager', 'origin-none');
+
+      await service.setStatus(superAdmin as never, target, 'suspended');
+
+      expect(await originOf('staff.suspended', target)).toStrictEqual({
+        ip: null,
+        agent: null,
+      });
+    });
+  });
 });

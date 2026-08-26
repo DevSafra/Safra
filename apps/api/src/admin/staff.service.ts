@@ -142,6 +142,33 @@ export interface StaffMember {
  * console because the console is not the security boundary.
  */
 /**
+ * Where a sensitive operation came from — §15's «تسجيل IP والجهاز».
+ *
+ * ## Why it is threaded rather than read here
+ *
+ * The `@Audited` interceptor reads `request.ip` and the user-agent for every route it decorates,
+ * which is why `auth.login_succeeded` carries both. These routes are `@AuditExempt` because the
+ * SERVICE records them — it knows the before-and-after that an interceptor cannot see — and a
+ * service has no request to read. So the controller passes it, the way `bookings.controller.ts`
+ * already does for booking creation.
+ *
+ * ## Why it matters most here
+ *
+ * These are the operations that grant and revoke access to the whole platform. Measured on
+ * 2026-08-26: `staff.invited` had 253 rows and not one carried an IP, while every one of 10,338
+ * `auth.login_failed` rows did. An administrator's session used to invite a new super admin left a
+ * record naming the account and the moment, and unable to say from where — which is the exact
+ * scenario §15 names IP and device for.
+ *
+ * Optional, because the invitation-acceptance route is reached by somebody who is not staff yet
+ * and the tests construct the service directly. A missing context records `null`, as before.
+ */
+export interface RequestOrigin {
+  readonly ipAddress?: string | undefined;
+  readonly userAgent?: string | undefined;
+}
+
+/**
  * Who counts as staff, as an ALLOW-LIST.
  *
  * ## The bug this replaced, 2026-08-23
@@ -319,6 +346,7 @@ export class StaffService {
       staffRoleId: string;
       locale?: string | undefined;
     },
+    origin?: RequestOrigin,
   ): Promise<{ id: string; email: string; role: Role }> {
     const email = input.email.trim().toLowerCase();
 
@@ -369,6 +397,8 @@ export class StaffService {
       actorUserId: actor?.sub,
       actorRole: actor?.role,
       action: 'staff.invited',
+      ipAddress: origin?.ipAddress,
+      userAgent: origin?.userAgent,
       subjectType: 'user',
       subjectId: user.id,
       after: { fullName: input.fullName, email, role, staffRoleId: input.staffRoleId },
@@ -530,6 +560,7 @@ export class StaffService {
     actor: AccessTokenClaims | undefined,
     userId: string,
     fullName: string,
+    origin?: RequestOrigin,
   ): Promise<void> {
     /* `staffById` is the ONE definition of "this id names a staff account", and it 404s otherwise. */
     const target = await this.staffById(userId);
@@ -550,6 +581,8 @@ export class StaffService {
           actorUserId: actor?.sub,
           actorRole: actor?.role,
           action: 'staff.renamed',
+          ipAddress: origin?.ipAddress,
+          userAgent: origin?.userAgent,
           subjectType: 'user',
           subjectId: userId,
           before: { fullName: target.full_name },
@@ -566,6 +599,7 @@ export class StaffService {
   async resendInvitation(
     actor: AccessTokenClaims | undefined,
     userId: string,
+    origin?: RequestOrigin,
   ): Promise<void> {
     const target = await this.staffById(userId);
 
@@ -577,6 +611,8 @@ export class StaffService {
       actorUserId: actor?.sub,
       actorRole: actor?.role,
       action: 'staff.invitation_resent',
+      ipAddress: origin?.ipAddress,
+      userAgent: origin?.userAgent,
       subjectType: 'user',
       subjectId: userId,
     });
@@ -607,6 +643,7 @@ export class StaffService {
     actor: AccessTokenClaims | undefined,
     userId: string,
     staffRoleId: string,
+    origin?: RequestOrigin,
   ): Promise<void> {
     const target = await this.staffById(userId);
 
@@ -647,6 +684,8 @@ export class StaffService {
       actorUserId: actor?.sub,
       actorRole: actor?.role,
       action: 'staff.role_changed',
+      ipAddress: origin?.ipAddress,
+      userAgent: origin?.userAgent,
       subjectType: 'user',
       subjectId: userId,
       before: { role: target.role },
@@ -671,6 +710,7 @@ export class StaffService {
     actor: AccessTokenClaims | undefined,
     userId: string,
     status: 'active' | 'suspended',
+    origin?: RequestOrigin,
   ): Promise<void> {
     const target = await this.staffById(userId);
 
@@ -692,6 +732,8 @@ export class StaffService {
       actorUserId: actor?.sub,
       actorRole: actor?.role,
       action: status === 'suspended' ? 'staff.suspended' : 'staff.reinstated',
+      ipAddress: origin?.ipAddress,
+      userAgent: origin?.userAgent,
       subjectType: 'user',
       subjectId: userId,
       before: { status: target.status },
@@ -748,7 +790,11 @@ export class StaffService {
    * Public — the recipient has no session yet. The token IS the authentication, which
    * is why it is 256 bits of randomness, single-use, and short-lived.
    */
-  async acceptInvitation(token: string, password: string): Promise<void> {
+  async acceptInvitation(
+    token: string,
+    password: string,
+    origin?: RequestOrigin,
+  ): Promise<void> {
     const redeemed = await this.authTokens.redeem(token, 'staff_invitation');
 
     /**
@@ -770,6 +816,8 @@ export class StaffService {
     await this.audit.record({
       actorUserId: redeemed.userId,
       action: 'staff.invitation_accepted',
+      ipAddress: origin?.ipAddress,
+      userAgent: origin?.userAgent,
       subjectType: 'user',
       subjectId: redeemed.userId,
     });

@@ -12,6 +12,7 @@ import {
 } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import type { RequestOrigin } from './staff.service.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, forbidden, notFound } from '../common/errors/app-error.js';
@@ -143,6 +144,8 @@ export class StaffScopeService {
     actor: AccessTokenClaims | undefined,
     userId: string,
     input: SetStaffScopeInput,
+    /* §15's «تسجيل IP والجهاز» — see `RequestOrigin` in `staff.service.ts`. */
+    origin?: RequestOrigin,
   ): Promise<StaffScopeView> {
     if (actor?.sub === userId) {
       throw forbidden(ERROR.STAFF_CANNOT_CHANGE_OWN_SCOPE);
@@ -244,6 +247,8 @@ export class StaffScopeService {
           actorUserId: actor?.sub,
           actorRole: actor?.role,
           action: 'staff.scope_changed',
+          ipAddress: origin?.ipAddress,
+          userAgent: origin?.userAgent,
           subjectType: 'user',
           subjectId: userId,
           before: { kind: user.kind, outside: user.outside, cityCount: before.length },

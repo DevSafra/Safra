@@ -8,6 +8,7 @@ import {
   Put,
   Query,
   Res,
+  Req,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
@@ -21,6 +22,8 @@ import {
   type PageQuery,
   type SetStaffScopeInput,
 } from '@safra/contracts';
+
+import type { Request } from 'express';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
@@ -257,8 +260,12 @@ export class RegistriesController {
     @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('userId') userId: string,
     @Body(new ZodValidationPipe(setStaffScopeSchema)) body: SetStaffScopeInput,
+    @Req() request: Request,
   ) {
-    return this.staffScope.set(user, userId, body);
+    return this.staffScope.set(user, userId, body, {
+      ipAddress: request.ip,
+      userAgent: request.get('user-agent'),
+    });
   }
 
   // ── الشركاء · العقارات · العملاء ────────────────────────────────────────────
