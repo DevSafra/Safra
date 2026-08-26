@@ -144,6 +144,14 @@ export class CouponService {
 
     if (!bumped.rows.at(0)) throw badRequest(ERROR.COUPON_EXHAUSTED);
 
+    /*
+      The CODE is logged, and that is a deliberate difference from a gift card.
+
+      A gift card code is a bearer credential — whoever reads it can spend the whole balance, so it
+      never appears in a log line. A coupon code is the opposite: it goes on posters and in emails,
+      it is meant to be shared, and it buys nothing on its own — a redemption needs a booking and is
+      capped globally and per customer. Support answering «why did my code not work» needs it.
+    */
     this.logger.log(
       `Coupon ${coupon.code} redeemed on booking ${bookingId} for ` +
         `${match.discountAmount} ${context.currencyCode}.`,
