@@ -177,6 +177,27 @@ test.describe('onboarding a partner in person', () => {
         .first(),
     ).toBeVisible({ timeout: 15_000 });
 
+    /*
+      A SECOND document, and §8.1 is the reason rather than thoroughness.
+
+      Approval refuses without one from each pair the SRS names — «هوية أو سجل تجاري» and «إثبات
+      ملكية أو عقد إدارة» — since 2026-08-26. With only the identity on file this walk ended at a
+      refusal, which is the gate working and the spec describing the world before it.
+    */
+    await page.selectOption('select[name="kind"]', 'ownership_proof');
+    await page
+      .getByLabel(onboarding.documentFile)
+      .setInputFiles('e2e/fixtures/room-one.jpg');
+
+    await page.getByRole('button', { name: onboarding.upload }).click();
+
+    await expect(
+      page
+        .locator('[data-document-kind], li')
+        .filter({ hasText: t.enums.documentKind['ownership_proof'] as string })
+        .first(),
+    ).toBeVisible({ timeout: 15_000 });
+
     /* ── ③ The contract. Generating it is the step SAFRA does before anybody signs ── */
     await expect(page.getByText(onboarding.contractStateNone)).toBeVisible();
 
