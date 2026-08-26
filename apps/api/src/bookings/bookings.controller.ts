@@ -21,6 +21,7 @@ import {
   type BookingStaffConfirmInput,
   type BookingCreateInput,
   type BookingQuoteInput,
+  type CouponPreviewInput,
   type CursorQuery,
   type PartnerBookingDecisionInput,
   bookingCancelSchema,
@@ -29,6 +30,7 @@ import {
   bookingStaffConfirmSchema,
   bookingCreateSchema,
   bookingQuoteSchema,
+  couponPreviewSchema,
   cursorQuerySchema,
   partnerBookingDecisionSchema,
 } from '@safra/contracts';
@@ -111,6 +113,37 @@ export class BookingsController {
     @Query(new ZodValidationPipe(bookingQuoteSchema)) query: BookingQuoteInput,
   ) {
     return this.creation.quote(query);
+  }
+
+  /**
+   * Prices a coupon code against a stay, before the customer commits (§9.3's الكوبونات).
+   *
+   * ## @Public(), like the quote it extends
+   *
+   * A guest reaches checkout before authenticating, and a coupon they cannot try until after they
+   * sign up is a coupon most of them abandon. Nothing is reserved and nothing is written — the
+   * redemption happens when the booking is created, under the coupon's row lock.
+   *
+   * ## Throttled hard, because this endpoint can be guessed at
+   *
+   * A coupon code is short and shareable by design, so a preview is a place somebody could hunt for
+   * live campaign codes. Ten a minute, and a code that does not exist answers exactly what one
+   * outside its window answers — `coupon.invalid` — so the response cannot be used to sort real
+   * codes from imaginary ones. See `CouponService.preview`.
+   *
+   * ## The customer never sends an amount
+   *
+   * Only the code and the stay. What a coupon is worth is decided on the server against prices the
+   * server computed; a client-supplied discount would be a price the customer chose.
+   */
+  @Public()
+  @Post('coupon-preview')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  async couponPreview(
+    @Body(new ZodValidationPipe(couponPreviewSchema)) body: CouponPreviewInput,
+  ) {
+    return this.creation.previewCoupon(body);
   }
 
   /**

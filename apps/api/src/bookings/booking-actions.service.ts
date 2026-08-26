@@ -83,6 +83,7 @@ export class BookingActionsService {
       currency_id: string;
       fx_rate_to_syp: string;
       total_amount: string;
+      discount_amount: string;
       wallet_amount: string;
       customer_fee_amount: string;
       partner_commission_amount: string;
@@ -91,6 +92,7 @@ export class BookingActionsService {
       SELECT id, partner_id, customer_profile_id, currency_id,
              fx_rate_to_syp::text AS fx_rate_to_syp,
              total_amount::text AS total_amount,
+             discount_amount::text AS discount_amount,
              wallet_amount::text AS wallet_amount,
              customer_fee_amount::text AS customer_fee_amount,
              partner_commission_amount::text AS partner_commission_amount,
@@ -170,6 +172,8 @@ export class BookingActionsService {
           customerFeeAmount: amounts.customer_fee_amount,
           partnerCommissionAmount: amounts.partner_commission_amount,
           partnerPayableAmount: amounts.partner_payable_amount,
+          /* What the coupon took off, so the group balances — see `postBookingPayment`. */
+          discountAmount: amounts.discount_amount,
           reference,
         },
         payment,

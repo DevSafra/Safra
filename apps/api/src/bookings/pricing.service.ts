@@ -13,7 +13,7 @@ import {
   toMinor,
 } from '../common/money.js';
 import { ERROR } from '@safra/contracts';
-import { notFound } from '../common/errors/app-error.js';
+import { notFound, badRequest } from '../common/errors/app-error.js';
 
 /**
  * Every amount is a decimal STRING, never a number — see `common/money.ts` for why
@@ -26,7 +26,15 @@ export interface PriceBreakdown {
   customerFeeAmount: string;
   partnerCommissionRate: string;
   partnerCommissionAmount: string;
+  /**
+   * What the customer owes AFTER any coupon — `base + fee - discount`.
+   *
+   * The partner's payable is deliberately not derived from this: a discount is SAFRA's, and
+   * reducing what a partner is owed because SAFRA ran a campaign would be taking their money.
+   */
   totalAmount: string;
+  /** Zero when no coupon applied. Never negative — the discount is capped at the stay. */
+  discountAmount: string;
   partnerPayableAmount: string;
   currencyCode: string;
   currencyId: string;
@@ -57,6 +65,14 @@ export class PricingService {
     unitId: string;
     checkIn: string;
     checkOut: string;
+    /**
+     * A discount already decided by `CouponService`, in this booking's currency.
+     *
+     * Passed IN rather than looked up here: pricing computes what a stay costs, and which coupon
+     * applies is a question about a customer and a code. Keeping the lookup out of this service is
+     * what stops a price quote acquiring a dependency on who is asking.
+     */
+    discountAmount?: string | undefined;
   }): Promise<PriceBreakdown> {
     const rows = await this.db.execute<{
       date: string;
@@ -124,7 +140,22 @@ export class PricingService {
     const partnerRate = await this.settings.getNumber('commission.partner_rate', 0);
     const partnerCommissionMinor = applyRate(baseMinor, partnerRate);
 
-    const totalMinor = baseMinor + customerFeeMinor;
+    /*
+      The discount comes off the total the CUSTOMER pays, and off nothing else.
+
+      `payableMinor` is computed from the base as it always was, so the partner is owed exactly what
+      the stay is worth however much SAFRA discounted it. The capture group then needs a
+      `coupon_discount` leg to balance, which is where the money actually comes from.
+    */
+    const discountMinor = toMinor(input.discountAmount ?? '0', scale);
+    const grossMinor = baseMinor + customerFeeMinor;
+
+    if (discountMinor < 0n || discountMinor > grossMinor) {
+      /* `CouponService` caps at the stay, so reaching here means a caller invented a figure. */
+      throw badRequest(ERROR.VALIDATION_AMOUNT_POSITIVE);
+    }
+
+    const totalMinor = grossMinor - discountMinor;
     const payableMinor = baseMinor - partnerCommissionMinor;
 
     /**
@@ -146,6 +177,7 @@ export class PricingService {
       partnerCommissionRate: partnerRate.toString(),
       partnerCommissionAmount: fromMinor(partnerCommissionMinor, scale),
       totalAmount: fromMinor(totalMinor, scale),
+      discountAmount: fromMinor(discountMinor, scale),
       partnerPayableAmount: fromMinor(payableMinor, scale),
       currencyCode: first.currency_code,
       currencyId: first.currency_id,

@@ -3,13 +3,14 @@ import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
-import { ERROR, evaluateArrival } from '@safra/contracts';
+import { ERROR, evaluateArrival, type CouponPreview } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { BookingAccessService } from './booking-access.service.js';
 import { PricingService } from './pricing.service.js';
+import { CouponService } from '../coupons/coupon.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
@@ -25,6 +26,8 @@ export interface BookingDraftInput {
   infants?: number | undefined;
   guest: { fullName: string; email: string; phone: string };
   attributes?: string[] | undefined;
+  /** As the customer typed it; `CouponService` normalises. Never a discount amount. */
+  couponCode?: string | undefined;
 }
 
 @Injectable()
@@ -35,6 +38,7 @@ export class BookingCreationService {
     private readonly settings: SettingsService,
     private readonly audit: AuditService,
     private readonly access: BookingAccessService,
+    private readonly coupons: CouponService,
   ) {}
 
   /**
@@ -54,6 +58,74 @@ export class BookingCreationService {
       totalAmount: price.totalAmount,
       currencyCode: price.currencyCode,
       nightly: price.nightly,
+    };
+  }
+
+  /**
+   * Prices a coupon against a stay, writing nothing (§9.3's الكوبونات).
+   *
+   * Answers what the customer needs to decide: the discount, and what it leaves to pay. The stay is
+   * priced here rather than trusted from the client for the same reason `quote` exists — a total
+   * the browser sent is a total the browser chose.
+   *
+   * The unit is resolved only far enough to know its city, its partner and its currency, which are
+   * what a coupon is scoped and denominated against. A stay that cannot be priced fails on the
+   * pricing call, before the coupon is ever consulted.
+   */
+  async previewCoupon(input: {
+    code: string;
+    unitId: string;
+    checkIn: string;
+    checkOut: string;
+  }): Promise<CouponPreview> {
+    const scope = await this.db.execute<{
+      city_id: string;
+      partner_id: string;
+      decimals: number;
+    }>(sql`
+      SELECT p.city_id, p.partner_id, cur.decimals
+      FROM units u
+      JOIN properties p  ON p.id = u.property_id
+      JOIN currencies cur ON cur.id = u.currency_id
+      WHERE u.id = ${input.unitId} AND u.is_active AND u.deleted_at IS NULL
+        AND p.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const unit = scope.rows[0];
+
+    if (!unit) throw notFound(ERROR.UNIT_NOT_FOUND);
+
+    const price = await this.pricing.quote({
+      unitId: input.unitId,
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+    });
+
+    const match = await this.coupons.preview(input.code, {
+      baseAmount: price.baseAmount,
+      totalAmount: price.totalAmount,
+      currencyId: price.currencyId,
+      currencyCode: price.currencyCode,
+      currencyDecimals: unit.decimals,
+      cityId: unit.city_id,
+      partnerId: unit.partner_id,
+    });
+
+    const after = await this.pricing.quote({
+      unitId: input.unitId,
+      checkIn: input.checkIn,
+      checkOut: input.checkOut,
+      discountAmount: match.discountAmount,
+    });
+
+    return {
+      code: match.code,
+      valueKind: match.valueKind,
+      discountAmount: match.discountAmount,
+      totalBefore: price.totalAmount,
+      totalAfter: after.totalAmount,
+      currencyCode: price.currencyCode,
     };
   }
 
@@ -90,6 +162,7 @@ export class BookingCreationService {
       property_status: string;
       policy_id: string;
       policy_code: string;
+      currency_decimals: number;
       policy_tiers: unknown;
       policy_min_refund: number;
     }>(sql`
@@ -99,12 +172,15 @@ export class BookingCreationService {
         (pa.suspended_at IS NOT NULL) AS partner_suspended,
         ci.timezone AS city_timezone, ci.same_day_cutoff_hour AS city_cutoff_hour,
         cp.id AS policy_id, cp.code AS policy_code, cp.tiers AS policy_tiers,
-        cp.min_refund_percent AS policy_min_refund
+        cp.min_refund_percent AS policy_min_refund,
+        -- The unit's own currency scale, so a coupon rounds to what the currency can pay.
+        cur.decimals AS currency_decimals
       FROM units u
       JOIN properties p ON p.id = u.property_id
       JOIN partners pa ON pa.id = p.partner_id
       JOIN cities ci ON ci.id = p.city_id
       JOIN cancellation_policies cp ON cp.id = p.cancellation_policy_id
+      JOIN currencies cur ON cur.id = u.currency_id
       WHERE u.id = ${input.unitId}
         AND u.is_active
         AND u.deleted_at IS NULL
@@ -232,11 +308,42 @@ export class BookingCreationService {
     }
 
     // ── Price, with every rate snapshotted ──────────────────────────────────
-    const price = await this.pricing.quote({
+    const undiscounted = await this.pricing.quote({
       unitId: input.unitId,
       checkIn: input.checkIn,
       checkOut: input.checkOut,
     });
+
+    /*
+      The coupon is PREVIEWED here and REDEEMED inside the transaction below.
+
+      Judging it out here means a bad code refuses before the booking exists, so a customer who
+      mistyped one does not hold a unit's nights while they work it out. The preview is not trusted:
+      `redeem()` locks the coupon and re-checks every rule, because between here and the insert the
+      last redemption of a campaign may have gone to somebody else.
+    */
+    const preview =
+      input.couponCode === undefined
+        ? null
+        : await this.coupons.preview(input.couponCode, {
+            baseAmount: undiscounted.baseAmount,
+            totalAmount: undiscounted.totalAmount,
+            currencyId: undiscounted.currencyId,
+            currencyCode: undiscounted.currencyCode,
+            currencyDecimals: unit.currency_decimals,
+            cityId: unit.city_id,
+            partnerId: unit.partner_id,
+          });
+
+    const price =
+      preview === null
+        ? undiscounted
+        : await this.pricing.quote({
+            unitId: input.unitId,
+            checkIn: input.checkIn,
+            checkOut: input.checkOut,
+            discountAmount: preview.discountAmount,
+          });
 
     const paymentWindowMinutes = await this.settings.getNumber(
       'booking.pending_payment_timeout_minutes',
@@ -274,6 +381,7 @@ export class BookingCreationService {
             partnerCommissionRate: price.partnerCommissionRate,
             partnerCommissionAmount: price.partnerCommissionAmount,
             totalAmount: price.totalAmount,
+            discountAmount: price.discountAmount,
             partnerPayableAmount: price.partnerPayableAmount,
             currencyId: price.currencyId,
             fxRateToSyp: price.fxRateToSyp,
@@ -309,6 +417,51 @@ export class BookingCreationService {
           });
 
         if (!booking) throw new Error('Booking insert returned no row.');
+
+        /*
+          The coupon is SPENT here, in the booking's own transaction.
+
+          `redeem()` takes the coupon's row lock and re-judges every rule, so the preview computed
+          before the transaction opened is never trusted — between then and now the last redemption
+          of a campaign may have gone to somebody else, and the customer would otherwise get a
+          discount the campaign had already run out of.
+
+          Same transaction as the booking, deliberately: a redemption recorded against a booking
+          that rolled back is a coupon spent on nothing, and a booking discounted with no redemption
+          row is money given away with no record of which campaign gave it.
+        */
+        if (preview !== null) {
+          const spent = await this.coupons.redeem(
+            tx as unknown as Database,
+            preview.code,
+            {
+              baseAmount: undiscounted.baseAmount,
+              totalAmount: undiscounted.totalAmount,
+              currencyId: undiscounted.currencyId,
+              currencyCode: undiscounted.currencyCode,
+              currencyDecimals: unit.currency_decimals,
+              cityId: unit.city_id,
+              partnerId: unit.partner_id,
+              customerProfileId,
+            },
+            booking.id,
+          );
+
+          /*
+            The booking was priced against the PREVIEW. If the coupon is now worth something else —
+            an operator edited its ceiling between the two — the row would claim a discount nobody
+            granted, so the whole thing rolls back rather than committing a booking whose total and
+            whose redemption disagree.
+
+            Compared by VALUE, not as strings. `CouponService` quantises to `MONEY_SCALE` and
+            returns `25.000`; `PricingService` formats at the CURRENCY's scale and returns `25.00`.
+            The two are the same amount spelled differently, and a string comparison here rolled
+            back every couponed booking — found by the end-to-end test, not by reading the code.
+          */
+          if (Number(spent.discountAmount) !== Number(price.discountAmount)) {
+            throw badRequest(ERROR.COUPON_INVALID);
+          }
+        }
 
         /**
          * Minted inside the same transaction as the booking. §4 allows booking

@@ -143,6 +143,8 @@ export class LedgerService {
       customerFeeAmount: string;
       partnerCommissionAmount: string;
       partnerPayableAmount: string;
+      /** What a coupon took off the total. Zero or absent when none applied. */
+      discountAmount?: string | undefined;
       reference: string;
     },
     paymentId: string,
@@ -170,6 +172,28 @@ export class LedgerService {
      * lie.
      */
     const funding: LedgerLeg[] = [];
+
+    /*
+      A discount is a DEBIT beside the money that actually arrived.
+
+      This group balances on `total = fee + commission + payable`, and a coupon makes the customer
+      pay less while the partner is owed exactly the same. Without a leg of its own the group would
+      be short by the discount and the deferred constraint trigger would refuse the whole capture —
+      which is the right failure, and this is the entry that makes it unnecessary.
+
+      It says the true thing: SAFRA gave up that revenue to win the booking. It is not a reduction
+      of what the partner earned, and `partner_payable` above is untouched.
+    */
+    const discount = toMinor(booking.discountAmount ?? '0', MONEY_SCALE);
+
+    if (discount > 0n) {
+      funding.push({
+        account: 'coupon_discount',
+        direction: 'debit',
+        amount: fromMinor(discount, MONEY_SCALE),
+        description: `Coupon discount on ${booking.reference}`,
+      });
+    }
 
     if (fromGateway > 0n) {
       funding.push({

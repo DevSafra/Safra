@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 
+import { CouponModule } from '../coupons/coupon.module.js';
+
 import { AuditService } from '../common/audit/audit.service.js';
 import { MailService } from '../mail/mail.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
@@ -20,7 +22,7 @@ import { WalletModule } from '../wallet/wallet.module.js';
 @Module({
   // Pricing cannot quote without an FX rate to SYP, so this is a hard dependency.
   // WalletModule is here for the SLA sweep, which credits §6.4 compensation.
-  imports: [FxModule, WalletModule],
+  imports: [FxModule, WalletModule, CouponModule],
   controllers: [BookingsController],
   providers: [
     BookingsService,

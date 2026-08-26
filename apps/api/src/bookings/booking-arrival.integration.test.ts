@@ -5,6 +5,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { ERROR } from '@safra/contracts';
 
 import { BookingCreationService } from './booking-creation.service.js';
+import { CouponService } from '../coupons/coupon.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { codeOf } from '../common/errors/app-error.js';
 
@@ -57,6 +58,7 @@ describeIfDb('a refused arrival date', () => {
       new SettingsService(db),
       {} as never,
       {} as never,
+      new CouponService(db),
     );
 
     unitId = await publishedUnit(db);
