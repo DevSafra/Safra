@@ -112,13 +112,24 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
   {
     key: 'customer',
     header: t.sections.wallet.colCustomer,
+    /*
+      The NAME on its own line, the reference under it (Bashar, 2026-08-26).
+
+      They were one run of text, so an Arabic name and a Latin `CUS-…` sat on the same line with
+      the bidi algorithm deciding where the boundary fell — and on a narrow column the reference
+      wrapped into the middle of the name. Stacked, each is read for what it is: the name is what
+      an operator scans, the reference is what they quote.
+
+      Same shape as the date column two along, and the same 10.5px faint treatment the reference
+      already had.
+    */
     render: (row) => (
-      <span className="text-text">
-        {row.customer}
+      <div className="grid min-w-0 gap-0.5">
+        <span className="truncate text-text">{row.customer}</span>
         {row.customerReference ? (
-          <Ltr className="ms-1.5 text-[10.5px] text-faint">{row.customerReference}</Ltr>
+          <Ltr className="text-[10.5px] text-faint">{row.customerReference}</Ltr>
         ) : null}
-      </span>
+      </div>
     ),
   },
   {
