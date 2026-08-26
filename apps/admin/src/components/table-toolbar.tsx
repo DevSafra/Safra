@@ -29,6 +29,7 @@ export function TableToolbar({
   placeholder,
   children,
   end,
+  below,
 }: {
   /** Where the form submits — normally the section's own path. */
   readonly action: string;
@@ -41,45 +42,61 @@ export function TableToolbar({
   readonly children?: ReactNode;
   /** Controls outside the form, pushed to the far end — a count line, an export button. */
   readonly end?: ReactNode;
+  /**
+   * A panel that opens UNDER the bar, at the full width of the table.
+   *
+   * `end` cannot serve this: its wrapper is `ms-auto` and sizes to its content, so a `w-full` child
+   * resolves to the content width and a form placed there renders in a third of the row with the
+   * search beside it. A panel is not a control at the end of a line — it is a row of its own.
+   */
+  readonly below?: ReactNode;
 }) {
   return (
-    <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
-      <form action={action} method="get" className="flex flex-wrap items-center gap-2.5">
-        {children}
-
-        {/*
-          The chosen size travels with the search as a hidden field.
-          Without it, submitting a search would drop `?size=` and quietly reset the table to 25
-          rows — the size control now lives in the bar UNDER the table, so this form has no visible
-          size input to carry it.
-        */}
-        <input type="hidden" name="size" value={String(size)} />
-
-        <input
-          type="search"
-          name="q"
-          defaultValue={query ?? ''}
-          placeholder={placeholder}
-          aria-label={placeholder}
-          className="min-w-[260px] rounded-[9px] border border-line bg-field px-3.5 py-2 text-[12.5px] text-text placeholder:text-faint"
-        />
-
-        {/*
-          A visible submit, not an Enter-only form. The handoff's input filters as you type;
-          this one submits, and a control that needs a keystroke the user cannot see is an
-          accessibility failure as well as a discoverability one.
-        */}
-        <button
-          type="submit"
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
+    <div className="mb-3.5 grid gap-2.5">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <form
+          action={action}
+          method="get"
+          className="flex flex-wrap items-center gap-2.5"
         >
-          {t.table.search}
-        </button>
-      </form>
+          {children}
 
-      {end ? (
-        <div className="ms-auto flex flex-wrap items-center gap-2.5">{end}</div>
-      ) : null}
+          {/*
+            The chosen size travels with the search as a hidden field.
+            Without it, submitting a search would drop `?size=` and quietly reset the table to 25
+            rows — the size control now lives in the bar UNDER the table, so this form has no visible
+            size input to carry it.
+          */}
+          <input type="hidden" name="size" value={String(size)} />
+
+          <input
+            type="search"
+            name="q"
+            defaultValue={query ?? ''}
+            placeholder={placeholder}
+            aria-label={placeholder}
+            className="min-w-[260px] rounded-[9px] border border-line bg-field px-3.5 py-2 text-[12.5px] text-text placeholder:text-faint"
+          />
+
+          {/*
+            A visible submit, not an Enter-only form. The handoff's input filters as you type;
+            this one submits, and a control that needs a keystroke the user cannot see is an
+            accessibility failure as well as a discoverability one.
+          */}
+          <button
+            type="submit"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
+          >
+            {t.table.search}
+          </button>
+        </form>
+
+        {end ? (
+          <div className="ms-auto flex flex-wrap items-center gap-2.5">{end}</div>
+        ) : null}
+      </div>
+
+      {below}
     </div>
   );
 }

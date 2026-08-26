@@ -10,12 +10,11 @@ import {
   StatusPill,
   type AdminColumn,
 } from '@/components/admin-table';
-import { TableToolbar } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { listParamsFor } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
-import { IssueGiftCardForm } from '@/components/issue-gift-card-form';
+import { GiftCardsToolbar } from '@/components/issue-gift-card-form';
 import { DEFAULT_MONEY_CURRENCY, GIFT_CARD_CURRENCIES } from '@safra/contracts';
 
 /**
@@ -93,24 +92,23 @@ export default async function GiftCardsPage({
   return (
     <ConsoleShell title={t.nav.giftCards} counts={counts}>
       <ConsolePanel>
-        <TableToolbar
+        {/*
+          The toolbar is rendered by the FORM, not beside it.
+
+          The trigger belongs in the bar and the panel belongs under it at the table's full width,
+          and the two share one piece of state — so one client component owns both and draws the bar
+          around them. Placed in the bar's `end` slot instead, the panel inherited an `ms-auto`
+          wrapper that sizes to its content and rendered in a third of the row with the search
+          beside it.
+        */}
+        <GiftCardsToolbar
           action="/giftcards"
           query={q}
           size={size}
           placeholder={t.sections.giftcards.searchPlaceholder}
-          /*
-            The create control sits where the hint used to (Bashar, 2026-08-26).
-
-            «الإنشاء والتعديل بصلاحيات إدارية محددة فقط» described a permission the reader either
-            has or does not — if they lack it the section refuses before this renders, and if they
-            have it the sentence tells them nothing they can act on. The button is what belongs in
-            that space.
-
-            The toolbar wraps, so the collapsed trigger sits beside the search and the opened panel
-            takes a row of its own.
-          */
-          end={<IssueGiftCardForm currencies={currencies} />}
+          currencies={currencies}
         />
+
         {result === 'unauthenticated' ? (
           <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (
@@ -149,11 +147,22 @@ const COLUMNS: readonly AdminColumn<GiftCardItem>[] = [
   {
     key: 'reference',
     header: t.sections.giftcards.colCode,
+    /*
+      The reference over the last four, not beside them (Bashar, 2026-08-26).
+
+      They were one run of text and rendered as «···7633GIF-018699» — two Latin values with no
+      separation, in an RTL cell where the bidi algorithm decides which end each begins at. Nothing
+      was clipped; it was unreadable, which is worse because it looks like data.
+
+      Stacked, each is read for what it is: the reference identifies the card, the four characters
+      are what a customer reads off their own copy of the code. Same shape as المحفظة's customer
+      cell, and the same faint 10.5px the last four already had.
+    */
     render: (row) => (
-      <span>
+      <div className="grid min-w-0 gap-0.5">
         <Ltr className="font-semibold text-sky">{row.reference}</Ltr>
-        <Ltr className="ms-1.5 text-[10.5px] text-faint">···{row.codeLast4}</Ltr>
-      </span>
+        <Ltr className="text-[10.5px] text-faint">••••{row.codeLast4}</Ltr>
+      </div>
     ),
   },
   {

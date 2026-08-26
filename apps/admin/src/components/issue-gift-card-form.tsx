@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { MAX_ISSUED_GIFT_CARD_AMOUNT, type GiftCardCurrency } from '@safra/contracts';
 
 import { t, apiError } from '@/lib/strings';
+import { TableToolbar } from './table-toolbar';
 
 /**
  * §9.3's «+ إنشاء بطاقة هدية».
@@ -31,10 +32,18 @@ import { t, apiError } from '@/lib/strings';
  * The registry's job is to be scannable. A permanent form above the table would push the first row
  * below the fold on a laptop, for a control most visits do not use.
  */
-export function IssueGiftCardForm({
+export function GiftCardsToolbar({
+  action,
+  query,
+  size,
+  placeholder,
   currencies,
 }: {
-  currencies: readonly GiftCardCurrency[];
+  readonly action: string;
+  readonly query: string | undefined;
+  readonly size: number;
+  readonly placeholder: string;
+  readonly currencies: readonly GiftCardCurrency[];
 }) {
   const router = useRouter();
   const c = t.sections.giftcards;
@@ -123,15 +132,14 @@ export function IssueGiftCardForm({
     }
   }
 
-  if (issued) {
-    return (
-      <div className="grid w-full gap-2 rounded-[10px] border border-[rgba(var(--goldA),0.4)] bg-field p-3.5">
-        <h3 className="text-[13px] font-bold text-gold">{c.issuedTitle}</h3>
-        {/*
+  const panel = issued ? (
+    <div className="grid w-full gap-2 rounded-[10px] border border-[rgba(var(--goldA),0.4)] bg-field p-3.5">
+      <h3 className="text-[13px] font-bold text-gold">{c.issuedTitle}</h3>
+      {/*
           `dir="ltr"` on a DISPLAYED Latin value, never on a field: the code is one Latin run and
           this is the display half of the rule, not the typing half.
         */}
-        {/*
+      {/*
           The whole code, visible at every width (Bashar, 2026-08-26).
 
           It was one line at 15px with 0.18em of tracking — twenty-three characters that do not fit
@@ -143,41 +151,26 @@ export function IssueGiftCardForm({
           is typed into the redeem box, and a flex row of groups copies with whatever whitespace the
           browser puts between them.
         */}
-        <p
-          dir="ltr"
-          className="select-all rounded-[9px] border border-line bg-card px-3 py-3 text-center font-mono text-[13px] leading-relaxed font-bold tracking-[0.1em] break-all text-text sm:text-[15px] sm:tracking-[0.16em]"
-        >
-          {issued.code}
-        </p>
-        <p className="text-[11.5px] font-semibold text-bad">{c.issuedCodeOnce}</p>
-        {/* Always: the address is required, so a card is never issued without being sent. */}
-        <p className="text-[11.5px] text-muted">{c.issuedEmailed}</p>
-        <div className="flex">
-          <button
-            type="button"
-            onClick={() => setIssued(null)}
-            className="min-h-10 cursor-pointer rounded-lg border border-line px-4.5 py-2 text-xs font-bold text-text lg:min-h-0"
-          >
-            {c.issuedDone}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="min-h-10 cursor-pointer rounded-[9px] border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+      <p
+        dir="ltr"
+        className="select-all rounded-[9px] border border-line bg-card px-3 py-3 text-center font-mono text-[13px] leading-relaxed font-bold tracking-[0.1em] break-all text-text sm:text-[15px] sm:tracking-[0.16em]"
       >
-        {c.create}
-      </button>
-    );
-  }
-
-  return (
+        {issued.code}
+      </p>
+      <p className="text-[11.5px] font-semibold text-bad">{c.issuedCodeOnce}</p>
+      {/* Always: the address is required, so a card is never issued without being sent. */}
+      <p className="text-[11.5px] text-muted">{c.issuedEmailed}</p>
+      <div className="flex">
+        <button
+          type="button"
+          onClick={() => setIssued(null)}
+          className="min-h-10 cursor-pointer rounded-lg border border-line px-4.5 py-2 text-xs font-bold text-text lg:min-h-0"
+        >
+          {c.issuedDone}
+        </button>
+      </div>
+    </div>
+  ) : !open ? null : (
     <div className="grid w-full gap-3 rounded-[10px] border border-line bg-field p-3.5">
       <h3 className="text-[13px] font-bold text-text">{c.issueTitle}</h3>
 
@@ -274,5 +267,31 @@ export function IssueGiftCardForm({
         </button>
       </div>
     </div>
+  );
+
+  return (
+    <TableToolbar
+      action={action}
+      query={query}
+      size={size}
+      placeholder={placeholder}
+      /*
+        The trigger sits where «الإنشاء والتعديل بصلاحيات إدارية محددة فقط» used to. It is hidden
+        while the panel is open — a control that opens something already open is a dead press, and
+        the panel carries its own إلغاء.
+      */
+      end={
+        panel === null ? (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="min-h-10 cursor-pointer rounded-[9px] border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+          >
+            {c.create}
+          </button>
+        ) : null
+      }
+      below={panel}
+    />
   );
 }
