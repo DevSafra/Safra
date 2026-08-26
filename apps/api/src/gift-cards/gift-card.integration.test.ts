@@ -6,6 +6,7 @@ import { normaliseGiftCode } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import type { Env } from '../config/env.js';
 import type { MailService, OutgoingMail } from '../mail/mail.service.js';
 import type { FxRateService } from '../fx/fx-rate.service.js';
@@ -115,6 +116,7 @@ describeIfDb('GiftCardService', () => {
       } as unknown as MailService,
       new LedgerService(db),
       fxForLedger,
+      new SettingsService(db),
     );
     await seed(db);
   });
@@ -581,6 +583,7 @@ describeIfDb('GiftCardService', () => {
       } as unknown as MailService,
       new LedgerService(db),
       fxForLedger,
+      new SettingsService(db),
     );
 
     await expect(failing.purchase(customer(), { amount: '25.00' })).rejects.toThrow();

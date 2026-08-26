@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { MAX_ISSUED_GIFT_CARD_AMOUNT, type GiftCardCurrency } from '@safra/contracts';
+import type { GiftCardCurrency } from '@safra/contracts';
 
 import { t, apiError } from '@/lib/strings';
 import { TableToolbar } from './table-toolbar';
@@ -64,11 +64,15 @@ export function GiftCardsToolbar({
     amount may carry three depends on its currency, which the API decides; this only stops the
     obvious typo from costing a round trip.
   */
-  const amountValid =
-    /^\d{1,10}(\.\d{1,3})?$/.test(amount.trim()) &&
-    Number(amount) > 0 &&
-    /* Per CURRENCY: SYP and USD differ by four orders of magnitude, so one ceiling cannot serve. */
-    Number(amount) <= MAX_ISSUED_GIFT_CARD_AMOUNT[currency];
+  /*
+    Shape and sign only — the CEILING is the server's call.
+
+    It is a setting now (`giftcard.max_issue_usd` and friends), per currency, and the browser cannot
+    read one. Checking against the compiled-in default would block a legitimate amount the moment
+    the business raised the ceiling — the drift this move to settings exists to end. An amount over
+    the configured value comes back as a translatable refusal instead.
+  */
+  const amountValid = /^\d{1,10}(\.\d{1,3})?$/.test(amount.trim()) && Number(amount) > 0;
 
   /*
     A plausible address before the button arms.

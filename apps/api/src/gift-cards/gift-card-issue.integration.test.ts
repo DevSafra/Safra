@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   ERROR,
   GIFT_CARD_CURRENCIES,
+  giftCardCeilingKey,
   giftCardIssueSchema,
   normaliseGiftCode,
   type GiftCardIssueInput,
@@ -12,6 +13,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { GiftCardService } from './gift-card.service.js';
 import { WalletService } from './../wallet/wallet.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -94,6 +96,7 @@ describeIfDb('a gift card issued by staff', () => {
       } as unknown as MailService,
       new LedgerService(db),
       fxForLedger,
+      new SettingsService(db),
     );
 
     const made = await db.execute<{ id: string }>(sql`
@@ -272,6 +275,58 @@ describeIfDb('a gift card issued by staff', () => {
 
     /* And SYP has a ceiling of its own. */
     await expect(issue({ amount: '15000001', currency: 'SYP' })).rejects.toBeDefined();
+  });
+
+  /**
+   * The ceiling is a SETTING the business moves, not an assumption in code (Bashar, 2026-08-26).
+   *
+   * `DEFAULT_MAX_ISSUED_GIFT_CARD` is the fallback used until somebody configures one — the same
+   * shape as `commission.partner_rate` and `booking.same_day_cutoff_hour`. What matters is that
+   * setting it actually takes effect, because a value documented as configurable and read from a
+   * constant is worse than an honest constant.
+   */
+  it('takes its ceiling from settings, not from the constant', async () => {
+    /* Well under the USD default of 1,000, so only a configured value can refuse it. */
+    await expect(issue({ amount: '250.00' })).resolves.toBeDefined();
+
+    await db.execute(sql`
+      INSERT INTO settings (key, value, value_schema)
+      VALUES (${giftCardCeilingKey('USD')}, '100'::jsonb, 'number')
+    `);
+
+    /* A fresh service, because SettingsService caches. */
+    const reconfigured = new GiftCardService(
+      db,
+      { APP_URL: 'https://safra.test' } as unknown as Env,
+      new WalletService(db, fxForLedger),
+      new AuditService(db),
+      {
+        send: (mail: OutgoingMail) => Promise.resolve(void sent.push(mail)),
+      } as unknown as MailService,
+      new LedgerService(db),
+      fxForLedger,
+      new SettingsService(db),
+    );
+
+    await expect(
+      reconfigured.issue(STAFF(staffId), {
+        amount: '250.00',
+        currency: 'USD',
+        recipientEmail: 'guest@example.test',
+        reason: 'تجاوز السقف المضبوط.',
+      }),
+      'the configured ceiling refuses what the default allowed',
+    ).rejects.toMatchObject({ response: { code: ERROR.GIFT_CARD_AMOUNT_INVALID } });
+
+    /* And the control: under the NEW ceiling it goes through. */
+    await expect(
+      reconfigured.issue(STAFF(staffId), {
+        amount: '90.00',
+        currency: 'USD',
+        recipientEmail: 'guest@example.test',
+        reason: 'ضمن السقف المضبوط.',
+      }),
+    ).resolves.toBeDefined();
   });
 
   /** An address gets the card; the staff member's REASON does not travel with it. */

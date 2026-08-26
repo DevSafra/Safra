@@ -9,8 +9,9 @@ import {
   GIFT_CODE_GROUPS,
   GIFT_CODE_GROUP_SIZE,
   type GiftCardPurchaseInput,
+  DEFAULT_MAX_ISSUED_GIFT_CARD,
   GIFT_CARD_CURRENCIES,
-  MAX_ISSUED_GIFT_CARD_AMOUNT,
+  giftCardCeilingKey,
   type GiftCardCancelInput,
   type GiftCardIssueInput,
   type GiftCardIssueResult,
@@ -26,6 +27,7 @@ import {
 import { DATABASE } from '../database/database.module.js';
 import { LedgerService, type LedgerLeg } from '../ledger/ledger.service.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { quantise } from '../common/money.js';
 import { DEFAULT_LOCALE } from '@safra/i18n';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -150,6 +152,7 @@ export class GiftCardService {
     private readonly mail: MailService,
     private readonly ledger: LedgerService,
     private readonly fx: FxRateService,
+    private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -605,7 +608,18 @@ export class GiftCardService {
     */
     if (!input.recipientEmail?.trim()) throw badRequest(ERROR.VALIDATION_EMAIL_INVALID);
 
-    const ceiling = MAX_ISSUED_GIFT_CARD_AMOUNT[input.currency];
+    /*
+      The ceiling is a SETTING, read per currency, with the contract's value as the fallback.
+
+      A typo guard belongs where the business can move it — `giftcard.max_issue_usd` and friends,
+      alongside `commission.partner_rate` and `booking.same_day_cutoff_hour`. It cannot live in the
+      zod schema at all: a field schema cannot read a setting, and the ceiling depends on which
+      currency was chosen.
+    */
+    const ceiling = await this.settings.getNumber(
+      giftCardCeilingKey(input.currency),
+      DEFAULT_MAX_ISSUED_GIFT_CARD[input.currency],
+    );
 
     if (Number(input.amount) <= 0 || Number(input.amount) > ceiling) {
       throw badRequest(ERROR.GIFT_CARD_AMOUNT_INVALID);

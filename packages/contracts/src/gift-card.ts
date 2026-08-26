@@ -205,27 +205,40 @@ export const GIFT_CARD_CURRENCIES = ['SYP', 'USD', 'EUR'] as const;
 export type GiftCardCurrency = (typeof GIFT_CARD_CURRENCIES)[number];
 
 /**
- * The most a single staff-issued card may carry, per currency.
+ * The DEFAULT ceiling on a staff-issued card, per currency — a setting, not a rule.
  *
- * A TYPO GUARD, not a price list: a finance officer meaning 100 and typing 1000 creates a real
- * liability a customer may spend before anybody reads the audit row.
+ * These are the values the platform starts with, and the business changes them without a deploy:
+ * `giftcard.max_issue_usd`, `_eur` and `_syp` in the settings table, read by `GiftCardService`
+ * through `SettingsService.getNumber(key, fallback)` like every other operational number
+ * (`commission.partner_rate`, `booking.same_day_cutoff_hour`). What is written here is the
+ * fallback used until somebody sets one.
  *
- * ## Why it cannot be one number
+ * ## What they are for
  *
- * It was `1000` flat, and that was written when USD was the only currency in play. SYP and USD
- * differ by four orders of magnitude — the same fact that makes «المبلغ 200.00» unreadable without
- * its currency — so a flat 1000 would have capped a SYP card at about eight US cents and made the
- * currency unusable the moment it was offered.
+ * A typo guard. A finance officer meaning 100 and typing 1000 creates a real liability a customer
+ * may spend before anybody reads the audit row. They are NOT a price list and not a policy — that
+ * distinction is why they belong in settings rather than in a constant nobody can move.
  *
- * The SYP figure is the USD one at the configured rate, rounded to a round number, so the three
- * caps mean roughly the same thing. **They are engineering guard rails derived from one another,
- * not limits the business has set** — worth confirming rather than inheriting.
+ * ## Why one number cannot serve
+ *
+ * SYP and USD differ by four orders of magnitude — the same fact that makes «المبلغ 200.00»
+ * unreadable without its currency. A flat 1,000 would cap a SYP card at about eight US cents. The
+ * SYP default is the USD one at the configured rate, rounded, so the three mean roughly the same
+ * thing until the business decides otherwise.
+ *
+ * The CEILING is not enforced here: a field schema cannot read a setting, so the check lives in
+ * `GiftCardService` where the currency and the configured value are both in hand.
  */
-export const MAX_ISSUED_GIFT_CARD_AMOUNT: Record<GiftCardCurrency, number> = {
+export const DEFAULT_MAX_ISSUED_GIFT_CARD: Record<GiftCardCurrency, number> = {
   USD: 1000,
   EUR: 1000,
   SYP: 15_000_000,
 };
+
+/** The settings key holding the ceiling for a currency — `giftcard.max_issue_usd`. */
+export function giftCardCeilingKey(currency: GiftCardCurrency): string {
+  return `giftcard.max_issue_${currency.toLowerCase()}`;
+}
 
 /**
  * A card issued by SAFRA rather than bought — §9.3's «+ إنشاء بطاقة هدية».
@@ -274,16 +287,7 @@ export const giftCardIssueSchema = z
     /** Why it was issued. Goes on the audit row, never into the customer's email. */
     reason: z.string().trim().min(3).max(500),
   })
-  .strict()
-  /*
-    The ceiling depends on the currency, so it is checked here rather than on the field — a field
-    schema cannot see its neighbours. `path` points at the amount so the console highlights the box
-    somebody typed in rather than the one they chose from.
-  */
-  .refine(
-    (value) => Number(value.amount) <= MAX_ISSUED_GIFT_CARD_AMOUNT[value.currency],
-    { message: ERROR.GIFT_CARD_AMOUNT_INVALID, path: ['amount'] },
-  );
+  .strict();
 
 export type GiftCardIssueInput = z.infer<typeof giftCardIssueSchema>;
 

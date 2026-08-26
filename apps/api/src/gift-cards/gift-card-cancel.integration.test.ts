@@ -7,6 +7,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { AuditService } from '../common/audit/audit.service.js';
 import { GiftCardService } from './gift-card.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { Env } from '../config/env.js';
@@ -76,6 +77,7 @@ describeIfDb('cancelling a gift card', () => {
       } as unknown as MailService,
       new LedgerService(db),
       fxStub,
+      new SettingsService(db),
     );
 
     const made = await db.execute<{ id: string }>(sql`

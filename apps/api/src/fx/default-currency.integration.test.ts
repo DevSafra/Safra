@@ -8,6 +8,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import { FxRateService } from './fx-rate.service.js';
 import { GiftCardService } from '../gift-cards/gift-card.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { Env } from '../config/env.js';
@@ -66,6 +67,7 @@ describeIfDb('the default currency model', () => {
       { send: (_m: OutgoingMail) => Promise.resolve() } as unknown as MailService,
       new LedgerService(db),
       fx,
+      new SettingsService(db),
     );
 
     /*
