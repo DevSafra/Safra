@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { getWalletTransactions, type WalletItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { money, shortDateTime } from '@/lib/format';
@@ -103,11 +105,25 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
       was FOR — the booking it belongs to — rather than by a fabricated `WTX-…` id. When there
       is no booking (a manual adjustment), the reason column carries the meaning.
     */
-    render: (row) => (
-      <Ltr className="font-semibold text-sky">
-        {row.bookingReference ?? t.admin.noData}
-      </Ltr>
-    ),
+    /*
+      Into the booking, carrying where to come back to.
+
+      المحفظة was the one registry a reader could not click out of, and it names the two things an
+      operator reconciling a movement actually asks about — whose balance this is, and which stay it
+      belongs to. Both screens exist; the references were being printed at them.
+    */
+    render: (row) =>
+      row.bookingReference ? (
+        <Link
+          href={`/bookings/${row.bookingReference}?from=wallet`}
+          className="font-semibold text-sky hover:underline"
+        >
+          <Ltr>{row.bookingReference}</Ltr>
+        </Link>
+      ) : (
+        /* A manual adjustment belongs to no booking; the reason column carries the meaning. */
+        <span className="text-faint">{t.admin.noData}</span>
+      ),
   },
   {
     key: 'customer',
@@ -123,14 +139,31 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
       Same shape as the date column two along, and the same 10.5px faint treatment the reference
       already had.
     */
-    render: (row) => (
-      <div className="grid min-w-0 gap-0.5">
-        <span className="truncate text-text">{row.customer}</span>
-        {row.customerReference ? (
+    /*
+      Linked only where there is still a record to open.
+
+      A movement outlives the profile it belongs to — it is a financial record, and hiding it
+      because somebody was removed would hide money — but العملاء filters deleted profiles out, so
+      the link would answer 404. Found by clicking one: the first row of المحفظة belonged to a
+      soft-deleted fixture. The reference stays either way, because reconciling is what it is for.
+    */
+    render: (row) =>
+      row.customerReference && row.customerActive ? (
+        <Link
+          href={`/customers/${row.customerReference}?from=wallet`}
+          className="grid min-w-0 gap-0.5 hover:underline"
+        >
+          <span className="truncate text-sky">{row.customer}</span>
           <Ltr className="text-[10.5px] text-faint">{row.customerReference}</Ltr>
-        ) : null}
-      </div>
-    ),
+        </Link>
+      ) : (
+        <div className="grid min-w-0 gap-0.5">
+          <span className="truncate text-text">{row.customer}</span>
+          {row.customerReference ? (
+            <Ltr className="text-[10.5px] text-faint">{row.customerReference}</Ltr>
+          ) : null}
+        </div>
+      ),
   },
   {
     key: 'reason',

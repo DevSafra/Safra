@@ -97,4 +97,71 @@ test.describe('the wallet ledger', () => {
       ).not.toContain(sentence);
     }
   });
+
+  /**
+   * المحفظة was the one registry a reader could not click out of.
+   *
+   * Seven others link their rows into a detail screen; this one printed a customer reference and a
+   * booking reference at the reader and left them to search another registry — which is the exact
+   * complaint that produced the customer record in the first place.
+   *
+   * Asserted as a ROUND TRIP rather than as an href. A link that opens the right screen and comes
+   * back to the wrong one is the failure this console's `from` allow-list exists to prevent, and it
+   * is silent: the fallback is a valid link to a real page.
+   */
+  test('opens a customer from a movement and comes back', async ({ page }) => {
+    /*
+      SEARCHED for, not read off page one.
+
+      Not every row can link: a movement outlives the profile it belongs to, and a deleted one has
+      no record to open. Page one of المحفظة is recent fixtures whose customers are all soft-deleted,
+      so a test reading it SKIPPED — which is a pass that proves nothing, and this suite has already
+      produced one of those today. The search finds a live customer with real movements.
+    */
+    await page.goto('/wallet?size=10&q=' + encodeURIComponent('Payments Guest'));
+
+    const customerLink = page.locator('tbody tr a[href^="/customers/CUS-"]').first();
+
+    expect(
+      await customerLink.count(),
+      'the probe found no linkable row, so this test proves nothing',
+    ).toBe(1);
+
+    const reference = (await customerLink.getAttribute('href'))
+      ?.split('/')[2]
+      ?.split('?')[0];
+
+    await customerLink.click();
+    await page.waitForURL(/\/customers\/CUS-/);
+
+    /* The right customer, not merely a customer. */
+    await expect(page.locator('main')).toContainText(reference ?? '—');
+
+    /* And back — to المحفظة, not to العملاء, which is what a discarded `from` would give. */
+    await page.locator('a[href^="/wallet"]').first().click();
+    await page.waitForURL(/\/wallet/);
+
+    expect(page.url()).toContain('/wallet');
+  });
+
+  /** The other reference on the row, and the same trip. */
+  test('opens the booking a movement belongs to', async ({ page }) => {
+    /* Same probe, for the same reason — page one carries no booking-linked movement. */
+    await page.goto('/wallet?size=25&q=' + encodeURIComponent('Payments Guest'));
+
+    const bookingLink = page.locator('tbody tr a[href^="/bookings/BKG-"]').first();
+
+    expect(
+      await bookingLink.count(),
+      'the probe found no booking-linked row, so this test proves nothing',
+    ).toBe(1);
+
+    await bookingLink.click();
+    await page.waitForURL(/\/bookings\/BKG-/);
+
+    await page.locator('a[href^="/wallet"]').first().click();
+    await page.waitForURL(/\/wallet/);
+
+    expect(page.url()).toContain('/wallet');
+  });
 });

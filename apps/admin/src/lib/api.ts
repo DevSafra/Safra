@@ -1223,6 +1223,8 @@ export async function getFinance(params: ListParams) {
 const walletItemSchema = z.object({
   customer: z.string(),
   customerReference: z.string().nullable(),
+  /* Required, not `.default(true)`: a field the API stops sending must fail the parse loudly. */
+  customerActive: z.boolean(),
   direction: z.string(),
   reason: z.string(),
   amount: z.string(),

@@ -323,6 +323,7 @@ export class FinanceService {
         id: string;
         customer: string;
         reference: string | null;
+        customer_active: boolean;
         direction: string;
         reason: string;
         amount: string;
@@ -336,6 +337,7 @@ export class FinanceService {
       SELECT wt.id,
              coalesce(c.full_name, '—')  AS customer,
              c.reference                 AS reference,
+             (c.id IS NOT NULL AND c.deleted_at IS NULL) AS customer_active,
              wt.direction::text          AS direction,
              wt.reason::text             AS reason,
              wt.amount::text             AS amount,
@@ -356,6 +358,14 @@ export class FinanceService {
       result.rows.map((row) => ({
         customer: row.customer,
         customerReference: row.reference,
+        /*
+          Whether that customer still has a record to open.
+
+          المحفظة keeps showing a movement whose profile was removed — it is a financial record and
+          hiding it would hide money — but العملاء filters deleted profiles out, so a link to one
+          answers 404. The row says which it is rather than the console guessing from the reference.
+        */
+        customerActive: row.customer_active,
         direction: row.direction,
         reason: row.reason,
         amount: row.amount,
