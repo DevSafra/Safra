@@ -113,23 +113,23 @@ export type BookingStaffConfirmInput = z.infer<typeof bookingStaffConfirmSchema>
 export const COMPENSATION_CURRENCIES = ['USD', 'EUR', 'SYP'] as const;
 
 /**
- * What an amount is denominated in when the row does not say.
+ * The platform's REFERENCE currency — what money is assumed to be in when nothing says otherwise.
  *
- * ## Why a fallback exists at all
+ * USD (Bashar, 2026-08-26), and it is the single source: `money-settings.service.ts` re-exports
+ * this rather than declaring its own, because two constants named "the default currency" in two
+ * packages is one more than can stay in step — the same reasoning `DEFAULT_TABLE_PAGE_SIZE` is
+ * written down with.
  *
- * Standing rule from Bashar (2026-08-25): **no amount is ever written without its currency,
- * anywhere in the system.** Several rows can carry a null currency — a coupon with no fixed value,
- * a wallet balance on a profile that has never transacted — and the code used to print
- * `{money(x)} {currency ?? ''}`, which renders a bare number precisely when nobody can tell what
- * it is.
+ * ## Not the same thing as the unit of account
  *
- * ## Why USD, and why this is a fallback rather than a guess
+ * `ledger_entries.amount_syp` is denominated in SYP, which is what SAFRA settles in. That cannot
+ * follow this constant: the table is append-only, `trialBalance()` sums the column across every
+ * group, and 71,463 rows are already in SYP — changing the unit for new rows would silently mix
+ * two currencies four orders of magnitude apart in the platform's own trial balance, and the old
+ * rows can never be converted.
  *
- * Every one of those rows is null because NOTHING has been denominated yet — a zero balance, an
- * unset minimum — so there is no other currency it could be. `currencies` carries USD as the
- * platform's reference rail and every fine and compensation is levied in it. A row that has a
- * currency always uses its own; this is only ever reached where the alternative is printing
- * nothing.
+ * So: USD is what the platform QUOTES, DEFAULTS to and configures against. SYP is what the ledger
+ * COUNTS in. Both are true at once, and the bridge between them is one configured rate.
  */
 export const DEFAULT_MONEY_CURRENCY = 'USD';
 

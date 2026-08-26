@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import {
   MONEY_SCALE,
@@ -15,10 +16,11 @@ import { describeError } from '../common/errors/safe-error.js';
 /**
  * The currency a bare money setting is assumed to be in.
  *
- * The approved Rules Engine screen shows every figure with a `$`, so a value stored
- * as a plain number means dollars.
+ * RE-EXPORTED, not redeclared. This was its own `= 'USD'` beside an identical constant in
+ * `@safra/contracts`, which is the shape that lets two "defaults" drift apart — and a money
+ * setting read in one currency and spent in another is not a small drift.
  */
-export const DEFAULT_MONEY_CURRENCY = 'USD';
+export { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /** When true, every money setting is USD whatever its own currency says. */
 export const ALWAYS_USD_KEY = 'money.always_usd';
