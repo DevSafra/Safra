@@ -1,0 +1,39 @@
+-- ============================================================================
+-- SAFRA — a manual wallet movement names who made it, and the database says so.
+--
+-- Idempotent, like the rest of the post/ stage.
+-- ============================================================================
+--
+-- `wallet_txn_reason` has five values and four of them are the platform moving
+-- its own money: a refund, an SLA compensation, a booking payment, a profile
+-- claim. Those correctly carry no `created_by_user_id` — inventing an actor for
+-- work nobody did is worse than the absence, which is the same argument §15's
+-- origin capture makes for a scheduled sweep.
+--
+-- `admin_adjustment` is the one a PERSON decides. It is money credited or taken
+-- away by judgement rather than by a rule, it is what §4.1 calls a sensitive
+-- financial operation, and the whole reason المحفظة prints the reason column is
+-- so an operator can pick those rows out of the other forty thousand. A row that
+-- says a staff member adjusted a balance and cannot say WHICH staff member is
+-- the one row on this table that means nothing.
+--
+-- The rule already existed and lived in exactly one place — a TypeScript `if` in
+-- `WalletService.move()`. That is the same shape as the cover image on
+-- 2026-08-26: a rule enforced by whichever writer you remembered is not a rule.
+-- `wallet_transactions` is append-only, so the actor cannot be stripped after
+-- the fact; what was missing was anything stopping a row arriving without one —
+-- a seed, a repair script, a second service, a migration.
+--
+-- One direction only, deliberately. The reverse — forbidding an actor on the
+-- other four reasons — is true of all 50,288 rows today and is NOT an invariant:
+-- a refund a staff member issues by hand is a plausible future, and a constraint
+-- that forbade recording who did it would have to be dropped to allow the right
+-- thing.
+--
+-- Safe to add on 2026-08-26: 2,064 `admin_adjustment` rows, zero without an
+-- actor. Verified against the database before writing this, not assumed — a
+-- constraint added against data that breaks it fails the migration and takes the
+-- deploy with it.
+
+SELECT add_constraint_if_missing('wallet_transactions', 'wallet_transactions_adjustment_has_actor',
+  'CHECK (reason <> ''admin_adjustment'' OR created_by_user_id IS NOT NULL)');
