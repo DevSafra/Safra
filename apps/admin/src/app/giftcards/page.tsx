@@ -10,13 +10,13 @@ import {
   StatusPill,
   type AdminColumn,
 } from '@/components/admin-table';
-import { TableToolbar, ToolbarNote } from '@/components/table-toolbar';
+import { TableToolbar } from '@/components/table-toolbar';
 import { t, label } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { listParamsFor } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
 import { IssueGiftCardForm } from '@/components/issue-gift-card-form';
-import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
+import { DEFAULT_MONEY_CURRENCY, GIFT_CARD_CURRENCIES } from '@safra/contracts';
 
 /**
  * بطاقات الهدايا (design handoff §8).
@@ -70,10 +70,25 @@ export default async function GiftCardsPage({
     getGeography(),
   ]);
 
-  const currencies =
+  /*
+    The three a card may be issued in, intersected with what geography says is ACTIVE.
+
+    Two filters rather than one, and each catches something the other cannot: `GIFT_CARD_CURRENCIES`
+    is the product decision (Bashar, 2026-08-26) and the schema enforces it, so JOD and LBP cannot
+    be issued even by a caller who edits the DOM. The intersection is the operational half — a
+    currency the platform deactivates stops being offerable here without anybody remembering this
+    screen.
+
+    A failed geography read falls back to the accounting currency rather than taking the registry
+    down: a screen that refuses to show gift cards because it could not list currencies is worse
+    than one whose form offers one.
+  */
+  const active =
     geo === 'unauthenticated' || geo === 'failed'
       ? [DEFAULT_MONEY_CURRENCY]
       : geo.currencies.map((entry) => entry.code);
+
+  const currencies = GIFT_CARD_CURRENCIES.filter((code) => active.includes(code));
 
   return (
     <ConsoleShell title={t.nav.giftCards} counts={counts}>
@@ -83,23 +98,19 @@ export default async function GiftCardsPage({
           query={q}
           size={size}
           placeholder={t.sections.giftcards.searchPlaceholder}
-          end={<ToolbarNote>{t.sections.giftcards.hint}</ToolbarNote>}
+          /*
+            The create control sits where the hint used to (Bashar, 2026-08-26).
+
+            «الإنشاء والتعديل بصلاحيات إدارية محددة فقط» described a permission the reader either
+            has or does not — if they lack it the section refuses before this renders, and if they
+            have it the sentence tells them nothing they can act on. The button is what belongs in
+            that space.
+
+            The toolbar wraps, so the collapsed trigger sits beside the search and the opened panel
+            takes a row of its own.
+          */
+          end={<IssueGiftCardForm currencies={currencies} />}
         />
-
-        {/*
-          The form, above the table.
-
-          The button was `aria-disabled` with its reasoning written beside it — an amount, a
-          currency, an expiry, a recipient, an audit entry and a delivery email, and the wrong
-          currency creates a debt in the wrong denomination. That was honest, and it was still a
-          capability with nothing behind it: `GIFT_CARD_MANAGE`, `issued_by_user_id` and this button
-          were three halves of one feature.
-
-          The currencies come from geography rather than a literal list, so a currency the platform
-          deactivates stops being offerable here without anybody remembering this screen.
-        */}
-        <IssueGiftCardForm currencies={currencies} />
-
         {result === 'unauthenticated' ? (
           <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
         ) : result === 'failed' ? (

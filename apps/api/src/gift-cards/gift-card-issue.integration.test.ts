@@ -1,7 +1,13 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { ERROR, normaliseGiftCode, type GiftCardIssueInput } from '@safra/contracts';
+import {
+  ERROR,
+  GIFT_CARD_CURRENCIES,
+  giftCardIssueSchema,
+  normaliseGiftCode,
+  type GiftCardIssueInput,
+} from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
@@ -80,6 +86,7 @@ describeIfDb('a gift card issued by staff', () => {
     giftCards.issue(STAFF(staffId), {
       amount: '75.00',
       currency: 'USD',
+      recipientEmail: 'guest@example.test',
       reason: 'تعويض عن تأخّر في معالجة طلب دعم.',
       ...over,
     });
@@ -194,17 +201,50 @@ describeIfDb('a gift card issued by staff', () => {
     });
   });
 
-  /** The control: three decimals ARE accepted where the currency has three. */
-  it('accepts a third decimal for a three-decimal currency', async () => {
-    const result = await issue({ amount: '10.125', currency: 'JOD' });
-
-    expect(result.card.originalAmount).toBe('10.125');
+  /**
+   * A currency SAFRA lists but does not issue cards in is refused (Bashar, 2026-08-26).
+   *
+   * JOD and LBP are active currencies — bookings can be priced in them — and a gift card may not be
+   * denominated in either. A card is a bearer instrument SAFRA must honour for as long as it lives,
+   * and each currency it can carry is another exposure.
+   *
+   * Asserted at the API because the picker is a COURTESY: somebody who edits the DOM, replays the
+   * form or types the request by hand meets this, not a dropdown.
+   */
+  it('refuses a currency SAFRA does not issue cards in', async () => {
+    for (const currency of ['JOD', 'LBP']) {
+      await expect(
+        issue({ currency } as Partial<GiftCardIssueInput>),
+      ).rejects.toBeDefined();
+    }
   });
 
-  it('refuses a currency the platform does not know', async () => {
-    await expect(issue({ currency: 'ZZZ' })).rejects.toMatchObject({
-      response: { code: ERROR.GEO_CURRENCY_UNKNOWN },
-    });
+  /** The control: each of the three that ARE allowed is accepted. */
+  it('accepts each currency a card may be issued in', async () => {
+    for (const currency of GIFT_CARD_CURRENCIES) {
+      const result = await issue({ currency, amount: '50.00' });
+
+      expect(result.card.currencyCode, `${currency} is issuable`).toBe(currency);
+    }
+  });
+
+  /**
+   * The ceiling is per CURRENCY, because one number cannot serve both.
+   *
+   * SYP and USD differ by four orders of magnitude. A flat cap of 1000 — which is what this was
+   * before SYP was offered — would have limited a SYP card to about eight US cents and made the
+   * currency unusable the moment it appeared in the picker.
+   */
+  it('caps each currency on its own scale', async () => {
+    await expect(issue({ amount: '1001', currency: 'USD' })).rejects.toBeDefined();
+
+    /* The same figure is ordinary in SYP, and must go through. */
+    const syp = await issue({ amount: '1001', currency: 'SYP' });
+
+    expect(syp.card.originalAmount).toBe('1001.000');
+
+    /* And SYP has a ceiling of its own. */
+    await expect(issue({ amount: '15000001', currency: 'SYP' })).rejects.toBeDefined();
   });
 
   /** An address gets the card; the staff member's REASON does not travel with it. */
@@ -225,12 +265,26 @@ describeIfDb('a gift card issued by staff', () => {
     );
   });
 
-  /** No address, no mail — and the card still exists to be handed over in person. */
-  it('sends nothing when no recipient was named', async () => {
-    const result = await issue();
+  /**
+   * The address is REQUIRED, so a card with nowhere to go cannot be created.
+   *
+   * Only `code_hash` is stored: a card whose code exists solely in a browser session that has since
+   * been closed is a liability SAFRA owes to somebody who cannot claim it.
+   */
+  it('refuses to issue a card with nowhere to send it', async () => {
+    await expect(issue({ recipientEmail: '' })).rejects.toMatchObject({
+      response: { code: ERROR.VALIDATION_EMAIL_INVALID },
+    });
 
-    expect(sent).toHaveLength(0);
-    expect(result.code).not.toBe('');
+    /* And the FORMAT is the schema's job — the route never reaches the service with this. */
+    expect(
+      giftCardIssueSchema.safeParse({
+        amount: '10.00',
+        currency: 'USD',
+        recipientEmail: 'not-an-address',
+        reason: 'اختبار.',
+      }).success,
+    ).toBe(false);
   });
 
   it('stores the expiry it was given', async () => {

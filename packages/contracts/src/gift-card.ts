@@ -190,16 +190,42 @@ export interface GiftCardRedeemResult {
 }
 
 /**
- * The most a single staff-issued card may carry.
+ * The currencies a gift card may be issued in (Bashar, 2026-08-26).
+ *
+ * SYP because it is what SAFRA settles in, USD because it is what the platform prices and reports
+ * in, EUR because a share of customers hold one. `currencies` also carries JOD and LBP and they are
+ * deliberately NOT here — a card is a bearer instrument SAFRA must honour for as long as it lives,
+ * and every currency it can be denominated in is another exposure to carry.
+ *
+ * Enforced in the SCHEMA, not only in the picker. A dropdown is a courtesy; the endpoint is the
+ * control, and the standing rule is to assume the attribute is gone and ask what the server does.
+ */
+export const GIFT_CARD_CURRENCIES = ['SYP', 'USD', 'EUR'] as const;
+
+export type GiftCardCurrency = (typeof GIFT_CARD_CURRENCIES)[number];
+
+/**
+ * The most a single staff-issued card may carry, per currency.
  *
  * A TYPO GUARD, not a price list: a finance officer meaning 100 and typing 1000 creates a real
- * liability that a customer may spend before anybody reads the audit row. Customer purchases are
- * limited to `GIFT_CARD_AMOUNTS`, whose largest is 200 — this sits well above that so goodwill is
- * not cramped, and well below the figure where a slip stops being recoverable.
+ * liability a customer may spend before anybody reads the audit row.
  *
- * It is a number worth revisiting with the business rather than a rule derived from one.
+ * ## Why it cannot be one number
+ *
+ * It was `1000` flat, and that was written when USD was the only currency in play. SYP and USD
+ * differ by four orders of magnitude — the same fact that makes «المبلغ 200.00» unreadable without
+ * its currency — so a flat 1000 would have capped a SYP card at about eight US cents and made the
+ * currency unusable the moment it was offered.
+ *
+ * The SYP figure is the USD one at the configured rate, rounded to a round number, so the three
+ * caps mean roughly the same thing. **They are engineering guard rails derived from one another,
+ * not limits the business has set** — worth confirming rather than inheriting.
  */
-export const MAX_ISSUED_GIFT_CARD_AMOUNT = 1000;
+export const MAX_ISSUED_GIFT_CARD_AMOUNT: Record<GiftCardCurrency, number> = {
+  USD: 1000,
+  EUR: 1000,
+  SYP: 15_000_000,
+};
 
 /**
  * A card issued by SAFRA rather than bought — §9.3's «+ إنشاء بطاقة هدية».
@@ -222,28 +248,41 @@ export const giftCardIssueSchema = z
   .object({
     amount: z
       .string()
-      .regex(/^\d{1,7}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING)
-      .refine((v) => Number(v) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE)
-      .refine(
-        (v) => Number(v) <= MAX_ISSUED_GIFT_CARD_AMOUNT,
-        ERROR.GIFT_CARD_AMOUNT_INVALID,
-      ),
-    currency: z.string().regex(/^[A-Z]{3}$/, ERROR.VALIDATION_CURRENCY_CODE),
+      .regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING)
+      .refine((v) => Number(v) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE),
+    currency: z.enum(GIFT_CARD_CURRENCIES, {
+      message: ERROR.VALIDATION_CURRENCY_CODE,
+    }),
     /** ISO date. Absent means the card does not expire — see the note above. */
     expiresOn: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, ERROR.VALIDATION_DATE_FORMAT)
       .optional(),
     recipientName: z.string().trim().min(1).max(120).optional(),
-    recipientEmail: z
-      .string()
-      .trim()
-      .email(ERROR.VALIDATION_EMAIL_INVALID)
-      .max(254)
-      .optional(),
+    /**
+     * REQUIRED (Bashar, 2026-08-26) — it is how the card reaches anybody.
+     *
+     * It was optional, on the reasoning that a code shown once on screen could be read out or
+     * handed over. That leaves the customer with nothing they can keep: only `code_hash` is stored,
+     * so a card whose code exists solely in a browser session that has since been closed is a
+     * liability SAFRA owes to somebody who cannot claim it.
+     *
+     * The screen still shows the code once, and that is now a fallback for the staff member rather
+     * than the delivery mechanism.
+     */
+    recipientEmail: z.string().trim().email(ERROR.VALIDATION_EMAIL_INVALID).max(254),
     /** Why it was issued. Goes on the audit row, never into the customer's email. */
     reason: z.string().trim().min(3).max(500),
   })
-  .strict();
+  .strict()
+  /*
+    The ceiling depends on the currency, so it is checked here rather than on the field — a field
+    schema cannot see its neighbours. `path` points at the amount so the console highlights the box
+    somebody typed in rather than the one they chose from.
+  */
+  .refine(
+    (value) => Number(value.amount) <= MAX_ISSUED_GIFT_CARD_AMOUNT[value.currency],
+    { message: ERROR.GIFT_CARD_AMOUNT_INVALID, path: ['amount'] },
+  );
 
 export type GiftCardIssueInput = z.infer<typeof giftCardIssueSchema>;

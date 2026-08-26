@@ -996,7 +996,6 @@ export const ar = {
     giftcards: {
       searchPlaceholder: 'بحث بالكود أو المشتري…',
       create: '+ إنشاء بطاقة هدية',
-      hint: 'الإنشاء والتعديل بصلاحيات إدارية محددة فقط — يسجَّل في سجل التدقيق',
       colCode: 'الكود',
       colValue: 'القيمة الأصلية',
       colRemaining: 'الرصيد المتبقي',
@@ -1018,10 +1017,23 @@ export const ar = {
       /* ── The issue form (Bashar, 2026-08-26) ─────────────────────────────────────────────── */
       issueTitle: 'إصدار بطاقة هدية',
       issueAmount: 'القيمة',
+      /**
+       * The FORMAT, not a suggested amount.
+       *
+       * A card may be issued in SYP as well as USD and EUR, and those differ by four orders of
+       * magnitude — «مثال: 100» would read as a hint about the value in whichever currency happens
+       * to be selected, which is the one thing a placeholder here must not do.
+       */
+      issueAmountPlaceholder: '0.00',
       issueCurrency: 'العملة',
       issueExpiry: 'تاريخ الانتهاء (اختياري)',
       issueRecipientName: 'اسم المستلم (اختياري)',
-      issueRecipientEmail: 'بريد المستلم (اختياري)',
+      issueRecipientEmail: 'بريد المستلم',
+      /**
+       * `example.com` is the reserved documentation domain (RFC 2606), so a placeholder using it
+       * can never be a real address somebody mistakes for a default and sends a live card to.
+       */
+      issueRecipientEmailPlaceholder: 'name@example.com',
       issueReason: 'سبب الإصدار',
       issueReasonHint: 'يُسجَّل في سجل التدقيق ولا يصل العميل.',
       issueSubmit: 'إصدار البطاقة',
@@ -1035,7 +1047,7 @@ export const ar = {
        */
       issuedTitle: 'صدرت البطاقة',
       issuedCodeOnce: 'انسخ الكود الآن — يُعرض مرة واحدة فقط ولا يمكن استرجاعه لاحقاً.',
-      issuedEmailed: 'أُرسل الكود أيضاً إلى بريد المستلم.',
+      issuedEmailed: 'أُرسل الكود إلى بريد المستلم.',
       issuedDone: 'تم',
       /** Codes are hashed and never returned — see PromotionsService. */
       codeNote: 'يُعرض آخر أربعة أحرف فقط — الأكواد مُعمَّاة ولا تُسترجع من هنا.',

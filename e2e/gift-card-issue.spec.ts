@@ -39,6 +39,12 @@ test.describe('issuing a gift card', () => {
     ).toBeDisabled();
 
     await page.getByLabel('سبب الإصدار').fill('اختبار إصدار من الكونسول.');
+    await expect(
+      submit,
+      'the address is how the card reaches anybody, so it is required too',
+    ).toBeDisabled();
+
+    await page.getByLabel('بريد المستلم').fill('guest@example.test');
     await expect(submit).toBeEnabled();
 
     await submit.click();
@@ -46,6 +52,8 @@ test.describe('issuing a gift card', () => {
     /* The success panel, and the sentence that says this is the only time. */
     await expect(page.getByText('صدرت البطاقة')).toBeVisible();
     await expect(page.getByText(/يُعرض مرة واحدة فقط/)).toBeVisible();
+    /* And it says the card was sent, because it always is now. */
+    await expect(page.getByText(/أُرسل الكود إلى بريد المستلم/)).toBeVisible();
 
     /*
       A real code: four groups of five from the gift alphabet. Asserting merely that something
@@ -60,5 +68,51 @@ test.describe('issuing a gift card', () => {
     /* And the card is on the table behind it, active, for the amount asked for. */
     await page.getByRole('button', { name: 'تم' }).click();
     await expect(page.locator('tbody tr').first()).toContainText('12.50');
+  });
+
+  /**
+   * The code is fully visible on a phone (Bashar, 2026-08-26).
+   *
+   * Twenty-three characters at 15px with 0.18em of tracking do not fit a 390px panel, and a code
+   * somebody can only half see is a code they cannot use. Measured rather than eyeballed: the
+   * element must not be wider than the box that holds it, at the width where it first fails.
+   */
+  test('shows the whole code inside its box at 390px', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto('/giftcards');
+
+    await page.getByRole('button', { name: /إنشاء بطاقة هدية/ }).click();
+    await page.getByLabel('القيمة').fill('9.00');
+    await page.getByLabel('بريد المستلم').fill('guest@example.test');
+    await page.getByLabel('سبب الإصدار').fill('اختبار العرض على الهاتف.');
+    await page.getByRole('button', { name: /^إصدار البطاقة$/ }).click();
+
+    const code = page.locator('p.font-mono');
+
+    await expect(code).toBeVisible();
+
+    const fits = await code.evaluate((element) => {
+      const box = element.parentElement;
+
+      return {
+        overflows: element.scrollWidth > element.clientWidth + 1,
+        withinPanel:
+          box === null || element.getBoundingClientRect().width <= box.clientWidth + 1,
+        text: (element.textContent ?? '').trim(),
+      };
+    });
+
+    expect(fits.overflows, 'the code is clipped inside its own box').toBe(false);
+    expect(fits.withinPanel, 'the code spills out of the panel').toBe(true);
+    /* And it is still the whole code, not an ellipsis. */
+    expect(fits.text).toMatch(/^[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}-[A-Z0-9]{5}$/);
+
+    /* Nothing scrolls sideways, which is the standing rule for every screen. */
+    const sideways = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    );
+
+    expect(sideways, 'the page scrolls sideways at 390px').toBe(false);
   });
 });

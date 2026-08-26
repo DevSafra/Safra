@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { MAX_ISSUED_GIFT_CARD_AMOUNT } from '@safra/contracts';
+import { MAX_ISSUED_GIFT_CARD_AMOUNT, type GiftCardCurrency } from '@safra/contracts';
 
 import { t, apiError } from '@/lib/strings';
 
@@ -31,20 +31,24 @@ import { t, apiError } from '@/lib/strings';
  * The registry's job is to be scannable. A permanent form above the table would push the first row
  * below the fold on a laptop, for a control most visits do not use.
  */
-export function IssueGiftCardForm({ currencies }: { currencies: readonly string[] }) {
+export function IssueGiftCardForm({
+  currencies,
+}: {
+  currencies: readonly GiftCardCurrency[];
+}) {
   const router = useRouter();
   const c = t.sections.giftcards;
 
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState(currencies[0] ?? 'USD');
+  const [currency, setCurrency] = useState<GiftCardCurrency>(currencies[0] ?? 'USD');
   const [expiresOn, setExpiresOn] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [issued, setIssued] = useState<{ code: string; emailed: boolean } | null>(null);
+  const [issued, setIssued] = useState<{ code: string } | null>(null);
 
   /*
     The same shape the contract accepts — up to three decimals, because JOD has three. Whether THIS
@@ -52,11 +56,20 @@ export function IssueGiftCardForm({ currencies }: { currencies: readonly string[
     obvious typo from costing a round trip.
   */
   const amountValid =
-    /^\d{1,7}(\.\d{1,3})?$/.test(amount.trim()) &&
+    /^\d{1,10}(\.\d{1,3})?$/.test(amount.trim()) &&
     Number(amount) > 0 &&
-    Number(amount) <= MAX_ISSUED_GIFT_CARD_AMOUNT;
+    /* Per CURRENCY: SYP and USD differ by four orders of magnitude, so one ceiling cannot serve. */
+    Number(amount) <= MAX_ISSUED_GIFT_CARD_AMOUNT[currency];
 
-  const ready = amountValid && reason.trim().length >= 3 && !busy;
+  /*
+    A plausible address before the button arms.
+
+    Not a validator — the schema and the service both decide — but the address is now how the card
+    REACHES anybody, so an obvious typo must not cost a round trip and, worse, a moment where the
+    operator does not know whether a card was created.
+  */
+  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim());
+  const ready = amountValid && emailValid && reason.trim().length >= 3 && !busy;
 
   function reset(): void {
     setAmount('');
@@ -81,7 +94,7 @@ export function IssueGiftCardForm({ currencies }: { currencies: readonly string[
           /* Omitted rather than sent empty: the contract is `.strict()` and these are optional. */
           ...(expiresOn ? { expiresOn } : {}),
           ...(recipientName.trim() ? { recipientName: recipientName.trim() } : {}),
-          ...(recipientEmail.trim() ? { recipientEmail: recipientEmail.trim() } : {}),
+          recipientEmail: recipientEmail.trim(),
         }),
       });
 
@@ -99,7 +112,7 @@ export function IssueGiftCardForm({ currencies }: { currencies: readonly string[
 
       const payload = (await response.json()) as { code?: string };
 
-      setIssued({ code: payload.code ?? '', emailed: recipientEmail.trim() !== '' });
+      setIssued({ code: payload.code ?? '' });
       setOpen(false);
       reset();
       router.refresh();
@@ -112,22 +125,33 @@ export function IssueGiftCardForm({ currencies }: { currencies: readonly string[
 
   if (issued) {
     return (
-      <div className="mb-3 grid gap-2 rounded-[10px] border border-[rgba(var(--goldA),0.4)] bg-field p-3.5">
+      <div className="grid w-full gap-2 rounded-[10px] border border-[rgba(var(--goldA),0.4)] bg-field p-3.5">
         <h3 className="text-[13px] font-bold text-gold">{c.issuedTitle}</h3>
         {/*
           `dir="ltr"` on a DISPLAYED Latin value, never on a field: the code is one Latin run and
           this is the display half of the rule, not the typing half.
         */}
+        {/*
+          The whole code, visible at every width (Bashar, 2026-08-26).
+
+          It was one line at 15px with 0.18em of tracking — twenty-three characters that do not fit
+          the panel on a phone, and a code somebody can only half see is a code they cannot use.
+          Three things make it fit: `break-all` so it wraps rather than overflowing, tighter
+          tracking, and a size that steps up only when there is room for it.
+
+          Still ONE string rather than four chips: `select-all` has to yield the code exactly as it
+          is typed into the redeem box, and a flex row of groups copies with whatever whitespace the
+          browser puts between them.
+        */}
         <p
           dir="ltr"
-          className="select-all rounded-[9px] border border-line bg-card px-3 py-2.5 text-center font-mono text-[15px] font-bold tracking-[0.18em] text-text"
+          className="select-all rounded-[9px] border border-line bg-card px-3 py-3 text-center font-mono text-[13px] leading-relaxed font-bold tracking-[0.1em] break-all text-text sm:text-[15px] sm:tracking-[0.16em]"
         >
           {issued.code}
         </p>
         <p className="text-[11.5px] font-semibold text-bad">{c.issuedCodeOnce}</p>
-        {issued.emailed ? (
-          <p className="text-[11.5px] text-muted">{c.issuedEmailed}</p>
-        ) : null}
+        {/* Always: the address is required, so a card is never issued without being sent. */}
+        <p className="text-[11.5px] text-muted">{c.issuedEmailed}</p>
         <div className="flex">
           <button
             type="button"
@@ -143,20 +167,18 @@ export function IssueGiftCardForm({ currencies }: { currencies: readonly string[
 
   if (!open) {
     return (
-      <div className="mb-3 flex">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
-        >
-          {c.create}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="min-h-10 cursor-pointer rounded-[9px] border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+      >
+        {c.create}
+      </button>
     );
   }
 
   return (
-    <div className="mb-3 grid gap-3 rounded-[10px] border border-line bg-field p-3.5">
+    <div className="grid w-full gap-3 rounded-[10px] border border-line bg-field p-3.5">
       <h3 className="text-[13px] font-bold text-text">{c.issueTitle}</h3>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -166,6 +188,7 @@ export function IssueGiftCardForm({ currencies }: { currencies: readonly string[
           <input
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
+            placeholder={c.issueAmountPlaceholder}
             inputMode="decimal"
             className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
           />
@@ -175,7 +198,7 @@ export function IssueGiftCardForm({ currencies }: { currencies: readonly string[
           {c.issueCurrency}
           <select
             value={currency}
-            onChange={(event) => setCurrency(event.target.value)}
+            onChange={(event) => setCurrency(event.target.value as GiftCardCurrency)}
             className="cursor-pointer rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
           >
             {currencies.map((code) => (
@@ -211,6 +234,7 @@ export function IssueGiftCardForm({ currencies }: { currencies: readonly string[
             type="email"
             value={recipientEmail}
             onChange={(event) => setRecipientEmail(event.target.value)}
+            placeholder={c.issueRecipientEmailPlaceholder}
             className="field-ltr rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
           />
         </label>

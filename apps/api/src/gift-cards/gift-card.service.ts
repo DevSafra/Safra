@@ -9,6 +9,8 @@ import {
   GIFT_CODE_GROUPS,
   GIFT_CODE_GROUP_SIZE,
   type GiftCardPurchaseInput,
+  GIFT_CARD_CURRENCIES,
+  MAX_ISSUED_GIFT_CARD_AMOUNT,
   type GiftCardIssueInput,
   type GiftCardIssueResult,
   type GiftCardPurchaseResult,
@@ -478,6 +480,35 @@ export class GiftCardService {
   ): Promise<GiftCardIssueResult> {
     if (!claims?.sub) throw badRequest(ERROR.INTERNAL_ACTOR_REQUIRED);
 
+    /*
+      Checked HERE as well as in the schema, and that is not belt-and-braces for its own sake.
+
+      `giftCardIssueSchema` guards the route, so a browser and a crafted request both meet it. This
+      guards the SERVICE, which any future caller inside the API reaches without passing a zod pipe
+      at all — a seed, a migration, a bulk import, another controller. A gift card is a bearer
+      liability SAFRA must honour for as long as it lives, so the list of currencies it can be
+      denominated in is an invariant of the thing rather than a property of one route.
+    */
+    if (!(GIFT_CARD_CURRENCIES as readonly string[]).includes(input.currency)) {
+      throw badRequest(ERROR.VALIDATION_CURRENCY_CODE);
+    }
+
+    /*
+      A card must have somewhere to go, checked here as well as in the schema.
+
+      Only `code_hash` is stored, so a card issued with no address is a liability SAFRA owes to
+      somebody who has no way to claim it — the code exists once, in a response, and then nowhere.
+      Same reasoning as the currency guard above: this is an invariant of the thing, not a property
+      of one route.
+    */
+    if (!input.recipientEmail?.trim()) throw badRequest(ERROR.VALIDATION_EMAIL_INVALID);
+
+    const ceiling = MAX_ISSUED_GIFT_CARD_AMOUNT[input.currency];
+
+    if (Number(input.amount) <= 0 || Number(input.amount) > ceiling) {
+      throw badRequest(ERROR.GIFT_CARD_AMOUNT_INVALID);
+    }
+
     const currency = await this.db.execute<{ id: string; decimals: number }>(sql`
       SELECT id, decimals FROM currencies WHERE code = ${input.currency} AND is_active
     `);
@@ -549,8 +580,12 @@ export class GiftCardService {
       };
     });
 
-    /* Outside the transaction: a mail server refusing must not undo an issued card. */
-    if (input.recipientEmail) {
+    /*
+      Outside the transaction: a mail server refusing must not undo an issued card.
+      `MailService` swallows delivery failures and records both outcomes, and the code is on the
+      issuing staff member's screen once — so a refused send costs a resend, not the card.
+    */
+    {
       await this.mail.send(
         giftCardReceivedMail({
           to: input.recipientEmail,
