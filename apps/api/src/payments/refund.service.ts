@@ -6,7 +6,7 @@ import type { Database } from '@safra/db';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { LedgerService, type LedgerLeg } from '../ledger/ledger.service.js';
-import { MONEY_SCALE, applyRate, fromMinor, toMinor } from '../common/money.js';
+import { MONEY_SCALE, applyRate, fromMinor, quantise, toMinor } from '../common/money.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { bookingRefundedMail } from '../mail/mail.templates.js';
@@ -14,7 +14,7 @@ import { ENV, type Env } from '../config/env.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { ERROR } from '@safra/contracts';
+import { ERROR, WALLET_NOTE } from '@safra/contracts';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
 /** The shape snapshotted onto the booking at creation. */
@@ -205,7 +205,7 @@ export class RefundService {
           currencyId: booking.currency_id,
           reason: 'refund',
           bookingId: booking.id,
-          note: `Refund on ${reference} (${quote.tierApplied})`,
+          note: WALLET_NOTE.REFUNDED,
         });
       }
 
@@ -468,9 +468,19 @@ export class RefundService {
     const refundableBase = booking.base_amount;
     const alreadyRefunded = await this.sumRefunded(booking.id);
 
-    const gross = fromMinor(
-      applyRate(toMinor(refundableBase, MONEY_SCALE), percent / 100),
-      MONEY_SCALE,
+    /*
+      Quantised to the BOOKING's currency.
+
+      A percentage creates a value rather than carrying one — 50% of 10.05 is 5.025, and half a
+      cent is not refundable in USD. Rounding here rather than at the column means the figure the
+      customer is quoted and the figure that is stored are the same number.
+    */
+    const gross = quantise(
+      fromMinor(
+        applyRate(toMinor(refundableBase, MONEY_SCALE), percent / 100),
+        MONEY_SCALE,
+      ),
+      Number(booking.currency_decimals),
     );
 
     const remaining = toMinor(gross, MONEY_SCALE) - toMinor(alreadyRefunded, MONEY_SCALE);
@@ -613,7 +623,8 @@ export class RefundService {
              b.wallet_amount::text AS wallet_amount,
              b.currency_id, b.fx_rate_to_syp::text AS fx_rate_to_syp,
              b.partner_id, b.customer_profile_id,
-             b.cancellation_policy_snapshot, cur.code AS currency_code
+             b.cancellation_policy_snapshot, cur.code AS currency_code,
+             cur.decimals AS currency_decimals
       FROM bookings b
       JOIN currencies cur ON cur.id = b.currency_id
       WHERE b.reference = ${reference} AND b.deleted_at IS NULL
@@ -642,6 +653,7 @@ type BookingRow = {
   wallet_amount: string;
   currency_id: string;
   currency_code: string;
+  currency_decimals: number;
   fx_rate_to_syp: string;
   partner_id: string;
   customer_profile_id: string;

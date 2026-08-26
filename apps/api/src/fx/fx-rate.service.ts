@@ -142,6 +142,25 @@ export class FxRateService {
   }
 
   /**
+   * How many decimals a currency actually has — two for USD, THREE for JOD.
+   *
+   * Here rather than in a currency service of its own because this is the class that already
+   * turns a code into a row, and a converted amount must be quantised to the target's scale in
+   * the same breath as it is converted. `quantise` is the other half; see `common/money.ts`.
+   */
+  async decimalsOf(currencyCode: string): Promise<number> {
+    const rows = await this.db.execute<{ decimals: number }>(sql`
+      SELECT decimals FROM currencies WHERE code = ${currencyCode}
+    `);
+
+    const found = rows.rows[0]?.decimals;
+
+    if (found === undefined) throw badRequest(ERROR.GEO_CURRENCY_UNKNOWN);
+
+    return Number(found);
+  }
+
+  /**
    * Every currency's current rate, for the admin screen.
    *
    * Reports staleness rather than acting on it: refusing to price on an OLD rate

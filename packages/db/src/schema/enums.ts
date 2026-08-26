@@ -255,6 +255,16 @@ export const ledgerAccount = pgEnum('ledger_account', [
    * one query instead of a forensic exercise.
    */
   'wallet_adjustment',
+  /**
+   * SAFRA's side of money it pays a customer for a failure of its own — an SLA
+   * compensation, a dispute resolved in the customer's favour.
+   *
+   * Its own account rather than `wallet_adjustment`, which is a finance CORRECTION.
+   * Both are SAFRA's own money leaving, and telling them apart is the whole point of
+   * an account: «what did compensation cost us this month» is a question the ledger
+   * should answer without anybody grepping descriptions.
+   */
+  'wallet_compensation',
 ]);
 
 export const ledgerDirection = pgEnum('ledger_direction', ['debit', 'credit']);

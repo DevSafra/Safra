@@ -16,6 +16,7 @@ import { DATABASE } from '../database/database.module.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import {
   MONEY_SCALE,
+  quantise,
   divideDecimalStrings,
   fromMinor,
   multiplyDecimalStrings,
@@ -49,6 +50,8 @@ export interface WalletBalance {
   readonly balance: string;
   readonly currencyId: string;
   readonly currencyCode: string;
+  /** `currencies.decimals` — two for USD, THREE for JOD. What a credit may round to. */
+  readonly currencyDecimals: number;
 }
 
 export interface WalletMovementResult extends WalletBalance {
@@ -256,6 +259,7 @@ export class WalletService {
       appliedAmount: applied,
       currencyId: wallet.currencyId,
       currencyCode: wallet.currencyCode,
+      currencyDecimals: wallet.currencyDecimals,
     };
   }
 
@@ -308,8 +312,9 @@ export class WalletService {
       balance: string;
       currency_id: string;
       code: string;
+      decimals: number;
     }>(sql`
-      SELECT w.id, w.balance::text AS balance, w.currency_id, cur.code
+      SELECT w.id, w.balance::text AS balance, w.currency_id, cur.code, cur.decimals
       FROM wallets w
       JOIN currencies cur ON cur.id = w.currency_id
       WHERE w.customer_profile_id = ${customerProfileId}
@@ -325,6 +330,7 @@ export class WalletService {
       balance: row.balance,
       currencyId: row.currency_id,
       currencyCode: row.code,
+      currencyDecimals: Number(row.decimals),
     };
   }
 
@@ -353,7 +359,17 @@ export class WalletService {
     const toRate = await this.fx.rateToSyp(wallet.currencyCode);
 
     const inSyp = multiplyDecimalStrings(amount, fromRate, MONEY_SCALE);
-    const converted = divideDecimalStrings(inSyp, toRate, MONEY_SCALE);
+    /*
+      Quantised to the WALLET's own decimals, not to the carrying scale.
+
+      A division at scale 3 produces a third decimal for every currency, and $9.293 is not an
+      amount anybody can settle — it would sit in a USD balance that can only ever pay whole
+      cents. A JOD wallet keeps all three, because JOD has three.
+    */
+    const converted = quantise(
+      divideDecimalStrings(inSyp, toRate, MONEY_SCALE),
+      wallet.currencyDecimals,
+    );
 
     this.logger.log(
       `Wallet movement converted ${amount} ${from} to ${converted} ` +
@@ -388,8 +404,9 @@ export class WalletService {
       balance: string;
       currency_id: string;
       code: string;
+      decimals: number;
     }>(sql`
-      SELECT w.id, w.balance::text AS balance, w.currency_id, cur.code
+      SELECT w.id, w.balance::text AS balance, w.currency_id, cur.code, cur.decimals
       FROM wallets w
       JOIN currencies cur ON cur.id = w.currency_id
       WHERE w.customer_profile_id = ${customerProfileId}
@@ -404,6 +421,7 @@ export class WalletService {
       balance: row.balance,
       currencyId: row.currency_id,
       currencyCode: row.code,
+      currencyDecimals: Number(row.decimals),
     };
   }
 
@@ -467,8 +485,10 @@ export class WalletService {
    * cheap for a statement a person reads, and not worth paying for on every write path.
    *
    * The arithmetic stays in SQL, in `numeric`. Doing it in JavaScript would put money through a float.
-   * The result is cast to `numeric(14, 2)` — the column's own type — because `greatest(0, …)` otherwise
-   * yields an integer zero and an empty gift part would print as "0" beside balances reading "35.00".
+   * The result is cast to `numeric(15, 3)` — the column's own type — because `greatest(0, …)` otherwise
+   * yields an integer zero and an empty gift part would print as "0" beside balances reading "35.000".
+   * It must track the column: while this said `numeric(14, 2)` after the columns went to scale 3, one
+   * field of this very object came back with two decimals and its neighbour with three.
    */
   async composition(
     customerProfileId: string,
@@ -478,16 +498,17 @@ export class WalletService {
       balance: string;
       currency_id: string;
       code: string;
+      decimals: number;
       gift_balance: string;
     }>(sql`
-      SELECT w.id, w.balance::text AS balance, w.currency_id, cur.code,
+      SELECT w.id, w.balance::text AS balance, w.currency_id, cur.code, cur.decimals,
              greatest(
                0,
                least(
                  coalesce(moved.gift_credited, 0) - coalesce(moved.spent_from_gift, 0),
                  w.balance
                )
-             )::numeric(14, 2)::text AS gift_balance
+             )::numeric(15, 3)::text AS gift_balance
       FROM wallets w
       JOIN currencies cur ON cur.id = w.currency_id
       LEFT JOIN LATERAL (
@@ -512,6 +533,7 @@ export class WalletService {
       balance: row.balance,
       currencyId: row.currency_id,
       currencyCode: row.code,
+      currencyDecimals: Number(row.decimals),
       giftBalance: row.gift_balance,
     };
   }

@@ -152,7 +152,7 @@ export const bookingCompensationSchema = z
   .object({
     amount: z
       .string()
-      .regex(/^\d{1,10}(\.\d{1,2})?$/, ERROR.VALIDATION_DECIMAL_STRING)
+      .regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_DECIMAL_STRING)
       .refine((value) => Number(value) > 0, ERROR.VALIDATION_AMOUNT_POSITIVE),
     /**
      * The ENUM, not a three-letter pattern — the lesson `FINE_CURRENCIES` records.

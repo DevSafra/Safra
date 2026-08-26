@@ -20,7 +20,7 @@ import { fill, t } from '@/lib/strings';
  * Every amount on this console reconciles against something outside it — a ledger, a bank
  * statement, a payment provider — and none of those render Arabic-Indic digits.
  */
-export function money(amount: string | null | undefined): string {
+export function money(amount: string | null | undefined, decimals = 2): string {
   if (amount === null || amount === undefined) return t.admin.noData;
 
   const value = Number(amount);
@@ -28,9 +28,24 @@ export function money(amount: string | null | undefined): string {
   if (!Number.isFinite(value)) return t.admin.noData;
 
   return value.toLocaleString(ARABIC_WESTERN_DIGITS, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   });
+}
+
+/**
+ * How many decimals a currency is written with.
+ *
+ * Two was hard-coded here, which was right for every currency SAFRA has traded in and wrong for
+ * one it lists: JOD has three, and `10.125 JOD` rendered as `10.13` — the console rounding away a
+ * digit the database now stores. A written list rather than `Intl`'s own table, for the reason the
+ * money-key list gives: a lookup that answers for every ISO code would also answer for codes this
+ * platform will never price in, and a wrong answer there is invisible.
+ */
+const CURRENCY_DECIMALS: Record<string, number> = { JOD: 3 };
+
+function decimalsOf(currency: string): number {
+  return CURRENCY_DECIMALS[currency] ?? 2;
 }
 
 /** A count, grouped. */
@@ -236,8 +251,10 @@ export function amount(value: string | null | undefined, currency: string): stri
   if (value === null || value === undefined) return t.admin.noData;
 
   const symbol = SYMBOLS[currency] ?? currency;
+  /* The currency's own scale — three for JOD, two for the rest. */
+  const written = money(value, decimalsOf(currency));
 
   return currency === 'SYP' || currency === 'JOD' || currency === 'LBP'
-    ? `${money(value)} ${symbol}`
-    : `${symbol}${money(value)}`;
+    ? `${written} ${symbol}`
+    : `${symbol}${written}`;
 }

@@ -14,7 +14,7 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { IntentOutcome } from './payment-provider.port.js';
 import { PaymentProviderUnavailableError } from './payment-provider.port.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
-import { ERROR } from '@safra/contracts';
+import { ERROR, WALLET_NOTE } from '@safra/contracts';
 import { conflict, forbidden } from '../common/errors/app-error.js';
 import { describeError } from '../common/errors/safe-error.js';
 
@@ -291,7 +291,7 @@ export class PaymentIntentService {
           currencyId: context.currencyId,
           reason: 'booking_payment',
           bookingId: booking.id,
-          note: `Applied to ${booking.reference}`,
+          note: WALLET_NOTE.APPLIED_TO_BOOKING,
         });
 
         await tx.execute(sql`
@@ -352,7 +352,8 @@ export class PaymentIntentService {
       paymentReference: await this.paymentReference(paymentId),
       status: 'captured',
       offline: false,
-      amount: { value: '0.00', currencyCode: context.currencyCode },
+      /* Through `fromMinor`, so this zero has the same shape as every other money string. */
+      amount: { value: fromMinor(0n, MONEY_SCALE), currencyCode: context.currencyCode },
       walletApplied: fromMinor(context.walletMinor + amountMinor, MONEY_SCALE),
     };
   }

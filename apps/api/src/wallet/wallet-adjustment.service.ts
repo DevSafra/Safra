@@ -5,7 +5,7 @@ import type { Database } from '@safra/db';
 import type { Role, WalletAdjustInput } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
-import { MONEY_SCALE, fromMinor, toMinor } from '../common/money.js';
+import { MONEY_SCALE, fromMinor, quantise, toMinor } from '../common/money.js';
 import { DATABASE } from '../database/database.module.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
@@ -51,6 +51,29 @@ export class WalletAdjustmentService {
     }
 
     const currencyId = await this.currencyId(input.currency);
+
+    /*
+      Refused, not rounded, when the amount is finer than its currency.
+
+      The field schema allows three decimals because JOD needs three, and it cannot see WHICH
+      currency this amount is in — only the object can. So the check lands here, and it refuses:
+      an operator who typed `10.005 USD` is told, rather than discovering afterwards that SAFRA
+      moved 10.01. «Reject rather than coerce» is the standing rule for a boundary, and a manual
+      wallet movement is the last place to quietly change somebody's number.
+    */
+    const decimals = await this.fx.decimalsOf(input.currency);
+
+    /*
+      By VALUE, not by counting digits.
+
+      Counting them refused `10.000 USD`, which is ten dollars written with the scale the database
+      renders — no precision at all, and exactly what somebody pastes back out of a previous
+      response. What must be refused is an amount that CHANGES when rounded to its currency:
+      10.005 USD does, 10.000 does not.
+    */
+    if (Number(quantise(input.amount, decimals)) !== Number(input.amount)) {
+      throw badRequest(ERROR.VALIDATION_DECIMAL_STRING);
+    }
 
     return this.db.transaction(async (tx) => {
       const handle = tx as unknown as Database;

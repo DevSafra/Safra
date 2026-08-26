@@ -13,20 +13,51 @@
  */
 
 /**
- * The scale every stored money amount actually has.
+ * The scale money is REPRESENTED at — the widest any currency SAFRA lists needs.
  *
- * Not the currency's own scale — the column's. Every money column in the schema is
- * `numeric(14,2)`, so two decimals is what the database will keep whatever
- * `currencies.decimals` says.
+ * Not a rounding decision. Every money column is `numeric(15, 3)`, so three is what
+ * the database keeps, and computing at three means `toMinor` → `fromMinor` is a
+ * lossless round trip for every currency: a JOD amount keeps its third decimal
+ * instead of being flattened on the way in.
  *
- * That matters for JOD, which is a three-decimal currency: `currencies.decimals`
- * records 3, but a JOD amount stored in one of these columns is rounded to 2 by
- * PostgreSQL regardless. Computing at scale 2 here makes the loss happen in one
- * predictable place instead of at whichever write reaches the database first.
- * Widening the columns is a schema-wide change and is tracked in the roadmap; it is
- * deliberately not smuggled in behind a wallet feature.
+ * ## This is not the scale a computed amount is rounded to
+ *
+ * Rounding to three would invent precision no two-decimal currency can pay: a 7%
+ * commission on $10.05 is 0.7035, and `$0.704` is not an amount anybody can settle.
+ * Where a value is CREATED rather than carried — a conversion, a percentage, a
+ * commission — it is quantised to the currency's own `decimals` by `quantise`
+ * below, and the currency is always in hand at those points.
+ *
+ * It was 2, with a comment saying the loss for JOD happened "in one predictable
+ * place". Predictable, and still a loss: 10.125 JOD became 10.13 before it reached
+ * the column. Both halves are fixed now — the column holds three, and the rounding
+ * asks the currency.
  */
-export const MONEY_SCALE = 2;
+export const MONEY_SCALE = 3;
+
+/**
+ * Rounds a decimal string to a currency's own number of decimals, half-up.
+ *
+ * The counterpart to `MONEY_SCALE`: that one is how wide a value may be CARRIED,
+ * this is how wide it may be CREATED. `quantise('9.2934', 2)` is `'9.29'`;
+ * `quantise('9.2934', 3)` is `'9.293'`.
+ *
+ * Half-up rather than banker's rounding, matching `multiplyDecimalStrings` and
+ * `divideDecimalStrings` — one rule everywhere beats a subtler rule applied in
+ * some places, and a mixture is how two figures that should agree stop agreeing.
+ */
+export function quantise(value: string, decimals: number): string {
+  if (decimals >= MONEY_SCALE) return fromMinor(toMinor(value, MONEY_SCALE), MONEY_SCALE);
+
+  const minor = toMinor(value, MONEY_SCALE);
+  const divisor = 10n ** BigInt(MONEY_SCALE - decimals);
+  const negative = minor < 0n;
+  const magnitude = negative ? -minor : minor;
+  const rounded = (magnitude + divisor / 2n) / divisor;
+
+  /* Back to the carrying scale, so every stored amount has the same shape. */
+  return fromMinor((negative ? -rounded : rounded) * divisor, MONEY_SCALE);
+}
 
 /** Parses a decimal string into integer minor units. Never uses parseFloat. */
 export function toMinor(value: string, scale: number): bigint {

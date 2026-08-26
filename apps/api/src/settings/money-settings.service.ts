@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import {
   MONEY_SCALE,
+  quantise,
   divideDecimalStrings,
   fromMinor,
   multiplyDecimalStrings,
@@ -98,7 +99,11 @@ export class MoneySettingsService {
     const toRate = await this.fx.rateToSyp(targetCurrency);
 
     const inSyp = multiplyDecimalStrings(setting.amount, fromRate, MONEY_SCALE);
-    const converted = divideDecimalStrings(inSyp, toRate, MONEY_SCALE);
+    /* To the TARGET currency's decimals — a converted setting must be payable in it. */
+    const converted = quantise(
+      divideDecimalStrings(inSyp, toRate, MONEY_SCALE),
+      await this.fx.decimalsOf(targetCurrency),
+    );
 
     this.logger.log(
       `Setting ${key}: ${setting.amount} ${setting.currency} → ${converted} ` +

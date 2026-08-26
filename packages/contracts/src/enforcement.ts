@@ -165,7 +165,7 @@ export type FineCurrency = (typeof FINE_CURRENCIES)[number];
 /** Attaching a fine. Optional in the progression, so it is its own step rather than a field. */
 export const violationFineSchema = z
   .object({
-    amount: z.string().regex(/^\d{1,10}(\.\d{1,2})?$/, ERROR.VALIDATION_REQUIRED),
+    amount: z.string().regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_REQUIRED),
     /*
       A coded message, like every other refusal here.
 
@@ -183,7 +183,7 @@ export const violationFineSchema = z
      */
     customerCompensation: z
       .string()
-      .regex(/^\d{1,10}(\.\d{1,2})?$/, ERROR.VALIDATION_REQUIRED)
+      .regex(/^\d{1,10}(\.\d{1,3})?$/, ERROR.VALIDATION_REQUIRED)
       .optional(),
   })
   .strict();
