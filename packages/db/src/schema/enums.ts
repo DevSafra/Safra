@@ -265,6 +265,15 @@ export const ledgerAccount = pgEnum('ledger_account', [
    * should answer without anybody grepping descriptions.
    */
   'wallet_compensation',
+  /**
+   * SAFRA's side of a card it GAVE away — the expense behind a staff issue.
+   *
+   * Distinct from `wallet_compensation`, which is money paid into a wallet for a failure of
+   * SAFRA's own, and from `gift_card_redemption`, which is the LIABILITY a live card represents.
+   * A giveaway and a service-failure payment are different cost lines and «what did we give away
+   * this month» should not require reading descriptions.
+   */
+  'gift_card_issued',
 ]);
 
 export const ledgerDirection = pgEnum('ledger_direction', ['debit', 'credit']);

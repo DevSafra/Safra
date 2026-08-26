@@ -176,6 +176,9 @@ export const de = {
   'gift_card.expired': 'Diese Geschenkkarte ist abgelaufen.',
   'gift_card.cancelled':
     'Diese Geschenkkarte wurde storniert. Bitte wenden Sie sich an den Support.',
+  'gift_card.not_cancellable':
+    'Diese Karte kann nicht storniert werden — sie ist bereits eingelöst, abgelaufen oder storniert.',
+  'gift_card.not_found': 'Geschenkkarte nicht gefunden.',
   'gift_card.cash_only':
     'Ihr aktuelles Guthaben reicht für diese Karte nicht aus. Eine Geschenkkarte kann nur mit dem aktuellen Guthaben gekauft werden, nicht mit Geschenkkarten-Guthaben.',
   'gift_card.amount_invalid':

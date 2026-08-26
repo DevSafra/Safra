@@ -1049,6 +1049,14 @@ export const ar = {
       issuedCodeOnce: 'انسخ الكود الآن — يُعرض مرة واحدة فقط ولا يمكن استرجاعه لاحقاً.',
       issuedEmailed: 'أُرسل الكود إلى بريد المستلم.',
       issuedDone: 'تم',
+      /* ── Voiding a live card ─────────────────────────────────────────────────────────────── */
+      cancel: 'إلغاء البطاقة',
+      cancelTitle: 'إلغاء البطاقة',
+      cancelReason: 'سبب الإلغاء',
+      cancelReasonHint:
+        'يُسجَّل في سجل التدقيق. تُعاد القيمة إلى محفظة المشتري إن كانت مشتراة.',
+      cancelConfirm: 'تأكيد الإلغاء',
+      cancelBack: 'تراجع',
       /** Codes are hashed and never returned — see PromotionsService. */
       codeNote: 'يُعرض آخر أربعة أحرف فقط — الأكواد مُعمَّاة ولا تُسترجع من هنا.',
     },
@@ -2526,6 +2534,7 @@ export const ar = {
     'customer.profile_updated': 'تعديل ملف عميل',
     'gift_card.purchase': 'شراء بطاقة هدية',
     'gift_card.issued': 'إصدار بطاقة هدية',
+    'gift_card.cancelled': 'إلغاء بطاقة هدية',
     'gift_card.redeem': 'استخدام بطاقة هدية',
     'partner.invitation_accepted': 'قبول دعوة شريك',
     'partner.two_factor_reset': 'إعادة تعيين المصادقة الثنائية لشريك',
@@ -2866,6 +2875,7 @@ export const ar = {
       creditedCurrency: 'عملة الإضافة',
       walletCurrency: 'عملة المحفظة',
       expiresAt: 'تاريخ الانتهاء',
+      returnedToBuyer: 'أُعيدت القيمة للمشتري',
       walletBalance: 'رصيد المحفظة',
 
       /*

@@ -486,6 +486,9 @@ export const ERROR = {
   GIFT_CARD_ALREADY_USED: 'gift_card.already_used',
   GIFT_CARD_EXPIRED: 'gift_card.expired',
   GIFT_CARD_CANCELLED: 'gift_card.cancelled',
+  /** Only a live card can be voided — one already used, expired or cancelled cannot. */
+  GIFT_CARD_NOT_CANCELLABLE: 'gift_card.not_cancellable',
+  GIFT_CARD_NOT_FOUND: 'gift_card.not_found',
   GIFT_CARD_AMOUNT_INVALID: 'gift_card.amount_invalid',
   GIFT_CARD_CASH_ONLY: 'gift_card.cash_only',
   WALLET_INSUFFICIENT_BALANCE: 'wallet.insufficient_balance',

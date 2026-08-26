@@ -11,6 +11,7 @@ import {
   type GiftCardPurchaseInput,
   GIFT_CARD_CURRENCIES,
   MAX_ISSUED_GIFT_CARD_AMOUNT,
+  type GiftCardCancelInput,
   type GiftCardIssueInput,
   type GiftCardIssueResult,
   type GiftCardPurchaseResult,
@@ -23,6 +24,8 @@ import {
 } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { LedgerService, type LedgerLeg } from '../ledger/ledger.service.js';
+import { FxRateService } from '../fx/fx-rate.service.js';
 import { quantise } from '../common/money.js';
 import { DEFAULT_LOCALE } from '@safra/i18n';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -145,7 +148,56 @@ export class GiftCardService {
     private readonly wallet: WalletService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
+    private readonly ledger: LedgerService,
+    private readonly fx: FxRateService,
   ) {}
+
+  /**
+   * One balanced group for a card's movement, in the CARD's own currency.
+   *
+   * ## Why the whole domain now posts
+   *
+   * `gift_card_redemption` was a ledger account with no writer: a card was bought, given away and
+   * spent entirely outside `ledger_entries`. So a live card — money SAFRA owes whoever holds it —
+   * appeared nowhere in the books, and redeeming one discharged nothing. Same objection Bashar
+   * raised about compensation and about profile claims, and gift cards were the last domain outside
+   * the accounting model.
+   *
+   * `gift_card_redemption` is the LIABILITY. The other leg says where it came from or went:
+   * `wallet_debit` when a customer paid for it, `gift_card_issued` when SAFRA gave it away,
+   * `wallet_credit` when it is spent or returned.
+   *
+   * ## In the card's currency, at the card's amount
+   *
+   * A group carries one currency, and a redemption can land in a wallet denominated in another. The
+   * liability being created or discharged is the CARD's, so that is what is booked; the converted
+   * figure the wallet actually moved by lives on the wallet transaction. In SYP — the unit the
+   * balance trigger checks — they are the same number. Same reasoning `postPartnerFine` gives.
+   *
+   * ## It needs an FX rate, and that is not a side effect
+   *
+   * Every ledger entry carries `amount_syp`, so a currency with no rate to SYP cannot be booked and
+   * this REFUSES. On 2026-08-26 that is EUR: a EUR card cannot be issued until a rate exists. That
+   * is the correct failure — a liability SAFRA cannot value in its accounting currency should not
+   * be created silently — and it is one configuration value away. Register item 196.
+   */
+  private async postCardLegs(
+    tx: Database,
+    legs: LedgerLeg[],
+    context: {
+      currencyCode: string;
+      currencyId: string;
+      customerProfileId?: string | undefined;
+      createdByUserId?: string | undefined;
+    },
+  ): Promise<void> {
+    await this.ledger.post(tx, legs, {
+      currencyId: context.currencyId,
+      fxRateToSyp: await this.fx.rateToSyp(context.currencyCode),
+      customerProfileId: context.customerProfileId,
+      createdByUserId: context.createdByUserId,
+    });
+  }
 
   /** The caller's own customer profile, or a refusal. No endpoint here accepts a customer id. */
   private profileOf(claims: AccessTokenClaims | undefined): string {
@@ -275,6 +327,31 @@ export class GiftCardService {
         createdByUserId: claims?.sub,
       });
 
+      /* The card's liability is discharged and the wallet's is created — see `postCardLegs`. */
+      await this.postCardLegs(
+        tx as unknown as Database,
+        [
+          {
+            account: 'gift_card_redemption',
+            direction: 'debit',
+            amount,
+            description: `Gift card ${card.reference} redeemed`,
+          },
+          {
+            account: 'wallet_credit',
+            direction: 'credit',
+            amount,
+            description: `Balance credited from gift card ${card.reference}`,
+          },
+        ],
+        {
+          currencyCode: card.currency_code,
+          currencyId: card.currency_id,
+          customerProfileId: profileId,
+          createdByUserId: claims?.sub,
+        },
+      );
+
       await this.audit.record(
         {
           actorUserId: claims?.sub,
@@ -385,6 +462,31 @@ export class GiftCardService {
       const row = created.rows.at(0);
 
       if (!row) throw badRequest(ERROR.GIFT_CARD_AMOUNT_INVALID);
+
+      /* The customer's balance became SAFRA's liability on a card — see `postCardLegs`. */
+      await this.postCardLegs(
+        tx as unknown as Database,
+        [
+          {
+            account: 'wallet_debit',
+            direction: 'debit',
+            amount: paid.appliedAmount,
+            description: `Gift card ${row.reference} bought from wallet balance`,
+          },
+          {
+            account: 'gift_card_redemption',
+            direction: 'credit',
+            amount: paid.appliedAmount,
+            description: `Gift card ${row.reference} outstanding`,
+          },
+        ],
+        {
+          currencyCode: wallet.currencyCode,
+          currencyId: wallet.currencyId,
+          customerProfileId: profileId,
+          createdByUserId: claims?.sub,
+        },
+      );
 
       await this.audit.record(
         {
@@ -574,6 +676,30 @@ export class GiftCardService {
         tx as unknown as Database,
       );
 
+      /* SAFRA gave this away, so the expense is the other side of the liability. */
+      await this.postCardLegs(
+        tx as unknown as Database,
+        [
+          {
+            account: 'gift_card_issued',
+            direction: 'debit',
+            amount: input.amount,
+            description: `Gift card ${row.reference} issued by staff`,
+          },
+          {
+            account: 'gift_card_redemption',
+            direction: 'credit',
+            amount: input.amount,
+            description: `Gift card ${row.reference} outstanding`,
+          },
+        ],
+        {
+          currencyCode: input.currency,
+          currencyId: found.id,
+          createdByUserId: claims.sub,
+        },
+      );
+
       return {
         card: this.summaryOf({ ...row, currency_code: input.currency }),
         code: group(code),
@@ -605,6 +731,162 @@ export class GiftCardService {
     );
 
     return result;
+  }
+
+  /**
+   * Voids a live card — §9.3's «إلغاء», and the fourth status finally gets a writer.
+   *
+   * ## Only a LIVE card
+   *
+   * `used`, `expired` and `cancelled` are all refused. Cancelling a spent card would rewrite what
+   * happened; cancelling an expired one changes nothing and hides which of the two it was.
+   *
+   * ## Where the money goes depends on who paid for it
+   *
+   * A card somebody BOUGHT is their money. Voiding it without returning the value would be taking
+   * it, so the remaining balance goes back to the buyer's wallet — through `WalletService`, like
+   * every other movement. A card SAFRA ISSUED cost the customer nothing, so voiding it simply
+   * reverses SAFRA's own expense.
+   *
+   * Both post a balanced group. The liability leaves `gift_card_redemption` either way; the other
+   * leg is where it went.
+   */
+  async cancel(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+    input: GiftCardCancelInput,
+  ): Promise<GiftCardSummary> {
+    if (!claims?.sub) throw badRequest(ERROR.INTERNAL_ACTOR_REQUIRED);
+
+    return this.db.transaction(async (tx) => {
+      /*
+        Locked on the way in, so a redemption racing this one waits and then finds the card
+        cancelled rather than both succeeding — the same reason `redeem()` takes the row lock.
+      */
+      const rows = await tx.execute<CardRow & { currency_code: string }>(sql`
+        SELECT g.id, g.reference, g.code_last4,
+               g.original_amount::text  AS original_amount,
+               g.remaining_amount::text AS remaining_amount,
+               g.currency_id, cur.code  AS currency_code,
+               g.status::text     AS status,
+               g.expires_at::text AS expires_at,
+               g.recipient_name, g.recipient_email,
+               g.created_at::text AS created_at,
+               g.purchased_by_customer_id
+        FROM gift_cards g
+        JOIN currencies cur ON cur.id = g.currency_id
+        WHERE g.reference = ${reference}
+        FOR UPDATE OF g
+      `);
+
+      const card = rows.rows.at(0);
+
+      if (!card) throw notFound(ERROR.GIFT_CARD_NOT_FOUND);
+
+      /*
+        Expiry is decided HERE, not read from the column.
+
+        `gift-card-expiry` retires cards hourly, so a card that lapsed forty minutes ago still says
+        `active`. Cancelling it would record a void for something that had already stopped being
+        spendable — and the two are different facts an operator may later need to tell apart.
+      */
+      const lapsed =
+        card.expires_at !== null && new Date(card.expires_at).getTime() <= Date.now();
+
+      if (card.status !== 'active' || lapsed) {
+        throw badRequest(ERROR.GIFT_CARD_NOT_CANCELLABLE);
+      }
+
+      const remaining = card.remaining_amount;
+
+      const voided = await tx.execute<{ id: string }>(sql`
+        UPDATE gift_cards
+        SET status = 'cancelled', remaining_amount = 0, updated_at = now()
+        WHERE id = ${card.id}::uuid AND status = 'active'
+        RETURNING id
+      `);
+
+      if (!voided.rows.at(0)) throw badRequest(ERROR.GIFT_CARD_NOT_CANCELLABLE);
+
+      /* Append-only by trigger: the card's history, and this is part of it. */
+      await tx.execute(sql`
+        INSERT INTO gift_card_transactions
+          (gift_card_id, amount, balance_after, created_by_user_id)
+        VALUES (${card.id}::uuid, ${remaining}::numeric, 0, ${claims.sub}::uuid)
+      `);
+
+      const buyer = card.purchased_by_customer_id;
+
+      if (buyer) {
+        /*
+          They paid for it, so they get it back. `gift_card_transfer` is the reason because that is
+          what this movement IS — value leaving a card for a wallet — and it keeps the balance out
+          of `composition`'s cash part, so a returned gift cannot be poured into a fresh card and
+          have its expiry reset. See the note on `purchase`.
+        */
+        await this.wallet.credit(tx as unknown as Database, {
+          customerProfileId: buyer,
+          amount: remaining,
+          currencyId: card.currency_id,
+          reason: 'gift_card_transfer',
+          createdByUserId: claims.sub,
+        });
+      }
+
+      await this.postCardLegs(
+        tx as unknown as Database,
+        [
+          {
+            account: 'gift_card_redemption',
+            direction: 'debit',
+            amount: remaining,
+            description: `Gift card ${card.reference} cancelled`,
+          },
+          buyer
+            ? {
+                account: 'wallet_credit',
+                direction: 'credit',
+                amount: remaining,
+                description: `Balance returned for cancelled gift card ${card.reference}`,
+              }
+            : {
+                account: 'gift_card_issued',
+                direction: 'credit',
+                amount: remaining,
+                description: `Issued gift card ${card.reference} cancelled`,
+              },
+        ],
+        {
+          currencyCode: card.currency_code,
+          currencyId: card.currency_id,
+          customerProfileId: buyer ?? undefined,
+          createdByUserId: claims.sub,
+        },
+      );
+
+      await this.audit.record(
+        {
+          actorUserId: claims.sub,
+          actorRole: claims.role,
+          action: 'gift_card.cancelled',
+          subjectType: 'gift_card',
+          subjectId: card.id,
+          before: { status: 'active', remainingAmount: remaining },
+          /* The reference identifies it; the code never appears, here or anywhere. */
+          after: {
+            status: 'cancelled',
+            reference: card.reference,
+            returnedToBuyer: buyer !== null,
+          },
+          reason: input.reason,
+        },
+        tx as unknown as Database,
+      );
+
+      this.logger.log(`Gift card ${card.reference} cancelled by ${claims.sub}.`);
+
+      return this.summaryOf({ ...card, remaining_amount: '0', status: 'cancelled' });
+    });
   }
 
   /**

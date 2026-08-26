@@ -115,4 +115,50 @@ test.describe('issuing a gift card', () => {
 
     expect(sideways, 'the page scrolls sideways at 390px').toBe(false);
   });
+
+  /**
+   * Voiding a live card, from the row (Bashar, 2026-08-26).
+   *
+   * `cancelled` was a status nothing could write — the enum value, the `GIFT_CARD_MANAGE`
+   * permission and no route between them. Once staff could CREATE cards that mattered: only
+   * `code_hash` is stored, so a card issued for the wrong amount could not be recalled by finding
+   * its code, and the only remedy was to wait for it to be spent or expire.
+   */
+  test('voids a card it has just issued', async ({ page }) => {
+    await page.goto('/giftcards');
+
+    /* Issue one, so the row being cancelled is known rather than whatever sits on top. */
+    await page.getByRole('button', { name: /إنشاء بطاقة هدية/ }).click();
+    await page.getByLabel('القيمة').fill('31.00');
+    await page.getByLabel('بريد المستلم').fill('guest@example.test');
+    await page.getByLabel('سبب الإصدار').fill('اختبار الإلغاء.');
+    await page.getByRole('button', { name: /^إصدار البطاقة$/ }).click();
+    await page.getByRole('button', { name: 'تم' }).click();
+
+    const row = page.locator('tbody tr').first();
+
+    await expect(row, 'the card just issued is on top').toContainText('31.00');
+    await expect(row.locator('[data-status-pill]')).toHaveText('نشطة');
+
+    await row.getByRole('button', { name: 'إلغاء البطاقة' }).click();
+
+    const confirm = page.getByRole('button', { name: 'تأكيد الإلغاء' });
+
+    await expect(
+      confirm,
+      'a reason is required — this destroys a liability',
+    ).toBeDisabled();
+
+    await page.locator('textarea[placeholder="سبب الإلغاء"]').fill('أُصدرت بقيمة خاطئة.');
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+
+    /* The row says so, and the control is gone because a cancelled card cannot be cancelled. */
+    await expect(
+      page.locator('tbody tr').first().locator('[data-status-pill]'),
+    ).toHaveText('ملغاة');
+    await expect(
+      page.locator('tbody tr').first().getByRole('button', { name: 'إلغاء البطاقة' }),
+    ).toHaveCount(0);
+  });
 });

@@ -14,7 +14,10 @@ import { t, label } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { listParamsFor } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
+import Link from 'next/link';
+
 import { GiftCardsToolbar } from '@/components/issue-gift-card-form';
+import { CancelGiftCardForm } from '@/components/cancel-gift-card-form';
 import { DEFAULT_MONEY_CURRENCY, GIFT_CARD_CURRENCIES } from '@safra/contracts';
 
 /**
@@ -37,8 +40,19 @@ import { DEFAULT_MONEY_CURRENCY, GIFT_CARD_CURRENCIES } from '@safra/contracts';
  */
 export const dynamic = 'force-dynamic';
 
+/**
+ * Whether a card's expiry has already passed.
+ *
+ * Asked of the CLOCK, not of the status column: `gift-card-expiry` runs hourly, so a card that
+ * lapsed forty minutes ago still says `active`. Offering an إلغاء control on it would be offering
+ * something the API refuses.
+ */
+function lapsed(expiresAt: string | null): boolean {
+  return expiresAt !== null && new Date(expiresAt).getTime() <= Date.now();
+}
+
 /** The design's `grid-template-columns`, verbatim. */
-const TEMPLATE = '1.1fr .9fr 1fr 1fr 1fr .9fr';
+const TEMPLATE = '1.1fr .8fr .9fr 1fr .9fr .8fr 1fr';
 
 export default async function GiftCardsPage({
   searchParams,
@@ -187,12 +201,45 @@ const COLUMNS: readonly AdminColumn<GiftCardItem>[] = [
   {
     key: 'buyer',
     header: t.sections.giftcards.colBuyer,
-    render: (row) => <span className="text-text2">{row.buyer ?? t.admin.noData}</span>,
+    /*
+      The buyer opens their record — every other registry that names a customer now does.
+
+      Linked only where there IS a buyer and they still have a record: `buyer` falls back to the
+      RECIPIENT's name for a card nobody bought, and that name belongs to no customer. A deleted
+      profile answers 404 on العملاء, so it stays plain text too — the same thing المحفظة learned
+      by clicking its own first row.
+    */
+    render: (row) =>
+      row.buyerReference && row.buyerActive ? (
+        <Link
+          href={`/customers/${row.buyerReference}?from=giftcards`}
+          className="truncate text-sky hover:underline"
+        >
+          {row.buyer}
+        </Link>
+      ) : (
+        <span className="truncate text-text2">{row.buyer ?? t.admin.noData}</span>
+      ),
   },
   {
     key: 'expiry',
     header: t.sections.giftcards.colExpiry,
     render: (row) => <Ltr className="text-muted">{shortDate(row.expiresAt)}</Ltr>,
+  },
+  {
+    /*
+      Voiding a live card. Only where one CAN be voided — a used, expired or cancelled card gets no
+      control, and neither does one whose expiry has lapsed but which the hourly sweep has not
+      reached. That is a courtesy: the API re-checks all four against the clock.
+    */
+    key: 'action',
+    header: t.table.colAction,
+    render: (row) =>
+      row.status === 'active' && !lapsed(row.expiresAt) ? (
+        <CancelGiftCardForm reference={row.reference} />
+      ) : (
+        <span className="text-faint">{t.admin.noData}</span>
+      ),
   },
   {
     key: 'status',

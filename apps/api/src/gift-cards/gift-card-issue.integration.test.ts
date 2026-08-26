@@ -11,6 +11,7 @@ import {
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { LedgerService } from '../ledger/ledger.service.js';
 import { GiftCardService } from './gift-card.service.js';
 import { WalletService } from './../wallet/wallet.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
@@ -33,6 +34,30 @@ import type { MailService, OutgoingMail } from '../mail/mail.service.js';
  * anything that stores or records it hands over spendable money later. And an issued card is a
  * liability created out of nothing, so who created it and why must be on the record.
  */
+/**
+ * Rates for the LEDGER, which needs one per entry whatever the currencies are.
+ *
+ * Every `ledger_entries` row carries `amount_syp`, so posting a gift card's legs asks for the
+ * card's rate to SYP. Only the three a card may be issued in answer here — anything else throws,
+ * which is what the platform itself does and what makes a missing rate visible rather than silent.
+ */
+const RATES_TO_SYP: Record<string, string> = {
+  SYP: '1',
+  USD: '13000.00000000',
+  EUR: '14000.00000000',
+};
+
+const fxForLedger = {
+  rateToSyp: (code: string) => {
+    const rate = RATES_TO_SYP[code];
+
+    if (!rate) throw new Error(`No stub rate for ${code}`);
+
+    return Promise.resolve(rate);
+  },
+  decimalsOf: () => Promise.resolve(2),
+} as unknown as FxRateService;
+
 const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
@@ -67,6 +92,8 @@ describeIfDb('a gift card issued by staff', () => {
       {
         send: (mail: OutgoingMail) => Promise.resolve(void sent.push(mail)),
       } as unknown as MailService,
+      new LedgerService(db),
+      fxForLedger,
     );
 
     const made = await db.execute<{ id: string }>(sql`

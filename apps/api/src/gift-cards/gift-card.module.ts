@@ -3,6 +3,8 @@ import { Module } from '@nestjs/common';
 import { AuditService } from '../common/audit/audit.service.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { WalletModule } from '../wallet/wallet.module.js';
+import { LedgerModule } from '../ledger/ledger.module.js';
+import { FxModule } from '../fx/fx.module.js';
 import { GiftCardController } from './gift-card.controller.js';
 import { GiftCardService } from './gift-card.service.js';
 import { GiftCardExpiryService } from './gift-card-expiry.service.js';
@@ -21,7 +23,8 @@ import { JobRunService } from '../common/jobs/job-run.service.js';
  * `ENV` needs no import: `DatabaseModule` is global.
  */
 @Module({
-  imports: [WalletModule, AuthModule],
+  /* `LedgerModule` and `FxModule`: every card movement now posts a balanced group. */
+  imports: [WalletModule, AuthModule, LedgerModule, FxModule],
   controllers: [GiftCardController],
   providers: [GiftCardService, GiftCardExpiryService, AuditService, JobRunService],
   /* `GiftCardExpiryService` is driven by `ScheduledProcessor`; see `scheduled.job.ts`. */

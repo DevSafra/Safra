@@ -351,6 +351,13 @@
       "when": 1787746484590,
       "tag": "0049_concerned_eternals",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1787755948454,
+      "tag": "0050_lethal_tarantula",
+      "breakpoints": true
     }
   ]
 }

@@ -19,9 +19,11 @@ import { z } from 'zod';
 import {
   BOOKING_ATTENTION,
   PERMISSIONS as P,
+  giftCardCancelSchema,
   giftCardIssueSchema,
   pageQuerySchema,
   setStaffScopeSchema,
+  type GiftCardCancelInput,
   type GiftCardIssueInput,
   type PageQuery,
   type SetStaffScopeInput,
@@ -388,6 +390,32 @@ export class RegistriesController {
     @CurrentUser() user: AccessTokenClaims | undefined,
   ) {
     return this.giftCardIssuer.issue(user, body);
+  }
+
+  /**
+   * Voids a live card — §9.3's «إلغاء».
+   *
+   * `GIFT_CARD_MANAGE`, the same capability as issuing one, because it is the same power in
+   * reverse: creating and destroying a liability are one authority, not two.
+   *
+   * `AuditExempt` because `GiftCardService` writes `gift_card.cancelled` inside the transaction
+   * with the balance either side and whether the buyer was made whole — none of which the
+   * interceptor can see.
+   */
+  @Post('gift-cards/:reference/cancel')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.GIFT_CARD_MANAGE)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @AuditExempt(
+    'GiftCardService records gift_card.cancelled inside the transaction, with the balance ' +
+      'either side of it and whether the value was returned.',
+  )
+  async cancelGiftCard(
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(giftCardCancelSchema)) body: GiftCardCancelInput,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+  ) {
+    return this.giftCardIssuer.cancel(user, reference, body);
   }
 
   @Get('coupons')

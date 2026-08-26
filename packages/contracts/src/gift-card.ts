@@ -286,3 +286,21 @@ export const giftCardIssueSchema = z
   );
 
 export type GiftCardIssueInput = z.infer<typeof giftCardIssueSchema>;
+
+/**
+ * Voiding a live card — the fourth status, which nothing could write.
+ *
+ * `gift_card_status` has four values and `cancelled` was only ever READ, in the guard that refuses
+ * to redeem one. So there was no way to void a card: not when a recipient reports the email was
+ * intercepted, not when one is issued for the wrong amount, not when a campaign is pulled. That
+ * mattered more once staff could create them — only `code_hash` is stored, so a card cannot be
+ * recalled by finding its code, and the only remedy was to wait for it to be spent or to expire.
+ */
+export const giftCardCancelSchema = z
+  .object({
+    /** Why it was voided. Goes on the audit row and on the ledger description. */
+    reason: z.string().trim().min(3).max(500),
+  })
+  .strict();
+
+export type GiftCardCancelInput = z.infer<typeof giftCardCancelSchema>;

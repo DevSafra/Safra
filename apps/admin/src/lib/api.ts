@@ -1255,6 +1255,9 @@ const giftCardItemSchema = z.object({
   status: z.string(),
   expiresAt: z.string().nullable(),
   buyer: z.string().nullable(),
+  /* Required, never `.default(null)`: a field the API stops sending must fail the parse loudly. */
+  buyerReference: z.string().nullable(),
+  buyerActive: z.boolean(),
 });
 
 export type GiftCardItem = z.infer<typeof giftCardItemSchema>;

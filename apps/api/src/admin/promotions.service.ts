@@ -85,6 +85,8 @@ export class PromotionsService {
         status: string;
         expires_at: string | null;
         buyer: string | null;
+        buyer_reference: string | null;
+        buyer_active: boolean;
         recipient: string | null;
         created_at: string;
       }>(sql`
@@ -111,6 +113,10 @@ export class PromotionsService {
              END                      AS status,
              to_char(g.expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS expires_at,
              c.full_name              AS buyer,
+             c.reference              AS buyer_reference,
+             -- Whether that buyer still has a record to open: العملاء filters deleted profiles
+             -- out, so a link to one answers 404. Same lesson المحفظة learned by clicking a row.
+             (c.id IS NOT NULL AND c.deleted_at IS NULL) AS buyer_active,
              g.recipient_name         AS recipient,
              to_char(g.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
                AS created_at
@@ -131,6 +137,13 @@ export class PromotionsService {
         status: row.status,
         expiresAt: row.expires_at,
         buyer: row.buyer ?? row.recipient,
+        /*
+          Only a real BUYER gets a reference. `buyer` falls back to the recipient's name for a card
+          nobody bought, and that name belongs to no customer record — linking it would open
+          somebody else's, or nothing.
+        */
+        buyerReference: row.buyer_reference,
+        buyerActive: row.buyer_active,
       })),
       total,
       query,
