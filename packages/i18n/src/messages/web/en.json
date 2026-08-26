@@ -517,6 +517,12 @@
     "voucherOpen": "Open voucher (PDF)",
     "voucherHint": "It carries a QR code for verification on arrival."
   },
+  "ads": {
+    "title": "Nearby, from our partners",
+    "label": "Partner ad",
+    "note": "Paid placements from partners in the same city — they never affect search ranking.",
+    "visit": "Visit site"
+  },
   "reviews": {
     "title": "Review your stay",
     "prompt": "You stayed at {property}. Tell other travellers how it went.",

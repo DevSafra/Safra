@@ -225,3 +225,49 @@ export async function searchSafely(
     };
   }
 }
+
+// ─── Partner advertising (§9.3) ──────────────────────────────────────────────
+
+const deliveredAdSchema = z.object({
+  reference: z.string(),
+  headline: z.string(),
+  advertiser: z.string(),
+  kind: z.string(),
+  /** The CLICK path on SAFRA — never the advertiser's own URL. See `AdDeliveryService`. */
+  clickPath: z.string(),
+  imagePath: z.string().nullable(),
+});
+
+const deliveredAdsSchema = z.object({ items: z.array(deliveredAdSchema) });
+
+export type DeliveredAdItem = z.infer<typeof deliveredAdSchema>;
+
+/**
+ * The live partner ads for one city, in the reader's language.
+ *
+ * ## Never cached, and never fatal
+ *
+ * Not cached because the API counts an IMPRESSION from what it actually returned: a cached response
+ * would bill an advertiser for one view and serve it a hundred times, and could keep serving a
+ * campaign whose window closed minutes ago. `revalidate: false` is the honest setting for a
+ * response whose side effect is the measurement.
+ *
+ * Never fatal because an ad is the least important thing on any page that carries one. A refusal, a
+ * timeout or a malformed body all resolve to an empty slate, which renders as nothing at all — the
+ * page the customer came for is unaffected.
+ */
+export async function getCityAds(
+  citySlug: string,
+  locale: string,
+): Promise<DeliveredAdItem[]> {
+  try {
+    const result = await apiFetch('/ads', deliveredAdsSchema, {
+      revalidate: false,
+      searchParams: { citySlug, locale },
+    });
+
+    return result.items;
+  } catch {
+    return [];
+  }
+}

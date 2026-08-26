@@ -517,6 +517,12 @@
     "voucherOpen": "Voucher öffnen (PDF)",
     "voucherHint": "Enthält einen QR-Code zur Prüfung bei der Ankunft."
   },
+  "ads": {
+    "title": "In der Nähe, von unseren Partnern",
+    "label": "Partneranzeige",
+    "note": "Bezahlte Platzierungen von Partnern in derselben Stadt — sie beeinflussen das Suchranking nicht.",
+    "visit": "Website besuchen"
+  },
   "reviews": {
     "title": "Bewerten Sie Ihren Aufenthalt",
     "prompt": "Sie waren in {property}. Berichten Sie anderen Reisenden davon.",

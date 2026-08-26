@@ -168,6 +168,8 @@ describe('routes a browser navigates to', () => {
       'partner/api/auth/logout',
       'partner/api/contracts/*/file',
       'web/account/invoices/*/pdf',
+      /* §9.3's ad click — a plain `<a href>`, so what it answers is what a customer LOOKS at. */
+      'web/api/ads/*/click',
       /* §6.5's voucher — an `<a href>`, so every failure path redirects rather than answering. */
       'web/api/bookings/*/voucher',
       'web/currency',

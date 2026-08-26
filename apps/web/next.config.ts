@@ -64,6 +64,22 @@ const config: NextConfig = {
           },
         ],
       },
+      /**
+       * The ad click redirect sends NO referrer, overriding the rule above.
+       *
+       * `strict-origin-when-cross-origin` still hands the advertiser `https://safra.sy` on the way
+       * out. Which city a customer was browsing — and that they were on SAFRA at all — is ours, not
+       * theirs, and this is the one route whose whole purpose is to hand a browser to somebody else.
+       *
+       * Set HERE rather than on the route's own response: a `headers()` rule wins over a header a
+       * route handler sets, which is how the handler's own `no-referrer` came back as the global
+       * value when this was driven in a browser. Listed after the catch-all because the last
+       * matching rule for a key is the one that applies.
+       */
+      {
+        source: '/:locale/api/ads/:reference/click',
+        headers: [{ key: 'Referrer-Policy', value: 'no-referrer' }],
+      },
     ]);
   },
 };

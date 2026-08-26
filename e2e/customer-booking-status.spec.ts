@@ -198,5 +198,109 @@ test.describe('حجوزاتي', () => {
     expect(answers[0]!.body).toBe(answers[1]!.body);
     /* And neither leaks a figure from the booking that does exist. */
     expect(answers[0]!.body).not.toMatch(/\d+\.\d{2}/);
+
+    // ─── §9.3 — «إعلان شريك», on the booking's own page ───────────────────────
+    /*
+      Driven from THIS session for the same reason as the voucher: a sign-in is budgeted here and
+      this screen is already open in front of one.
+
+      ## A biconditional again, over the two cities this customer booked in
+
+      The block appears where the city HAS a live campaign and is absent where it does not, and
+      both halves are exercised or the test says so. «An ad slot renders» is also true of a slot
+      that renders on every page, including the ones with nothing to show — which is the shape that
+      would put an empty labelled box under a booking in a city with no advertisers.
+
+      The two states are found by asking the API which cities have live ads rather than by naming
+      one, so this does not depend on what a previous spec happened to create.
+    */
+    const withAds: string[] = [];
+    const withoutAds: string[] = [];
+
+    await page.goto('/ar/account/bookings');
+
+    const bookingLinks = await page
+      .locator('ul a[href*="/account/bookings/"]')
+      .evaluateAll((nodes) => nodes.map((node) => (node as HTMLAnchorElement).href));
+
+    for (const href of bookingLinks) {
+      await page.goto(href);
+
+      const slot = page.getByRole('region', { name: ar.ads.title });
+
+      if ((await slot.count()) > 0) {
+        withAds.push(href);
+
+        /* Labelled — every card, not the block. A reader who stops at the headline was told. */
+        const cards = slot.locator('li');
+        const labels = slot.getByText(ar.ads.label);
+
+        await expect(labels).toHaveCount(await cards.count());
+
+        /*
+          And every link is OURS. The href is this app's own click route: the API's `clickPath` is
+          on the API's origin, which this browser never reaches, and the advertiser's URL must
+          never be in the page at all.
+        */
+        for (const link of await slot
+          .locator('a')
+          .evaluateAll((nodes) =>
+            nodes.map((node) => (node as HTMLAnchorElement).getAttribute('href') ?? ''),
+          )) {
+          expect(link, 'an ad link goes through SAFRA').toMatch(
+            /^\/ar\/api\/ads\/ADS-\d+\/click$/,
+          );
+        }
+
+        /*
+          And the advertiser's own URL is nowhere in the block.
+
+          Scoped to the SLOT and to `href`/`src` attributes. The first version of this read the
+          whole `<main>` for any absolute URL and failed on `xmlns="http://www.w3.org/2000/svg"` in
+          the theme toggle — a true match for a regex that was asking the wrong question.
+        */
+        expect(
+          (await slot.innerHTML()).match(/(?:href|src)="https?:\/\/[^"]*"/g) ?? [],
+          'the destination is not in the page source',
+        ).toStrictEqual([]);
+
+        /*
+          Following one, without following it.
+
+          `maxRedirects: 0` so the `Location` can be READ. Three things have to be true of it at
+          once and each was wrong at some point while this was built: the redirect leaves SAFRA
+          (the link is not a dead route on this origin), it carries `no-referrer` (the app-wide
+          `strict-origin-when-cross-origin` would hand the advertiser our domain), and the response
+          is a redirect at all rather than a JSON body.
+        */
+        const first = await slot.locator('a').first().getAttribute('href');
+        const hop = await page.request.get(first!, { maxRedirects: 0 });
+
+        expect(hop.status(), 'a click is a redirect').toBe(302);
+        expect(hop.headers()['referrer-policy'], 'the advertiser learns nothing').toBe(
+          'no-referrer',
+        );
+        expect(hop.headers()['location'], 'and it leaves SAFRA').toMatch(/^https?:\/\//);
+        expect(hop.headers()['location']).not.toContain('localhost:3000');
+      } else {
+        withoutAds.push(href);
+      }
+    }
+
+    expect(
+      withAds.length + withoutAds.length,
+      'the sweep actually visited bookings',
+    ).toBeGreaterThan(0);
+
+    /*
+      Said rather than skipped silently.
+
+      With no live campaign in any city this customer booked in, the loop above proves only the
+      absence half — which is worth knowing, and worth not mistaking for coverage.
+    */
+    test.info().annotations.push({
+      type: 'ad slots',
+      description: `${withAds.length} booking(s) carried ads, ${withoutAds.length} did not.`,
+    });
   });
 });

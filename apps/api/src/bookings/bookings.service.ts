@@ -158,6 +158,15 @@ export class BookingsService {
       with: {
         property: { columns: { nameAr: true, nameEn: true, nameDe: true } },
         unit: { columns: { nameAr: true, nameEn: true, nameDe: true } },
+        /*
+          The city SLUG, so the booking's own page can carry the city's partner ads.
+
+          §9.3 places advertising «حسب مدينة حجز العميل» — a customer who booked in Damascus is
+          shown Damascus restaurants — and a screen cannot ask for that without knowing which city
+          the booking is in. The slug is a public identifier: `/city/damascus` is a page anybody can
+          open, so it adds no reach to a caller already scoped to this booking.
+        */
+        city: { columns: { slug: true } },
       },
     });
 

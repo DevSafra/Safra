@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 
 import { AccountShell } from '@/components/account-shell';
 import { BackLink } from '@/components/back-link';
+import { PartnerAds } from '@/components/partner-ads';
 import { DateRange } from '@/components/date-range';
 import { StatusPill, customerBookingStatus } from '@/components/booking-status-pill';
 import { getAccountSummary, getMyBooking } from '@/lib/account';
@@ -196,6 +197,23 @@ export default async function BookingDetailPage({
           <p className="mt-1 text-xs text-muted">{t('voucherHint')}</p>
         </div>
       ) : null}
+
+      {/*
+        §9.3 — «موجَّهة حسب مدينة حجز العميل … وتظهر داخل صفحة الحجز».
+
+        BELOW the booking's own facts and the voucher, never above them: this screen exists to
+        answer «where am I staying and what do I show at the desk», and an advertisement placed
+        before that answer would be selling to somebody who came here for something else.
+
+        The holding page at `/booking/[reference]` deliberately carries none. It performs no lookup
+        — a reference alone must never reveal a booking — so it has no city to target by, and
+        taking one from the query string would put a caller-chosen parameter behind an impression
+        somebody is billed for.
+
+        `booking.city` can legitimately be absent if the API stops sending it; the slot then simply
+        does not render.
+      */}
+      {booking.city ? <PartnerAds citySlug={booking.city.slug} locale={locale} /> : null}
 
       <div className="mt-8">
         <BackLink href={back} locale={locale} />

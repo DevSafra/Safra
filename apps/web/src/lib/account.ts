@@ -158,6 +158,15 @@ const bookingDetailSchema = z.object({
   guestsChildren: z.number().nullable().optional(),
   guestsInfants: z.number().nullable().optional(),
   totalAmount: z.string(),
+  /*
+    Where the stay is, as the city's public slug — for the partner ads §9.3 targets by city.
+
+    An OBJECT rather than a bare string, because that is the shape the API's relation returns, and
+    `.nullable()` rather than `.default()`: a booking's city is `NOT NULL` in the database, so a
+    missing one means the API stopped sending it, and a default would invent a plausible city
+    instead of showing no ads. See «A zod .default() hides a missing field».
+  */
+  city: z.object({ slug: z.string() }).nullable().optional(),
   confirmationDeadlineAt: z
     .union([z.string(), z.date(), z.null()])
     .optional()
