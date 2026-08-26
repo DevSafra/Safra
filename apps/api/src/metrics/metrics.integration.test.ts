@@ -234,6 +234,94 @@ describeIfDb('MetricsService', () => {
     });
   });
 
+  /**
+   * FX — the rates every cross-currency wallet movement depends on.
+   *
+   * A wallet holds one currency forever, so a credit arriving in another converts through SYP.
+   * With no rate the conversion REFUSES, which is the right behaviour and precisely why the
+   * absence needs a signal that is not an exception thrown at whoever happened to try. On
+   * 2026-08-26 three of five active currencies had no rate and nothing reported it.
+   */
+  describe('fx rates', () => {
+    const AGE = 'safra_fx_rate_age_seconds';
+    const MISSING = 'safra_fx_currencies_without_rate';
+
+    const syp = sql`(SELECT id FROM currencies WHERE code = 'SYP')`;
+
+    beforeEach(async () => {
+      await db.execute(sql`DELETE FROM fx_rates WHERE quote_currency_id = ${syp}`);
+    });
+
+    const rate = (code: string, hoursAgo: number) =>
+      db.execute(sql`
+        INSERT INTO fx_rates (base_currency_id, quote_currency_id, rate, effective_from, source)
+        SELECT c.id, ${syp}, '13000.00000000',
+               now() - (${hoursAgo} * interval '1 hour'), 'test'
+        FROM currencies c WHERE c.code = ${code}
+      `);
+
+    /**
+     * The assertion this gauge exists for.
+     *
+     * -1 rather than an omitted series: a currency the platform cannot convert must not look like
+     * a scrape that did not run. This was the live state for EUR, JOD and LBP.
+     */
+    it('reports -1 for a currency holding no rate at all', async () => {
+      const metrics = await scrape();
+
+      expect(metrics[`${AGE}{currency="EUR"}`]).toBe(-1);
+      expect(metrics[`${AGE}{currency="USD"}`]).toBe(-1);
+    });
+
+    it('reports the age once a rate exists', async () => {
+      await rate('USD', 3);
+
+      const metrics = await scrape();
+
+      const age = metrics[`${AGE}{currency="USD"}`] ?? 0;
+
+      /* Three hours, give or take the clock — and emphatically not -1. */
+      expect(age).toBeGreaterThan(3 * 3600 - 120);
+      expect(age).toBeLessThan(3 * 3600 + 120);
+    });
+
+    /** The count is what an alert reads, so it moves with the rates rather than being restated. */
+    it('counts the currencies that cannot be converted', async () => {
+      const before = (await scrape())[MISSING] ?? 0;
+
+      expect(
+        before,
+        'every active currency but SYP is missing a rate here',
+      ).toBeGreaterThan(0);
+
+      await rate('USD', 1);
+
+      expect((await scrape())[MISSING]).toBe(before - 1);
+    });
+
+    /**
+     * SYP is never reported, and that is deliberate.
+     *
+     * It is the quote currency. A SYP→SYP rate is not something anybody configures, so a series
+     * for it would sit at -1 for ever — and an alert that can never be cleared is one somebody
+     * mutes, taking the currencies that CAN be fixed with it.
+     */
+    it('does not ask for a rate from SYP to itself', async () => {
+      const metrics = await scrape();
+
+      expect(metrics[`${AGE}{currency="SYP"}`]).toBeUndefined();
+    });
+
+    /** A rate that has not taken effect yet is not a rate you can price with. */
+    it('ignores a rate dated in the future', async () => {
+      await rate('USD', -48);
+
+      const metrics = await scrape();
+
+      expect(metrics[`${AGE}{currency="USD"}`]).toBe(-1);
+    });
+  });
+
   describe('sanctions', () => {
     const AGE = 'safra_sanctions_snapshot_age_seconds';
 

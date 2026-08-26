@@ -105,21 +105,31 @@ export class MetricsService {
   }
 
   private async collect(): Promise<Gauge[]> {
-    const [jobs, notifications, sanctions, webhooks, sla, deadLetters, imagePipeline] =
-      await Promise.all([
-        this.jobs(),
-        this.notifications(),
-        this.sanctions(),
-        this.webhooks(),
-        this.sla(),
-        this.deadLetters(),
-        this.imagePipeline(),
-      ]);
+    const [
+      jobs,
+      notifications,
+      sanctions,
+      fx,
+      webhooks,
+      sla,
+      deadLetters,
+      imagePipeline,
+    ] = await Promise.all([
+      this.jobs(),
+      this.notifications(),
+      this.sanctions(),
+      this.fx(),
+      this.webhooks(),
+      this.sla(),
+      this.deadLetters(),
+      this.imagePipeline(),
+    ]);
 
     return [
       ...jobs,
       ...notifications,
       ...sanctions,
+      ...fx,
       ...webhooks,
       ...sla,
       ...deadLetters,
@@ -283,6 +293,65 @@ export class MetricsService {
         name: 'safra_sanctions_snapshot_age_seconds',
         help: 'Seconds since this sanctions source was last fetched. -1 means never.',
         samples,
+      },
+    ];
+  }
+
+  /**
+   * The FX rates every cross-currency movement depends on — how old, and how many are missing.
+   *
+   * ## Why this exists at all
+   *
+   * `FxRateService` already refuses to price on a rate it does not have, rather than defaulting to
+   * 1 — which is right, and which is exactly why the absence has to be visible somewhere other
+   * than an exception. On 2026-08-26 three of the five active currencies had NO rate to SYP and
+   * the fourth was fifteen days old, and nothing anywhere reported that: the only signal was a
+   * throttled log line and a 503 reaching whoever happened to try.
+   *
+   * A wallet is denominated in one currency forever, so a credit arriving in another is converted
+   * through SYP. No rate means the conversion refuses, which means a compensation, a refund to a
+   * wallet, or a gift card redeemed across currencies cannot complete. 512 of the 11,801 wallets
+   * are EUR, and EUR is one of the three.
+   *
+   * ## `-1` for a currency with no rate, never an omitted series
+   *
+   * The same argument the sanctions gauge makes above: an absent series is indistinguishable from
+   * a failed scrape, and "we hold no rate for this currency at all" must not look like a
+   * monitoring outage. Every ACTIVE currency reports, whether or not a rate exists.
+   *
+   * SYP itself is excluded — it is the quote currency, and a SYP→SYP rate is not a thing anybody
+   * configures. Including it would report a permanent -1 that nobody can ever clear, which is how
+   * an alert gets muted and stays muted.
+   */
+  private async fx(): Promise<Gauge[]> {
+    const rows = await this.db.execute<{ currency: string; age: string | null }>(sql`
+      SELECT c.code AS currency,
+             EXTRACT(EPOCH FROM (now() - max(f.effective_from)))::text AS age
+      FROM currencies c
+      LEFT JOIN fx_rates f
+        ON f.base_currency_id = c.id
+       AND f.quote_currency_id = (SELECT id FROM currencies WHERE code = 'SYP')
+       AND f.effective_from <= now()
+      WHERE c.is_active AND c.code <> 'SYP'
+      GROUP BY c.code
+      ORDER BY c.code
+    `);
+
+    const samples = rows.rows.map((row) => ({
+      labels: { currency: row.currency },
+      value: row.age === null ? -1 : Number(row.age),
+    }));
+
+    return [
+      {
+        name: 'safra_fx_rate_age_seconds',
+        help: 'Seconds since this currency\u2019s rate to SYP took effect. -1 means no rate exists.',
+        samples,
+      },
+      {
+        name: 'safra_fx_currencies_without_rate',
+        help: 'Active currencies, SYP excluded, holding no rate to SYP. Every conversion into or out of one of these refuses.',
+        samples: [{ labels: {}, value: samples.filter((s) => s.value === -1).length }],
       },
     ];
   }
@@ -517,11 +586,21 @@ function render(gauges: readonly Gauge[]): string {
     lines.push(`# TYPE ${gauge.name} gauge`);
 
     for (const sample of gauge.samples) {
-      const labels = sample.labels
-        ? `{${Object.entries(sample.labels)
-            .map(([key, value]) => `${key}="${escapeLabel(value)}"`)
-            .join(',')}}`
-        : '';
+      /*
+        No braces at all when there are no labels.
+
+        `{}` is legal exposition and every strict parser accepts it, but the canonical form is the
+        bare name, and it is what a series keyed by name in a query or a test actually matches.
+        Four gauges here already passed an empty object and rendered `safra_images_processing{} 3`
+        while `safra_metrics_collection_seconds` rendered bare — same table, two spellings.
+        Prometheus treats them as the SAME series, so this changes no dashboard.
+      */
+      const pairs = Object.entries(sample.labels ?? {});
+
+      const labels =
+        pairs.length > 0
+          ? `{${pairs.map(([key, value]) => `${key}="${escapeLabel(value)}"`).join(',')}}`
+          : '';
 
       lines.push(`${gauge.name}${labels} ${sample.value}`);
     }
