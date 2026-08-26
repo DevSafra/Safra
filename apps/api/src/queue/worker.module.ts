@@ -16,6 +16,7 @@ import { ScheduledProcessor } from './scheduled.processor.js';
 import { ScheduledRegistrar } from './scheduled.registrar.js';
 import { ExportProcessor } from './export.processor.js';
 import { AdminModule } from '../admin/admin.module.js';
+import { GiftCardModule } from '../gift-cards/gift-card.module.js';
 
 /**
  * The worker side of every queue, resolvable from `AppModule`.
@@ -55,6 +56,8 @@ import { AdminModule } from '../admin/admin.module.js';
     AuthModule,
     /* For `BookingExportService` — the one query that decides what an export contains. */
     AdminModule,
+    /* For `GiftCardExpiryService` — the hourly pass that retires cards past their expiry. */
+    GiftCardModule,
   ],
   /*
     `ImageService` and `StorageService` are deliberately ABSENT.

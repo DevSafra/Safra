@@ -111,6 +111,8 @@ describeIfReady('the scheduled queue', () => {
       { run: () => stub('notification-redrive').run() } as never,
       /* §6.4's refund sweep — records through `JobRunService` like the rest of them. */
       { sweep: () => stub('system-refunds').run() } as never,
+      /* The hourly pass that retires gift cards past their expiry. */
+      { sweep: () => stub('gift-card-expiry').run() } as never,
       runs,
       new DeadLetterService(db),
     );

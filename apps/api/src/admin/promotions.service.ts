@@ -92,7 +92,23 @@ export class PromotionsService {
              g.original_amount::text  AS original_amount,
              g.remaining_amount::text AS remaining_amount,
              cur.code                 AS currency,
-             g.status::text           AS status,
+             -- The EFFECTIVE status, not only the stored one.
+             --
+             -- gift-card-expiry retires cards hourly, so the column is right within the hour —
+             -- and "within the hour" is a window where بطاقات الهدايا says «نشطة» about a card
+             -- redemption will refuse, which is this defect at a smaller size. The screen must
+             -- never lie; the sweep is what makes the COLUMN right for everything that queries it
+             -- without knowing to compensate. Same shape as contractTone on الشركاء, where the
+             -- calendar overrules the column.
+             --
+             -- No backticks in here: they terminate the sql template. Documented trap.
+             CASE
+               WHEN g.status = 'active'
+                 AND g.expires_at IS NOT NULL
+                 AND g.expires_at <= now()
+               THEN 'expired'
+               ELSE g.status::text
+             END                      AS status,
              to_char(g.expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS expires_at,
              c.full_name              AS buyer,
              g.recipient_name         AS recipient,

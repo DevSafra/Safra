@@ -51,6 +51,14 @@ export const SCHEDULED_JOBS = {
   'credential-retention': '30 3 * * *',
   'sanctions-refresh': '0 4 * * *',
   /**
+   * Retiring gift cards whose expiry has passed — `expired` had no writer at all.
+   *
+   * Hourly, because a card expires at an INSTANT: daily would leave a window of up to a day where
+   * بطاقات الهدايا says «نشطة» and redemption refuses, which is the defect at a smaller size. At
+   * :45 so it does not land on the hour with `payout-accrual` and `booking-sla-sweep`.
+   */
+  'gift-card-expiry': '45 * * * *',
+  /**
    * Re-driving notifications whose jobs were lost — the recovery half of `O-notify-2`.
    *
    * Five minutes, which is the only cadence here that was chosen rather than inherited. A notice

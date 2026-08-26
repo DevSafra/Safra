@@ -5,6 +5,8 @@ import { AuthModule } from '../auth/auth.module.js';
 import { WalletModule } from '../wallet/wallet.module.js';
 import { GiftCardController } from './gift-card.controller.js';
 import { GiftCardService } from './gift-card.service.js';
+import { GiftCardExpiryService } from './gift-card-expiry.service.js';
+import { JobRunService } from '../common/jobs/job-run.service.js';
 
 /**
  * بطاقات الهدايا (handoff §6).
@@ -21,6 +23,8 @@ import { GiftCardService } from './gift-card.service.js';
 @Module({
   imports: [WalletModule, AuthModule],
   controllers: [GiftCardController],
-  providers: [GiftCardService, AuditService],
+  providers: [GiftCardService, GiftCardExpiryService, AuditService, JobRunService],
+  /* `GiftCardExpiryService` is driven by `ScheduledProcessor`; see `scheduled.job.ts`. */
+  exports: [GiftCardService, GiftCardExpiryService],
 })
 export class GiftCardModule {}
