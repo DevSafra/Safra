@@ -30,7 +30,17 @@ import { CouponActiveToggle } from '@/components/coupon-active-toggle';
 export const dynamic = 'force-dynamic';
 
 /** The design's `grid-template-columns`, verbatim. */
-const TEMPLATE = '1fr .9fr .7fr .9fr .9fr 1.1fr .8fr';
+/*
+  EIGHT tracks for eight columns.
+
+  This had seven while the table had eight — I added «إجراء» and did not widen it, so the last
+  column fell onto an implicit `auto` track and took whatever its content wanted. That is most of
+  where the horizontal scrollbar came from.
+
+  The date column is the narrowest it can be because its two dates now STACK; everything else is
+  sized to its content rather than to a guess.
+*/
+const TEMPLATE = '.9fr .8fr .7fr .8fr .7fr .8fr .8fr .7fr';
 
 export default async function CouponsPage({
   searchParams,
@@ -90,7 +100,7 @@ export default async function CouponsPage({
               rows={result.items}
               template={TEMPLATE}
               rowKey={(row) => row.code}
-              minWidth={760}
+              minWidth={680}
               empty={t.table.empty}
             />
             <TablePagination
@@ -166,10 +176,18 @@ const COLUMNS: readonly AdminColumn<CouponItem>[] = [
   {
     key: 'period',
     header: t.sections.coupons.colPeriod,
+    /*
+      The two dates STACK rather than sitting on one line.
+
+      `2026-08-27 ← 2026-09-26` with `whitespace-nowrap` is the widest cell in the table by a long
+      way, and it was forcing the whole grid past the panel. Stacked, the column needs about half
+      the width and each date is still read as a date.
+    */
     render: (row) => (
-      <Ltr className="whitespace-nowrap text-muted">
-        {shortDate(row.startsAt)} ← {shortDate(row.endsAt)}
-      </Ltr>
+      <div className="grid gap-0.5">
+        <Ltr className="text-muted">{shortDate(row.startsAt)}</Ltr>
+        <Ltr className="text-[10.5px] text-faint">{shortDate(row.endsAt)}</Ltr>
+      </div>
     ),
   },
   {

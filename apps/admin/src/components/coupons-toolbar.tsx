@@ -140,12 +140,19 @@ export function CouponsToolbar({
         <label className={labelled}>
           {c.fCode}
           {/* No `dir` — a field follows the page's direction; the bidi algorithm lays out Latin. */}
+          {/*
+            The rule reads inside the LABEL, in parentheses (Bashar, 2026-08-27).
+
+            It was a separate line under the field, which put it below the thing it constrains and
+            gave this row a third line nothing else in the grid had. In the label it is read before
+            the box is typed into, which is when it is useful.
+          */}
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
+            placeholder={c.fCodePlaceholder}
             className={field}
           />
-          <span className="font-normal text-faint">{c.fCodeHint}</span>
         </label>
 
         <label className={labelled}>

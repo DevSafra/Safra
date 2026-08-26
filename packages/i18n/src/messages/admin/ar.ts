@@ -1066,8 +1066,8 @@ export const ar = {
       create: '+ كوبون جديد',
       /* ── The create form (Bashar, 2026-08-26) ────────────────────────────────────────────── */
       newTitle: 'كوبون جديد',
-      fCode: 'الكود',
-      fCodeHint: 'أحرف وأرقام فقط — يُحوَّل إلى أحرف كبيرة.',
+      fCode: 'الكود (أحرف وأرقام فقط — يُحوَّل إلى أحرف كبيرة)',
+      fCodePlaceholder: 'SAFRA20',
       fType: 'النوع',
       fValueKind: 'نوع القيمة',
       fValue: 'القيمة',

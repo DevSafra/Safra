@@ -90,4 +90,57 @@ test.describe('creating a coupon', () => {
 
     await expect(page.getByRole('button', { name: /^إنشاء الكوبون$/ })).toBeDisabled();
   });
+
+  /**
+   * All eight columns, and no scrollbar where there is room for them.
+   *
+   * The table had a SEVEN-track `grid-template-columns` for eight columns — «إجراء» was added and
+   * the template was not widened — so the last column fell onto an implicit `auto` track and took
+   * whatever it wanted. Together with a `minWidth` of 760 against a 698px box, that scrolled at
+   * 1024 and 768 as well as on a phone.
+   *
+   * Measured rather than eyeballed, at the widths the standing rule names. 390 still scrolls INSIDE
+   * its own box, deliberately: eight columns of Arabic in 320px is unreadable, not responsive — and
+   * the PAGE must never scroll sideways at any width, which is asserted separately here.
+   */
+  test('fits its columns without scrolling, down to a tablet', async ({ page }) => {
+    for (const width of [1440, 1280, 1024, 768]) {
+      await page.setViewportSize({ width, height: 950 });
+      await page.goto('/coupons');
+      await page.waitForSelector('tbody tr');
+
+      const fit = await page.evaluate(() => {
+        const box = document.querySelector('[class*="overflow-x-auto"]');
+
+        return {
+          overflows: box !== null && box.scrollWidth > box.clientWidth + 1,
+          columns: document.querySelectorAll('thead > div > *, thead th').length,
+          sideways:
+            document.documentElement.scrollWidth >
+            document.documentElement.clientWidth + 1,
+        };
+      });
+
+      expect(fit.overflows, `the table scrolls at ${width}px`).toBe(false);
+      expect(fit.sideways, `the page scrolls sideways at ${width}px`).toBe(false);
+    }
+
+    /* And nothing was dropped to achieve it: every column is still a column. */
+    await page.setViewportSize({ width: 1440, height: 950 });
+    await page.goto('/coupons');
+
+    const headers = await page.locator('thead').first().innerText();
+
+    for (const header of [
+      'الكود',
+      'النوع',
+      'الخصم',
+      'الاستخدام',
+      'الفترة',
+      'إجراء',
+      'الحالة',
+    ]) {
+      expect(headers, `«${header}» is still shown`).toContain(header);
+    }
+  });
 });
