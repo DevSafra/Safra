@@ -117,29 +117,60 @@ export function payloadEntries(
     return [];
 
   const fields = payload as Record<string, unknown>;
-  const currency = currencyOf(fields);
-  const attached =
-    currency !== null && Object.keys(fields).some((key) => MONEY_KEYS.has(key));
+
+  /*
+    Each amount takes ITS OWN currency, and only falls back to the payload's general one.
+
+    One currency for the whole payload was wrong, and confidently wrong. An SLA compensation on a
+    JOD booking paid into a USD wallet writes `fine` and `compensation` in the BOOKING's currency
+    beside `creditedAmount` in the WALLET's — the payload is built that way on purpose, and the
+    comment where it is written names the case. `creditedCurrency` sat in the general list, so it
+    was found first and stamped onto all four: «الغرامة 10.000 USD» for a fine of 10.000 JOD.
+
+    A bare number is a number nobody can act on. A number wearing the wrong currency is worse —
+    it is one somebody acts on and is wrong by whatever the two currencies differ by, which
+    between SYP and USD is four orders of magnitude.
+  */
+  const general = currencyOf(fields, GENERAL_CURRENCY_KEYS);
+  const currencyFor = (key: string): string | null =>
+    (PAIRED_CURRENCY_KEY[key] !== undefined
+      ? currencyOf(fields, [PAIRED_CURRENCY_KEY[key]])
+      : null) ?? general;
+
+  /* A currency row is dropped only where its own amount actually carried it. */
+  const consumed = new Set(
+    Object.keys(fields)
+      .filter((key) => MONEY_KEYS.has(key) && currencyFor(key) !== null)
+      .map((key) => PAIRED_CURRENCY_KEY[key] ?? '')
+      .filter((key) => key !== '' && currencyOf(fields, [key]) !== null),
+  );
+
+  if (general !== null && Object.keys(fields).some((key) => MONEY_KEYS.has(key))) {
+    for (const key of GENERAL_CURRENCY_KEYS) {
+      if (currencyOf(fields, [key]) === general) consumed.add(key);
+    }
+  }
 
   return (
     Object.entries(fields)
       /*
-      The currency's OWN row goes, once it is on the amounts.
+        The currency's OWN row goes, once it is on the amounts.
 
-      Otherwise «المبلغ 90.00 USD» is followed by «العملة USD», which is the same fact twice and
-      reads as though the two might differ. It is dropped only when it was actually attached to
-      something — a payload carrying a currency and no money key keeps its row, because there it is
-      the only place the currency appears at all.
-    */
-      .filter(([key]) => !(attached && CURRENCY_KEYS.includes(key)))
-      .map(([key, value]) => ({
-        key,
-        label: t.enums.payloadKey[key] ?? key,
-        value:
-          currency && MONEY_KEYS.has(key)
-            ? `${payloadValue(value)} ${currency}`
-            : payloadValue(value),
-      }))
+        Otherwise «المبلغ 90.00 USD» is followed by «العملة USD», which is the same fact twice and
+        reads as though the two might differ. It is dropped only when it was actually attached to
+        something — a payload carrying a currency and no money key keeps its row, because there it
+        is the only place the currency appears at all.
+      */
+      .filter(([key]) => !consumed.has(key))
+      .map(([key, value]) => {
+        const currency = MONEY_KEYS.has(key) ? currencyFor(key) : null;
+
+        return {
+          key,
+          label: t.enums.payloadKey[key] ?? key,
+          value: currency ? `${payloadValue(value)} ${currency}` : payloadValue(value),
+        };
+      })
   );
 }
 
@@ -195,10 +226,36 @@ const MONEY_KEYS = new Set([
  * is no backfilling it. Those render exactly as they do today, which is the honest outcome: an
  * amount whose currency was never recorded must not be shown wearing a guess.
  */
-const CURRENCY_KEYS = ['currency', 'currencyCode', 'creditedCurrency'];
+/**
+ * The currency a payload states for its amounts GENERALLY — the booking's, the payment's.
+ *
+ * `creditedCurrency` used to be in here and that was the leak: it is the WALLET's currency, which
+ * on a cross-currency compensation is not the currency of the fine or the compensation sitting
+ * beside it in the same payload. It is paired below instead, so it reaches its own amount and
+ * nothing else.
+ */
+const GENERAL_CURRENCY_KEYS = ['currency', 'currencyCode'];
 
-function currencyOf(fields: Record<string, unknown>): string | null {
-  for (const key of CURRENCY_KEYS) {
+/**
+ * Amounts that state their own currency, and the key each one states it in.
+ *
+ * These exist because a single payload legitimately holds money in two currencies — what a staff
+ * member asked for against what the wallet took, what a booking was priced at against what landed
+ * in a differently denominated balance. Where a pair exists it WINS over the general currency; a
+ * money key with neither renders bare, which is the old behaviour rather than a wrong one.
+ */
+const PAIRED_CURRENCY_KEY: Record<string, string | undefined> = {
+  creditedAmount: 'creditedCurrency',
+  requestedAmount: 'requestedCurrency',
+  compensationAmount: 'compensationCurrency',
+  walletBalance: 'walletCurrency',
+};
+
+function currencyOf(
+  fields: Record<string, unknown>,
+  keys: readonly string[],
+): string | null {
+  for (const key of keys) {
     const value = fields[key];
 
     /* Three letters, upper case — an ISO code and not a name, a symbol or an id. */

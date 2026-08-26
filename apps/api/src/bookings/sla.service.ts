@@ -483,9 +483,18 @@ export class SlaService {
             occurrence,
             fine: fineAmount,
             compensation,
+            /*
+              The BOOKING's currency, for the two figures above it.
+
+              Without this they rendered bare, or — before the payload renderer paired each amount
+              with its own currency — wearing `creditedCurrency`, which is the WALLET's. «الغرامة
+              10.000 USD» for a fine of 10.000 JOD is not a smaller version of the right answer.
+            */
+            currency: booking.currency_code,
             creditedAmount: movement.appliedAmount,
             creditedCurrency: movement.currencyCode,
             walletBalance: movement.balance,
+            walletCurrency: movement.currencyCode,
           };
 
           await tx.execute(sql`

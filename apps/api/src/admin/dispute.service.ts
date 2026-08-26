@@ -10,7 +10,7 @@ import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
-import { WalletService } from '../wallet/wallet.service.js';
+import { WalletService, type WalletMovementResult } from '../wallet/wallet.service.js';
 import { canTransition, type BookingStatus } from '../bookings/booking-state.js';
 import { redactIncomingMessage } from '../messaging/redaction.js';
 
@@ -384,6 +384,9 @@ export class DisputeService {
       ? await this.currencyIdOf(input.compensationCurrency)
       : null;
 
+    /* What actually landed, for the audit row — see where it is recorded. */
+    let credited: WalletMovementResult | null = null;
+
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
         UPDATE disputes
@@ -413,7 +416,7 @@ export class DisputeService {
           own `tx`, so it nests as a SAVEPOINT and the credit still commits or rolls back with the
           resolution.
         */
-        await this.wallet.credit(tx as unknown as Database, {
+        credited = await this.wallet.credit(tx as unknown as Database, {
           customerProfileId: dispute.customer_profile_id,
           amount: input.compensationAmount,
           currencyId,
@@ -435,6 +438,16 @@ export class DisputeService {
             status: input.outcome,
             compensationAmount: input.compensationAmount ?? null,
             compensationCurrency: input.compensationCurrency ?? null,
+            /*
+              What the wallet actually took, beside what was decided.
+
+              They differ whenever the customer's wallet is denominated in another currency —
+              10.00 USD becomes 9.29 EUR — and a record holding only the decision cannot answer
+              the question a customer asks, which is why their balance moved by that number. The
+              same pairing `sla.service.ts` writes on the timeline, for the same reason.
+            */
+            creditedAmount: credited?.appliedAmount ?? null,
+            creditedCurrency: credited?.currencyCode ?? null,
           },
           reason: input.resolution,
         },

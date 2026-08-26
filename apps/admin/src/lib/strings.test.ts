@@ -56,6 +56,123 @@ describe('payloadEntries', () => {
    * 200 of. On this platform that is not pedantry — SYP and USD differ by four orders of magnitude,
    * which is the same reason `bookingCompensationSchema` refuses an amount without one.
    */
+  /**
+   * Each amount takes its OWN currency when the payload states two.
+   *
+   * The defect this replaces was confidently wrong rather than merely missing. An SLA compensation
+   * on a JOD booking paid into a USD wallet writes the fine and the compensation in the booking's
+   * currency beside `creditedAmount` in the wallet's — deliberately, and the service comment says
+   * so. `creditedCurrency` was in the general currency list, so it was found first and stamped on
+   * all four: «الغرامة 10.000 USD» for a fine of 10.000 JOD.
+   *
+   * Watched to fail against the payload AS IT WAS WRITTEN — no general `currency` key at all, which
+   * is what made `creditedCurrency` the only candidate. Restoring it to the general list turns
+   * `fine` into `10.000 USD` in the case below, and the service now writes the booking's currency
+   * so the paired case above it stays honest too.
+   */
+  it('never puts the wallet’s currency on the booking’s amounts', () => {
+    const entries = payloadEntries({
+      occurrence: 1,
+      fine: '10.000',
+      compensation: '10.000',
+      currency: 'JOD',
+      creditedAmount: '14.46',
+      creditedCurrency: 'USD',
+      walletBalance: '24.46',
+      walletCurrency: 'USD',
+    });
+
+    const value = (key: string): string =>
+      entries.find((entry) => entry.key === key)?.value ?? '';
+
+    /* The booking's own figures, in the booking's currency. */
+    expect(
+      value('fine'),
+      'the fine is what the PARTNER owes, in the booking currency',
+    ).toBe('10.000 JOD');
+    expect(value('compensation')).toBe('10.000 JOD');
+
+    /* And the wallet's figures in the wallet's. */
+    expect(value('creditedAmount'), 'what actually landed, in the wallet currency').toBe(
+      '14.46 USD',
+    );
+    expect(value('walletBalance')).toBe('24.46 USD');
+
+    /* Every currency row was attached to something, so none of them is repeated as its own row. */
+    for (const key of ['currency', 'creditedCurrency', 'walletCurrency']) {
+      expect(
+        entries.some((entry) => entry.key === key),
+        `«${key}» is on the amounts, so it does not also get a row`,
+      ).toBe(false);
+    }
+  });
+
+  /**
+   * The payload exactly as `sla.service.ts` used to write it — no general currency.
+   *
+   * This is the shape that shipped. With nothing but `creditedCurrency` in the payload, a general
+   * lookup finds it and stamps the WALLET's currency onto the partner's fine. The service now
+   * writes `currency` as well, and this case pins the renderer's half: given no currency it can
+   * trust for these two, it must print them bare rather than reach for the wallet's.
+   */
+  it('does not reach for the wallet currency when the booking states none', () => {
+    const entries = payloadEntries({
+      occurrence: 1,
+      fine: '10.000',
+      compensation: '10.000',
+      creditedAmount: '14.46',
+      creditedCurrency: 'USD',
+      walletBalance: '24.46',
+    });
+
+    const value = (key: string): string =>
+      entries.find((entry) => entry.key === key)?.value ?? '';
+
+    expect(value('fine'), 'a JOD fine must never read as USD').toBe('10.000');
+    expect(value('compensation')).toBe('10.000');
+    /* Its own pair still reaches it. */
+    expect(value('creditedAmount')).toBe('14.46 USD');
+  });
+
+  /**
+   * A staff adjustment states what was asked and what was applied, and they can differ.
+   *
+   * `requestedAmount` is what the operator typed, in the currency they chose; `appliedAmount` and
+   * `balance` are the wallet's. The pairing has to hold here too, or an adjustment reads as though
+   * SAFRA moved a different number than it did.
+   */
+  it('separates what was requested from what the wallet took', () => {
+    const entries = payloadEntries({
+      balance: '109.29',
+      currency: 'EUR',
+      direction: 'credit',
+      requestedAmount: '10.00',
+      requestedCurrency: 'USD',
+      appliedAmount: '9.29',
+    });
+
+    const value = (key: string): string =>
+      entries.find((entry) => entry.key === key)?.value ?? '';
+
+    expect(value('requestedAmount'), 'what the operator asked for').toBe('10.00 USD');
+    expect(value('appliedAmount'), 'what the wallet took').toBe('9.29 EUR');
+    expect(value('balance')).toBe('109.29 EUR');
+  });
+
+  /**
+   * A money key with no currency anywhere still renders bare — the old behaviour, not a new one.
+   *
+   * The point of the pairing is to stop a WRONG currency being attached. It must not start
+   * inventing one where the payload states none.
+   */
+  it('leaves an amount bare rather than borrowing an unrelated currency', () => {
+    const entries = payloadEntries({ fine: '10.000', creditedCurrency: 'USD' });
+
+    expect(entries.find((entry) => entry.key === 'fine')?.value).toBe('10.000');
+    /* And the unattached currency keeps its own row, because it is the only place it appears. */
+    expect(entries.some((entry) => entry.key === 'creditedCurrency')).toBe(true);
+  });
+
   it('puts the payload currency on a money value', () => {
     const entries = payloadEntries({
       amount: '200.00',
