@@ -18,8 +18,6 @@
  * It used to be a `nameAr` field on this interface, which put Arabic into a JSON response and gave
  * any second client nothing it could display.
  */
-import type { EmailMessages } from '@safra/i18n';
-
 export interface NotificationTemplate {
   /** Stable key, written to `notifications.template_key`. */
   readonly key: string;
@@ -32,34 +30,6 @@ export interface NotificationTemplate {
 }
 
 const ALL_LOCALES = ['ar', 'en', 'de'] as const;
-
-/**
- * Which entry in the email catalogue each template key's copy lives under.
- *
- * The two names differ and always have: `notifications.template_key` is `support.replied`, and the
- * copy is `emailMessages(locale).supportReplied`. One is the identifier written to a row that
- * outlives any deploy; the other is a property name. Mapping them explicitly is the only honest
- * option — deriving one from the other by camel-casing would work until a key needed a name that
- * did not transliterate, and would fail silently when it did.
- *
- * Only the keys the platform SENDS are here. A template nothing sends has no row to expand.
- */
-export const TEMPLATE_COPY_KEYS: Readonly<Record<string, keyof EmailMessages>> = {
-  'booking.confirmed': 'bookingConfirmed',
-  'booking.invoice': 'bookingInvoice',
-  'booking.cancelled_refund': 'bookingCancelledBySafra',
-  'booking.refunded': 'bookingRefunded',
-  'booking.needs_action': 'bookingNeedsAction',
-  'partner.deadline_reminder': 'bookingDeadlineReminder',
-  'review.received': 'reviewReceived',
-  'review.replied': 'reviewReplied',
-  'support.replied': 'supportReplied',
-  'partner.warned': 'partnerWarned',
-  'partner.fined': 'partnerFined',
-  'partner.fine_waived': 'partnerFineWaived',
-  'partner.suspended': 'partnerSuspended',
-  'partner.unsuspended': 'partnerUnsuspended',
-};
 
 export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
   {
