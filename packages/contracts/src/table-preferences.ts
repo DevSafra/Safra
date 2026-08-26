@@ -89,6 +89,14 @@ export const TABLE_SECTIONS = [
    * into a value this schema rejects.
    */
   'staffActivity',
+  /**
+   * فواتير الإعلانات — a second paged list on `/ads`, beneath the campaign registry.
+   *
+   * Its own key and namespaced parameters for the same reason as `staffScope`: it shares a route
+   * with a registry that already owns `?page=`, and sharing them would drag the reader's place in
+   * the campaigns list along every time they stepped through the billing.
+   */
+  'adInvoices',
 ] as const;
 
 export type TableSection = (typeof TABLE_SECTIONS)[number];
@@ -130,6 +138,7 @@ export const TABLE_SECTION_PATHS: Readonly<Record<TableSection, string>> = {
   partnerApplications: '/applications',
   partnersPending: '/partners',
   propertiesPending: '/properties',
+  adInvoices: '/ads',
 };
 
 /**
@@ -151,6 +160,7 @@ const NAMESPACED: Readonly<
   propertiesPending: { page: 'queuePage', size: 'queueSize' },
   /* Namespaced like `staffScope`: the record screen may carry its own parameters too. */
   partnerViolations: { page: 'vpage', size: 'vsize' },
+  adInvoices: { page: 'ipage', size: 'isize' },
 };
 
 export const TABLE_SECTION_PARAMS: Readonly<

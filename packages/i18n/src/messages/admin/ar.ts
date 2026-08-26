@@ -1613,6 +1613,36 @@ export const ar = {
     },
 
     ads: {
+      /* ── الحملة الجديدة (Bashar, 2026-08-27) ─────────────────────────────────────────────── */
+      create: '+ حملة جديدة',
+      newTitle: 'حملة إعلانية جديدة',
+      fAdvertiser: 'المعلن (المرجع)',
+      fAdvertiserPlaceholder: 'ADV-000001',
+      fCity: 'المدينة (المُعرِّف)',
+      fHeadlineAr: 'العنوان بالعربية',
+      fHeadlineEn: 'العنوان بالإنجليزية',
+      fHeadlineDe: 'العنوان بالألمانية',
+      fTargetUrl: 'الرابط (يبدأ بـ https)',
+      fTargetPlaceholder: 'https://example.com',
+      fBilling: 'دورة الفوترة',
+      fPrice: 'السعر لكل دورة (اختياري)',
+      fCurrency: 'العملة',
+      fStarts: 'يبدأ في',
+      fEnds: 'ينتهي في',
+      submit: 'إنشاء الحملة',
+      cancel: 'إلغاء',
+      billingWeekly: 'أسبوعية',
+      billingMonthly: 'شهرية',
+      billingQuarterly: 'ربع سنوية',
+      /* A new advertiser, created inline: a campaign needs one and there is nowhere else to add it. */
+      newAdvertiser: '+ معلن جديد',
+      advTitle: 'معلن جديد',
+      advName: 'الاسم',
+      advKind: 'النوع',
+      advEmail: 'البريد (اختياري)',
+      advPhone: 'الهاتف (اختياري)',
+      advSubmit: 'إضافة المعلن',
+      advCreated: 'أُضيف المعلن — مرجعه {reference}',
       searchPlaceholder: 'بحث بالمعلن أو المدينة…',
       kpiActive: 'حملات نشطة',
       kpiPaused: 'حملات متوقفة',
@@ -1635,6 +1665,24 @@ export const ar = {
       note: 'الإعلانات موجَّهة حسب مدينة حجز العميل، وتظهر بعد تأكيد الحجز أو داخل صفحة الحجز — موسومة دائماً «إعلان شريك» ولا تُخلط بترتيب البحث الطبيعي. رسالة واتساب واحدة غير مزعجة كحد أقصى.',
       noRanking:
         'لا يوجد ترتيب أو أولوية للإعلانات في نتائج البحث — لا في الواجهة ولا في قاعدة البيانات.',
+    },
+
+    /* فواتير الإعلانات — the money half of §9.3, a second paged table on the same screen. */
+    adInvoices: {
+      title: 'فواتير الإعلانات',
+      searchPlaceholder: 'بحث برقم الفاتورة أو المعلن أو الحملة…',
+      colCampaign: 'الحملة',
+      colPeriod: 'الفترة',
+      colAmount: 'المبلغ',
+      markPaid: 'تسجيل السداد',
+      confirm: 'تأكيد',
+      note: 'كيف وصل المبلغ',
+      notePlaceholder: 'رقم الحوالة أو الإيصال',
+      paidOn: 'سُدِّدت في {date}',
+      note1:
+        'تُصدَر فاتورة لكل دورة فوترة عند إنشاء الحملة. الفاتورة مطالبة وليست إيراداً — يُقيَّد الإيراد في دفتر الأستاذ لحظة تسجيل السداد، لا لحظة الإصدار.',
+      note2:
+        'حملة بلا سعر لا تُصدِر فواتير — مثل الإعلانات المجانية أو التبادلية. ولا يُسجَّل السداد مرتين: الفاتورة المسدَّدة لا تقبل تسجيلاً ثانياً.',
     },
 
     contracts: {
@@ -2422,6 +2470,7 @@ export const ar = {
   auditSubject: {
     coupon: 'كوبون',
     advertiser: 'معلن',
+    ad_campaign: 'حملة إعلانية',
     ad_invoice: 'فاتورة إعلان',
     partner_application: 'طلب شراكة',
     booking: 'حجز',
@@ -2505,6 +2554,7 @@ export const ar = {
     'emergency_mode.deactivated': 'إيقاف وضع الطوارئ',
     'ad_campaign.paused': 'إيقاف حملة إعلانية',
     'ad_campaign.resumed': 'تشغيل حملة إعلانية',
+    'ad_campaign.activated': 'إطلاق حملة إعلانية',
     'partner_contract.uploaded': 'رفع عقد شراكة',
     /* ── أدوار الموظفين، يُعرِّفها المدير العام (Bashar, 2026-08-23) ── */
     'staff_role.created': 'إنشاء دور لموظفي سفرة',
@@ -2750,7 +2800,20 @@ export const ar = {
     },
     verification: {
       pending: 'بانتظار التحقق',
-      in_review: 'قيد المراجعة',
+      /*
+        «قيد التحقق», not «قيد المراجعة» (2026-08-27).
+
+        Three statuses read «قيد المراجعة» in two colours: `propertyStatus.pending_review` (amber),
+        `disputeStatus.investigating` (amber) and this one (sky). The first two agree and never
+        share a screen, which is fine; this one made the same word mean amber on العقارات and sky
+        on الشركاء — rule 1's failure, «a colour that changes meaning between screens un-teaches
+        what it meant», arriving through the word rather than the value.
+
+        It is also the accurate word: this vocabulary is `verification`, which is التحقق, and
+        `pending` already says «بانتظار التحقق» beside it. Found by the cross-vocabulary check in
+        `status-tone.test.ts`, which was written the same day for a collision one screen over.
+      */
+      in_review: 'قيد التحقق',
       approved: 'معتمد',
       rejected: 'مرفوض',
     } as Record<string, string>,
@@ -2791,7 +2854,20 @@ export const ar = {
       processing: 'قيد المعالجة',
       completed: 'مكتمل',
       collected: 'محصلة',
-      waived: 'ملغاة',
+      /*
+        «معفاة», not «ملغاة» (2026-08-27).
+
+        The same problem `pending`/`processing` had above, one screen further out: «ملغاة» was
+        ALSO بطاقات الهدايا's `cancelled`, so one word appeared in two colours — stone on الدفع and
+        red on بطاقات الهدايا. `status-tone.test.ts` cannot see it, because the two are in
+        different vocabularies; only the browser sweep across all twenty sections can, and it only
+        sees it on a day when both screens happen to show both statuses. Found 2026-08-27.
+
+        It is also the more accurate word. A waived fee was FORGIVEN — SAFRA chose not to collect
+        it — where a cancelled gift card was withdrawn. «معفاة» says the first and cannot be read
+        as the second.
+      */
+      waived: 'معفاة',
     } as Record<string, string>,
 
     /**
@@ -2821,6 +2897,13 @@ export const ar = {
      */
     payloadKey: {
       reason: 'السبب',
+      /*
+        Written by `ad_invoice.paid` — WHICH campaign the money settled, beside the amount and its
+        currency. Uncatalogued until an invoice was actually paid, because
+        `audit-catalogue.integration.test.ts` reads the TABLE: a payload nothing writes is a
+        payload nothing can flag.
+      */
+      campaign: 'الحملة',
       /* §8.1's map location, recorded by `partner.location_set`. */
       latitude: 'خط العرض',
       longitude: 'خط الطول',
@@ -3388,6 +3471,20 @@ export const ar = {
       active: 'نشط',
       paused: 'متوقف',
       expired: 'منتهٍ',
+    } as Record<string, string>,
+
+    adInvoiceStatus: {
+      due: 'مستحقة',
+      paid: 'مسدَّدة',
+      /*
+        «مشطوبة», not «ملغاة» — the accounting word, and a word no other status uses.
+
+        `cancelled` is «ملغاة» on بطاقات الهدايا and there is no fourteenth colour to spare for a
+        second one: «one word in two colours reads as a rendering fault». Written off is also what
+        this status MEANS — an invoice that will never be collected, as against one that was never
+        issued.
+      */
+      void: 'مشطوبة',
     } as Record<string, string>,
 
     advertiserKind: {

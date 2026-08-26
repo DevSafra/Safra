@@ -67,4 +67,70 @@ describe('no two statuses on one screen share a word', () => {
 
     expect(clashes).toStrictEqual([]);
   });
+
+  /**
+   * And ACROSS vocabularies, where two different statuses share a word but not a colour.
+   *
+   * The check above is per vocabulary, deliberately — «معتمد» is a fine label for both an approved
+   * partner and an approved document, because no screen shows both. But that reasoning holds only
+   * while the two words carry the SAME colour. When they do not, one word appears in two colours,
+   * which is precisely the rendering fault the per-vocabulary check exists to prevent, one screen
+   * further out.
+   *
+   * ## Why this is here rather than only in the browser sweep
+   *
+   * `navigation.spec.ts` catches it — it walks twenty sections comparing pill text to pill colour —
+   * but only on a day when both screens happen to be SHOWING both statuses. «ملغاة» was
+   * `paymentStatus.waived` (stone) and `giftCardStatus.cancelled` (red) for three weeks and the
+   * sweep was green throughout, because الدفع had no waived row in it. It went red on 2026-08-27
+   * when one appeared, and a third status was about to join them.
+   *
+   * A word-and-tone comparison over the catalogues needs no data at all and no browser, so it
+   * fails the moment somebody WRITES the collision rather than the day one is finally displayed.
+   *
+   * The same VALUE in two vocabularies is exempt: `expired` is «منتهية» on بطاقات الهدايا and
+   * «منتهٍ» on الإعلانات, and where the word does match it is one status, one colour, by
+   * construction.
+   */
+  it('never gives one word two colours across vocabularies', () => {
+    const VOCABULARIES: readonly (readonly [string, Record<string, string>])[] = [
+      ['bookingStatus', t.bookingStatus],
+      ['paymentStatus', t.enums.paymentStatus],
+      ['propertyStatus', t.enums.propertyStatus],
+      ['verification', t.enums.verification],
+      ['partnerApplicationStatus', t.enums.partnerApplicationStatus],
+      ['disputeStatus', t.enums.disputeStatus],
+      ['payoutStatus', t.enums.payoutStatus],
+      ['giftCardStatus', t.enums.giftCardStatus],
+      ['couponStatus', t.enums.couponStatus],
+      ['adStatus', t.enums.adStatus],
+      ['adInvoiceStatus', t.enums.adInvoiceStatus],
+      ['userStatus', t.enums.userStatus],
+      ['notificationStatus', t.enums.notificationStatus],
+    ];
+
+    /** word → the (status, tone) pairs that render it. */
+    const byWord = new Map<string, Map<string, string>>();
+
+    for (const [name, map] of VOCABULARIES) {
+      for (const [status, word] of Object.entries(map)) {
+        const tone = statusTone(status);
+        const pairs = byWord.get(word) ?? new Map<string, string>();
+
+        /* Keyed by STATUS, so the same value in two vocabularies collapses to one entry. */
+        pairs.set(status, `${tone} (${name}.${status})`);
+        byWord.set(word, pairs);
+      }
+    }
+
+    const clashes = [...byWord.entries()]
+      .filter(
+        ([, pairs]) => new Set([...pairs.values()].map((v) => v.split(' ')[0])).size > 1,
+      )
+      .map(
+        ([word, pairs]) => `«${word}» renders as ${[...pairs.values()].join(' and ')}`,
+      );
+
+    expect(clashes).toStrictEqual([]);
+  });
 });

@@ -126,6 +126,14 @@ const STATUS_TONES: Record<string, Tone> = {
   pending_release: 'warn',
   /** Gold: `pending` sits beside `requires_action` and `processing` in الدفع. */
   pending: 'gold',
+  /**
+   * An advertising invoice nobody has paid yet — money owed, which is what gold says in الدفع.
+   *
+   * It shares a SCREEN with the campaign registry's four statuses (see `adsScreen` below), and
+   * gold is free there. `pending`'s gold is not a clash: they are different values and no screen
+   * shows both.
+   */
+  due: 'gold',
   /** Orange: ran out. Not red — nothing went wrong — and not `failed`'s colour. */
   expired: 'orange',
   /** Also orange: a payout stopped on purpose is not a failure, and must not read as one. */
@@ -150,6 +158,8 @@ const STATUS_TONES: Record<string, Tone> = {
   superseded: 'slate',
   waived: 'stone',
   terminated: 'stone',
+  /** An advertising invoice that will never be collected — written off, like `waived`. */
+  void: 'stone',
 };
 
 /**
@@ -210,6 +220,17 @@ export const VOCABULARIES: Readonly<Record<string, readonly string[]>> = {
   dispute: ['open', 'investigating', 'resolved', 'rejected'],
   giftCard: ['active', 'used', 'expired', 'cancelled'],
   ad: ['draft', 'active', 'paused', 'expired'],
+  /**
+   * What الإعلانات actually paints, which is not either enum on its own.
+   *
+   * The screen carries TWO paged tables — the campaign registry and فواتير الإعلانات beneath it —
+   * so rule 2's "one screen" spans seven values across two enums. `ad` above stays because rule 1
+   * is about a value's colour everywhere; this entry is the constraint a reader of that page meets.
+   *
+   * Same reasoning as `payments`, which unions three vocabularies onto one table.
+   */
+  adsScreen: ['draft', 'active', 'paused', 'expired', 'due', 'paid', 'void'],
+  adInvoice: ['due', 'paid', 'void'],
   /*
     `draft` was added to the enum on 2026-08-21 with the two-sided signing flow and NOT added here,
     so every sweep that walks this list skipped it — and الشركاء spent two days painting a draft
