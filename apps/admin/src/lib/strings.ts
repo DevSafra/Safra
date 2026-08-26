@@ -100,6 +100,21 @@ export function cancellationReason(reason: string): string {
 }
 
 /**
+ * A wallet movement's «السبب» — the platform's own code, or a person's own sentence.
+ *
+ * The same duality as `cancellationReason`, and resolved the same way. What the PLATFORM writes is
+ * a `wallet.note.*` code, translated here. What a STAFF member typed into a manual adjustment is
+ * their own words and is printed as written — translating somebody's sentence is not this
+ * function's business, and prettifying an unknown value is how a missing entry hides.
+ *
+ * The map also carries the English sentences written before the codes existed, because
+ * `wallet_transactions` is append-only and those 9,083 rows cannot be rewritten.
+ */
+export function walletNote(note: string): string {
+  return t.enums.walletNote[note] ?? note;
+}
+
+/**
  * A timeline event's payload, as readable label/value pairs.
  *
  * Replaces printing the JSON verbatim. The reasoning for showing the payload at all is that a

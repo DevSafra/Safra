@@ -11,7 +11,7 @@ import {
   type AdminColumn,
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { t, label } from '@/lib/strings';
+import { t, label, walletNote } from '@/lib/strings';
 import { listParamsFor } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
 
@@ -148,9 +148,14 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
   {
     key: 'note',
     header: t.sections.wallet.colReason,
+    /*
+      Through `walletNote`, so a code the platform wrote reads as Arabic and a sentence a staff
+      member typed reads as they typed it. This printed `row.note` raw, and the platform's own
+      notes were English prose on an Arabic-only console.
+    */
     render: (row) => (
       <span className="text-text2">
-        {row.note ?? label(t.enums.walletReason, row.reason)}
+        {row.note ? walletNote(row.note) : label(t.enums.walletReason, row.reason)}
       </span>
     ),
   },

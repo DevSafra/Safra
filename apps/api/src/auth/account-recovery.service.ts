@@ -16,7 +16,7 @@ import { PasswordService } from '../common/crypto/password.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { AuthTokenService } from './auth-token.service.js';
 import { TokenService } from './token.service.js';
-import { ERROR } from '@safra/contracts';
+import { ERROR, WALLET_NOTE } from '@safra/contracts';
 import { badRequest } from '../common/errors/app-error.js';
 
 /** §4: long enough to act on, short enough that a leaked link goes stale fast. */
@@ -374,7 +374,7 @@ export class AccountRecoveryService {
       amount: wallet.balance,
       currencyId: wallet.currency_id,
       reason: 'profile_claim',
-      note: 'Balance moved to the account that claimed this guest profile.',
+      note: WALLET_NOTE.CLAIMED_FROM_GUEST,
     });
 
     await this.wallet.credit(tx, {
@@ -382,7 +382,7 @@ export class AccountRecoveryService {
       amount: wallet.balance,
       currencyId: wallet.currency_id,
       reason: 'profile_claim',
-      note: 'Balance carried over from a guest booking made with this address.',
+      note: WALLET_NOTE.CARRIED_TO_ACCOUNT,
     });
 
     this.logger.log(

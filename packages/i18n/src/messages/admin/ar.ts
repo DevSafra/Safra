@@ -2815,6 +2815,7 @@ export const ar = {
       compensation: 'التعويض',
       creditedAmount: 'المبلغ المضاف',
       creditedCurrency: 'عملة الإضافة',
+      walletCurrency: 'عملة المحفظة',
       walletBalance: 'رصيد المحفظة',
 
       /*
@@ -3081,6 +3082,36 @@ export const ar = {
      * the raw value rather than to «—», which also keeps rows written before the codes existed
      * readable in the English they were stored in.
      */
+    /**
+     * What the PLATFORM wrote as a wallet movement's reason.
+     *
+     * «السبب» on المحفظة held English prose written into eight services — «Partner did not respond
+     * within the confirmation window.» on 9,083 rows of an Arabic-only console. The services write
+     * a CODE now; these are the words.
+     *
+     * The legacy sentences are mapped too, and have to be: `wallet_transactions` is append-only, so
+     * the rows already written can never be rewritten. Without them 9,083 movements would read
+     * English for ever. They are a MIGRATION, not a vocabulary — nothing writes them any more.
+     */
+    walletNote: {
+      'wallet.note.applied_to_booking': 'دُفع من الرصيد لهذا الحجز',
+      'wallet.note.refunded': 'استرداد أُعيد إلى الرصيد',
+      'wallet.note.returned_cancelled': 'أُعيد الرصيد بعد إلغاء الحجز قبل الدفع',
+      'wallet.note.returned_expired': 'أُعيد الرصيد بعد انتهاء مهلة الدفع',
+      'wallet.note.partner_no_response': 'تعويض: لم يردّ الشريك ضمن مهلة التأكيد',
+      'wallet.note.dispute_resolved': 'تعويض عن نزاع حُسم لصالح العميل',
+      'wallet.note.claimed_from_guest': 'نُقل الرصيد إلى الحساب الذي طالب بملف الضيف',
+      'wallet.note.carried_to_account': 'رصيد منقول من حجز ضيف بالبريد نفسه',
+
+      /* ── Written before the codes existed, and unrewritable: append-only. ── */
+      'Partner did not respond within the confirmation window.':
+        'تعويض: لم يردّ الشريك ضمن مهلة التأكيد',
+      'Balance moved to the account that claimed this guest profile.':
+        'نُقل الرصيد إلى الحساب الذي طالب بملف الضيف',
+      'Balance carried over from a guest booking made with this address.':
+        'رصيد منقول من حجز ضيف بالبريد نفسه',
+    } as Record<string, string>,
+
     cancellationReason: {
       'system.payment_expired': 'لم يكتمل الدفع خلال المهلة المسموحة (EC-001).',
       'system.partner_no_response': 'لم يرد الشريك خلال مهلة التأكيد (§6.4).',

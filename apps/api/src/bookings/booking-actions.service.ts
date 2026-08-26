@@ -25,7 +25,7 @@ import {
   type BookingStatus,
 } from './booking-state.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { ERROR } from '@safra/contracts';
+import { ERROR, WALLET_NOTE } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
 import { conflict } from '../common/errors/app-error.js';
 
@@ -748,7 +748,7 @@ export class BookingActionsService {
        * path and applies §7.4's tiers to it.
        */
       if (booking.status === 'pending_payment') {
-        await this.releaseWalletHold(tx as unknown as Database, booking.id, reference);
+        await this.releaseWalletHold(tx as unknown as Database, booking.id);
       }
 
       await tx.execute(sql`
@@ -783,11 +783,7 @@ export class BookingActionsService {
    * Reads the amount inside the caller's transaction rather than taking it as an
    * argument, so it cannot be handed a figure that has already gone stale.
    */
-  private async releaseWalletHold(
-    tx: Database,
-    bookingId: string,
-    reference: string,
-  ): Promise<void> {
+  private async releaseWalletHold(tx: Database, bookingId: string): Promise<void> {
     const rows = await tx.execute<{
       wallet_amount: string;
       customer_profile_id: string;
@@ -806,7 +802,7 @@ export class BookingActionsService {
       currencyId: held.currency_id,
       reason: 'refund',
       bookingId,
-      note: `Balance returned — ${reference} was cancelled before payment.`,
+      note: WALLET_NOTE.RETURNED_CANCELLED,
     });
 
     await tx.execute(sql`

@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { SLA_EXPIRY_WARNING_MINUTES } from '@safra/contracts';
+import { SLA_EXPIRY_WARNING_MINUTES, WALLET_NOTE } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { LedgerService } from '../ledger/ledger.service.js';
@@ -191,7 +191,7 @@ export class SlaService {
           currencyId: booking.currency_id,
           reason: 'refund',
           bookingId: booking.id,
-          note: `Balance returned — ${booking.reference} expired before payment.`,
+          note: WALLET_NOTE.RETURNED_EXPIRED,
         });
 
         await tx.execute(sql`
@@ -421,7 +421,7 @@ export class SlaService {
             currencyId: booking.currency_id,
             reason: 'sla_compensation',
             bookingId: booking.id,
-            note: 'Partner did not respond within the confirmation window.',
+            note: WALLET_NOTE.PARTNER_NO_RESPONSE,
           });
 
           /*
