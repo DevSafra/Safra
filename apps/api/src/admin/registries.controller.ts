@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -19,10 +20,16 @@ import { z } from 'zod';
 import {
   BOOKING_ATTENTION,
   PERMISSIONS as P,
+  couponActiveSchema,
+  couponCreateSchema,
+  couponUpdateSchema,
   giftCardCancelSchema,
   giftCardIssueSchema,
   pageQuerySchema,
   setStaffScopeSchema,
+  type CouponActiveInput,
+  type CouponCreateInput,
+  type CouponUpdateInput,
   type GiftCardCancelInput,
   type GiftCardIssueInput,
   type PageQuery,
@@ -45,6 +52,7 @@ import { StaffOverviewService } from './staff-overview.service.js';
 import { ExportRequestService } from './export-request.service.js';
 import { StaffScopeService } from './staff-scope.service.js';
 import { GiftCardService } from '../gift-cards/gift-card.service.js';
+import { CouponAdminService } from './coupon-admin.service.js';
 import {
   EmergencyService,
   activateEmergencySchema,
@@ -138,6 +146,7 @@ export class RegistriesController {
     private readonly exportRequests: ExportRequestService,
     private readonly staffScope: StaffScopeService,
     private readonly giftCardIssuer: GiftCardService,
+    private readonly couponAdmin: CouponAdminService,
   ) {}
 
   // ── الحجوزات ───────────────────────────────────────────────────────────────
@@ -416,6 +425,64 @@ export class RegistriesController {
     @CurrentUser() user: AccessTokenClaims | undefined,
   ) {
     return this.giftCardIssuer.cancel(user, reference, body);
+  }
+
+  /**
+   * Creating a coupon — §9.3's «+ كوبون جديد».
+   *
+   * `COUPON_MANAGE`, which finance and super admin hold and which had no route behind it: the
+   * permission, the `coupons` table and a disabled button were a feature that existed only in the
+   * data model.
+   *
+   * Throttled, because a coupon is money off that anybody holding the code can spend.
+   *
+   * `AuditExempt` — `CouponAdminService` records `coupon.created` inside the transaction with the
+   * code, the value and the window, none of which the interceptor can see.
+   */
+  @Post('coupons')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermissions(P.COUPON_MANAGE)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @AuditExempt('CouponAdminService records coupon.created inside the transaction.')
+  async createCoupon(
+    @Body(new ZodValidationPipe(couponCreateSchema)) body: CouponCreateInput,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+  ) {
+    return this.couponAdmin.create(user, body);
+  }
+
+  /** Editing a coupon's window and caps. Its code and value are set once — see the service. */
+  @Patch('coupons/:code')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.COUPON_MANAGE)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @AuditExempt('CouponAdminService records coupon.updated inside the transaction.')
+  async updateCoupon(
+    @Param('code') code: string,
+    @Body(new ZodValidationPipe(couponUpdateSchema)) body: CouponUpdateInput,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+  ) {
+    await this.couponAdmin.update(user, code, body);
+
+    return { ok: true };
+  }
+
+  /** Pausing or resuming a campaign, without touching its dates. */
+  @Post('coupons/:code/active')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(P.COUPON_MANAGE)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @AuditExempt(
+    'CouponAdminService records coupon.activated/deactivated in the transaction.',
+  )
+  async setCouponActive(
+    @Param('code') code: string,
+    @Body(new ZodValidationPipe(couponActiveSchema)) body: CouponActiveInput,
+    @CurrentUser() user: AccessTokenClaims | undefined,
+  ) {
+    await this.couponAdmin.setActive(user, code, body);
+
+    return { ok: true };
   }
 
   @Get('coupons')

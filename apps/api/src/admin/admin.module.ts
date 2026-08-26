@@ -39,6 +39,7 @@ import { StaffOverviewService } from './staff-overview.service.js';
 import { EmergencyService } from './emergency.service.js';
 import { CommsController } from './comms.controller.js';
 import { DisputeService } from './dispute.service.js';
+import { CouponAdminService } from './coupon-admin.service.js';
 import { MessagingService } from './messaging.service.js';
 import { AdvertisingService } from './advertising.service.js';
 import { PartnerContractService } from './partner-contract.service.js';
@@ -103,6 +104,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     EmergencyService,
     // §8's customer-facing and commercial domains — see CommsController.
     DisputeService,
+    CouponAdminService,
     MessagingService,
     // A staff reply on a ticket emails the asker. MailService comes from AuthModule's exports.
     NotificationService,

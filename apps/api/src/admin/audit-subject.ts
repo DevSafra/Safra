@@ -193,6 +193,18 @@ const SOURCES: Record<string, Source> = {
     label: sql`coalesce(recipient_name, recipient_email)`,
     href: null,
   },
+  coupon: {
+    table: 'coupons',
+    /*
+      A coupon's CODE is its reference — it is what an operator searches for and what a customer was
+      told, and unlike a gift card code it is meant to be shared. There is no separate reference
+      column, so the code serves as both.
+    */
+    reference: sql`code`,
+    label: sql`code`,
+    /* الكوبونات is one registry with no detail screen; the code identifies the row on it. */
+    href: null,
+  },
   ad_campaign: {
     table: 'ad_campaigns',
     reference: sql`reference`,
