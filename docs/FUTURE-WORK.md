@@ -2887,9 +2887,11 @@ than something a test writes, or accept the skip permanently and verify the page
 release. The first is better and is the same shape `O-e2e-4` needs for the count cap, so the two
 should probably be solved together. **To unblock:** nothing external.
 
-### O-sec-13 — staff scope has never been swept; the coverage claim has been wrong twice
+### O-sec-13 — CLOSED: staff scope is swept, and the claim is now checkable
 
-**Status:** open · **Severity:** Medium · **Owner:** engineering · **Recorded:** 2026-08-23
+**Status:** **CLOSED 2026-08-27** — the systematic pass done, ELEVEN more gaps found and fixed, and
+the claim moved from remembered to enforced · **Severity:** Medium · **Owner:** engineering ·
+**Recorded:** 2026-08-23
 
 §4 of this register records staff scope as enforced "across 9 registries, the dashboard, all
 reports, the finance ledger and the export" (2026-08-04). **That completeness claim has since been
@@ -2957,11 +2959,58 @@ touches a city-bearing resource is a candidate, and `SCOPED_RESOURCES` already n
 `reports`, `finance`. Sub-resources inherit a city through a join and are the easiest to miss —
 a partner contract has no city of its own.
 
-**The work:** a systematic pass over every admin-facing service, and then a test that makes the
-claim checkable rather than remembered — the shape `employee-reach.test.ts` uses for the employee
-boundary would transfer, reading route metadata and failing when a scoped resource's handler has no
-scope enforcement behind it. Until that exists, §4's line should be read as "scoped where somebody
-looked". **To unblock:** nothing external.
+## The pass, 2026-08-27
+
+Asked for by Bashar after the fourth: «close the city-scope question systematically rather than
+continue finding these cases one by one». Every controller in the API was enumerated — 246 routes,
+189 of them carrying a permission — each resolved to the service method behind it, and each method
+read for whether it consults a scope at all.
+
+**Eleven more were unscoped.** Ordered by what they let somebody do:
+
+| Service                                     | Reachable by a city-scoped member                                                                                                  | Now                                                                               |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `booking-actions.service.ts`                | capture the payment, confirm on the partner's behalf, check in, undo a check-in, complete, **cancel** — any booking in the country | scoped `load()`, one resolver for all seven                                       |
+| `payout.service.ts`                         | **mark a payout PAID** (money out), close, release, hold, lift, cancel; and read the registry                                      | scoped `require()`; both staff reads narrowed                                     |
+| `refund.service.ts`                         | quote and **issue a refund** on any booking                                                                                        | scoped `load()`; the SLA sweep passes `undefined` and stays unrestricted          |
+| `reviews/review.service.ts`                 | read the moderation queue and **hide or dismiss** any reported review                                                              | scoped by the reviewed property's city                                            |
+| `partner-application.service.ts`            | read, log a call on, **accept** (creates a partner) or reject any request                                                          | scoped `rowOf()`                                                                  |
+| `partner-onboarding.service.ts`             | **create a partner in another city**, set their map pin, re-send their invitation                                                  | `assertCanWrite` on the resolved city; `writeFilter` in the update                |
+| `partner-documents.service.ts`              | list, file, **read the bytes of**, and approve/reject identity documents                                                           | scoped resolver + a guard inside the review transaction                           |
+| `messaging.service.ts`                      | read any support thread including its internal notes, and **reply into it**                                                        | scoped by `coalesce(b.city_id, p.city_id)`, the same expression the list uses     |
+| `booking-recovery.service.ts`               | **mail a verification code** to any booking's customer, and consume it                                                             | `assertCanWrite`; `writeFilter` in the consuming statement                        |
+| `partner-two-factor.service.ts`             | **reset another partner's second factor** and issue a new enrolment                                                                | `scopeCondition` + `assertCanWrite`                                               |
+| `admin/review.service.ts` `attentionCounts` | count every pending queue across the country                                                                                       | every counter narrowed; the badge and the list it labels now count the same thing |
+
+**Three shapes recur**, and naming them is most of the value:
+
+1. **A resolver by REFERENCE with no city.** Nine of the eleven. The list was scoped; the row behind
+   it was not.
+2. **A sub-resource inheriting a city through a join** — a payout from its partner, a review from
+   its property, a document from its partner, a conversation from its booking. `O-sec-13` predicted
+   this one and it was still the majority.
+3. **A statement that finds and writes in one go**, where there is no load to guard. `writeFilter`
+   was added for it — the write counterpart of `scopeFilter`, which returns TRUE for `read_only` and
+   is therefore WRONG in an `UPDATE`.
+
+**The claim is now checkable.** `scope-coverage.test.ts` walks every controller, resolves each
+handler to its service method two levels deep, and fails when a staff route neither enforces a scope
+nor appears in `NO_CITY` — an allow-list where each entry names the resource that has no geography
+rather than the route that is convenient to excuse. It runs in `pnpm verify`, so a route added
+without a scope fails on the commit that adds it. Watched to fail by stripping the guards from
+`booking-detail` and `payout` and confirming both reappear by name.
+
+`scope-sweep.integration.test.ts` runs the queries, because the static sweep cannot tell a
+`scopeFilter` on the right column from one on the wrong column. Five services, each with its
+opposite control, each watched to fail.
+
+**What the two together do NOT prove.** That every `NO_CITY` entry is still true — an entry is a
+claim that a resource has no geography, and the day one grows a city column the list is where
+somebody must come and say so. And correctness of the column chosen, beyond the five the
+integration suite exercises.
+
+**Superseded:** «a systematic pass over every admin-facing service, and then a test that makes the
+claim checkable rather than remembered». Both done.
 
 ### O-sec-14 — Closed: enrolling in 2FA now issues the session it invalidates
 
