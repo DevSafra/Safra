@@ -2655,7 +2655,28 @@ address appears zero times in the log. `safeMessage` and `framesOnly` in
 `apps/api/src/common/errors/app-exception.filter.ts` are the shape the fix takes and should be
 lifted into a shared module when the sweep happens.
 
-**Not fixed: 25 other files log a raw `error.message`.** The ones on paths a database error reaches
+**The sweep WAS done on 2026-08-25** — `safe-error.ts` is the shared module, `describeError` is the
+standard shape, and `no-raw-error-messages.test.ts` holds the class. Four columns that stored a raw
+message were found and fixed, three of which this entry had never named. **This status line is
+therefore stale and the item is nearly closed.**
+
+**What the sweep still misses, found 2026-08-27.** Its three patterns all key on the VARIABLE NAME
+(`error|err|cause|exception|reason`) in a `catch` binding, so two shapes walk past it:
+
+- a differently-named binding — `queue.runtime.ts` logs
+  `failure instanceof Error ? failure.message : …`;
+- a typed PARAMETER rather than a catch — `worker.on('failed', (job, error) => …)` in
+  `queue.runtime.ts`, and `onFailed(job, error: Error)` in all four processors, each of which logs
+  `${error.message}`. BullMQ hands those the error the processor threw, and a scheduled or media
+  processor throws `DrizzleQueryError`, so bound parameters reach the log by the route the sweep was
+  written to close.
+
+That is «a privacy assertion phrased as the string it names» in the register's own words: the sweep
+protects the spellings it enumerates rather than the behaviour. **The work is small** — widen the
+catch pattern to any binding, add a pattern for `.message` on a parameter typed `Error`, and change
+the six call sites to `describeError`.
+
+**Originally recorded: 25 other files log a raw `error.message`.** The ones on paths a database error reaches
 are what matter — `job-run.service.ts`, `audit.service.ts`, `sla.service.ts`, `booking-state.ts`,
 `payment-webhook.service.ts`, `export-request.service.ts`, `property-images.service.ts`, and the
 four queue processors.
@@ -2866,14 +2887,29 @@ falsified twice, by accident both times.**
   force", in one request. Partner references are sequential, so finding a target was a loop rather
   than a guess.
 
-**Why both were found by accident rather than by a check.** `scope.sql.ts` warns in its own comment
+- **2026-08-27** — two more, found by asking the question directly rather than by accident, while
+  answering «what is left». **`booking-detail.service.ts` does not scope at all**: `detail()` takes
+  `claims` and uses them only to decide whether payments and internal notes are included, while the
+  `WHERE` is `b.reference = $1 AND b.deleted_at IS NULL`. The query already joins `cities`. A
+  manager scoped to one city therefore opens ANY booking in the country by reference — and §9.4's
+  screen shows the customer's name, email and phone, the partner's phone and the full money
+  breakdown. Booking references are sequential, so enumeration is a loop. **Reproduced**, not
+  theorised: a manager scoped away from its city retrieved `BKG-2026-005572`.
+  **`enforcement.service.ts` does not scope either**, and it is worse because it WRITES:
+  `livePartner()` resolves a partner by reference with no city column and no `assertCanWrite`, and
+  `suspend`, `unsuspend`, `raise`, `warn`, `fine` and `waive` all go through it. `actor` is used
+  only to stamp `suspended_by_user_id`. So the same out-of-scope reach suspends or fines a partner
+  in another city — the `partner-contract` shape again, on the actions that stop a business trading.
+
+**Why all four were found by accident rather than by a check.** `scope.sql.ts` warns in its own comment
 that duplicating the predicate per service is how a scope ends up "enforced on eight resources and
 forgotten on the ninth". It was right twice. There is no test that iterates `SCOPED_RESOURCES` and
 asserts each one is actually scoped — the enforcement tests that exist
 (`review-scope.integration.test.ts`, `partner-contract-scope.integration.test.ts`) were each written
 AFTER a gap was found, and each covers only the service that was found.
 
-**So the honest position is that scope coverage is unknown**, not complete. Every service that
+**So the honest position is that scope coverage is unknown**, not complete. Four services have now
+been found unscoped and none of them by a test. Every service that
 touches a city-bearing resource is a candidate, and `SCOPED_RESOURCES` already names them:
 `bookings`, `partners`, `properties`, `disputes`, `conversations`, `ad_campaigns`, `dashboard`,
 `reports`, `finance`. Sub-resources inherit a city through a join and are the easiest to miss —
