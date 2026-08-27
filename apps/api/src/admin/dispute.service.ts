@@ -361,6 +361,91 @@ export class DisputeService {
    * it was given. The wallet is append-only by trigger, so a partial write cannot be tidied up
    * afterwards.
    */
+  /**
+   * «I have this» — the button Bashar asked for on 2026-08-27 to bring the badge down.
+   *
+   * ## Why this is a STATUS and not a "read" flag
+   *
+   * The ask was a control that decreases the sidebar count. The tempting shape — mark it seen and
+   * stop counting it — hides a dispute that still FREEZES THE PARTNER'S PAYOUT: the queue would
+   * report nobody waiting while the money stays held, which is the one thing this domain must
+   * never do quietly.
+   *
+   * `investigating` already existed for this and had no writer at all (reported the same day as the
+   * review's finding ①). It says what is true — somebody has picked this up and it is not settled —
+   * and it changes nothing about the money: `UNRESOLVED` still contains it, so the payout stays
+   * frozen, «مستحقات مجمّدة» still counts it, and the queue still sorts it to the top by age.
+   *
+   * What changes is only the BADGE, which now counts what nobody has taken. That is the honest
+   * reading of a number whose job is to say «this needs somebody».
+   *
+   * ## It records WHO, because otherwise the state says nothing useful
+   *
+   * `assigned_to_user_id` is written in the same statement. Without it «قيد المراجعة» means an
+   * anonymous somebody, and two operators can each mark the same dispute and each believe the other
+   * has not — which is the coordination failure the button exists to prevent.
+   *
+   * ## Idempotent, and quiet about it
+   *
+   * Taking one that is already taken changes nothing and writes NO audit row. Closing is different
+   * and stays different: that is a CONFLICT, because two people settling one complaint differently
+   * is a race worth surfacing.
+   */
+  async acknowledge(
+    actor: AccessTokenClaims | undefined,
+    reference: string,
+  ): Promise<{ acknowledged: boolean }> {
+    const found = await this.db.execute<{
+      id: string;
+      status: string;
+      city_id: string | null;
+    }>(sql`
+      SELECT d.id, d.status::text AS status, b.city_id
+      FROM disputes d
+      LEFT JOIN bookings b ON b.id = d.booking_id
+      WHERE d.reference = ${reference} AND d.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'b.city_id')}
+      LIMIT 1
+    `);
+
+    const dispute = found.rows[0];
+
+    if (!dispute) throw notFound(ERROR.DISPUTE_NOT_FOUND);
+
+    /* The write path is guarded on its own — the list is not the gate. */
+    assertCanWrite(actor, dispute.city_id);
+
+    if (dispute.status === 'resolved' || dispute.status === 'rejected') {
+      throw conflict(ERROR.DISPUTE_ALREADY_CLOSED);
+    }
+
+    if (dispute.status === 'investigating') return { acknowledged: false };
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE disputes
+        SET status = 'investigating'::dispute_status,
+            assigned_to_user_id = ${actor?.sub}::uuid
+        WHERE id = ${dispute.id}::uuid
+      `);
+
+      await this.audit.record(
+        {
+          actorUserId: actor?.sub,
+          actorRole: actor?.role,
+          action: 'dispute.acknowledged',
+          subjectType: 'dispute',
+          subjectId: dispute.id,
+          before: { status: 'open' },
+          after: { status: 'investigating', assignedTo: actor?.sub },
+        },
+        tx as unknown as Database,
+      );
+    });
+
+    return { acknowledged: true };
+  }
+
   async close(
     actor: AccessTokenClaims | undefined,
     reference: string,

@@ -10,6 +10,7 @@ import { TablePagination } from '@/components/table-pagination';
 import { FootNote, Ltr, StatusPill } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { CloseDisputeForm } from '@/components/close-dispute-form';
+import { AcknowledgeDisputeButton } from '@/components/acknowledge-dispute-button';
 import { label, t, plural } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { oneOf } from '@/lib/search-params';
@@ -204,7 +205,23 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
               {label(t.enums.disputeKind, dispute.kind)}
             </span>
             {dispute.freezesPayout ? (
-              <StatusPill tone="warn">{t.sections.disputes.frozen}</StatusPill>
+              /*
+                ── indigo, not amber (2026-08-27) ──────────────────────────────
+
+                «المستحقات مجمّدة» is not a status — it is a property of the booking's money — but
+                it is drawn as a pill on a screen that also draws the four dispute statuses, and
+                «One status, one word, one colour» forbids two pills sharing a colour there.
+
+                It was `warn`, which was safe only because `investigating` could never happen:
+                nothing wrote that status. «استلام» gave it a writer, «قيد المراجعة» is `warn` too,
+                and `navigation.spec.ts` failed the same hour — «المستحقات مجمّدة / قيد المراجعة
+                are all rgb(232, 165, 75)». The rule earning its keep on the first screen to test it.
+
+                Indigo because the four statuses hold crimson, amber, green and red, and because a
+                held payout reads as cold rather than as an alarm. Same shape as the sanctions pill
+                on الشركاء, which takes teal/orange for exactly this reason.
+              */
+              <StatusPill tone="indigo">{t.sections.disputes.frozen}</StatusPill>
             ) : null}
           </div>
 
@@ -279,6 +296,18 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
           </Ltr>
         </div>
       </div>
+
+      {/*
+        «استلام» beside the close workflow, and only while nobody has taken it.
+
+        Both live on the card rather than behind a separate screen: an operator works down this
+        queue, and the two things they do to a dispute are take it and settle it.
+      */}
+      {dispute.status === 'open' ? (
+        <div className="mt-3">
+          <AcknowledgeDisputeButton reference={dispute.reference} />
+        </div>
+      ) : null}
 
       {/* The close workflow lives on the card, not behind a separate screen. */}
       {closed ? null : <CloseDisputeForm reference={dispute.reference} />}

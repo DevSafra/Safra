@@ -155,6 +155,24 @@ export class CommsController {
    * Not about brute force — the caller is authenticated and permissioned. It bounds the damage of
    * a stuck retry loop crediting the same customer repeatedly.
    */
+  /**
+   * Taking a dispute — «قيد المراجعة», the control that brings the sidebar badge down.
+   *
+   * Same permission as closing: deciding to handle a complaint is part of handling it, and a
+   * reader who may not close one has no business claiming it either. Not throttled as hard as
+   * closing, which can credit a wallet; this moves no money.
+   */
+  @Post('disputes/:reference/acknowledge')
+  @RequirePermissions(P.DISPUTE_MANAGE)
+  @AuditExempt('DisputeService records dispute.acknowledged inside the transaction.')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async acknowledgeDispute(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.disputes.acknowledge(user, reference);
+  }
+
   @Post('disputes/:reference/close')
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @RequirePermissions(P.DISPUTE_MANAGE)

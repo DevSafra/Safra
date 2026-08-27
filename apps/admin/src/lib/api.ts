@@ -1024,6 +1024,8 @@ const dashboardSchema = z.object({
     }),
   ),
   openDisputes: z.number().nullable(),
+  /* Disputes nobody has taken — the sidebar badge. See the dashboard service's note. */
+  unacknowledgedDisputes: z.number(),
 });
 
 export type DashboardOverview = z.infer<typeof dashboardSchema>;

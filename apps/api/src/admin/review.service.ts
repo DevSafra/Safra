@@ -1018,17 +1018,23 @@ export class ReviewService {
       -- NO BACKTICKS ANYWHERE IN THIS COMMENT: it sits inside a sql template literal, and one
       -- would end the string here rather than in the note. That has cost time repeatedly.
       --
-      -- Unresolved, not open alone. Open and investigating both mean somebody is waiting on us,
-      -- both freeze the partner's payout, and both sort to the top of the queue -- the same
-      -- predicate DisputeService.UNRESOLVED and DashboardService.openDisputes already use, so the
-      -- badge cannot disagree with the dashboard tile counting the same thing.
+      -- OPEN only -- disputes nobody has picked up yet.
+      --
+      -- It counted open + investigating for a day. Bashar then asked for a control that brings the
+      -- badge down (2026-08-27), and the honest way to decrease a backlog number is for somebody to
+      -- TAKE the item, not for the screen to stop mentioning it. DisputeService.acknowledge moves
+      -- open -> investigating, and this predicate is what makes that button do something.
+      --
+      -- Nothing is hidden by the narrowing: an acknowledged dispute still freezes the partner's
+      -- payout, still counts in مستحقات مجمّدة, still counts in قيد المراجعة, and still sorts to the
+      -- top of the queue by age. Only the badge changes, and its job is to say THIS NEEDS SOMEBODY.
       --
       -- A dispute has no city of its own; it inherits the booking's, which is why this joins rather
       -- than filtering directly. Same reasoning as the dispute queue's own scope.
       SELECT 'disputes_open', COUNT(*)::text
         FROM disputes d
         LEFT JOIN bookings db ON db.id = d.booking_id
-        WHERE d.status IN ('open', 'investigating') AND d.deleted_at IS NULL
+        WHERE d.status = 'open' AND d.deleted_at IS NULL
           AND ${scopeFilter(actor, 'db.city_id')}
       UNION ALL
       SELECT 'bookings_awaiting_confirmation', COUNT(*)::text

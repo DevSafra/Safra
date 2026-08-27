@@ -151,12 +151,12 @@ export default async function DashboardPage() {
                 properties: overview.counters.properties_pending_review,
                 partnerApplications: overview.counters.partner_applications_open,
                 /*
-                  From the dashboard's OWN payload, which already counts unresolved disputes with
-                  the same predicate `/admin/attention` uses. `null` means the count could not be
-                  determined, and a badge is the one place that must read as absent rather than as
-                  zero.
+                  The UNTAKEN ones — what the badge means since «استلام» arrived. Not
+                  `openDisputes`, which is the KPI tile beside it and counts everything unresolved:
+                  a tile reports money held, a badge reports work nobody has claimed, and one number
+                  cannot be both without a button that changes neither.
                 */
-                disputes: overview.openDisputes ?? undefined,
+                disputes: overview.unacknowledgedDisputes,
                 /* Never produced by anything — see the note in `lib/console.ts`. */
                 staff: undefined,
               }

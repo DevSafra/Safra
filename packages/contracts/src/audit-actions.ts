@@ -196,6 +196,8 @@ export const AUDIT_ACTIONS = [
   'review.reported',
   'review.hidden',
   'review.report_dismissed',
+  /* Somebody took it: open -> investigating, with who took it. */
+  'dispute.acknowledged',
   'dispute.resolved',
   'dispute.rejected',
   /*

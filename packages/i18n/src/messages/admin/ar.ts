@@ -1563,6 +1563,16 @@ export const ar = {
         '{n, plural, zero {لا صور مرفوعة} one {صورة واحدة مرفوعة} two {صورتان مرفوعتان} few {# صور مرفوعة} many {# صورة مرفوعة} other {# صورة مرفوعة}}',
       open: 'فتح النزاع ←',
       frozen: 'المستحقات مجمّدة',
+      /*
+        ── «استلام» (Bashar, 2026-08-27) ──────────────────────────────────────
+
+        He asked for a control on every dispute that brings the sidebar badge down. It says TAKEN,
+        not «read» and not «done»: the dispute is not settled, the partner's payout is still frozen
+        and it is still in the queue. What changes is that it now has somebody's name on it, so the
+        badge — which counts what nobody has picked up — stops asking for one.
+      */
+      acknowledge: 'استلام',
+      acknowledging: 'جارٍ الاستلام…',
       note: 'فتح النزاع يجمّد استحقاق تحويل الشريك للحجز المعني حتى الإغلاق. الصور المرفوعة من العميل (EC-007) تظهر داخل ملف النزاع.',
       /** The close form. */
       close: 'إغلاق النزاع',
@@ -2639,6 +2649,7 @@ export const ar = {
     'staff.suspended': 'إيقاف موظف',
     'wallet.adjusted': 'تعديل محفظة',
     // Added 2026-08-04 with the four new sections.
+    'dispute.acknowledged': 'استلام نزاع للمراجعة',
     'dispute.resolved': 'إغلاق نزاع لصالح العميل',
     'dispute.rejected': 'رفض نزاع',
     'emergency_mode.activated': 'تفعيل وضع الطوارئ',
@@ -3001,6 +3012,14 @@ export const ar = {
       latitude: 'خط العرض',
       longitude: 'خط الطول',
       reference: 'المرجع',
+      /*
+        Written by `dispute.acknowledged` — WHO took the dispute for review. A staff user id, which
+        سجل التدقيق already renders as a name; without this line it printed the raw key.
+
+        Caught by `audit-catalogue.integration.test.ts`, which reads the TABLE rather than the code:
+        the key did not exist until the first «استلام» wrote one.
+      */
+      assignedTo: 'أُسند إلى',
       /* Written by `dispute.resolved` / `dispute.rejected` when a closure agrees compensation. */
       compensationAmount: 'مبلغ التعويض',
       compensationCurrency: 'عملة التعويض',

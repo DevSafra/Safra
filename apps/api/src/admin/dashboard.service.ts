@@ -61,17 +61,19 @@ export class DashboardService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   async overview(actor?: AccessTokenClaims) {
-    const [counters, revenue, bookings, audit, openDisputes] = await Promise.all([
-      this.counters(actor),
-      this.revenueSeries(actor),
-      this.recentBookings(actor),
-      /*
+    const [counters, revenue, bookings, audit, openDisputes, unacknowledgedDisputes] =
+      await Promise.all([
+        this.counters(actor),
+        this.revenueSeries(actor),
+        this.recentBookings(actor),
+        /*
         The activity panel is NOT scoped: it reads the audit log, which Bashar's decision keeps
         global and complete for every staff member. A scoped audit trail is not an audit trail.
       */
-      this.recentAudit(),
-      this.openDisputes(actor),
-    ]);
+        this.recentAudit(),
+        this.openDisputes(actor),
+        this.unacknowledgedDisputes(actor),
+      ]);
 
     return {
       counters,
@@ -79,6 +81,7 @@ export class DashboardService {
       recentBookings: bookings,
       recentAudit: audit,
       openDisputes,
+      unacknowledgedDisputes,
     };
   }
 
@@ -96,6 +99,28 @@ export class DashboardService {
    * `null` still means "cannot be determined", which is a different statement from zero and is
    * what the client renders differently.
    */
+  /**
+   * Disputes nobody has picked up — the sidebar badge, which the dashboard builds itself.
+   *
+   * Separate from `openDisputes` because the two answer different questions and must not be one
+   * number: the KPI tile reports the BACKLOG (everything unresolved, money held), and the badge
+   * reports what NEEDS SOMEBODY. Sharing one count would mean either a tile that under-reports
+   * frozen money or a badge that no button can bring down.
+   *
+   * The dashboard renders the sidebar from this payload while every other screen fetches
+   * `/admin/attention`; the two must agree, and `sidebar.spec.ts` is what holds them to it.
+   */
+  private async unacknowledgedDisputes(actor?: AccessTokenClaims): Promise<number> {
+    const result = await this.db.execute<{ n: string }>(sql`
+      SELECT count(*)::text AS n FROM disputes d
+      LEFT JOIN bookings b ON b.id = d.booking_id
+      WHERE d.status = 'open' AND d.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'b.city_id')}
+    `);
+
+    return Number(result.rows[0]?.n ?? 0);
+  }
+
   private async openDisputes(actor?: AccessTokenClaims): Promise<number> {
     const result = await this.db.execute<{ n: string }>(sql`
       SELECT count(*)::text AS n FROM disputes d
