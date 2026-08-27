@@ -82,6 +82,92 @@ test.describe('النزاعات', () => {
   });
 
   /**
+   * «استلام» brings the badge down — the whole of what Bashar asked for on 2026-08-27.
+   *
+   * ## Both halves, because either alone is a different feature
+   *
+   * The badge must DECREASE, and the dispute must stay in the queue with «مستحقات مجمّدة»
+   * unchanged. A button that only did the first would be a read-flag hiding a dispute whose payout
+   * is still frozen — the console reporting an empty queue over money the platform is holding.
+   *
+   * ## Read from the SIDEBAR, not from the KPI
+   *
+   * The KPI «نزاعات مفتوحة» and the badge are computed by different code on different screens; this
+   * asserts the one Bashar pointed at.
+   */
+  test('taking a dispute lowers the badge without releasing the money', async ({
+    page,
+  }) => {
+    await page.goto('/disputes?size=25');
+    await page.waitForSelector('article');
+
+    const badge = page.locator(
+      '.console-sidebar nav a[href="/disputes"] span.rounded-full',
+    );
+    /*
+      The KPI's VALUE, reached through its own label.
+
+      Written as a substring `getByText` first and it matched ten elements: every unresolved card
+      carries a «المستحقات مجمّدة» pill, and the KPI's «مستحقات مجمّدة» is a substring of it.
+      `exact` separates the two, and the value is the paragraph directly after the label — see
+      `Kpi` in `console-shell.tsx`.
+    */
+    const frozen = page
+      .locator('main')
+      .getByText(t.sections.disputes.kpiFrozen, { exact: true })
+      .locator('xpath=following-sibling::p[1]');
+
+    await expect(badge, 'the queue has a backlog to work from').toBeVisible();
+
+    const numeric = async (locator: typeof badge): Promise<number> =>
+      Number(((await locator.textContent()) ?? '').replace(/[^\d]/g, ''));
+
+    const before = await numeric(badge);
+    const frozenBefore = await numeric(frozen);
+
+    /*
+      ── the skip has to be narrower than «no button» ─────────────────────────
+
+      This first read «skip if there is no button», and mutating the card to stop offering one made
+      the test SKIP rather than fail — a vacuous pass over exactly the defect it exists for.
+
+      So the page is asked how many UNTAKEN disputes it is showing, from the status pills. Zero is
+      the only honest reason to skip; one or more and the control must be there, asserted rather
+      than assumed. «مفتوح» is not a substring of any other dispute status word — the closed ones
+      are «مغلق — …» and the taken one is «قيد المراجعة».
+    */
+    const untaken = page
+      .locator('article [data-status-pill]')
+      .filter({ hasText: t.enums.disputeStatus['open'] ?? '' });
+
+    test.skip(
+      (await untaken.count()) === 0,
+      'Every dispute here has already been taken.',
+    );
+
+    const take = page
+      .getByRole('button', { name: t.sections.disputes.acknowledge })
+      .first();
+
+    await expect(take, 'an untaken dispute offers «استلام»').toBeVisible();
+
+    await take.click();
+
+    await expect
+      .poll(async () => numeric(badge), {
+        timeout: 15_000,
+        message: 'the badge counts what nobody has taken, so taking one lowers it',
+      })
+      .toBe(before - 1);
+
+    /* And the money is exactly where it was. */
+    expect(
+      await numeric(frozen),
+      'taking a dispute does not release the partner payout it is holding',
+    ).toBe(frozenBefore);
+  });
+
+  /**
    * The queue is ordered as a queue, and it says how much is frozen.
    *
    * A dispute holds the partner's payout, so «مستحقات مجمّدة» is money the platform is sitting on.

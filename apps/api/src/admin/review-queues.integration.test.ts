@@ -170,21 +170,28 @@ describeIfDb('verification queues', () => {
    * of the database rather than about the counter, and that is exactly what put four untouched
    * retention cases red earlier the same day when a seven-day window rolled over mid-session.
    *
-   * ## The closed one is the control
+   * ## Two controls, and the second is what «استلام» turns on
    *
-   * Both are created together, and only the unresolved one may move the number. Without it the
-   * case passes just as well against `COUNT(*) FROM disputes`, which would badge the queue with
-   * every dispute ever settled.
+   * A SETTLED dispute must not count — without that the case passes against
+   * `COUNT(*) FROM disputes`, which would badge the queue with every complaint ever handled.
+   *
+   * And an ACKNOWLEDGED one must not count either. That is the whole of Bashar's 2026-08-27 ask:
+   * he wanted a control that brings the badge down, so the badge has to mean «nobody has taken
+   * this». Three disputes are created and exactly one may move the number.
    */
-  it('badges the disputes still waiting, and not the settled ones', async () => {
+  it('badges only the disputes nobody has taken', async () => {
     const before = Number((await review.attentionCounts())['disputes_open']);
 
     await dispute(db, 'open');
+    await dispute(db, 'investigating');
     await dispute(db, 'resolved');
 
     const after = Number((await review.attentionCounts())['disputes_open']);
 
-    expect(after - before, 'the open one is counted and the closed one is not').toBe(1);
+    expect(
+      after - before,
+      'the untaken one is counted; the taken one and the settled one are not',
+    ).toBe(1);
   });
 });
 
@@ -194,7 +201,10 @@ describeIfDb('verification queues', () => {
  * A booking is borrowed rather than built: this file's subject is the counters, and a dispute needs
  * a booking, a partner and a customer that already agree with each other.
  */
-async function dispute(db: Database, status: 'open' | 'resolved'): Promise<void> {
+async function dispute(
+  db: Database,
+  status: 'open' | 'investigating' | 'resolved',
+): Promise<void> {
   await db.execute(sql`
     INSERT INTO disputes (booking_id, partner_id, customer_profile_id, kind, status, title
                           ${status === 'resolved' ? sql`, resolution, closed_at` : sql``})

@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { ERROR } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
@@ -43,6 +44,15 @@ const STAFF = (sub: string): AccessTokenClaims =>
     permissions: ['dispute.manage'],
   }) as unknown as AccessTokenClaims;
 
+/** The same member, but able to write in ONE named city and nowhere else. */
+const SCOPED = (sub: string, cityId: string): AccessTokenClaims =>
+  ({
+    sub,
+    role: 'operations_manager',
+    permissions: ['dispute.manage'],
+    scope: { kind: 'cities', cityIds: [cityId], outside: 'none' },
+  }) as unknown as AccessTokenClaims;
+
 describeIfDb('a dispute opened on a booking', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
@@ -73,6 +83,61 @@ describeIfDb('a dispute opened on a booking', () => {
     `);
 
     return rows.rows[0]?.status ?? '';
+  };
+
+  /** This booking's only dispute — the fixture opens exactly one. */
+  const onlyReference = async (): Promise<string> => {
+    const rows = await db.execute<{ reference: string }>(sql`
+      SELECT d.reference FROM disputes d
+      JOIN bookings b ON b.id = d.booking_id
+      WHERE b.reference = ${reference}
+      ORDER BY d.created_at DESC LIMIT 1
+    `);
+
+    const only = rows.rows[0];
+
+    if (!only) throw new Error('the fixture opened no dispute');
+
+    return only.reference;
+  };
+
+  const disputeRow = async (): Promise<{
+    status: string;
+    assigned_to_user_id: string | null;
+  }> => {
+    const rows = await db.execute<{
+      status: string;
+      assigned_to_user_id: string | null;
+    }>(sql`
+      SELECT d.status::text AS status, d.assigned_to_user_id::text AS assigned_to_user_id
+      FROM disputes d
+      JOIN bookings b ON b.id = d.booking_id
+      WHERE b.reference = ${reference}
+      ORDER BY d.created_at DESC LIMIT 1
+    `);
+
+    const only = rows.rows[0];
+
+    if (!only) throw new Error('the fixture opened no dispute');
+
+    return only;
+  };
+
+  /**
+   * Whether THIS booking's payout is frozen, asked the way `PayoutService` asks it.
+   *
+   * Counted rather than listed so «still frozen» is a number that cannot quietly become a
+   * different booking's freeze.
+   */
+  const frozenCount = async (): Promise<number> => {
+    const rows = await db.execute<{ n: string }>(sql`
+      SELECT count(*)::text AS n FROM disputes d
+      JOIN bookings b ON b.id = d.booking_id
+      WHERE b.reference = ${reference}
+        AND d.status IN ('open', 'investigating') AND d.deleted_at IS NULL
+    `);
+
+    return Number(rows.rows[0]?.n ?? 0);
   };
 
   const open = (kind = 'not_as_described') =>
@@ -122,6 +187,92 @@ describeIfDb('a dispute opened on a booking', () => {
 
     /* The control: the title is NOT the description, so this cannot pass by reading the headline. */
     expect(mine?.title).not.toBe(mine?.description);
+  });
+
+  /**
+   * ── «استلام»: taking a dispute (Bashar, 2026-08-27) ─────────────────────
+   *
+   * He asked for a control on every dispute that brings the sidebar badge down. The assertion that
+   * matters is the PAIR: the badge stops counting it AND the partner's money stays frozen. A button
+   * that only did the first would report an empty queue over money the platform is still holding,
+   * which is the failure this whole design exists to prevent.
+   */
+  it('takes a dispute without releasing the money', async () => {
+    await open();
+
+    const before = await frozenCount();
+
+    await disputes.acknowledge(STAFF(staffId), await onlyReference());
+
+    const row = await disputeRow();
+
+    expect(row.status, 'somebody has it now').toBe('investigating');
+    expect(row.assigned_to_user_id, 'and the row says who').toBe(staffId);
+
+    /*
+      The half that must NOT move. `frozenBookingReferences` is what stops a payout, and it reads
+      the same UNRESOLVED set — so taking a dispute has to leave it exactly as it was.
+    */
+    expect(await frozenCount(), 'the payout is still frozen').toBe(before);
+  });
+
+  /** Taking one that is already taken changes nothing and writes no audit row. */
+  it('is idempotent, and does not audit a second take', async () => {
+    await open();
+
+    const reference = await onlyReference();
+
+    expect(await disputes.acknowledge(STAFF(staffId), reference)).toStrictEqual({
+      acknowledged: true,
+    });
+    expect(await disputes.acknowledge(STAFF(staffId), reference)).toStrictEqual({
+      acknowledged: false,
+    });
+
+    /* Scoped to THIS dispute: `audit_log` is append-only and shared with every other suite. */
+    const audited = await db.execute<{ n: string }>(sql`
+      SELECT count(*)::text AS n FROM audit_log a
+      JOIN disputes d ON d.id = a.subject_id
+      WHERE a.action = 'dispute.acknowledged' AND d.reference = ${reference}
+    `);
+
+    expect(audited.rows[0]?.n, 'one take, one row').toBe('1');
+  });
+
+  /** A settled dispute cannot be taken — that is a conflict, not a no-op. */
+  it('refuses to take a dispute that is already closed', async () => {
+    await open();
+
+    const reference = await onlyReference();
+
+    await disputes.close(STAFF(staffId), reference, {
+      outcome: 'rejected',
+      resolution: 'تم البت في الشكوى بعد مراجعة الأدلة.',
+    });
+
+    await expect(disputes.acknowledge(STAFF(staffId), reference)).rejects.toMatchObject({
+      response: { code: ERROR.DISPUTE_ALREADY_CLOSED },
+    });
+  });
+
+  /** Out of scope answers exactly as absent, and the dispute is untouched. */
+  it('refuses a dispute in a city this reader cannot see', async () => {
+    await open();
+
+    const reference = await onlyReference();
+    const elsewhere = await db.execute<{ id: string }>(sql`
+      SELECT id::text FROM cities WHERE deleted_at IS NULL LIMIT 1 OFFSET 1
+    `);
+    const other = elsewhere.rows[0]?.id;
+
+    if (!other) throw new Error('the fixture needs a second city');
+
+    await expect(
+      disputes.acknowledge(SCOPED(staffId, other), reference),
+    ).rejects.toMatchObject({ response: { code: ERROR.DISPUTE_NOT_FOUND } });
+
+    /* The control: it is still open, so the refusal withheld rather than failed. */
+    expect((await disputeRow()).status).toBe('open');
   });
 
   it('moves the booking to disputed', async () => {
