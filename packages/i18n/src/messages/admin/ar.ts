@@ -1636,7 +1636,15 @@ export const ar = {
       billingQuarterly: 'ربع سنوية',
       /* A new advertiser, created inline: a campaign needs one and there is nowhere else to add it. */
       /* Editing what a live campaign SAYS — the headlines and the target, never the window. */
-      editCreative: 'تعديل الإعلان',
+      /*
+        One word, to match «إيقاف» beside it (Bashar, 2026-08-27).
+        
+        «تعديل الإعلان» set the width of BOTH controls once they became a pair of equal tracks, and
+        at 1024px it wrapped to two lines inside its own button — which put fifteen pixels of height
+        on every row of the screen to say a word the column header already implies. Two short verbs
+        read as two actions; a verb and a phrase read as a control and a sentence.
+      */
+      editCreative: 'تعديل',
       saveCreative: 'حفظ',
       newAdvertiser: '+ معلن جديد',
       advTitle: 'معلن جديد',
@@ -1656,8 +1664,27 @@ export const ar = {
       colPeriod: 'المدة',
       colImpressions: 'مشاهدات',
       colClicks: 'نقرات',
-      endsIn: 'ينتهي بعد {days} أيام',
+      /*
+        An ICU PLURAL, not a `fill()` template with «أيام» written into it (Bashar, 2026-08-27).
+        
+        It read «ينتهي بعد 59 أيام», which is not Arabic: 59 takes «يوماً», 2 takes «يومان» and 1
+        takes «يوم واحد». That is the rule «do not build plurals with a conditional» meeting the
+        case it was written for — the word was not conditional, it was simply always the wrong one
+        for four of Arabic's six categories.
+        
+        «متبقٍ» rather than «ينتهي بعد», because the cell now shows the window's dates directly
+        underneath: the reader gets the span and how much of it is left, without the sentence
+        repeating what the dates already say.
+      */
+      endsIn:
+        '{days, plural, zero {ينتهي اليوم} one {يوم واحد متبقٍ} two {يومان متبقيان} few {# أيام متبقية} many {# يوماً متبقياً} other {# يوم متبقٍ}}',
       ended: 'انتهت المدة',
+      /*
+        A campaign with no price is legitimate — a goodwill placement, or a barter — and it issues
+        no invoices. The cell showed «شهري» with nothing under it, which reads as data that failed
+        to load rather than as a decision somebody made.
+      */
+      noPrice: 'بلا سعر',
       pause: 'إيقاف',
       resume: 'تشغيل',
       pausing: 'جارٍ التنفيذ…',

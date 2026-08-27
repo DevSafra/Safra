@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { t, apiError } from '@/lib/strings';
+import { t, apiErrorOf } from '@/lib/strings';
 
 /**
  * Editing what a live campaign SAYS, from the row it says it on.
@@ -78,13 +78,7 @@ export function CampaignCreativeForm({
       if (!response.ok) {
         const payload: unknown = await response.json().catch(() => null);
 
-        setError(
-          apiError(
-            typeof payload === 'object' && payload !== null && 'message' in payload
-              ? String(payload.message)
-              : null,
-          ),
-        );
+        setError(apiErrorOf(payload));
 
         return;
       }
@@ -103,7 +97,7 @@ export function CampaignCreativeForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="cursor-pointer justify-self-start rounded-md border border-line px-2.5 py-0.5 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
+        className="inline-flex w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
       >
         {c.editCreative}
       </button>
@@ -111,10 +105,34 @@ export function CampaignCreativeForm({
   }
 
   const field =
-    'w-full min-w-0 rounded-md border border-line bg-card px-2 py-1 text-[11px] text-text';
+    'w-full min-w-0 rounded-md border border-line bg-field px-2 py-1.5 text-[11.5px] text-text';
 
+  /*
+    Open, the form takes the WHOLE cell — and the cell is still narrow.
+
+    ## What was tried and does not work
+
+    A popover: `absolute`, anchored under the button at `w-[19rem]`, so the fields would have room.
+    It is CLIPPED. The table lives in an `overflow-x-auto` box — which it must, so a wide table
+    scrolls inside itself rather than pushing the page sideways — and `overflow: auto` clips
+    absolutely positioned descendants. Measured rather than reasoned: the panel rendered 163px wide
+    against the 304px asked for, with the rest cut off at the container's edge. Escaping that needs
+    `position: fixed` and JavaScript to keep the panel with the button, which is a lot of machinery
+    for four text inputs.
+
+    ## What this is instead
+
+    `col-span-2`, so the form uses the full width of الحالة rather than half of it now that the
+    controls are a pair of equal tracks. That is the best shape available inside a table cell, and
+    it is still cramped: the URL label wraps and its value scrolls inside the box.
+
+    **The right answer is to open this in the panel under the toolbar**, at the table's full width,
+    where the CREATE form already lives — reached from the row by a `?edit=<reference>` parameter so
+    it stays server-driven and shareable. That is a change to the screen's shape rather than to this
+    cell, and it is Bashar's to approve.
+  */
   return (
-    <div className="grid gap-1.5">
+    <div className="col-span-2 grid gap-1.5">
       {/* The label carries the language: four boxes with no names is four guesses. */}
       <label className="grid gap-0.5 text-[10px] text-faint">
         {c.fHeadlineAr}

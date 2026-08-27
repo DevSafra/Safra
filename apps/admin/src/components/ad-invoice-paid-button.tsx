@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { t, apiError } from '@/lib/strings';
+import { t, apiErrorOf } from '@/lib/strings';
 
 /**
  * «سُدِّدت» — the moment an advertising invoice becomes revenue in the books.
@@ -44,12 +44,7 @@ export function AdInvoicePaidButton({ reference }: { readonly reference: string 
 
       if (!response.ok) {
         const payload: unknown = await response.json().catch(() => null);
-        const message =
-          typeof payload === 'object' && payload !== null && 'message' in payload
-            ? String(payload.message)
-            : null;
-
-        setError(apiError(message));
+        setError(apiErrorOf(payload));
 
         return;
       }
@@ -69,7 +64,7 @@ export function AdInvoicePaidButton({ reference }: { readonly reference: string 
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="cursor-pointer justify-self-start rounded-md border border-line px-2.5 py-0.5 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
+        className="inline-flex w-fit cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
       >
         {c.markPaid}
       </button>

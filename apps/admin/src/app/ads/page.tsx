@@ -24,7 +24,7 @@ import { TableToolbar } from '@/components/table-toolbar';
 import { CampaignStatusButton } from '@/components/campaign-status-button';
 import { AdInvoicePaidButton } from '@/components/ad-invoice-paid-button';
 import { CampaignCreativeForm } from '@/components/campaign-creative-form';
-import { fill, label, t } from '@/lib/strings';
+import { fill, label, plural, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { listParamsFor } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
@@ -48,7 +48,14 @@ import { refuseSection } from '@/components/section-refusal';
 export const dynamic = 'force-dynamic';
 
 /** The design's `grid-template-columns`, verbatim. */
-const TEMPLATE = '1fr 1.3fr .8fr .9fr .9fr .8fr .8fr .9fr';
+/*
+  الحالة is the widest track, and that is deliberate (Bashar, 2026-08-27).
+
+  It carries four things — the pill, how long is left, the window's dates, and two controls — and at
+  `.9fr` the pair of buttons could not sit on one line, so they wrapped and the column drove the
+  height of every row on the screen. The width comes off المعلن, which is a name and wraps happily.
+*/
+const TEMPLATE = '1fr 1.15fr .8fr .85fr .9fr .75fr .75fr 1.2fr';
 
 /** فواتير الإعلانات — seven columns, seven tracks. */
 const INVOICE_TEMPLATE = '1fr .9fr 1.1fr 1.1fr .9fr .9fr 1fr';
@@ -377,7 +384,27 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
   {
     key: 'advertiser',
     header: t.sections.ads.colAdvertiser,
-    render: (row) => <span className="font-semibold text-text">{row.advertiser}</span>,
+    /*
+      The advertiser, and UNDER it the Arabic headline the customer actually reads.
+
+      Bashar, 2026-08-27: «when I edit a row and save, nothing changes, is that correct?» It was
+      correct, and it was the defect. «تعديل» edits the three headlines and the target, and NONE of
+      the four appeared anywhere on this screen — so a save that worked, wrote and was audited
+      looked identical to one that had failed silently. A control whose result is invisible cannot
+      be told apart from a broken one, and the operator has no way to know which they have.
+
+      The ARABIC one, because this console is Arabic and it is the copy most of its readers are
+      served. The English and German headlines and the target stay in the form: four lines per row
+      would spend this row's legibility on the rarer question.
+    */
+    render: (row) => (
+      <div className="grid gap-0.5 leading-tight">
+        <span className="font-semibold text-text">{row.advertiser}</span>
+        <span className="truncate text-[10.5px] text-faint" title={row.headlineAr}>
+          {row.headlineAr}
+        </span>
+      </div>
+    ),
   },
   {
     key: 'kind',
@@ -396,15 +423,30 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
   {
     key: 'period',
     header: t.sections.ads.colPeriod,
+    /*
+      The cycle on one line, what it costs on the next (Bashar, 2026-08-27).
+
+      They were one line — the Arabic word, then the amount in an inline `Ltr` with a margin — and
+      they rendered touching: «شهري$150.00». The margin was `ms-`, which is the INLINE START, and on
+      an RTL line that puts the gap on the far side of the isolated run from where it is needed.
+      Two values of different kinds sharing a line in two directions is a fight that a margin does
+      not settle.
+
+      Stacked, each reads as itself: the cycle is a word, the price is a figure, and «شهري» directly
+      above «$150.00» says «monthly, at this rate» without either being read into the other.
+    */
     render: (row) => (
-      <span className="text-muted">
-        {periodLabel(row.billingPeriod)}
+      <div className="grid gap-0.5 leading-tight">
+        <span className="text-text2">{periodLabel(row.billingPeriod)}</span>
         {row.priceAmount && row.priceCurrency ? (
-          <Ltr className="ms-1.5 text-[10.5px] text-gold">
+          /* Never a bare figure — SYP and USD differ by four orders of magnitude. */
+          <Ltr className="text-[11px] font-bold text-gold">
             {amount(row.priceAmount, row.priceCurrency)}
           </Ltr>
-        ) : null}
-      </span>
+        ) : (
+          <span className="text-[10.5px] text-faint">{t.sections.ads.noPrice}</span>
+        )}
+      </div>
     ),
   },
   {
@@ -429,24 +471,60 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
   {
     key: 'status',
     header: t.table.colStatus,
+    /*
+      Four things a reader needs, in the order they need them (Bashar, 2026-08-27).
+
+      It was five stacked items of five different widths — pill, countdown, then the two dates on
+      separate lines with a dangling «←», then two buttons one above the other — and the column drove
+      the height of every row on the screen.
+
+      ## What changed, and why each one
+
+      **The pill and how long is left share a line.** They answer one question — «is this running,
+      and for how much longer» — and reading them as one glance is the whole point of the column.
+
+      **The countdown is no longer wrapped in `<Ltr>`.** It is an Arabic SENTENCE, and forcing an
+      LTR isolate over a label is the mistake `docs/i18n.md` names outright: the number inside it is
+      a Latin RUN, and the bidi algorithm lays a run out correctly without being told. Wrapping the
+      sentence is what pushed the digits around.
+
+      **The dates are one line that does not break**, isolated as a PAIR — a range is a single value
+      and `whitespace-nowrap` keeps «←» between its two ends instead of stranded at the end of a row.
+
+      **The controls sit side by side.** Two buttons of the same size on one line read as a pair of
+      actions; stacked, they read as a list of two more facts about the campaign.
+    */
     render: (row) => (
       <div className="grid gap-1.5">
-        <StatusPill tone={statusTone(row.status)}>
-          {label(t.enums.adStatus, row.status)}
-        </StatusPill>
-        {/* The design's "ينتهي بعد 4 أيام" — a window closing is what needs the operator. */}
-        <Ltr className="text-[10px] text-faint">
-          {row.daysRemaining < 0
-            ? t.sections.ads.ended
-            : fill(t.sections.ads.endsIn, { days: count(row.daysRemaining) })}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <StatusPill tone={statusTone(row.status)}>
+            {label(t.enums.adStatus, row.status)}
+          </StatusPill>
+          <span className="text-[10px] text-faint">
+            {row.daysRemaining < 0
+              ? t.sections.ads.ended
+              : plural(t.sections.ads.endsIn, { days: row.daysRemaining })}
+          </span>
+        </div>
+
+        <Ltr className="text-[10px] whitespace-nowrap text-faint2">
+          {shortDate(row.startsAt)} ← {shortDate(row.endsAt)}
         </Ltr>
-        <span className="text-[10px] text-faint2">
-          <Ltr>
-            {shortDate(row.startsAt)} ← {shortDate(row.endsAt)}
-          </Ltr>
-        </span>
+
         {row.status === 'expired' ? null : (
-          <>
+          /*
+            A two-column GRID, not a flex row with a `min-w-*` on each button.
+
+            `min-w-[5.5rem]` was tried first and computed to `0px` in the browser: `globals.css`
+            carries `:where(.grid, .flex, .inline-flex) > * { min-width: 0 }`, and under Tailwind v4
+            that rule outranks the utility despite the utility's higher specificity — cascade LAYERS
+            beat specificity, and the note beside that rule saying «any explicit `min-w-*` still
+            wins» is no longer true of the built CSS. Measured, not assumed.
+
+            Two equal tracks need no override and no magic number: the pair reads as a pair at every
+            width, and neither button has to be told how wide the other is.
+          */
+          <div className="grid grid-cols-2 items-start gap-1.5">
             <CampaignStatusButton reference={row.reference} status={row.status} />
             {/*
               The creative, editable from the row it appears on.
@@ -461,7 +539,7 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
               headlineDe={row.headlineDe}
               targetUrl={row.targetUrl}
             />
-          </>
+          </div>
         )}
       </div>
     ),
