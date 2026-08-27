@@ -2,6 +2,7 @@ import { relations, sql } from 'drizzle-orm';
 import {
   bigint,
   index,
+  integer,
   pgEnum,
   pgTable,
   text,
@@ -10,7 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 import { foreignId, money, primaryId, timestamps } from './_shared.js';
-import { adStatus } from './enums.js';
+import { adStatus, imageStatus } from './enums.js';
 import { cities, currencies } from './geo.js';
 import { users } from './identity.js';
 
@@ -136,8 +137,43 @@ export const adCampaigns = pgTable(
      */
     targetUrl: text('target_url').notNull(),
 
-    /** Optional: an ad may be a line of text. Stored like every other media path. */
+    /*
+      The CREATIVE image, through the same pipeline every other picture on the platform uses.
+
+      It was one nullable `image_path` — a free-text column nothing wrote and nothing read, and the
+      reason the customer app rendered text only: an `<img>` built from a path nobody validates
+      means the first thing to write that column decides what SAFRA's pages fetch.
+
+      These five are `property_images`' shape, minus the gallery: a campaign has ONE creative, so
+      there is no sort order, no cover and no second row. Everything else is identical because it is
+      literally the same code — `ImageService.inspect` refuses anything that is not a photograph by
+      its magic bytes, the worker re-encodes it (which destroys polyglot files and strips EXIF), and
+      `variant_widths` records what was actually produced because the pipeline never upscales.
+
+      `image_status` is the field that says whether the URLs resolve yet. A campaign with no image
+      is still a complete ad — a headline and an advertiser name — so all five are nullable.
+    */
+    /*
+      `image_path` is KEPT and unused (2026-08-27).
+
+      It was the free-text column this replaces, and nothing ever wrote it — measured at 0 of 21
+      campaigns the day the pipeline was built. Dropping it would make `db:generate` ask whether the
+      new `image_file_key` is a RENAME of it, which is a question a non-interactive run cannot
+      answer, and answering it wrong would rewrite the column rather than add one.
+      
+      So it stays, deprecated, with nothing reading it. The same trade `TABLE_SECTIONS` records for
+      `staffScope`: a dead name is cheaper than a migration that has to be got right by eye.
+    */
     imagePath: text('image_path'),
+
+    imageFileKey: text('image_file_key'),
+    imageWidth: integer('image_width'),
+    imageHeight: integer('image_height'),
+    imageVariantWidths: integer('image_variant_widths').array(),
+    imageStatus: imageStatus('image_status'),
+    /** The uploaded bytes, parked until the worker has re-encoded them. Cleared when it has. */
+    imageOriginalKey: text('image_original_key'),
+    imageFailureCode: text('image_failure_code'),
 
     createdByUserId: foreignId('created_by_user_id').references(() => users.id),
     ...timestamps,

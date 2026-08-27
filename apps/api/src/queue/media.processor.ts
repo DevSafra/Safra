@@ -11,7 +11,7 @@ import { ImageService } from '../storage/image.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { QUEUE } from './queue.definitions.js';
 import { DeadLetterService } from './dead-letter.service.js';
-import { MEDIA_JOB, type MediaJobData } from './media.job.js';
+import { MEDIA_JOB, type MediaJobData, type MediaSubject } from './media.job.js';
 import { describeError } from '../common/errors/safe-error.js';
 
 /**
@@ -56,6 +56,8 @@ export class MediaProcessor {
     }
 
     const { imageId, originalKey, fileKey } = job.data;
+    /* Absent means `property_images` — see `MediaSubject`. */
+    const subject = job.data.subject ?? 'property_image';
 
     /*
       Claimed, not just read.
@@ -67,11 +69,18 @@ export class MediaProcessor {
 
       The `updated_at` touch is the claim itself; the trigger on this table would do it anyway.
     */
-    const claimed = await this.db.execute<{ id: string }>(sql`
-      UPDATE property_images SET updated_at = now()
-      WHERE id = ${imageId}::uuid AND status = 'processing'
-      RETURNING id
-    `);
+    const claimed =
+      subject === 'ad_campaign'
+        ? await this.db.execute<{ id: string }>(sql`
+            UPDATE ad_campaigns SET updated_at = now()
+            WHERE id = ${imageId}::uuid AND image_status = 'processing'
+            RETURNING id
+          `)
+        : await this.db.execute<{ id: string }>(sql`
+            UPDATE property_images SET updated_at = now()
+            WHERE id = ${imageId}::uuid AND status = 'processing'
+            RETURNING id
+          `);
 
     if (!claimed.rows[0]) {
       this.logger.log(`Image ${imageId} is no longer processing; nothing to do.`);
@@ -86,7 +95,7 @@ export class MediaProcessor {
         Terminal, and deliberately not a retry: the bytes are gone, and no number of attempts
         brings them back. Throwing would burn three attempts to reach the same place slower.
       */
-      await this.fail(imageId, ERROR.UPLOAD_FILE_MISSING);
+      await this.fail(imageId, ERROR.UPLOAD_FILE_MISSING, subject);
       this.logger.error(`Image ${imageId}: the uploaded object ${originalKey} is gone.`);
 
       return;
@@ -102,19 +111,35 @@ export class MediaProcessor {
       knows the column is an array and encodes it correctly, so the type declaration does the work
       instead of a hand-written `ARRAY[…]::integer[]` that has to be got right by eye.
     */
-    await this.db
-      .update(schema.propertyImages)
-      .set({
-        status: 'ready',
-        width: processed.width,
-        height: processed.height,
-        // Distinct widths only — each appears twice, once per format.
-        variantWidths: [...new Set(processed.variants.map((variant) => variant.width))],
-        /* Cleared with the object below, so a set column always means a file still exists. */
-        originalKey: null,
-        failureCode: null,
-      })
-      .where(eq(schema.propertyImages.id, imageId));
+    // Distinct widths only — each appears twice, once per format.
+    const widths = [...new Set(processed.variants.map((variant) => variant.width))];
+
+    if (subject === 'ad_campaign') {
+      await this.db
+        .update(schema.adCampaigns)
+        .set({
+          imageStatus: 'ready',
+          imageWidth: processed.width,
+          imageHeight: processed.height,
+          imageVariantWidths: widths,
+          imageOriginalKey: null,
+          imageFailureCode: null,
+        })
+        .where(eq(schema.adCampaigns.id, imageId));
+    } else {
+      await this.db
+        .update(schema.propertyImages)
+        .set({
+          status: 'ready',
+          width: processed.width,
+          height: processed.height,
+          variantWidths: widths,
+          /* Cleared with the object below, so a set column always means a file still exists. */
+          originalKey: null,
+          failureCode: null,
+        })
+        .where(eq(schema.propertyImages.id, imageId));
+    }
 
     /*
       Last. A failure here leaves an orphan under `incoming/` and a perfectly good published image,
@@ -176,7 +201,30 @@ export class MediaProcessor {
    * and leave two covers — the partial unique index would reject the second, which is the guarantee
    * doing its job rather than a crash to explain.
    */
-  private async fail(imageId: string, code: string): Promise<void> {
+  private async fail(
+    imageId: string,
+    code: string,
+    subject: MediaSubject = 'property_image',
+  ): Promise<void> {
+    /*
+      A campaign's creative fails on its own, with none of the gallery's consequences.
+
+      `property_images` has to promote the next photograph when a COVER fails, because a published
+      listing with no cover renders «لا صورة بعد» to customers. A campaign has one image and no
+      cover to lose: the ad falls back to text, which is a complete ad, so the whole CTE below is
+      not merely unnecessary here — it names columns this table does not have.
+    */
+    if (subject === 'ad_campaign') {
+      await this.db
+        .update(schema.adCampaigns)
+        .set({ imageStatus: 'failed', imageFailureCode: code })
+        .where(eq(schema.adCampaigns.id, imageId));
+
+      this.logger.warn(`Campaign creative ${imageId} failed: ${code}.`);
+
+      return;
+    }
+
     try {
       await this.db.transaction(async (tx) => {
         /*

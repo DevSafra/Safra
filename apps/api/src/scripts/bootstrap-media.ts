@@ -53,7 +53,20 @@ function readOnlyPolicy(bucket: string): string {
           a different prefix and are served through signed URLs precisely because they are private.
         */
         Action: ['s3:GetObject'],
-        Resource: [`arn:aws:s3:::${bucket}/properties/*`],
+        /*
+          Every prefix the platform SERVES, named one by one.
+
+          `ads/*` joined it on 2026-08-27 with advertising creatives, and its absence was a silent
+          403: the URL was right, the object existed, the row said `ready`, and the browser rendered
+          nothing — `naturalWidth` zero, no error anybody could see. That is the failure mode this
+          list produces every time, which is why it is a list rather than a wildcard.
+
+          A wildcard would also be wrong for a reason no convenience outweighs: identity documents
+          live in this bucket under their own prefix and are served through signed URLs precisely
+          because they are private. `cities/*` is deliberately absent — `ImageService.keyFor`
+          accepts the kind and nothing calls it, so adding it would open a prefix nothing writes.
+        */
+        Resource: [`arn:aws:s3:::${bucket}/properties/*`, `arn:aws:s3:::${bucket}/ads/*`],
       },
     ],
   });
@@ -107,7 +120,8 @@ async function main(): Promise<void> {
   );
 
   console.log(
-    `Anonymous read enabled for ${bucket}/properties/*. Identity documents stay private.`,
+    `Anonymous read enabled for ${bucket}/properties/* and ${bucket}/ads/*. ` +
+      'Identity documents stay private.',
   );
 }
 

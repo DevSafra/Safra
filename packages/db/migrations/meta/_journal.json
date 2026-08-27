@@ -372,6 +372,13 @@
       "when": 1787783477223,
       "tag": "0052_shiny_obadiah_stane",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1787842766508,
+      "tag": "0053_flaky_cobalt_man",
+      "breakpoints": true
     }
   ]
 }

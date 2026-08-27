@@ -21,9 +21,24 @@ export const MEDIA_JOB = 'image.render' as const;
  * request already wrote. A job whose payload came from an upload form would be a way to make a
  * worker read and re-encode an arbitrary object in the bucket.
  */
+/**
+ * Which table the row lives in.
+ *
+ * The pipeline is ONE pipeline — one `ImageService`, one queue, one worker, one re-drive story —
+ * and the only thing that differs between a listing photograph and an advertising creative is where
+ * the finished widths are written. A second processor would be a second place for the magic-byte
+ * check, the EXIF-stripping re-encode or the claim-before-render to be forgotten, and the one that
+ * was forgotten would be the interesting one.
+ *
+ * Absent means `property_images`, so every job enqueued before advertising creatives existed still
+ * means what it meant.
+ */
+export type MediaSubject = 'property_image' | 'ad_campaign';
+
 export interface MediaJobData {
-  /** The `property_images` row this job completes. */
+  /** The row this job completes — in `property_images`, or `ad_campaigns` for a creative. */
   readonly imageId: string;
+  readonly subject?: MediaSubject;
   /** Where the uploaded bytes are parked. Private prefix — see `INCOMING_PREFIX`. */
   readonly originalKey: string;
   /** The prefix the variants hang off, already stored on the row. */
