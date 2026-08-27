@@ -155,7 +155,58 @@ describeIfDb('verification queues', () => {
     expect(counters).toHaveProperty('bookings_sla_expiring_within_30m');
     expect(counters.partners_pending_verification).toBeGreaterThan(0);
   });
+
+  /**
+   * The badge beside النزاعات counts what is WAITING, not what exists.
+   *
+   * Bashar asked for the count on 2026-08-27. `warn` was already set on that nav item — the flag's
+   * own note names «a customer whose dispute is open» as the case it exists for — and no query had
+   * ever produced the number.
+   *
+   * ## Asserted as a DELTA, never as an absolute
+   *
+   * This counter reads the whole table, and the database this runs against carries disputes from
+   * the testbed and from the browser suite. `toBe(1)` on a shared table is a claim about the rest
+   * of the database rather than about the counter, and that is exactly what put four untouched
+   * retention cases red earlier the same day when a seven-day window rolled over mid-session.
+   *
+   * ## The closed one is the control
+   *
+   * Both are created together, and only the unresolved one may move the number. Without it the
+   * case passes just as well against `COUNT(*) FROM disputes`, which would badge the queue with
+   * every dispute ever settled.
+   */
+  it('badges the disputes still waiting, and not the settled ones', async () => {
+    const before = Number((await review.attentionCounts())['disputes_open']);
+
+    await dispute(db, 'open');
+    await dispute(db, 'resolved');
+
+    const after = Number((await review.attentionCounts())['disputes_open']);
+
+    expect(after - before, 'the open one is counted and the closed one is not').toBe(1);
+  });
 });
+
+/**
+ * One dispute on an existing booking, in a chosen state.
+ *
+ * A booking is borrowed rather than built: this file's subject is the counters, and a dispute needs
+ * a booking, a partner and a customer that already agree with each other.
+ */
+async function dispute(db: Database, status: 'open' | 'resolved'): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO disputes (booking_id, partner_id, customer_profile_id, kind, status, title
+                          ${status === 'resolved' ? sql`, resolution, closed_at` : sql``})
+    SELECT b.id, b.partner_id, b.customer_profile_id, 'complaint',
+           ${status}::dispute_status, 'نزاع اختبار العداد'
+           ${status === 'resolved' ? sql`, 'closed for the counter test', now()` : sql``}
+    FROM bookings b
+    WHERE b.deleted_at IS NULL AND b.customer_profile_id IS NOT NULL
+    ORDER BY b.created_at DESC
+    LIMIT 1
+  `);
+}
 
 async function createPendingPartnerWithDocument(db: Database): Promise<string> {
   const id = randomUUID();

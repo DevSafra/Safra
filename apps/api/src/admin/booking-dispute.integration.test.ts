@@ -98,9 +98,19 @@ describeIfDb('a dispute opened on a booking', () => {
   it('carries the account somebody gave into the queue', async () => {
     await open();
 
+    /*
+      FILTERED to this booking, not page one of everything.
+    
+      Written as `page: 1, limit: 25` first, which passed alone and failed inside `pnpm verify` the
+      same hour: the queue puts unresolved disputes oldest-first, so a dispute created just now
+      sorts LAST among them — and once the shared database held more than 25 open disputes it fell
+      off page one. A test whose subject has to be in the first 25 rows of a table other suites
+      write to is asserting about the size of the backlog, not about the projection.
+    */
     const queue = await disputes.list({
       page: 1,
       limit: 25,
+      q: reference,
       actor: STAFF(staffId),
     });
     const mine = queue.items.find((row) => row.bookingReference === reference);

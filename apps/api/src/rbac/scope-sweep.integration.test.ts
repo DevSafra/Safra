@@ -206,7 +206,51 @@ describeIfDb('the O-sec-13 sweep, in behaviour', () => {
     ).toBeLessThan(Number(everything['partner_applications_open']));
   });
 
+  /**
+   * The disputes badge is scoped too — and through a JOIN, which is where it could differ.
+   *
+   * A dispute has no city column of its own; it inherits the booking's. Every other counter in
+   * `attentionCounts` filters a city on the table it counts, so this one is the only place the
+   * scope predicate is applied to a joined alias — and an alias typed wrong there does not fail,
+   * it silently counts the country. Added with the badge on 2026-08-27.
+   */
+  it('badges only the disputes the reader could open', async () => {
+    const review = new AdminReviewService(
+      db,
+      new AuditService(db),
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await disputeIn(away);
+    await disputeIn(away);
+
+    const mine = Number((await review.attentionCounts(scopedTo(home)))['disputes_open']);
+    const everything = Number((await review.attentionCounts(undefined))['disputes_open']);
+
+    expect(
+      everything,
+      'the unscoped count sees the two just made',
+    ).toBeGreaterThanOrEqual(2);
+    expect(mine, 'and a reader scoped elsewhere does not').toBeLessThan(everything);
+  });
+
   /* ── Fixtures ─────────────────────────────────────────────────────────────────────────────── */
+
+  /** An open dispute on a booking in `cityId`, so the badge has something to be scoped away from. */
+  async function disputeIn(cityId: string | null): Promise<void> {
+    await db.execute(sql`
+      INSERT INTO disputes (booking_id, partner_id, customer_profile_id, kind, status, title)
+      SELECT b.id, b.partner_id, b.customer_profile_id, 'complaint', 'open', 'نزاع نطاق'
+      FROM bookings b
+      WHERE b.city_id = ${cityId}::uuid AND b.deleted_at IS NULL
+        AND b.customer_profile_id IS NOT NULL
+      ORDER BY b.created_at DESC
+      LIMIT 1
+    `);
+  }
 
   async function partnerIn(cityId: string | null): Promise<{ id: string }> {
     const email = `sweep-p-${process.pid}-${run}-${Math.random().toString(36).slice(2)}@safra.test`;

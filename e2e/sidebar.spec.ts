@@ -443,4 +443,26 @@ test.describe('the sidebar badges', () => {
 
     expect(onDashboard['/applications']).toMatch(/[٠-٩\d]/);
   });
+
+  /**
+   * And النزاعات, added on 2026-08-27 — named for the same reason.
+   *
+   * `toStrictEqual` above compares the two screens with each other, so it passes when BOTH lose a
+   * badge. A new badge is exactly when that happens: the dashboard builds its counts from its own
+   * payload and every other screen from `/admin/attention`, and wiring one and forgetting the other
+   * is the defect this describe block was written for.
+   *
+   * Fails if the queue is empty, which is honest rather than annoying: a badge that renders no
+   * number when there is nothing waiting is correct, and a test that skipped on it would report
+   * coverage for a screen it never looked at.
+   */
+  test('include النزاعات on the dashboard', async ({ page }) => {
+    const onDashboard = await badges(page, '/');
+
+    expect(
+      onDashboard['/disputes'],
+      'the disputes queue badges its backlog — empty here means either the count never reached ' +
+        'the dashboard, or there is genuinely nothing waiting',
+    ).toMatch(/[٠-٩\d]/);
+  });
 });
