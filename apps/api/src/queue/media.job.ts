@@ -58,3 +58,27 @@ export interface MediaJobData {
 export function mediaJobId(imageId: string): string {
   return `image-${imageId}`;
 }
+
+/**
+ * The job id for a CAMPAIGN creative, keyed on the file rather than on the row.
+ *
+ * ## The bug this exists for (Bashar, 2026-08-27: «it keeps loading and nothing happens»)
+ *
+ * `mediaJobId` keys on the row, and its docblock explains why that is right: «a retried request
+ * that re-enqueues the same row is a no-op». For `property_images` every upload INSERTS a row, so
+ * the id is fresh each time and the property holds.
+ *
+ * A campaign's creative lives on the campaign. The row id is the same for every upload against it,
+ * so the second one produced the same job id as the first — and completed jobs are retained for a
+ * DAY (`RETENTION.removeOnComplete.age`), so BullMQ still knew that id and ignored the `add`
+ * entirely. Silently: `add` resolves with the existing job, the API answers 201, the row sits at
+ * `processing`, and the dialog spins for ever. Measured on `ADS-000721` — three uploads in the API
+ * log, one render in the worker log, and the row pointing at a key nothing ever rendered.
+ *
+ * The FILE KEY carries a fresh uuid per upload (`ImageService.keyFor`), so this is unique per
+ * upload and still deterministic for a retry of the SAME upload — which is the property the row key
+ * was chosen for in the first place.
+ */
+export function creativeJobId(fileKey: string): string {
+  return `creative-${fileKey.replaceAll('/', '_')}`;
+}

@@ -59,8 +59,13 @@ describeIfDb('a campaign creative', () => {
     publicUrl: (key: string) => `https://media.test/${key}`,
   };
   const queue = {
-    add: (_name: string, data: Record<string, unknown>) => {
-      enqueued.push(data);
+    /* The OPTIONS are recorded too: the job id lives there, and it is what the replace case turns on. */
+    add: (
+      _name: string,
+      data: Record<string, unknown>,
+      options: Record<string, unknown>,
+    ) => {
+      enqueued.push({ ...data, jobId: options['jobId'] });
 
       return Promise.resolve();
     },
@@ -158,9 +163,10 @@ describeIfDb('a campaign creative', () => {
     });
 
     expect(result.status).toBe('processing');
-    expect(result.url, 'the address the variant will have').toContain(
-      String(CREATIVE_WIDTH),
-    );
+    expect(
+      result.url,
+      'the address the variant will have — no widths are recorded yet',
+    ).toContain(String(CREATIVE_WIDTH));
 
     expect(stored, 'exactly one object, under the private incoming prefix').toHaveLength(
       1,
@@ -185,6 +191,44 @@ describeIfDb('a campaign creative', () => {
 
     expect(enqueued, 'one render, addressed to THIS table').toHaveLength(1);
     expect(enqueued[0]?.['subject']).toBe('ad_campaign');
+  });
+
+  /**
+   * REPLACING a creative queues a second render (Bashar, 2026-08-27).
+   *
+   * «I am trying to change the image now, but it keeps loading and nothing happens.»
+   *
+   * The job id was `mediaJobId(campaign.id)` — the ROW — copied from the listing pipeline, where it
+   * is right because every upload inserts a new row. A campaign's creative lives ON the campaign,
+   * so the id was identical for every upload against it, and completed jobs are retained for a DAY:
+   * BullMQ knew the id, ignored the `add`, and answered as though it had queued. The API returned
+   * 201, the row sat at `processing`, and the dialog spun for ever.
+   *
+   * Nothing anywhere reported a failure, which is why this is asserted on the JOB IDS rather than
+   * on the row: the row looked identical in both the working and the broken case.
+   */
+  it('queues a second render when the image is replaced', async () => {
+    await creative.upload(staff(), reference, {
+      buffer: PHOTO,
+      originalname: 'first.jpg',
+    });
+    await creative.upload(staff(), reference, {
+      buffer: PHOTO,
+      originalname: 'second.jpg',
+    });
+
+    expect(enqueued, 'both uploads were queued').toHaveLength(2);
+
+    const ids = enqueued.map((job) => job['jobId']);
+
+    expect(new Set(ids).size, 'and with DIFFERENT ids, or the second is dropped').toBe(2);
+
+    /* And the row points at the second file, not the first. */
+    const row = await db.execute<{ file_key: string }>(sql`
+      SELECT image_file_key AS file_key FROM ad_campaigns WHERE reference = ${reference}
+    `);
+
+    expect(enqueued[1]?.['fileKey']).toBe(row.rows[0]?.file_key);
   });
 
   /** §15 — who filed it, and what it was. */

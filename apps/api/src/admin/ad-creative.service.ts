@@ -9,7 +9,7 @@ import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { ImageService } from '../storage/image.service.js';
 import { StorageService } from '../storage/storage.service.js';
-import { MEDIA_JOB, mediaJobId, type MediaJobData } from '../queue/media.job.js';
+import { MEDIA_JOB, creativeJobId, type MediaJobData } from '../queue/media.job.js';
 import { JOB_OPTIONS, QUEUE } from '../queue/queue.definitions.js';
 import { MEDIA_QUEUE } from '../queue/queue.tokens.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
@@ -150,7 +150,11 @@ export class AdCreativeService {
       await this.media.add(
         MEDIA_JOB,
         { imageId: campaign.id, originalKey, fileKey, subject: 'ad_campaign' },
-        { ...JOB_OPTIONS.media, jobId: mediaJobId(campaign.id) },
+        /*
+          Keyed on the FILE, not the campaign — see `creativeJobId`. Keying on the row made every
+          replacement after the first a silent no-op for a day.
+        */
+        { ...JOB_OPTIONS.media, jobId: creativeJobId(fileKey) },
       );
     } catch (error) {
       this.logger.error(
@@ -166,7 +170,8 @@ export class AdCreativeService {
         does it. It is the address the variant WILL have, the console needs it to render the tile
         once processing finishes, and `status` is the field that says whether it works.
       */
-      url: this.images.publicUrl(fileKey, CREATIVE_WIDTH),
+      /* No variants yet — the address the render will produce. See `creativeUrl`. */
+      url: creativeUrl(this.images, fileKey, null),
       width: inspected.width,
       height: inspected.height,
       failureCode: null,
@@ -175,10 +180,41 @@ export class AdCreativeService {
 }
 
 /**
- * The width an ad tile is served at.
+ * The width an ad tile is served at, WHERE ONE THAT WIDE EXISTS.
  *
- * One width, not a srcset: the customer app renders the creative in a card of a fixed size, and
- * offering three would be three objects to store for a picture nobody zooms into. 800 is the middle
- * variant the pipeline already produces, so this costs no extra encode.
+ * One width rather than a srcset: the customer app renders the creative in a card of a fixed size,
+ * and offering three would be three objects stored for a picture nobody zooms into.
  */
 export const CREATIVE_WIDTH = 800;
+
+/**
+ * The URL of the widest variant that ACTUALLY EXISTS at or below `CREATIVE_WIDTH`.
+ *
+ * ## Why this is not `publicUrl(fileKey, CREATIVE_WIDTH)`
+ *
+ * Because the pipeline never upscales. A 640px creative produces variants at 400 and 640 and NO
+ * 800 — so asking for 800 addresses an object that was never written, and the browser renders a
+ * broken image: `naturalWidth` zero, a 404 nobody sees, on a picture the row says is `ready`.
+ *
+ * Found by a test that replaced a 900px creative with a 640px one, which is an ordinary thing for
+ * an operator to do. `apps/web/src/lib/property.ts` had already solved this for the listing gallery
+ * — «the pipeline never upscales, so a 1200px source has no 1600px variant» — and this is the same
+ * problem arriving at a second caller.
+ *
+ * Falls back to the SMALLEST variant when every one is wider than the target, and to the target
+ * itself when the row records none at all: a row still `processing` has an empty array, and the
+ * address it produces is the one the variant will have.
+ */
+export function creativeUrl(
+  images: ImageService,
+  fileKey: string,
+  variantWidths: readonly number[] | null,
+): string {
+  const available = [...(variantWidths ?? [])].sort((a, b) => a - b);
+  const chosen =
+    available.filter((width) => width <= CREATIVE_WIDTH).pop() ??
+    available[0] ??
+    CREATIVE_WIDTH;
+
+  return images.publicUrl(fileKey, chosen);
+}

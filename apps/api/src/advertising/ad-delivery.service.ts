@@ -8,7 +8,7 @@ import { DATABASE } from '../database/database.module.js';
 import { notFound } from '../common/errors/app-error.js';
 import { describeError } from '../common/errors/safe-error.js';
 import { ImageService } from '../storage/image.service.js';
-import { CREATIVE_WIDTH } from '../admin/ad-creative.service.js';
+import { creativeUrl } from '../admin/ad-creative.service.js';
 
 /** How many ads one city page may carry. */
 const SLOTS = 3;
@@ -66,12 +66,14 @@ export class AdDeliveryService {
       advertiser: string;
       kind: string;
       image_file_key: string | null;
+      image_variant_widths: number[] | null;
     }>(sql`
       SELECT c.reference, ${headline} AS headline, a.name AS advertiser,
              a.kind::text AS kind,
              -- Only a FINISHED render. A key whose variants are still being written is an address,
              -- not a picture, and a customer meeting it sees a broken image on their booking.
-             CASE WHEN c.image_status = 'ready' THEN c.image_file_key END AS image_file_key
+             CASE WHEN c.image_status = 'ready' THEN c.image_file_key END AS image_file_key,
+             c.image_variant_widths
       FROM ad_campaigns c
       JOIN advertisers a ON a.id = c.advertiser_id
       JOIN cities ci     ON ci.id = c.city_id
@@ -102,7 +104,7 @@ export class AdDeliveryService {
       */
       clickPath: `/api/v1/ads/${row.reference}/click`,
       imageUrl: row.image_file_key
-        ? this.images.publicUrl(row.image_file_key, CREATIVE_WIDTH)
+        ? creativeUrl(this.images, row.image_file_key, row.image_variant_widths)
         : null,
     }));
   }
