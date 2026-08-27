@@ -255,14 +255,36 @@ test.describe('حجوزاتي', () => {
         /*
           And the advertiser's own URL is nowhere in the block.
 
-          Scoped to the SLOT and to `href`/`src` attributes. The first version of this read the
-          whole `<main>` for any absolute URL and failed on `xmlns="http://www.w3.org/2000/svg"` in
-          the theme toggle — a true match for a regex that was asking the wrong question.
+          Scoped to the SLOT, and to `href` — the DESTINATION. This read `href|src` and went red the
+          day creatives shipped, on our own media host: `src` is now legitimately absolute, because
+          the picture is served from the object store. That is the assertion drifting from its
+          reason, not a defect — what must never appear is a link OFF this platform, which is
+          exactly what `href` is.
+
+          The pictures are checked separately, below, and against a stricter rule than «absolute».
         */
         expect(
-          (await slot.innerHTML()).match(/(?:href|src)="https?:\/\/[^"]*"/g) ?? [],
+          (await slot.innerHTML()).match(/href="https?:\/\/[^"]*"/g) ?? [],
           'the destination is not in the page source',
         ).toStrictEqual([]);
+
+        /*
+          Every picture comes from OUR media host.
+
+          A creative is served from the object store, so its `src` is absolute — and the rule that
+          matters is not «is it absolute» but «is it ours». A third-party image URL on this page
+          would be a request the customer's browser makes to somebody else's server from inside
+          their own booking, which is a tracking pixel however it got there.
+        */
+        const media = process.env['NEXT_PUBLIC_MEDIA_URL'] ?? 'http://localhost:9000';
+
+        for (const src of await slot
+          .locator('img')
+          .evaluateAll((nodes) => nodes.map((n) => (n as HTMLImageElement).src))) {
+          expect(src, 'an ad picture is served from SAFRA’s own media host').toContain(
+            new URL(media).host,
+          );
+        }
 
         /*
           Following one, without following it.

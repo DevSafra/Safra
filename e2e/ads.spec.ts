@@ -139,24 +139,29 @@ test.describe('الإعلانات', () => {
 
     await live.getByRole('button', { name: 'تعديل', exact: true }).click();
 
-    const save = live.getByRole('button', { name: 'حفظ' });
+    /*
+      A DIALOG over the table, not a panel inside the cell (Bashar, 2026-08-27).
+
+      الحالة is about 150px wide and neither shape that stays inside a table cell works: a panel
+      spanning the cell is still 150px, and an absolutely positioned popover is CLIPPED by the
+      table's own `overflow-x-auto` box — measured at 163px rendered against 304px asked for.
+    */
+    const dialog = page.getByRole('dialog');
+
+    await expect(dialog, 'the edit opens in a dialog').toBeVisible();
+
+    const save = dialog.getByRole('button', { name: 'حفظ' });
 
     await expect(save, 'nothing has changed yet').toBeDisabled();
 
     const edited = `إعلان معدَّل ${stamp}`;
 
-    await live.getByLabel('العنوان بالعربية').fill(edited);
+    await dialog.getByLabel('العنوان بالعربية').fill(edited);
     await expect(save).toBeEnabled();
     await save.click();
 
+    await expect(dialog, 'the dialog closes on a successful save').toBeHidden();
     await expect(page.locator('tbody tr').first()).toContainText(advertiserName);
-    await expect(
-      page
-        .locator('tbody tr')
-        .first()
-        .getByRole('button', { name: 'تعديل', exact: true }),
-      'the form closes and the row returns',
-    ).toBeVisible();
 
     /*
       And the row SHOWS the new headline (Bashar, 2026-08-27).
@@ -198,6 +203,68 @@ test.describe('الإعلانات', () => {
     await expect(invoices.first(), 'never a bare figure').toContainText(
       /\b(?:USD|EUR|SYP|SAR|JOD|TRY|AED|GBP)\b|[$€£]|ل\.س/,
     );
+  });
+
+  /**
+   * The dialog behaves like a dialog.
+   *
+   * Escape closes it, the backdrop closes it, and focus returns to the button that opened it — the
+   * last is the part a bare `fixed` overlay does not give you, and without it a keyboard reader is
+   * returned to the top of the document having lost the row they were working on.
+   */
+  test('closes on Escape and gives the focus back', async ({ page }) => {
+    await page.goto('/ads?size=5');
+    await page.waitForSelector('tbody tr');
+
+    const trigger = page
+      .locator('tbody tr')
+      .first()
+      .getByRole('button', { name: 'تعديل', exact: true });
+
+    await trigger.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toBeHidden();
+
+    await expect(trigger, 'focus came back to where it started').toBeFocused();
+  });
+
+  /**
+   * A creative goes through the platform's pipeline, and what comes back is OURS.
+   *
+   * The assertion that matters is `naturalWidth`: the row can say `ready` and the URL can be right
+   * while the browser renders nothing — which is exactly what happened before `ads/*` was added to
+   * the object store's public-read policy, silently, with no request anybody could see.
+   */
+  test('uploads a creative and shows what the server re-encoded', async ({ page }) => {
+    await page.goto('/ads?size=5');
+    await page.waitForSelector('tbody tr');
+    await page
+      .locator('tbody tr')
+      .first()
+      .getByRole('button', { name: 'تعديل', exact: true })
+      .click();
+
+    const dialog = page.getByRole('dialog');
+
+    await expect(dialog).toBeVisible();
+    await page.setInputFiles('input[type=file]', 'e2e/fixtures/room-one.jpg');
+
+    /*
+      The render is a QUEUED job, so the tile is a placeholder until a worker has run. Polled rather
+      than slept on: the wait is for the row to reach `ready`, and how long that takes is not this
+      test's business.
+    */
+    const picture = dialog.locator('img');
+
+    await expect(picture).toBeVisible({ timeout: 30_000 });
+    await expect
+      .poll(
+        async () => picture.evaluate((node) => (node as HTMLImageElement).naturalWidth),
+        { timeout: 30_000, message: 'the browser actually loaded the re-encoded image' },
+      )
+      .toBeGreaterThan(0);
   });
 
   /**
