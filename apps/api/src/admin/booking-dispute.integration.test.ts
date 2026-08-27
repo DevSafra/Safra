@@ -83,6 +83,37 @@ describeIfDb('a dispute opened on a booking', () => {
       description: 'أفاد العميل بأن الغرفة أصغر بكثير مما ظهر في الصور المنشورة.',
     });
 
+  /**
+   * The account a staff member takes down reaches the QUEUE they will read it from.
+   *
+   * `openForBooking` and the customer's own route both store a `description`, redacted on the way
+   * in — and until 2026-08-27 no staff surface selected it. The queue showed a 120-character title,
+   * the booking screen showed a count, and that was the whole of what an operator had while
+   * deciding to uphold a complaint, release a frozen payout and credit somebody's wallet. Measured
+   * that day: 22 of 22 open disputes carried one and not one was on a screen.
+   *
+   * Asserted through `list()` rather than by reading the column, because the column was never the
+   * problem — the projection was. A test on the row would have passed throughout.
+   */
+  it('carries the account somebody gave into the queue', async () => {
+    await open();
+
+    const queue = await disputes.list({
+      page: 1,
+      limit: 25,
+      actor: STAFF(staffId),
+    });
+    const mine = queue.items.find((row) => row.bookingReference === reference);
+
+    expect(mine, 'the dispute is in the queue').toBeDefined();
+    expect(mine?.description, 'and the queue carries what was said').toBe(
+      'أفاد العميل بأن الغرفة أصغر بكثير مما ظهر في الصور المنشورة.',
+    );
+
+    /* The control: the title is NOT the description, so this cannot pass by reading the headline. */
+    expect(mine?.title).not.toBe(mine?.description);
+  });
+
   it('moves the booking to disputed', async () => {
     await open();
 
