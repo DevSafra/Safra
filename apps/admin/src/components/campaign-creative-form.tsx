@@ -59,6 +59,8 @@ export function CampaignCreativeForm({
   const [target, setTarget] = useState(targetUrl);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  /** Set when the poll below has given up, so the tile stops claiming to be working. */
+  const [slow, setSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const trigger = useRef<HTMLButtonElement>(null);
@@ -106,11 +108,22 @@ export function CampaignCreativeForm({
     if (!open || imageStatus !== 'processing') return undefined;
 
     let attempts = 0;
+
+    setSlow(false);
+
     const timer = setInterval(() => {
       attempts += 1;
 
       if (attempts > POLL_ATTEMPTS) {
         clearInterval(timer);
+        /*
+          It has stopped asking, and it SAYS so.
+
+          Leaving «جارٍ المعالجة…» on screen after the polling ends is a spinner describing a state
+          nobody is observing any more. That is how the job-id bug presented — «it keeps loading and
+          nothing happens» — with no way to tell a slow render from a job that was never queued.
+        */
+        setSlow(true);
 
         return;
       }
@@ -191,6 +204,8 @@ export function CampaignCreativeForm({
         return;
       }
 
+      /* A fresh upload starts the wait over — see the poll above. */
+      setSlow(false);
       router.refresh();
     } catch {
       setError(t.errors.unreachable);
@@ -299,7 +314,9 @@ export function CampaignCreativeForm({
                   ) : (
                     <span className="grid h-20 w-32 place-items-center rounded-lg border border-dashed border-line px-2 text-center text-[10.5px] text-faint">
                       {imageStatus === 'processing'
-                        ? c.imageProcessing
+                        ? slow
+                          ? c.imageSlow
+                          : c.imageProcessing
                         : imageStatus === 'failed'
                           ? c.imageFailed
                           : c.imageNone}

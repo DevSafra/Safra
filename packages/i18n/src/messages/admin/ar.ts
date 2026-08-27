@@ -1661,6 +1661,13 @@ export const ar = {
       imageFailed: 'تعذّرت معالجة الصورة. جرّب صورة أخرى.',
       imageNone: 'بلا صورة — يظهر الإعلان كنص',
       imageUploading: 'جارٍ الرفع…',
+      /*
+        Said when the dialog has stopped waiting, rather than leaving «جارٍ المعالجة…» spinning.
+        A screen that waits for ever is indistinguishable from one that is broken — which is how
+        Bashar met the job-id bug on 2026-08-27.
+      */
+      imageSlow:
+        'ما زالت قيد المعالجة. أعد فتح النافذة بعد قليل، أو ارفع الصورة مرة أخرى.',
       saveCreative: 'حفظ',
       newAdvertiser: '+ معلن جديد',
       advTitle: 'معلن جديد',
