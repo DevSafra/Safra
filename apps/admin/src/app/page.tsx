@@ -150,6 +150,13 @@ export default async function DashboardPage() {
                 partners: overview.counters.partners_pending_verification,
                 properties: overview.counters.properties_pending_review,
                 partnerApplications: overview.counters.partner_applications_open,
+                /*
+                  From the dashboard's OWN payload, which already counts unresolved disputes with
+                  the same predicate `/admin/attention` uses. `null` means the count could not be
+                  determined, and a badge is the one place that must read as absent rather than as
+                  zero.
+                */
+                disputes: overview.openDisputes ?? undefined,
                 /* Never produced by anything — see the note in `lib/console.ts`. */
                 staff: undefined,
               }

@@ -22,7 +22,7 @@ interface NavItem {
   readonly href?: string;
   /** Which counter, if any, drives the badge. */
   readonly badge?:
-    'bookings' | 'partners' | 'properties' | 'staff' | 'partnerApplications';
+    'bookings' | 'partners' | 'properties' | 'staff' | 'partnerApplications' | 'disputes';
   /**
    * Renders the badge red instead of blue (`badgeWarn` in the design handoff §8).
    *
@@ -80,7 +80,12 @@ const NAV: readonly NavItem[] = [
     kind, because the next person reads it as a backlog and plans work that is already done.
   */
   { key: 'ads', href: '/ads' },
-  { key: 'disputes', href: '/disputes', warn: true },
+  /*
+    The badge Bashar asked for on 2026-08-27, and `warn` was already set for it — the note on that
+    flag names «a customer whose dispute is open» as the case it exists for, and the count had
+    simply never been produced.
+  */
+  { key: 'disputes', href: '/disputes', badge: 'disputes', warn: true },
   { key: 'messages', href: '/messages' },
   { key: 'whatsapp', href: '/comms' },
   { key: 'geo', href: '/geo' },
@@ -129,6 +134,7 @@ export interface SidebarCounts {
   readonly properties: number | undefined;
   readonly staff: number | undefined;
   readonly partnerApplications: number | undefined;
+  readonly disputes: number | undefined;
 }
 
 /**
@@ -145,6 +151,7 @@ export const NO_COUNTS: SidebarCounts = {
   properties: undefined,
   staff: undefined,
   partnerApplications: undefined,
+  disputes: undefined,
 };
 
 export function AdminSidebar({

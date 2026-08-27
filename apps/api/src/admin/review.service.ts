@@ -1013,6 +1013,24 @@ export class ReviewService {
         WHERE pd.status = 'pending' AND pd.deleted_at IS NULL
           AND ${scopeFilter(actor, 'pdp.city_id')}
       UNION ALL
+      -- Disputes still waiting on SAFRA — the sidebar badge beside النزاعات (Bashar, 2026-08-27).
+      --
+      -- NO BACKTICKS ANYWHERE IN THIS COMMENT: it sits inside a sql template literal, and one
+      -- would end the string here rather than in the note. That has cost time repeatedly.
+      --
+      -- Unresolved, not open alone. Open and investigating both mean somebody is waiting on us,
+      -- both freeze the partner's payout, and both sort to the top of the queue -- the same
+      -- predicate DisputeService.UNRESOLVED and DashboardService.openDisputes already use, so the
+      -- badge cannot disagree with the dashboard tile counting the same thing.
+      --
+      -- A dispute has no city of its own; it inherits the booking's, which is why this joins rather
+      -- than filtering directly. Same reasoning as the dispute queue's own scope.
+      SELECT 'disputes_open', COUNT(*)::text
+        FROM disputes d
+        LEFT JOIN bookings db ON db.id = d.booking_id
+        WHERE d.status IN ('open', 'investigating') AND d.deleted_at IS NULL
+          AND ${scopeFilter(actor, 'db.city_id')}
+      UNION ALL
       SELECT 'bookings_awaiting_confirmation', COUNT(*)::text
         FROM bookings WHERE status = 'pending_confirmation' AND deleted_at IS NULL
           AND ${scopeFilter(actor, 'city_id')}

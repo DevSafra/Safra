@@ -80,6 +80,7 @@ const attentionSchema = z.object({
   partners_unscreened: z.number(),
   partner_applications_open: z.number(),
   partner_documents_pending_review: z.number(),
+  disputes_open: z.number(),
   bookings_awaiting_confirmation: z.number(),
   bookings_sla_expiring_within_30m: z.number(),
 });
@@ -974,9 +975,13 @@ export async function getStaffMember(userId: string) {
 /**
  * The §9.2 dashboard payload.
  *
- * `openDisputes` is nullable because disputes are not implemented — the API returns
- * `null` rather than `0` so the console can show a dash and say why, instead of a
- * confident zero for a feature that does not exist.
+ * `openDisputes` counts the disputes still waiting on SAFRA — `open` and `investigating`, the
+ * same predicate the queue and the sidebar badge use.
+ *
+ * The NULLABLE type is kept although the count has been real since the disputes table landed on
+ * 2026-08-04: `null` means «cannot be determined», which is a different statement from zero and is
+ * rendered differently. The note here used to say the feature did not exist, which stopped being
+ * true and went on being read.
  */
 const dashboardSchema = z.object({
   counters: z.object({
