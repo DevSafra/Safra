@@ -309,13 +309,7 @@ test('a booking links to its disputes, and the count is the number that are ther
 
   await expect(card, 'the link carries this booking as the filter').toBeVisible();
 
-  const claimed = Number(
-    /\d+/.exec(
-      (await card.innerText()).replace(/[٠-٩]/g, (digit) =>
-        String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)),
-      ),
-    )?.[0] ?? '1',
-  );
+  const claimedText = (await card.innerText()).trim();
 
   await card.click();
   await page.waitForURL(/\/disputes\?/);
@@ -324,7 +318,24 @@ test('a booking links to its disputes, and the count is the number that are ther
     (await page.locator('main').innerText()).match(/DSP-\d+/g) ?? [],
   );
 
-  expect(listed.size, 'the card counted what the screen lists').toBe(claimed);
+  /*
+    The card is compared to the WORD Arabic uses for that many, not to a digit in it.
+
+    This read the first `\d+` out of the card and fell back to `'1'` when there was none. Arabic has
+    a DUAL: two disputes render «نزاعان», with no digit at all — as does «نزاع واحد» for one — so on
+    the first booking to reach exactly two, the test invented `1`, compared it to a list of 2 and
+    reported a defect that was not there. A fallback that supplies a plausible number is the same
+    fault as a `.default()` hiding a missing field: it could equally have invented a PASS.
+
+    Built from the catalogue's own ICU branches, so a reworded plural fails here loudly instead of
+    silently matching nothing.
+  */
+  const expected = pluralBranch(copy.relatedDisputes, listed.size);
+
+  expect(
+    claimedText,
+    `the card counted what the screen lists (${listed.size})`,
+  ).toContain(expected);
 
   /* And every one of them is THIS booking's — a filter that matched everything would also pass. */
   const body = await page.locator('main').innerText();
@@ -334,6 +345,23 @@ test('a booking links to its disputes, and the count is the number that are ther
     'every dispute listed belongs to this booking',
   ).toBeGreaterThanOrEqual(listed.size);
 });
+
+/**
+ * The text an ICU plural renders for `n`, taken from the catalogue rather than guessed.
+ *
+ * Only the branches Arabic actually uses below a page of disputes: `zero`, `one`, `two`, and `few`
+ * for 3–10, where `#` stands for the number. Anything larger is not reachable on one page of this
+ * screen, and a branch this cannot resolve throws rather than returning something plausible.
+ */
+function pluralBranch(template: string, n: number): string {
+  const branch =
+    n === 0 ? 'zero' : n === 1 ? 'one' : n === 2 ? 'two' : n <= 10 ? 'few' : 'many';
+  const text = new RegExp(`\\b${branch} \\{([^}]*)\\}`).exec(template)?.[1];
+
+  if (text === undefined) throw new Error(`No «${branch}» branch in «${template}»`);
+
+  return text.replace('#', String(n));
+}
 
 /** The newest booking in the registry — any one will do for a note. */
 async function anyBooking(page: Page): Promise<string> {
