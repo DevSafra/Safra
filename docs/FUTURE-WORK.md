@@ -1171,6 +1171,40 @@ the same for every job. `docs/runbook-scheduled-jobs.md` is the on-call procedur
 
 **Owner:** engineering, after S-1 lands.
 
+### O-media-2 — A lost render is never re-driven, and the row waits for ever
+
+**Severity: Medium.** Found on 2026-08-27 while investigating Bashar's second report that a
+creative "keeps loading and nothing happens". That report's cause was operational — the media
+worker was not running, because I stopped it for a test run and did not restart it — but the
+symptom it produced is a real gap, and it is not confined to advertising.
+
+**What happens.** `AdCreativeService.upload` and `PropertyImageService.upload` both commit the row
+at `processing` and then enqueue the render, deliberately swallowing an enqueue failure so a
+successful upload is never undone by a queue that is briefly unavailable. The row is the durable
+record and carries `image_original_key`, which is precisely what a re-drive needs. **Nothing reads
+it.** If the job is lost — the worker is down long enough, Redis restarts with `appendonly` off (it
+is off, and the API warns about exactly this at startup), or the job is dropped — the row sits at
+`processing` permanently. The console polls, gives up after forty seconds and says so, and every
+subsequent upload takes the same path.
+
+**Why it is the same shape as a problem this project already solved.** `notification-redrive` runs
+every five minutes for this exact failure, and its note calls itself "the recovery half of
+`O-notify-2`". Media has no equivalent half. The asymmetry is not deliberate; it is simply that the
+listing pipeline predates that lesson and the advertising pipeline inherited its shape.
+
+**What it would take.** A `media-redrive` entry in `SCHEDULED_JOBS`, and one query per subject
+selecting rows at `processing` older than a threshold with an `image_original_key` set, re-adding
+the job under its existing deterministic id — which is now `creativeJobId(fileKey)` for ads and
+`mediaJobId(id)` for listings, both stable for the same upload, so a re-drive of a job that is
+merely slow is a no-op rather than a duplicate render. Roughly a half-day including the partial
+index, the integration test for both subjects, and a mutation check that the sweep actually moves a
+stuck row.
+
+**Not fixed, waiting on a decision** — it is neither a correctness nor a security defect, and the
+upload path itself is working, so under "Asked work, and gaps found beside it" it is reported
+rather than closed. The operational note stands in the meantime: **the media worker must be running
+for any image to render**, and no screen anywhere says when it is not.
+
 ### O-media-1 — Property images are managed; a defect and two guarantees came with it
 
 **Shipped 2026-08-07.** Upload existed and nothing else did — no list, no reorder, no cover change,
