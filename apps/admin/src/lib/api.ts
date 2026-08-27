@@ -1729,6 +1729,11 @@ const campaignItemSchema = z.object({
   impressions: z.number(),
   clicks: z.number(),
   daysRemaining: z.number(),
+  /* The creative, so «تعديل الإعلان» shows what it is about to change. */
+  headlineAr: z.string(),
+  headlineEn: z.string(),
+  headlineDe: z.string(),
+  targetUrl: z.string(),
 });
 
 const campaignsSchema = offsetPage(campaignItemSchema).extend({

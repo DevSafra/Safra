@@ -23,6 +23,7 @@ import { AdsToolbar } from '@/components/ads-toolbar';
 import { TableToolbar } from '@/components/table-toolbar';
 import { CampaignStatusButton } from '@/components/campaign-status-button';
 import { AdInvoicePaidButton } from '@/components/ad-invoice-paid-button';
+import { CampaignCreativeForm } from '@/components/campaign-creative-form';
 import { fill, label, t } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
 import { listParamsFor } from '@/lib/table-size';
@@ -445,7 +446,22 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
           </Ltr>
         </span>
         {row.status === 'expired' ? null : (
-          <CampaignStatusButton reference={row.reference} status={row.status} />
+          <>
+            <CampaignStatusButton reference={row.reference} status={row.status} />
+            {/*
+              The creative, editable from the row it appears on.
+
+              Not offered on an expired campaign: its window has closed, nothing is being served,
+              and a control that rewrites copy nobody will read is a promise the screen cannot keep.
+            */}
+            <CampaignCreativeForm
+              reference={row.reference}
+              headlineAr={row.headlineAr}
+              headlineEn={row.headlineEn}
+              headlineDe={row.headlineDe}
+              targetUrl={row.targetUrl}
+            />
+          </>
         )}
       </div>
     ),

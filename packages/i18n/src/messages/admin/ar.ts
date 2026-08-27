@@ -1635,6 +1635,9 @@ export const ar = {
       billingMonthly: 'شهرية',
       billingQuarterly: 'ربع سنوية',
       /* A new advertiser, created inline: a campaign needs one and there is nowhere else to add it. */
+      /* Editing what a live campaign SAYS — the headlines and the target, never the window. */
+      editCreative: 'تعديل الإعلان',
+      saveCreative: 'حفظ',
       newAdvertiser: '+ معلن جديد',
       advTitle: 'معلن جديد',
       advName: 'الاسم',

@@ -42,6 +42,18 @@ export interface CampaignRow {
   readonly clicks: number;
   /** Whole days until `endsAt`; negative once past. Drives "ينتهي بعد 4 أيام". */
   readonly daysRemaining: number;
+  /*
+    The CREATIVE — the four fields `campaignUpdateSchema` can change.
+
+    Carried on the row so the console's edit form can show what it is about to change rather than
+    presenting four empty boxes over a live campaign. Not a widening of reach: this is the copy the
+    campaign PUBLISHES, readable by anybody who is served it, and the reader already holds
+    `AD_READ`. The price and the window are deliberately NOT editable — see the contract.
+  */
+  readonly headlineAr: string;
+  readonly headlineEn: string;
+  readonly headlineDe: string;
+  readonly targetUrl: string;
 }
 
 export interface AdCounters {
@@ -191,6 +203,7 @@ export class AdvertisingService {
              to_char(c.starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS starts_at,
              to_char(c.ends_at   AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS ends_at,
              floor(extract(epoch FROM (c.ends_at - now())) / 86400)::int AS days_remaining,
+             c.headline_ar, c.headline_en, c.headline_de, c.target_url,
              c.created_at
       ${fromWhere}
         ORDER BY c.created_at DESC, c.id DESC
@@ -214,6 +227,10 @@ export class AdvertisingService {
         impressions: Number(row.impressions),
         clicks: Number(row.clicks),
         daysRemaining: row.days_remaining,
+        headlineAr: row.headline_ar,
+        headlineEn: row.headline_en,
+        headlineDe: row.headline_de,
+        targetUrl: row.target_url,
       })),
       total,
       query,
@@ -326,5 +343,9 @@ interface CampaignRowSql extends Record<string, unknown> {
   starts_at: string;
   ends_at: string;
   days_remaining: number;
+  headline_ar: string;
+  headline_en: string;
+  headline_de: string;
+  target_url: string;
   created_at: string;
 }

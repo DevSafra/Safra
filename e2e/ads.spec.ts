@@ -129,6 +129,31 @@ test.describe('الإعلانات', () => {
     ).toBeVisible();
 
     /*
+      ── the creative, edited from the row ───────────────────────────────────
+
+      `PATCH /admin/ad-campaigns/:reference` shipped with no caller at all — the same «built and
+      connected to nothing» shape the whole domain had, reproduced one level down in my own work.
+      A typo in a headline is visible to every customer in the city until somebody can fix it.
+    */
+    const live = page.locator('tbody tr').first();
+
+    await live.getByRole('button', { name: 'تعديل الإعلان' }).click();
+
+    const save = live.getByRole('button', { name: 'حفظ' });
+
+    await expect(save, 'nothing has changed yet').toBeDisabled();
+
+    await live.getByLabel('العنوان بالعربية').fill(`إعلان معدَّل ${stamp}`);
+    await expect(save).toBeEnabled();
+    await save.click();
+
+    await expect(page.locator('tbody tr').first()).toContainText(advertiserName);
+    await expect(
+      page.locator('tbody tr').first().getByRole('button', { name: 'تعديل الإعلان' }),
+      'the form closes and the row returns',
+    ).toBeVisible();
+
+    /*
       And the money followed it, in the same transaction.
 
       Two months at a monthly price is two invoices, and the whole point of issuing them at creation
