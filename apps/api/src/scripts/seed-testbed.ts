@@ -6,6 +6,7 @@ import { FieldEncryptionService } from '../common/crypto/field-encryption.servic
 import { PasswordService } from '../common/crypto/password.service.js';
 import type { Env } from '../config/env.js';
 import { describeError } from '../common/errors/safe-error.js';
+import { assertCascadeIsComplete } from './testbed-cascade.js';
 
 /**
  * A small, hand-built dataset you can actually test against — three شركاء, one customer, and
@@ -523,6 +524,9 @@ async function upsertUser(
 }
 
 async function build(db: Seeder): Promise<void> {
+  /* Before ANY delete — the point is a sentence naming the table, not a rollback. */
+  await assertCascadeIsComplete(db);
+
   /* The platform's own hasher, so a fixture account is hashed exactly like a real one. */
   const passwordHash = await new PasswordService().hash(PASSWORD);
 
@@ -570,6 +574,54 @@ async function build(db: Seeder): Promise<void> {
        OR b.partner_id IN (
             SELECT pa.id FROM partners pa JOIN users u ON u.id = pa.user_id
             WHERE lower(u.email) IN (${emailList}))`;
+
+  /*
+    The LEDGER goes first, before the refunds and payments it points at.
+
+    `ledger_entries` carries a nullable foreign key to `bookings`, `payments`, `refunds`,
+    `partners` and `customer_profiles`, so it pins all five — and it was deleted a hundred lines
+    BELOW the refunds and payments it pins. That ordering worked for as long as no refund had
+    accounting behind it. The moment one did, on 2026-08-27, the script stopped with
+
+        error [23503]: update or delete on table "refunds" violates foreign key constraint
+        "ledger_entries_refund_id_refunds_id_fk" on table "ledger_entries"
+
+    and the reset that every fixture-consuming spec depends on could not be run. Measured at the
+    time: ONE refund, pinned by two legs (`customer_payment` and `refund`), both of which this
+    script was already going to delete — a hundred lines too late.
+
+    It is the same lesson as `notifications` above, which had to move before the four tables it
+    points at: the delete order is decided by the foreign keys, not by intuition about what
+    "belongs to" what.
+
+    ## By every reference, not only by `booking_id`
+
+    A leg with `booking_id` NULL and a `refund_id` or `payment_id` set would still pin its row and
+    was never covered. There are none today — checked before this was written, which is the only
+    reason the ordering bug surfaced as a clean single failure — but a predicate that happens to be
+    complete is not a complete predicate.
+
+    Both triggers are suspended for the length of these statements and put back immediately.
+    Wholesale TRUNCATE is still refused: `partner_payouts.entry_group_id` points into this table,
+    so clearing it would leave paid transfers claiming a movement that no longer exists.
+  */
+  const testbedPayments = sql`
+    SELECT id FROM payments WHERE booking_id IN (${testbedBookings})`;
+  const testbedRefunds = sql`
+    SELECT id FROM refunds WHERE booking_id IN (${testbedBookings})`;
+
+  await db.execute(sql`ALTER TABLE ledger_entries DISABLE TRIGGER USER`);
+  await db.execute(sql`ALTER TABLE wallet_transactions DISABLE TRIGGER USER`);
+  await db.execute(sql`
+    DELETE FROM ledger_entries
+    WHERE booking_id IN (${testbedBookings})
+       OR payment_id IN (${testbedPayments})
+       OR refund_id  IN (${testbedRefunds})`);
+  await db.execute(
+    sql`DELETE FROM wallet_transactions WHERE booking_id IN (${testbedBookings})`,
+  );
+  await db.execute(sql`ALTER TABLE wallet_transactions ENABLE TRIGGER USER`);
+  await db.execute(sql`ALTER TABLE ledger_entries ENABLE TRIGGER USER`);
 
   await db.execute(sql`DELETE FROM refunds WHERE booking_id IN (${testbedBookings})`);
   await db.execute(sql`DELETE FROM payment_provider_events WHERE payment_id IN (
@@ -656,31 +708,35 @@ async function build(db: Seeder): Promise<void> {
       WHERE lower(u.email) IN (${emailList}))`);
 
   /*
-    Ledger entries and wallet movements pin the bookings they belong to, and both tables are
-    append-only by trigger.
+    The ledger and the wallet movements were cleared at the TOP of this cascade — see the note
+    there. They pin the refunds and payments as well as the bookings, so they cannot wait until
+    here, which is where they used to be.
 
-    The rows are debris: integration suites post real movements against whatever bookings exist,
-    and `docs/FUTURE-WORK.md` carries that as O-data-2. The seed has to clear them or it can never
-    re-run on a machine where the tests have been run — which is every machine.
-
-    The trigger is disabled for the length of this ONE statement rather than the table being
-    truncated, so only the entries belonging to bookings this script is already deleting go. That
-    matters: `partner_payouts.entry_group_id` points into this table, and a wholesale TRUNCATE
-    would leave paid payouts claiming a movement that no longer exists — the exact reconciliation
-    failure the payout detail screen was built to surface.
-
-    Inside the seed's transaction, so a failure anywhere puts the trigger back.
+    The rows are debris either way: integration suites post real movements against whatever
+    bookings exist, and `docs/FUTURE-WORK.md` carries that as O-data-2. The seed has to clear them
+    or it can never re-run on a machine where the tests have been run — which is every machine.
   */
-  await db.execute(sql`ALTER TABLE ledger_entries DISABLE TRIGGER USER`);
-  await db.execute(sql`ALTER TABLE wallet_transactions DISABLE TRIGGER USER`);
+  /*
+    The three tables that hang off a booking and were never in this cascade.
+
+    `booking_verifications` (the arrival QR check), `booking_internal_notes` (§9.4's staff notes)
+    and `coupon_redemptions` (الكوبونات, 2026-08-27) each gained a foreign key to `bookings` when
+    their feature shipped, and each was invisible here until the day a fixture booking actually had
+    one. `booking_verifications` is what stopped this script on 2026-08-27 — with 25 rows on the
+    development database and a message naming a table nobody had thought about.
+
+    `assertCascadeIsComplete` above now refuses to run rather than letting the next one be found
+    this way.
+  */
   await db.execute(
-    sql`DELETE FROM ledger_entries WHERE booking_id IN (${testbedBookings})`,
+    sql`DELETE FROM booking_verifications WHERE booking_id IN (${testbedBookings})`,
   );
   await db.execute(
-    sql`DELETE FROM wallet_transactions WHERE booking_id IN (${testbedBookings})`,
+    sql`DELETE FROM booking_internal_notes WHERE booking_id IN (${testbedBookings})`,
   );
-  await db.execute(sql`ALTER TABLE wallet_transactions ENABLE TRIGGER USER`);
-  await db.execute(sql`ALTER TABLE ledger_entries ENABLE TRIGGER USER`);
+  await db.execute(
+    sql`DELETE FROM coupon_redemptions WHERE booking_id IN (${testbedBookings})`,
+  );
 
   await db.execute(sql`DELETE FROM bookings WHERE id IN (${testbedBookings})`);
 
@@ -689,6 +745,10 @@ async function build(db: Seeder): Promise<void> {
     WHERE lower(u.email) IN (${emailList})`;
 
   await db.execute(sql`DELETE FROM availability_days WHERE unit_id IN (
+    SELECT un.id FROM units un JOIN properties pr ON pr.id = un.property_id
+    WHERE pr.partner_id IN (${testbedPartners}))`);
+  /* A unit's amenity rows pin it, and were never cleared — empty so far, which is why. */
+  await db.execute(sql`DELETE FROM unit_amenities WHERE unit_id IN (
     SELECT un.id FROM units un JOIN properties pr ON pr.id = un.property_id
     WHERE pr.partner_id IN (${testbedPartners}))`);
   await db.execute(sql`DELETE FROM units WHERE property_id IN (
@@ -774,6 +834,21 @@ async function build(db: Seeder): Promise<void> {
   await db.execute(
     sql`DELETE FROM wallets WHERE customer_profile_id IN (${testbedProfiles})`,
   );
+  /*
+    `ledger_entries` keeps a THIRD reference — by CUSTOMER PROFILE.
+
+    A wallet credit or a gift-card movement is booked against the person, not against a booking, so
+    the booking-shaped delete at the top of this cascade and the partner-shaped one below both miss
+    it. This is the failure mode `assertCascadeIsComplete` cannot see: it asks which TABLES point
+    at something being deleted, and `ledger_entries` is in the list three times over. A table can be
+    handled and a COLUMN still forgotten.
+  */
+  await db.execute(sql`ALTER TABLE ledger_entries DISABLE TRIGGER USER`);
+  await db.execute(
+    sql`DELETE FROM ledger_entries WHERE customer_profile_id IN (${testbedProfiles})`,
+  );
+  await db.execute(sql`ALTER TABLE ledger_entries ENABLE TRIGGER USER`);
+
   await db.execute(sql`DELETE FROM customer_profiles WHERE id IN (${testbedProfiles})`);
 
   /*
@@ -798,6 +873,40 @@ async function build(db: Seeder): Promise<void> {
   await db.execute(
     sql`DELETE FROM partner_applications WHERE partner_id IN (${testbedPartners})`,
   );
+
+  /*
+    The six tables that hang off a PARTNER and were never in this cascade.
+
+    Every one arrived with a feature — the contract file and its two signatures, verification
+    documents, the employee roster and its role definitions, the payout account, and a coupon
+    scoped to one partner. None had a row for a testbed partner yet, which is exactly why nobody
+    noticed: `partner_contracts` has 132 rows on this database and `partner_employees` 199, none of
+    them on these three fixtures. The first testbed partner to be given an employee would have
+    stopped the reset with a truncated «Failed query: DELETE FROM partners».
+
+    Ordered by their own foreign keys: signatures before contracts, employees before the roles they
+    hold, redemptions before the coupons they spent.
+  */
+  await db.execute(sql`DELETE FROM partner_contract_signatures WHERE contract_id IN (
+    SELECT id FROM partner_contracts WHERE partner_id IN (${testbedPartners}))`);
+  await db.execute(
+    sql`DELETE FROM partner_contracts WHERE partner_id IN (${testbedPartners})`,
+  );
+  await db.execute(
+    sql`DELETE FROM partner_documents WHERE partner_id IN (${testbedPartners})`,
+  );
+  await db.execute(
+    sql`DELETE FROM partner_employees WHERE partner_id IN (${testbedPartners})`,
+  );
+  await db.execute(
+    sql`DELETE FROM partner_employee_roles WHERE partner_id IN (${testbedPartners})`,
+  );
+  await db.execute(
+    sql`DELETE FROM partner_payout_accounts WHERE partner_id IN (${testbedPartners})`,
+  );
+  await db.execute(sql`DELETE FROM coupon_redemptions WHERE coupon_id IN (
+    SELECT id FROM coupons WHERE partner_id IN (${testbedPartners}))`);
+  await db.execute(sql`DELETE FROM coupons WHERE partner_id IN (${testbedPartners})`);
 
   await db.execute(sql`DELETE FROM partners WHERE id IN (${testbedPartners})`);
   /*
