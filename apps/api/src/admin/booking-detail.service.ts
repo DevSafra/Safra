@@ -7,6 +7,7 @@ import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { actorName } from '../common/actor-name.sql.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { allowedTransitions, type BookingStatus } from '../bookings/booking-state.js';
@@ -94,6 +95,32 @@ export class BookingDetailService {
   ) {}
 
   async detail(reference: string, claims: AccessTokenClaims | undefined) {
+    /*
+      ## Scoped by CITY, in the `WHERE` (2026-08-27)
+
+      This screen took `claims` and used them only to decide whether payments and internal notes
+      were included — the row itself came back for `b.reference = $1` and nothing else. So an
+      operations manager scoped to one city opened ANY booking in the country by typing its
+      reference, and §9.4 shows the customer's name, email and phone, the partner's phone and the
+      whole money breakdown. References are sequential, so finding one is a loop rather than a
+      guess. Reproduced against the development database before it was fixed: a manager scoped away
+      from its city retrieved `BKG-2026-005572`.
+
+      The third instance of `O-sec-13` — after `review.service.ts` and `partner-contract.service.ts`
+      — and the one `assertCanRead`'s own docblock predicted: «the reason the detail screens went
+      unscoped for so long is that the predicate looked like it covered everything». الحجوزات's
+      LIST was scoped from the start; the row behind it was not.
+
+      ## In the predicate rather than after the fetch
+
+      Two reasons, and the second is the one that matters. A row refused after it arrives has
+      already crossed a process boundary. And a post-fetch `assertCanRead` throws
+      `request.not_found` while a missing booking throws `booking.not_found` — two different codes
+      behind two 404s, which is exactly the difference that lets somebody walk the references. In
+      the `WHERE`, out-of-scope and absent are the same answer because they are the same code path.
+
+      `read_only` is unaffected: `scopeFilter` returns TRUE for it, which is what that mode means.
+    */
     const rows = await this.db.execute<Record<string, unknown>>(sql`
       SELECT b.id, b.reference, b.status::text AS status,
              b.check_in::text, b.check_out::text, b.nights,
@@ -126,6 +153,7 @@ export class BookingDetailService {
       JOIN units u              ON u.id = b.unit_id
       JOIN cities ci            ON ci.id = b.city_id
       WHERE b.reference = ${reference} AND b.deleted_at IS NULL
+        AND ${scopeFilter(claims, 'b.city_id')}
     `);
 
     const booking = rows.rows[0];
@@ -380,14 +408,32 @@ export class BookingDetailService {
     input: { amount: string; currency: string; note: string },
     claims: AccessTokenClaims | undefined,
   ) {
-    const rows = await this.db.execute<{ customer_profile_id: string }>(sql`
-      SELECT customer_profile_id FROM bookings
+    /*
+      Scoped BOTH ways, because the two modes need different answers.
+
+      The predicate makes an out-of-scope booking indistinguishable from one that does not exist for
+      a member scoped `none` — same 404, same code. `assertCanWrite` then refuses the `read_only`
+      member, who legitimately passed the predicate and may look but not act. Reading the row and
+      checking afterwards would answer `request.not_found` where a real miss answers
+      `booking.not_found`, and two codes behind two 404s is a way to walk the references.
+
+      This is money: `compensate` credits a customer's wallet. It was reachable for any booking in
+      the country by reference.
+    */
+    const rows = await this.db.execute<{
+      customer_profile_id: string;
+      city_id: string;
+    }>(sql`
+      SELECT customer_profile_id, city_id::text AS city_id FROM bookings
       WHERE reference = ${reference} AND deleted_at IS NULL
+        AND ${scopeFilter(claims, 'city_id')}
     `);
 
     const booking = rows.rows[0];
 
     if (!booking) throw notFound(ERROR.BOOKING_NOT_FOUND);
+
+    assertCanWrite(claims, booking.city_id);
 
     const result = await this.wallet.adjust(
       booking.customer_profile_id,
@@ -476,13 +522,18 @@ export class BookingDetailService {
     note: string,
     claims: AccessTokenClaims | undefined,
   ): Promise<{ reference: string }> {
-    const rows = await this.db.execute<{ id: string }>(sql`
-      SELECT id FROM bookings WHERE reference = ${reference} AND deleted_at IS NULL
+    /* Scoped like `compensate` above — see the note there on why it takes both guards. */
+    const rows = await this.db.execute<{ id: string; city_id: string }>(sql`
+      SELECT id, city_id::text AS city_id FROM bookings
+      WHERE reference = ${reference} AND deleted_at IS NULL
+        AND ${scopeFilter(claims, 'city_id')}
     `);
 
     const booking = rows.rows[0];
 
     if (!booking) throw notFound(ERROR.BOOKING_NOT_FOUND);
+
+    assertCanWrite(claims, booking.city_id);
 
     /*
       One transaction, so a note that was written and an audit row that says so cannot disagree.
