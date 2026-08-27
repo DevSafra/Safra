@@ -28,6 +28,8 @@ export const dynamic = 'force-dynamic';
 /** Whether an increase in this measure is good news. */
 const HIGHER_IS_BETTER: Record<ReportCard['key'], boolean> = {
   commission_revenue: true,
+  /* More advertising revenue is good news, like the commission beside it. */
+  ad_revenue: true,
   occupancy: true,
   cancellations: false,
   partner_response: false,
@@ -142,6 +144,10 @@ const COPY: Record<ReportCard['key'], { title: string; sub: string }> = {
     title: t.sections.reports.commissionRevenue,
     sub: t.sections.reports.commissionRevenueSub,
   },
+  ad_revenue: {
+    title: t.sections.reports.adRevenue,
+    sub: t.sections.reports.adRevenueSub,
+  },
   occupancy: {
     title: t.sections.reports.occupancy,
     sub: t.sections.reports.occupancySub,
@@ -159,7 +165,9 @@ const COPY: Record<ReportCard['key'], { title: string; sub: string }> = {
 /** Each measure has its own unit; a shared formatter would print "$71" for occupancy. */
 function format(card: ReportCard): string {
   switch (card.key) {
+    /* Both revenue cards are money, and neither may print a bare figure. */
     case 'commission_revenue':
+    case 'ad_revenue':
       return `$${money(card.value)}`;
     case 'partner_response':
       return `${Number(card.value).toLocaleString('en-US')} ${t.sections.reports.minutes}`;
@@ -171,6 +179,7 @@ function format(card: ReportCard): string {
 function formatDelta(card: ReportCard, delta: number): string {
   switch (card.key) {
     case 'commission_revenue':
+    case 'ad_revenue':
       return `$${money(String(delta))}`;
     case 'partner_response':
       return `${Math.round(delta).toLocaleString('en-US')} ${t.sections.reports.minutes}`;

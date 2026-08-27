@@ -8,7 +8,12 @@ import { scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 export interface ReportCard {
-  readonly key: 'commission_revenue' | 'occupancy' | 'cancellations' | 'partner_response';
+  readonly key:
+    | 'commission_revenue'
+    | 'ad_revenue'
+    | 'occupancy'
+    | 'cancellations'
+    | 'partner_response';
   /** The headline figure, already formatted as a decimal string. */
   readonly value: string;
   /** Same measure over the previous period, so the UI can state the delta honestly. */
@@ -47,14 +52,16 @@ export class ReportsService {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
   async cards(actor?: AccessTokenClaims): Promise<ReportCard[]> {
-    const [revenue, occupancy, cancellations, response] = await Promise.all([
+    const [revenue, ads, occupancy, cancellations, response] = await Promise.all([
       this.commissionRevenue(actor),
+      this.adRevenue(actor),
       this.occupancy(actor),
       this.cancellations(actor),
       this.partnerResponse(actor),
     ]);
 
-    return [revenue, occupancy, cancellations, response];
+    /* Beside the commission, because they are SAFRA's two revenue streams and read as a pair. */
+    return [revenue, ads, occupancy, cancellations, response];
   }
 
   /**
@@ -85,6 +92,54 @@ export class ReportsService {
     `);
 
     return this.card('commission_revenue', result.rows);
+  }
+
+  /**
+   * SAFRA's OTHER revenue: what advertisers actually paid (§9.3).
+   *
+   * ## Why it is here at all
+   *
+   * Bashar, 2026-08-27: «I do not want advertising revenue to be accounted for in the ledger but
+   * invisible in reporting.» It posts `ad_payment` ↔ `ad_revenue` the moment an invoice is recorded
+   * as paid, and every figure derived from the books carried it — while التقارير, the screen
+   * somebody opens to ask what the platform earns, counted only booking commission. A revenue
+   * stream that exists in the accounts and not on the report is a report that is quietly wrong.
+   *
+   * ## Read from the INVOICE, not from the ledger
+   *
+   * The two are the same number by construction — `AdInvoiceService.markPaid` posts the pair in the
+   * same transaction as the status change, so an invoice is `paid` if and only if the legs exist.
+   * The invoice is used because a ledger entry has no city: `ad_revenue` legs carry no
+   * `booking_id` and no `partner_id`, so there is nothing to narrow by, and every other card on
+   * this screen is scoped. Reaching the city through `ad_campaigns` is what makes this card obey
+   * the same rule as the rest of the screen.
+   *
+   * `paid_at`, not `created_at`: an invoice issued in March and settled in May is May's revenue,
+   * which is the whole reason the ledger posts on payment rather than on issue.
+   */
+  private async adRevenue(actor?: AccessTokenClaims): Promise<ReportCard> {
+    const result = await this.db.execute<{ bucket: string; value: string }>(sql`
+      WITH weeks AS (
+        SELECT generate_series(
+          date_trunc('week', current_date) - interval '${sql.raw(String(BUCKETS - 1))} weeks',
+          date_trunc('week', current_date),
+          interval '1 week'
+        ) AS bucket
+      )
+      SELECT to_char(w.bucket, 'YYYY-MM-DD') AS bucket,
+             coalesce(sum(i.amount), 0)::text AS value
+      FROM weeks w
+      LEFT JOIN ad_invoices i
+        ON date_trunc('week', i.paid_at) = w.bucket
+       AND i.status = 'paid'
+       AND i.deleted_at IS NULL
+      LEFT JOIN ad_campaigns c ON c.id = i.campaign_id
+      WHERE i.id IS NULL OR ${scopeFilter(actor, 'c.city_id')}
+      GROUP BY w.bucket
+      ORDER BY w.bucket
+    `);
+
+    return this.card('ad_revenue', result.rows);
   }
 
   /** Booked nights against recorded availability — see the class note on what this measures. */

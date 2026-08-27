@@ -26,6 +26,8 @@ export interface FinanceCounters {
   readonly captured_today: string;
   readonly refunded_today: string;
   readonly fines_collected_month: string;
+  /** Advertising settled this month — the platform's second revenue stream (§9.3). */
+  readonly ad_revenue_month: string;
   readonly partner_payable_outstanding: string;
   readonly currency: string;
 }
@@ -93,6 +95,7 @@ export class FinanceService {
       captured_today: string;
       refunded_today: string;
       fines_collected_month: string;
+      ad_revenue_month: string;
       partner_payable_outstanding: string;
       currency: string;
     }>(sql`
@@ -108,6 +111,16 @@ export class FinanceService {
                   WHERE v.collected_at IS NOT NULL
                     AND v.collected_at >= date_trunc('month', current_date)), 0)::text
           AS fines_collected_month,
+        -- Advertising settled this month (§9.3). From the INVOICE rather than from the ledger,
+        -- for the same reason the report card is: an ad_revenue leg carries no city, and every
+        -- other figure on this screen is scoped. The two are the same number by construction --
+        -- markPaid posts the pair in the transaction that sets the status.
+        coalesce((SELECT sum(i.amount) FROM ad_invoices i
+                  JOIN ad_campaigns c ON c.id = i.campaign_id
+                  WHERE i.status = 'paid' AND i.deleted_at IS NULL
+                    AND i.paid_at >= date_trunc('month', current_date)
+                    AND ${scopeFilter(actor, 'c.city_id')}), 0)::text
+          AS ad_revenue_month,
         coalesce((SELECT sum(b.partner_payable_amount) FROM bookings b
                   WHERE b.status IN ('confirmed','checked_in','completed')
                     AND ${scopeFilter(actor, 'b.city_id')}), 0)::text
@@ -127,6 +140,7 @@ export class FinanceService {
         captured_today: '0',
         refunded_today: '0',
         fines_collected_month: '0',
+        ad_revenue_month: '0',
         partner_payable_outstanding: '0',
         currency: 'USD',
       }

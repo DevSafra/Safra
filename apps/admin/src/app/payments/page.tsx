@@ -101,6 +101,18 @@ export default async function PaymentsPage({
               )}
               valueClass="text-warn"
             />
+            {/*
+              §9.3's advertising, on the screen where money is read (Bashar, 2026-08-27).
+
+              It posts `ad_payment` ↔ `ad_revenue` the moment an invoice is settled, so every figure
+              derived from the ledger already carried it — and الدفع, the screen an operator opens to
+              ask what came in, did not name it at all.
+            */}
+            <Kpi
+              label={t.sections.payments.kpiAdRevenue}
+              value={amount(result.counters.ad_revenue_month, result.counters.currency)}
+              valueClass="text-gold"
+            />
           </KpiRow>
 
           <ConsolePanel>
