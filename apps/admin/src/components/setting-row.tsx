@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { SANCTIONS_POLICIES } from '@safra/contracts';
 
 import type { EditableSetting } from '@/lib/api';
-import { fill, t } from '@/lib/strings';
+import { apiErrorOf, fill, t } from '@/lib/strings';
 import { shortDate } from '@/lib/format';
 
 /** Schemas this form knows how to render an input for. */
@@ -61,7 +61,7 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? t.sections.settings.saveFailed);
+        setError(apiErrorOf(body));
         setBusy(false);
         return;
       }
@@ -360,11 +360,4 @@ function currencyOf(value: unknown): string | null {
   const currency = (value as Record<string, unknown>)['currency'];
 
   return typeof currency === 'string' ? currency : null;
-}
-
-function messageOf(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
-
-  const { message } = body;
-  return typeof message === 'string' ? message : null;
 }

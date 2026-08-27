@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import type { PartnerDocument } from '@/lib/api';
-import { fill, label, t } from '@/lib/strings';
+import { apiErrorOf, fill, label, t } from '@/lib/strings';
 import { StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
 
@@ -37,7 +37,7 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? t.sections.panels.failed);
+        setError(apiErrorOf(body));
         setBusy(false);
         return;
       }
@@ -160,11 +160,4 @@ export function DocumentReview({ document }: { document: PartnerDocument }) {
       )}
     </div>
   );
-}
-
-function messageOf(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
-
-  const { message } = body;
-  return typeof message === 'string' ? message : null;
 }

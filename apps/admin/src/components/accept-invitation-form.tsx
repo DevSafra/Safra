@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PasswordField } from '@safra/ui';
 
 import { text } from '@/lib/form';
-import { t } from '@/lib/strings';
+import { apiErrorOf, t } from '@/lib/strings';
 
 /**
  * Setting a first password from an invitation link (M-5).
@@ -55,7 +55,7 @@ export function AcceptInvitationForm({ token }: { token: string }) {
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? t.sections.panels.invitationFailed);
+        setError(apiErrorOf(body));
         setSubmitting(false);
         return;
       }
@@ -126,11 +126,4 @@ export function AcceptInvitationForm({ token }: { token: string }) {
       </button>
     </form>
   );
-}
-
-function messageOf(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
-
-  const { message } = body;
-  return typeof message === 'string' ? message : null;
 }

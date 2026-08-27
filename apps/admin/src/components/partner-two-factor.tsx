@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { fill, t } from '@/lib/strings';
+import { apiErrorOf, fill, t } from '@/lib/strings';
 
 /**
  * Clearing a partner's second factor — the lost-phone path (§4.1 sensitive operation).
@@ -50,7 +50,7 @@ export function PartnerTwoFactor({
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? t.sections.partnerTwoFactor.failed);
+        setError(apiErrorOf(body));
         setBusy(false);
         return;
       }
@@ -154,13 +154,6 @@ export function PartnerTwoFactor({
       )}
     </div>
   );
-}
-
-function messageOf(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
-
-  const { message } = body;
-  return typeof message === 'string' ? message : null;
 }
 
 /** The count the API reports, or zero — never a guess presented as a fact. */

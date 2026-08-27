@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 
 import type { EmergencyState } from '@/lib/api';
-import { t, apiError } from '@/lib/strings';
+import { t, apiErrorOf } from '@/lib/strings';
 
 /**
  * The Emergency Mode control (EC-009, design handoff §8.3).
@@ -70,12 +70,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
           rightly refuses one. `String()` handles the case where the API sends an array of
           validation messages rather than a single string.
         */
-        const message =
-          typeof payload === 'object' && payload !== null && 'message' in payload
-            ? String(payload.message)
-            : null;
-
-        setError(apiError(message));
+        setError(apiErrorOf(payload));
         setBusy(false);
 
         return;

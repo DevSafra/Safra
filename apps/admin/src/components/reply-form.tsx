@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { t, apiError } from '@/lib/strings';
+import { t, apiErrorOf } from '@/lib/strings';
 
 /**
  * A staff reply into a three-party thread.
@@ -49,12 +49,7 @@ export function ReplyForm({ reference }: { reference: string }) {
 
       if (!response.ok) {
         const payload: unknown = await response.json().catch(() => null);
-        const message =
-          typeof payload === 'object' && payload !== null && 'message' in payload
-            ? String(payload.message)
-            : null;
-
-        setError(apiError(message));
+        setError(apiErrorOf(payload));
 
         return;
       }

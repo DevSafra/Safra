@@ -5,7 +5,7 @@ import { useState } from 'react';
 
 import { COUPON_TYPES, type CouponType } from '@safra/contracts';
 
-import { t, apiError, label } from '@/lib/strings';
+import { t, apiErrorOf, label } from '@/lib/strings';
 import { TableToolbar } from './table-toolbar';
 
 /**
@@ -102,12 +102,7 @@ export function CouponsToolbar({
 
       if (!response.ok) {
         const payload: unknown = await response.json().catch(() => null);
-        const message =
-          typeof payload === 'object' && payload !== null && 'message' in payload
-            ? String(payload.message)
-            : null;
-
-        setError(apiError(message));
+        setError(apiErrorOf(payload));
 
         return;
       }

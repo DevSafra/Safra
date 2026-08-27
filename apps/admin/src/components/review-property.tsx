@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { t } from '@/lib/strings';
+import { apiErrorOf, t } from '@/lib/strings';
 
 /**
  * Publish or reject a listing (§8.1, P-002).
@@ -51,7 +51,7 @@ export function ReviewProperty({
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? t.sections.reviewProperty.failed);
+        setError(apiErrorOf(body));
         setBusy(false);
         return;
       }
@@ -145,11 +145,4 @@ export function ReviewProperty({
       )}
     </div>
   );
-}
-
-function messageOf(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
-
-  const { message } = body;
-  return typeof message === 'string' ? message : null;
 }

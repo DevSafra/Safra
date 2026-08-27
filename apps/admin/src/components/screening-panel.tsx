@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { SanctionsPolicy } from '@safra/contracts';
 
-import { fill, t } from '@/lib/strings';
+import { apiErrorOf, fill, t } from '@/lib/strings';
 
 interface Candidate {
   name: string;
@@ -68,7 +68,7 @@ export function ScreeningPanel({
 
       if (!response.ok) {
         const body: unknown = await response.json().catch(() => null);
-        setError(messageOf(body) ?? t.sections.panels.screeningFailed);
+        setError(apiErrorOf(body));
         setBusy(false);
         return;
       }
@@ -306,11 +306,4 @@ function readResult(result: unknown): {
       ? (record['candidates'] as Candidate[])
       : [],
   };
-}
-
-function messageOf(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null || !('message' in body)) return null;
-
-  const { message } = body;
-  return typeof message === 'string' ? message : null;
 }
