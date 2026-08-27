@@ -26,6 +26,7 @@ import {
 } from './booking-state.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR, WALLET_NOTE } from '@safra/contracts';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { notFound } from '../common/errors/app-error.js';
 import { conflict } from '../common/errors/app-error.js';
 
@@ -70,7 +71,7 @@ export class BookingActionsService {
     claims: AccessTokenClaims | undefined,
     paymentId?: string,
   ) {
-    const booking = await this.load(reference);
+    const booking = await this.load(reference, claims);
 
     this.assertTransition(booking.status, 'pending_confirmation', 'system');
 
@@ -356,7 +357,7 @@ export class BookingActionsService {
     reason: string | undefined,
     claims: AccessTokenClaims | undefined,
   ) {
-    const booking = await this.load(reference);
+    const booking = await this.load(reference, claims);
 
     // Ownership is part of the check, and a mismatch is 404 rather than 403 so a
     // partner cannot probe other partners' references.
@@ -513,7 +514,7 @@ export class BookingActionsService {
     claims: AccessTokenClaims | undefined,
     reason?: string,
   ): Promise<{ reference: string; status: BookingStatus }> {
-    const booking = await this.load(reference);
+    const booking = await this.load(reference, claims);
 
     this.assertTransition(booking.status, to, 'staff');
 
@@ -730,7 +731,7 @@ export class BookingActionsService {
     actor: Actor,
     claims: AccessTokenClaims | undefined,
   ) {
-    const booking = await this.load(reference);
+    const booking = await this.load(reference, claims);
     this.assertTransition(booking.status, 'cancelled', actor);
 
     return this.db.transaction(async (tx) => {
@@ -840,20 +841,49 @@ export class BookingActionsService {
     return id;
   }
 
-  private async load(reference: string) {
+  /**
+   * The booking an action names, IF this caller is scoped to reach it.
+   *
+   * ## The gap this closes (`O-sec-13`, 2026-08-27)
+   *
+   * Every staff transition on a booking — capture the payment, confirm on the partner's behalf,
+   * check in, undo a check-in, complete, cancel — arrives here by REFERENCE, and this returned the
+   * row for `reference = $1` and nothing else. `claims` was used to stamp `cancelled_by_user_id`
+   * and to write the audit row. So an operations manager scoped to one city could cancel or
+   * complete any booking in the country, and references are sequential.
+   *
+   * `bookings` has been in `SCOPED_RESOURCES` since scope was built. The registry and the detail
+   * screen were scoped; the ACTIONS were not, which is the same «the predicate looked like it
+   * covered everything» that hid the detail screen until the day before.
+   *
+   * ## A partner is unaffected
+   *
+   * `partnerDecision` reaches this too, and a partner's claims carry no `scope` — `scopeOf` answers
+   * `UNSCOPED`, `isRestricted` is false, and the predicate folds to TRUE at plan time. Their own
+   * boundary is `requirePartnerId`, one layer up, and it is untouched.
+   *
+   * The predicate here, `assertCanWrite` at each call site: the predicate so a `none` member cannot
+   * tell an out-of-scope booking from an absent one, the assertion so a `read_only` member who may
+   * legitimately LOOK cannot act.
+   */
+  private async load(reference: string, claims: AccessTokenClaims | undefined) {
     const rows = await this.db.execute<{
       id: string;
       status: BookingStatus;
       partner_id: string;
+      city_id: string | null;
     }>(sql`
-      SELECT id, status::text AS status, partner_id
+      SELECT id, status::text AS status, partner_id, city_id::text AS city_id
       FROM bookings
       WHERE reference = ${reference} AND deleted_at IS NULL
+        AND ${scopeFilter(claims, 'city_id')}
       LIMIT 1
     `);
 
     const booking = rows.rows[0];
     if (!booking) throw notFound(ERROR.BOOKING_NOT_FOUND);
+
+    assertCanWrite(claims, booking.city_id);
 
     return booking;
   }

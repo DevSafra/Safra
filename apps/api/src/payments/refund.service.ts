@@ -15,6 +15,7 @@ import { describeError } from '../common/errors/safe-error.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR, WALLET_NOTE } from '@safra/contracts';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
 /** The shape snapshotted onto the booking at creation. */
@@ -71,8 +72,11 @@ export class RefundService {
    * Separate from `execute` so support staff and the customer-facing cancellation
    * screen can show a figure before anyone commits to it.
    */
-  async quote(reference: string): Promise<RefundQuote> {
-    const booking = await this.load(reference);
+  async quote(
+    reference: string,
+    claims: AccessTokenClaims | undefined,
+  ): Promise<RefundQuote> {
+    const booking = await this.load(reference, claims);
     return this.computeQuote(booking);
   }
 
@@ -90,7 +94,7 @@ export class RefundService {
     reason: string,
     claims: AccessTokenClaims | undefined,
   ): Promise<{ refundId: string; amount: string; status: string; percent: number }> {
-    const booking = await this.load(reference);
+    const booking = await this.load(reference, claims);
     const quote = await this.computeQuote(booking);
 
     return this.post(booking, quote, reason, claims);
@@ -123,7 +127,8 @@ export class RefundService {
     reference: string,
     reason: string,
   ): Promise<{ refundId: string; amount: string; status: string; percent: number }> {
-    const booking = await this.load(reference);
+    /* No actor: the SLA sweep. Unrestricted by construction — see `load`. */
+    const booking = await this.load(reference, undefined);
     const quote = await this.fullQuote(booking);
 
     return this.post(booking, quote, reason, undefined);
@@ -616,23 +621,46 @@ export class RefundService {
     return rows.rows[0] ?? null;
   }
 
-  private async load(reference: string): Promise<BookingRow> {
+  /**
+   * The booking a refund names, IF this caller is scoped to reach it.
+   *
+   * ## The gap this closes (`O-sec-13`, 2026-08-27)
+   *
+   * `quote` and `execute` are `REFUND_READ`/`REFUND_CREATE` on `payments/:reference`, and this
+   * resolved the booking by reference alone. A refund moves real money back to a customer, so a
+   * city-scoped finance officer could issue one against any booking in the country — and see the
+   * quote for it first, which is the reconnaissance step.
+   *
+   * ## `undefined` claims are the SWEEP, and stay unrestricted
+   *
+   * `refundInFull` is called by the SLA expiry sweep with no actor at all. `scopeOf(undefined)`
+   * answers `UNSCOPED`, so the predicate folds to TRUE and the system path is unchanged — which is
+   * correct: a job has no geography and refusing it would strand the money it exists to return.
+   */
+  private async load(
+    reference: string,
+    claims: AccessTokenClaims | undefined,
+  ): Promise<BookingRow> {
     const rows = await this.db.execute<BookingRow>(sql`
       SELECT b.id, b.reference, b.status::text AS status, b.check_in::text AS check_in,
              b.base_amount::text AS base_amount, b.total_amount::text AS total_amount,
              b.wallet_amount::text AS wallet_amount,
              b.currency_id, b.fx_rate_to_syp::text AS fx_rate_to_syp,
-             b.partner_id, b.customer_profile_id,
+             b.partner_id, b.customer_profile_id, b.city_id::text AS city_id,
              b.cancellation_policy_snapshot, cur.code AS currency_code,
              cur.decimals AS currency_decimals
       FROM bookings b
       JOIN currencies cur ON cur.id = b.currency_id
       WHERE b.reference = ${reference} AND b.deleted_at IS NULL
+        AND ${scopeFilter(claims, 'b.city_id')}
       LIMIT 1
     `);
 
     const booking = rows.rows[0];
     if (!booking) throw notFound(ERROR.BOOKING_NOT_FOUND);
+
+    /* `read_only` passes the predicate — it may look — and is refused here. */
+    assertCanWrite(claims, booking.city_id);
 
     if (booking.status === 'draft') {
       throw badRequest(ERROR.BOOKING_DRAFT_NOT_REFUNDABLE);
@@ -644,6 +672,8 @@ export class RefundService {
 
 /** A `type`, not an `interface` — see the note on PaymentRow in the webhook service. */
 type BookingRow = {
+  /** The city, for the scope predicate and guard in `load`. */
+  city_id: string | null;
   id: string;
   reference: string;
   status: string;

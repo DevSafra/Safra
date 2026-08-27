@@ -157,8 +157,12 @@ export class PaymentsController {
    */
   @Get(':reference/refund-quote')
   @RequirePermissions(P.REFUND_READ)
-  async refundQuote(@Param('reference') reference: string) {
-    return this.refunds.quote(reference);
+  async refundQuote(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    /* Scoped: a quote is the reconnaissance step for a refund and is gated the same way. */
+    return this.refunds.quote(reference, user);
   }
 
   /**

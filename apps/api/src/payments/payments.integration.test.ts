@@ -534,7 +534,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
     });
 
     it('quotes the tier that applies, against the base amount only', async () => {
-      const quote = await refunds.quote(booking.reference);
+      const quote = await refunds.quote(booking.reference, undefined);
 
       // Check-in is well over 168h out, so the 100% tier applies to the 200.00 base.
       expect(quote.refundPercent).toBe(100);
@@ -585,7 +585,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
     });
 
     it('never refunds SAFRA’s service fee, only the partner-side base', async () => {
-      const quote = await refunds.quote(booking.reference);
+      const quote = await refunds.quote(booking.reference, undefined);
 
       // Booking total is 201.99 = 200.00 base + 1.99 service fee. Only the base
       // is refundable: the fee is earned when the booking is made.
@@ -930,7 +930,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
 
       await deliver(webhooks, eventId(), ref, '151.990');
 
-      const quote = await refunds.quote(booking.reference);
+      const quote = await refunds.quote(booking.reference, undefined);
 
       // 200.00 refundable base: 50.00 back to the wallet, 150.00 to the card.
       expect(quote.refundAmount).toBe('200.000');

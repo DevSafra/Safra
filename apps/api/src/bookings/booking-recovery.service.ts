@@ -15,6 +15,7 @@ import { MailService } from '../mail/mail.service.js';
 import { bookingRecoveryMail, bookingVerificationMail } from '../mail/mail.templates.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { assertCanWrite, scopeFilter, writeFilter } from '../rbac/scope.sql.js';
 
 /** SHA-256, for the same reason `BookingAccessService` uses it — see `bookingVerifications`. */
 const digest = (value: string): string =>
@@ -126,20 +127,34 @@ export class BookingRecoveryService {
   ): Promise<{ sentTo: string; expiresInMinutes: number }> {
     const rows = await this.db.execute<{
       id: string;
+      city_id: string | null;
       email: string;
       locale: string | null;
     }>(sql`
-      SELECT b.id, cp.email, u.preferred_locale AS locale
+      SELECT b.id, b.city_id::text AS city_id, cp.email, u.preferred_locale AS locale
       FROM bookings b
       JOIN customer_profiles cp ON cp.id = b.customer_profile_id
       LEFT JOIN users u ON u.id = cp.user_id
       WHERE b.reference = ${reference} AND b.deleted_at IS NULL
+        AND ${scopeFilter(claims, 'b.city_id')}
       LIMIT 1
     `);
 
     const booking = rows.rows[0];
 
     if (!booking) throw notFound(ERROR.BOOKING_NOT_FOUND);
+
+    /*
+      Scoped by the booking's city (`O-sec-13`, 2026-08-27).
+
+      Sending a verification code MAILS A CREDENTIAL to the customer of a booking, and the response
+      names the address it went to. Reached by reference alone, that is both a write on somebody
+      else's booking and a partial disclosure of their email — for any booking in the country.
+
+      `assertCanWrite` for the `read_only` member, who may read the booking and may not send its
+      customer anything.
+    */
+    assertCanWrite(claims, booking.city_id);
 
     /* `randomInt`, not `Math.random()` — this is a credential, however short-lived. */
     const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
@@ -211,6 +226,11 @@ export class BookingRecoveryService {
       FROM bookings b
       WHERE b.reference = ${reference}
         AND v.booking_id = b.id
+        -- Scoped in the statement: this finds and consumes in one go, so a separate load would
+        -- open a window rather than close one. writeFilter, not scopeFilter -- consuming a code
+        -- is a write, and read_only must not reach it.
+        -- (No backticks in a comment inside a sql template: one would end the string.)
+        AND ${writeFilter(claims, 'b.city_id')}
         AND v.code_hash = ${digest(code)}
         AND v.consumed_at IS NULL
         AND v.expires_at > now()
