@@ -137,21 +137,40 @@ test.describe('الإعلانات', () => {
     */
     const live = page.locator('tbody tr').first();
 
-    await live.getByRole('button', { name: 'تعديل الإعلان' }).click();
+    await live.getByRole('button', { name: 'تعديل', exact: true }).click();
 
     const save = live.getByRole('button', { name: 'حفظ' });
 
     await expect(save, 'nothing has changed yet').toBeDisabled();
 
-    await live.getByLabel('العنوان بالعربية').fill(`إعلان معدَّل ${stamp}`);
+    const edited = `إعلان معدَّل ${stamp}`;
+
+    await live.getByLabel('العنوان بالعربية').fill(edited);
     await expect(save).toBeEnabled();
     await save.click();
 
     await expect(page.locator('tbody tr').first()).toContainText(advertiserName);
     await expect(
-      page.locator('tbody tr').first().getByRole('button', { name: 'تعديل الإعلان' }),
+      page
+        .locator('tbody tr')
+        .first()
+        .getByRole('button', { name: 'تعديل', exact: true }),
       'the form closes and the row returns',
     ).toBeVisible();
+
+    /*
+      And the row SHOWS the new headline (Bashar, 2026-08-27).
+
+      «when I edit a row and save, nothing changes, is that correct?» — it was correct, and it was
+      the defect: none of the four fields this form edits appeared anywhere on the screen, so a save
+      that worked was indistinguishable from one that had failed silently. This is the assertion
+      that was missing. The suite passed against a build where the write landed and the person who
+      made it could not tell.
+    */
+    await expect(
+      page.locator('tbody tr').first(),
+      'the edit is visible to the person who made it',
+    ).toContainText(edited);
 
     /*
       And the money followed it, in the same transaction.
