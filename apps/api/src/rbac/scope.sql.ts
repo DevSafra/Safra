@@ -91,6 +91,47 @@ export function scopeFilter(
 }
 
 /**
+ * The scope as a predicate for a WRITE — the counterpart of `scopeFilter`.
+ *
+ * ## Why `scopeFilter` cannot be used in an `UPDATE`
+ *
+ * Because it returns `TRUE` for `read_only`, deliberately: that mode means «you may look at the
+ * rest of the country», and the write restriction is carried by `assertCanWrite` instead. Put the
+ * READ filter in an `UPDATE … WHERE` and a `read_only` member writes wherever they can see, which
+ * is everywhere — the one configuration the scope model says must not exist.
+ *
+ * ## When to reach for this rather than the load-then-assert pair
+ *
+ * Almost never. The house shape is: narrow the LOOKUP with `scopeFilter`, then `assertCanWrite` on
+ * the row's city — it gives a `none` member a 404 indistinguishable from absence and a `read_only`
+ * member a 403 that says the action is not permitted, which are the two different answers those
+ * modes are owed.
+ *
+ * This exists for the case where there is no load: a statement that finds and writes in one go, and
+ * where adding a separate read would introduce a window rather than remove one. `setLocation` is
+ * that case. The cost is that both modes get the same 404, which is acceptable where the row is
+ * named by a reference the caller already had.
+ */
+export function writeFilter(
+  actor: AccessTokenClaims | undefined,
+  cityColumn: string,
+): SQL {
+  const scope = scopeOf(actor);
+
+  if (!isRestricted(scope)) return sql`TRUE`;
+
+  const column = sql.raw(cityColumn);
+
+  /* Each id its own bound parameter — see the note in `scopeFilter` on why `= ANY` fails here. */
+  const ids = sql.join(
+    scope.cityIds.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  );
+
+  return sql`(${column} IS NULL OR ${column} IN (${ids}))`;
+}
+
+/**
  * Whether the actor's scope restricts reads at all.
  *
  * Exposed so a caller can label a list as scoped in the response — an operator who cannot see a
