@@ -151,9 +151,11 @@ export class AdminReviewController {
   @RequirePermissions(P.REVIEW_MODERATE)
   @AuditExempt('Reading the moderation queue; changes nothing.')
   async reported(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(new ZodValidationPipe(listQuerySchema)) query: z.infer<typeof listQuerySchema>,
   ) {
-    return this.reviews.listReported(query);
+    /* Scoped by the reviewed PROPERTY's city — a review has none of its own. */
+    return this.reviews.listReported(query, user);
   }
 
   @Post(':reference/moderate')

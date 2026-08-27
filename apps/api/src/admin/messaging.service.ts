@@ -12,7 +12,7 @@ import { supportRepliedMail } from '../mail/mail.templates.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { redactIncomingMessage } from '../messaging/redaction.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { scopeFilter } from '../rbac/scope.sql.js';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { notFound } from '../common/errors/app-error.js';
 
 export const staffReplySchema = z
@@ -216,7 +216,21 @@ export class MessagingService {
   }
 
   /** One thread in full, oldest first — the order it was written in. */
-  async thread(reference: string): Promise<MessageRow[]> {
+  /**
+   * One conversation's messages, scoped like the registry that lists them (`O-sec-13`, 2026-08-27).
+   *
+   * `conversations` has been in `SCOPED_RESOURCES` since scope was built and the LIST narrows by
+   * `coalesce(b.city_id, p.city_id)` — a thread hangs off a booking, or off a partner where there
+   * is no booking. Opening one by reference narrowed by nothing, so a city-scoped agent could read
+   * any thread in the country, including its internal staff notes.
+   *
+   * The same expression as the list, deliberately: two ways of deciding which city a conversation
+   * is in would be two answers.
+   */
+  async thread(
+    reference: string,
+    actor: AccessTokenClaims | undefined,
+  ): Promise<MessageRow[]> {
     const result = await this.db.execute<{
       sender_kind: string;
       sender_email: string | null;
@@ -231,8 +245,11 @@ export class MessagingService {
              to_char(m.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS at
       FROM messages m
       JOIN conversations c ON c.id = m.conversation_id
+      LEFT JOIN bookings b ON b.id = c.booking_id
+      LEFT JOIN partners p ON p.id = c.partner_id
       LEFT JOIN users u    ON u.id = m.sender_user_id
       WHERE c.reference = ${reference} AND c.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'coalesce(b.city_id, p.city_id)')}
       ORDER BY m.created_at ASC
       LIMIT 200
     `);
@@ -259,15 +276,26 @@ export class MessagingService {
     reference: string,
     input: StaffReplyInput,
   ): Promise<MessageRow[]> {
-    const found = await this.db.execute<{ id: string }>(sql`
-      SELECT id FROM conversations
-      WHERE reference = ${reference} AND deleted_at IS NULL AND closed_at IS NULL
+    /*
+      Scoped both ways — see `thread`. The predicate so an out-of-scope thread answers exactly as a
+      closed or absent one, and `assertCanWrite` so a `read_only` agent who may read the thread
+      cannot post into it.
+    */
+    const found = await this.db.execute<{ id: string; city_id: string | null }>(sql`
+      SELECT c.id, coalesce(b.city_id, p.city_id)::text AS city_id
+      FROM conversations c
+      LEFT JOIN bookings b ON b.id = c.booking_id
+      LEFT JOIN partners p ON p.id = c.partner_id
+      WHERE c.reference = ${reference} AND c.deleted_at IS NULL AND c.closed_at IS NULL
+        AND ${scopeFilter(actor, 'coalesce(b.city_id, p.city_id)')}
       LIMIT 1
     `);
 
     const conversation = found.rows[0];
 
     if (!conversation) throw notFound(ERROR.CONVERSATION_NOT_FOUND_OR_CLOSED);
+
+    assertCanWrite(actor, conversation.city_id);
 
     // Staff are not exempt — see the class note.
     const redacted = redactIncomingMessage(input.body);
@@ -305,7 +333,7 @@ export class MessagingService {
       await this.notifyAskerOfReply(conversation.id);
     }
 
-    return this.thread(reference);
+    return this.thread(reference, actor);
   }
 
   /**

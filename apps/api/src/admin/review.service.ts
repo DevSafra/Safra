@@ -895,15 +895,30 @@ export class ReviewService {
     reference: string,
     input: { matched?: boolean | undefined; notes?: string | undefined },
   ) {
+    /*
+      Scoped by the partner's city (`O-sec-13`, 2026-08-27).
+
+      Recording a screening writes `sanctions_screened_at` and a reviewer's judgement onto a
+      partner's compliance record, and it was reachable for any partner in the country by
+      reference. `scopeCondition` rather than `scopeFilter` because this is the relational builder,
+      and it returns `undefined` for an unrestricted scope so an unscoped member's query is
+      unchanged.
+
+      `city_id` comes back so `assertCanWrite` can refuse the `read_only` member the predicate
+      deliberately lets through.
+    */
     const partner = await this.db.query.partners.findFirst({
       where: and(
         eq(schema.partners.reference, reference),
         isNull(schema.partners.deletedAt),
+        scopeCondition(claims, schema.partners.cityId),
       ),
-      columns: { id: true, legalName: true, displayName: true },
+      columns: { id: true, legalName: true, displayName: true, cityId: true },
     });
 
     if (!partner) throw notFound(ERROR.PARTNER_NOT_FOUND);
+
+    assertCanWrite(claims, partner.cityId);
 
     /**
      * Both names are searched. A designation may name the company or the person
@@ -956,21 +971,39 @@ export class ReviewService {
   }
 
   /** Counts for the §9.2 "needs your attention now" panel. */
-  async attentionCounts() {
+  /**
+   * The badges beside the queues — counted within the reader's own cities (`O-sec-13`, 2026-08-27).
+   *
+   * This took no actor. Every queue it counts is scoped where it is LISTED, so a city-scoped
+   * operator read «١٢ عقاراً بانتظار المراجعة» over a list that showed three — the badge and the
+   * screen contradicting each other, and the difference being a count of another city's work.
+   *
+   * A count is not a row, so this is the smallest of the gaps found in this pass. It is still
+   * cross-city information the member is not scoped to have, and «the numbers do not match the
+   * list» is how somebody discovers that the two are answering different questions.
+   *
+   * Every counter narrows by the city its own subject carries; `partner_documents` and the two
+   * booking counters reach one through a join, which is the shape that hid the others.
+   */
+  async attentionCounts(actor?: AccessTokenClaims) {
     const rows = await this.db.execute<{ metric: string; count: string }>(sql`
       SELECT 'properties_pending_review' AS metric, COUNT(*)::text AS count
         FROM properties WHERE status = 'pending_review' AND deleted_at IS NULL
+          AND ${scopeFilter(actor, 'city_id')}
       UNION ALL
       SELECT 'partners_pending_verification', COUNT(*)::text
         FROM partners WHERE verification = 'pending' AND deleted_at IS NULL
+          AND ${scopeFilter(actor, 'city_id')}
       UNION ALL
       -- Requests to JOIN, which nobody has decided yet (Bashar, 2026-08-19).
       SELECT 'partner_applications_open', COUNT(*)::text
         FROM partner_applications
         WHERE status IN ('submitted', 'contacted') AND deleted_at IS NULL
+          AND ${scopeFilter(actor, 'city_id')}
       UNION ALL
       SELECT 'partners_unscreened', COUNT(*)::text
         FROM partners WHERE sanctions_screened_at IS NULL AND deleted_at IS NULL
+          AND ${scopeFilter(actor, 'city_id')}
       UNION ALL
       -- Documents sent and not yet looked at. See the note on the same counter in
       -- DashboardService: the upload itself moved no number that staff could see.
@@ -978,9 +1011,11 @@ export class ReviewService {
         FROM partner_documents pd
         JOIN partners pdp ON pdp.id = pd.partner_id AND pdp.deleted_at IS NULL
         WHERE pd.status = 'pending' AND pd.deleted_at IS NULL
+          AND ${scopeFilter(actor, 'pdp.city_id')}
       UNION ALL
       SELECT 'bookings_awaiting_confirmation', COUNT(*)::text
         FROM bookings WHERE status = 'pending_confirmation' AND deleted_at IS NULL
+          AND ${scopeFilter(actor, 'city_id')}
       UNION ALL
       -- SLA about to lapse: the single most time-critical queue (§6.4).
       SELECT 'bookings_sla_expiring_within_30m', COUNT(*)::text
@@ -989,6 +1024,7 @@ export class ReviewService {
           AND confirmation_deadline_at IS NOT NULL
           AND confirmation_deadline_at <= now() + (${SLA_EXPIRY_WARNING_MINUTES}::int * INTERVAL '1 minute')
           AND deleted_at IS NULL
+          AND ${scopeFilter(actor, 'city_id')}
     `);
 
     return Object.fromEntries(rows.rows.map((r) => [r.metric, Number(r.count)]));

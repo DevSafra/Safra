@@ -19,6 +19,7 @@ import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
@@ -173,7 +174,7 @@ export class PayoutService {
 
   /** Closes the open period so its total stops moving and a human can look at it. */
   async close(payoutId: string, claims: AccessTokenClaims | undefined): Promise<void> {
-    const payout = await this.require(payoutId);
+    const payout = await this.require(payoutId, claims);
 
     if (payout.status !== 'accruing') {
       throw conflict(ERROR.PAYOUT_NOT_ACCRUING);
@@ -202,7 +203,7 @@ export class PayoutService {
     input: { scheduledFor: string; notes?: string | undefined },
     claims: AccessTokenClaims | undefined,
   ): Promise<void> {
-    const payout = await this.require(payoutId);
+    const payout = await this.require(payoutId, claims);
 
     if (payout.status !== 'pending_release') {
       throw conflict(ERROR.PAYOUT_NOT_RELEASABLE);
@@ -314,7 +315,7 @@ export class PayoutService {
     input: { paidReference: string },
     claims: AccessTokenClaims | undefined,
   ): Promise<void> {
-    const payout = await this.require(payoutId);
+    const payout = await this.require(payoutId, claims);
 
     if (payout.status !== 'scheduled') {
       throw conflict(ERROR.PAYOUT_NOT_SCHEDULED);
@@ -370,7 +371,7 @@ export class PayoutService {
     input: { reason: string },
     claims: AccessTokenClaims | undefined,
   ): Promise<void> {
-    const payout = await this.require(payoutId);
+    const payout = await this.require(payoutId, claims);
 
     if (payout.status === 'paid' || payout.status === 'cancelled') {
       throw conflict(ERROR.PAYOUT_ALREADY_FINAL);
@@ -394,7 +395,7 @@ export class PayoutService {
     payoutId: string,
     claims: AccessTokenClaims | undefined,
   ): Promise<void> {
-    const payout = await this.require(payoutId);
+    const payout = await this.require(payoutId, claims);
 
     if (payout.status !== 'on_hold') throw conflict(ERROR.PAYOUT_NOT_HELD);
 
@@ -421,7 +422,7 @@ export class PayoutService {
     input: { reason: string },
     claims: AccessTokenClaims | undefined,
   ): Promise<void> {
-    const payout = await this.require(payoutId);
+    const payout = await this.require(payoutId, claims);
 
     if (payout.status === 'paid') throw conflict(ERROR.PAYOUT_ALREADY_PAID);
     if (payout.status === 'cancelled') throw conflict(ERROR.PAYOUT_ALREADY_FINAL);
@@ -499,8 +500,10 @@ export class PayoutService {
    */
   async listForStaff(
     query: PageQuery & { status?: string | undefined; q?: string | undefined },
+    claims: AccessTokenClaims | undefined,
   ): Promise<OffsetPage<ReturnType<typeof toView>>> {
-    const conditions = [sql`p.deleted_at IS NULL`];
+    /* Scoped by the PARTNER's city — see `require`. A read, so the predicate is the whole guard. */
+    const conditions = [sql`p.deleted_at IS NULL`, scopeFilter(claims, 'pa.city_id')];
 
     if (query.status) {
       conditions.push(sql`p.status = ${query.status}::payout_status`);
@@ -554,13 +557,14 @@ export class PayoutService {
    * is the reconciliation failure worth surfacing, and a check constraint already makes it
    * impossible to create — this is what proves the constraint is still doing its job.
    */
-  async detailForStaff(reference: string) {
+  async detailForStaff(reference: string, claims: AccessTokenClaims | undefined) {
     const rows = await this.db.execute<PayoutRow & { entry_group_id: string | null }>(sql`
       ${PAYOUT_COLUMNS}, p.entry_group_id
       FROM partner_payouts p
       JOIN currencies cur ON cur.id = p.currency_id
       JOIN partners pa    ON pa.id = p.partner_id
       WHERE p.reference = ${reference} AND p.deleted_at IS NULL
+        AND ${scopeFilter(claims, 'pa.city_id')}
     `);
 
     const row = rows.rows[0];
@@ -704,15 +708,36 @@ export class PayoutService {
     }));
   }
 
-  private async require(payoutId: string): Promise<PayoutRow> {
+  /**
+   * The payout an action names, IF this caller is scoped to reach it.
+   *
+   * ## The gap this closes (`O-sec-13`, 2026-08-27)
+   *
+   * Six `PAYOUT_EXECUTE` actions arrive here by id — close, release, mark paid, hold, lift the
+   * hold, cancel — and this resolved the row for `p.id = $1` and nothing else. `markPaid` records
+   * that money LEFT THE COMPANY, and `finance` has been in `SCOPED_RESOURCES` since scope was
+   * built. A payout has no city of its own; it inherits one from its partner, which is the shape
+   * `O-sec-13` names as «the easiest to miss» and the same one `liveViolation` had.
+   *
+   * `accrue` is deliberately not guarded: it is the scheduled sweep, it names no partner, and it
+   * takes no actor.
+   */
+  private async require(
+    payoutId: string,
+    claims: AccessTokenClaims | undefined,
+  ): Promise<PayoutRow> {
     const rows = await this.db.execute<PayoutRow>(sql`
       ${PAYOUT_SELECT}
       WHERE p.id = ${payoutId} AND p.deleted_at IS NULL
+        AND ${scopeFilter(claims, 'pa.city_id')}
     `);
 
     const row = rows.rows[0];
 
     if (!row) throw notFound(ERROR.PAYOUT_NOT_FOUND);
+
+    /* `read_only` passes the predicate — it may look — and is refused here. */
+    assertCanWrite(claims, row.city_id);
 
     return row;
   }
@@ -737,6 +762,8 @@ export class PayoutService {
 
 type PayoutRow = {
   id: string;
+  /** The PARTNER's city — a payout has no city of its own. For the scope guard in `require`. */
+  city_id: string | null;
   reference: string;
   partner_id: string;
   currency_id: string;
@@ -764,7 +791,8 @@ type PayoutRow = {
  * rate of its own until it is paid — and the ledger needs one to post the movement in SYP.
  */
 const PAYOUT_COLUMNS = sql`
-  SELECT p.id, p.reference, p.partner_id, p.currency_id, cur.code AS currency_code,
+  SELECT p.id, p.reference, p.partner_id, pa.city_id::text AS city_id,
+         p.currency_id, cur.code AS currency_code,
          -- The live rate for this currency against SYP. fx_rates is a PAIR table (base and
          -- quote), so the lookup names both; an earlier version read a currency_id column that
          -- does not exist, and every partner read failed on it.

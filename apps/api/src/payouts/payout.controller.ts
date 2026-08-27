@@ -122,10 +122,12 @@ export class AdminPayoutController {
   @RequirePermissions(P.PAYOUT_READ)
   @AuditExempt('Reading the payout registry; changes nothing.')
   async list(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(new ZodValidationPipe(payoutListQuerySchema))
     query: z.infer<typeof payoutListQuerySchema>,
   ) {
-    return this.payouts.listForStaff(query);
+    /* Scoped by the partner's city, like every other staff registry. */
+    return this.payouts.listForStaff(query, user);
   }
 
   /**
@@ -138,8 +140,11 @@ export class AdminPayoutController {
   @Get(':reference')
   @RequirePermissions(P.PAYOUT_READ)
   @AuditExempt('Reading one payout; changes nothing.')
-  async detail(@Param('reference') reference: string) {
-    return this.payouts.detailForStaff(reference);
+  async detail(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.payouts.detailForStaff(reference, user);
   }
 
   @Post('accrue')

@@ -195,8 +195,12 @@ export class CommsController {
 
   @Get('conversations/:reference')
   @RequirePermissions(P.MESSAGE_READ)
-  async thread(@Param('reference') reference: string) {
-    return { messages: await this.messaging.thread(reference) };
+  async thread(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    /* Scoped by the booking's city, or the partner's where there is no booking. */
+    return { messages: await this.messaging.thread(reference, user) };
   }
 
   @Post('conversations/:reference/reply')

@@ -23,6 +23,7 @@ import { NotificationService } from '../notifications/notification.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { requirePartnerId } from '../rbac/ownership.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import {
   badRequest,
   conflict,
@@ -705,13 +706,30 @@ export class ReviewService {
   }
 
   /** The staff moderation queue: what partners have reported, oldest first. */
-  async listReported(query: PageQuery): Promise<OffsetPage<ReviewView>> {
+  /**
+   * The moderation queue — reported reviews, scoped to the moderator's cities.
+   *
+   * ## The gap this closes (`O-sec-13`, 2026-08-27)
+   *
+   * This took no actor at all. A review has no city of its own and inherits one from the PROPERTY
+   * it is about, so it is the same shape as a payout inheriting one from its partner: a city-scoped
+   * moderator could read every reported review in the country and hide or dismiss any of them.
+   *
+   * Not the same service as the one `O-sec-4` fixed on 2026-08-20 — that was
+   * `admin/review.service.ts`, which reviews PARTNERS and PROPERTIES for approval. Two files named
+   * `review.service.ts` doing different jobs is most of why this one was passed over.
+   */
+  async listReported(
+    query: PageQuery,
+    actor?: AccessTokenClaims,
+  ): Promise<OffsetPage<ReviewView>> {
     const fromWhere = sql`
       FROM reviews r
       JOIN properties pr ON pr.id = r.property_id
       JOIN units un      ON un.id = r.unit_id
       JOIN customer_profiles cp ON cp.id = r.customer_profile_id
-      WHERE r.report_status = 'open'`;
+      WHERE r.report_status = 'open'
+        AND ${scopeFilter(actor, 'pr.city_id')}`;
 
     const [rows, counted] = await Promise.all([
       this.db.execute<ReviewRow>(sql`
@@ -743,13 +761,31 @@ export class ReviewService {
   ) {
     if (!claims) throw unauthorized(ERROR.AUTH_REQUIRED);
 
-    const found = await this.db.execute<{ id: string; report_status: string }>(
-      sql`SELECT id, report_status::text FROM reviews WHERE reference = ${reference}`,
-    );
+    /*
+      Scoped by the PROPERTY's city, both ways — see `listReported`.
+
+      The predicate so an out-of-scope review answers exactly as one that does not exist, and
+      `assertCanWrite` so a `read_only` moderator who may legitimately read the queue cannot hide a
+      review in a city they do not run.
+    */
+    const found = await this.db.execute<{
+      id: string;
+      report_status: string;
+      city_id: string | null;
+    }>(sql`
+      SELECT r.id, r.report_status::text, pr.city_id::text AS city_id
+      FROM reviews r
+      JOIN properties pr ON pr.id = r.property_id
+      WHERE r.reference = ${reference}
+        AND ${scopeFilter(claims, 'pr.city_id')}
+    `);
 
     const review = found.rows[0];
 
     if (!review) throw notFound(ERROR.REVIEW_NOT_FOUND);
+
+    assertCanWrite(claims, review.city_id);
+
     if (review.report_status !== 'open') throw conflict(ERROR.REVIEW_NOT_REPORTED);
 
     const upheld = input.decision === 'uphold';

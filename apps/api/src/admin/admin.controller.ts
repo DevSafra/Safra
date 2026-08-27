@@ -54,8 +54,9 @@ export class AdminController {
   /** The §9.2 dashboard counters. */
   @Get('attention')
   @RequirePermissions(P.BOOKING_READ_ALL)
-  async attention() {
-    return this.review.attentionCounts();
+  async attention(@CurrentUser() user: AccessTokenClaims | undefined) {
+    /* Scoped, so the badge and the list it labels count the same thing. */
+    return this.review.attentionCounts(user);
   }
 
   /**
