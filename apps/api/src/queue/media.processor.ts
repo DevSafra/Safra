@@ -141,7 +141,7 @@ export class MediaProcessor {
   async onFailed(job: Job<MediaJobData> | undefined, error: Error): Promise<void> {
     if (!job) {
       this.logger.error(
-        `A ${QUEUE.media} job failed before it could be read: ${error.message}`,
+        `A ${QUEUE.media} job failed before it could be read: ${describeError(error)}`,
       );
 
       return;

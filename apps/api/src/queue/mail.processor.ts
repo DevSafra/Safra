@@ -5,6 +5,7 @@ import { NotificationService } from '../notifications/notification.service.js';
 import { QUEUE } from './queue.definitions.js';
 import { DeadLetterService } from './dead-letter.service.js';
 import { MAIL_JOB, type MailJobData } from './mail.job.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * The `mail` queue's worker-side body.
@@ -58,7 +59,7 @@ export class MailProcessor {
     if (!job) {
       /* A job that could not even be deserialised. There is nothing to record it against. */
       this.logger.error(
-        `A ${QUEUE.mail} job failed before it could be read: ${error.message}`,
+        `A ${QUEUE.mail} job failed before it could be read: ${describeError(error)}`,
       );
 
       return;

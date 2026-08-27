@@ -11,6 +11,7 @@ import { Redis } from 'ioredis';
 import { ENV, type Env } from '../config/env.js';
 import { QUEUE } from './queue.definitions.js';
 import { assertQueueRedisIsDurable } from './queue.durability.js';
+import { describeError } from '../common/errors/safe-error.js';
 import {
   EXPORTS_QUEUE,
   MAIL_QUEUE,
@@ -68,7 +69,7 @@ function producerFor(name: string, connection: Redis): Queue {
 
         /* Mandatory: an ioredis client with no error listener crashes the process on a blip. */
         client.on('error', (error: Error) => {
-          logger.error(`Queue Redis connection error: ${error.message}`);
+          logger.error(`Queue Redis connection error: ${describeError(error)}`);
         });
 
         /*

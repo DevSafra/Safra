@@ -16,6 +16,7 @@ import { SystemRefundService } from '../payments/system-refund.service.js';
 import { GiftCardExpiryService } from '../gift-cards/gift-card-expiry.service.js';
 import { AdExpiryService } from '../admin/ad-expiry.service.js';
 import { StayCompletionService } from '../bookings/stay-completion.service.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * The `scheduled` queue's worker-side body: five recurring jobs, dispatched by name.
@@ -143,7 +144,7 @@ export class ScheduledProcessor {
   async onFailed(job: Job<ScheduledJobData> | undefined, error: Error): Promise<void> {
     if (!job) {
       this.logger.error(
-        `A ${QUEUE.scheduled} job failed before it could be read: ${error.message}`,
+        `A ${QUEUE.scheduled} job failed before it could be read: ${describeError(error)}`,
       );
 
       return;

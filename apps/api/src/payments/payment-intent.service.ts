@@ -178,7 +178,9 @@ export class PaymentIntentService {
        * customer their card was refused, and they would stop retrying.
        */
       if (error instanceof PaymentProviderUnavailableError) {
-        this.logger.error(`Provider ${error.provider} unavailable: ${error.message}`);
+        this.logger.error(
+          `Provider ${error.provider} unavailable: ${describeError(error)}`,
+        );
         throw conflict(ERROR.PAYMENT_UNAVAILABLE);
       }
 

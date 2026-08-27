@@ -31,24 +31,56 @@ import { describe, expect, it } from 'vitest';
 const API = join(import.meta.dirname, '..', '..');
 
 /**
- * Taking a message off a caught error, in each spelling this codebase has used.
+ * Names an identifier is given when it holds a caught or delivered error.
+ *
+ * The list is the point of the 2026-08-27 widening. The three patterns below used to key on
+ * `error|err|cause|exception|reason` inside a `catch` binding, and TWO shapes walked straight past:
+ *
+ * - a binding with another name — `queue.runtime.ts` logged
+ *   `failure instanceof Error ? failure.message : …`;
+ * - an error delivered as a PARAMETER rather than caught — `worker.on('failed', (job, error) => …)`
+ *   and `onFailed(job, error: Error)` in all four queue processors. BullMQ hands those whatever the
+ *   processor threw, and a scheduled or a media processor throws `DrizzleQueryError` — so bound
+ *   parameters reached the log by exactly the route this sweep was written to close.
+ *
+ * That is the register's own warning about itself: «a privacy assertion phrased as "this particular
+ * string is absent" only ever protects the string it names». The sweep protected the spellings it
+ * enumerated rather than the behaviour.
+ */
+const ERROR_NAMES =
+  'error|err|cause|exception|reason|failure|fault|rejection|problem|e|ex';
+
+/**
+ * Taking a message off a caught or delivered error, in each spelling this codebase has used.
  *
  * Not a bare `/\.message/`: `HttpException.message`, a zod issue's `message` and a notification
  * row's `message` are all legitimate and have nothing to do with a thrown error. These name the
- * idiom that carries a query — a catch binding, and the message read off it.
+ * idiom that carries a query.
  */
 const SPELLINGS: readonly { readonly what: string; readonly pattern: RegExp }[] = [
   {
-    what: 'error instanceof Error ? error.message : …',
-    pattern: /(error|err|cause|exception|reason)\s+instanceof\s+Error\s*\?\s*\1\.message/,
+    what: 'x instanceof Error ? x.message : …',
+    pattern: /(\w+)\s+instanceof\s+Error\s*\?\s*\1\.message/,
   },
   {
-    what: '(error as Error).message',
-    pattern: /\((?:error|err|cause|exception)\s+as\s+Error\)\.message/,
+    what: '(x as Error).message',
+    pattern: /\(\s*\w+\s+as\s+(?:Error|\{[^)]*message[^)]*\})\s*\)\.message/,
   },
+  /*
+    The one that replaced the catch-window regex.
+
+    That regex was `catch\s*\((\w+)\).{0,300}\1\.message` over a run with no closing brace in it,
+    so a `.message` read more than three hundred characters into a handler, or after any nested
+    block, escaped — and a `.message` on a PARAMETER was never a catch at all. Keying on the NAME
+    instead is blunter and strictly wider: it does not care where the identifier came from, which is
+    the property the two escapes had in common.
+
+    The cost is that a variable legitimately named `reason` carrying something that is not an error
+    would be flagged. That is the right direction to be wrong in, and renaming it is the fix.
+  */
   {
-    what: 'catch (e) { … e.message',
-    pattern: /catch\s*\(\s*(\w+)\s*(?::[^)]*)?\)\s*\{[^}]{0,300}?\b\1\.message\b/s,
+    what: 'x.message, where x is named like an error',
+    pattern: new RegExp(`(?<![.\\w])(?:${ERROR_NAMES})\\d*\\.message\\b`),
   },
 ];
 
@@ -74,12 +106,29 @@ const ALLOWED = new Set([
  * stop writing the sentence.
  */
 function codeOnly(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/\/\/[^\n]*/g, ' ')
-    .replace(/`(?:[^`\\]|\\.)*`/g, '``')
-    .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
-    .replace(/"(?:[^"\\\n]|\\.)*"/g, '""');
+  return (
+    source
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/\/\/[^\n]*/g, ' ')
+      /*
+        A template literal keeps its INTERPOLATIONS (2026-08-27).
+
+        This blanked the whole literal, backticks and all — and every leak this file exists to find
+        is written inside one, because a log line is a template literal. `${error.message}` was
+        erased before any pattern could see it, so the sweep reported a clean run over source it had
+        already deleted the evidence from. It could not have caught the original defect either.
+
+        The prose between the interpolations still goes: the reason the stripper exists is that the
+        first version of this test flagged four files for their own COMMENTS, including the one on
+        `job-run.service.ts` that reads "`describeError`, not `error.message`" — the fix describing
+        itself. Keeping `${…}` and dropping the rest answers both.
+      */
+      .replace(/`(?:[^`\\]|\\.)*`/g, (literal) =>
+        ['``', ...(literal.match(/\$\{[^}]*\}/g) ?? [])].join(' '),
+      )
+      .replace(/'(?:[^'\\\n]|\\.)*'/g, "''")
+      .replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
+  );
 }
 
 function walk(dir: string): string[] {
@@ -134,9 +183,14 @@ describe('the API never logs or stores a raw error message', () => {
    */
   it('recognises every spelling it claims to', () => {
     const samples = [
-      'const m = error instanceof Error ? error.message : String(error);',
-      'log((error as Error).message);',
-      'try { go(); } catch (oops) { this.logger.error(oops.message); }',
+      'const m = failure instanceof Error ? failure.message : String(failure);',
+      'log((thrown as Error).message);',
+      /*
+        Inside a template literal AND on a parameter rather than a catch — the two shapes that
+        escaped until 2026-08-27, in one sample. It must survive `codeOnly`, which is the second
+        assertion below and the one that would have failed while the stripper ate templates whole.
+      */
+      'worker.on(`failed`, (job, error) => log.warn(`job failed: ${error.message}`));',
     ];
 
     expect(samples).toHaveLength(SPELLINGS.length);

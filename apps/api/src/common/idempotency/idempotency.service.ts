@@ -8,6 +8,7 @@ import type { Database } from '@safra/db';
 import { DATABASE } from '../../database/database.module.js';
 import { ERROR } from '@safra/contracts';
 import { conflict } from '../errors/app-error.js';
+import { describeError } from '../errors/safe-error.js';
 import { errorMessage } from '@safra/i18n';
 
 /** How long a completed response is replayable. */
@@ -134,7 +135,7 @@ export class IdempotencyService {
         this.log.error(
           `Could not release idempotency claim for scope ${call.scope}; it will be ` +
             `reclaimable after ${STALE_CLAIM_MINUTES} minutes. ` +
-            `Release failed with: ${releaseError instanceof Error ? releaseError.message : String(releaseError)}`,
+            `Release failed with: ${describeError(releaseError)}`,
         );
       }
 

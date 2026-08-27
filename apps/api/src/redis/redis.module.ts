@@ -10,6 +10,7 @@ import { Redis } from 'ioredis';
 import { ENV, type Env } from '../config/env.js';
 import { RedisThrottlerStorage } from './redis-throttler.storage.js';
 import { REDIS } from './redis.tokens.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * The shared Redis connection.
@@ -56,7 +57,7 @@ import { REDIS } from './redis.tokens.js';
          * process. A Redis blip must never take the API down.
          */
         client.on('error', (error: Error) => {
-          logger.error(`Redis connection error: ${error.message}`);
+          logger.error(`Redis connection error: ${describeError(error)}`);
         });
 
         client.on('ready', () => logger.log('Redis connected.'));

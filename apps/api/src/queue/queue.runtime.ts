@@ -10,6 +10,7 @@ import {
   jitteredBackoff,
   type QueueName,
 } from './queue.definitions.js';
+import { describeError } from '../common/errors/safe-error.js';
 
 /**
  * A processor, in the only two shapes the worker entrypoint needs to know about.
@@ -80,16 +81,15 @@ export function startWorker<T>(
     */
     void processor.onFailed(job, error).catch((failure: unknown) => {
       log.error(
-        `${queue}: recording the failure itself failed: ` +
-          `${failure instanceof Error ? failure.message : String(failure)}`,
+        `${queue}: recording the failure itself failed: ` + `${describeError(failure)}`,
       );
     });
 
-    log.warn(`job ${job?.id ?? 'unknown'} failed: ${error.message}`);
+    log.warn(`job ${job?.id ?? 'unknown'} failed: ${describeError(error)}`);
   });
 
   /* A worker with no error listener crashes the process when Redis blips. */
-  worker.on('error', (error) => log.error(`Worker error: ${error.message}`));
+  worker.on('error', (error) => log.error(`Worker error: ${describeError(error)}`));
 
   log.log(`Ready at concurrency ${CONCURRENCY[queue]}.`);
 

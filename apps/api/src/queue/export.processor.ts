@@ -148,7 +148,7 @@ export class ExportProcessor {
   async onFailed(job: Job<ExportJobData> | undefined, error: Error): Promise<void> {
     if (!job) {
       this.logger.error(
-        `An ${QUEUE.exports} job failed before it could be read: ${error.message}`,
+        `An ${QUEUE.exports} job failed before it could be read: ${describeError(error)}`,
       );
 
       return;
