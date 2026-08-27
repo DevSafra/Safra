@@ -86,6 +86,19 @@ export default async function AdsPage({
   */
   const invoiceParams = await listParamsFor('adInvoices', searchParams, 'iq');
 
+  /*
+    The campaign just created, so its creative dialog opens by itself — Bashar, 2026-08-27, so
+    «أنشئ ثم أضف الصورة» is one continuous move instead of hunting for the row afterwards.
+
+    Read here, on the SERVER, and handed to the row as a boolean. The parameter is only ever
+    COMPARED with a reference this page already fetched: it names no route, builds no query, and
+    reaches no link, so the worst a crafted `?created=` can do is open a dialog on a row the reader
+    is looking at anyway. The toolbar sends the reader to a literal `/ads`, so the new campaign is
+    the first row of an unfiltered page — the list is ordered `created_at DESC`.
+  */
+  const query = await searchParams;
+  const created = typeof query['created'] === 'string' ? query['created'] : null;
+
   const [result, invoices, counts, geo] = await Promise.all([
     getCampaigns({ q, page, limit: size }),
     getAdInvoices({
@@ -147,7 +160,7 @@ export default async function AdsPage({
             />
 
             <AdminTable
-              columns={COLUMNS}
+              columns={columnsFor(created)}
               rows={result.items}
               template={TEMPLATE}
               rowKey={(row) => row.reference}
@@ -375,16 +388,23 @@ function Counters({ counters }: { counters: Campaigns['counters'] }) {
   );
 }
 
-const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
-  {
-    key: 'reference',
-    header: t.table.colId,
-    render: (row) => <Ltr className="font-semibold text-sky">{row.reference}</Ltr>,
-  },
-  {
-    key: 'advertiser',
-    header: t.sections.ads.colAdvertiser,
-    /*
+/**
+ * The campaign columns, told which row (if any) should open its creative dialog on arrival.
+ *
+ * A function rather than a constant because that one row differs per request. Everything else here
+ * is still static.
+ */
+function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[] {
+  return [
+    {
+      key: 'reference',
+      header: t.table.colId,
+      render: (row) => <Ltr className="font-semibold text-sky">{row.reference}</Ltr>,
+    },
+    {
+      key: 'advertiser',
+      header: t.sections.ads.colAdvertiser,
+      /*
       The advertiser, and UNDER it the Arabic headline the customer actually reads.
 
       Bashar, 2026-08-27: «when I edit a row and save, nothing changes, is that correct?» It was
@@ -397,33 +417,57 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
       served. The English and German headlines and the target stay in the form: four lines per row
       would spend this row's legibility on the rarer question.
     */
-    render: (row) => (
-      <div className="grid gap-0.5 leading-tight">
-        <span className="font-semibold text-text">{row.advertiser}</span>
-        <span className="truncate text-[10.5px] text-faint" title={row.headlineAr}>
-          {row.headlineAr}
+      render: (row) => (
+        <div className="grid gap-0.5 leading-tight">
+          <span className="font-semibold text-text">{row.advertiser}</span>
+          <span className="truncate text-[10.5px] text-faint" title={row.headlineAr}>
+            {row.headlineAr}
+          </span>
+          {/*
+          «بلا صورة» — an incomplete campaign, identifiable without opening twenty dialogs
+          (Bashar, 2026-08-27). The creative itself is only ever visible inside the dialog, so
+          without this the row cannot be told from a complete one.
+
+          Shown for a campaign that has never had one AND for one whose render failed: both are
+          served to the customer as text, which is what the marker is reporting. `processing` is
+          deliberately excluded — a picture is being made, and saying «بلا صورة» about it would be
+          wrong for the forty seconds it is true of nothing.
+
+          Not a `StatusPill`. A campaign's status is active/paused/expired, and «One status, one
+          word, one colour» governs that column across the whole console; a fourth word borrowing
+          the pill's shape would read as a status and would be swept as one by
+          `navigation.spec.ts`. A dashed outline is the same language the empty tile already uses.
+        */}
+          {row.imageStatus === null || row.imageStatus === 'failed' ? (
+            <span
+              data-no-creative={row.reference}
+              title={t.sections.ads.rowNoCreativeTitle}
+              className="mt-0.5 w-fit rounded border border-dashed border-line px-1.5 py-px text-[10px] text-muted"
+            >
+              {t.sections.ads.rowNoCreative}
+            </span>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      key: 'kind',
+      header: t.table.colType,
+      render: (row) => (
+        <span className="text-text2">
+          {label(t.enums.advertiserKind, row.advertiserKind)}
         </span>
-      </div>
-    ),
-  },
-  {
-    key: 'kind',
-    header: t.table.colType,
-    render: (row) => (
-      <span className="text-text2">
-        {label(t.enums.advertiserKind, row.advertiserKind)}
-      </span>
-    ),
-  },
-  {
-    key: 'city',
-    header: t.table.colCity,
-    render: (row) => <span className="text-muted">{row.city}</span>,
-  },
-  {
-    key: 'period',
-    header: t.sections.ads.colPeriod,
-    /*
+      ),
+    },
+    {
+      key: 'city',
+      header: t.table.colCity,
+      render: (row) => <span className="text-muted">{row.city}</span>,
+    },
+    {
+      key: 'period',
+      header: t.sections.ads.colPeriod,
+      /*
       The cycle on one line, what it costs on the next (Bashar, 2026-08-27).
 
       They were one line — the Arabic word, then the amount in an inline `Ltr` with a margin — and
@@ -435,43 +479,43 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
       Stacked, each reads as itself: the cycle is a word, the price is a figure, and «شهري» directly
       above «$150.00» says «monthly, at this rate» without either being read into the other.
     */
-    render: (row) => (
-      <div className="grid gap-0.5 leading-tight">
-        <span className="text-text2">{periodLabel(row.billingPeriod)}</span>
-        {row.priceAmount && row.priceCurrency ? (
-          /* Never a bare figure — SYP and USD differ by four orders of magnitude. */
-          <Ltr className="text-[11px] font-bold text-gold">
-            {amount(row.priceAmount, row.priceCurrency)}
-          </Ltr>
-        ) : (
-          <span className="text-[10.5px] text-faint">{t.sections.ads.noPrice}</span>
-        )}
-      </div>
-    ),
-  },
-  {
-    key: 'impressions',
-    header: t.sections.ads.colImpressions,
-    render: (row) => <Ltr className="text-text2">{count(row.impressions)}</Ltr>,
-  },
-  {
-    key: 'clicks',
-    header: t.sections.ads.colClicks,
-    render: (row) => (
-      <span>
-        <Ltr className="text-text2">{count(row.clicks)}</Ltr>
-        {row.impressions > 0 ? (
-          <Ltr className="ms-1 text-[10px] text-faint">
-            {percent(((row.clicks / row.impressions) * 100).toFixed(1))}
-          </Ltr>
-        ) : null}
-      </span>
-    ),
-  },
-  {
-    key: 'status',
-    header: t.table.colStatus,
-    /*
+      render: (row) => (
+        <div className="grid gap-0.5 leading-tight">
+          <span className="text-text2">{periodLabel(row.billingPeriod)}</span>
+          {row.priceAmount && row.priceCurrency ? (
+            /* Never a bare figure — SYP and USD differ by four orders of magnitude. */
+            <Ltr className="text-[11px] font-bold text-gold">
+              {amount(row.priceAmount, row.priceCurrency)}
+            </Ltr>
+          ) : (
+            <span className="text-[10.5px] text-faint">{t.sections.ads.noPrice}</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'impressions',
+      header: t.sections.ads.colImpressions,
+      render: (row) => <Ltr className="text-text2">{count(row.impressions)}</Ltr>,
+    },
+    {
+      key: 'clicks',
+      header: t.sections.ads.colClicks,
+      render: (row) => (
+        <span>
+          <Ltr className="text-text2">{count(row.clicks)}</Ltr>
+          {row.impressions > 0 ? (
+            <Ltr className="ms-1 text-[10px] text-faint">
+              {percent(((row.clicks / row.impressions) * 100).toFixed(1))}
+            </Ltr>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: t.table.colStatus,
+      /*
       Four things a reader needs, in the order they need them (Bashar, 2026-08-27).
 
       It was five stacked items of five different widths — pill, countdown, then the two dates on
@@ -494,25 +538,25 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
       **The controls sit side by side.** Two buttons of the same size on one line read as a pair of
       actions; stacked, they read as a list of two more facts about the campaign.
     */
-    render: (row) => (
-      <div className="grid gap-1.5">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <StatusPill tone={statusTone(row.status)}>
-            {label(t.enums.adStatus, row.status)}
-          </StatusPill>
-          <span className="text-[10px] text-faint">
-            {row.daysRemaining < 0
-              ? t.sections.ads.ended
-              : plural(t.sections.ads.endsIn, { days: row.daysRemaining })}
-          </span>
-        </div>
+      render: (row) => (
+        <div className="grid gap-1.5">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <StatusPill tone={statusTone(row.status)}>
+              {label(t.enums.adStatus, row.status)}
+            </StatusPill>
+            <span className="text-[10px] text-faint">
+              {row.daysRemaining < 0
+                ? t.sections.ads.ended
+                : plural(t.sections.ads.endsIn, { days: row.daysRemaining })}
+            </span>
+          </div>
 
-        <Ltr className="text-[10px] whitespace-nowrap text-faint2">
-          {shortDate(row.startsAt)} ← {shortDate(row.endsAt)}
-        </Ltr>
+          <Ltr className="text-[10px] whitespace-nowrap text-faint2">
+            {shortDate(row.startsAt)} ← {shortDate(row.endsAt)}
+          </Ltr>
 
-        {row.status === 'expired' ? null : (
-          /*
+          {row.status === 'expired' ? null : (
+            /*
             A two-column GRID, not a flex row with a `min-w-*` on each button.
 
             `min-w-[5.5rem]` was tried first and computed to `0px` in the browser: `globals.css`
@@ -524,29 +568,31 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
             Two equal tracks need no override and no magic number: the pair reads as a pair at every
             width, and neither button has to be told how wide the other is.
           */
-          <div className="grid grid-cols-2 items-start gap-1.5">
-            <CampaignStatusButton reference={row.reference} status={row.status} />
-            {/*
+            <div className="grid grid-cols-2 items-start gap-1.5">
+              <CampaignStatusButton reference={row.reference} status={row.status} />
+              {/*
               The creative, editable from the row it appears on.
 
               Not offered on an expired campaign: its window has closed, nothing is being served,
               and a control that rewrites copy nobody will read is a promise the screen cannot keep.
             */}
-            <CampaignCreativeForm
-              reference={row.reference}
-              headlineAr={row.headlineAr}
-              headlineEn={row.headlineEn}
-              headlineDe={row.headlineDe}
-              targetUrl={row.targetUrl}
-              imageUrl={row.imageUrl}
-              imageStatus={row.imageStatus}
-            />
-          </div>
-        )}
-      </div>
-    ),
-  },
-];
+              <CampaignCreativeForm
+                reference={row.reference}
+                headlineAr={row.headlineAr}
+                headlineEn={row.headlineEn}
+                headlineDe={row.headlineDe}
+                targetUrl={row.targetUrl}
+                imageUrl={row.imageUrl}
+                imageStatus={row.imageStatus}
+                autoOpen={created === row.reference}
+              />
+            </div>
+          )}
+        </div>
+      ),
+    },
+  ];
+}
 
 function periodLabel(period: string): string {
   switch (period) {

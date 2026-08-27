@@ -1652,6 +1652,15 @@ export const ar = {
       /* ── The edit dialog (Bashar, 2026-08-27) ────────────────────────────── */
       editTitle: 'تعديل الإعلان',
       close: 'إغلاق',
+      /*
+        The × in the corner, named apart from the footer's «إغلاق».
+
+        Both close the dialog, and once the footer button started reading «إغلاق» rather than
+        «إلغاء» there were two controls in one dialog answering to the same name — a reader
+        hearing «إغلاق، إغلاق» has no way to tell which is which. Same reasoning as `BackLink`
+        putting its destination in the label.
+      */
+      closeDialog: 'إغلاق النافذة',
       /* ── The creative image, through the shared pipeline ─────────────────── */
       image: 'صورة الإعلان',
       imageHint: 'JPEG أو PNG أو WebP، حتى 10 ميغابايت. تُعاد المعالجة على خوادمنا.',
@@ -1660,7 +1669,16 @@ export const ar = {
       imageProcessing: 'جارٍ المعالجة…',
       imageFailed: 'تعذّرت معالجة الصورة. جرّب صورة أخرى.',
       imageNone: 'بلا صورة — يظهر الإعلان كنص',
-      imageUploading: 'جارٍ الرفع…',
+      /*
+        ── Staged, not sent (Bashar, 2026-08-27) ──────────────────────────────
+
+        Choosing a file used to upload it on the spot, which broke the dialog's own contract twice:
+        حفظ stayed disabled when the image was the only thing changed, and إلغاء did not undo the
+        one change it had already committed. The file now waits for حفظ, so this line has to say
+        that plainly — a chosen file that LOOKS uploaded is the same lie in the other direction.
+      */
+      imageStaged: 'ستُرفع عند الحفظ',
+      imageStagedDiscard: 'إزالة الصورة المختارة',
       /*
         Said when the dialog has stopped waiting, rather than leaving «جارٍ المعالجة…» spinning.
         A screen that waits for ever is indistinguishable from one that is broken — which is how
@@ -1677,6 +1695,17 @@ export const ar = {
       advPhone: 'الهاتف (اختياري)',
       advSubmit: 'إضافة المعلن',
       advCreated: 'أُضيف المعلن — مرجعه {reference}',
+      /*
+        ── «بلا صورة» on the ROW (Bashar, 2026-08-27) ─────────────────────────
+
+        So an incomplete campaign is identifiable without opening twenty dialogs. Deliberately NOT
+        a `StatusPill`: a campaign's status is `active`/`paused`/`expired`, and a marker that
+        borrows the status vocabulary would put a fourth word into a column that «One status, one
+        word, one colour» governs — and `navigation.spec.ts` sweeps `data-status-pill` precisely to
+        stop that. This is a completeness marker, drawn as one.
+      */
+      rowNoCreative: 'بلا صورة',
+      rowNoCreativeTitle: 'هذه الحملة تُعرض كنص — لا صورة معروضة لها',
       searchPlaceholder: 'بحث بالمعلن أو المدينة…',
       kpiActive: 'حملات نشطة',
       kpiPaused: 'حملات متوقفة',

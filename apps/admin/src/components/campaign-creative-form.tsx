@@ -40,6 +40,7 @@ export function CampaignCreativeForm({
   targetUrl,
   imageUrl,
   imageStatus,
+  autoOpen,
 }: {
   readonly reference: string;
   readonly headlineAr: string;
@@ -48,23 +49,57 @@ export function CampaignCreativeForm({
   readonly targetUrl: string;
   readonly imageUrl: string | null;
   readonly imageStatus: string | null;
+  /*
+    Opened by the page, because the operator has JUST created this campaign.
+
+    Decided on the SERVER, from that page's own `searchParams`, rather than read here with
+    `useSearchParams` — the comparison is `created === row.reference`, an equality test against a
+    value this screen already holds, so a crafted `?created=` can only ever open a dialog on a row
+    the reader is already looking at.
+  */
+  readonly autoOpen: boolean;
 }) {
   const router = useRouter();
   const c = t.sections.ads;
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen);
   const [ar, setAr] = useState(headlineAr);
   const [en, setEn] = useState(headlineEn);
   const [de, setDe] = useState(headlineDe);
   const [target, setTarget] = useState(targetUrl);
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  /*
+    The file WAITING to be sent — the whole of «Save should commit, Cancel should discard».
+
+    It used to upload the instant it was chosen, which broke this dialog's own contract in both
+    directions: حفظ stayed disabled when the picture was the only thing changed, and إلغاء could
+    not undo the one change that had already been committed. Nothing leaves the browser now until
+    حفظ is pressed.
+  */
+  const [pending, setPending] = useState<File | null>(null);
   /** Set when the poll below has given up, so the tile stops claiming to be working. */
   const [slow, setSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const trigger = useRef<HTMLButtonElement>(null);
   const file = useRef<HTMLInputElement>(null);
+
+  /**
+   * Opens on the row as it stands NOW — which is what makes إلغاء a real cancel.
+   *
+   * A headline typed, abandoned and found still typed on reopening would be the same lie the
+   * staged file used to tell: the dialog showing an edit that is not saved anywhere.
+   */
+  function reopen(): void {
+    setAr(headlineAr);
+    setEn(headlineEn);
+    setDe(headlineDe);
+    setTarget(targetUrl);
+    setPending(null);
+    setError(null);
+    setSlow(false);
+    setOpen(true);
+  }
 
   /*
     Escape closes, the page behind does not scroll, and focus comes back to the button that opened
@@ -75,7 +110,7 @@ export function CampaignCreativeForm({
     if (!open) return undefined;
 
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') dismiss();
     };
 
     document.addEventListener('keydown', onKey);
@@ -142,76 +177,140 @@ export function CampaignCreativeForm({
     /^https?:\/\/\S+$/.test(target.trim()) &&
     !busy;
 
-  const changed =
-    ar !== headlineAr || en !== headlineEn || de !== headlineDe || target !== targetUrl;
+  /*
+    Something is DIFFERENT — including a picture that has been chosen and not yet sent.
 
+    Bashar, 2026-08-27: «when I change only the image, I should be able to save». Leaving the file
+    out of this was what disabled حفظ on the one change an operator makes most often.
+  */
+  const changed =
+    ar !== headlineAr ||
+    en !== headlineEn ||
+    de !== headlineDe ||
+    target !== targetUrl ||
+    pending !== null;
+
+  /**
+   * Closes, throwing away the file that was never sent.
+   *
+   * The TEXT is reverted by `reopen` rather than here, and the difference matters: this function
+   * is called from an effect that runs only when `open` changes, so anything it read from props
+   * would be whatever those props were when the dialog opened. After a save the row refreshes
+   * underneath it, and resetting from that stale copy would put the OLD headline back on a field
+   * the operator had just saved. Reverting on the way IN reads today's row every time.
+   */
+  function dismiss(): void {
+    setOpen(false);
+    setPending(null);
+    setError(null);
+
+    /*
+      And the `?created=` that opened it is dropped, so a reload does not reopen a dialog the
+      operator has closed. `history.replaceState` rather than a router navigation: there is nothing
+      to re-fetch, and the path comes from `location`, never from the parameter being removed.
+    */
+    if (typeof window === 'undefined') return;
+
+    const url = new URL(window.location.href);
+
+    if (!url.searchParams.has('created')) return;
+
+    url.searchParams.delete('created');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  /**
+   * One save, committing whatever is different — the text, the picture, or both.
+   *
+   * ## The order, and what a half-failure leaves behind
+   *
+   * The PATCH first, because it is validated in milliseconds and the upload STARTS A RENDER: a save
+   * that is going to be refused for a headline should not have queued a worker job first. They are
+   * two resources and there is no transaction across them, so a failure on the second leaves the
+   * first saved — the dialog stays open, says which one refused, and the operator presses حفظ
+   * again. That is the honest outcome; pretending otherwise would need a staging area for bytes,
+   * which is a second storage path and a second place for the pipeline's guarantees to be missed.
+   */
   async function submit(): Promise<void> {
     setBusy(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/ad-campaigns/${encodeURIComponent(reference)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        /* Only what actually changed — the schema takes each field optionally. */
-        body: JSON.stringify({
-          ...(ar !== headlineAr ? { headlineAr: ar.trim() } : {}),
-          ...(en !== headlineEn ? { headlineEn: en.trim() } : {}),
-          ...(de !== headlineDe ? { headlineDe: de.trim() } : {}),
-          ...(target !== targetUrl ? { targetUrl: target.trim() } : {}),
-        }),
-      });
+      /* Only what actually changed — the schema takes each field optionally. */
+      const text = {
+        ...(ar !== headlineAr ? { headlineAr: ar.trim() } : {}),
+        ...(en !== headlineEn ? { headlineEn: en.trim() } : {}),
+        ...(de !== headlineDe ? { headlineDe: de.trim() } : {}),
+        ...(target !== targetUrl ? { targetUrl: target.trim() } : {}),
+      };
 
-      if (!response.ok) {
-        setError(apiErrorOf(await response.json().catch(() => null)));
+      /*
+        Skipped entirely when the picture is the only change. An empty PATCH would still write an
+        audit row saying the campaign was edited, which is a record of an event that did not happen.
+      */
+      if (Object.keys(text).length > 0) {
+        const response = await fetch(
+          `/api/ad-campaigns/${encodeURIComponent(reference)}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(text),
+          },
+        );
 
+        if (!response.ok) {
+          setError(apiErrorOf(await response.json().catch(() => null)));
+
+          return;
+        }
+
+        /* What the server was actually given, so a trailing space does not read as unsaved. */
+        setAr(ar.trim());
+        setEn(en.trim());
+        setDe(de.trim());
+        setTarget(target.trim());
+      }
+
+      if (pending) {
+        const body = new FormData();
+
+        body.append('file', pending);
+
+        const response = await fetch(
+          `/api/ad-campaigns/${encodeURIComponent(reference)}/creative`,
+          { method: 'POST', body },
+        );
+
+        if (!response.ok) {
+          setError(apiErrorOf(await response.json().catch(() => null)));
+
+          return;
+        }
+
+        setPending(null);
+        /* A fresh upload starts the wait over — see the poll above. */
+        setSlow(false);
+        router.refresh();
+
+        /*
+          And the dialog STAYS OPEN.
+
+          This is the only place in the console the creative is visible — the row shows whether one
+          exists, never the picture itself. Closing here would send the operator away at the exact
+          moment the render begins, with no way to see the result but to reopen. Instead the row
+          comes back `processing`, the poll above takes over, and the tile becomes the image the
+          SERVER re-encoded. حفظ is disabled again because nothing is different any more, and the
+          left button now reads «إغلاق» rather than «إلغاء».
+        */
         return;
       }
 
-      setOpen(false);
       router.refresh();
+      dismiss();
     } catch {
       setError(t.errors.unreachable);
     } finally {
       setBusy(false);
-    }
-  }
-
-  /**
-   * Sends one image through the platform's shared pipeline.
-   *
-   * The file never becomes a data URL and is never previewed from the client's own bytes: what the
-   * tile shows after this is what the SERVER re-encoded, which is the only version anybody is ever
-   * served. `router.refresh()` re-reads the row, so the status the operator sees is the row's.
-   */
-  async function send(chosen: File): Promise<void> {
-    setUploading(true);
-    setError(null);
-
-    try {
-      const body = new FormData();
-
-      body.append('file', chosen);
-
-      const response = await fetch(
-        `/api/ad-campaigns/${encodeURIComponent(reference)}/creative`,
-        { method: 'POST', body },
-      );
-
-      if (!response.ok) {
-        setError(apiErrorOf(await response.json().catch(() => null)));
-
-        return;
-      }
-
-      /* A fresh upload starts the wait over — see the poll above. */
-      setSlow(false);
-      router.refresh();
-    } catch {
-      setError(t.errors.unreachable);
-    } finally {
-      setUploading(false);
-      if (file.current) file.current.value = '';
     }
   }
 
@@ -224,7 +323,7 @@ export function CampaignCreativeForm({
       <button
         ref={trigger}
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => reopen()}
         className="inline-flex w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
       >
         {c.editCreative}
@@ -236,7 +335,7 @@ export function CampaignCreativeForm({
           aria-modal="true"
           aria-label={c.editTitle}
           /* The backdrop closes, which is what everybody tries first. */
-          onClick={() => setOpen(false)}
+          onClick={() => dismiss()}
           className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 sm:items-center"
         >
           <div
@@ -248,8 +347,8 @@ export function CampaignCreativeForm({
               <h2 className="text-[15px] font-bold text-text">{c.editTitle}</h2>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
-                aria-label={c.close}
+                onClick={() => dismiss()}
+                aria-label={c.closeDialog}
                 className="grid size-8 cursor-pointer place-items-center rounded-lg border border-line text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
               >
                 <span aria-hidden="true">×</span>
@@ -300,7 +399,23 @@ export function CampaignCreativeForm({
                 {c.image}
 
                 <div className="flex flex-wrap items-center gap-3">
-                  {imageUrl && imageStatus === 'ready' ? (
+                  {pending ? (
+                    /*
+                      Chosen, not sent — and it says so.
+
+                      The file's NAME, never a preview drawn from its bytes. `URL.createObjectURL`
+                      would show the operator their own picture and then swap it for a different
+                      one after the render, which teaches that the thing on screen is what will be
+                      served. It is not: what gets served is the SERVER's re-encode, and this tile
+                      shows only that.
+                    */
+                    <span className="grid h-20 w-32 content-center gap-1 rounded-lg border border-dashed border-[rgba(var(--goldA),0.55)] px-2 text-center text-[10.5px] text-gold">
+                      <span className="w-full truncate" title={pending.name}>
+                        {pending.name}
+                      </span>
+                      <span className="font-normal text-faint">{c.imageStaged}</span>
+                    </span>
+                  ) : imageUrl && imageStatus === 'ready' ? (
                     /*
                       The SERVER's re-encode, not the bytes that were chosen. Nothing the client
                       uploaded is ever displayed, for the same reason nothing it uploaded is ever
@@ -326,19 +441,27 @@ export function CampaignCreativeForm({
                   <div className="grid gap-1.5">
                     <button
                       type="button"
-                      disabled={uploading}
+                      disabled={busy}
                       onClick={() => file.current?.click()}
                       className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-[9px] border border-line px-4 py-2 text-[12px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold disabled:opacity-50 lg:min-h-0"
                     >
-                      {uploading
-                        ? c.imageUploading
-                        : imageUrl
-                          ? c.imageReplace
-                          : c.imageChoose}
+                      {imageUrl || pending ? c.imageReplace : c.imageChoose}
                     </button>
-                    <span className="text-[10.5px] font-normal text-faint">
-                      {c.imageHint}
-                    </span>
+                    {/* Putting a chosen file back, without closing everything else down. */}
+                    {pending ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setPending(null)}
+                        className="w-fit cursor-pointer text-[10.5px] font-normal text-muted underline transition-colors hover:text-gold disabled:opacity-50"
+                      >
+                        {c.imageStagedDiscard}
+                      </button>
+                    ) : (
+                      <span className="text-[10.5px] font-normal text-faint">
+                        {c.imageHint}
+                      </span>
+                    )}
                   </div>
 
                   {/*
@@ -353,7 +476,16 @@ export function CampaignCreativeForm({
                     onChange={(event) => {
                       const chosen = event.target.files?.[0];
 
-                      if (chosen) void send(chosen);
+                      if (chosen) {
+                        setPending(chosen);
+                        setError(null);
+                      }
+
+                      /*
+                        Cleared, so choosing the SAME file again after discarding it still fires
+                        `change` — a file input whose value is unchanged is silent.
+                      */
+                      event.target.value = '';
                     }}
                   />
                 </div>
@@ -364,12 +496,18 @@ export function CampaignCreativeForm({
               ) : null}
 
               <div className="mt-1 flex flex-wrap justify-end gap-2">
+                {/*
+                  «إلغاء» while there is something to discard, «إغلاق» once there is not.
+
+                  After a save the dialog stays open to show the render, and a button still
+                  offering to CANCEL at that point describes an undo this screen cannot perform.
+                */}
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={() => dismiss()}
                   className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4.5 py-2 text-xs font-bold text-muted lg:min-h-0"
                 >
-                  {c.cancel}
+                  {changed ? c.cancel : c.close}
                 </button>
                 {/*
                   Disabled until something is DIFFERENT, not merely valid — a PATCH with an empty

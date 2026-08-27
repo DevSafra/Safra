@@ -422,6 +422,24 @@ export function AdsToolbar({
                   setHeadlineDe('');
                   setTargetUrl('');
                   setPrice('');
+
+                  /*
+                    Straight to the new campaign, with its creative dialog open — Bashar,
+                    2026-08-27. A campaign is valid without a picture and stays that way; this
+                    only puts the operator in front of the control instead of leaving them to
+                    find the row.
+
+                    A LITERAL `/ads`, never a path assembled from anything the server returned,
+                    and the reference percent-encoded into the one parameter. Unfiltered and on
+                    page one deliberately: the registry is ordered `created_at DESC`, so this is
+                    the only view where the new row is guaranteed to be present to open.
+                  */
+                  const reference = made['reference'];
+
+                  if (typeof reference === 'string' && reference !== '') {
+                    router.replace(`/ads?created=${encodeURIComponent(reference)}`);
+                  }
+
                   router.refresh();
                 }
               })();
