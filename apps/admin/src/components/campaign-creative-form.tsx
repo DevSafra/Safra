@@ -5,6 +5,18 @@ import { useEffect, useRef, useState } from 'react';
 
 import { t, apiErrorOf } from '@/lib/strings';
 
+/**
+ * The change waiting for حفظ — a new picture, or the removal of the one that is there.
+ *
+ * One value rather than a `File | null` beside a `removing` boolean, because those two can
+ * contradict each other and this cannot: choosing a picture and removing it are alternatives, and
+ * the type is what says so.
+ */
+type Staged =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'replace'; readonly file: File }
+  | { readonly kind: 'remove' };
+
 /** How often, and how many times, an open dialog asks whether the render has finished. */
 const POLL_EVERY_MS = 2_000;
 const POLL_ATTEMPTS = 20;
@@ -76,7 +88,7 @@ export function CampaignCreativeForm({
     not undo the one change that had already been committed. Nothing leaves the browser now until
     حفظ is pressed.
   */
-  const [pending, setPending] = useState<File | null>(null);
+  const [staged, setStaged] = useState<Staged>({ kind: 'none' });
   /** Set when the poll below has given up, so the tile stops claiming to be working. */
   const [slow, setSlow] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +107,7 @@ export function CampaignCreativeForm({
     setEn(headlineEn);
     setDe(headlineDe);
     setTarget(targetUrl);
-    setPending(null);
+    setStaged({ kind: 'none' });
     setError(null);
     setSlow(false);
     setOpen(true);
@@ -188,7 +200,7 @@ export function CampaignCreativeForm({
     en !== headlineEn ||
     de !== headlineDe ||
     target !== targetUrl ||
-    pending !== null;
+    staged.kind !== 'none';
 
   /**
    * Closes, throwing away the file that was never sent.
@@ -201,7 +213,7 @@ export function CampaignCreativeForm({
    */
   function dismiss(): void {
     setOpen(false);
-    setPending(null);
+    setStaged({ kind: 'none' });
     setError(null);
 
     /*
@@ -271,10 +283,33 @@ export function CampaignCreativeForm({
         setTarget(target.trim());
       }
 
-      if (pending) {
+      if (staged.kind === 'remove') {
+        const response = await fetch(
+          `/api/ad-campaigns/${encodeURIComponent(reference)}/creative`,
+          { method: 'DELETE' },
+        );
+
+        if (!response.ok) {
+          setError(apiErrorOf(await response.json().catch(() => null)));
+
+          return;
+        }
+
+        /*
+          Closed, unlike a replacement: nothing is being rendered and there is nothing to wait
+          for. The row picks up «بلا صورة», which is the confirmation.
+        */
+        setStaged({ kind: 'none' });
+        router.refresh();
+        dismiss();
+
+        return;
+      }
+
+      if (staged.kind === 'replace') {
         const body = new FormData();
 
-        body.append('file', pending);
+        body.append('file', staged.file);
 
         const response = await fetch(
           `/api/ad-campaigns/${encodeURIComponent(reference)}/creative`,
@@ -287,7 +322,7 @@ export function CampaignCreativeForm({
           return;
         }
 
-        setPending(null);
+        setStaged({ kind: 'none' });
         /* A fresh upload starts the wait over — see the poll above. */
         setSlow(false);
         router.refresh();
@@ -399,7 +434,15 @@ export function CampaignCreativeForm({
                 {c.image}
 
                 <div className="flex flex-wrap items-center gap-3">
-                  {pending ? (
+                  {staged.kind === 'remove' ? (
+                    /* What حفظ is about to do, said before it is done. */
+                    <span className="grid h-20 w-32 content-center gap-1 rounded-lg border border-dashed border-line px-2 text-center text-[10.5px] text-muted">
+                      <span>{c.imageNone}</span>
+                      <span className="font-normal text-faint">
+                        {c.imageRemoveStaged}
+                      </span>
+                    </span>
+                  ) : staged.kind === 'replace' ? (
                     /*
                       Chosen, not sent — and it says so.
 
@@ -410,8 +453,8 @@ export function CampaignCreativeForm({
                       shows only that.
                     */
                     <span className="grid h-20 w-32 content-center gap-1 rounded-lg border border-dashed border-[rgba(var(--goldA),0.55)] px-2 text-center text-[10.5px] text-gold">
-                      <span className="w-full truncate" title={pending.name}>
-                        {pending.name}
+                      <span className="w-full truncate" title={staged.file.name}>
+                        {staged.file.name}
                       </span>
                       <span className="font-normal text-faint">{c.imageStaged}</span>
                     </span>
@@ -445,22 +488,43 @@ export function CampaignCreativeForm({
                       onClick={() => file.current?.click()}
                       className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-[9px] border border-line px-4 py-2 text-[12px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold disabled:opacity-50 lg:min-h-0"
                     >
-                      {imageUrl || pending ? c.imageReplace : c.imageChoose}
+                      {imageUrl || staged.kind === 'replace'
+                        ? c.imageReplace
+                        : c.imageChoose}
                     </button>
-                    {/* Putting a chosen file back, without closing everything else down. */}
-                    {pending ? (
+
+                    {/*
+                      Taking the picture OFF, offered only where there is one to take off — and
+                      not while a replacement is staged, because choosing a file and removing it
+                      are alternatives rather than a sequence.
+                    */}
+                    {imageStatus !== null && staged.kind === 'none' ? (
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => setPending(null)}
-                        className="w-fit cursor-pointer text-[10.5px] font-normal text-muted underline transition-colors hover:text-gold disabled:opacity-50"
+                        onClick={() => setStaged({ kind: 'remove' })}
+                        className="w-fit cursor-pointer text-[10.5px] font-normal text-muted underline transition-colors hover:text-bad disabled:opacity-50"
                       >
-                        {c.imageStagedDiscard}
+                        {c.imageRemove}
                       </button>
-                    ) : (
+                    ) : null}
+
+                    {/* Putting a staged change back, without closing everything else down. */}
+                    {staged.kind === 'none' ? (
                       <span className="text-[10.5px] font-normal text-faint">
                         {c.imageHint}
                       </span>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setStaged({ kind: 'none' })}
+                        className="w-fit cursor-pointer text-[10.5px] font-normal text-muted underline transition-colors hover:text-gold disabled:opacity-50"
+                      >
+                        {staged.kind === 'remove'
+                          ? c.imageRemoveUndo
+                          : c.imageStagedDiscard}
+                      </button>
                     )}
                   </div>
 
@@ -477,7 +541,7 @@ export function CampaignCreativeForm({
                       const chosen = event.target.files?.[0];
 
                       if (chosen) {
-                        setPending(chosen);
+                        setStaged({ kind: 'replace', file: chosen });
                         setError(null);
                       }
 

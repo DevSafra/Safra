@@ -177,6 +177,83 @@ export class AdCreativeService {
       failureCode: null,
     };
   }
+
+  /**
+   * Takes the picture off a campaign, leaving the campaign.
+   *
+   * Bashar, 2026-08-27: «I should be also able to remove the current image and keep the الإعلان
+   * without an image.» A campaign with no creative is a complete campaign — a headline and an
+   * advertiser name are the whole of §9.3 — so this is not a deletion of anything, it is a return
+   * to the state every campaign starts in. Delivery drops `imageUrl` and the ad renders as text.
+   *
+   * ## The BYTES are not deleted, and that is deliberate
+   *
+   * The same reasoning P-003 gives for a soft-deleted listing image and for a REPLACED creative:
+   * the audit row names a key, and a key that resolves to nothing makes the record unverifiable.
+   * `before` therefore carries the key that stopped being used, so what was removed is still
+   * answerable months later. What changes is what the platform SERVES: nothing here is reachable
+   * from any screen or any API response once the row stops pointing at it.
+   *
+   * ## Idempotent, and quiet about it
+   *
+   * Removing a creative that is not there succeeds and writes NO audit row. An audit trail that
+   * records a removal which removed nothing is a record of an event that did not happen — the same
+   * objection that keeps an empty PATCH from being sent at all.
+   */
+  async remove(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+  ): Promise<{ removed: boolean }> {
+    const found = await this.db.execute<{
+      id: string;
+      city_id: string | null;
+      image_file_key: string | null;
+    }>(sql`
+      SELECT id, city_id::text AS city_id, image_file_key FROM ad_campaigns
+      WHERE reference = ${reference} AND deleted_at IS NULL
+        AND ${scopeFilter(claims, 'city_id')}
+      LIMIT 1
+    `);
+
+    const campaign = found.rows[0];
+
+    /* Out of scope answers exactly as absent — the same shape as `upload`. */
+    if (!campaign) throw notFound(ERROR.CAMPAIGN_NOT_FOUND);
+
+    assertCanWrite(claims, campaign.city_id);
+
+    if (!campaign.image_file_key) return { removed: false };
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(schema.adCampaigns)
+        .set({
+          imageFileKey: null,
+          imageWidth: null,
+          imageHeight: null,
+          imageVariantWidths: null,
+          imageStatus: null,
+          imageOriginalKey: null,
+          imageFailureCode: null,
+        })
+        .where(eq(schema.adCampaigns.id, campaign.id));
+
+      await this.audit.record(
+        {
+          actorUserId: claims?.sub,
+          actorRole: claims?.role,
+          action: 'ad_campaign.creative_removed',
+          subjectType: 'ad_campaign',
+          subjectId: campaign.id,
+          /* What stopped being served, so the stored object stays answerable. */
+          before: { fileKey: campaign.image_file_key },
+        },
+        tx as unknown as Database,
+      );
+    });
+
+    return { removed: true };
+  }
 }
 
 /**

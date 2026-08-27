@@ -214,6 +214,8 @@ export const AUDIT_ACTIONS = [
   'ad_campaign.activated',
   /* A creative image uploaded through the shared pipeline — what it is, and who filed it. */
   'ad_campaign.creative_uploaded',
+  /* And taken off again — the campaign stays, the picture stops being served. */
+  'ad_campaign.creative_removed',
 
   // ── Staff and configuration ───────────────────────────────────────────────
   'staff.invited',

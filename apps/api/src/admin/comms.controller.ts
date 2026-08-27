@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -310,6 +311,25 @@ export class CommsController {
     file: { buffer: Buffer; mimetype: string; originalname: string } | undefined,
   ) {
     return this.adCreative.upload(user, reference, file);
+  }
+
+  /**
+   * Taking the creative OFF a campaign, which stays live without one.
+   *
+   * `DELETE` on the same path the picture was `POST`ed to: it is the same sub-resource, and a
+   * `POST …/creative/remove` would be a second name for one thing. The campaign itself is
+   * untouched — this is not a route that can delete a campaign, and there is no path here that
+   * takes an id from the caller.
+   */
+  @Delete('ad-campaigns/:reference/creative')
+  @RequirePermissions(P.AD_MANAGE)
+  @AuditExempt('AdCreativeService records ad_campaign.creative_removed transactionally.')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  async removeCreative(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.adCreative.remove(user, reference);
   }
 
   /** Editing the creative. The window and the price are not editable — see the contract. */

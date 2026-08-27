@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { getStaffSession } from '@/lib/session-server';
+import { proxy } from '@/lib/proxy';
 
 const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
 
@@ -54,4 +55,21 @@ export async function POST(
       { status: 502 },
     );
   }
+}
+
+/**
+ * Taking the creative off a campaign.
+ *
+ * `proxy()` here rather than the hand-rolled pass-through above: a DELETE carries no body, so
+ * none of the multipart reasoning applies and there is nothing to keep intact.
+ */
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ reference: string }> },
+): Promise<NextResponse> {
+  const { reference } = await params;
+
+  return proxy(`/admin/ad-campaigns/${encodeURIComponent(reference)}/creative`, {
+    method: 'DELETE',
+  });
 }

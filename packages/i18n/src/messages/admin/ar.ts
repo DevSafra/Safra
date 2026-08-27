@@ -1680,6 +1680,15 @@ export const ar = {
       imageStaged: 'ستُرفع عند الحفظ',
       imageStagedDiscard: 'إزالة الصورة المختارة',
       /*
+        Taking the picture OFF, which is not the same act as replacing it (Bashar, 2026-08-27:
+        «I should be also able to remove the current image and keep the الإعلان without an
+        image»). Staged like an upload, so حفظ commits it and إلغاء puts it back — a remove that
+        acted on the spot would reintroduce exactly the inconsistency staging removed.
+      */
+      imageRemove: 'إزالة الصورة',
+      imageRemoveStaged: 'ستُزال عند الحفظ',
+      imageRemoveUndo: 'التراجع عن الإزالة',
+      /*
         Said when the dialog has stopped waiting, rather than leaving «جارٍ المعالجة…» spinning.
         A screen that waits for ever is indistinguishable from one that is broken — which is how
         Bashar met the job-id bug on 2026-08-27.
@@ -2638,6 +2647,7 @@ export const ar = {
     'ad_campaign.resumed': 'تشغيل حملة إعلانية',
     'ad_campaign.activated': 'إطلاق حملة إعلانية',
     'ad_campaign.creative_uploaded': 'رفع صورة إعلان',
+    'ad_campaign.creative_removed': 'إزالة صورة إعلان',
     'partner_contract.uploaded': 'رفع عقد شراكة',
     /* ── أدوار الموظفين، يُعرِّفها المدير العام (Bashar, 2026-08-23) ── */
     'staff_role.created': 'إنشاء دور لموظفي سفرة',
