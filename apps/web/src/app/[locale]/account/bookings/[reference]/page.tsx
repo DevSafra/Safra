@@ -181,10 +181,23 @@ export default async function BookingDetailPage({
         A plain link, not a fetch. The endpoint answers `Content-Disposition: inline`, so a browser
         opens it in a tab and a phone hands it to the PDF viewer — and it works with no JavaScript,
         which is the state the customer is most likely to be in at an airport.
+
+        ## The COLLAPSED state, not a second list of statuses (2026-08-27)
+
+        This read `confirmed || checked_in || completed` — a hand-written list beside the one
+        `customerBookingStatus` already keeps, and the two had drifted: that map deliberately treats
+        `disputed` as «مؤكد» («a dispute is a complaint about a stay, not a change to whether the
+        booking stands»), and this list forgot it. So a guest disputing their room read «مؤكد» on
+        this screen and had no voucher — while the API was serving one, its own note saying «a guest
+        mid-dispute still has to check in somewhere».
+
+        EC-006 and EC-007 are raised ON ARRIVAL, so that is the ordinary case rather than the edge
+        one: the document withdrawn was the one they needed at the desk they were standing at.
+
+        `shown` is the same value the pill renders, so the screen can no longer say «مؤكد» beside a
+        withheld voucher. The endpoint keys on `confirmed_at` and remains the control.
       */}
-      {booking.status === 'confirmed' ||
-      booking.status === 'checked_in' ||
-      booking.status === 'completed' ? (
+      {shown === 'confirmed' ? (
         <div className="mt-8 rounded-card border border-line bg-card p-4">
           <a
             href={`/${locale}/api/bookings/${encodeURIComponent(booking.reference)}/voucher`}
