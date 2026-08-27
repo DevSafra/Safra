@@ -244,7 +244,7 @@ describeIfDb('suspending a partner because of a violation', () => {
       reason: 'وصف المخالفة كما كتبه الموظف ليقرأه الشريك.',
     });
 
-    const page = await enforcement.list(partner.reference, { limit: 25, page: 1 });
+    const page = await enforcement.list(partner.reference, { limit: 25, page: 1 }, staff);
     const row = page.items[0] as Record<string, unknown> | undefined;
 
     expect(row?.['description']).toBe('وصف المخالفة كما كتبه الموظف ليقرأه الشريك.');

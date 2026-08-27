@@ -102,10 +102,12 @@ export class EnforcementController {
   @RequirePermissions(P.VIOLATION_READ)
   @AuditExempt('Reading violations; changes nothing.')
   async violations(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Param('reference') reference: string,
     @Query(new ZodValidationPipe(pageQuerySchema)) query: z.infer<typeof pageQuerySchema>,
   ) {
-    return this.enforcement.list(reference, query);
+    /* Scoped: a member restricted to one city reads that city's partners and no others. */
+    return this.enforcement.list(reference, query, user);
   }
 
   @Post('partners/:reference/violations')

@@ -20,6 +20,7 @@ import { DATABASE } from '../database/database.module.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { EnforcementNotifier } from './enforcement-notifier.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
@@ -87,7 +88,10 @@ export class EnforcementService {
     reference: string,
     input: PartnerSuspendInput,
   ): Promise<void> {
-    const partner = await this.livePartner(reference);
+    const partner = await this.livePartner(reference, actor);
+
+    /* `read_only` passes the predicate above — it may look — and is refused here. */
+    assertCanWrite(actor, partner.city_id);
 
     if (partner.suspended_at !== null) throw badRequest(ERROR.PARTNER_ALREADY_SUSPENDED);
 
@@ -147,7 +151,10 @@ export class EnforcementService {
     reference: string,
     input: PartnerSuspendInput,
   ): Promise<void> {
-    const partner = await this.livePartner(reference);
+    const partner = await this.livePartner(reference, actor);
+
+    /* `read_only` passes the predicate above — it may look — and is refused here. */
+    assertCanWrite(actor, partner.city_id);
 
     if (partner.suspended_at === null) throw badRequest(ERROR.PARTNER_NOT_SUSPENDED);
 
@@ -196,7 +203,10 @@ export class EnforcementService {
     reference: string,
     input: ViolationRaiseInput,
   ): Promise<{ id: string }> {
-    const partner = await this.livePartner(reference);
+    const partner = await this.livePartner(reference, actor);
+
+    /* `read_only` passes the predicate above — it may look — and is refused here. */
+    assertCanWrite(actor, partner.city_id);
 
     const priors = await this.db.execute<{ n: string }>(sql`
       SELECT count(*)::text AS n FROM partner_violations
@@ -252,7 +262,10 @@ export class EnforcementService {
     violationId: string,
     input: ViolationWarnInput,
   ): Promise<void> {
-    const violation = await this.liveViolation(violationId);
+    const violation = await this.liveViolation(violationId, actor);
+
+    /* `read_only` passes the predicate above — it may look — and is refused here. */
+    assertCanWrite(actor, violation.city_id);
 
     if (violation.stage !== 'recorded') throw badRequest(ERROR.VIOLATION_STAGE_INVALID);
 
@@ -301,7 +314,10 @@ export class EnforcementService {
     violationId: string,
     input: ViolationFineInput,
   ): Promise<void> {
-    const violation = await this.liveViolation(violationId);
+    const violation = await this.liveViolation(violationId, actor);
+
+    /* `read_only` passes the predicate above — it may look — and is refused here. */
+    assertCanWrite(actor, violation.city_id);
 
     if (violation.stage === 'fined' || violation.waived_at !== null) {
       throw badRequest(ERROR.VIOLATION_STAGE_INVALID);
@@ -375,7 +391,10 @@ export class EnforcementService {
     violationId: string,
     input: FineWaiveInput,
   ): Promise<void> {
-    const violation = await this.liveViolation(violationId);
+    const violation = await this.liveViolation(violationId, actor);
+
+    /* `read_only` passes the predicate above — it may look — and is refused here. */
+    assertCanWrite(actor, violation.city_id);
 
     if (violation.fine_amount === null || violation.fine_currency_id === null) {
       throw badRequest(ERROR.VIOLATION_NOT_FINED);
@@ -467,8 +486,14 @@ export class EnforcementService {
   async list(
     reference: string,
     query: { limit: number; page: number },
+    actor: AccessTokenClaims | undefined,
   ): Promise<OffsetPage<unknown>> {
-    const partner = await this.livePartner(reference);
+    /*
+      A READ, so the predicate inside `livePartner` is the whole guard — no `assertCanWrite`.
+      `read_only` means «you may look at the rest of the country», and refusing the list here would
+      break the mode it exists for.
+    */
+    const partner = await this.livePartner(reference, actor);
 
     const fromWhere = sql`
       FROM partner_violations v
@@ -563,19 +588,43 @@ export class EnforcementService {
     );
   }
 
-  private async livePartner(reference: string) {
+  /**
+   * The partner an enforcement action names, IF this member is scoped to reach them.
+   *
+   * ## The gap this closes (2026-08-27)
+   *
+   * This resolved a partner by reference and returned no city at all, and not one of the six
+   * actions checked a scope — `actor` was used only to stamp `suspended_by_user_id` and to write
+   * the audit row. A city-scoped operations manager could therefore SUSPEND, warn, fine or waive
+   * against any partner in the country. Partner references are sequential, so finding a target was
+   * a loop rather than a guess.
+   *
+   * The fourth instance of `O-sec-13`, and the same shape as `partner-contract.service.ts` three
+   * days earlier — except that these are the actions which stop a business trading.
+   *
+   * ## The predicate here, the write guard at the call site
+   *
+   * Scoping the LOOKUP makes an out-of-scope partner answer exactly as one that does not exist:
+   * same 404, same `partner.not_found`. Checking after the fetch instead would answer
+   * `request.not_found` from `assertCanWrite`, and two codes behind two 404s is a way to walk the
+   * references. `read_only` legitimately passes this predicate — it may look — so each action that
+   * WRITES calls `assertCanWrite` on the city returned here.
+   */
+  private async livePartner(reference: string, actor: AccessTokenClaims | undefined) {
     const rows = await this.db.execute<{
       id: string;
+      city_id: string | null;
       email: string;
       preferred_locale: string;
       suspended_at: string | null;
       suspended_reason: string | null;
     }>(sql`
-      SELECT p.id, p.email, u.preferred_locale,
+      SELECT p.id, p.city_id::text AS city_id, p.email, u.preferred_locale,
              p.suspended_at::text, p.suspended_reason
       FROM partners p
       JOIN users u ON u.id = p.user_id
       WHERE p.reference = ${reference} AND p.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'p.city_id')}
       LIMIT 1
     `);
 
@@ -655,20 +704,33 @@ export class EnforcementService {
     );
   }
 
-  private async liveViolation(id: string) {
+  /**
+   * A violation, and the city of the partner it belongs to.
+   *
+   * A violation has no city of its own — it inherits one through `partner_id`, which is exactly the
+   * shape `O-sec-13` calls «the easiest to miss». `warn`, `fine` and `waive` reach a partner through
+   * this row rather than through `livePartner`, so scoping only that one would have left three of
+   * the six actions open, and `waive` posts to the LEDGER.
+   *
+   * Predicate here, `assertCanWrite` at the call site — same reasoning as `livePartner`.
+   */
+  private async liveViolation(id: string, actor: AccessTokenClaims | undefined) {
     const rows = await this.db.execute<{
       id: string;
       partner_id: string;
+      city_id: string | null;
       stage: string;
       fine_amount: string | null;
       fine_currency_id: string | null;
       booking_id: string | null;
       waived_at: string | null;
     }>(sql`
-      SELECT id, partner_id, stage::text AS stage, fine_amount, fine_currency_id,
-             booking_id, waived_at::text
-      FROM partner_violations
-      WHERE id = ${id}::uuid AND deleted_at IS NULL
+      SELECT v.id, v.partner_id, p.city_id::text AS city_id, v.stage::text AS stage,
+             v.fine_amount, v.fine_currency_id, v.booking_id, v.waived_at::text
+      FROM partner_violations v
+      JOIN partners p ON p.id = v.partner_id
+      WHERE v.id = ${id}::uuid AND v.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'p.city_id')}
       LIMIT 1
     `);
 
