@@ -18,6 +18,7 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import { ERROR } from '@safra/contracts';
 import { badRequest, notFound } from '../common/errors/app-error.js';
 import { describeError } from '../common/errors/safe-error.js';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 
 /** §8.1 requires proof of identity and of the right to let the property. */
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -186,8 +187,11 @@ export class PartnerDocumentsService {
   }
 
   /** As `list`, resolving the partner by their §13.2 reference. */
-  async listByReference(reference: string): Promise<DocumentRecord[]> {
-    return this.list(await this.partnerIdOf(reference));
+  async listByReference(
+    reference: string,
+    actor: AccessTokenClaims | undefined,
+  ): Promise<DocumentRecord[]> {
+    return this.list((await this.partnerIdOf(reference, actor)).id);
   }
 
   /**
@@ -218,7 +222,12 @@ export class PartnerDocumentsService {
     file: UploadedDocument | undefined,
     actor: AccessTokenClaims | undefined,
   ): Promise<DocumentRecord> {
-    return this.upload(await this.partnerIdOf(reference), kind, file, actor);
+    const partner = await this.partnerIdOf(reference, actor);
+
+    /* Filing a document is a write: `read_only` passes the predicate and is refused here. */
+    assertCanWrite(actor, partner.city_id);
+
+    return this.upload(partner.id, kind, file, actor);
   }
 
   /**
@@ -228,15 +237,32 @@ export class PartnerDocumentsService {
    * yours" and "not there" must be indistinguishable, or the difference between them is an
    * enumeration oracle.
    */
-  private async partnerIdOf(reference: string): Promise<string> {
-    const rows = await this.db.execute<{ id: string }>(sql`
-      SELECT id FROM partners WHERE reference = ${reference} AND deleted_at IS NULL
+  /**
+   * The partner a STAFF document route names, IF this member is scoped to reach them.
+   *
+   * `O-sec-13`, 2026-08-27. Identity documents are the most sensitive thing a partner gives the
+   * platform — a passport, a commercial register — and both the staff LIST and the staff UPLOAD
+   * arrived here by reference with no city check at all. `read` (the bytes) is guarded separately
+   * on the document's own partner, below.
+   *
+   * `write` decides the assertion because both callers write or expose: `listByReference` feeds the
+   * console's document panel, which a `read_only` member may see, so it passes only the predicate;
+   * `uploadByReference` files a document and takes the assertion too.
+   */
+  private async partnerIdOf(
+    reference: string,
+    actor: AccessTokenClaims | undefined,
+  ): Promise<{ id: string; city_id: string | null }> {
+    const rows = await this.db.execute<{ id: string; city_id: string | null }>(sql`
+      SELECT id, city_id::text AS city_id FROM partners
+      WHERE reference = ${reference} AND deleted_at IS NULL
+        AND ${scopeFilter(actor, 'city_id')}
     `);
 
-    const partnerId = rows.rows[0]?.id;
-    if (!partnerId) throw notFound(ERROR.PARTNER_NOT_FOUND);
+    const partner = rows.rows[0];
+    if (!partner) throw notFound(ERROR.PARTNER_NOT_FOUND);
 
-    return partnerId;
+    return partner;
   }
 
   /** Metadata only — the bytes are never included in a list. */
@@ -287,8 +313,11 @@ export class PartnerDocumentsService {
       file_key: string;
       file_name: string;
     }>(sql`
-      SELECT partner_id, file_key, file_name FROM partner_documents
-      WHERE id = ${documentId} AND deleted_at IS NULL
+      SELECT d.partner_id, d.file_key, d.file_name
+      FROM partner_documents d
+      JOIN partners p ON p.id = d.partner_id
+      WHERE d.id = ${documentId} AND d.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'p.city_id')}
     `);
 
     const doc = rows.rows[0];
@@ -345,6 +374,28 @@ export class PartnerDocumentsService {
     const status = decision === 'approve' ? 'approved' : 'rejected';
 
     const updated = await this.db.transaction(async (tx) => {
+      /*
+        Scoped before the write (`O-sec-13`, 2026-08-27).
+
+        A document has no city; it inherits one from its partner. The predicate makes an
+        out-of-scope document answer exactly as one that does not exist, and `assertCanWrite`
+        refuses the `read_only` reviewer the predicate deliberately lets through. Inside the
+        transaction, so the check and the update cannot be separated.
+      */
+      const owner = await tx.execute<{ city_id: string | null }>(sql`
+        SELECT p.city_id::text AS city_id
+        FROM partner_documents d
+        JOIN partners p ON p.id = d.partner_id
+        WHERE d.id = ${documentId} AND d.deleted_at IS NULL
+          AND ${scopeFilter(actor, 'p.city_id')}
+      `);
+
+      const partner = owner.rows[0];
+
+      if (!partner) throw notFound(ERROR.DOCUMENT_NOT_FOUND);
+
+      assertCanWrite(actor, partner.city_id);
+
       const rows = await tx.execute<{
         id: string;
         partner_id: string;

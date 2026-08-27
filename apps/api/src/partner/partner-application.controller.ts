@@ -129,16 +129,21 @@ export class AdminPartnerApplicationController {
   @Get()
   @RequirePermissions(P.PARTNER_APPLICATION_READ)
   async list(
+    @CurrentUser() user: AccessTokenClaims | undefined,
     @Query(new ZodValidationPipe(partnerApplicationListQuerySchema))
     query: PartnerApplicationListQuery,
   ) {
-    return this.applications.list(query);
+    /* Scoped by the city the request names — see `rowOf`. */
+    return this.applications.list(query, user);
   }
 
   @Get(':reference')
   @RequirePermissions(P.PARTNER_APPLICATION_READ)
-  async detail(@Param('reference') reference: string) {
-    return this.applications.detail(reference);
+  async detail(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.applications.detail(reference, user);
   }
 
   /** Step 2 — the call happened. */

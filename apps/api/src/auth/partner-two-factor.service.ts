@@ -8,6 +8,7 @@ import { ERROR, type PartnerTwoFactorResetResponse } from '@safra/contracts';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { forbidden, notFound, unauthorized } from '../common/errors/app-error.js';
+import { assertCanWrite, scopeCondition } from '../rbac/scope.sql.js';
 import type { AccessTokenClaims } from './token.service.js';
 
 /**
@@ -63,15 +64,32 @@ export class PartnerTwoFactorService {
   ): Promise<PartnerTwoFactorResetResponse> {
     if (!actor) throw unauthorized(ERROR.AUTH_REQUIRED);
 
+    /*
+      Scoped by the partner's city (`O-sec-13`, 2026-08-27).
+
+      A reset clears the second factor on somebody else's account and issues them a new enrolment —
+      the strongest single action in the console short of a suspension — and it was reachable for
+      any partner in the country by reference. `assertCanWrite` refuses the `read_only` member that
+      the predicate deliberately lets through.
+    */
     const partner = await this.db.query.partners.findFirst({
       where: and(
         eq(schema.partners.reference, reference),
         isNull(schema.partners.deletedAt),
+        scopeCondition(actor, schema.partners.cityId),
       ),
-      columns: { id: true, reference: true, displayName: true, userId: true },
+      columns: {
+        id: true,
+        reference: true,
+        displayName: true,
+        userId: true,
+        cityId: true,
+      },
     });
 
     if (!partner) throw notFound(ERROR.PARTNER_NOT_FOUND);
+
+    assertCanWrite(actor, partner.cityId);
     if (!partner.userId) throw notFound(ERROR.PARTNER_TWO_FACTOR_NO_ACCOUNT);
 
     const target = await this.db.query.users.findFirst({

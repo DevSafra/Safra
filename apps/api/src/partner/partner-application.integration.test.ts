@@ -319,7 +319,7 @@ describeIfDb('PartnerApplicationService', () => {
       );
       await service.markContacted(reviewer, request.reference, 'اكتمل الملف.');
 
-      const detail = await service.detail(request.reference);
+      const detail = await service.detail(request.reference, undefined);
 
       expect(detail.contacts.map((contact) => contact.notes)).toStrictEqual([
         'السجل التجاري عند المحاسب.',
@@ -335,8 +335,8 @@ describeIfDb('PartnerApplicationService', () => {
       await service.markContacted(reviewer, request.reference, 'الأولى');
       await service.markContacted(reviewer, request.reference, 'الثانية');
 
-      const times = (await service.detail(request.reference)).contacts.map((c) =>
-        Date.parse(c.at),
+      const times = (await service.detail(request.reference, undefined)).contacts.map(
+        (c) => Date.parse(c.at),
       );
 
       expect(times[0]).toBeLessThanOrEqual(times[1] as number);
@@ -349,7 +349,7 @@ describeIfDb('PartnerApplicationService', () => {
       await service.markContacted(reviewer, request.reference, 'مرة');
       await service.markContacted(reviewer, request.reference, 'مرتان');
 
-      const detail = await service.detail(request.reference);
+      const detail = await service.detail(request.reference, undefined);
 
       expect(detail.contacts).toHaveLength(2);
       expect(detail.contacts.every((contact) => contact.byEmail !== null)).toBe(true);
@@ -364,10 +364,10 @@ describeIfDb('PartnerApplicationService', () => {
       const request = await service.submit(application(), { userId: CUSTOMER_USER_ID });
 
       await service.markContacted(reviewer, request.reference, 'الأولى');
-      const afterFirst = await service.detail(request.reference);
+      const afterFirst = await service.detail(request.reference, undefined);
 
       await service.markContacted(reviewer, request.reference, 'الثانية');
-      const afterSecond = await service.detail(request.reference);
+      const afterSecond = await service.detail(request.reference, undefined);
 
       expect(afterFirst.contactedAt).not.toBeNull();
       expect(Date.parse(afterSecond.contactedAt as string)).toBeGreaterThanOrEqual(
@@ -383,7 +383,7 @@ describeIfDb('PartnerApplicationService', () => {
     /** A request nobody has rung has no calls and no date — not an empty-string placeholder. */
     it('reports no contact at all before anybody rings', async () => {
       const request = await service.submit(application(), { userId: CUSTOMER_USER_ID });
-      const detail = await service.detail(request.reference);
+      const detail = await service.detail(request.reference, undefined);
 
       expect(detail.contacts).toStrictEqual([]);
       expect(detail.contactedAt).toBeNull();
@@ -526,7 +526,9 @@ describeIfDb('PartnerApplicationService', () => {
 
       /* Nothing half-done: no partner, no invitation, and the request is still open. */
       expect(issued).toHaveLength(0);
-      expect((await service.detail(created.reference)).status).toBe('submitted');
+      expect((await service.detail(created.reference, undefined)).status).toBe(
+        'submitted',
+      );
     });
 
     it('refuses to decide a request twice', async () => {
@@ -546,12 +548,12 @@ describeIfDb('PartnerApplicationService', () => {
     });
 
     it('answers a reference that does not exist the same as one that is not a reference', async () => {
-      await expect(service.detail('PRQ-999999')).rejects.toMatchObject({
+      await expect(service.detail('PRQ-999999', undefined)).rejects.toMatchObject({
         response: { code: ERROR.PARTNER_APPLICATION_NOT_FOUND },
       });
 
       await expect(
-        service.detail("'; DROP TABLE partner_applications; --"),
+        service.detail("'; DROP TABLE partner_applications; --", undefined),
       ).rejects.toMatchObject({
         response: { code: ERROR.PARTNER_APPLICATION_NOT_FOUND },
       });

@@ -114,8 +114,12 @@ export class AdminPartnerDocumentsController {
    */
   @Get(':reference/documents')
   @RequirePermissions(P.PARTNER_DOCUMENT_REVIEW)
-  async list(@Param('reference') reference: string) {
-    return { documents: await this.documents.listByReference(reference) };
+  async list(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    /* Scoped by the partner's city, like every other staff read of a partner's record. */
+    return { documents: await this.documents.listByReference(reference, user) };
   }
 
   /**

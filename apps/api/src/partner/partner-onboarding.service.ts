@@ -15,6 +15,7 @@ import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { PartnerInvitationService } from './partner-invitation.service.js';
 import { describeError } from '../common/errors/safe-error.js';
+import { assertCanWrite, scopeFilter, writeFilter } from '../rbac/scope.sql.js';
 
 /**
  * The account this onboarding will attach a partner to — found, or still to be created.
@@ -106,6 +107,18 @@ export class PartnerOnboardingService {
       this.lookupPartnerType(input.partnerTypeCode),
       this.lookupCity(input.citySlug),
     ]);
+
+    /*
+      The new partner's CITY has to be one this member may write in (`O-sec-13`, 2026-08-27).
+
+      Every other guard in this pass narrows a lookup; there is nothing to look up here — the row
+      does not exist yet, and the city comes from the REQUEST. So the check is on the resolved city
+      directly, and it is the whole guard: without it a member scoped to Latakia could create a
+      Damascus partner, send them an invitation, and then be unable to see the partner they had
+      just made. `assertCanWrite` rather than a predicate for the same reason, and `read_only` is
+      refused by it as it is everywhere else.
+    */
+    assertCanWrite(claims, city.id);
 
     /*
       An open «انضم كشريك» request from this address is refused rather than absorbed.
@@ -259,12 +272,21 @@ export class PartnerOnboardingService {
     reference: string,
     input: PartnerLocationInput,
   ): Promise<{ latitude: string; longitude: string }> {
+    /*
+      Scoped in the UPDATE's own predicate (`O-sec-13`, 2026-08-27).
+
+      Setting a partner's map pin is a write on their record and reached them by reference alone.
+      In the statement rather than a check before it, because this IS the statement — there is no
+      separate load to guard. `writableCityIds` is the WRITE narrowing, so `read_only` is refused
+      here as it is everywhere else rather than being widened by `scopeFilter`.
+    */
     const rows = await this.db.execute<{ id: string }>(sql`
       UPDATE partners
       SET latitude = ${String(input.latitude)},
           longitude = ${String(input.longitude)},
           updated_at = now()
       WHERE reference = ${reference} AND deleted_at IS NULL
+        AND ${writeFilter(claims, 'city_id')}
       RETURNING id
     `);
 
@@ -291,20 +313,26 @@ export class PartnerOnboardingService {
     const rows = await this.db.execute<{
       user_id: string;
       email: string;
+      city_id: string | null;
       locale: string;
       role: string;
     }>(sql`
-      SELECT p.user_id, p.email, u.preferred_locale AS locale, u.role::text AS role
+      SELECT p.user_id, p.email, p.city_id::text AS city_id,
+             u.preferred_locale AS locale, u.role::text AS role
       FROM partners p
       JOIN users u ON u.id = p.user_id
       WHERE p.reference = ${reference}
         AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+        AND ${scopeFilter(claims, 'p.city_id')}
       LIMIT 1
     `);
 
     const row = rows.rows[0];
 
     if (!row) throw notFound(ERROR.PARTNER_NOT_FOUND);
+
+    /* Re-sending an invitation is a write on somebody's account: `read_only` is refused. */
+    assertCanWrite(claims, row.city_id);
 
     if (row.role === 'partner') {
       throw conflict(ERROR.PARTNER_ONBOARDING_ALREADY_ACTIVATED);

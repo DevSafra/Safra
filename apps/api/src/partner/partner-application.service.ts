@@ -22,6 +22,7 @@ import {
   partnerApplicationRejectedMail,
 } from '../mail/mail.templates.js';
 import { PartnerInvitationService } from './partner-invitation.service.js';
+import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { actorName } from '../common/actor-name.sql.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
@@ -30,6 +31,8 @@ import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 const REFERENCE_PATTERN = /^PRQ-\d{1,12}$/;
 
 type ApplicationRow = {
+  /** The city the request names — for the scope predicate and guard in `rowOf`. */
+  city_id: string | null;
   /** The uuid. Never leaves the service — `audit_log.subject_id` is a uuid column. */
   id: string;
   /** The account that filed it. The ONLY account acceptance may convert. Never leaves the service. */
@@ -280,7 +283,7 @@ export class PartnerApplicationService {
   }
 
   /** The console's queue. Paged by NUMBER, like every other staff registry. */
-  async list(query: PartnerApplicationListQuery) {
+  async list(query: PartnerApplicationListQuery, actor?: AccessTokenClaims) {
     const search = query.q ? `%${query.q}%` : null;
 
     /*
@@ -294,6 +297,7 @@ export class PartnerApplicationService {
       LEFT JOIN users db ON db.id = a.decided_by_user_id
       LEFT JOIN partners p ON p.id = a.partner_id
       WHERE a.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'a.city_id')}
         ${query.status ? sql`AND a.status = ${query.status}::partner_application_status` : sql``}
         ${
           search
@@ -346,8 +350,8 @@ export class PartnerApplicationService {
    * and fetching a history per row would be work nobody reads. The detail screen is where «سجل
    * الطلب» is drawn, so it is the one that asks for all of them.
    */
-  async detail(reference: string) {
-    const row = await this.rowOf(reference);
+  async detail(reference: string, actor: AccessTokenClaims | undefined) {
+    const row = await this.rowOf(reference, actor);
 
     return { ...this.viewOf(row), contacts: await this.contactsOf(row.id) };
   }
@@ -425,7 +429,10 @@ export class PartnerApplicationService {
     reference: string,
     notes: string,
   ) {
-    const row = await this.rowOf(reference);
+    const row = await this.rowOf(reference, claims);
+
+    /* `read_only` passes the predicate — it may look — and is refused here. */
+    assertCanWrite(claims, row.city_id);
 
     if (row.status !== 'submitted' && row.status !== 'contacted') {
       throw badRequest(ERROR.PARTNER_APPLICATION_ALREADY_DECIDED);
@@ -476,7 +483,7 @@ export class PartnerApplicationService {
         : {}),
     });
 
-    return this.detail(reference);
+    return this.detail(reference, claims);
   }
 
   /**
@@ -490,7 +497,10 @@ export class PartnerApplicationService {
    * between and eligibility can change. Everything else here is bookkeeping.
    */
   async accept(claims: AccessTokenClaims | undefined, reference: string, notes?: string) {
-    const row = await this.rowOf(reference);
+    const row = await this.rowOf(reference, claims);
+
+    /* `read_only` passes the predicate — it may look — and is refused here. */
+    assertCanWrite(claims, row.city_id);
 
     if (row.status === 'accepted' || row.status === 'rejected') {
       throw badRequest(ERROR.PARTNER_APPLICATION_ALREADY_DECIDED);
@@ -567,12 +577,15 @@ export class PartnerApplicationService {
       `Partnership request ${reference} accepted; partner ${created.partnerReference} invited.`,
     );
 
-    return this.detail(reference);
+    return this.detail(reference, claims);
   }
 
   /** Rejected, with the reason mailed to the applicant. */
   async reject(claims: AccessTokenClaims | undefined, reference: string, notes: string) {
-    const row = await this.rowOf(reference);
+    const row = await this.rowOf(reference, claims);
+
+    /* `read_only` passes the predicate — it may look — and is refused here. */
+    assertCanWrite(claims, row.city_id);
 
     if (row.status === 'accepted' || row.status === 'rejected') {
       throw badRequest(ERROR.PARTNER_APPLICATION_ALREADY_DECIDED);
@@ -606,12 +619,15 @@ export class PartnerApplicationService {
       }),
     );
 
-    return this.detail(reference);
+    return this.detail(reference, claims);
   }
 
   /** Re-sends the invitation, for one that expired or never arrived. */
   async resendInvitation(claims: AccessTokenClaims | undefined, reference: string) {
-    const row = await this.rowOf(reference);
+    const row = await this.rowOf(reference, claims);
+
+    /* `read_only` passes the predicate — it may look — and is refused here. */
+    assertCanWrite(claims, row.city_id);
 
     if (row.status !== 'accepted' || !row.partner_reference) {
       throw badRequest(ERROR.PARTNER_APPLICATION_ALREADY_DECIDED);
@@ -631,7 +647,7 @@ export class PartnerApplicationService {
 
     await this.sendInvitation(row.submitted_by_user_id, row, row.partner_reference);
 
-    return this.detail(reference);
+    return this.detail(reference, claims);
   }
 
   /**
@@ -788,7 +804,25 @@ export class PartnerApplicationService {
     return new URL(`/${locale}/partners/join`, this.env.APP_URL).toString();
   }
 
-  private async rowOf(reference: string): Promise<ApplicationRow> {
+  /**
+   * The request an action names, IF this member is scoped to reach it (`O-sec-13`, 2026-08-27).
+   *
+   * «طلبات الشراكة» is a queue of businesses asking to join, and every row names the CITY it wants
+   * to operate in — `partner_applications.city_id`, which the list already joins for its display.
+   * Nothing narrowed by it: a city-scoped member could read any request in the country, log a call
+   * against it, and ACCEPT it — which creates a partner and sends an invitation.
+   *
+   * `partner_applications` is not in `SCOPED_RESOURCES` today; it is the sub-resource shape the
+   * register warns about, and it inherits nothing — it carries its own city outright.
+   *
+   * Predicate here, `assertCanWrite` at each write: the predicate so an out-of-scope request
+   * answers exactly as one that does not exist, the assertion so a `read_only` member who may
+   * legitimately read the queue cannot decide on it.
+   */
+  private async rowOf(
+    reference: string,
+    actor: AccessTokenClaims | undefined,
+  ): Promise<ApplicationRow> {
     if (!REFERENCE_PATTERN.test(reference)) {
       throw notFound(ERROR.PARTNER_APPLICATION_NOT_FOUND);
     }
@@ -803,13 +837,14 @@ export class PartnerApplicationService {
              a.decided_at::text,
              ${actorName(sql`db.email`, sql`db.role`)} AS decided_by_email, a.decision_notes,
              p.reference AS partner_reference, p.verification::text AS partner_verification,
-             a.created_at::text
+             a.city_id::text AS city_id, a.created_at::text
       FROM partner_applications a
       JOIN partner_types pt ON pt.id = a.partner_type_id
       JOIN cities c ON c.id = a.city_id
       LEFT JOIN users db ON db.id = a.decided_by_user_id
       LEFT JOIN partners p ON p.id = a.partner_id
       WHERE a.reference = ${reference} AND a.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'a.city_id')}
       LIMIT 1
     `);
 
