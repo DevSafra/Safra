@@ -102,10 +102,47 @@ test.describe('الإعلانات', () => {
     await expect(submit).toBeEnabled();
     await submit.click();
 
+    /*
+      ── created, and the creative dialog is ALREADY OPEN (Bashar, 2026-08-27) ─
+
+      «After a campaign is created successfully, automatically open the Edit / Creative dialog for
+      the newly created campaign.» The picture stays optional and the campaign is valid without
+      one; this only puts the operator in front of the control rather than leaving them to find
+      the row. Asserted on the real create path, because the wiring runs from the toolbar's
+      redirect through the page's `searchParams` to the row's `autoOpen` — three places, any of
+      which could be right on its own while the flow is broken.
+    */
+    const opened = page.getByRole('dialog');
+
+    await expect(opened, 'the new campaign opens its own creative dialog').toBeVisible();
+    await expect(page).toHaveURL(/[?&]created=ADS-/);
+
+    await opened.getByRole('button', { name: 'إغلاق', exact: true }).click();
+    await expect(opened).toBeHidden();
+
+    /*
+      And the parameter is gone, so a reload does not reopen a dialog that was closed. Checked
+      because `history.replaceState` is silent: leaving it out changes nothing a person sees until
+      they press refresh, which is exactly when they would not connect it to this.
+    */
+    await expect(page).not.toHaveURL(/[?&]created=/);
+
     /* The campaign is on top of its registry, live, in the city it was made for. */
     const row = page.locator('tbody tr').first();
 
     await expect(row).toContainText(advertiserName);
+
+    /*
+      ── «بلا صورة» on the row (Bashar, 2026-08-27) ───────────────────────────
+
+      «I would also like a clear visual indication in the table when a campaign has no creative
+      image yet, so operators can identify incomplete campaigns without opening every dialog.» A
+      brand-new campaign is exactly that case, so this is the one row guaranteed to carry it.
+    */
+    await expect(
+      row.locator('[data-no-creative]'),
+      'a campaign with no creative says so on its row',
+    ).toHaveText('بلا صورة');
 
     /*
       A DRAFT, and then live — both halves, because the second was unreachable.
@@ -237,7 +274,7 @@ test.describe('الإعلانات', () => {
    * while the browser renders nothing — which is exactly what happened before `ads/*` was added to
    * the object store's public-read policy, silently, with no request anybody could see.
    */
-  test('uploads a creative and shows what the server re-encoded', async ({ page }) => {
+  test('saves a creative when the picture is the only change', async ({ page }) => {
     await page.goto('/ads?size=5');
     await page.waitForSelector('tbody tr');
     await page
@@ -249,12 +286,35 @@ test.describe('الإعلانات', () => {
     const dialog = page.getByRole('dialog');
 
     await expect(dialog).toBeVisible();
+
+    const save = dialog.getByRole('button', { name: 'حفظ', exact: true });
+
+    await expect(save, 'nothing is different yet').toBeDisabled();
+
     await page.setInputFiles('input[type=file]', 'e2e/fixtures/room-one.jpg');
 
     /*
-      The render is a QUEUED job, so the tile is a placeholder until a worker has run. Polled rather
-      than slept on: the wait is for the row to reach `ready`, and how long that takes is not this
-      test's business.
+      ── the whole of Bashar's report, 2026-08-27 ─────────────────────────────
+
+      «When I change only the image, I should be able to save!» حفظ was gated on the four text
+      fields alone, so the one change an operator makes most often left it greyed out. Watched to
+      fail: dropping `pending !== null` from `changed` makes this line red.
+    */
+    await expect(save, 'the picture alone is a change worth saving').toBeEnabled();
+    await expect(dialog, 'and it says it has not been sent yet').toContainText(
+      'ستُرفع عند الحفظ',
+    );
+
+    await save.click();
+
+    /*
+      The render is a QUEUED job, so the tile is a placeholder until a worker has run. Polled
+      rather than slept on: the wait is for the row to reach `ready`, and how long that takes is
+      not this test's business.
+
+      `naturalWidth` is the assertion that matters. The row can say `ready` and the URL can be
+      right while the browser renders nothing — which is exactly what happened before `ads/*` was
+      added to the object store's public-read policy, silently, with no request anybody could see.
     */
     const picture = dialog.locator('img');
 
@@ -281,6 +341,7 @@ test.describe('الإعلانات', () => {
     const first = await picture.getAttribute('src');
 
     await page.setInputFiles('input[type=file]', 'e2e/fixtures/room-two.jpg');
+    await dialog.getByRole('button', { name: 'حفظ', exact: true }).click();
 
     await expect
       .poll(async () => picture.getAttribute('src'), {
@@ -295,6 +356,74 @@ test.describe('الإعلانات', () => {
         { timeout: 40_000 },
       )
       .toBeGreaterThan(0);
+
+    /* And the row stops saying «بلا صورة», because it now has one. */
+    await dialog.getByRole('button', { name: 'إغلاق', exact: true }).click();
+    await expect(
+      page.locator('tbody tr').first().locator('[data-no-creative]'),
+    ).toBeHidden();
+  });
+
+  /**
+   * The file WAITS for حفظ, and إلغاء throws it away.
+   *
+   * It used to upload the instant it was chosen, which broke the dialog's contract in both
+   * directions at once — حفظ disabled on the only change that had been made, and إلغاء unable to
+   * undo the one it had already committed. Bashar, 2026-08-27: «Save should commit the image
+   * change and Cancel should discard it rather than uploading immediately when a file is
+   * selected.»
+   *
+   * The strong half is the REQUEST assertion. «The picture did not change» is also what a screen
+   * that failed to refresh looks like; counting the POSTs distinguishes «never sent» from «sent
+   * and not shown», and only one of those is the behaviour asked for.
+   */
+  test('sends nothing until حفظ, and إلغاء discards the choice', async ({ page }) => {
+    const uploads: string[] = [];
+
+    page.on('request', (request) => {
+      if (request.method() === 'POST' && request.url().includes('/creative')) {
+        uploads.push(request.url());
+      }
+    });
+
+    await page.goto('/ads?size=5');
+    await page.waitForSelector('tbody tr');
+
+    const row = page.locator('tbody tr').first();
+
+    await row.getByRole('button', { name: 'تعديل', exact: true }).click();
+
+    const dialog = page.getByRole('dialog');
+
+    await expect(dialog).toBeVisible();
+
+    const before = await dialog.locator('img').count();
+
+    await page.setInputFiles('input[type=file]', 'e2e/fixtures/room-one.jpg');
+    await expect(dialog).toContainText('ستُرفع عند الحفظ');
+
+    /* Nothing has left the browser. Watched to fail by uploading on `change` again. */
+    expect(uploads, 'choosing a file sends nothing').toStrictEqual([]);
+
+    await dialog.getByRole('button', { name: 'إلغاء', exact: true }).click();
+    await expect(dialog).toBeHidden();
+
+    /* Still nothing — closing is not a deferred send. */
+    expect(uploads, 'إلغاء sends nothing either').toStrictEqual([]);
+
+    await row.getByRole('button', { name: 'تعديل', exact: true }).click();
+
+    await expect(dialog).toBeVisible();
+    await expect(dialog, 'the discarded choice is gone').not.toContainText(
+      'ستُرفع عند الحفظ',
+    );
+    await expect(
+      dialog.getByRole('button', { name: 'حفظ', exact: true }),
+      'and there is nothing left to save',
+    ).toBeDisabled();
+    expect(await dialog.locator('img').count(), 'the creative is exactly as it was').toBe(
+      before,
+    );
   });
 
   /**
