@@ -2629,9 +2629,9 @@ as a capacity one — `ipAddress` and `userAgent` are stored on every row.
 
 ### O-sec-7 — A failed query's BOUND PARAMETERS reach the logs, and one path writes them to a table
 
-**Status:** open — one instance fixed, the sweep is not done · **Severity:** **High** (§14 / GDPR:
-personal data in logs, and in one case at rest) · **Owner:** engineering · **Recorded:** 2026-08-20,
-found live while proving `O-api-1`'s 503 path
+**Status:** **CLOSED 2026-08-27** · **Severity:** **High** (§14 / GDPR: personal data in logs, and
+in one case at rest) · **Owner:** engineering · **Recorded:** 2026-08-20, found live while proving
+`O-api-1`'s 503 path
 
 **What.** `drizzle-orm@0.45.2` builds `DrizzleQueryError`'s message as
 
@@ -2660,7 +2660,10 @@ standard shape, and `no-raw-error-messages.test.ts` holds the class. Four column
 message were found and fixed, three of which this entry had never named. **This status line is
 therefore stale and the item is nearly closed.**
 
-**What the sweep still misses, found 2026-08-27.** Its three patterns all key on the VARIABLE NAME
+**The hole in the sweep, found and closed 2026-08-27.** Two things were wrong with it, and the
+second is why it could never have caught the original defect.
+
+**One — it keyed on the variable NAME inside a `catch`.** Its three patterns all key on the VARIABLE NAME
 (`error|err|cause|exception|reason`) in a `catch` binding, so two shapes walk past it:
 
 - a differently-named binding — `queue.runtime.ts` logs
@@ -2672,9 +2675,24 @@ therefore stale and the item is nearly closed.**
   written to close.
 
 That is «a privacy assertion phrased as the string it names» in the register's own words: the sweep
-protects the spellings it enumerates rather than the behaviour. **The work is small** — widen the
-catch pattern to any binding, add a pattern for `.message` on a parameter typed `Error`, and change
-the six call sites to `describeError`.
+protected the spellings it enumerated rather than the behaviour.
+
+**Two — and worse — the comment stripper ate every template literal whole.** `codeOnly` replaced
+`` `…` `` with ` ` ``, interpolations included. **Every leak this sweep exists to find is written
+inside a template literal**, because a log line is a template literal: `${error.message}` was erased
+before any pattern could look at it. The sweep was reporting a clean run over source it had already
+deleted the evidence from, and it could not have caught the 2026-08-20 defect either. It now keeps
+the `${…}` expressions and drops only the prose between them — which still answers the reason the
+stripper was added, that the first version flagged four files for their own COMMENTS.
+
+**Fixed.** The name-based pattern replaced the fragile catch-window regex (`[^}]{0,300}` — a
+`.message` read more than three hundred characters in, or after any nested block, escaped it too),
+the stripper preserves interpolations, and **ten call sites** moved to `describeError` — not six:
+the widened sweep found `common/idempotency/idempotency.service.ts`, which is squarely a database
+path, and `payments/payment-intent.service.ts`, which the old window regex had been missing all
+along. Both directions watched to fail: reinstating one call site reddens the sweep by name, and
+reverting the stripper reddens the OPPOSITE control with «missed its sample after stripping» — the
+assertion that would have caught the hole in the first place.
 
 **Originally recorded: 25 other files log a raw `error.message`.** The ones on paths a database error reaches
 are what matter — `job-run.service.ts`, `audit.service.ts`, `sla.service.ts`, `booking-state.ts`,
@@ -2887,8 +2905,8 @@ falsified twice, by accident both times.**
   force", in one request. Partner references are sequential, so finding a target was a loop rather
   than a guess.
 
-- **2026-08-27** — two more, found by asking the question directly rather than by accident, while
-  answering «what is left». **`booking-detail.service.ts` does not scope at all**: `detail()` takes
+- **2026-08-27 — both FIXED the same day**, and each is held by a suite watched to fail. Found by
+  asking the question directly rather than by accident, while answering «what is left». **`booking-detail.service.ts` does not scope at all**: `detail()` takes
   `claims` and uses them only to decide whether payments and internal notes are included, while the
   `WHERE` is `b.reference = $1 AND b.deleted_at IS NULL`. The query already joins `cities`. A
   manager scoped to one city therefore opens ANY booking in the country by reference — and §9.4's
@@ -2900,6 +2918,30 @@ falsified twice, by accident both times.**
   `suspend`, `unsuspend`, `raise`, `warn`, `fine` and `waive` all go through it. `actor` is used
   only to stamp `suspended_by_user_id`. So the same out-of-scope reach suspends or fines a partner
   in another city — the `partner-contract` shape again, on the actions that stop a business trading.
+
+  **What was built.** `BookingDetailService` scopes all THREE of its entry points: `detail` takes
+  the predicate in its `WHERE`, and `compensate` (which credits a wallet) and `addNote` take the
+  predicate on the lookup PLUS `assertCanWrite` on the row — the predicate so a `none` member cannot
+  tell an out-of-scope booking from an absent one, the assertion so a `read_only` member who may
+  legitimately LOOK cannot act. `EnforcementService` scopes both of its resolvers: `livePartner`
+  carries `p.city_id` and `liveViolation` reaches one by joining `partners`, so all six actions are
+  covered whichever way they arrive at a partner. `list` takes the predicate only, because
+  `read_only` means «you may look at the rest of the country».
+
+  **The refusals are indistinguishable.** Asserted rather than assumed, in both suites: an
+  out-of-scope booking answers the same status AND the same code as one that does not exist. A
+  post-fetch check would have answered `request.not_found` where a real miss answers
+  `booking.not_found`, and two codes behind two 404s is a way to walk sequential references.
+
+  **Held by** `booking-scope.integration.test.ts` (6) and `enforcement-scope.integration.test.ts`
+  (7), every case with its opposite control — the same call from inside the scope must still work,
+  or a service that refused everybody would satisfy every refusal on its own. Five mutations run:
+  removing the detail predicate reddens 2, the write pair 3, `livePartner`'s predicate 5,
+  `liveViolation`'s 1, and every `assertCanWrite` 1 (the `read_only` case, which nothing else
+  covers).
+
+  **Still open, and unchanged by this:** the systematic pass and the route-metadata test below. Four
+  services have now been found unscoped, and the fourth was found by hand like the other three.
 
 **Why all four were found by accident rather than by a check.** `scope.sql.ts` warns in its own comment
 that duplicating the predicate per service is how a scope ends up "enforced on eight resources and
