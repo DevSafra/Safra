@@ -265,6 +265,36 @@ test.describe('الإعلانات', () => {
         { timeout: 30_000, message: 'the browser actually loaded the re-encoded image' },
       )
       .toBeGreaterThan(0);
+
+    /*
+      And REPLACING it works (Bashar, 2026-08-27: «it keeps loading and nothing happens»).
+
+      The job id was keyed on the campaign ROW, which is the same row for every upload against it —
+      so the second `add` collided with the first, BullMQ ignored it, and the row sat at
+      `processing` for ever. `ad-creative.integration.test.ts` holds the ids; this holds what a
+      person actually meets.
+
+      The assertion is that the src CHANGES. A first pass asserted only `naturalWidth > 0`, which
+      the ALREADY-LOADED first image satisfies instantly — it passed against the broken build, which
+      is the vacuous shape this suite's own history keeps producing.
+    */
+    const first = await picture.getAttribute('src');
+
+    await page.setInputFiles('input[type=file]', 'e2e/fixtures/room-two.jpg');
+
+    await expect
+      .poll(async () => picture.getAttribute('src'), {
+        timeout: 40_000,
+        message: 'the replacement reaches the dialog',
+      })
+      .not.toBe(first);
+
+    await expect
+      .poll(
+        async () => picture.evaluate((node) => (node as HTMLImageElement).naturalWidth),
+        { timeout: 40_000 },
+      )
+      .toBeGreaterThan(0);
   });
 
   /**
