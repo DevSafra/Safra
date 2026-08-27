@@ -1592,6 +1592,7 @@ const disputeItemSchema = z.object({
   kind: z.string(),
   status: z.string(),
   title: z.string(),
+  description: z.string().nullable(),
   bookingReference: z.string().nullable(),
   partner: z.string().nullable(),
   customer: z.string().nullable(),

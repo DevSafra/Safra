@@ -66,6 +66,20 @@ export interface DisputeRow {
   readonly kind: string;
   readonly status: string;
   readonly title: string;
+  /**
+   * What the person actually said, and the reason this field is here at all.
+   *
+   * `disputes.description` is written on both routes — the customer's own words through the app,
+   * and the account a staff member takes down over the phone — redacted on the way in like every
+   * stored message. Until 2026-08-27 no staff surface SELECTED it: the queue showed a 120-character
+   * title, the booking screen showed a count, and that was everything an operator had.
+   *
+   * Which means the decision to uphold a complaint, release a frozen payout and credit somebody's
+   * wallet was taken from a headline. Measured that day: 22 of 22 open disputes carried a
+   * description and not one of them was on a screen. «الغرفة لم تطابق الوصف المنشور» is the title;
+   * that the room faced the car park instead of the garden is in the description.
+   */
+  readonly description: string | null;
   readonly bookingReference: string | null;
   readonly partner: string | null;
   readonly customer: string | null;
@@ -247,6 +261,9 @@ export class DisputeService {
              d.kind::text   AS kind,
              d.status::text AS status,
              d.title,
+             -- The customer's OWN ACCOUNT. Stored since the first migration and read by nothing:
+             -- see the row type's note.
+             d.description,
              b.reference    AS booking_reference,
              p.display_name AS partner,
              c.full_name    AS customer,
@@ -295,6 +312,7 @@ export class DisputeService {
         kind: row.kind,
         status: row.status,
         title: row.title,
+        description: row.description,
         bookingReference: row.booking_reference,
         partner: row.partner,
         customer: row.customer,
@@ -765,6 +783,7 @@ interface DisputeRowSql extends Record<string, unknown> {
   kind: string;
   status: string;
   title: string;
+  description: string | null;
   booking_reference: string | null;
   partner: string | null;
   customer: string | null;

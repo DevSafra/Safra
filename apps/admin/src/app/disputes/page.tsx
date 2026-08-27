@@ -213,6 +213,31 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
             {renderRedactions(dispute.title, 'ar')}
           </p>
 
+          {/*
+            ── what the person actually SAID (2026-08-27) ─────────────────────
+
+            The title is 120 characters and is the headline; this is the account. It was stored on
+            both routes — the customer's own words through the app, and what a staff member takes
+            down over the phone — and displayed nowhere: the queue showed the title, the booking
+            screen showed a count. So the decision to uphold a complaint, release a frozen payout
+            and credit a wallet was taken from a headline.
+
+            «الغرفة لم تطابق الوصف المنشور» was the title on DSP-010142. That the room faced the
+            car park rather than the advertised garden was in the description, unread.
+
+            Redacted on the way IN like every stored message, so it is rendered the way the title
+            is — the masks are markers in the stored text, not something applied here.
+          */}
+          {dispute.description ? (
+            <p
+              /* Marked so the browser sweep can find the account and nothing else. */
+              data-dispute-account={dispute.reference}
+              className="mt-1.5 text-[12px] leading-relaxed whitespace-pre-line text-text2"
+            >
+              {renderRedactions(dispute.description, 'ar')}
+            </p>
+          ) : null}
+
           {/* Back from the booking returns to النزاعات, the list the reader is actually in. */}
           <p className="mt-1 text-[11.5px] text-faint">
             {dispute.bookingReference ? (
