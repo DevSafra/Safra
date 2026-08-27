@@ -66,6 +66,20 @@ describeIfDb('CredentialRetentionService', () => {
     `);
   }
 
+  /**
+   * THIS user's codes — never the delete count the sweep returns.
+   *
+   * `pruneLoginCodes` deletes across the whole table, so its return value counts every row that
+   * happened to be prunable when it ran. Asserting `toBe(1)` on it therefore claims that no other
+   * spent code anywhere in the database is older than the retention window — which is not a fact
+   * about the sweep, it is a fact about the clock.
+   *
+   * It went red on 2026-08-27 at about 20:40 having passed at 20:13, on an untouched file: the
+   * window is seven days, and codes written by the browser suite on 2026-08-20 crossed it during
+   * the session. Twenty more were due to cross within the hour. The fixture writes exactly one row
+   * against a user it creates itself, so the scoped count says everything the return value was
+   * meant to and says it at any time of day.
+   */
   const codeCount = async (): Promise<number> => {
     const rows = await db.execute<{ n: string }>(
       sql`SELECT count(*)::text AS n FROM login_codes WHERE user_id = ${userId}::uuid`,
@@ -77,22 +91,23 @@ describeIfDb('CredentialRetentionService', () => {
   describe('sign-in codes', () => {
     it('removes a spent code past the window', async () => {
       await code({ ageDays: 30, consumed: true });
+      await service.pruneLoginCodes();
 
-      expect(await service.pruneLoginCodes()).toBe(1);
       expect(await codeCount()).toBe(0);
     });
 
     it('removes an unused code that expired long ago', async () => {
       await code({ ageDays: 30, expired: true });
+      await service.pruneLoginCodes();
 
-      expect(await service.pruneLoginCodes()).toBe(1);
+      expect(await codeCount()).toBe(0);
     });
 
     /** Inside the window it is still evidence — that is what the window is for. */
     it('keeps a spent code from this morning', async () => {
       await code({ ageDays: 0, consumed: true });
+      await service.pruneLoginCodes();
 
-      expect(await service.pruneLoginCodes()).toBe(0);
       expect(await codeCount()).toBe(1);
     });
 
@@ -102,8 +117,8 @@ describeIfDb('CredentialRetentionService', () => {
      */
     it('never touches a live code, however the dates fall', async () => {
       await code({ ageDays: 30 });
+      await service.pruneLoginCodes();
 
-      expect(await service.pruneLoginCodes()).toBe(0);
       expect(await codeCount()).toBe(1);
     });
   });
@@ -137,22 +152,23 @@ describeIfDb('CredentialRetentionService', () => {
   describe('refresh tokens', () => {
     it('removes a revoked token past the window', async () => {
       await token({ ageDays: 120, revoked: true });
+      await service.pruneRefreshTokens();
 
-      expect(await service.pruneRefreshTokens()).toBe(1);
       expect(await tokenCount()).toBe(0);
     });
 
     it('removes one that expired long ago', async () => {
       await token({ ageDays: 120, expired: true });
+      await service.pruneRefreshTokens();
 
-      expect(await service.pruneRefreshTokens()).toBe(1);
+      expect(await tokenCount()).toBe(0);
     });
 
     /** A family revoked by replay detection is the record of a stolen session. */
     it('keeps a revoked token inside the window', async () => {
       await token({ ageDays: 10, revoked: true });
+      await service.pruneRefreshTokens();
 
-      expect(await service.pruneRefreshTokens()).toBe(0);
       expect(await tokenCount()).toBe(1);
     });
 
@@ -165,8 +181,8 @@ describeIfDb('CredentialRetentionService', () => {
      */
     it('never touches a live token, however old the row is', async () => {
       await token({ ageDays: 365 });
+      await service.pruneRefreshTokens();
 
-      expect(await service.pruneRefreshTokens()).toBe(0);
       expect(await tokenCount()).toBe(1);
     });
   });
