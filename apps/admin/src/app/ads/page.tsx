@@ -538,6 +538,8 @@ const COLUMNS: readonly AdminColumn<CampaignItem>[] = [
               headlineEn={row.headlineEn}
               headlineDe={row.headlineDe}
               targetUrl={row.targetUrl}
+              imageUrl={row.imageUrl}
+              imageStatus={row.imageStatus}
             />
           </div>
         )}

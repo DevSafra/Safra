@@ -1,27 +1,36 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { t, apiErrorOf } from '@/lib/strings';
 
+/** How often, and how many times, an open dialog asks whether the render has finished. */
+const POLL_EVERY_MS = 2_000;
+const POLL_ATTEMPTS = 20;
+
 /**
- * Editing what a live campaign SAYS, from the row it says it on.
+ * Editing what a live campaign SAYS and SHOWS — in a dialog over the table.
  *
- * ## Why the creative is editable and nothing else is
+ * ## Why a dialog and not a panel in the cell
  *
- * A typo in a headline is visible to every customer in the city until somebody fixes it, and the
- * only alternative was to end the campaign and issue a new one — which re-bills the advertiser for
- * a window they had already paid for. The WINDOW and the PRICE stay fixed for the same reason
- * inverted: they are what the invoices were issued against, and a campaign whose billing period
- * moves underneath its own invoices is a bill nobody can reconcile. The API's schema knows only
- * these four fields, so this is not a rule the form is keeping.
+ * الحالة is about 150px wide, and four labelled inputs plus an image control cannot be typed into
+ * there. Two shapes were tried and neither works inside a table: a panel spanning the cell is still
+ * 150px, and an absolutely positioned popover is CLIPPED — the table lives in an `overflow-x-auto`
+ * box, which it must so a wide table scrolls inside itself rather than pushing the page sideways,
+ * and `overflow: auto` clips absolutely positioned descendants. Measured: 163px rendered against
+ * 304px asked for.
  *
- * ## It opens in the row, not in a panel
+ * A fixed-position dialog is outside that box by construction. Bashar asked for exactly this shape
+ * on 2026-08-27, and it is the one `photo-gallery.tsx` already uses — backdrop closes, Escape
+ * closes, the page behind does not scroll.
  *
- * `PATCH /admin/ad-campaigns/:reference` had no caller at all until this existed — the same
- * «built and connected to nothing» shape that the whole domain had a day earlier, reproduced one
- * level down. Found by asking, of my own work, which endpoints a person can actually reach.
+ * ## A campaign's WINDOW and PRICE are still not editable
+ *
+ * There is no form for either, and that is deliberate rather than unfinished: both are what the
+ * invoices were issued against, and a campaign whose billing period moves underneath its own
+ * invoices is a bill nobody can reconcile. The API's schema knows only these four fields plus the
+ * image, so this is not a rule the dialog is keeping on its own.
  */
 export function CampaignCreativeForm({
   reference,
@@ -29,12 +38,16 @@ export function CampaignCreativeForm({
   headlineEn,
   headlineDe,
   targetUrl,
+  imageUrl,
+  imageStatus,
 }: {
   readonly reference: string;
   readonly headlineAr: string;
   readonly headlineEn: string;
   readonly headlineDe: string;
   readonly targetUrl: string;
+  readonly imageUrl: string | null;
+  readonly imageStatus: string | null;
 }) {
   const router = useRouter();
   const c = t.sections.ads;
@@ -45,7 +58,68 @@ export function CampaignCreativeForm({
   const [de, setDe] = useState(headlineDe);
   const [target, setTarget] = useState(targetUrl);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const trigger = useRef<HTMLButtonElement>(null);
+  const file = useRef<HTMLInputElement>(null);
+
+  /*
+    Escape closes, the page behind does not scroll, and focus comes back to the button that opened
+    it. The last one is the part a `fixed` overlay does not give you: without it a keyboard reader
+    is returned to the top of the document, having lost the row they were working on.
+  */
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('keydown', onKey);
+
+    const previous = document.body.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previous;
+      trigger.current?.focus();
+    };
+  }, [open]);
+
+  /*
+    While the dialog is open and a render is in flight, ask again.
+
+    The upload returns the moment the bytes are parked — the variants are written by a WORKER, so
+    the row says `processing` and the tile is a placeholder. One `router.refresh()` at upload time
+    therefore always re-reads a row that is still processing, and the placeholder stayed there until
+    somebody reloaded the page by hand: the operator uploads a picture and never sees it.
+
+    Bounded rather than open-ended. Twenty attempts at two seconds is forty — comfortably past the
+    render, and short enough that a job which died leaves a dialog that has stopped asking rather
+    than one polling for ever. The status is then `failed`, which the tile says, or still
+    `processing`, which `safra_images_processing_stuck` alerts on.
+  */
+  useEffect(() => {
+    if (!open || imageStatus !== 'processing') return undefined;
+
+    let attempts = 0;
+    const timer = setInterval(() => {
+      attempts += 1;
+
+      if (attempts > POLL_ATTEMPTS) {
+        clearInterval(timer);
+
+        return;
+      }
+
+      router.refresh();
+    }, POLL_EVERY_MS);
+
+    return () => clearInterval(timer);
+  }, [open, imageStatus, router]);
 
   /* Shape only; every rule is re-checked by the schema, which is the guard. */
   const ready =
@@ -76,9 +150,7 @@ export function CampaignCreativeForm({
       });
 
       if (!response.ok) {
-        const payload: unknown = await response.json().catch(() => null);
-
-        setError(apiErrorOf(payload));
+        setError(apiErrorOf(await response.json().catch(() => null)));
 
         return;
       }
@@ -92,110 +164,215 @@ export function CampaignCreativeForm({
     }
   }
 
-  if (!open) {
-    return (
+  /**
+   * Sends one image through the platform's shared pipeline.
+   *
+   * The file never becomes a data URL and is never previewed from the client's own bytes: what the
+   * tile shows after this is what the SERVER re-encoded, which is the only version anybody is ever
+   * served. `router.refresh()` re-reads the row, so the status the operator sees is the row's.
+   */
+  async function send(chosen: File): Promise<void> {
+    setUploading(true);
+    setError(null);
+
+    try {
+      const body = new FormData();
+
+      body.append('file', chosen);
+
+      const response = await fetch(
+        `/api/ad-campaigns/${encodeURIComponent(reference)}/creative`,
+        { method: 'POST', body },
+      );
+
+      if (!response.ok) {
+        setError(apiErrorOf(await response.json().catch(() => null)));
+
+        return;
+      }
+
+      router.refresh();
+    } catch {
+      setError(t.errors.unreachable);
+    } finally {
+      setUploading(false);
+      if (file.current) file.current.value = '';
+    }
+  }
+
+  const field =
+    'w-full min-w-0 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text';
+  const labelled = 'grid gap-1.5 text-[11.5px] font-semibold text-muted';
+
+  return (
+    <>
       <button
+        ref={trigger}
         type="button"
         onClick={() => setOpen(true)}
         className="inline-flex w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
       >
         {c.editCreative}
       </button>
-    );
-  }
 
-  const field =
-    'w-full min-w-0 rounded-md border border-line bg-field px-2 py-1.5 text-[11.5px] text-text';
-
-  /*
-    Open, the form takes the WHOLE cell — and the cell is still narrow.
-
-    ## What was tried and does not work
-
-    A popover: `absolute`, anchored under the button at `w-[19rem]`, so the fields would have room.
-    It is CLIPPED. The table lives in an `overflow-x-auto` box — which it must, so a wide table
-    scrolls inside itself rather than pushing the page sideways — and `overflow: auto` clips
-    absolutely positioned descendants. Measured rather than reasoned: the panel rendered 163px wide
-    against the 304px asked for, with the rest cut off at the container's edge. Escaping that needs
-    `position: fixed` and JavaScript to keep the panel with the button, which is a lot of machinery
-    for four text inputs.
-
-    ## What this is instead
-
-    `col-span-2`, so the form uses the full width of الحالة rather than half of it now that the
-    controls are a pair of equal tracks. That is the best shape available inside a table cell, and
-    it is still cramped: the URL label wraps and its value scrolls inside the box.
-
-    **The right answer is to open this in the panel under the toolbar**, at the table's full width,
-    where the CREATE form already lives — reached from the row by a `?edit=<reference>` parameter so
-    it stays server-driven and shareable. That is a change to the screen's shape rather than to this
-    cell, and it is Bashar's to approve.
-  */
-  return (
-    <div className="col-span-2 grid gap-1.5">
-      {/* The label carries the language: four boxes with no names is four guesses. */}
-      <label className="grid gap-0.5 text-[10px] text-faint">
-        {c.fHeadlineAr}
-        <input value={ar} onChange={(e) => setAr(e.target.value)} className={field} />
-      </label>
-      <label className="grid gap-0.5 text-[10px] text-faint">
-        {c.fHeadlineEn}
-        <input
-          value={en}
-          onChange={(e) => setEn(e.target.value)}
-          className={`field-ltr ${field}`}
-        />
-      </label>
-      <label className="grid gap-0.5 text-[10px] text-faint">
-        {c.fHeadlineDe}
-        <input
-          value={de}
-          onChange={(e) => setDe(e.target.value)}
-          className={`field-ltr ${field}`}
-        />
-      </label>
-      <label className="grid gap-0.5 text-[10px] text-faint">
-        {c.fTargetUrl}
-        <input
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-          className={`field-ltr ${field}`}
-        />
-      </label>
-
-      {error ? <span className="text-[10px] font-semibold text-bad">{error}</span> : null}
-
-      <div className="flex flex-wrap gap-1.5">
-        {/*
-          Disabled until something is DIFFERENT, not merely valid.
-
-          «A submit that changes nothing does nothing» — a PATCH with an empty body would still
-          write an audit row saying the campaign was edited, which is a record of an event that
-          did not happen.
-        */}
-        <button
-          type="button"
-          disabled={!ready || !changed}
-          onClick={() => void submit()}
-          className="cursor-pointer rounded-md border border-[rgba(var(--goldA),0.4)] px-2.5 py-0.5 text-[10.5px] font-bold text-gold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+      {open ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={c.editTitle}
+          /* The backdrop closes, which is what everybody tries first. */
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 sm:items-center"
         >
-          {busy ? c.pausing : c.saveCreative}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setOpen(false);
-            setError(null);
-            setAr(headlineAr);
-            setEn(headlineEn);
-            setDe(headlineDe);
-            setTarget(targetUrl);
-          }}
-          className="cursor-pointer rounded-md border border-line px-2.5 py-0.5 text-[10.5px] text-muted"
-        >
-          {c.cancel}
-        </button>
-      </div>
-    </div>
+          <div
+            /* Clicks inside the dialog must not reach the backdrop's handler. */
+            onClick={(event) => event.stopPropagation()}
+            className="w-full max-w-xl rounded-[14px] border border-line bg-card p-5 shadow-2xl"
+          >
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <h2 className="text-[15px] font-bold text-text">{c.editTitle}</h2>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label={c.close}
+                className="grid size-8 cursor-pointer place-items-center rounded-lg border border-line text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </div>
+
+            <div className="grid gap-3.5">
+              <label className={labelled}>
+                {c.fHeadlineAr}
+                <input
+                  value={ar}
+                  onChange={(event) => setAr(event.target.value)}
+                  className={field}
+                />
+              </label>
+
+              <div className="grid gap-3.5 sm:grid-cols-2">
+                <label className={labelled}>
+                  {c.fHeadlineEn}
+                  <input
+                    value={en}
+                    onChange={(event) => setEn(event.target.value)}
+                    className={`field-ltr ${field}`}
+                  />
+                </label>
+                <label className={labelled}>
+                  {c.fHeadlineDe}
+                  <input
+                    value={de}
+                    onChange={(event) => setDe(event.target.value)}
+                    className={`field-ltr ${field}`}
+                  />
+                </label>
+              </div>
+
+              <label className={labelled}>
+                {c.fTargetUrl}
+                {/* `field-ltr`: a URL is read left-to-right whatever the page direction. */}
+                <input
+                  value={target}
+                  onChange={(event) => setTarget(event.target.value)}
+                  className={`field-ltr ${field}`}
+                />
+              </label>
+
+              {/* ── The creative ───────────────────────────────────────────── */}
+              <div className={labelled}>
+                {c.image}
+
+                <div className="flex flex-wrap items-center gap-3">
+                  {imageUrl && imageStatus === 'ready' ? (
+                    /*
+                      The SERVER's re-encode, not the bytes that were chosen. Nothing the client
+                      uploaded is ever displayed, for the same reason nothing it uploaded is ever
+                      served.
+                    */
+                    <img
+                      src={imageUrl}
+                      alt=""
+                      className="h-20 w-32 rounded-lg border border-line object-cover"
+                    />
+                  ) : (
+                    <span className="grid h-20 w-32 place-items-center rounded-lg border border-dashed border-line px-2 text-center text-[10.5px] text-faint">
+                      {imageStatus === 'processing'
+                        ? c.imageProcessing
+                        : imageStatus === 'failed'
+                          ? c.imageFailed
+                          : c.imageNone}
+                    </span>
+                  )}
+
+                  <div className="grid gap-1.5">
+                    <button
+                      type="button"
+                      disabled={uploading}
+                      onClick={() => file.current?.click()}
+                      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-[9px] border border-line px-4 py-2 text-[12px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold disabled:opacity-50 lg:min-h-0"
+                    >
+                      {uploading
+                        ? c.imageUploading
+                        : imageUrl
+                          ? c.imageReplace
+                          : c.imageChoose}
+                    </button>
+                    <span className="text-[10.5px] font-normal text-faint">
+                      {c.imageHint}
+                    </span>
+                  </div>
+
+                  {/*
+                    `accept` is a COURTESY, not the control. The server refuses anything whose magic
+                    bytes are not a supported photograph, before a byte reaches storage.
+                  */}
+                  <input
+                    ref={file}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={(event) => {
+                      const chosen = event.target.files?.[0];
+
+                      if (chosen) void send(chosen);
+                    }}
+                  />
+                </div>
+              </div>
+
+              {error ? (
+                <p className="text-[11.5px] font-semibold text-bad">{error}</p>
+              ) : null}
+
+              <div className="mt-1 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4.5 py-2 text-xs font-bold text-muted lg:min-h-0"
+                >
+                  {c.cancel}
+                </button>
+                {/*
+                  Disabled until something is DIFFERENT, not merely valid — a PATCH with an empty
+                  body would still write an audit row saying the campaign was edited, which is a
+                  record of an event that did not happen. The IMAGE saves on choosing, so it is not
+                  gated by this.
+                */}
+                <button
+                  type="button"
+                  disabled={!ready || !changed}
+                  onClick={() => void submit()}
+                  className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+                >
+                  {busy ? c.pausing : c.saveCreative}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }

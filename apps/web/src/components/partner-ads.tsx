@@ -30,13 +30,17 @@ import { getCityAds } from '@/lib/api';
  * was opened from. A plain `<a>` rather than `<Link>`, deliberately — `<Link>` prefetches, and a
  * prefetched click is a click nobody made.
  *
- * ## No creative image yet, deliberately
+ * ## The creative comes through the platform's own pipeline
  *
- * `ad_campaigns.image_path` exists and this renders TEXT only. Nothing writes that column — there
- * is no upload flow for an ad creative — and rendering an `<img>` from a free-text path nobody
- * validates would mean the first thing to write it decides what SAFRA's pages fetch. The column
- * stays; the render waits for the upload path that makes it trustworthy. Recorded in
- * `docs/FUTURE-WORK.md`.
+ * This used to render text only, because the column behind it was a free-text `image_path` nobody
+ * validated — the first thing to write it would have decided what SAFRA's pages fetch. Staff now
+ * upload through the SAME pipeline as every listing photograph: the magic bytes are checked before
+ * a byte is stored, a worker decodes and re-encodes (destroying polyglot files and stripping EXIF),
+ * and `imageUrl` is set only once that has finished. So what a customer is served is always
+ * something this platform produced, never something somebody uploaded.
+ *
+ * A campaign without one is still a complete ad — a headline and an advertiser name — so the card
+ * simply has no picture rather than a placeholder.
  *
  * ## An empty slate renders nothing
  *
@@ -75,6 +79,20 @@ export async function PartnerAds({
             <span className="w-fit rounded-full border border-gold/40 px-2 py-0.5 text-[11px] font-semibold text-gold">
               {t('label')}
             </span>
+
+            {ad.imageUrl ? (
+              /*
+                `alt=""` — the headline directly beneath says the same thing, and a screen reader
+                announcing it twice is worse than not announcing the picture at all. `loading="lazy"`
+                because an advertisement must never delay the booking the reader came for.
+              */
+              <img
+                src={ad.imageUrl}
+                alt=""
+                loading="lazy"
+                className="aspect-[3/2] w-full rounded-lg border border-line object-cover"
+              />
+            ) : null}
 
             <p className="text-sm font-semibold text-text">{ad.headline}</p>
             <p className="text-xs text-muted">{ad.advertiser}</p>

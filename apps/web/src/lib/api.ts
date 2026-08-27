@@ -235,7 +235,14 @@ const deliveredAdSchema = z.object({
   kind: z.string(),
   /** The CLICK path on SAFRA — never the advertiser's own URL. See `AdDeliveryService`. */
   clickPath: z.string(),
-  imagePath: z.string().nullable(),
+  /*
+    A resolvable URL on the media host, or null for a text ad.
+
+    `.nullable()` rather than `.default(null)`: a default would invent «this ad has no picture» for
+    a field the API stopped sending, which is the shape «a zod .default() hides a missing field»
+    exists to forbid. Only ever set once the render has FINISHED — see the delivery service.
+  */
+  imageUrl: z.string().nullable(),
 });
 
 const deliveredAdsSchema = z.object({ items: z.array(deliveredAdSchema) });

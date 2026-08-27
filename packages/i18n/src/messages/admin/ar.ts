@@ -884,6 +884,8 @@ export const ar = {
       kpiRefunded: 'استردادات اليوم',
       kpiPayable: 'مستحقات شركاء غير مدفوعة',
       kpiFines: 'غرامات محصلة (هذا الشهر)',
+      /* §9.3 — the platform's second revenue stream, beside the booking commission. */
+      kpiAdRevenue: 'إيرادات إعلانات (هذا الشهر)',
       /**
        * The design's fourth KPI is "تحويلات شركاء مجدولة" — SCHEDULED transfers. There is no
        * payouts table and payment rails are deferred, so this shows what is OWED instead and
@@ -1118,6 +1120,8 @@ export const ar = {
     },
 
     reports: {
+      adRevenue: 'إيرادات الإعلانات',
+      adRevenueSub: 'فواتير إعلانية سُدِّدت — تُقيَّد لحظة السداد لا لحظة الإصدار',
       commissionRevenue: 'إيرادات العمولات',
       commissionRevenueSub: 'رسوم خدمة 1.99$ للعميل + عمولة 7٪ شريك · هذا الأسبوع',
       occupancy: 'نسبة الإشغال',
@@ -1645,6 +1649,18 @@ export const ar = {
         read as two actions; a verb and a phrase read as a control and a sentence.
       */
       editCreative: 'تعديل',
+      /* ── The edit dialog (Bashar, 2026-08-27) ────────────────────────────── */
+      editTitle: 'تعديل الإعلان',
+      close: 'إغلاق',
+      /* ── The creative image, through the shared pipeline ─────────────────── */
+      image: 'صورة الإعلان',
+      imageHint: 'JPEG أو PNG أو WebP، حتى 10 ميغابايت. تُعاد المعالجة على خوادمنا.',
+      imageChoose: 'اختر صورة',
+      imageReplace: 'استبدال الصورة',
+      imageProcessing: 'جارٍ المعالجة…',
+      imageFailed: 'تعذّرت معالجة الصورة. جرّب صورة أخرى.',
+      imageNone: 'بلا صورة — يظهر الإعلان كنص',
+      imageUploading: 'جارٍ الرفع…',
       saveCreative: 'حفظ',
       newAdvertiser: '+ معلن جديد',
       advTitle: 'معلن جديد',
@@ -2585,6 +2601,7 @@ export const ar = {
     'ad_campaign.paused': 'إيقاف حملة إعلانية',
     'ad_campaign.resumed': 'تشغيل حملة إعلانية',
     'ad_campaign.activated': 'إطلاق حملة إعلانية',
+    'ad_campaign.creative_uploaded': 'رفع صورة إعلان',
     'partner_contract.uploaded': 'رفع عقد شراكة',
     /* ── أدوار الموظفين، يُعرِّفها المدير العام (Bashar, 2026-08-23) ── */
     'staff_role.created': 'إنشاء دور لموظفي سفرة',

@@ -1206,6 +1206,8 @@ const financeSchema = offsetPage(financeItemSchema).extend({
     captured_today: z.string(),
     refunded_today: z.string(),
     fines_collected_month: z.string(),
+    /* §9.3 — advertising settled this month, beside the booking commission. */
+    ad_revenue_month: z.string(),
     partner_payable_outstanding: z.string(),
     currency: z.string(),
   }),
@@ -1342,6 +1344,7 @@ const reportsSchema = z.object({
     z.object({
       key: z.enum([
         'commission_revenue',
+        'ad_revenue',
         'occupancy',
         'cancellations',
         'partner_response',
@@ -1734,6 +1737,13 @@ const campaignItemSchema = z.object({
   headlineEn: z.string(),
   headlineDe: z.string(),
   targetUrl: z.string(),
+  /*
+    The creative. `.nullable()`, never `.default(null)` — a `.default()` would invent «no image» for
+    a field the API stopped sending, and a campaign whose picture silently vanished from the console
+    is exactly the failure that shape produces.
+  */
+  imageUrl: z.string().nullable(),
+  imageStatus: z.string().nullable(),
 });
 
 const campaignsSchema = offsetPage(campaignItemSchema).extend({
