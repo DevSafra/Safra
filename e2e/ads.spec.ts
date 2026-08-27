@@ -427,6 +427,92 @@ test.describe('الإعلانات', () => {
   });
 
   /**
+   * Taking the picture off, and keeping the campaign — Bashar, 2026-08-27.
+   *
+   * «I should be also able to remove the current image and keep the الإعلان without an image.»
+   *
+   * The two halves are asserted together and neither is enough alone: the picture is gone from the
+   * dialog, AND the campaign is still in the registry saying what it said. A test that only checked
+   * the first would pass just as happily against a route that deleted the campaign.
+   *
+   * Staged like an upload, so إلغاء puts it back. That case is asserted FIRST — an undo that
+   * silently did nothing would leave the removal looking correct while the campaign lost its
+   * picture to a click somebody took back.
+   */
+  test('removes the picture on حفظ, and puts it back on إلغاء', async ({ page }) => {
+    await page.goto('/ads?size=5');
+    await page.waitForSelector('tbody tr');
+
+    /* A row that HAS a picture — the earlier tests upload one, so the first row is the one. */
+    const row = page.locator('tbody tr').first();
+    /*
+      The REFERENCE, not the advertiser cell. Captured from that cell first, which was wrong twice
+      over: it holds the advertiser and the headline on two lines, and after a removal it also
+      holds «بلا صورة» — so the text captured before could never be a substring of the text after,
+      and the test failed on a removal that had worked perfectly.
+    */
+    const reference = (await row.locator('td').first().innerText()).trim();
+
+    await row.getByRole('button', { name: 'تعديل', exact: true }).click();
+
+    const dialog = page.getByRole('dialog');
+
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('img'), 'this row has a creative to remove').toBeVisible({
+      timeout: 30_000,
+    });
+
+    /* ── staged, then taken back ─────────────────────────────────────────── */
+    await dialog.getByRole('button', { name: 'إزالة الصورة', exact: true }).click();
+    await expect(dialog).toContainText('ستُزال عند الحفظ');
+    await expect(
+      dialog.getByRole('button', { name: 'حفظ', exact: true }),
+      'a removal is a change worth saving',
+    ).toBeEnabled();
+
+    await dialog.getByRole('button', { name: 'التراجع عن الإزالة', exact: true }).click();
+
+    await expect(dialog).not.toContainText('ستُزال عند الحفظ');
+    await expect(dialog.locator('img'), 'the picture is back').toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'حفظ', exact: true }),
+      'and there is nothing left to save',
+    ).toBeDisabled();
+
+    /* ── and now for real ────────────────────────────────────────────────── */
+    await dialog.getByRole('button', { name: 'إزالة الصورة', exact: true }).click();
+    await dialog.getByRole('button', { name: 'حفظ', exact: true }).click();
+
+    await expect(dialog, 'the dialog closes — there is nothing to render').toBeHidden();
+
+    const after = page.locator('tbody tr').first();
+
+    /* The campaign is still there, and still live. */
+    await expect(after).toContainText(reference);
+    await expect(
+      after.locator('[data-status-pill]'),
+      'removing a picture does not disturb the campaign',
+    ).toHaveText('نشط');
+    await expect(
+      after.locator('[data-no-creative]'),
+      'and the row now says it has no picture',
+    ).toHaveText('بلا صورة');
+
+    /* Reopened, it offers to CHOOSE rather than to replace — there is nothing to replace. */
+    await after.getByRole('button', { name: 'تعديل', exact: true }).click();
+
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('img')).toBeHidden();
+    await expect(
+      dialog.getByRole('button', { name: 'اختر صورة', exact: true }),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'إزالة الصورة', exact: true }),
+      'nothing to remove, so nothing offers to',
+    ).toBeHidden();
+  });
+
+  /**
    * Recording a payment needs a note, and the note reaches the audit log.
    *
    * A ledger pair that cannot be unposted is worth one sentence about how the money arrived. The

@@ -274,4 +274,215 @@ describeIfDb('a campaign creative', () => {
 
     expect(allowed.status).toBe('processing');
   });
+  /**
+   * ── taking the picture off, and keeping the campaign ─────────────────────
+   *
+   * Bashar, 2026-08-27: «I should be also able to remove the current image and keep the الإعلان
+   * without an image.» The campaign must survive intact — this is a return to the state every
+   * campaign starts in, not a deletion of anything.
+   *
+   * Asserted as a PAIR: every image column is cleared AND the campaign is still there, live, with
+   * its headline. Checking only the first would pass just as well against a `DELETE FROM
+   * ad_campaigns`, which is the accident this route is one typo away from.
+   */
+  it('clears the picture and leaves the campaign standing', async () => {
+    await creative.upload(staff(), reference, {
+      buffer: PHOTO,
+      originalname: 'creative.jpg',
+    });
+
+    const before = await row();
+
+    expect(
+      before.image_file_key,
+      'the fixture actually has a picture to remove',
+    ).not.toBeNull();
+
+    expect(await creative.remove(staff(), reference)).toStrictEqual({ removed: true });
+
+    const after = await row();
+
+    /* Every column, not the one the screen happens to read — a stale width is a lie too. */
+    expect(after.image_file_key).toBeNull();
+    expect(after.image_status).toBeNull();
+    expect(after.image_width).toBeNull();
+    expect(after.image_height).toBeNull();
+    expect(after.image_variant_widths).toBeNull();
+    expect(after.image_original_key).toBeNull();
+    expect(after.image_failure_code).toBeNull();
+
+    /* And the campaign itself is untouched. */
+    expect(after.status, 'the campaign is still live').toBe('active');
+    expect(after.headline_ar, 'and still says what it said').toBe('عنوان');
+  });
+
+  /** What was removed stays answerable, because the bytes are kept and the row is not. */
+  it('records what stopped being served', async () => {
+    await creative.upload(staff(), reference, {
+      buffer: PHOTO,
+      originalname: 'creative.jpg',
+    });
+
+    const key = (await row()).image_file_key;
+
+    await creative.remove(staff(), reference);
+
+    /*
+      Scoped to THIS campaign. Written against the whole table first, which passed alone and failed
+      inside `pnpm verify`: `audit_log` is append-only and the browser suite really removes a
+      creative, so rows from earlier runs are committed and visible from inside this rollback
+      transaction. A test that reads a shared append-only table has to name its own subject.
+    */
+    const audited = await db.execute<{ before: { fileKey?: string } | null }>(sql`
+      SELECT a.before FROM audit_log a
+      JOIN ad_campaigns c ON c.id = a.subject_id
+      WHERE a.action = 'ad_campaign.creative_removed' AND c.reference = ${reference}
+      ORDER BY a.created_at DESC LIMIT 1
+    `);
+
+    expect(
+      audited.rows[0]?.before?.fileKey,
+      'the audit names the key it stopped serving',
+    ).toBe(key);
+  });
+
+  /**
+   * Removing a picture that is not there succeeds and writes NOTHING.
+   *
+   * An audit trail carrying a removal that removed nothing is a record of an event that did not
+   * happen — the same objection that stops an empty PATCH being sent at all.
+   */
+  it('is idempotent, and does not audit a removal that removed nothing', async () => {
+    expect(await creative.remove(staff(), reference)).toStrictEqual({ removed: false });
+
+    /* This campaign's rows, for the reason the case above gives. */
+    const audited = await db.execute<{ n: string }>(sql`
+      SELECT count(*)::text AS n FROM audit_log a
+      JOIN ad_campaigns c ON c.id = a.subject_id
+      WHERE a.action = 'ad_campaign.creative_removed' AND c.reference = ${reference}
+    `);
+
+    expect(audited.rows[0]?.n).toBe('0');
+  });
+
+  /**
+   * Removing MID-RENDER does not come back.
+   *
+   * The upload leaves the row `processing` with a worker job in flight. The worker claims its work
+   * with `WHERE image_status = 'processing'`, so a row cleared underneath it fails the claim and
+   * the job exits without writing — which is why remove is offered while a render is running. If
+   * that guard were ever dropped, the picture would reappear seconds after somebody removed it.
+   */
+  it('stays removed even though a render was in flight', async () => {
+    await creative.upload(staff(), reference, {
+      buffer: PHOTO,
+      originalname: 'creative.jpg',
+    });
+
+    expect((await row()).image_status, 'the render is in flight').toBe('processing');
+
+    await creative.remove(staff(), reference);
+
+    /* The claim the worker would make, run here rather than mocking the processor. */
+    const claimed = await db.execute<{ id: string }>(sql`
+      UPDATE ad_campaigns SET updated_at = now()
+      WHERE reference = ${reference} AND image_status = 'processing'
+      RETURNING id
+    `);
+
+    expect(claimed.rows, 'the worker finds nothing to claim').toStrictEqual([]);
+    expect((await row()).image_file_key).toBeNull();
+  });
+
+  /** Out of scope answers exactly as absent — the same shape every other write on a campaign has. */
+  it('refuses a campaign in a city this reader cannot see', async () => {
+    await creative.upload(staff(), reference, {
+      buffer: PHOTO,
+      originalname: 'creative.jpg',
+    });
+
+    const elsewhere = await db.execute<{ id: string }>(sql`
+      SELECT id::text FROM cities WHERE deleted_at IS NULL AND id <> ${cityId}::uuid LIMIT 1
+    `);
+    const other = elsewhere.rows[0]?.id;
+
+    if (!other) throw new Error('the fixture needs a second city');
+
+    await expect(creative.remove(staff([other]), reference)).rejects.toMatchObject({
+      response: { code: ERROR.CAMPAIGN_NOT_FOUND },
+    });
+
+    /* The control: the picture is still there, so the refusal withheld rather than failed. */
+    expect((await row()).image_file_key).not.toBeNull();
+  });
+
+  /**
+   * A reader who may LOOK at this campaign but not change it is refused the write, not the row.
+   *
+   * `outside: 'read_only'` means «the rest of the country is visible and not editable», so the
+   * scope has to be pinned to a DIFFERENT city for this campaign to fall outside it. Written the
+   * other way round first, which asserted nothing: the campaign was inside `cityIds`, the reader
+   * had full write access to it, and the removal simply succeeded.
+   */
+  it('refuses a reader who may look but not change', async () => {
+    await creative.upload(staff(), reference, {
+      buffer: PHOTO,
+      originalname: 'creative.jpg',
+    });
+
+    const elsewhere = await db.execute<{ id: string }>(sql`
+      SELECT id::text FROM cities WHERE deleted_at IS NULL AND id <> ${cityId}::uuid LIMIT 1
+    `);
+    const other = elsewhere.rows[0]?.id;
+
+    if (!other) throw new Error('the fixture needs a second city');
+
+    const readOnly = {
+      sub: staffId,
+      role: 'operations_manager',
+      permissions: ['ad.manage'],
+      scope: { kind: 'cities', cityIds: [other], outside: 'read_only' },
+    } as unknown as AccessTokenClaims;
+
+    await expect(creative.remove(readOnly, reference)).rejects.toMatchObject({
+      response: { code: ERROR.SCOPE_OUTSIDE },
+    });
+
+    expect((await row()).image_file_key).not.toBeNull();
+  });
+
+  /** The campaign row as it stands, so each case asserts against the database and not a return value. */
+  async function row(): Promise<{
+    image_file_key: string | null;
+    image_status: string | null;
+    image_width: number | null;
+    image_height: number | null;
+    image_variant_widths: number[] | null;
+    image_original_key: string | null;
+    image_failure_code: string | null;
+    status: string;
+    headline_ar: string;
+  }> {
+    const found = await db.execute<{
+      image_file_key: string | null;
+      image_status: string | null;
+      image_width: number | null;
+      image_height: number | null;
+      image_variant_widths: number[] | null;
+      image_original_key: string | null;
+      image_failure_code: string | null;
+      status: string;
+      headline_ar: string;
+    }>(sql`
+      SELECT image_file_key, image_status, image_width, image_height, image_variant_widths,
+             image_original_key, image_failure_code, status::text, headline_ar
+      FROM ad_campaigns WHERE reference = ${reference}
+    `);
+
+    const only = found.rows[0];
+
+    if (!only) throw new Error('the fixture campaign is gone');
+
+    return only;
+  }
 });
