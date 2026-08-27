@@ -37,7 +37,10 @@ describeIfDb('an ad campaign past its window', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
   const expiry = new AdExpiryService(db, new JobRunService(db));
-  const advertising = new AdvertisingService(db, new AuditService(db));
+  const advertising = new AdvertisingService(db, new AuditService(db), {
+    /* Only the URL builder is reached from `list`; the pipeline itself is not exercised here. */
+    publicUrl: (key: string) => `https://media.test/${key}`,
+  } as never);
 
   let staffId = '';
 

@@ -11,8 +11,11 @@ import {
   Query,
   Req,
   Res,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 
@@ -37,6 +40,7 @@ import { notFound } from '../common/errors/app-error.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { AdCreativeService } from './ad-creative.service.js';
 import { AdManagementService } from './ad-management.service.js';
 import { AdInvoiceService } from './ad-invoice.service.js';
 import {
@@ -111,6 +115,7 @@ export class CommsController {
     private readonly advertising: AdvertisingService,
     private readonly contracts: PartnerContractService,
     private readonly adManagement: AdManagementService,
+    private readonly adCreative: AdCreativeService,
     private readonly adInvoices: AdInvoiceService,
   ) {}
 
@@ -281,6 +286,30 @@ export class CommsController {
     @Body(new ZodValidationPipe(campaignCreateSchema)) body: CampaignCreateInput,
   ) {
     return this.adManagement.createCampaign(user, body);
+  }
+
+  /**
+   * The creative IMAGE, through the same pipeline every other picture on the platform uses.
+   *
+   * Multipart, held in memory like the listing upload: sharp needs the whole buffer, and a temp
+   * file would be one more place an unvalidated upload could sit. The 10MB ceiling is the same one,
+   * and `ImageService.inspect` refuses anything that is not a photograph before a byte is stored.
+   */
+  @Post('ad-campaigns/:reference/creative')
+  @RequirePermissions(P.AD_MANAGE)
+  @AuditExempt('AdCreativeService records ad_campaign.creative_uploaded transactionally.')
+  /* Image processing is CPU-heavy, so the budget is tighter than the global one. */
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }),
+  )
+  async uploadCreative(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @UploadedFile()
+    file: { buffer: Buffer; mimetype: string; originalname: string } | undefined,
+  ) {
+    return this.adCreative.upload(user, reference, file);
   }
 
   /** Editing the creative. The window and the price are not editable — see the contract. */

@@ -212,6 +212,8 @@ export const AUDIT_ACTIONS = [
   'ad_campaign.resumed',
   /* A DRAFT going live for the first time — not the same event as resuming a paused one. */
   'ad_campaign.activated',
+  /* A creative image uploaded through the shared pipeline — what it is, and who filed it. */
+  'ad_campaign.creative_uploaded',
 
   // ── Staff and configuration ───────────────────────────────────────────────
   'staff.invited',

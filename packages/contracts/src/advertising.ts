@@ -144,5 +144,12 @@ export interface DeliveredAd {
   readonly kind: AdvertiserKind;
   /** The CLICK path on SAFRA, never the advertiser's URL — see the delivery service. */
   readonly clickPath: string;
-  readonly imagePath: string | null;
+  /**
+   * The creative, or `null` for a text ad.
+   *
+   * A resolvable URL on the media host, produced by the same pipeline as every listing photograph —
+   * NOT the free-text `image_path` this replaced. Only ever set when the render has finished: an
+   * address whose object does not exist yet would render as a broken image on somebody's booking.
+   */
+  readonly imageUrl: string | null;
 }

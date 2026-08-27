@@ -25,7 +25,7 @@ const describeIfDb = DATABASE_URL ? describe : describe.skip;
 describeIfDb('what the customer app is served', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
-  const delivery = new AdDeliveryService(db);
+  const delivery = new AdDeliveryService(db, {} as never);
 
   let citySlug = '';
   let otherSlug = '';

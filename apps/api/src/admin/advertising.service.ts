@@ -7,6 +7,8 @@ import { COUNT_CAP, ERROR, type OffsetPage, offsetPage } from '@safra/contracts'
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
+import { ImageService } from '../storage/image.service.js';
+import { CREATIVE_WIDTH } from './ad-creative.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
@@ -54,6 +56,14 @@ export interface CampaignRow {
   readonly headlineEn: string;
   readonly headlineDe: string;
   readonly targetUrl: string;
+  /*
+    The creative, so the console can show the tile and the edit dialog can preview what it is
+    replacing. `imageStatus` is the field that says whether `imageUrl` resolves yet — the pipeline
+    writes the widths asynchronously, and a URL offered before the worker has run is an address
+    rather than a picture.
+  */
+  readonly imageUrl: string | null;
+  readonly imageStatus: string | null;
 }
 
 export interface AdCounters {
@@ -85,6 +95,7 @@ export class AdvertisingService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
+    private readonly images: ImageService,
   ) {}
 
   /** The row count for a page, capped, over the same `FROM … WHERE` the list uses. */
@@ -204,6 +215,7 @@ export class AdvertisingService {
              to_char(c.ends_at   AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS ends_at,
              floor(extract(epoch FROM (c.ends_at - now())) / 86400)::int AS days_remaining,
              c.headline_ar, c.headline_en, c.headline_de, c.target_url,
+             c.image_file_key, c.image_status::text AS image_status,
              c.created_at
       ${fromWhere}
         ORDER BY c.created_at DESC, c.id DESC
@@ -231,6 +243,14 @@ export class AdvertisingService {
         headlineEn: row.headline_en,
         headlineDe: row.headline_de,
         targetUrl: row.target_url,
+        /*
+          Built here rather than in the console, so «where does an image live» is answered once.
+          `publicUrl` is the same helper the listing gallery uses.
+        */
+        imageUrl: row.image_file_key
+          ? this.images.publicUrl(row.image_file_key, CREATIVE_WIDTH)
+          : null,
+        imageStatus: row.image_status,
       })),
       total,
       query,
@@ -347,5 +367,7 @@ interface CampaignRowSql extends Record<string, unknown> {
   headline_en: string;
   headline_de: string;
   target_url: string;
+  image_file_key: string | null;
+  image_status: string | null;
   created_at: string;
 }

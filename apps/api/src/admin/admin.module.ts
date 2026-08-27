@@ -41,6 +41,7 @@ import { CommsController } from './comms.controller.js';
 import { DisputeService } from './dispute.service.js';
 import { CouponAdminService } from './coupon-admin.service.js';
 import { AdExpiryService } from './ad-expiry.service.js';
+import { AdCreativeService } from './ad-creative.service.js';
 import { AdManagementService } from './ad-management.service.js';
 import { AdInvoiceService } from './ad-invoice.service.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
@@ -110,6 +111,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     DisputeService,
     CouponAdminService,
     AdExpiryService,
+    AdCreativeService,
     AdManagementService,
     AdInvoiceService,
     JobRunService,
