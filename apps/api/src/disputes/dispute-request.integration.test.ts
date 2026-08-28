@@ -54,6 +54,8 @@ describeIfDb('DisputeRequestService', () => {
     new WalletService(db, new FxRateService(db, new AuditService(db))),
     new LedgerService(db),
     new FxRateService(db, new AuditService(db)),
+    /* The notifier only announces a closure; these suites assert the closure itself. */
+    { closed: () => Promise.resolve() } as never,
   );
 
   let profileId = '';

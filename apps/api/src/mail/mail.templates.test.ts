@@ -469,6 +469,50 @@ const RENDERERS: {
     shows: SAMPLE.reason,
   },
   {
+    name: 'disputeResolvedMail',
+    entry: 'disputeResolved',
+    render: (locale) =>
+      templates.disputeResolvedMail({
+        to: SAMPLE.to,
+        locale,
+        url: SAMPLE.url,
+        booking: 'BKG-2026-000431',
+        reference: 'DSP-000112',
+        resolution: SAMPLE.reason,
+        date: SAMPLE.date,
+      }),
+    shows: SAMPLE.reason,
+  },
+  {
+    name: 'disputeRejectedMail',
+    entry: 'disputeRejected',
+    render: (locale) =>
+      templates.disputeRejectedMail({
+        to: SAMPLE.to,
+        locale,
+        url: SAMPLE.url,
+        booking: 'BKG-2026-000431',
+        reference: 'DSP-000112',
+        resolution: SAMPLE.reason,
+        date: SAMPLE.date,
+      }),
+    shows: SAMPLE.reason,
+  },
+  {
+    name: 'disputePayoutReleasedMail',
+    entry: 'disputePayoutReleased',
+    render: (locale) =>
+      templates.disputePayoutReleasedMail({
+        to: SAMPLE.to,
+        locale,
+        url: SAMPLE.url,
+        booking: 'BKG-2026-000431',
+        reference: 'DSP-000112',
+        date: SAMPLE.date,
+      }),
+    shows: 'DSP-000112',
+  },
+  {
     name: 'partnerFinedMail',
     entry: 'partnerFined',
     render: (locale) =>
