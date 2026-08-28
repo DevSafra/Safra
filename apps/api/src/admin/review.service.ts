@@ -1186,6 +1186,31 @@ export class ReviewService {
         LIMIT ${SEEN_BADGE_CAP + 1}
       ) capped_wallet
       UNION ALL
+      -- Threads with something unread, still open -- the badge beside الرسائل.
+      --
+      -- CONVERSATIONS, not messages. The badge points at a list of threads and every other badge
+      -- counts the items on the list it opens; the per-row pill already says how many messages are
+      -- waiting in each. Counting messages here would put a number beside the section that no row
+      -- on the screen adds up to.
+      --
+      -- Closed threads are excluded: unread_for_staff is zeroed on close, so this is belt and
+      -- braces -- but a thread somebody ended is not work waiting, whatever the counter says.
+      --
+      -- Scoped through the same coalesce MessagingService.subjectJoins uses: a thread belongs to
+      -- the booking's city, to the partner's where there is no booking, and a DISPUTE thread
+      -- reaches the partner through the dispute. Reaching only conv.partner_id would leave every
+      -- dispute thread with a NULL city, which a scope filter reads as platform-level -- so one
+      -- badge would count a case in Aleppo for an operator who cannot open it.
+      SELECT 'messages_unread', COUNT(*)::text
+        FROM conversations conv
+        LEFT JOIN bookings convb ON convb.id = conv.booking_id
+        LEFT JOIN disputes convd ON convd.id = conv.dispute_id
+        LEFT JOIN partners convp
+          ON convp.id = coalesce(conv.partner_id, convb.partner_id, convd.partner_id)
+        WHERE conv.deleted_at IS NULL AND conv.closed_at IS NULL
+          AND conv.unread_for_staff > 0
+          AND ${scopeFilter(actor, 'coalesce(convb.city_id, convp.city_id)')}
+      UNION ALL
       SELECT 'bookings_awaiting_confirmation', COUNT(*)::text
         FROM bookings WHERE status = 'pending_confirmation' AND deleted_at IS NULL
           AND ${scopeFilter(actor, 'city_id')}

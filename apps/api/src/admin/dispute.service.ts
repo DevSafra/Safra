@@ -15,6 +15,7 @@ import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DisputeNotifier } from './dispute-notifier.js';
 import { evidenceVariant } from '../disputes/dispute-evidence.service.js';
+import { openDisputeThread } from '../disputes/dispute-thread.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
@@ -86,6 +87,12 @@ export interface DisputeRow {
   readonly partner: string | null;
   readonly customer: string | null;
   readonly evidenceCount: number;
+  /**
+   * The thread this case opened with — `CNV-000042`, or null for a dispute filed before threads
+   * existed. It is what turns النزاعات and الرسائل into one workflow rather than two screens
+   * holding halves of the same complaint.
+   */
+  readonly conversationReference: string | null;
   /** The photographs, each with the widest variant that exists — see `evidenceUrl`. */
   readonly evidence: readonly {
     readonly id: string;
@@ -260,6 +267,15 @@ export class DisputeService {
       LEFT JOIN partners p          ON p.id = d.partner_id
       LEFT JOIN customer_profiles c ON c.id = d.customer_profile_id
       LEFT JOIN currencies cur      ON cur.id = d.compensation_currency_id
+      -- At most one, and unique in practice: openDisputeThread (no backticks: they would end this
+      -- sql template) runs once inside the transaction that creates the dispute. LIMIT 1 rather
+      -- than a plain join so a hand-inserted second row
+      -- could never duplicate the dispute across the page.
+      LEFT JOIN LATERAL (
+        SELECT reference FROM conversations
+        WHERE dispute_id = d.id AND deleted_at IS NULL
+        ORDER BY created_at ASC LIMIT 1
+      ) conv ON TRUE
       LEFT JOIN (
       SELECT dispute_id, count(*) AS n,
              jsonb_agg(jsonb_build_object(
@@ -284,6 +300,7 @@ export class DisputeService {
              p.display_name AS partner,
              c.full_name    AS customer,
              coalesce(ev.n, 0)::int         AS evidence_count,
+             conv.reference                 AS conversation_reference,
              -- The photographs themselves, not merely how many there are.
              --
              -- The count has been on this screen since النزاعات was built and nothing could write a
@@ -340,6 +357,7 @@ export class DisputeService {
         partner: row.partner,
         customer: row.customer,
         evidenceCount: row.evidence_count,
+        conversationReference: row.conversation_reference,
         evidence: (row.evidence ?? []).map((one) => ({
           id: one.id,
           /*
@@ -787,6 +805,17 @@ export class DisputeService {
 
       if (!row) throw notFound(ERROR.DISPUTE_NOT_FOUND);
 
+      /* The case and its thread commit together — see `openDisputeThread`. */
+      await openDisputeThread(tx as unknown as Database, {
+        disputeId: row.id,
+        customerProfileId: booking.customer_profile_id,
+        openedByUserId: actor?.sub ?? null,
+        senderKind: 'staff',
+        title: title.body,
+        description: description.body,
+        redactedCount: title.redactedCount + description.redactedCount,
+      });
+
       /*
         The status carries the FROM state in its predicate, so two staff opening disputes at once
         cannot both move it — the second matches nothing and leaves the first's move standing. It
@@ -916,6 +945,7 @@ interface DisputeRowSql extends Record<string, unknown> {
   partner: string | null;
   customer: string | null;
   evidence_count: number;
+  conversation_reference: string | null;
   evidence: {
     id: string;
     storageKey: string;

@@ -18,6 +18,7 @@ import type { AccessTokenClaims } from '../auth/token.service.js';
 import { REDACTION_MARKERS } from '@safra/i18n';
 
 import { redactIncomingMessage } from '../messaging/redaction.js';
+import { openDisputeThread } from './dispute-thread.js';
 import { badRequest, notFound, unauthorized } from '../common/errors/app-error.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -230,32 +231,53 @@ export class DisputeRequestService {
     const title = redactIncomingMessage(input.title);
     const description = redactIncomingMessage(input.description);
 
-    const created = await this.db.execute<{ reference: string }>(sql`
-      INSERT INTO disputes
-        (booking_id, partner_id, customer_profile_id, kind, status, title, description,
-         opened_by_user_id)
-      VALUES (
-        ${booking.id}::uuid,
-        ${booking.partner_id}::uuid,
-        ${profileId}::uuid,
-        ${input.kind}::dispute_kind,
-        'open'::dispute_status,
-        ${title.body},
-        ${description.body},
-        /*
-          NULL, and that is the schema's stated meaning: "null when the customer raised it through
-          the app rather than a staff member". Who raised it is already answered by
-          customer_profile_id; this column exists to say a STAFF member did, and writing the
-          customer's user id here would make that question unanswerable.
-        */
-        NULL
-      )
-      RETURNING reference
-    `);
+    /*
+      The dispute and its thread commit together — see `openDisputeThread`. A case whose
+      conversation failed to open is the «capability with no feature» state, and the two inserts
+      are cheap enough that atomicity costs nothing.
+    */
+    const created = await this.db.transaction(async (tx) => {
+      const rows = await tx.execute<{ id: string; reference: string }>(sql`
+        INSERT INTO disputes
+          (booking_id, partner_id, customer_profile_id, kind, status, title, description,
+           opened_by_user_id)
+        VALUES (
+          ${booking.id}::uuid,
+          ${booking.partner_id}::uuid,
+          ${profileId}::uuid,
+          ${input.kind}::dispute_kind,
+          'open'::dispute_status,
+          ${title.body},
+          ${description.body},
+          /*
+            NULL, and that is the schema's stated meaning: "null when the customer raised it through
+            the app rather than a staff member". Who raised it is already answered by
+            customer_profile_id; this column exists to say a STAFF member did, and writing the
+            customer's user id here would make that question unanswerable.
+          */
+          NULL
+        )
+        RETURNING id, reference
+      `);
 
-    const reference = created.rows[0]?.reference;
+      const row = rows.rows[0];
 
-    if (!reference) throw badRequest(ERROR.DISPUTE_NOT_FOUND);
+      if (!row) throw badRequest(ERROR.DISPUTE_NOT_FOUND);
+
+      await openDisputeThread(tx as unknown as Database, {
+        disputeId: row.id,
+        customerProfileId: profileId,
+        openedByUserId: claims?.sub ?? null,
+        senderKind: 'customer',
+        title: title.body,
+        description: description.body,
+        redactedCount: title.redactedCount + description.redactedCount,
+      });
+
+      return row;
+    });
+
+    const reference = created.reference;
 
     /*
       The reference and the reason only. A dispute's description is the customer's own account of

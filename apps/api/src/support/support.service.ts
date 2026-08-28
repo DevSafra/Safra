@@ -149,8 +149,20 @@ export class SupportService {
    */
   private scopeOf(asker: Asker): SQL {
     if (asker.kind === 'customer') {
+      /*
+        Their own tickets, AND the thread on a dispute they are named on.
+
+        `dispute_id IS NULL` was in this predicate when nothing could write that column, so it cost
+        nothing and read as «a support ticket is about nothing else». Now a dispute opens with a
+        thread, and leaving the clause here would make it one staff can write into and the customer
+        can never read — a reply notification pointing at a page that does not list it.
+
+        `booking_id`/`partner_id` stay excluded: a booking thread is the three-party record staff
+        keep, and a partner thread is somebody else's business entirely. `customer_profile_id` is
+        still the whole authorization — a dispute thread is theirs only if it names them.
+      */
       return sql`c.customer_profile_id = ${asker.profileId}::uuid
-                 AND c.booking_id IS NULL AND c.dispute_id IS NULL AND c.partner_id IS NULL`;
+                 AND c.booking_id IS NULL AND c.partner_id IS NULL`;
     }
 
     const business = sql`c.partner_id = ${asker.partnerId}::uuid
