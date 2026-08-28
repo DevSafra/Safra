@@ -24,6 +24,10 @@ export async function sidebarCounts(): Promise<SidebarCounts> {
     properties: attention.properties_pending_review,
     partnerApplications: attention.partner_applications_open,
     disputes: attention.disputes_open,
+    /* «New since this reader last opened the section» — see `SEEN_SECTIONS`. */
+    customers: attention.customers_new,
+    payments: attention.payments_new,
+    wallet: attention.wallet_new,
     /*
       `NAV` declares a badge for الموظفون and NOTHING has ever produced the number — not this
       endpoint, not the dashboard. So the badge has never rendered anywhere, which is why nobody

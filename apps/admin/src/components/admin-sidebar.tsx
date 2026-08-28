@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 import { ThemeToggle } from '@safra/ui';
+import { SEEN_BADGE_CAP, seenBadgeLabel } from '@safra/contracts';
+import { Ltr } from '@/components/admin-table';
 
 import { ARABIC_WESTERN_DIGITS } from '@/lib/numerals';
 import { SignOutButton } from '@/components/sign-out-button';
@@ -22,7 +24,15 @@ interface NavItem {
   readonly href?: string;
   /** Which counter, if any, drives the badge. */
   readonly badge?:
-    'bookings' | 'partners' | 'properties' | 'staff' | 'partnerApplications' | 'disputes';
+    | 'bookings'
+    | 'partners'
+    | 'properties'
+    | 'staff'
+    | 'partnerApplications'
+    | 'disputes'
+    | 'customers'
+    | 'payments'
+    | 'wallet';
   /**
    * Renders the badge red instead of blue (`badgeWarn` in the design handoff §8).
    *
@@ -39,6 +49,18 @@ interface NavItem {
  * The order is the design's, not alphabetical and not built-first: staff learn a spatial
  * habit for where things sit, and reordering as sections ship would break it every time.
  */
+/**
+ * The badges whose count has no natural bound, and which therefore cap.
+ *
+ * Everything else counts a queue that empties — bookings awaiting confirmation, partners pending
+ * verification — where the exact figure is both cheap and the point.
+ */
+const UNBOUNDED_BADGES: ReadonlySet<string> = new Set([
+  'customers',
+  'payments',
+  'wallet',
+]);
+
 const NAV: readonly NavItem[] = [
   { key: 'dashboard', href: '/' },
   { key: 'bookings', href: '/bookings', badge: 'bookings' },
@@ -57,7 +79,14 @@ const NAV: readonly NavItem[] = [
     warn: true,
   },
   { key: 'properties', href: '/properties', badge: 'properties', warn: true },
-  { key: 'customers', href: '/customers' },
+  /*
+    ── «new since I last looked» (Bashar, 2026-08-27) ──────────────────────────
+
+    Not `warn`. That flag is for a queue where somebody is WAITING on SAFRA — an unverified partner
+    cannot trade, an open dispute holds money. A customer who signed up is not waiting on anybody:
+    this badge says «there are rows here you have not seen», and blue is what that reads as.
+  */
+  { key: 'customers', href: '/customers', badge: 'customers' },
   { key: 'staff', href: '/staff', badge: 'staff' },
   /*
     أدوار الموظفين, directly after الموظفون.
@@ -67,8 +96,8 @@ const NAV: readonly NavItem[] = [
     because each side defines the roles of its own employees (Bashar, 2026-08-23).
   */
   { key: 'staffRoles', href: '/staff-roles' },
-  { key: 'payments', href: '/payments' },
-  { key: 'wallet', href: '/wallet' },
+  { key: 'payments', href: '/payments', badge: 'payments' },
+  { key: 'wallet', href: '/wallet', badge: 'wallet' },
   { key: 'giftCards', href: '/giftcards' },
   { key: 'coupons', href: '/coupons' },
   /*
@@ -135,6 +164,9 @@ export interface SidebarCounts {
   readonly staff: number | undefined;
   readonly partnerApplications: number | undefined;
   readonly disputes: number | undefined;
+  readonly customers: number | undefined;
+  readonly payments: number | undefined;
+  readonly wallet: number | undefined;
 }
 
 /**
@@ -152,6 +184,9 @@ export const NO_COUNTS: SidebarCounts = {
   staff: undefined,
   partnerApplications: undefined,
   disputes: undefined,
+  customers: undefined,
+  payments: undefined,
+  wallet: undefined,
 };
 
 export function AdminSidebar({
@@ -240,7 +275,27 @@ export function AdminSidebar({
                       : 'bg-[rgba(var(--skyA),0.15)] text-sky'
                   }`}
                 >
-                  {badge.toLocaleString(ARABIC_WESTERN_DIGITS)}
+                  {/*
+                    ── only the UNBOUNDED badges are capped ────────────────────
+
+                    «New since I last looked» has no natural bound, so its query stops reading at
+                    the cap and the badge must not print a figure that stopped counting — the same
+                    rule the tables follow for «أكثر من ١٠٠٠٠ نتيجة».
+
+                    The other badges are bounded QUEUES and their counts are exact. Capping them
+                    too was the first version of this, and it turned «١٠٢٦ حجزاً بانتظار تأكيد
+                    الشريك» into «+99» — an operational number replaced by a shrug. Caught by
+                    looking at the screen.
+
+                    `Ltr` because «99+» is a Latin run on an Arabic line: without it the bidi
+                    algorithm moves the plus to the wrong end and it reads «+99». The plain counts
+                    need no isolation — a bare number has no directional character in it.
+                  */}
+                  {UNBOUNDED_BADGES.has(item.badge ?? '') && badge > SEEN_BADGE_CAP ? (
+                    <Ltr>{seenBadgeLabel(badge)}</Ltr>
+                  ) : (
+                    badge.toLocaleString(ARABIC_WESTERN_DIGITS)
+                  )}
                 </span>
               ) : null}
             </>

@@ -14,7 +14,8 @@ import {
 } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { t, label, walletNote } from '@/lib/strings';
-import { listParamsFor } from '@/lib/table-size';
+import { isUnread, listParamsFor } from '@/lib/table-size';
+import { MarkSectionSeen } from '@/components/mark-section-seen';
 import { refuseSection } from '@/components/section-refusal';
 
 /**
@@ -46,15 +47,34 @@ export default async function WalletPage({
 
   if (refused) return refused;
 
-  const { q, page, size } = await listParamsFor('wallet', searchParams);
+  const { q, page, size, seen } = await listParamsFor('wallet', searchParams);
 
   const [result, counts] = await Promise.all([
     getWalletTransactions({ q, page, limit: size }),
     sidebarCounts(),
   ]);
 
+  /*
+    The OLDEST row this page is about to render — the frontier the reader will have reached.
+
+    These registries are ordered newest first, so the last item is the deepest one shown, and
+    reporting it is what lets the badge fall by exactly the new rows on this page rather than
+    by the whole batch. `undefined` when the list could not be read or came back empty: the
+    visit is still reported, without a frontier, because that is what starts the clock for a
+    reader who has never opened this section.
+  */
+  const oldestShown = typeof result === 'object' ? result.items.at(-1)?.at : undefined;
+  /* And the NEWEST — the top of what was shown, which is where the next batch begins. */
+  const newestShown = typeof result === 'object' ? result.items.at(0)?.at : undefined;
+
   return (
     <ConsoleShell title={t.nav.wallet} counts={counts}>
+      {/*
+        Marks this section read AFTER the render above has already used the old mark, so the
+        badge and the tinted rows are shown on the visit that clears them. A client effect
+        rather than part of rendering: Next.js prefetches links, and a prefetch is not a visit.
+      */}
+      <MarkSectionSeen section="wallet" readTo={oldestShown} readFrom={newestShown} />
       <ConsolePanel>
         <TableToolbar
           action="/wallet"
@@ -72,6 +92,7 @@ export default async function WalletPage({
             <AdminTable
               columns={COLUMNS}
               rows={result.items}
+              isNew={(row) => isUnread(seen)(row.at)}
               template={TEMPLATE}
               rowKey={(row) => `${row.at}-${row.customerReference ?? ''}-${row.amount}`}
               minWidth={820}

@@ -17,7 +17,8 @@ import {
 import { OutlineAction, TableToolbar, ToolbarNote } from '@/components/table-toolbar';
 import { bookingStatus, fill, t } from '@/lib/strings';
 import { oneOf, pageNumber, returnQuery } from '@/lib/search-params';
-import { resolvePageSize } from '@/lib/table-size';
+import { isUnread, readerView } from '@/lib/table-size';
+import { MarkSectionSeen } from '@/components/mark-section-seen';
 import { statusTone } from '@/lib/status-tone';
 import { refuseSection } from '@/components/section-refusal';
 
@@ -120,8 +121,15 @@ export default async function BookingsPage({
   */
   const attention = oneOf(params['attention'], BOOKING_ATTENTION);
   const page = pageNumber(first('page'));
-  // The URL wins, then this reader's saved size for bookings, then ten — see `resolvePageSize`.
-  const size = await resolvePageSize('bookings', first('size'));
+  /*
+    The URL wins, then this reader's saved size for bookings, then ten — see `readerView`, which
+    returns the «last opened» mark from the same read rather than costing a second one.
+
+    الحجوزات keeps its SLA badge and takes the tint only (Bashar, 2026-08-27): «بانتظار تأكيد
+    الشريك» is work with a deadline, and a sidebar number that counted something else instead
+    would trade an operational signal for a convenience.
+  */
+  const { size, seen } = await readerView('bookings', first('size'));
 
   // Carried into every row link, so «رجوع» on the detail screen comes back here.
   const back = returnQuery({ page, size, q, status });
@@ -131,8 +139,25 @@ export default async function BookingsPage({
     sidebarCounts(),
   ]);
 
+  /*
+    The OLDEST row this page is about to render — the frontier the reader will have reached.
+
+    These registries are ordered newest first, so the last item is the deepest one shown, and
+    reporting it is what lets the badge fall by exactly the new rows on this page rather than
+    by the whole batch. `undefined` when the list could not be read or came back empty: the
+    visit is still reported, without a frontier, because that is what starts the clock for a
+    reader who has never opened this section.
+  */
+  const oldestShown =
+    typeof result === 'object' ? result.items.at(-1)?.createdAt : undefined;
+  /* And the NEWEST — the top of what was shown, which is where the next batch begins. */
+  const newestShown =
+    typeof result === 'object' ? result.items.at(0)?.createdAt : undefined;
+
   return (
     <ConsoleShell title={t.nav.bookings} counts={counts}>
+      {/* See the note on `MarkSectionSeen`: after the render, because a prefetch is not a visit. */}
+      <MarkSectionSeen section="bookings" readTo={oldestShown} readFrom={newestShown} />
       <ConsolePanel>
         <TableToolbar
           action="/bookings"
@@ -241,6 +266,7 @@ export default async function BookingsPage({
             <AdminTable
               columns={columns(back)}
               rows={result.items}
+              isNew={(row) => isUnread(seen)(row.createdAt)}
               template={TEMPLATE}
               rowKey={(row) => row.reference}
               minWidth={MIN_WIDTH}

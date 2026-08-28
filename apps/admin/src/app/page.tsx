@@ -8,7 +8,7 @@ import {
   type PendingPartnerPage,
 } from '@/lib/api';
 import { amount, count } from '@/lib/format';
-import { AdminSidebar, NO_COUNTS } from '@/components/admin-sidebar';
+import { AdminSidebar } from '@/components/admin-sidebar';
 import { RevenueChart } from '@/components/revenue-chart';
 import { ConsoleHeader } from '@/components/console-header';
 import { t, auditAction, bookingStatus } from '@/lib/strings';
@@ -95,8 +95,6 @@ export default async function DashboardPage() {
     getPendingPartners({ page: 1, limit: DASHBOARD_QUEUE_ROWS }),
   ]);
 
-  const loaded = overview !== 'failed' && overview !== 'unauthenticated';
-
   return (
     <div className="console-layout mx-auto max-w-[1380px] px-6 pt-6 pb-16">
       <main className="console-main min-w-0">
@@ -135,33 +133,25 @@ export default async function DashboardPage() {
       <AdminSidebar
         sections={await readerSections()}
         /*
-          Every badge the sidebar can show, from this one payload.
+          ── ONE producer for the badges (2026-08-27) ──────────────────────────
 
-          The dashboard renders `AdminSidebar` directly — `ConsoleShell` exists for the other
-          eighteen sections and fetches `/admin/attention` for them — so anything missing here is
-          missing on this screen alone. طلبات الشراكة was, which is why its number vanished the
-          moment somebody opened لوحة الإدارة (Bashar, 2026-08-20). `SidebarCounts` marks its keys
-          required so the next badge added cannot be forgotten the same way.
+          This screen used to build its own counts object from the dashboard payload while the
+          other eighteen went through `ConsoleShell` and `/admin/attention`. Two builders for one
+          list of badges, and the dashboard's was missing `partnerApplications` — so طلبات الشراكة
+          showed its number everywhere except the page a super admin opens first (Bashar,
+          2026-08-20). `SidebarCounts` was then made all-required so the omission could not be
+          silent again, and it worked: every badge added since has failed to compile until BOTH
+          producers were updated.
+
+          Which is the point at which two builders stopped being worth keeping. Three more badges
+          arrived today, and each would have meant a second query on this screen for a number
+          `/admin/attention` already computes. The dashboard now reads the same source as every
+          other section, so the class of bug is gone rather than guarded against.
+
+          `sidebar.spec.ts` still asserts the two screens agree. It now asserts something that
+          cannot differ, which is the right end state for a test that caught a real defect.
         */
-        counts={
-          loaded
-            ? {
-                bookings: overview.counters.pending_confirmation,
-                partners: overview.counters.partners_pending_verification,
-                properties: overview.counters.properties_pending_review,
-                partnerApplications: overview.counters.partner_applications_open,
-                /*
-                  The UNTAKEN ones — what the badge means since «استلام» arrived. Not
-                  `openDisputes`, which is the KPI tile beside it and counts everything unresolved:
-                  a tile reports money held, a badge reports work nobody has claimed, and one number
-                  cannot be both without a button that changes neither.
-                */
-                disputes: overview.unacknowledgedDisputes,
-                /* Never produced by anything — see the note in `lib/console.ts`. */
-                staff: undefined,
-              }
-            : NO_COUNTS
-        }
+        counts={await sidebarCounts()}
       />
       <SidebarBackdrop label={t.nav.hideSidebar} className="console-backdrop" />
     </div>

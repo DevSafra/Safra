@@ -81,6 +81,9 @@ const attentionSchema = z.object({
   partner_applications_open: z.number(),
   partner_documents_pending_review: z.number(),
   disputes_open: z.number(),
+  customers_new: z.number(),
+  payments_new: z.number(),
+  wallet_new: z.number(),
   bookings_awaiting_confirmation: z.number(),
   bookings_sla_expiring_within_30m: z.number(),
 });
@@ -1096,6 +1099,8 @@ const bookingListItemSchema = z.object({
   amount: z.string(),
   currency: z.string(),
   status: z.string(),
+  /* What «new since I last looked» is measured against — see `SEEN_SECTIONS`. */
+  createdAt: z.string(),
 });
 
 const bookingListSchema = offsetPage(bookingListItemSchema).extend({
@@ -1184,6 +1189,11 @@ const customerListItemSchema = z.object({
   walletBalance: z.string().nullable(),
   walletCurrency: z.string().nullable(),
   lastActivity: z.string(),
+  /*
+    The profile's own age. `lastActivity` is a different fact — a customer who booked this morning
+    has recent activity and is not new — so the tint cannot be derived from it.
+  */
+  createdAt: z.string(),
 });
 
 export type CustomerListItem = z.infer<typeof customerListItemSchema>;
@@ -1848,6 +1858,18 @@ export async function getContracts(partner?: string) {
 
 const preferencesSchema = z.object({
   tablePageSizes: z.record(z.string(), z.number()),
+  /*
+    Section → the batch boundary and how far down it this reader has read. An absent key means
+    «never looked», which deliberately makes nothing new — see `SEEN_SECTIONS`.
+  */
+  sectionSeenAt: z.record(
+    z.string(),
+    z.object({
+      since: z.string(),
+      readTo: z.string().nullable(),
+      readFrom: z.string().nullable(),
+    }),
+  ),
 });
 
 /**

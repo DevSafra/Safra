@@ -60,6 +60,7 @@ export function AdminTable<T>({
   rows,
   template,
   rowKey,
+  isNew,
   minWidth = 640,
   empty,
 }: {
@@ -68,6 +69,17 @@ export function AdminTable<T>({
   /** The design's `grid-template-columns` value, verbatim. */
   readonly template: string;
   readonly rowKey: (row: T) => string;
+  /**
+   * Whether this row arrived since the reader last opened the section (Bashar, 2026-08-27).
+   *
+   * A predicate rather than a class name: what «new» MEANS is the page's business — it compares a
+   * row's own timestamp with this reader's mark — and what new LOOKS LIKE is one decision for the
+   * whole console, made here. Two tables tinting new rows differently would be two answers to a
+   * question with one.
+   *
+   * Absent on a table with no mark, which is most of them.
+   */
+  readonly isNew?: (row: T) => boolean;
   /**
    * Below this the table scrolls inside its own box rather than squashing.
    *
@@ -145,7 +157,16 @@ export function AdminTable<T>({
             <tr
               key={rowKey(row)}
               id={rowAnchor(rowKey(row))}
-              className="scroll-mt-24 target:bg-[rgba(var(--goldA),0.14)]"
+              /*
+                `data-new` marks it for the browser sweep, and the tint is a SKY wash rather than
+                the gold one `:target` uses — gold already means «the row you came back to», and a
+                page where half the rows are gold would say nothing. The `:target` rule stays after
+                it in the class list so returning to a row still wins over merely being new.
+              */
+              {...(isNew?.(row) ? { 'data-new': '' } : {})}
+              className={`scroll-mt-24 target:bg-[rgba(var(--goldA),0.14)] ${
+                isNew?.(row) ? 'bg-[rgba(var(--skyA),0.09)]' : ''
+              }`}
             >
               {columns.map((column) => (
                 <td

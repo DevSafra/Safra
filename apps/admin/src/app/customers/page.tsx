@@ -16,7 +16,8 @@ import {
 import { TableToolbar } from '@/components/table-toolbar';
 import { returnQuery } from '@/lib/search-params';
 import { t } from '@/lib/strings';
-import { listParamsFor } from '@/lib/table-size';
+import { isUnread, listParamsFor } from '@/lib/table-size';
+import { MarkSectionSeen } from '@/components/mark-section-seen';
 import { refuseSection } from '@/components/section-refusal';
 
 /**
@@ -53,7 +54,7 @@ export default async function CustomersPage({
 
   if (refused) return refused;
 
-  const { q, page, size } = await listParamsFor('customers', searchParams);
+  const { q, page, size, seen } = await listParamsFor('customers', searchParams);
 
   /* Carried into every row link, so «رجوع» on the record comes back to this page of this search. */
   const back = returnQuery({ page, size, q });
@@ -63,8 +64,29 @@ export default async function CustomersPage({
     sidebarCounts(),
   ]);
 
+  /*
+    The OLDEST row this page is about to render — the frontier the reader will have reached.
+
+    These registries are ordered newest first, so the last item is the deepest one shown, and
+    reporting it is what lets the badge fall by exactly the new rows on this page rather than
+    by the whole batch. `undefined` when the list could not be read or came back empty: the
+    visit is still reported, without a frontier, because that is what starts the clock for a
+    reader who has never opened this section.
+  */
+  const oldestShown =
+    typeof result === 'object' ? result.items.at(-1)?.createdAt : undefined;
+  /* And the NEWEST — the top of what was shown, which is where the next batch begins. */
+  const newestShown =
+    typeof result === 'object' ? result.items.at(0)?.createdAt : undefined;
+
   return (
     <ConsoleShell title={t.nav.customers} counts={counts}>
+      {/*
+        Marks this section read AFTER the render above has already used the old mark, so the
+        badge and the tinted rows are shown on the visit that clears them. A client effect
+        rather than part of rendering: Next.js prefetches links, and a prefetch is not a visit.
+      */}
+      <MarkSectionSeen section="customers" readTo={oldestShown} readFrom={newestShown} />
       <ConsolePanel>
         <TableToolbar
           action="/customers"
@@ -82,6 +104,7 @@ export default async function CustomersPage({
             <AdminTable
               columns={columns(back)}
               rows={result.items}
+              isNew={(row) => isUnread(seen)(row.createdAt)}
               template={TEMPLATE}
               rowKey={(row) => row.reference}
               minWidth={700}
