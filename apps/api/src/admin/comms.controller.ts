@@ -277,7 +277,25 @@ export class CommsController {
     @Param('reference') reference: string,
   ) {
     /* Scoped by the booking's city, or the partner's where there is no booking. */
-    return { messages: await this.messaging.thread(reference, user) };
+    return this.messaging.thread(reference, user);
+  }
+
+  /**
+   * Ends a thread from the console — «إنهاء المحادثة».
+   *
+   * Same permission as replying: closing is an act on the thread, and an agent who may not post
+   * into one has no business ending it. `MESSAGE_SEND` is that permission, and `assertCanWrite`
+   * inside the service refuses a `read_only` member who may read the queue.
+   */
+  @Post('conversations/:reference/close')
+  @RequirePermissions(P.MESSAGE_SEND)
+  @AuditExempt('MessagingService records conversation.closed inside the transaction.')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async closeConversation(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.messaging.close(user, reference);
   }
 
   @Post('conversations/:reference/reply')
@@ -288,7 +306,7 @@ export class CommsController {
     @Param('reference') reference: string,
     @Body(new ZodValidationPipe(staffReplySchema)) body: StaffReplyInput,
   ) {
-    return { messages: await this.messaging.reply(user, reference, body) };
+    return this.messaging.reply(user, reference, body);
   }
 
   // ── واتساب والبريد ─────────────────────────────────────────────────────────

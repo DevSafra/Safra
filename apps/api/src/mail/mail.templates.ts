@@ -1009,6 +1009,30 @@ export function partnerSuspendedMail(input: {
  * Compensation is described rather than stated as a figure: the amount is already in the wallet and
  * on the wallet screen, and a number repeated in a mail is a number that can disagree with it.
  */
+/**
+ * «Your support ticket has been closed.»
+ *
+ * Sent when SAFRA ends the thread, never when the asker does — somebody who closed their own ticket
+ * does not need telling. It carries no answer of its own: the answer, if there was one, arrived as
+ * `support.replied`, and repeating it here would be a second version of one exchange.
+ *
+ * It says how to come back, because a closed thread with no route onward reads as a door shutting.
+ */
+export function supportClosedMail(input: {
+  to: string;
+  locale: string;
+  reference: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.supportClosed, input.locale, {
+      reference: input.reference,
+      url: input.url,
+    }),
+  };
+}
+
 export function disputeResolvedMail(input: {
   to: string;
   locale: string;

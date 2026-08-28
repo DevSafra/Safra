@@ -77,6 +77,10 @@ export const ar = {
     told NOBODY. The customer who raised it and the partner whose money was held both found out by
     looking. Three messages, because three different people need three different facts.
   */
+  supportClosed: {
+    subject: 'أُغلقت محادثة الدعم {reference}',
+    body: 'أُغلقت محادثة الدعم رقم {reference} من فريق سفرة.\n\nالمحادثة محفوظة كاملة ويمكنك قراءتها في أي وقت:\n{url}\n\nإن كان الأمر ما زال قائماً أو ظهر شيء جديد، افتح محادثة جديدة من حسابك وسنتابعها من هناك — لا نحذف المحادثات السابقة، بل نضيف إليها.\n\nفريق سفرة',
+  },
   disputeResolved: {
     subject: 'قرار في نزاعك على الحجز {booking}',
     body: 'راجعنا شكواك على الحجز {booking} وقررناها لصالحك.\n\nرقم النزاع: {reference}\nتاريخ القرار: {date}\n\nالقرار:\n{resolution}\n\nإن كان القرار يتضمن تعويضاً فقد أُضيف إلى محفظتك في سفرة ويمكنك استخدامه في أي حجز قادم.\n\nيمكنك مراجعة الحجز والنزاع كاملين من حسابك:\n{url}\n\nنأسف لما حدث، وشكراً لأنك أبلغتنا.\n\nفريق سفرة',

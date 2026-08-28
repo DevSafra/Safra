@@ -180,6 +180,19 @@ const SOURCES: Record<string, Source> = {
     label: sql`reference`,
     href: (row) => `/disputes/${row.reference}`,
   },
+  /*
+    A thread is named by its own reference and nothing else.
+
+    Not by the customer or the partner in it: this screen is read by more people than the record is,
+    and `audit-anonymity` holds that line for every other subject here. `CNV-000042` is what the
+    inbox shows and what the console route takes, so the entry names the thing a reader can open.
+  */
+  conversation: {
+    table: 'conversations',
+    reference: sql`reference`,
+    label: sql`reference`,
+    href: (row) => `/messages/${row.reference}`,
+  },
   review: {
     table: 'reviews',
     reference: sql`reference`,

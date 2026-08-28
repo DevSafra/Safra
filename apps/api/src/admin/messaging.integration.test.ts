@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
 
+import { AuditService } from '../common/audit/audit.service.js';
 import { MessagingService } from './messaging.service.js';
 import { SupportService } from '../support/support.service.js';
 import { NotificationService } from '../notifications/notification.service.js';
@@ -74,7 +75,7 @@ describeIfDb('MessagingService — telling the asker a reply arrived', () => {
 
   mailQueue.autoRun = (job) =>
     notifications.deliver(job.notificationId, job.templateKey, job.mail);
-  const messaging = new MessagingService(db, notifications, {
+  const messaging = new MessagingService(db, new AuditService(db), notifications, {
     APP_URL: 'http://localhost:3000',
     PARTNER_URL: 'http://localhost:3002',
   } as unknown as Env);
@@ -252,7 +253,7 @@ describeIfDb('MessagingService — telling the asker a reply arrived', () => {
       internal: true,
     });
 
-    expect(thread.filter((message) => message.internal)).toHaveLength(1);
+    expect(thread.messages.filter((message) => message.internal)).toHaveLength(1);
     /* The customer's own view of the same thread is unchanged. */
     const asked = await support.thread(customer(), ticket.reference);
 
@@ -337,7 +338,7 @@ describeIfDb('MessagingService — telling the asker a reply arrived', () => {
       internal: false,
     });
 
-    expect(thread).toHaveLength(2);
+    expect(thread.messages).toHaveLength(2);
     expect(await countOf('support.replied')).toBe(0);
   });
 
@@ -380,7 +381,7 @@ describeIfDb('MessagingService — telling the asker a reply arrived', () => {
       internal: false,
     });
 
-    expect(thread).toHaveLength(2);
+    expect(thread.messages).toHaveLength(2);
 
     const row = await logFor('support.replied');
 

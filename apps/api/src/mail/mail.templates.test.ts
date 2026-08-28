@@ -377,6 +377,13 @@ const RENDERERS: {
     shows: 'CNV-000042',
   },
   {
+    name: 'supportClosedMail',
+    entry: 'supportClosed',
+    render: (locale) =>
+      templates.supportClosedMail({ ...SAMPLE, locale, reference: 'CNV-000042' }),
+    shows: 'CNV-000042',
+  },
+  {
     name: 'bookingNeedsActionMail',
     entry: 'bookingNeedsAction',
     render: (locale) =>

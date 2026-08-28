@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -8,9 +8,10 @@ import { resolveLocale } from '@safra/i18n';
 
 import { DATABASE } from '../database/database.module.js';
 import { ENV, type Env } from '../config/env.js';
-import { supportRepliedMail } from '../mail/mail.templates.js';
+import { supportClosedMail, supportRepliedMail } from '../mail/mail.templates.js';
 import { NotificationService } from '../notifications/notification.service.js';
 import { redactIncomingMessage } from '../messaging/redaction.js';
+import { AuditService } from '../common/audit/audit.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { notFound } from '../common/errors/app-error.js';
@@ -80,8 +81,11 @@ export interface MessageRow {
  */
 @Injectable()
 export class MessagingService {
+  private readonly logger = new Logger(MessagingService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
+    private readonly audit: AuditService,
     /* `notifier`, not `notifications` — this class already has a `notifications()` READ, the log. */
     private readonly notifier: NotificationService,
     @Inject(ENV) private readonly env: Env,
@@ -113,11 +117,7 @@ export class MessagingService {
     q?: string | undefined;
     actor?: AccessTokenClaims | undefined;
   }): Promise<OffsetPage<ConversationRow>> {
-    /*
-      A conversation has no city; it inherits one from whatever it is about. `coalesce` over the
-      booking and the partner covers all three subject kinds — a dispute-scoped thread reaches a
-      booking through the dispute, and a partner thread uses the partner's own city.
-    */
+    /* Where a conversation's city comes from: see `subjectJoins`. */
     const conditions: SQL[] = [
       sql`c.deleted_at IS NULL`,
       /*
@@ -157,9 +157,7 @@ export class MessagingService {
     // One fragment, used by both queries below — see `countOf`.
     const fromWhere = sql`
       FROM conversations c
-      LEFT JOIN bookings b          ON b.id = c.booking_id
-      LEFT JOIN disputes d          ON d.id = c.dispute_id
-      LEFT JOIN partners p          ON p.id = coalesce(c.partner_id, b.partner_id, d.partner_id)
+      ${this.subjectJoins}
       LEFT JOIN customer_profiles cust ON cust.id = c.customer_profile_id
       LEFT JOIN (
         SELECT conversation_id, count(*) AS n FROM messages GROUP BY conversation_id
@@ -227,10 +225,70 @@ export class MessagingService {
    * The same expression as the list, deliberately: two ways of deciding which city a conversation
    * is in would be two answers.
    */
+  /**
+   * The thread behind a reference, if this actor's cities include it.
+   *
+   * Deliberately WITHOUT `closed_at IS NULL`: both callers need to tell a finished thread from an
+   * absent one — the screen to stop offering a reply box, and `close` because a second click is an
+   * ordinary thing to do rather than a thread that has vanished. `reply` keeps its own predicate,
+   * where closed genuinely does mean «not available».
+   */
+  /**
+   * The joins that give a conversation its CITY, and nothing else.
+   *
+   * A conversation has no city of its own; it inherits one from whatever it is about. A booking
+   * thread takes the booking's, a partner thread the partner's, and a DISPUTE thread reaches the
+   * partner through the dispute — `coalesce(c.partner_id, b.partner_id, d.partner_id)`.
+   *
+   * Written once because it was written twice. The inbox reached the partner through the dispute
+   * and the four single-thread queries did not, so a dispute thread scoped to Aleppo was absent
+   * from a Damascus operator's list and readable — and repliable — by that same operator the
+   * moment they had its reference. A NULL city reads as «platform-level, everybody may», which is
+   * right for an unrouted support ticket and wrong for a case about a specific property.
+   */
+  private get subjectJoins(): SQL {
+    return sql`
+      LEFT JOIN bookings b ON b.id = c.booking_id
+      LEFT JOIN disputes d ON d.id = c.dispute_id
+      LEFT JOIN partners p ON p.id = coalesce(c.partner_id, b.partner_id, d.partner_id)
+    `;
+  }
+
+  private async scopedConversation(
+    reference: string,
+    actor: AccessTokenClaims | undefined,
+  ): Promise<
+    { id: string; city_id: string | null; closed_at: string | null } | undefined
+  > {
+    const found = await this.db.execute<{
+      id: string;
+      city_id: string | null;
+      closed_at: string | null;
+    }>(sql`
+      SELECT c.id, coalesce(b.city_id, p.city_id)::text AS city_id, c.closed_at::text
+      FROM conversations c
+      ${this.subjectJoins}
+      WHERE c.reference = ${reference} AND c.deleted_at IS NULL
+        AND ${scopeFilter(actor, 'coalesce(b.city_id, p.city_id)')}
+      LIMIT 1
+    `);
+
+    return found.rows[0];
+  }
+
   async thread(
     reference: string,
     actor: AccessTokenClaims | undefined,
-  ): Promise<MessageRow[]> {
+  ): Promise<{ closed: boolean; messages: MessageRow[] }> {
+    /*
+      The thread's own state travels with its messages.
+
+      Without it the screen cannot tell a finished conversation from a live one, and it went on
+      offering a reply box over a thread whose reply endpoint refuses everything — the control that
+      «does nothing» this codebase keeps finding. One extra indexed lookup on a reference.
+    */
+    const conversation = await this.scopedConversation(reference, actor);
+
     const result = await this.db.execute<{
       sender_kind: string;
       sender_email: string | null;
@@ -245,8 +303,7 @@ export class MessagingService {
              to_char(m.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS at
       FROM messages m
       JOIN conversations c ON c.id = m.conversation_id
-      LEFT JOIN bookings b ON b.id = c.booking_id
-      LEFT JOIN partners p ON p.id = c.partner_id
+      ${this.subjectJoins}
       LEFT JOIN users u    ON u.id = m.sender_user_id
       WHERE c.reference = ${reference} AND c.deleted_at IS NULL
         AND ${scopeFilter(actor, 'coalesce(b.city_id, p.city_id)')}
@@ -254,14 +311,17 @@ export class MessagingService {
       LIMIT 200
     `);
 
-    return result.rows.map((row) => ({
-      senderKind: row.sender_kind,
-      senderEmail: row.sender_email,
-      body: row.body,
-      redactedCount: row.redacted_count,
-      internal: row.internal,
-      at: row.at,
-    }));
+    return {
+      closed: conversation?.closed_at != null,
+      messages: result.rows.map((row) => ({
+        senderKind: row.sender_kind,
+        senderEmail: row.sender_email,
+        body: row.body,
+        redactedCount: row.redacted_count,
+        internal: row.internal,
+        at: row.at,
+      })),
+    };
   }
 
   /**
@@ -271,11 +331,75 @@ export class MessagingService {
    * that landed without clearing the badge would leave the thread looking unanswered, and the
    * next agent would answer it twice.
    */
+  /**
+   * Ends a thread from the console — «إنهاء المحادثة».
+   *
+   * ## The gap this closes
+   *
+   * `closed_at` had exactly one writer: `SupportService.close`, which is asker-only. So an agent who
+   * had fully answered somebody could not end the conversation — it stayed open until the customer
+   * or partner closed it themselves, which most people never do. الرسائل accumulated threads that
+   * were finished and still looked like work, and the unread badge beside it counts what looks like
+   * work. Reported in the الرسائل review of 2026-08-28.
+   *
+   * ## Closing is not deleting, and it does not silence the thread
+   *
+   * The messages stay readable, exactly as they do when the asker closes it. §10 makes a thread the
+   * record of who said what and when, and the answer to «this is finished» is a closed thread rather
+   * than a hidden one. Somebody who needs help again opens a new ticket, which is one action and
+   * leaves the first thread intact — `SupportService.close`'s own reasoning, unchanged.
+   *
+   * ## And the person waiting is told
+   *
+   * A thread ended by somebody else, silently, leaves the asker waiting for an answer that is not
+   * coming. The same reasoning that put a notification on a closed dispute the day before: they
+   * found out by looking, or not at all.
+   */
+  async close(
+    actor: AccessTokenClaims | undefined,
+    reference: string,
+  ): Promise<{ closed: boolean }> {
+    /* Scoped both ways, exactly as `reply` is — see `scopedConversation` on the missing predicate. */
+    const conversation = await this.scopedConversation(reference, actor);
+
+    if (!conversation) throw notFound(ERROR.CONVERSATION_NOT_FOUND_OR_CLOSED);
+
+    assertCanWrite(actor, conversation.city_id);
+
+    /* Already ended: nothing changes, and no audit row for an event that did not happen. */
+    if (conversation.closed_at !== null) return { closed: false };
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE conversations
+        SET closed_at = now(), unread_for_staff = 0, updated_at = now()
+        WHERE id = ${conversation.id}::uuid AND closed_at IS NULL
+      `);
+
+      await this.audit.record(
+        {
+          actorUserId: actor?.sub,
+          actorRole: actor?.role,
+          action: 'conversation.closed',
+          subjectType: 'conversation',
+          subjectId: conversation.id,
+          after: { reference },
+        },
+        tx as unknown as Database,
+      );
+    });
+
+    /* After the commit, and it cannot fail the closure — see `notifyAskerOfClose`. */
+    await this.notifyAskerOfClose(conversation.id, reference);
+
+    return { closed: true };
+  }
+
   async reply(
     actor: AccessTokenClaims | undefined,
     reference: string,
     input: StaffReplyInput,
-  ): Promise<MessageRow[]> {
+  ): Promise<{ closed: boolean; messages: MessageRow[] }> {
     /*
       Scoped both ways — see `thread`. The predicate so an out-of-scope thread answers exactly as a
       closed or absent one, and `assertCanWrite` so a `read_only` agent who may read the thread
@@ -284,8 +408,7 @@ export class MessagingService {
     const found = await this.db.execute<{ id: string; city_id: string | null }>(sql`
       SELECT c.id, coalesce(b.city_id, p.city_id)::text AS city_id
       FROM conversations c
-      LEFT JOIN bookings b ON b.id = c.booking_id
-      LEFT JOIN partners p ON p.id = c.partner_id
+      ${this.subjectJoins}
       WHERE c.reference = ${reference} AND c.deleted_at IS NULL AND c.closed_at IS NULL
         AND ${scopeFilter(actor, 'coalesce(b.city_id, p.city_id)')}
       LIMIT 1
@@ -359,12 +482,76 @@ export class MessagingService {
    */
   private async notifyAskerOfReply(conversationId: string): Promise<void> {
     /*
-      One query, one row, or nothing.
-
-      `coalesce(cu.status, pu.status) = 'active'` is the guard: a suspended or closed account is not
-      written to, and a customer profile with no user at all — a guest, which cannot open a ticket —
-      falls to NULL and is skipped rather than emailed. Safe by omission in both directions.
+      The same lookup the close notice uses, and that is the point: it was written out twice, and
+      the note under `askerOfThread` already claimed «one definition of the person waiting rather
+      than two that drift». They would have drifted here: widening one predicate for a dispute
+      thread and leaving the other means a closure tells the customer and a reply does not.
     */
+    const asker = await this.askerOfThread(conversationId);
+
+    if (!asker) return;
+
+    const { email, locale, url, reference } = asker;
+
+    await this.notifier.notify(
+      'support.replied',
+      supportRepliedMail({
+        to: email,
+        locale,
+        reference,
+        url,
+      }),
+      locale,
+      /*
+        The RECIPIENT's id, not the thread's.
+
+        `notify`'s subject has no `conversation_id` and does not gain one here. Those columns exist
+        so the delivery log can answer "was this person told?", which is asked when somebody
+        disputes that they were — and the recipient's id answers it, while a thread id would need a
+        migration, a fourth subject FK on a table whose shape already carries three, and a join in
+        the console query, to record something the inbox already shows against the same person. The
+        ticket itself is not lost: `template_key` is `support.replied` and the thread is one click
+        away from the same customer or partner.
+      */
+      asker.subject,
+    );
+  }
+
+  /**
+   * The person waiting on a thread — address, language, and where to send them.
+   *
+   * ## Only a thread the recipient can actually open
+   *
+   * The `WHERE` refuses any thread with a BOOKING — the same shape `SupportService.scopeOf` defines
+   * as «mine». A booking thread has two parties and no route into it from either dashboard, so a
+   * link to its reference answers 404 to the person who followed it, and writing to one would be
+   * worse than silence.
+   *
+   * A DISPUTE thread is not in that class and is no longer excluded. الدعم lists it on the
+   * customer's side and it opens at the same `/account/support/{reference}` this link points at, so
+   * the notice leads somewhere. The clause excluding it cost nothing while the column had no
+   * writer; keeping it now would mean staff replying into a thread the customer can read and is
+   * never told about.
+   *
+   * ## Active accounts only
+   *
+   * `coalesce(cu.status, pu.status) = 'active'` is the guard: a suspended or closed account is not
+   * written to, and a customer profile with no user at all — a guest, which cannot open a ticket —
+   * falls to NULL and is skipped rather than emailed. Safe by omission in both directions.
+   *
+   * ## The RECIPIENT's language, not the agent's
+   *
+   * The agent is Arabic-only by construction, so taking the locale from the actor would send every
+   * German customer Arabic and nothing would fail. `resolveLocale` decides what an unrecognised
+   * value means, so the link always matches the language the message is written in.
+   */
+  private async askerOfThread(conversationId: string): Promise<{
+    email: string;
+    locale: string;
+    url: string;
+    reference: string;
+    subject: { customerProfileId: string } | { partnerId: string };
+  } | null> {
     const found = await this.db.execute<{
       reference: string;
       customer_profile_id: string | null;
@@ -384,63 +571,83 @@ export class MessagingService {
       LEFT JOIN users pu             ON pu.id = pa.user_id
       WHERE c.id = ${conversationId}::uuid
         AND c.booking_id IS NULL
-        AND c.dispute_id IS NULL
         AND coalesce(cu.status, pu.status) = 'active'
       LIMIT 1
     `);
 
     const row = found.rows[0];
 
-    if (!row?.email) return;
+    if (!row?.email) return null;
 
-    const asker = row.customer_profile_id
-      ? ({ kind: 'customer', customerProfileId: row.customer_profile_id } as const)
-      : row.partner_id
-        ? ({ kind: 'partner', partnerId: row.partner_id } as const)
-        : null;
+    const locale = resolveLocale(row.locale ?? 'ar');
+
+    if (row.customer_profile_id) {
+      return {
+        email: row.email,
+        locale,
+        url: new URL(
+          `/${locale}/account/support/${row.reference}`,
+          this.env.APP_URL,
+        ).toString(),
+        reference: row.reference,
+        subject: { customerProfileId: row.customer_profile_id },
+      };
+    }
+
+    if (row.partner_id) {
+      return {
+        email: row.email,
+        locale,
+        url: new URL(`/support/${row.reference}`, this.env.PARTNER_URL).toString(),
+        reference: row.reference,
+        subject: { partnerId: row.partner_id },
+      };
+    }
+
+    return null;
+  }
+
+  /**
+   * Tells the asker their TICKET has been ended by SAFRA.
+   *
+   * A thread closed by somebody else, silently, leaves the person who opened it waiting for an
+   * answer that is not coming. The same reasoning that put a notice on a closed dispute the day
+   * before: they found out by looking, or not at all.
+   *
+   * Everything about WHO is `askerOfThread`'s — reachable threads only, active accounts only, the
+   * recipient's own language — so there is one definition of «the person waiting», now used by both
+   * notices rather than written out twice.
+   */
+  private async notifyAskerOfClose(
+    conversationId: string,
+    reference: string,
+  ): Promise<void> {
+    const asker = await this.askerOfThread(conversationId);
 
     if (!asker) return;
 
-    /*
-      Resolved rather than passed through. `preferred_locale` is an unconstrained text column, so a
-      value of `fr` would build /fr/account/support/… — a URL the web app answers 404 to, in an
-      email whose body is in Arabic. One helper decides what an unrecognised locale means, and the
-      link then matches the language it is written in.
-    */
-    const locale = resolveLocale(row.locale ?? 'ar');
-
-    const url =
-      asker.kind === 'customer'
-        ? new URL(
-            `/${locale}/account/support/${row.reference}`,
-            this.env.APP_URL,
-          ).toString()
-        : new URL(`/support/${row.reference}`, this.env.PARTNER_URL).toString();
-
-    await this.notifier.notify(
-      'support.replied',
-      supportRepliedMail({
-        to: row.email,
-        locale,
-        reference: row.reference,
-        url,
-      }),
-      locale,
+    try {
+      await this.notifier.notify(
+        'support.closed',
+        supportClosedMail({
+          to: asker.email,
+          locale: asker.locale,
+          reference,
+          url: asker.url,
+        }),
+        asker.locale,
+        asker.subject,
+      );
+    } catch (error) {
       /*
-        The RECIPIENT's id, not the thread's.
-
-        `notify`'s subject has no `conversation_id` and does not gain one here. Those columns exist
-        so the delivery log can answer "was this person told?", which is asked when somebody
-        disputes that they were — and the recipient's id answers it, while a thread id would need a
-        migration, a fourth subject FK on a table whose shape already carries three, and a join in
-        the console query, to record something the inbox already shows against the same person. The
-        ticket itself is not lost: `template_key` is `support.replied` and the thread is one click
-        away from the same customer or partner.
+        Swallowed. The thread IS closed — the transaction committed before this ran — and an agent
+        told their close had failed would reasonably do it again.
       */
-      asker.kind === 'customer'
-        ? { customerProfileId: asker.customerProfileId }
-        : { partnerId: asker.partnerId },
-    );
+      this.logger.error(
+        `Could not tell the asker that thread ${reference} was closed.`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
   }
 
   // ── واتساب والبريد ─────────────────────────────────────────────────────────

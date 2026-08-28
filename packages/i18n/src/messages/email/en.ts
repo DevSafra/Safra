@@ -49,6 +49,10 @@ export const en = {
     subject: 'A fine on your account has been waived',
     body: 'The SAFRA team has reviewed the fine on your account and decided to waive it.\n\nAmount: {amount}\nDate waived: {date}\n\nReason:\n{reason}\n\nYou will not be charged this amount. The original violation remains recorded on your account with the waiver recorded beside it — we do not delete the record, we add to it, so what happened stays clear to you and to us.\n\nYou can review the violation and the waiver here:\n{url}\n\nThe SAFRA team',
   },
+  supportClosed: {
+    subject: 'Your support conversation {reference} has been closed',
+    body: 'Support conversation {reference} has been closed by the SAFRA team.\n\nThe conversation is kept in full and you can read it at any time:\n{url}\n\nIf the matter is still open, or something new has come up, start a new conversation from your account and we will pick it up there — we do not delete earlier conversations, we add to them.\n\nThe SAFRA team',
+  },
   disputeResolved: {
     subject: 'A decision on your dispute for booking {booking}',
     body: 'We reviewed your complaint about booking {booking} and decided it in your favour.\n\nDispute reference: {reference}\nDecided on: {date}\n\nThe decision:\n{resolution}\n\nIf the decision includes compensation, it has been added to your SAFRA wallet and can be used on any future booking.\n\nYou can read the booking and the dispute in full in your account:\n{url}\n\nWe are sorry this happened, and thank you for telling us.\n\nThe SAFRA team',

@@ -49,6 +49,10 @@ export const de = {
     subject: 'Eine Geldstrafe auf Ihrem Konto wurde erlassen',
     body: 'Das SAFRA-Team hat die Geldstrafe auf Ihrem Konto geprüft und entschieden, sie zu erlassen.\n\nBetrag: {amount}\nDatum des Erlasses: {date}\n\nGrund:\n{reason}\n\nDieser Betrag wird Ihnen nicht berechnet. Der ursprüngliche Verstoß bleibt in Ihrem Konto verzeichnet, mit dem Erlass daneben — wir löschen den Eintrag nicht, wir ergänzen ihn, damit nachvollziehbar bleibt, was geschehen ist.\n\nVerstoß und Erlass können Sie hier einsehen:\n{url}\n\nIhr SAFRA-Team',
   },
+  supportClosed: {
+    subject: 'Ihre Support-Konversation {reference} wurde geschlossen',
+    body: 'Die Support-Konversation {reference} wurde vom SAFRA-Team geschlossen.\n\nDie Konversation bleibt vollständig erhalten und ist jederzeit einsehbar:\n{url}\n\nFalls das Anliegen weiterbesteht oder etwas Neues aufgetreten ist, eröffnen Sie über Ihr Konto eine neue Konversation, und wir nehmen sie dort auf — frühere Konversationen löschen wir nicht, wir ergänzen sie.\n\nIhr SAFRA-Team',
+  },
   disputeResolved: {
     subject: 'Entscheidung zu Ihrer Beschwerde zur Buchung {booking}',
     body: 'Wir haben Ihre Beschwerde zur Buchung {booking} geprüft und zu Ihren Gunsten entschieden.\n\nVorgangsnummer: {reference}\nEntschieden am: {date}\n\nDie Entscheidung:\n{resolution}\n\nFalls die Entscheidung eine Entschädigung umfasst, wurde sie Ihrem SAFRA-Guthaben gutgeschrieben und kann für jede künftige Buchung verwendet werden.\n\nBuchung und Vorgang finden Sie vollständig in Ihrem Konto:\n{url}\n\nEs tut uns leid, und danke für Ihre Meldung.\n\nIhr SAFRA-Team',

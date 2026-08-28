@@ -82,6 +82,13 @@ export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
     والبريد lists what was sent by key: one «dispute closed» would make «did the customer hear the
     outcome» unanswerable from the log.
   */
+  /* A support thread ended BY SAFRA — never when the asker closed it themselves. */
+  {
+    key: 'support.closed',
+    channels: ['email'],
+    locales: ALL_LOCALES,
+    implemented: true,
+  },
   {
     key: 'dispute.resolved',
     channels: ['email'],
