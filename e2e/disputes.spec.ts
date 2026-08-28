@@ -168,6 +168,72 @@ test.describe('النزاعات', () => {
   });
 
   /**
+   * A photograph can be filed on a dispute, and it is SERVED — not merely stored.
+   *
+   * ## The gap this closes
+   *
+   * `dispute_evidence` existed from the first migration and nothing could write a row: zero,
+   * platform-wide, on 2026-08-27, while this screen offered to tell an operator how many there
+   * were. «الغرفة لا تطابق الصور المنشورة» is a claim settled by looking at a photograph, and there
+   * was no way to put one in front of anybody.
+   *
+   * ## `naturalWidth` is the assertion, and it is doing more here than usual
+   *
+   * The bytes are PRIVATE: the `disputes/` prefix is deliberately absent from the bucket's
+   * anonymous read policy, so the picture only appears if the whole authorised path works — the
+   * console's own route, the cookie it exchanges for a token, the API's scope check, and the
+   * variant the renderer actually produced. A stored row and a rendered file are not the same
+   * thing, and neither is the same as a picture a person can see.
+   */
+  test('files a photograph on a dispute and shows what the server re-encoded', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    await page.goto('/disputes?size=5');
+    await page.waitForSelector('article');
+
+    const card = page.locator('article').first();
+    const add = card.getByRole('button', { name: t.sections.disputes.evidenceAdd });
+
+    await expect(add, 'an open dispute offers to take evidence').toBeVisible();
+
+    const before = await card.locator('[data-evidence]').count();
+
+    await page.setInputFiles('input[type=file]', 'e2e/fixtures/room-one.jpg');
+
+    /*
+      The render is a QUEUED job, so a placeholder stands in until a worker has run. Polled rather
+      than slept on: how long that takes is not this test's business.
+    */
+    await expect
+      .poll(async () => card.locator('[data-evidence]').count(), {
+        timeout: 60_000,
+        message: 'the photograph reaches the card',
+      })
+      .toBeGreaterThan(before);
+
+    const picture = card.locator('[data-evidence] img').first();
+
+    await expect
+      .poll(
+        async () => picture.evaluate((node) => (node as HTMLImageElement).naturalWidth),
+        { timeout: 60_000, message: 'and the browser actually loaded it' },
+      )
+      .toBeGreaterThan(0);
+
+    /*
+      Served from THIS origin under authorisation, never from the object store. A public URL here
+      would mean a photograph of the inside of somebody's home was readable by anyone holding the
+      link — which is why the prefix is not in the bucket policy, and why this asserts the path.
+    */
+    expect(
+      await picture.getAttribute('src'),
+      'the bytes come through the authorised route, not the media host',
+    ).toMatch(/^\/api\/disputes\/evidence\//);
+  });
+
+  /**
    * The queue is ordered as a queue, and it says how much is frozen.
    *
    * A dispute holds the partner's payout, so «مستحقات مجمّدة» is money the platform is sitting on.
