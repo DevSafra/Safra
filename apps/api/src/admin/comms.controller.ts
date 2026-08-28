@@ -42,6 +42,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { AdCreativeService } from './ad-creative.service.js';
+import { DisputeEvidenceService } from '../disputes/dispute-evidence.service.js';
 import { AdManagementService } from './ad-management.service.js';
 import { AdInvoiceService } from './ad-invoice.service.js';
 import {
@@ -112,6 +113,7 @@ const signedSchema = z
 export class CommsController {
   constructor(
     private readonly disputes: DisputeService,
+    private readonly disputeEvidence: DisputeEvidenceService,
     private readonly messaging: MessagingService,
     private readonly advertising: AdvertisingService,
     private readonly contracts: PartnerContractService,
@@ -162,6 +164,57 @@ export class CommsController {
    * reader who may not close one has no business claiming it either. Not throttled as hard as
    * closing, which can credit a wallet; this moves no money.
    */
+  /**
+   * A photograph filed on a dispute by STAFF — a complaint taken by telephone with a picture sent
+   * afterwards, which is the ordinary way one arrives.
+   *
+   * Same permission as closing: adding to the file a decision will be made from is part of making
+   * it, and a reader who may not settle a dispute has no business adding to its evidence.
+   */
+  @Post('disputes/:reference/evidence')
+  @RequirePermissions(P.DISPUTE_MANAGE)
+  @AuditExempt('DisputeEvidenceService records dispute.evidence_added transactionally.')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024, files: 1 } }),
+  )
+  async addDisputeEvidence(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @UploadedFile() file: { buffer: Buffer; originalname: string } | undefined,
+  ) {
+    return this.disputeEvidence.addAsStaff(user, reference, file);
+  }
+
+  /**
+   * The bytes of one photograph, for a staff member entitled to see it.
+   *
+   * Streamed rather than published. The prefix is deliberately absent from the bucket's anonymous
+   * read policy — this is the inside of somebody's home, filed in a complaint — so the only way to
+   * it is a request that carries who is asking. `inline`, unlike a partner document: the bytes have
+   * been decoded and re-encoded by our own renderer, so there is nothing active left in them.
+   */
+  @Get('disputes/evidence/:evidenceId/file')
+  @RequirePermissions(P.DISPUTE_MANAGE)
+  @AuditExempt(
+    'Reading evidence changes nothing; the dispute row records what was filed.',
+  )
+  async disputeEvidenceFile(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Res() response: Response,
+  ) {
+    const file = await this.disputeEvidence.readFile(evidenceId, user, 'staff');
+
+    response
+      .setHeader('Content-Type', file.contentType)
+      .setHeader('Content-Disposition', 'inline')
+      .setHeader('X-Content-Type-Options', 'nosniff')
+      /* Private to one reader, so it must not sit in a shared cache or survive a sign-out. */
+      .setHeader('Cache-Control', 'private, no-store')
+      .send(file.bytes);
+  }
+
   @Post('disputes/:reference/acknowledge')
   @RequirePermissions(P.DISPUTE_MANAGE)
   @AuditExempt('DisputeService records dispute.acknowledged inside the transaction.')

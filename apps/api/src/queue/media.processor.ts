@@ -76,11 +76,22 @@ export class MediaProcessor {
             WHERE id = ${imageId}::uuid AND image_status = 'processing'
             RETURNING id
           `)
-        : await this.db.execute<{ id: string }>(sql`
-            UPDATE property_images SET updated_at = now()
-            WHERE id = ${imageId}::uuid AND status = 'processing'
-            RETURNING id
-          `);
+        : subject === 'dispute_evidence'
+          ? /*
+              Evidence has no status to claim, because the table is APPEND-ONLY: a row exists the
+              moment the bytes are stored and never changes state. `variant_widths IS NULL` is the
+              equivalent question — «has anything rendered this yet» — and it makes a re-drive of a
+              file already rendered a no-op, exactly as the status claims do elsewhere.
+            */
+            await this.db.execute<{ id: string }>(sql`
+              SELECT id FROM dispute_evidence
+              WHERE id = ${imageId}::uuid AND variant_widths IS NULL
+            `)
+          : await this.db.execute<{ id: string }>(sql`
+              UPDATE property_images SET updated_at = now()
+              WHERE id = ${imageId}::uuid AND status = 'processing'
+              RETURNING id
+            `);
 
     if (!claimed.rows[0]) {
       this.logger.log(`Image ${imageId} is no longer processing; nothing to do.`);
@@ -114,7 +125,16 @@ export class MediaProcessor {
     // Distinct widths only — each appears twice, once per format.
     const widths = [...new Set(processed.variants.map((variant) => variant.width))];
 
-    if (subject === 'ad_campaign') {
+    if (subject === 'dispute_evidence') {
+      /*
+        Only the widths. There is no `ready` to set and no cover to promote — the row has been
+        readable since it was written, and this is what lets a URL ask for a size that exists.
+      */
+      await this.db
+        .update(schema.disputeEvidence)
+        .set({ variantWidths: widths })
+        .where(eq(schema.disputeEvidence.id, imageId));
+    } else if (subject === 'ad_campaign') {
       await this.db
         .update(schema.adCampaigns)
         .set({
@@ -214,6 +234,15 @@ export class MediaProcessor {
       cover to lose: the ad falls back to text, which is a complete ad, so the whole CTE below is
       not merely unnecessary here — it names columns this table does not have.
     */
+    if (subject === 'dispute_evidence') {
+      /*
+        Nothing to record. The table is append-only and has no failure column, so an unrendered
+        piece of evidence stays exactly what it is — a row with no variants, which is what the
+        reader is shown as «still processing». The log line below is the record.
+      */
+      return;
+    }
+
     if (subject === 'ad_campaign') {
       await this.db
         .update(schema.adCampaigns)

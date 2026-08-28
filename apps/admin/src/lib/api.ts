@@ -1614,6 +1614,20 @@ const disputeItemSchema = z.object({
   partner: z.string().nullable(),
   customer: z.string().nullable(),
   evidenceCount: z.number(),
+  /*
+    The photographs. `url` is `.nullable()`, never defaulted: null means the worker has not
+    rendered it yet, and inventing a plausible address for a file that does not exist is how a
+    broken image reaches a screen that thinks it is fine.
+  */
+  evidence: z.array(
+    z.object({
+      id: z.string(),
+      /* Whether the worker has produced anything yet — the address is the same for all of them. */
+      rendered: z.boolean(),
+      fileName: z.string(),
+      byStaff: z.boolean(),
+    }),
+  ),
   compensationAmount: z.string().nullable(),
   compensationCurrency: z.string().nullable(),
   resolution: z.string().nullable(),

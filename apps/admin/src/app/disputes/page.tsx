@@ -10,6 +10,7 @@ import { TablePagination } from '@/components/table-pagination';
 import { FootNote, Ltr, StatusPill } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
 import { CloseDisputeForm } from '@/components/close-dispute-form';
+import { DisputeEvidence } from '@/components/dispute-evidence';
 import { AcknowledgeDisputeButton } from '@/components/acknowledge-dispute-button';
 import { label, t, plural } from '@/lib/strings';
 import { statusTone } from '@/lib/status-tone';
@@ -308,6 +309,16 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
           <AcknowledgeDisputeButton reference={dispute.reference} />
         </div>
       ) : null}
+
+      {/*
+        The evidence, and the control that adds to it — above the close form, because it is what the
+        decision is made FROM.
+      */}
+      <DisputeEvidence
+        reference={dispute.reference}
+        closed={closed}
+        evidence={dispute.evidence}
+      />
 
       {/* The close workflow lives on the card, not behind a separate screen. */}
       {closed ? null : <CloseDisputeForm reference={dispute.reference} />}

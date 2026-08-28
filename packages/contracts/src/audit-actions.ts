@@ -200,6 +200,8 @@ export const AUDIT_ACTIONS = [
   'dispute.acknowledged',
   /* Who was told a dispute closed, and whether they could be. */
   'dispute.notified',
+  /* A photograph filed on a dispute — by the customer, or by staff on their behalf. */
+  'dispute.evidence_added',
   'dispute.resolved',
   'dispute.rejected',
   /*

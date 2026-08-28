@@ -14,6 +14,7 @@ import {
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DisputeNotifier } from './dispute-notifier.js';
+import { evidenceVariant } from '../disputes/dispute-evidence.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
@@ -85,6 +86,13 @@ export interface DisputeRow {
   readonly partner: string | null;
   readonly customer: string | null;
   readonly evidenceCount: number;
+  /** The photographs, each with the widest variant that exists — see `evidenceUrl`. */
+  readonly evidence: readonly {
+    readonly id: string;
+    readonly rendered: boolean;
+    readonly fileName: string;
+    readonly byStaff: boolean;
+  }[];
   readonly compensationAmount: string | null;
   readonly compensationCurrency: string | null;
   readonly resolution: string | null;
@@ -253,7 +261,13 @@ export class DisputeService {
       LEFT JOIN customer_profiles c ON c.id = d.customer_profile_id
       LEFT JOIN currencies cur      ON cur.id = d.compensation_currency_id
       LEFT JOIN (
-      SELECT dispute_id, count(*) AS n FROM dispute_evidence GROUP BY dispute_id
+      SELECT dispute_id, count(*) AS n,
+             jsonb_agg(jsonb_build_object(
+               'id', id, 'storageKey', storage_key, 'fileName', file_name,
+               'variantWidths', variant_widths,
+               'byStaff', uploaded_by_user_id IS NOT NULL)
+               ORDER BY created_at, id) AS items
+      FROM dispute_evidence GROUP BY dispute_id
       ) ev ON ev.dispute_id = d.id
       WHERE ${sql.join(conditions, sql` AND `)}`;
 
@@ -270,6 +284,13 @@ export class DisputeService {
              p.display_name AS partner,
              c.full_name    AS customer,
              coalesce(ev.n, 0)::int         AS evidence_count,
+             -- The photographs themselves, not merely how many there are.
+             --
+             -- The count has been on this screen since النزاعات was built and nothing could write a
+             -- row, so it read zero for every dispute the platform ever had. Aggregated in the same
+             -- query rather than fetched per row: twenty-five disputes would otherwise be
+             -- twenty-five round trips for a picture most of them do not have.
+             coalesce(ev.items, '[]'::jsonb)  AS evidence,
              d.compensation_amount::text    AS compensation_amount,
              cur.code                       AS compensation_currency,
              d.resolution,
@@ -319,6 +340,16 @@ export class DisputeService {
         partner: row.partner,
         customer: row.customer,
         evidenceCount: row.evidence_count,
+        evidence: (row.evidence ?? []).map((one) => ({
+          id: one.id,
+          /*
+            Whether there is anything to look at — NOT an address. The bytes are private and are
+            served by an authorised route, so the console builds one path for all of them.
+          */
+          rendered: evidenceVariant(one.variantWidths) !== null,
+          fileName: one.fileName,
+          byStaff: one.byStaff,
+        })),
         compensationAmount: row.compensation_amount,
         compensationCurrency: row.compensation_currency,
         resolution: row.resolution,
@@ -885,6 +916,13 @@ interface DisputeRowSql extends Record<string, unknown> {
   partner: string | null;
   customer: string | null;
   evidence_count: number;
+  evidence: {
+    id: string;
+    storageKey: string;
+    fileName: string;
+    variantWidths: number[] | null;
+    byStaff: boolean;
+  }[];
   compensation_amount: string | null;
   compensation_currency: string | null;
   resolution: string | null;

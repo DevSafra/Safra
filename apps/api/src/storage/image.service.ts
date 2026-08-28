@@ -143,7 +143,10 @@ export class ImageService {
    * key is a path-traversal write, and a caller-influenced filename is a stored-XSS vector when it
    * is later rendered.
    */
-  keyFor(context: { kind: 'properties' | 'cities' | 'ads'; owner: string }): string {
+  keyFor(context: {
+    kind: 'properties' | 'cities' | 'ads' | 'disputes';
+    owner: string;
+  }): string {
     return `${context.kind}/${context.owner}/${randomUUID()}`;
   }
 

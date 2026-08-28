@@ -1571,6 +1571,18 @@ export const ar = {
         and it is still in the queue. What changes is that it now has somebody's name on it, so the
         badge — which counts what nobody has picked up — stops asking for one.
       */
+      /*
+        ── The photographs on a dispute (Bashar, 2026-08-28) ─────────────────
+
+        «الغرفة لا تطابق الصور المنشورة» is settled by looking at one. The COUNT has been on this
+        screen since النزاعات was built while nothing could write a row, so it read zero for every
+        dispute the platform ever had.
+      */
+      evidenceTitle: 'الأدلة',
+      evidenceAdd: '+ إضافة دليل',
+      evidenceUploading: 'جارٍ الرفع…',
+      evidenceProcessing: 'جارٍ المعالجة…',
+      evidenceSlow: 'لم تكتمل بعد',
       acknowledge: 'استلام',
       acknowledging: 'جارٍ الاستلام…',
       note: 'فتح النزاع يجمّد استحقاق تحويل الشريك للحجز المعني حتى الإغلاق. الصور المرفوعة من العميل (EC-007) تظهر داخل ملف النزاع.',
@@ -2651,6 +2663,7 @@ export const ar = {
     // Added 2026-08-04 with the four new sections.
     'dispute.acknowledged': 'استلام نزاع للمراجعة',
     'dispute.notified': 'إشعار أطراف النزاع بالإغلاق',
+    'dispute.evidence_added': 'إضافة دليل إلى نزاع',
     'dispute.resolved': 'إغلاق نزاع لصالح العميل',
     'dispute.rejected': 'رفض نزاع',
     'emergency_mode.activated': 'تفعيل وضع الطوارئ',
@@ -3021,6 +3034,8 @@ export const ar = {
         the key did not exist until the first «استلام» wrote one.
       */
       assignedTo: 'أُسند إلى',
+      /* Written by `dispute.evidence_added` — whether staff filed it or the customer did. */
+      byStaff: 'أضافه موظف',
       /* Written by `dispute.resolved` / `dispute.rejected` when a closure agrees compensation. */
       compensationAmount: 'مبلغ التعويض',
       compensationCurrency: 'عملة التعويض',
@@ -3631,6 +3646,16 @@ export const ar = {
     /* Sent by RefundService on EVERY refund — the staff button and §6.4's sweep alike. */
     'booking.refunded': 'بدء الاسترداد',
     'wallet.compensation': 'تعويض المحفظة',
+    /*
+      ── A closed dispute, announced (Bashar, 2026-08-28) ──────────────────────
+
+      Three keys because three people need three different facts. سجل واتساب والبريد lists what was
+      sent BY KEY, so one «dispute closed» would make «did the customer hear the outcome» a question
+      the log cannot answer.
+    */
+    'dispute.resolved': 'قرار نزاع لصالح العميل',
+    'dispute.rejected': 'قرار نزاع برفض الشكوى',
+    'dispute.payout_released': 'رفع تجميد المستحقات عن الشريك',
     'partner.deadline_reminder': 'تذكير الشريك بالمهلة',
     'ad.single_offer': 'عرض إعلاني (رسالة واحدة)',
     /*

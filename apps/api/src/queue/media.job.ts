@@ -33,7 +33,7 @@ export const MEDIA_JOB = 'image.render' as const;
  * Absent means `property_images`, so every job enqueued before advertising creatives existed still
  * means what it meant.
  */
-export type MediaSubject = 'property_image' | 'ad_campaign';
+export type MediaSubject = 'property_image' | 'ad_campaign' | 'dispute_evidence';
 
 export interface MediaJobData {
   /** The row this job completes — in `property_images`, or `ad_campaigns` for a creative. */
@@ -79,6 +79,18 @@ export function mediaJobId(imageId: string): string {
  * upload and still deterministic for a retry of the SAME upload — which is the property the row key
  * was chosen for in the first place.
  */
+/**
+ * The job id for one piece of dispute evidence.
+ *
+ * Keyed on the FILE, like a creative and for the same reason: the id must be fresh per upload or a
+ * completed job's retained id silently swallows the next `add`. Evidence rows are append-only so a
+ * row id would in fact be unique — but keying two of three subjects one way and the third another
+ * is how the wrong one gets copied next time.
+ */
+export function evidenceJobId(fileKey: string): string {
+  return `evidence-${fileKey.replaceAll('/', '_')}`;
+}
+
 export function creativeJobId(fileKey: string): string {
   return `creative-${fileKey.replaceAll('/', '_')}`;
 }

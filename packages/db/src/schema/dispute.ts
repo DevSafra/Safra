@@ -140,6 +140,16 @@ export const disputeEvidence = pgTable(
     storageKey: text('storage_key').notNull(),
     contentType: text('content_type').notNull(),
     sizeBytes: integer('size_bytes').notNull(),
+    /**
+     * The widths the renderer actually produced — `null` until it has run.
+     *
+     * Not a weakening of «append-only»: it records what the PIPELINE wrote, not anything a person
+     * said. It exists because the pipeline never upscales, so a URL asking for a fixed width can
+     * address an object that was never written — the defect that shipped on ad creatives on
+     * 2026-08-27. Null doubles as the only status this table needs: the row exists once the bytes
+     * are stored, and the picture appears when the worker has finished.
+     */
+    variantWidths: integer('variant_widths').array(),
     /** Null when the customer uploaded it. */
     uploadedByUserId: foreignId('uploaded_by_user_id').references(() => users.id),
     ...createdAt,
