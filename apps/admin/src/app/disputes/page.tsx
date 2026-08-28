@@ -268,6 +268,24 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
             ) : null}
             {dispute.customer ? ` · ${dispute.customer}` : ''}
             {dispute.partner ? ` · ${dispute.partner}` : ''}
+            {/*
+              Into the thread this case opened with.
+
+              The complaint, the evidence and the decision are on this card; the one thing that is
+              not is the conversation, and «ask the customer which night it was» is what settles
+              half of these. `from=disputes` so رجوع comes back here rather than to الرسائل.
+            */}
+            {dispute.conversationReference ? (
+              <>
+                {' · '}
+                <Link
+                  href={`/messages/${dispute.conversationReference}?from=disputes`}
+                  className="text-sky hover:underline"
+                >
+                  {t.sections.disputes.thread}
+                </Link>
+              </>
+            ) : null}
             {dispute.evidenceCount > 0
               ? ` · ${plural(t.sections.disputes.evidence, { n: dispute.evidenceCount })}`
               : ''}

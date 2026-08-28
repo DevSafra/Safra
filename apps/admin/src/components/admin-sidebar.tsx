@@ -32,7 +32,8 @@ interface NavItem {
     | 'disputes'
     | 'customers'
     | 'payments'
-    | 'wallet';
+    | 'wallet'
+    | 'messages';
   /**
    * Renders the badge red instead of blue (`badgeWarn` in the design handoff §8).
    *
@@ -115,7 +116,12 @@ const NAV: readonly NavItem[] = [
     simply never been produced.
   */
   { key: 'disputes', href: '/disputes', badge: 'disputes', warn: true },
-  { key: 'messages', href: '/messages' },
+  /*
+    `warn`, because somebody is WAITING. A thread with something unread is a person who has written
+    to SAFRA and not been answered — which is what that flag's own note describes, and the same
+    reading as an unverified partner or an untaken dispute.
+  */
+  { key: 'messages', href: '/messages', badge: 'messages', warn: true },
   { key: 'whatsapp', href: '/comms' },
   { key: 'geo', href: '/geo' },
   { key: 'reports', href: '/reports' },
@@ -167,6 +173,7 @@ export interface SidebarCounts {
   readonly customers: number | undefined;
   readonly payments: number | undefined;
   readonly wallet: number | undefined;
+  readonly messages: number | undefined;
 }
 
 /**
@@ -187,6 +194,7 @@ export const NO_COUNTS: SidebarCounts = {
   customers: undefined,
   payments: undefined,
   wallet: undefined,
+  messages: undefined,
 };
 
 export function AdminSidebar({

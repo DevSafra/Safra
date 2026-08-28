@@ -498,6 +498,27 @@ test('a dispute opened here moves the booking and shows on its links', async ({
 
   /* The count moved with it — a link that still said «لا نزاعات» would be the failure it exists to prevent. */
   await expect(page.locator(`a[href="/disputes?q=${reference}"]`)).not.toHaveText(before);
+
+  /*
+    ── And the case opened a CONVERSATION (الرسائل review, 2026-08-28) ──
+
+    `conversations.dispute_id` had no writer at all, so the inbox's «نزاع» subject kind and its
+    branch printing the dispute's reference were unreachable: an operator settling a complaint had
+    the account of it on one screen and no way to ask the customer the one question that would
+    settle it. Asserted here rather than in `disputes.spec.ts` because only a dispute opened DURING
+    a run has a thread — the seeded ones predate the writer, and a link asserted over those would
+    fail for a reason that is not a defect.
+  */
+  await page.goto(`/disputes?q=${reference}`);
+
+  const thread = page.locator('article a[href^="/messages/CNV-"]').first();
+
+  await expect(thread, 'a dispute opens with a thread').toBeVisible();
+  await thread.click();
+  await page.waitForURL(/\/messages\/CNV-/);
+
+  /* The complaint IS the first message — not a sentence composed in a service. */
+  await expect(page.locator('ul')).toContainText('الغرفة لا تطابق الصور المنشورة');
 });
 
 /**

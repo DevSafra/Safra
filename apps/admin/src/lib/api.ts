@@ -81,6 +81,7 @@ const attentionSchema = z.object({
   partner_applications_open: z.number(),
   partner_documents_pending_review: z.number(),
   disputes_open: z.number(),
+  messages_unread: z.number(),
   customers_new: z.number(),
   payments_new: z.number(),
   wallet_new: z.number(),
@@ -1614,6 +1615,8 @@ const disputeItemSchema = z.object({
   partner: z.string().nullable(),
   customer: z.string().nullable(),
   evidenceCount: z.number(),
+  /* Null for a dispute filed before a case opened its own thread — never defaulted. */
+  conversationReference: z.string().nullable(),
   /*
     The photographs. `url` is `.nullable()`, never defaulted: null means the worker has not
     rendered it yet, and inventing a plausible address for a file that does not exist is how a
@@ -1690,7 +1693,7 @@ export type ThreadMessage = z.infer<typeof messageSchema>;
 export async function getThread(reference: string) {
   return staffFetch(
     `/admin/conversations/${encodeURIComponent(reference)}`,
-    z.object({ messages: z.array(messageSchema) }),
+    z.object({ closed: z.boolean(), messages: z.array(messageSchema) }),
   );
 }
 

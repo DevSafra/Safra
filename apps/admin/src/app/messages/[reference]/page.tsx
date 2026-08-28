@@ -6,6 +6,7 @@ import { count, shortDateTime } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { FootNote, Ltr } from '@/components/admin-table';
 import { ReplyForm } from '@/components/reply-form';
+import { CloseThreadButton } from '@/components/close-thread-button';
 import { BackLink } from '@/components/back-link';
 import { backTarget } from '@/lib/search-params';
 import { fill, t } from '@/lib/strings';
@@ -81,7 +82,21 @@ export default async function ThreadPage({
 
         {result === 'unauthenticated' || result === 'failed' ? null : (
           <ConsolePanel>
-            <ReplyForm reference={reference} />
+            {/*
+              A closed thread takes no reply — the API refuses it — so the box is not offered over
+              one. The notice replaces it rather than sitting beside a disabled control, because
+              «why can I not type» is the question a greyed-out box asks and does not answer.
+            */}
+            {result.closed ? (
+              <p className="text-[12.5px] text-faint">
+                {t.sections.messages.closedNotice}
+              </p>
+            ) : (
+              <>
+                <ReplyForm reference={reference} />
+                <CloseThreadButton reference={reference} />
+              </>
+            )}
           </ConsolePanel>
         )}
       </div>

@@ -24,6 +24,7 @@ export async function sidebarCounts(): Promise<SidebarCounts> {
     properties: attention.properties_pending_review,
     partnerApplications: attention.partner_applications_open,
     disputes: attention.disputes_open,
+    messages: attention.messages_unread,
     /* «New since this reader last opened the section» — see `SEEN_SECTIONS`. */
     customers: attention.customers_new,
     payments: attention.payments_new,

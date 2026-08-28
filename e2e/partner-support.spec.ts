@@ -197,4 +197,87 @@ test.describe('الدعم', () => {
       expect(overflow, `/support scrolls sideways at ${width}px`).toBeLessThanOrEqual(0);
     }
   });
+
+  /**
+   * ── The console can end a thread, and الرسائل says how many are waiting ──
+   *
+   * The two remaining halves of the الرسائل review (2026-08-28). `closed_at` had exactly one writer
+   * before this — `SupportService.close`, which is asker-only — so a request answered on the phone,
+   * or opened twice, stayed in the console's queue for ever. The badge beside الرسائل counts open
+   * threads with something unread, which is the number an agent works down; until now they could
+   * not work it down.
+   *
+   * ## Its own ticket
+   *
+   * Closing is final, and the test above ends with the ASKER closing theirs. Two closes cannot share
+   * one thread, so this opens its own — the same reason that test opens one rather than reusing an
+   * existing thread.
+   */
+  test('ends a thread from the console, and the partner is told', async ({
+    page,
+    browser,
+  }) => {
+    await page.goto('/support');
+    await page
+      .locator('textarea[name=body]')
+      .fill('سؤال عن موعد التحويل الشهري، ولا حاجة لمتابعة بعد الرد.');
+    await page.locator('form:has(textarea) button[type=submit]').click();
+    await page.waitForURL(/\/support\/CNV-/, { timeout: 20_000 });
+
+    const reference = (page.url().split('/').pop() ?? '').trim();
+
+    expect(reference).toMatch(/^CNV-\d+$/);
+
+    const staffContext = await browser.newContext({ storageState: STAFF_STATE });
+    const staffPage = await staffContext.newPage();
+
+    try {
+      await staffPage.goto(`${ADMIN}/messages/${reference}`, {
+        waitUntil: 'domcontentloaded',
+      });
+
+      /*
+        The badge, located the way الشركاء and النزاعات locate theirs — the span inside the SIDEBAR's
+        own nav link. By role and name it collides with `BackLink`, whose accessible name is «الرجوع
+        إلى الرسائل» and which matched first.
+
+        Something unread exists by construction: this test opened a ticket a moment ago. A sidebar
+        with no badge here means the counter never reached it.
+      */
+      await expect(
+        staffPage.locator('.console-sidebar nav a[href="/messages"] span.rounded-full'),
+        'الرسائل must carry the unread count',
+      ).toBeVisible();
+
+      const close = staffPage.getByRole('button', {
+        name: adminAr.sections.messages.closeThread,
+      });
+
+      await expect(close, 'an open thread offers the control').toBeVisible();
+      await close.click();
+
+      /*
+        The notice REPLACES the reply box. A closed thread's reply endpoint refuses everything, so a
+        box left sitting there is a control that cannot work — «why can I not type» is the question
+        a greyed-out one asks and does not answer.
+      */
+      await expect(
+        staffPage.getByText(adminAr.sections.messages.closedNotice),
+      ).toBeVisible({ timeout: 20_000 });
+      await expect(staffPage.locator('textarea')).toHaveCount(0);
+      await expect(
+        staffPage.getByRole('button', { name: adminAr.sections.messages.closeThread }),
+      ).toHaveCount(0);
+
+      /* And the history survives: ending a thread is not hiding it. */
+      await expect(staffPage.locator('ul li').first()).toBeVisible();
+    } finally {
+      await staffContext.close();
+    }
+
+    /* The person who was waiting is told, on the page they read it in. */
+    await page.goto(`/support/${reference}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText(t.support.closedNote)).toBeVisible();
+    await expect(page.locator('textarea[name=body]')).toHaveCount(0);
+  });
 });

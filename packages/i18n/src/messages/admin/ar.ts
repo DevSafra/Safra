@@ -1588,6 +1588,7 @@ export const ar = {
       note: 'فتح النزاع يجمّد استحقاق تحويل الشريك للحجز المعني حتى الإغلاق. الصور المرفوعة من العميل (EC-007) تظهر داخل ملف النزاع.',
       /** The close form. */
       close: 'إغلاق النزاع',
+      thread: 'المحادثة',
       outcome: 'النتيجة',
       outcomeResolved: 'لصالح العميل — تُقبل الشكوى',
       outcomeRejected: 'ترفض الشكوى',
@@ -1616,6 +1617,10 @@ export const ar = {
       replying: 'جارٍ الإرسال…',
       replyPlaceholder: 'اكتب رداً…',
       replyInternal: 'ملاحظة داخلية — لا يراها العميل أو الشريك',
+      closeThread: 'إنهاء المحادثة',
+      closingThread: 'جارٍ الإنهاء…',
+      closeThreadHint: 'تُحفظ الرسائل ويُخطَر صاحب الطلب. لا يمكن الرد بعد الإنهاء.',
+      closedNotice: 'انتهت هذه المحادثة. الرسائل محفوظة، ولا يمكن إضافة رد.',
       note: 'دردشة ثلاثية: العميل، سفرة، الشريك — سفرة تراقب وتوجّه. يُمنع تبادل أرقام هواتف أو بيانات تواصل مباشرة قبل تأكيد الحجز، وتُحجب تلقائياً.',
       redactionNote: 'الحجب يطبَّق على ردود الموظفين أيضاً، ولا يُحفظ النص الأصلي.',
     },
@@ -2599,6 +2604,8 @@ export const ar = {
       ever been closed in a committed run. Found 2026-08-25 the first time one was.
     */
     dispute: 'نزاع',
+    /* Reached the catalogue the same way a dispute did: the first time one was closed. */
+    conversation: 'محادثة',
     /* The role definition itself, not an employee — `EmployeeRolesService` audits against it. */
     partner_employee_role: 'دور موظف شريك',
     /* A role definition for SAFRA's OWN staff — «مدير عام», «مشرف حجوزات». */
@@ -2664,6 +2671,7 @@ export const ar = {
     'dispute.acknowledged': 'استلام نزاع للمراجعة',
     'dispute.notified': 'إشعار أطراف النزاع بالإغلاق',
     'dispute.evidence_added': 'إضافة دليل إلى نزاع',
+    'conversation.closed': 'إنهاء محادثة',
     'dispute.resolved': 'إغلاق نزاع لصالح العميل',
     'dispute.rejected': 'رفض نزاع',
     'emergency_mode.activated': 'تفعيل وضع الطوارئ',
@@ -3653,6 +3661,7 @@ export const ar = {
       sent BY KEY, so one «dispute closed» would make «did the customer hear the outcome» a question
       the log cannot answer.
     */
+    'support.closed': 'إشعار بإنهاء محادثة الدعم',
     'dispute.resolved': 'قرار نزاع لصالح العميل',
     'dispute.rejected': 'قرار نزاع برفض الشكوى',
     'dispute.payout_released': 'رفع تجميد المستحقات عن الشريك',
