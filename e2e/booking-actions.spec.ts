@@ -400,7 +400,11 @@ async function addNote(page: Page, note: string): Promise<void> {
 test('a dispute opened here moves the booking and shows on its links', async ({
   page,
 }) => {
-  await page.goto('/bookings?status=confirmed&size=5');
+  /*
+    Twenty-five rather than five: the pool has to be big enough to contain a booking that is both
+    undisputed and DISPUTABLE, and the newest five are whatever other suites happened to create.
+  */
+  await page.goto('/bookings?status=confirmed&size=25');
 
   const references = [
     ...new Set(
@@ -438,15 +442,32 @@ test('a dispute opened here moves the booking and shows on its links', async ({
 
     if ((await link.count()) === 0) continue;
 
-    if ((await link.innerText()).includes(NO_DISPUTES)) {
-      reference = candidate;
-      break;
+    if (!(await link.innerText()).includes(NO_DISPUTES)) continue;
+
+    /*
+      And it must actually be DISPUTABLE, which «no disputes yet» does not imply.
+
+      The profile-claim fixtures (`BKG-CLAIM-…`) are confirmed and undisputed and have never been
+      paid, so §10 withholds the action: a booking with no money at stake has nothing to freeze and
+      nothing to compensate. This loop tested only the first half of the precondition, so on a run
+      where those sorted to the top it picked one and then timed out waiting for a control that is
+      correctly absent — an assertion failing for a reason unrelated to what it is about.
+    */
+    if (
+      (await page
+        .getByRole('button', { name: copy.openDispute, exact: true })
+        .count()) === 0
+    ) {
+      continue;
     }
+
+    reference = candidate;
+    break;
   }
 
   test.skip(
     reference === '',
-    'Every confirmed booking on page one already has a dispute.',
+    'No confirmed booking on page one is both undisputed and disputable.',
   );
 
   const before = await page.locator(`a[href="/disputes?q=${reference}"]`).innerText();
