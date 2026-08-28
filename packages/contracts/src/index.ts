@@ -30,6 +30,7 @@ export * from './coupon.js';
 export * from './dispute.js';
 export * from './support.js';
 export * from './table-preferences.js';
+export * from './seen.js';
 export * from './two-factor.js';
 export * from './wallet.js';
 export * from './review.js';

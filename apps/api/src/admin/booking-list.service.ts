@@ -24,6 +24,8 @@ export interface BookingListRow {
   readonly amount: string;
   readonly currency: string;
   readonly status: string;
+  /** When the booking was made — what «new since I last looked» is measured against. */
+  readonly createdAt: string;
 }
 
 export interface BookingListQuery {
@@ -267,6 +269,11 @@ export class BookingListService {
         amount: row.amount,
         currency: row.currency,
         status: row.status,
+        /*
+          SELECTed and typed since this list was written, and never mapped out — the same shape the
+          customers registry had. «New since I last looked» is measured against it.
+        */
+        createdAt: row.created_at,
       })),
       total,
       query,

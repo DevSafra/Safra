@@ -1,6 +1,11 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Patch } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post } from '@nestjs/common';
 
-import { type TablePageSizeInput, tablePageSizeSchema } from '@safra/contracts';
+import {
+  type MarkSeenInput,
+  markSeenSchema,
+  type TablePageSizeInput,
+  tablePageSizeSchema,
+} from '@safra/contracts';
 
 import { AuditExempt } from '../common/audit/audit.interceptor.js';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
@@ -60,5 +65,35 @@ export class MeController {
     @Body(new ZodValidationPipe(tablePageSizeSchema)) body: TablePageSizeInput,
   ): Promise<void> {
     await this.me.setTablePageSize(user?.sub, body);
+  }
+
+  /**
+   * Marks a registry as seen — what clears the «new» badge and the tinted rows.
+   *
+   * ## POST, and not part of rendering the page
+   *
+   * The console calls this from the browser once the section has actually been opened, and the
+   * page render itself writes nothing. That is not an implementation detail: Next.js PREFETCHES
+   * links, so marking a section read while rendering it would let a mouse passing over a sidebar
+   * item clear a badge nobody has looked at. It is the same reasoning that made the rows-per-page
+   * bar a POST rather than a GET.
+   *
+   * ## No timestamp and no user id in the body
+   *
+   * The moment is `now()` in the database and the row is `claims.sub`. The caller chooses only
+   * WHICH section, out of a closed list — so it can neither backdate a mark to keep a badge alive
+   * nor mark a registry read on somebody else's account.
+   */
+  @Post('seen')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @AuditExempt(
+    'Records that the caller opened one of their own console sections. It grants nothing, ' +
+      "reveals nothing, and a row per person per page view would bury §9.3's decisions in noise.",
+  )
+  async markSeen(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(markSeenSchema)) body: MarkSeenInput,
+  ): Promise<void> {
+    await this.me.markSeen(user?.sub, body);
   }
 }

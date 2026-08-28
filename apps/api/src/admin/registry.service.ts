@@ -526,6 +526,13 @@ export class RegistryService {
         walletBalance: row.wallet_balance,
         walletCurrency: row.wallet_currency,
         lastActivity: row.last_activity,
+        /*
+          Already SELECTed and typed, and never mapped out — so the registry ordered by it and
+          could not say which rows it had put at the top. «New since I last looked» needs the
+          row's own age, and `lastActivity` is a different fact: a customer who booked this
+          morning has recent activity and is not new.
+        */
+        createdAt: row.created_at,
       })),
       total,
       query,
@@ -611,4 +618,6 @@ export interface CustomerRow {
   readonly walletBalance: string | null;
   readonly walletCurrency: string | null;
   readonly lastActivity: string;
+  /** When the profile itself was created — what «new» is measured against. */
+  readonly createdAt: string;
 }

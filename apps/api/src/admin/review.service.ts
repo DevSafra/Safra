@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
@@ -11,8 +11,10 @@ import type {
 import {
   DEFAULT_SANCTIONS_POLICY,
   SANCTIONS_POLICY_SETTING,
+  SEEN_BADGE_CAP,
   isSanctionsPolicy,
   type SanctionsPolicy,
+  type SeenSection,
 } from '@safra/contracts';
 
 import { actorName } from '../common/actor-name.sql.js';
@@ -47,6 +49,95 @@ import {
  * Nothing reaches search without passing through here, and every decision is
  * recorded with who made it, when, and why.
  */
+/**
+ * When this reader last opened `section`, as a value a `created_at` can be compared against.
+ *
+ * ## An absent mark answers NULL, and that is the design
+ *
+ * `created_at > NULL` is NULL, which is not TRUE, so nothing counts as new for somebody who has
+ * never opened the section. The alternative — treating «never looked» as «since the beginning» —
+ * would greet a new operator with a badge counting every row the platform has ever had, which is
+ * noise wearing the clothes of a queue.
+ *
+ * ## And it reads the caller's OWN row
+ *
+ * The subject comes from the access token, never from the request, so there is no shape of this
+ * query that reads somebody else's mark. `section` arrives as a TypeScript literal from
+ * `SEEN_SECTIONS` and is still passed as a parameter rather than interpolated — validated upstream
+ * is a reason to expect a value to be safe, not a reason to build SQL out of it.
+ */
+function seenAt(actor: AccessTokenClaims | undefined, section: SeenSection): SQL {
+  if (!actor?.sub) return sql`NULL::timestamptz`;
+
+  return sql`(
+    SELECT (u.section_seen_at -> ${section} ->> 'since')::timestamptz
+    FROM users u WHERE u.id = ${actor.sub}::uuid
+  )`;
+}
+
+/** The NEWEST row this reader has had on screen for `section`. */
+function readFrom(actor: AccessTokenClaims | undefined, section: SeenSection): SQL {
+  if (!actor?.sub) return sql`NULL::timestamptz`;
+
+  return sql`(
+    SELECT (u.section_seen_at -> ${section} ->> 'readFrom')::timestamptz
+    FROM users u WHERE u.id = ${actor.sub}::uuid
+  )`;
+}
+
+/**
+ * The oldest row this reader has had on screen for `section` — the TOP of what is still unread.
+ *
+ * `NULL` means «none of this batch yet», which the callers read as «no upper bound»: everything
+ * after `since` is still unread. That is the state a reader is in the moment a batch begins.
+ */
+function readTo(actor: AccessTokenClaims | undefined, section: SeenSection): SQL {
+  if (!actor?.sub) return sql`NULL::timestamptz`;
+
+  return sql`(
+    SELECT (u.section_seen_at -> ${section} ->> 'readTo')::timestamptz
+    FROM users u WHERE u.id = ${actor.sub}::uuid
+  )`;
+}
+
+/**
+ * The rows of `section` this reader has not yet had on screen.
+ *
+ * Newer than the batch boundary AND older than the deepest row they have read — an INTERVAL, not a
+ * suffix. The first version of this feature used only the lower bound, so opening page one marked
+ * the whole batch read and page two's new rows silently stopped being new (Bashar, 2026-08-28).
+ *
+ * ## Both clauses are needed, and neither alone is enough
+ *
+ * The interval alone cannot see a row that arrives after a batch has been read out: the frontier is
+ * already at the boundary, so there is no room above it. The badge would then appear only on the
+ * reader's SECOND visit after new rows landed, which is a feature that does not work.
+ *
+ * The «newer than anything shown» clause alone was tried too, and reproduced the very defect the
+ * interval exists to fix: reading the newest of those arrivals moved that top past the others and
+ * stranded them. What makes the pair correct is `markSeen` RE-OPENING the batch from the top of
+ * what was seen on the first report after they arrive — so they are counted at once by the second
+ * clause, and are an ordinary batch by the time the reader pages into them.
+ *
+ * Written as a fragment because four counters need exactly the same predicate over four different
+ * `created_at` columns, and four hand-written copies is four places for the bound to drift.
+ */
+function stillUnread(
+  actor: AccessTokenClaims | undefined,
+  section: SeenSection,
+  column: string,
+): SQL {
+  return sql`(
+    -- Inside the batch and below the frontier: paging down has not reached it yet.
+    (${sql.raw(column)} > ${seenAt(actor, section)}
+       AND (${readTo(actor, section)} IS NULL
+            OR ${sql.raw(column)} < ${readTo(actor, section)}))
+    -- Or newer than anything ever shown: it ARRIVED while the reader was here.
+    OR (${readFrom(actor, section)} IS NOT NULL
+        AND ${sql.raw(column)} > ${readFrom(actor, section)})
+  )`;
+}
+
 @Injectable()
 export class ReviewService {
   private readonly logger = new Logger(ReviewService.name);
@@ -1036,6 +1127,64 @@ export class ReviewService {
         LEFT JOIN bookings db ON db.id = d.booking_id
         WHERE d.status = 'open' AND d.deleted_at IS NULL
           AND ${scopeFilter(actor, 'db.city_id')}
+      UNION ALL
+      -- ── «what is new since I last looked» (Bashar, 2026-08-27) ───────────
+      --
+      -- NO BACKTICKS IN THIS COMMENT: it is inside a sql template literal.
+      --
+      -- Rows created since this reader last OPENED the section. The mark lives in
+      -- users.section_seen_at; an ABSENT key makes the comparison NULL and the count zero, which
+      -- is the deliberate default -- a new operator must not be greeted by a badge counting every
+      -- customer the platform has ever had.
+      --
+      -- Each is capped at SEEN_BADGE_CAP + 1 by a LIMIT-ed subquery so the database stops reading:
+      -- unlike every other counter here the set has no natural bound, and an operator away for a
+      -- month would otherwise ask for an unbounded scan on every page view.
+      --
+      -- Each counts EXACTLY what its registry lists, which is why the scoping differs: العملاء and
+      -- المحفظة are not city-scoped (neither list is -- a customer has no city), and الدفع is,
+      -- through the booking. A badge that counted more widely than the list it points at would
+      -- show a regional operator a national figure.
+      SELECT 'customers_new', COUNT(*)::text FROM (
+        SELECT 1 FROM customer_profiles c
+        WHERE c.deleted_at IS NULL AND ${stillUnread(actor, 'customers', 'c.created_at')}
+        LIMIT ${SEEN_BADGE_CAP + 1}
+      ) capped_customers
+      UNION ALL
+      -- الدفع والفواتير is not one table: its list UNIONs payments, refunds and fines, so the
+      -- badge counts all three. Counting only payments would show a number smaller than the rows
+      -- that actually appeared, which is the drift «a count and its list share one FROM ... WHERE»
+      -- exists to prevent. Scoped per branch, exactly as FinanceService.list scopes them -- a fine
+      -- has no booking city and falls back to the partner's.
+      SELECT 'payments_new', COUNT(*)::text FROM (
+        SELECT 1 FROM payments pay
+        LEFT JOIN bookings payb ON payb.id = pay.booking_id
+        WHERE pay.deleted_at IS NULL AND ${stillUnread(actor, 'payments', 'pay.created_at')}
+          AND ${scopeFilter(actor, 'payb.city_id')}
+        UNION ALL
+        SELECT 1 FROM refunds ref
+        LEFT JOIN bookings refb ON refb.id = ref.booking_id
+        WHERE ref.deleted_at IS NULL AND ${stillUnread(actor, 'payments', 'ref.created_at')}
+          AND ${scopeFilter(actor, 'refb.city_id')}
+        UNION ALL
+        SELECT 1 FROM partner_violations vio
+        LEFT JOIN bookings viob   ON viob.id = vio.booking_id
+        LEFT JOIN partners viop   ON viop.id = vio.partner_id
+        WHERE vio.deleted_at IS NULL AND ${stillUnread(actor, 'payments', 'vio.created_at')}
+          AND ${scopeFilter(actor, 'coalesce(viob.city_id, viop.city_id)')}
+          -- Only violations that CARRY a fine, mirroring the list's own branch. A violation at
+          -- 'recorded' or 'warned' has no fine_amount and never appears on الدفع, so counting it
+          -- would badge rows the reader will not find when they arrive.
+          AND vio.fine_amount IS NOT NULL
+          AND vio.fine_currency_id IS NOT NULL
+        LIMIT ${SEEN_BADGE_CAP + 1}
+      ) capped_payments
+      UNION ALL
+      SELECT 'wallet_new', COUNT(*)::text FROM (
+        SELECT 1 FROM wallet_transactions wt
+        WHERE ${stillUnread(actor, 'wallet', 'wt.created_at')}
+        LIMIT ${SEEN_BADGE_CAP + 1}
+      ) capped_wallet
       UNION ALL
       SELECT 'bookings_awaiting_confirmation', COUNT(*)::text
         FROM bookings WHERE status = 'pending_confirmation' AND deleted_at IS NULL

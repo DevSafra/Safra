@@ -379,6 +379,13 @@
       "when": 1787842766508,
       "tag": "0053_flaky_cobalt_man",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1787862082799,
+      "tag": "0054_strong_vengeance",
+      "breakpoints": true
     }
   ]
 }

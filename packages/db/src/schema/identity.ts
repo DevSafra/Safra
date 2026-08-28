@@ -208,6 +208,21 @@ export const users = pgTable(
       .$type<Record<string, number>>()
       .notNull()
       .default({}),
+    /**
+     * When this staff member last OPENED each registry — «what is new since I last looked».
+     *
+     * Beside `table_page_sizes` and for the same reasons: a `jsonb` map rather than a column per
+     * section, keys validated against a closed allow-list (`SEEN_SECTIONS`) because this row is
+     * read on every authenticated request, and a missing key meaning «never looked».
+     *
+     * A missing key deliberately counts NOTHING as new. The alternative — treating «never looked»
+     * as «everything since the beginning» — would greet a new operator with a badge counting every
+     * customer the platform has ever had, which is noise wearing the clothes of a queue.
+     */
+    sectionSeenAt: jsonb('section_seen_at')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
     /** Lockout state after repeated failed sign-ins (§1 rate limiting). */
     failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
     lockedUntil: timestamp('locked_until', { withTimezone: true }),
