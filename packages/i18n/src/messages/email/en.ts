@@ -49,6 +49,18 @@ export const en = {
     subject: 'A fine on your account has been waived',
     body: 'The SAFRA team has reviewed the fine on your account and decided to waive it.\n\nAmount: {amount}\nDate waived: {date}\n\nReason:\n{reason}\n\nYou will not be charged this amount. The original violation remains recorded on your account with the waiver recorded beside it — we do not delete the record, we add to it, so what happened stays clear to you and to us.\n\nYou can review the violation and the waiver here:\n{url}\n\nThe SAFRA team',
   },
+  disputeResolved: {
+    subject: 'A decision on your dispute for booking {booking}',
+    body: 'We reviewed your complaint about booking {booking} and decided it in your favour.\n\nDispute reference: {reference}\nDecided on: {date}\n\nThe decision:\n{resolution}\n\nIf the decision includes compensation, it has been added to your SAFRA wallet and can be used on any future booking.\n\nYou can read the booking and the dispute in full in your account:\n{url}\n\nWe are sorry this happened, and thank you for telling us.\n\nThe SAFRA team',
+  },
+  disputeRejected: {
+    subject: 'A decision on your dispute for booking {booking}',
+    body: 'We reviewed your complaint about booking {booking} and did not find enough to uphold it.\n\nDispute reference: {reference}\nDecided on: {date}\n\nThe decision:\n{resolution}\n\nIf there is anything more to add — photographs, messages, any detail that did not reach us — contact support from your account and we will look again.\n\nThe booking and the dispute are in your account:\n{url}\n\nThe SAFRA team',
+  },
+  disputePayoutReleased: {
+    subject: 'The dispute on booking {booking} is closed',
+    body: 'The dispute opened on booking {booking} has been closed, and the hold on your payout for it has been lifted.\n\nDispute reference: {reference}\nClosed on: {date}\n\nWhat this means: the payout for this booking was held while the dispute was open, and it is now in the ordinary transfer cycle. Nothing was cancelled because the dispute was opened.\n\nThe booking is in your partner console:\n{url}\n\nThe SAFRA team',
+  },
   partnerWarned: {
     subject: 'A warning has been issued on your account',
     body: 'A formal warning has been issued on your SAFRA partner account.\n\nDate of warning: {date}\n\nThe warning:\n{note}\n\nA warning is a record on your account. It carries no charge, and it does not affect where your listings rank in search. Confirmed bookings stand and your guests are unaffected.\n\nYou can read the violation and its full detail in the partner portal:\n{url}\n\nTo appeal or ask a question, contact the SAFRA team through support in the partner portal.\n\nThe SAFRA team',

@@ -39,6 +39,7 @@ import { StaffOverviewService } from './staff-overview.service.js';
 import { EmergencyService } from './emergency.service.js';
 import { CommsController } from './comms.controller.js';
 import { DisputeService } from './dispute.service.js';
+import { DisputeNotifier } from './dispute-notifier.js';
 import { CouponAdminService } from './coupon-admin.service.js';
 import { AdExpiryService } from './ad-expiry.service.js';
 import { AdCreativeService } from './ad-creative.service.js';
@@ -109,6 +110,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     EmergencyService,
     // §8's customer-facing and commercial domains — see CommsController.
     DisputeService,
+    DisputeNotifier,
     CouponAdminService,
     AdExpiryService,
     AdCreativeService,

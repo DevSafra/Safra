@@ -13,6 +13,7 @@ import {
 
 import { DATABASE } from '../database/database.module.js';
 import { AuditService } from '../common/audit/audit.service.js';
+import { DisputeNotifier } from './dispute-notifier.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { assertCanWrite, scopeFilter } from '../rbac/scope.sql.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
@@ -139,6 +140,7 @@ export class DisputeService {
     private readonly wallet: WalletService,
     private readonly ledger: LedgerService,
     private readonly fx: FxRateService,
+    private readonly notifier: DisputeNotifier,
   ) {}
 
   /** A currency code the platform knows, or a refusal a person can read. */
@@ -620,6 +622,16 @@ export class DisputeService {
       */
       await this.restoreBookingStatus(tx as unknown as Database, dispute.id, actor);
     });
+
+    /*
+      AFTER the commit, and it cannot fail the closure.
+
+      Both people this concerns are told: the customer what was decided, the partner that the hold
+      on their money is lifted. Neither was told anything until 2026-08-28 — they found out by
+      looking. `DisputeNotifier` swallows its own errors and audits what actually happened, so a mail
+      server being down cannot make a settled dispute look unsettled.
+    */
+    await this.notifier.closed(actor, dispute.id, input.outcome);
 
     /*
       Re-read WITHOUT the actor's scope filter. The write was already authorised above, and a member

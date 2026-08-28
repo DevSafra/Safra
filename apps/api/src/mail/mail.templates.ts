@@ -998,6 +998,94 @@ export function partnerSuspendedMail(input: {
  * `note` is the warning TEXT — written by an operator for this reader, under a field labelled
  * «يقرأه الشريك». The staff-only fields never come near this template.
  */
+/**
+ * «We decided your dispute in your favour.»
+ *
+ * The resolution is quoted VERBATIM, because it is the sentence a staff member wrote knowing it
+ * would be read — a database CHECK requires one, and §10 makes it the record a customer, a partner
+ * or an insurer asks to see. Summarising it here would put a second account of one decision into
+ * the world.
+ *
+ * Compensation is described rather than stated as a figure: the amount is already in the wallet and
+ * on the wallet screen, and a number repeated in a mail is a number that can disagree with it.
+ */
+export function disputeResolvedMail(input: {
+  to: string;
+  locale: string;
+  booking: string;
+  reference: string;
+  resolution: string;
+  date: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.disputeResolved, input.locale, {
+      booking: input.booking,
+      reference: input.reference,
+      resolution: input.resolution,
+      date: input.date,
+      url: input.url,
+    }),
+  };
+}
+
+/**
+ * «We did not uphold your dispute» — and how to come back with more.
+ *
+ * A refusal that offers no route onward reads as a door closing. §10 lets a dispute be reopened by
+ * raising it again with more, so the mail says so.
+ */
+export function disputeRejectedMail(input: {
+  to: string;
+  locale: string;
+  booking: string;
+  reference: string;
+  resolution: string;
+  date: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.disputeRejected, input.locale, {
+      booking: input.booking,
+      reference: input.reference,
+      resolution: input.resolution,
+      date: input.date,
+      url: input.url,
+    }),
+  };
+}
+
+/**
+ * «The dispute is closed and your payout is no longer held.»
+ *
+ * To the PARTNER, and it deliberately does not carry the resolution: the outcome is between SAFRA
+ * and the customer, and forwarding a complaint's verdict to the party complained about would put a
+ * customer's words in front of them without their asking.
+ *
+ * What the partner is owed is the fact about their money — the freeze is lifted and nothing was
+ * cancelled by the dispute having existed, which is the assumption a partner otherwise makes.
+ */
+export function disputePayoutReleasedMail(input: {
+  to: string;
+  locale: string;
+  booking: string;
+  reference: string;
+  date: string;
+  url: string;
+}): OutgoingMail {
+  return {
+    to: input.to,
+    ...compose((m) => m.disputePayoutReleased, input.locale, {
+      booking: input.booking,
+      reference: input.reference,
+      date: input.date,
+      url: input.url,
+    }),
+  };
+}
+
 export function partnerWarnedMail(input: {
   to: string;
   locale: string;

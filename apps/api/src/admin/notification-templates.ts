@@ -75,6 +75,31 @@ export const NOTIFICATION_TEMPLATES: readonly NotificationTemplate[] = [
     */
     implemented: false,
   },
+  /*
+    ── A closed dispute, announced (Bashar, 2026-08-28) ──────────────────────
+
+    Three keys because three different people need three different facts, and because سجل واتساب
+    والبريد lists what was sent by key: one «dispute closed» would make «did the customer hear the
+    outcome» unanswerable from the log.
+  */
+  {
+    key: 'dispute.resolved',
+    channels: ['email'],
+    locales: ALL_LOCALES,
+    implemented: true,
+  },
+  {
+    key: 'dispute.rejected',
+    channels: ['email'],
+    locales: ALL_LOCALES,
+    implemented: true,
+  },
+  {
+    key: 'dispute.payout_released',
+    channels: ['email'],
+    locales: ALL_LOCALES,
+    implemented: true,
+  },
   {
     key: 'partner.deadline_reminder',
     channels: ['whatsapp', 'email'],

@@ -198,6 +198,8 @@ export const AUDIT_ACTIONS = [
   'review.report_dismissed',
   /* Somebody took it: open -> investigating, with who took it. */
   'dispute.acknowledged',
+  /* Who was told a dispute closed, and whether they could be. */
+  'dispute.notified',
   'dispute.resolved',
   'dispute.rejected',
   /*

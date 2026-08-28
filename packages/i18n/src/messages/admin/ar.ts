@@ -2650,6 +2650,7 @@ export const ar = {
     'wallet.adjusted': 'تعديل محفظة',
     // Added 2026-08-04 with the four new sections.
     'dispute.acknowledged': 'استلام نزاع للمراجعة',
+    'dispute.notified': 'إشعار أطراف النزاع بالإغلاق',
     'dispute.resolved': 'إغلاق نزاع لصالح العميل',
     'dispute.rejected': 'رفض نزاع',
     'emergency_mode.activated': 'تفعيل وضع الطوارئ',

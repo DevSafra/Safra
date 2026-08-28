@@ -49,6 +49,18 @@ export const de = {
     subject: 'Eine Geldstrafe auf Ihrem Konto wurde erlassen',
     body: 'Das SAFRA-Team hat die Geldstrafe auf Ihrem Konto geprüft und entschieden, sie zu erlassen.\n\nBetrag: {amount}\nDatum des Erlasses: {date}\n\nGrund:\n{reason}\n\nDieser Betrag wird Ihnen nicht berechnet. Der ursprüngliche Verstoß bleibt in Ihrem Konto verzeichnet, mit dem Erlass daneben — wir löschen den Eintrag nicht, wir ergänzen ihn, damit nachvollziehbar bleibt, was geschehen ist.\n\nVerstoß und Erlass können Sie hier einsehen:\n{url}\n\nIhr SAFRA-Team',
   },
+  disputeResolved: {
+    subject: 'Entscheidung zu Ihrer Beschwerde zur Buchung {booking}',
+    body: 'Wir haben Ihre Beschwerde zur Buchung {booking} geprüft und zu Ihren Gunsten entschieden.\n\nVorgangsnummer: {reference}\nEntschieden am: {date}\n\nDie Entscheidung:\n{resolution}\n\nFalls die Entscheidung eine Entschädigung umfasst, wurde sie Ihrem SAFRA-Guthaben gutgeschrieben und kann für jede künftige Buchung verwendet werden.\n\nBuchung und Vorgang finden Sie vollständig in Ihrem Konto:\n{url}\n\nEs tut uns leid, und danke für Ihre Meldung.\n\nIhr SAFRA-Team',
+  },
+  disputeRejected: {
+    subject: 'Entscheidung zu Ihrer Beschwerde zur Buchung {booking}',
+    body: 'Wir haben Ihre Beschwerde zur Buchung {booking} geprüft und konnten ihr nicht stattgeben.\n\nVorgangsnummer: {reference}\nEntschieden am: {date}\n\nDie Entscheidung:\n{resolution}\n\nWenn es etwas zu ergänzen gibt — Fotos, Nachrichten, ein Detail, das uns nicht erreicht hat — wenden Sie sich über Ihr Konto an den Support, und wir prüfen erneut.\n\nBuchung und Vorgang finden Sie in Ihrem Konto:\n{url}\n\nIhr SAFRA-Team',
+  },
+  disputePayoutReleased: {
+    subject: 'Der Vorgang zur Buchung {booking} ist abgeschlossen',
+    body: 'Der zur Buchung {booking} eröffnete Vorgang wurde abgeschlossen, und die Sperre Ihrer Auszahlung dafür wurde aufgehoben.\n\nVorgangsnummer: {reference}\nAbgeschlossen am: {date}\n\nWas das bedeutet: Die Auszahlung für diese Buchung war gesperrt, solange der Vorgang offen war, und befindet sich nun im üblichen Überweisungslauf. Durch die Eröffnung des Vorgangs wurde nichts storniert.\n\nDie Buchung finden Sie in Ihrer Partner-Konsole:\n{url}\n\nIhr SAFRA-Team',
+  },
   partnerWarned: {
     subject: 'Eine Verwarnung wurde für Ihr Konto ausgesprochen',
     body: 'Für Ihr SAFRA-Partnerkonto wurde eine formelle Verwarnung ausgesprochen.\n\nDatum der Verwarnung: {date}\n\nDie Verwarnung:\n{note}\n\nEine Verwarnung ist ein Eintrag in Ihrem Konto. Sie ist mit keiner Zahlung verbunden und hat keinen Einfluss darauf, wie Ihre Inserate in der Suche platziert werden. Bestätigte Buchungen bleiben bestehen, Ihre Gäste sind nicht betroffen.\n\nDen Verstoß und alle Einzelheiten finden Sie im Partnerportal:\n{url}\n\nFür Einsprüche oder Rückfragen wenden Sie sich über den Support im Partnerportal an das SAFRA-Team.\n\nIhr SAFRA-Team',
