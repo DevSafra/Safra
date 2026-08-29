@@ -1,9 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-
-import { PasswordField } from '@safra/ui';
+import { PasswordField, replaceInto } from '@safra/ui';
 
 import { t, apiError } from '@/lib/strings';
 import { ERROR } from '@safra/contracts';
@@ -51,8 +49,6 @@ const TOTP_PATTERN = /^\d{6}$/;
  * - anything else — a real failure, shown as such
  */
 export function StaffLoginForm({ next }: { next: string }) {
-  const router = useRouter();
-
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,13 +84,20 @@ export function StaffLoginForm({ next }: { next: string }) {
   }
 
   /**
-   * `refresh()` before navigating: the session is an HttpOnly cookie the React tree
-   * cannot see, so without it the server components render from cache and still
-   * believe nobody is signed in.
+   * A full document load that REPLACES this page — see `replaceInto`.
+   *
+   * It was `router.refresh()` then `router.push(next)`, which is two navigations at once and they
+   * disagree: the refresh refetches `/login`, where the middleware now sees a session and redirects
+   * to `/`, while the push transitions to the deep link the reader originally asked for. Whichever
+   * settled last decided, so the address bar could be left on `/login?next=…` over a page showing
+   * the thread — and the next click could put them back on the sign-in form. Reported by Bashar on
+   * 2026-08-29 as «I click رجوع and I am back at the login page».
+   *
+   * A real navigation also removes the reason `refresh()` was here: the document is fetched again
+   * with the new cookie, so no server component can render from a cache made before the sign-in.
    */
   function enter(payload: unknown): void {
-    router.refresh();
-    router.push(requiresEnrolment(payload) ? '/enrol-2fa' : next);
+    replaceInto(requiresEnrolment(payload) ? '/enrol-2fa' : next);
   }
 
   /**

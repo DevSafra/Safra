@@ -274,7 +274,25 @@ test.describe('الموظفون', () => {
         .fill(await signInCodeFor(request, address, signedInAt));
       await page.getByRole('button', { name: t.login.codeSubmit }).click();
 
-      await page.waitForURL(`${PARTNER_BASE}/`, { timeout: 20_000 });
+      /*
+        Off the sign-in form and INTO the portal — not `/` specifically.
+
+        This waited for `${PARTNER_BASE}/` and passed only because the form used to navigate on the
+        client: the URL became `/` for an instant before the server's own redirect moved it on. A
+        sign-in is now a real document load (see `replaceInto`), so the browser follows that
+        redirect and `/` is never shown — and the assertion was measuring a moment that only
+        existed because of the race it was hiding.
+
+        `/` is owner-only by design: `page.tsx` sends a reader without `dashboard` access to their
+        first readable section, because an empty overview of a business you cannot read is
+        indistinguishable from a broken portal. For this employee that is «الوصول».
+      */
+      await page.waitForURL((url) => !url.pathname.startsWith('/login'), {
+        timeout: 20_000,
+      });
+
+      /* And it is the landing their permissions actually allow, not an owner-only screen. */
+      await expect(page).toHaveURL(`${PARTNER_BASE}/arrivals`);
 
       // ── What they may see ───────────────────────────────────────────────────
 

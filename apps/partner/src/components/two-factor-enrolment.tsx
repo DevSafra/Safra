@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { reloadInto } from '@safra/ui';
 
 import { t } from '@/lib/strings';
 
@@ -31,8 +31,6 @@ interface Setup {
  * its sign-out lives in a sidebar that is always present; here there is no sidebar yet.
  */
 export function TwoFactorEnrolment() {
-  const router = useRouter();
-
   const [setup, setSetup] = useState<Setup | null>(null);
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -142,8 +140,12 @@ export function TwoFactorEnrolment() {
           onClick={() => {
             // refresh() first: the new token carries totpEnabled, and middleware reads it on the
             // next request to let this person past the gate.
-            router.refresh();
-            router.push('/');
+            /*
+              A full document load — see `reloadInto`. Enrolment is the moment the session becomes
+              usable: the middleware stops confining this account to `/enrol-2fa`, and a soft push
+              would land on a dashboard rendered from a cache made while it was still confined.
+            */
+            reloadInto('/');
           }}
           className="min-h-10 cursor-pointer rounded-lg bg-gold px-5 py-3 font-semibold text-bg"
         >

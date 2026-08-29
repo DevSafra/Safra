@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-
 import { ERROR } from '@safra/contracts';
-import { PasswordField } from '@safra/ui';
+import { PasswordField, replaceInto } from '@safra/ui';
 
 import { t } from '@/lib/strings';
 
@@ -35,7 +33,6 @@ const TOTP_PATTERN = /^\d{6}$/;
  * account locks.
  */
 export function PartnerLoginForm({ next }: { readonly next: string }) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [awaitingCode, setAwaitingCode] = useState(false);
@@ -78,8 +75,12 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
    * asserted the parameter was set and nothing asserted it was used.
    */
   function enter(): void {
-    router.refresh();
-    router.replace(next === '' ? '/' : next);
+    /*
+      A full document load that REPLACES this page — see `replaceInto`. The same two-navigations
+      race the console's sign-in had: `refresh()` refetches `/login`, where the middleware now sees
+      a session and redirects away, while the navigation to `next` is still in flight.
+    */
+    replaceInto(next === '' ? '/' : next);
   }
 
   async function submitCredentials(event: React.FormEvent<HTMLFormElement>) {

@@ -315,8 +315,31 @@ test.describe('staff sign-in', () => {
     await expect(field(page, t.login.code)).toHaveValue('');
   });
 
-  test('signs in with a valid code and reaches the dashboard', async ({ page }) => {
-    await page.goto('/login');
+  /**
+   * Signs in from a DEEP LINK, which is the arrival that was broken.
+   *
+   * ## The bug (Bashar, 2026-08-29)
+   *
+   * Open `/messages/CNV-…` signed out, sign in, press «رجوع» — and land back on the sign-in page.
+   * The form ran `router.refresh()` and then `router.push(next)`: two navigations at once that
+   * disagree, because the refresh refetches `/login`, where the middleware now sees a session and
+   * redirects to `/`. Whichever settled last decided, so the address bar could be left reading
+   * `/login?next=…` over a page showing the thread, and the next click put the reader back on the
+   * form. Timing-dependent, which is why it looked intermittent.
+   *
+   * ## Arriving deep costs no more than arriving at `/login`
+   *
+   * This spec has a documented sign-in budget — five POSTs a minute per IP on the login route — so
+   * this replaces the plain sign-in rather than joining it. It asserts everything that one did and
+   * three things it could not: where the address bar ends up, that «رجوع» works from there, and
+   * that the browser's own back button is not a trapdoor into a page the middleware bounces.
+   */
+  test('signs in from a deep link and lands where they were going', async ({ page }) => {
+    await page.goto('/messages?size=10');
+
+    /* Sent to the form, carrying where they were headed. */
+    await expect(page).toHaveURL(/\/login\?next=/);
+
     await field(page, t.login.email).fill(EMAIL as string);
     await field(page, t.login.password).fill(PASSWORD as string);
     await submit(page).click();
@@ -324,7 +347,20 @@ test.describe('staff sign-in', () => {
     await field(page, t.login.code).fill(await freshCode());
     await submit(page).click();
 
-    await expect(page.getByRole('heading', { name: t.admin.title })).toBeVisible();
+    /*
+      The ADDRESS BAR, not merely the content. The whole defect was that these two disagreed: the
+      page showed the destination while the URL still said `/login?next=…`.
+    */
+    await expect(page).toHaveURL(/\/messages/, { timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: t.nav.messages })).toBeVisible();
+
+    /*
+      And the sign-in page is not left behind in history. `replace`, not `assign`: a signed-in
+      person cannot return to `/login` — the middleware bounces it — so an entry for it makes the
+      browser's back button a trapdoor.
+    */
+    await page.goBack();
+    await expect(page).not.toHaveURL(/\/login/);
   });
 
   test('a wrong password never reaches the code step', async ({ page }) => {

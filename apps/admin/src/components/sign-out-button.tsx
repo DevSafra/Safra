@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { reloadInto } from '@safra/ui';
 
 import { t } from '@/lib/strings';
 
@@ -14,7 +14,6 @@ import { t } from '@/lib/strings';
  * rather than only in this browser — which is the point on a shared machine.
  */
 export function SignOutButton() {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   async function signOut() {
@@ -28,8 +27,13 @@ export function SignOutButton() {
       // completes the sign-out from this browser's point of view.
     }
 
-    router.refresh();
-    router.push('/login');
+    /*
+      A full document load — see `reloadInto`. `refresh()` refetches the page being LEFT, which is a
+      guarded route the middleware answers with `/login?next=<here>`, while `push` renders a cached
+      copy of the destination. The console's chrome is server-rendered from the session cookie, so
+      the two together left it wearing a signed-in sidebar after signing out.
+    */
+    reloadInto('/login');
   }
 
   return (
