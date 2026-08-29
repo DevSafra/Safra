@@ -8,7 +8,7 @@ import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
 import { PhoneField } from '@/components/phone-field';
-import { reloadInto } from '@/lib/session-navigation';
+import { reloadInto } from '@safra/ui';
 import { errorMessage } from '@safra/i18n';
 import { isErrorCode, phoneSchema } from '@safra/contracts';
 

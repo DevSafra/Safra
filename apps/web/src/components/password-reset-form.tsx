@@ -7,7 +7,7 @@ import type { Locale } from '@/i18n/routing';
 
 import { PasswordField, PasswordStrengthMeter, passwordsMatch } from '@safra/ui';
 
-import { reloadInto } from '@/lib/session-navigation';
+import { reloadInto } from '@safra/ui';
 
 /**
  * Both halves of a password reset (SRS §4).

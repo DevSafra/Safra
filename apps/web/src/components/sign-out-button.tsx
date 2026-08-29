@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
-import { reloadInto } from '@/lib/session-navigation';
+import { reloadInto } from '@safra/ui';
 
 /**
  * Sign out.

@@ -21,3 +21,4 @@ export * from './sidebar.js';
 export * from './sidebar-toggle.js';
 export * from './sidebar-backdrop.js';
 export * from './theme-toggle.js';
+export { reloadInto, replaceInto } from './session-navigation.js';

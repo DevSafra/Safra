@@ -7,7 +7,7 @@ import type { Locale } from '@/i18n/routing';
 import { PhoneField } from '@/components/phone-field';
 import { PasswordField, passwordMismatch, passwordsMatch } from '@safra/ui';
 
-import { reloadInto } from '@/lib/session-navigation';
+import { reloadInto } from '@safra/ui';
 
 /**
  * الملف الشخصي's two forms (handoff §6).
