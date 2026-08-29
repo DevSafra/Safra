@@ -32,6 +32,33 @@ export const staffReplySchema = z
 
 export type StaffReplyInput = z.infer<typeof staffReplySchema>;
 
+/**
+ * Who a staff member is writing TO, and what they are writing.
+ *
+ * ## Three recipients, because a booking has two sides
+ *
+ * `customer` and `partner` each open a two-party thread — the shape a support ticket already has,
+ * except SAFRA spoke first. `booking` is the THREE-party thread the whole design describes and that
+ * nothing could create until now: the customer, SAFRA and the host in one ordered record, which is
+ * what «who said what, when» needs when the two of them disagree about a night.
+ *
+ * ## A reference, never an id
+ *
+ * The console shows `CUS-`, `PAR-` and `BKG-` references on every screen and links by them; an id
+ * would be a value the operator cannot see or check. The KIND is explicit rather than sniffed from
+ * the prefix, so a mistyped reference is «not found» in one table rather than a lookup in whichever
+ * table happens to match.
+ */
+export const startConversationSchema = z
+  .object({
+    to: z.enum(['customer', 'partner', 'booking']),
+    reference: z.string().trim().min(3).max(40),
+    body: z.string().trim().min(1).max(4000),
+  })
+  .strict();
+
+export type StartConversationInput = z.infer<typeof startConversationSchema>;
+
 export interface ConversationRow {
   readonly reference: string;
   /** `booking` | `dispute` | `partner` — what the thread is about. */
@@ -44,6 +71,28 @@ export interface ConversationRow {
   readonly unreadForStaff: number;
   readonly messageCount: number;
   readonly closed: boolean;
+}
+
+/** The thread screen's payload: what the conversation IS, and what was said in it. */
+export interface ThreadView {
+  readonly closed: boolean;
+  /** `booking` | `dispute` | `partner` | `support` — the same four the inbox names. */
+  readonly subjectKind: string;
+  /** The booking or dispute it is about; null for a ticket, which is about nothing else. */
+  readonly subjectReference: string | null;
+  readonly customer: string | null;
+  readonly partner: string | null;
+  readonly messages: MessageRow[];
+}
+
+interface ScopedConversation extends Record<string, unknown> {
+  id: string;
+  city_id: string | null;
+  closed_at: string | null;
+  subject_kind: string;
+  subject_reference: string | null;
+  customer: string | null;
+  partner: string | null;
 }
 
 export interface MessageRow {
@@ -178,7 +227,14 @@ export class MessagingService {
                   WHEN c.dispute_id IS NOT NULL THEN 'dispute'
                   WHEN c.partner_id IS NOT NULL THEN 'partner'
                   ELSE 'support' END        AS subject_kind,
-             coalesce(b.reference, d.reference, p.reference, c.reference) AS subject_reference,
+             -- The SUBJECT, and only a real one.
+             --
+             -- This coalesced down to the partner's reference and then to the conversation's own,
+             -- so a support ticket printed a CNV number identical to the link beside it and a
+             -- partner's ticket printed PAR-… — the party, already named on the row. Two tickets
+             -- from one host were then indistinguishable: same line, same «subject», nothing to
+             -- tell them apart. A ticket is about nothing else; the KIND says what it is.
+             coalesce(b.reference, d.reference) AS subject_reference,
              cust.full_name                 AS customer,
              p.display_name                 AS partner,
              c.unread_for_staff,
@@ -257,17 +313,20 @@ export class MessagingService {
   private async scopedConversation(
     reference: string,
     actor: AccessTokenClaims | undefined,
-  ): Promise<
-    { id: string; city_id: string | null; closed_at: string | null } | undefined
-  > {
-    const found = await this.db.execute<{
-      id: string;
-      city_id: string | null;
-      closed_at: string | null;
-    }>(sql`
-      SELECT c.id, coalesce(b.city_id, p.city_id)::text AS city_id, c.closed_at::text
+  ): Promise<ScopedConversation | undefined> {
+    const found = await this.db.execute<ScopedConversation>(sql`
+      SELECT c.id, coalesce(b.city_id, p.city_id)::text AS city_id, c.closed_at::text,
+             CASE WHEN c.booking_id IS NOT NULL THEN 'booking'
+                  WHEN c.dispute_id IS NOT NULL THEN 'dispute'
+                  WHEN c.partner_id IS NOT NULL THEN 'partner'
+                  ELSE 'support' END AS subject_kind,
+             coalesce(b.reference, d.reference) AS subject_reference,
+             cust.full_name                     AS customer,
+             p.display_name                     AS partner
       FROM conversations c
       ${this.subjectJoins}
+      LEFT JOIN customer_profiles cust
+        ON cust.id = coalesce(c.customer_profile_id, b.customer_profile_id)
       WHERE c.reference = ${reference} AND c.deleted_at IS NULL
         AND ${scopeFilter(actor, 'coalesce(b.city_id, p.city_id)')}
       LIMIT 1
@@ -279,13 +338,15 @@ export class MessagingService {
   async thread(
     reference: string,
     actor: AccessTokenClaims | undefined,
-  ): Promise<{ closed: boolean; messages: MessageRow[] }> {
+  ): Promise<ThreadView> {
     /*
-      The thread's own state travels with its messages.
+      The thread's own state and its PARTIES travel with its messages.
 
-      Without it the screen cannot tell a finished conversation from a live one, and it went on
-      offering a reply box over a thread whose reply endpoint refuses everything — the control that
-      «does nothing» this codebase keeps finding. One extra indexed lookup on a reference.
+      Without them the screen could say neither whether the conversation was finished nor who it was
+      with: it printed a bare CNV reference over a list of messages, and an operator had to read the
+      messages to work out whether they were looking at a support ticket, a dispute or a booking.
+      The `closed` half also stopped it offering a reply box over a thread whose reply endpoint
+      refuses everything. One extra indexed lookup on a reference.
     */
     const conversation = await this.scopedConversation(reference, actor);
 
@@ -298,7 +359,12 @@ export class MessagingService {
       at: string;
     }>(sql`
       SELECT m.sender_kind::text AS sender_kind,
-             u.email             AS sender_email,
+             -- The STAFF address only, which is what this column was documented to be for:
+             -- «internal accountability». The join is on every sender, so it was handing back the
+             -- customer's and the host's addresses too and the screen printed them beside the
+             -- role. The party line names who they are; an address adds nothing a reader needs
+             -- and is the one thing on this screen that must not travel.
+             CASE WHEN m.sender_kind = 'staff' THEN u.email END AS sender_email,
              m.body, m.redacted_count, m.internal,
              to_char(m.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS at
       FROM messages m
@@ -313,6 +379,10 @@ export class MessagingService {
 
     return {
       closed: conversation?.closed_at != null,
+      subjectKind: conversation?.subject_kind ?? 'support',
+      subjectReference: conversation?.subject_reference ?? null,
+      customer: conversation?.customer ?? null,
+      partner: conversation?.partner ?? null,
       messages: result.rows.map((row) => ({
         senderKind: row.sender_kind,
         senderEmail: row.sender_email,
@@ -395,11 +465,236 @@ export class MessagingService {
     return { closed: true };
   }
 
+  /**
+   * The subject columns and the city for a recipient the operator named.
+   *
+   * One query per kind rather than one polymorphic lookup: each answers a different table, and a
+   * reference that exists in none of them is a single «not found» rather than three.
+   *
+   * The city is what `assertCanWrite` narrows on. A CUSTOMER has none — customer records are
+   * platform-level everywhere in this console — so writing to one is not a geographic decision. A
+   * partner's and a booking's are, and an operator scoped to Damascus must not open a thread with
+   * an Aleppo host.
+   */
+  private async recipientOf(input: StartConversationInput): Promise<{
+    bookingId: string | null;
+    partnerId: string | null;
+    customerProfileId: string | null;
+    cityId: string | null;
+  }> {
+    if (input.to === 'customer') {
+      const found = await this.db.execute<{ id: string }>(sql`
+        SELECT id::text FROM customer_profiles
+        WHERE reference = ${input.reference} AND deleted_at IS NULL
+        LIMIT 1
+      `);
+
+      const row = found.rows[0];
+
+      if (!row) throw notFound(ERROR.CONVERSATION_RECIPIENT_NOT_FOUND);
+
+      return {
+        bookingId: null,
+        partnerId: null,
+        customerProfileId: row.id,
+        cityId: null,
+      };
+    }
+
+    if (input.to === 'partner') {
+      const found = await this.db.execute<{ id: string; city_id: string | null }>(sql`
+        SELECT id::text, city_id::text FROM partners
+        WHERE reference = ${input.reference} AND deleted_at IS NULL
+        LIMIT 1
+      `);
+
+      const row = found.rows[0];
+
+      if (!row) throw notFound(ERROR.CONVERSATION_RECIPIENT_NOT_FOUND);
+
+      return {
+        bookingId: null,
+        partnerId: row.id,
+        customerProfileId: null,
+        cityId: row.city_id,
+      };
+    }
+
+    const found = await this.db.execute<{
+      id: string;
+      customer_profile_id: string;
+      city_id: string | null;
+    }>(sql`
+      SELECT id::text, customer_profile_id::text, city_id::text FROM bookings
+      WHERE reference = ${input.reference} AND deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const row = found.rows[0];
+
+    if (!row) throw notFound(ERROR.CONVERSATION_RECIPIENT_NOT_FOUND);
+
+    /*
+      `customer_profile_id` travels with the booking so the thread names its participant, exactly as
+      a dispute thread does. The CHECK counts subjects, and the customer column is not one — it says
+      who is in the thread, not what it is about.
+    */
+    return {
+      bookingId: row.id,
+      partnerId: null,
+      customerProfileId: row.customer_profile_id,
+      cityId: row.city_id,
+    };
+  }
+
+  /**
+   * SAFRA writing first — «محادثة جديدة».
+   *
+   * ## The gap this closes (الرسائل review, 2026-08-29)
+   *
+   * `INSERT INTO conversations` had two callers: a customer or partner opening a support ticket, and
+   * a dispute opening its own thread. Staff had none. So الرسائل was a reply-only inbox — an
+   * operator could answer somebody who had written in and could not write to anybody, which is the
+   * first thing a person expects of a screen called «الرسائل». Bashar asked how to message a
+   * customer, a partner, or both at once; the honest answer was that there was no way.
+   *
+   * ## An open thread with the same subject is CONTINUED, not duplicated
+   *
+   * Messaging a customer twice made two rows that look identical in the inbox — same party, same
+   * subject, nothing to tell them apart. A chat continues; only a CLOSED thread is finished, and
+   * writing to somebody whose last thread is closed opens a new one. That is also what stops this
+   * endpoint being a way to fill the queue with duplicates of a thread already being worked.
+   *
+   * ## Redacted like every other message
+   *
+   * Staff are not exempt — `reply`'s reasoning, unchanged: an agent pasting a host's number to a
+   * customer defeats the rule as thoroughly as the customer asking for it.
+   */
+  async start(
+    actor: AccessTokenClaims | undefined,
+    input: StartConversationInput,
+  ): Promise<{ reference: string; created: boolean }> {
+    const recipient = await this.recipientOf(input);
+
+    assertCanWrite(actor, recipient.cityId);
+
+    const redacted = redactIncomingMessage(input.body);
+
+    const existing = await this.db.execute<{ id: string; reference: string }>(sql`
+      SELECT id::text, reference FROM conversations
+      WHERE deleted_at IS NULL AND closed_at IS NULL AND dispute_id IS NULL
+        AND booking_id IS NOT DISTINCT FROM ${recipient.bookingId}::uuid
+        AND partner_id IS NOT DISTINCT FROM ${recipient.partnerId}::uuid
+        AND customer_profile_id IS NOT DISTINCT FROM ${recipient.customerProfileId}::uuid
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+
+    const reuse = existing.rows[0];
+
+    const conversation = await this.db.transaction(async (tx) => {
+      const target =
+        reuse ??
+        (
+          await tx.execute<{ id: string; reference: string }>(sql`
+            INSERT INTO conversations
+              (booking_id, partner_id, customer_profile_id, opened_by_user_id,
+               last_message_at, unread_for_staff)
+            VALUES (${recipient.bookingId}::uuid, ${recipient.partnerId}::uuid,
+                    ${recipient.customerProfileId}::uuid, ${actor?.sub}::uuid,
+                    now(),
+                    /* Staff wrote it; a thread unread to its own author inflates the badge. */
+                    0)
+            RETURNING id::text, reference
+          `)
+        ).rows[0];
+
+      if (!target) throw notFound(ERROR.CONVERSATION_RECIPIENT_NOT_FOUND);
+
+      await tx.execute(sql`
+        INSERT INTO messages
+          (conversation_id, sender_kind, sender_user_id, body, redacted_count, internal)
+        VALUES (${target.id}::uuid, 'staff', ${actor?.sub}::uuid,
+                ${redacted.body}, ${redacted.redactedCount}, false)
+      `);
+
+      /* Continuing a thread moves it up the inbox, exactly as a reply does. */
+      await tx.execute(sql`
+        UPDATE conversations SET last_message_at = now(), updated_at = now()
+        WHERE id = ${target.id}::uuid
+      `);
+
+      await this.audit.record(
+        {
+          actorUserId: actor?.sub,
+          actorRole: actor?.role,
+          action: 'conversation.started',
+          subjectType: 'conversation',
+          subjectId: target.id,
+          after: {
+            reference: target.reference,
+            to: input.to,
+            /* The recipient's REFERENCE, never their name or address. */
+            recipient: input.reference,
+            continued: reuse !== undefined,
+          },
+        },
+        tx as unknown as Database,
+      );
+
+      return target;
+    });
+
+    /* After the commit, and it cannot undo the message — see `notifyOfReply`. */
+    await this.notifyOfReply(conversation.id);
+
+    return { reference: conversation.reference, created: reuse === undefined };
+  }
+
+  /**
+   * «I have read this» — what brings the الرسائل badge down.
+   *
+   * ## Why reading, and why not on the GET
+   *
+   * `unread_for_staff` was cleared by a REPLY and by a CLOSE and by nothing else, so a thread an
+   * agent read and decided needed no answer stayed counted for ever and the badge beside الرسائل
+   * could not be worked down by working. Reading is taking, exactly as «استلام» is on النزاعات.
+   *
+   * Clearing it inside the thread's GET would have been the obvious place and is wrong: Next
+   * PREFETCHES a link the mouse passes over, and a prefetch is not a person reading. So the console
+   * posts this from an effect that runs only when the screen is actually rendered — the same
+   * mechanism, and the same reasoning, as `MarkSectionSeen`.
+   *
+   * ## It is a write, so it takes a write's permissions
+   *
+   * The counter is ONE number shared by every agent, not a per-reader flag: clearing it decides for
+   * everybody that this thread has been seen. A `read_only` member is refused, as they are for a
+   * close.
+   */
+  async markRead(
+    actor: AccessTokenClaims | undefined,
+    reference: string,
+  ): Promise<{ read: boolean }> {
+    const conversation = await this.scopedConversation(reference, actor);
+
+    if (!conversation) throw notFound(ERROR.CONVERSATION_NOT_FOUND_OR_CLOSED);
+
+    assertCanWrite(actor, conversation.city_id);
+
+    const done = await this.db.execute(sql`
+      UPDATE conversations SET unread_for_staff = 0, updated_at = now()
+      WHERE id = ${conversation.id}::uuid AND unread_for_staff > 0
+    `);
+
+    /* False when there was nothing to clear — an ordinary second render, not a failure. */
+    return { read: (done.rowCount ?? 0) > 0 };
+  }
+
   async reply(
     actor: AccessTokenClaims | undefined,
     reference: string,
     input: StaffReplyInput,
-  ): Promise<{ closed: boolean; messages: MessageRow[] }> {
+  ): Promise<ThreadView> {
     /*
       Scoped both ways — see `thread`. The predicate so an out-of-scope thread answers exactly as a
       closed or absent one, and `assertCanWrite` so a `read_only` agent who may read the thread
@@ -453,7 +748,7 @@ export class MessagingService {
       undone by an unreachable mailbox.
     */
     if (!input.internal) {
-      await this.notifyAskerOfReply(conversation.id);
+      await this.notifyOfReply(conversation.id);
     }
 
     return this.thread(reference, actor);
@@ -480,29 +775,34 @@ export class MessagingService {
    * agent writing the reply is Arabic-only by construction, so taking the locale from the actor
    * would send every German customer Arabic and nothing would fail.
    */
-  private async notifyAskerOfReply(conversationId: string): Promise<void> {
+  private async notifyOfReply(conversationId: string): Promise<void> {
     /*
       The same lookup the close notice uses, and that is the point: it was written out twice, and
       the note under `askerOfThread` already claimed «one definition of the person waiting rather
       than two that drift». They would have drifted here: widening one predicate for a dispute
       thread and leaving the other means a closure tells the customer and a reply does not.
     */
-    const asker = await this.askerOfThread(conversationId);
+    const recipients = await this.recipientsOfThread(conversationId);
 
-    if (!asker) return;
-
-    const { email, locale, url, reference } = asker;
-
-    await this.notifier.notify(
-      'support.replied',
-      supportRepliedMail({
-        to: email,
-        locale,
-        reference,
-        url,
-      }),
-      locale,
+    for (const { email, locale, url, reference, subject } of recipients) {
       /*
+        Per recipient, and one failure does not silence the other.
+
+        On a booking thread the customer and the host are told separately, in their own languages,
+        each pointed at their own dashboard. A single try/catch around the loop would let an
+        unreachable mailbox on one side swallow the notice to the other.
+      */
+      try {
+        await this.notifier.notify(
+          'support.replied',
+          supportRepliedMail({
+            to: email,
+            locale,
+            reference,
+            url,
+          }),
+          locale,
+          /*
         The RECIPIENT's id, not the thread's.
 
         `notify`'s subject has no `conversation_id` and does not gain one here. Those columns exist
@@ -513,25 +813,32 @@ export class MessagingService {
         ticket itself is not lost: `template_key` is `support.replied` and the thread is one click
         away from the same customer or partner.
       */
-      asker.subject,
-    );
+          subject,
+        );
+      } catch (error) {
+        this.logger.error(
+          `Could not tell a party that thread ${reference} had a reply.`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
+    }
   }
 
   /**
-   * The person waiting on a thread — address, language, and where to send them.
+   * Everybody waiting on a thread — address, language, and where to send each of them.
    *
-   * ## Only a thread the recipient can actually open
+   * ## An array, because a booking thread has TWO sides
    *
-   * The `WHERE` refuses any thread with a BOOKING — the same shape `SupportService.scopeOf` defines
-   * as «mine». A booking thread has two parties and no route into it from either dashboard, so a
-   * link to its reference answers 404 to the person who followed it, and writing to one would be
-   * worse than silence.
+   * It returned one recipient while a thread could only ever have one. A booking thread is the
+   * three-party record — customer, SAFRA, host — and telling one side an answer arrived while the
+   * other finds out by looking is not a three-party conversation, it is two half-broken ones.
    *
-   * A DISPUTE thread is not in that class and is no longer excluded. الدعم lists it on the
-   * customer's side and it opens at the same `/account/support/{reference}` this link points at, so
-   * the notice leads somewhere. The clause excluding it cost nothing while the column had no
-   * writer; keeping it now would mean staff replying into a thread the customer can read and is
-   * never told about.
+   * ## Only somebody who can actually open it
+   *
+   * Each row resolves to the dashboard that lists the thread for that party, so the link leads
+   * somewhere: `/account/support/{reference}` on the customer's side, `/support/{reference}` on the
+   * host's. The BOOKING exclusion that used to sit here went with the same commit that let both
+   * dashboards read a booking thread — a guard against a 404 that can no longer happen.
    *
    * ## Active accounts only
    *
@@ -545,66 +852,66 @@ export class MessagingService {
    * German customer Arabic and nothing would fail. `resolveLocale` decides what an unrecognised
    * value means, so the link always matches the language the message is written in.
    */
-  private async askerOfThread(conversationId: string): Promise<{
-    email: string;
-    locale: string;
-    url: string;
-    reference: string;
-    subject: { customerProfileId: string } | { partnerId: string };
-  } | null> {
+  private async recipientsOfThread(conversationId: string): Promise<
+    {
+      email: string;
+      locale: string;
+      url: string;
+      reference: string;
+      subject: { customerProfileId: string } | { partnerId: string };
+    }[]
+  > {
     const found = await this.db.execute<{
       reference: string;
-      customer_profile_id: string | null;
-      partner_id: string | null;
+      party: 'customer' | 'partner';
+      subject_id: string;
       email: string | null;
       locale: string | null;
     }>(sql`
-      SELECT c.reference,
-             c.customer_profile_id,
-             c.partner_id,
-             coalesce(cp.email, pu.email)                       AS email,
-             coalesce(cp.preferred_locale, pu.preferred_locale) AS locale
+      -- The customer side: named on the thread, or the one whose booking it is.
+      SELECT c.reference, 'customer' AS party, cp.id::text AS subject_id,
+             cp.email AS email, cp.preferred_locale AS locale
       FROM conversations c
-      LEFT JOIN customer_profiles cp ON cp.id = c.customer_profile_id
-      LEFT JOIN users cu             ON cu.id = cp.user_id
-      LEFT JOIN partners pa          ON pa.id = c.partner_id
-      LEFT JOIN users pu             ON pu.id = pa.user_id
-      WHERE c.id = ${conversationId}::uuid
-        AND c.booking_id IS NULL
-        AND coalesce(cu.status, pu.status) = 'active'
-      LIMIT 1
+      LEFT JOIN bookings b        ON b.id = c.booking_id
+      JOIN customer_profiles cp   ON cp.id = coalesce(c.customer_profile_id,
+                                                     b.customer_profile_id)
+      JOIN users cu               ON cu.id = cp.user_id
+      WHERE c.id = ${conversationId}::uuid AND cu.status = 'active'
+      UNION ALL
+      -- The host side, which exists only on a partner thread or a booking's.
+      SELECT c.reference, 'partner', pa.id::text,
+             pu.email, pu.preferred_locale
+      FROM conversations c
+      LEFT JOIN bookings b ON b.id = c.booking_id
+      JOIN partners pa     ON pa.id = coalesce(c.partner_id, b.partner_id)
+      JOIN users pu        ON pu.id = pa.user_id
+      WHERE c.id = ${conversationId}::uuid AND pu.status = 'active'
     `);
 
-    const row = found.rows[0];
+    return found.rows.flatMap((row) => {
+      if (!row.email) return [];
 
-    if (!row?.email) return null;
+      const locale = resolveLocale(row.locale ?? 'ar');
 
-    const locale = resolveLocale(row.locale ?? 'ar');
-
-    if (row.customer_profile_id) {
-      return {
-        email: row.email,
-        locale,
-        url: new URL(
-          `/${locale}/account/support/${row.reference}`,
-          this.env.APP_URL,
-        ).toString(),
-        reference: row.reference,
-        subject: { customerProfileId: row.customer_profile_id },
-      };
-    }
-
-    if (row.partner_id) {
-      return {
-        email: row.email,
-        locale,
-        url: new URL(`/support/${row.reference}`, this.env.PARTNER_URL).toString(),
-        reference: row.reference,
-        subject: { partnerId: row.partner_id },
-      };
-    }
-
-    return null;
+      return [
+        {
+          email: row.email,
+          locale,
+          url:
+            row.party === 'customer'
+              ? new URL(
+                  `/${locale}/account/support/${row.reference}`,
+                  this.env.APP_URL,
+                ).toString()
+              : new URL(`/support/${row.reference}`, this.env.PARTNER_URL).toString(),
+          reference: row.reference,
+          subject:
+            row.party === 'customer'
+              ? { customerProfileId: row.subject_id }
+              : { partnerId: row.subject_id },
+        },
+      ];
+    });
   }
 
   /**
@@ -614,7 +921,7 @@ export class MessagingService {
    * answer that is not coming. The same reasoning that put a notice on a closed dispute the day
    * before: they found out by looking, or not at all.
    *
-   * Everything about WHO is `askerOfThread`'s — reachable threads only, active accounts only, the
+   * Everything about WHO is `recipientsOfThread`'s — reachable parties only, active accounts only, the
    * recipient's own language — so there is one definition of «the person waiting», now used by both
    * notices rather than written out twice.
    */
@@ -622,31 +929,29 @@ export class MessagingService {
     conversationId: string,
     reference: string,
   ): Promise<void> {
-    const asker = await this.askerOfThread(conversationId);
-
-    if (!asker) return;
-
-    try {
-      await this.notifier.notify(
-        'support.closed',
-        supportClosedMail({
-          to: asker.email,
-          locale: asker.locale,
-          reference,
-          url: asker.url,
-        }),
-        asker.locale,
-        asker.subject,
-      );
-    } catch (error) {
-      /*
-        Swallowed. The thread IS closed — the transaction committed before this ran — and an agent
-        told their close had failed would reasonably do it again.
-      */
-      this.logger.error(
-        `Could not tell the asker that thread ${reference} was closed.`,
-        error instanceof Error ? error.stack : undefined,
-      );
+    for (const recipient of await this.recipientsOfThread(conversationId)) {
+      try {
+        await this.notifier.notify(
+          'support.closed',
+          supportClosedMail({
+            to: recipient.email,
+            locale: recipient.locale,
+            reference,
+            url: recipient.url,
+          }),
+          recipient.locale,
+          recipient.subject,
+        );
+      } catch (error) {
+        /*
+          Swallowed, per recipient. The thread IS closed — the transaction committed before this
+          ran — and an agent told their close had failed would reasonably do it again.
+        */
+        this.logger.error(
+          `Could not tell a party that thread ${reference} was closed.`,
+          error instanceof Error ? error.stack : undefined,
+        );
+      }
     }
   }
 

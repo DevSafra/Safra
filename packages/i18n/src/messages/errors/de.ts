@@ -169,6 +169,7 @@ export const de = {
   'dispute.already_open':
     'Sie haben zu dieser Buchung bereits einen offenen Streitfall aus demselben Grund.',
   'conversation.not_found_or_closed': 'Unterhaltung nicht gefunden oder geschlossen.',
+  'conversation.recipient_not_found': 'Empfänger nicht gefunden.',
   'campaign.not_found': 'Kampagne nicht gefunden.',
   'gift_card.code_invalid':
     'Dieser Geschenkkarten-Code ist ungültig. Bitte prüfen und erneut versuchen.',

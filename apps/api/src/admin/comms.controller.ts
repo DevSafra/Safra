@@ -53,7 +53,9 @@ import {
 import {
   MessagingService,
   staffReplySchema,
+  startConversationSchema,
   type StaffReplyInput,
+  type StartConversationInput,
 } from './messaging.service.js';
 import {
   AdvertisingService,
@@ -268,6 +270,42 @@ export class CommsController {
     @Query(new ZodValidationPipe(listQuerySchema)) query: z.infer<typeof listQuerySchema>,
   ) {
     return this.messaging.conversations({ ...query, actor: user });
+  }
+
+  /**
+   * SAFRA writing first — «محادثة جديدة».
+   *
+   * `MESSAGE_SEND`, the same permission a reply takes: opening a thread is posting into one that
+   * did not exist yet. The recipient is named by REFERENCE and resolved server-side, so the caller
+   * never supplies an id, a city, or anything about who is in the thread.
+   */
+  @Post('conversations')
+  @RequirePermissions(P.MESSAGE_SEND)
+  @AuditExempt('MessagingService records conversation.started inside the transaction.')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async startConversation(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(startConversationSchema)) body: StartConversationInput,
+  ) {
+    return this.messaging.start(user, body);
+  }
+
+  /**
+   * «An agent has read this» — what brings the الرسائل badge down.
+   *
+   * Posted by the thread screen once it has rendered, never from the GET: Next prefetches a link the
+   * mouse passes over, and a prefetch is not somebody reading. Not audited — a read is not an event
+   * the record needs, and one row per screen view would bury the log.
+   */
+  @Post('conversations/:reference/read')
+  @RequirePermissions(P.MESSAGE_SEND)
+  @AuditExempt('Reading a thread is not an event the audit record needs.')
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
+  async markConversationRead(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+  ) {
+    return this.messaging.markRead(user, reference);
   }
 
   @Get('conversations/:reference')

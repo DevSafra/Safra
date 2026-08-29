@@ -99,6 +99,8 @@ describeIfDb('the conversation a dispute opens with', () => {
   let customerUserId = '';
   let strangerProfileId = '';
   let strangerUserId = '';
+  let partnerId = '';
+  let partnerUserId = '';
   let staffUserId = '';
 
   const customer = (): AccessTokenClaims => ({
@@ -124,6 +126,15 @@ describeIfDb('the conversation a dispute opens with', () => {
     permissions: [],
     locale: 'ar',
     customerProfileId: strangerProfileId,
+  });
+
+  /** The host the complaint is ABOUT — who must not be reading it. */
+  const accused = (): AccessTokenClaims => ({
+    sub: partnerUserId,
+    role: 'partner',
+    permissions: [],
+    locale: 'ar',
+    partnerId,
   });
 
   /** Restricted to `cities`, with no reach outside them. */
@@ -286,6 +297,30 @@ describeIfDb('the conversation a dispute opens with', () => {
     });
   });
 
+  /**
+   * The host is structurally not in a dispute thread, and it has to stay that way.
+   *
+   * `conversations_exactly_one_subject_v2` forbids `dispute_id` beside `partner_id`, which is what
+   * keeps them out — but on 2026-08-29 the partner's own predicate learnt to reach a thread THROUGH
+   * its booking, and a dispute is about a booking. It reaches it through `c.booking_id`, which a
+   * dispute thread does not carry, so the two do not meet. Asserted rather than reasoned about: a
+   * complainant's account of the night is the last thing the person complained about should read
+   * live, and the next widening of that predicate is where it would go wrong.
+   */
+  it('keeps the dispute thread away from the host it is about', async () => {
+    const reference = await openAsCustomer();
+    const conversation = (await threadOf(reference))?.reference ?? '';
+
+    await expect(support.thread(accused(), conversation)).rejects.toMatchObject({
+      response: { code: ERROR.SUPPORT_TICKET_NOT_FOUND },
+    });
+
+    /* The control: the customer whose complaint it is still reads it. */
+    await expect(support.thread(customer(), conversation)).resolves.toMatchObject({
+      reference: conversation,
+    });
+  });
+
   it('emails the customer when staff answer on it', async () => {
     const reference = await openAsCustomer();
     const conversation = (await threadOf(reference))?.reference ?? '';
@@ -423,6 +458,8 @@ describeIfDb('the conversation a dispute opens with', () => {
       customer_user_id: string;
       stranger_profile_id: string;
       stranger_user_id: string;
+      partner_id: string;
+      partner_user_id: string;
       staff_user_id: string;
     }>(sql`
       WITH ref AS (
@@ -468,7 +505,7 @@ describeIfDb('the conversation a dispute opens with', () => {
                               address, phone, email, verification)
         SELECT pu.id, ref.partner_type_id, 'Dispute Thread', 'شريك النزاع', ref.city_id, 'x',
                '+963900000093', 'dth-p-' || gen_random_uuid() || '@safra.test', 'approved'
-        FROM pu, ref RETURNING id, city_id
+        FROM pu, ref RETURNING id, user_id, city_id
       ), pr AS (
         INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
                                 slug, name_ar, name_en, name_de, address, status)
@@ -499,8 +536,9 @@ describeIfDb('the conversation a dispute opens with', () => {
       SELECT bk.reference AS booking_reference,
              cp.id AS customer_profile_id, cp.user_id AS customer_user_id,
              xp.id AS stranger_profile_id, xp.user_id AS stranger_user_id,
+             pa.id AS partner_id, pa.user_id AS partner_user_id,
              st.id AS staff_user_id
-      FROM bk, cp, xp, st
+      FROM bk, cp, xp, pa, st
     `);
 
     const row = made.rows[0];
@@ -512,6 +550,8 @@ describeIfDb('the conversation a dispute opens with', () => {
     customerUserId = row.customer_user_id;
     strangerProfileId = row.stranger_profile_id;
     strangerUserId = row.stranger_user_id;
+    partnerId = row.partner_id;
+    partnerUserId = row.partner_user_id;
     staffUserId = row.staff_user_id;
   }
 });

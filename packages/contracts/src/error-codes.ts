@@ -279,6 +279,8 @@ export const ERROR = {
   /** One open dispute per booking per reason. A second would freeze the payout twice over. */
   DISPUTE_ALREADY_OPEN: 'dispute.already_open',
   CONVERSATION_NOT_FOUND_OR_CLOSED: 'conversation.not_found_or_closed',
+  /* The customer, partner or booking a staff member addressed a new thread to. */
+  CONVERSATION_RECIPIENT_NOT_FOUND: 'conversation.recipient_not_found',
   CAMPAIGN_NOT_FOUND: 'campaign.not_found',
   WALLET_NOT_FOUND: 'wallet.not_found',
   WALLET_AMOUNT_NOT_POSITIVE: 'wallet.amount_not_positive',

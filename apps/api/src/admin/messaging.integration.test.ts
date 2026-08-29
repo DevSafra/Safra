@@ -343,13 +343,18 @@ describeIfDb('MessagingService — telling the asker a reply arrived', () => {
   });
 
   /**
-   * Tickets only.
+   * A booking thread tells BOTH sides — the three-party record, working.
    *
-   * A booking thread has two parties and no route into it from either dashboard — الدعم lists
-   * subject-less threads, so `SupportService` answers 404 for a booking thread's reference. A notice
-   * linking to one would send somebody to a page they cannot open.
+   * This asserted the opposite until 2026-08-29, and correctly: a booking thread had no route into
+   * it from either dashboard, so a notice linking to one sent somebody to a page they could not
+   * open. Now `SupportService.scopeOf` lists it for the customer AND for the host, and a reply that
+   * told only one of them would leave the other to find out by looking — which is not a three-party
+   * conversation, it is two half-broken ones.
+   *
+   * Each is addressed at their OWN dashboard, which is the part a single-recipient notice could
+   * never have got right: the customer at `/account/support`, the host at the partner console.
    */
-  it('says nothing on a thread that belongs to a booking', async () => {
+  it('tells both the customer and the host on a booking thread', async () => {
     const created = await db.execute<{ reference: string }>(sql`
       INSERT INTO conversations (booking_id, customer_profile_id, last_message_at, unread_for_staff)
       VALUES (${bookingId}::uuid, ${customerProfileId}::uuid, now(), 1)
@@ -360,8 +365,22 @@ describeIfDb('MessagingService — telling the asker a reply arrived', () => {
 
     await messaging.reply(agent(), reference, { body: ANSWERED, internal: false });
 
-    expect(await countOf('support.replied')).toBe(0);
-    expect(sentMail).toHaveLength(0);
+    expect(await countOf('support.replied')).toBe(2);
+
+    const addressed = await db.execute<{ customer: number; partner: number }>(sql`
+      SELECT count(*) FILTER (WHERE customer_profile_id IS NOT NULL)::int AS customer,
+             count(*) FILTER (WHERE partner_id IS NOT NULL)::int          AS partner
+      FROM notifications
+      WHERE template_key = 'support.replied' AND ${mine()}
+    `);
+
+    expect(addressed.rows[0]).toMatchObject({ customer: 1, partner: 1 });
+
+    /* Each at their own dashboard — one link would have been wrong for one of them. */
+    const links = sentMail.map((message) => message.text).join('\n');
+
+    expect(links).toContain(`http://localhost:3000/ar/account/support/${reference}`);
+    expect(links).toContain(`http://localhost:3002/support/${reference}`);
   });
 
   // ─── When the send fails ───────────────────────────────────────────────────

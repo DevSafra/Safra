@@ -141,32 +141,42 @@ export class SupportService {
   }
 
   /**
-   * The WHERE fragment that defines "my tickets", used by every read and write.
+   * The WHERE fragment that defines "mine", used by every read and write.
    *
-   * A ticket is subject-less, so a customer's filter says so explicitly: without the three NULL checks
-   * this would also return every booking thread they are a participant in, which belongs on the booking
-   * rather than on الدعم. A partner's threads are `partner_id`-only by construction.
+   * ## It grew as the shapes did, and each clause is load-bearing
+   *
+   * It began as «a ticket is subject-less», three NULL checks, because a ticket was the only thing
+   * anybody could open. Two shapes have arrived since, and each was invisible to the person it was
+   * written for until this predicate learnt it: a DISPUTE thread (2026-08-28) and a thread SAFRA
+   * starts on a BOOKING (2026-08-29), which is the three-party record — customer, SAFRA, host —
+   * that the design has described from the beginning and nothing could create.
+   *
+   * The one clause that never moves is the identity: a customer's own profile id, a partner's own
+   * id. Everything else is about the SHAPE of the thread; that is the authorization.
    */
   private scopeOf(asker: Asker): SQL {
     if (asker.kind === 'customer') {
       /*
-        Their own tickets, AND the thread on a dispute they are named on.
-
-        `dispute_id IS NULL` was in this predicate when nothing could write that column, so it cost
-        nothing and read as «a support ticket is about nothing else». Now a dispute opens with a
-        thread, and leaving the clause here would make it one staff can write into and the customer
-        can never read — a reply notification pointing at a page that does not list it.
-
-        `booking_id`/`partner_id` stay excluded: a booking thread is the three-party record staff
-        keep, and a partner thread is somebody else's business entirely. `customer_profile_id` is
-        still the whole authorization — a dispute thread is theirs only if it names them.
+        Their own tickets, the thread on a dispute they are named on, and the thread on their own
+        booking. `partner_id IS NULL` is what stays: a partner's correspondence with SAFRA is
+        somebody else's business entirely, and no customer is a participant in it.
       */
-      return sql`c.customer_profile_id = ${asker.profileId}::uuid
-                 AND c.booking_id IS NULL AND c.partner_id IS NULL`;
+      return sql`c.partner_id IS NULL
+                 AND (c.customer_profile_id = ${asker.profileId}::uuid
+                      OR sb.customer_profile_id = ${asker.profileId}::uuid)`;
     }
 
-    const business = sql`c.partner_id = ${asker.partnerId}::uuid
-                         AND c.booking_id IS NULL AND c.dispute_id IS NULL`;
+    /*
+      The host's own correspondence, plus the thread on a booking AT THEIR PROPERTY.
+
+      A booking thread is reached through the booking rather than through `partner_id` — the CHECK
+      allows a row exactly one subject, so a thread about a booking cannot also carry the host's id.
+      Their DISPUTE threads are still excluded and that is deliberate: a dispute is adjudicated by
+      SAFRA, and the complainant's account of the night is not something the host reads live.
+    */
+    const business = sql`(c.partner_id = ${asker.partnerId}::uuid
+                          AND c.booking_id IS NULL AND c.dispute_id IS NULL)
+                         OR sb.partner_id = ${asker.partnerId}::uuid`;
 
     /*
       An employee reads ONLY the threads they opened; the owner reads every thread on the business.
@@ -180,9 +190,17 @@ export class SupportService {
       excludes NULL — so an employee cannot read a thread that predates them. That is the reason
       migration 0043 does not backfill it.
     */
+    /*
+      An employee reads only what they opened, and a booking thread is opened by SAFRA — so a
+      booking thread is the OWNER's. Deny by default: an employee who needs one asks the owner, and
+      widening this later is a decision somebody makes on purpose rather than a side effect of a
+      predicate that grew.
+    */
     return asker.kind === 'partner_employee'
-      ? sql`${business} AND c.opened_by_user_id = ${asker.userId}::uuid`
-      : business;
+      ? sql`c.partner_id = ${asker.partnerId}::uuid
+            AND c.booking_id IS NULL AND c.dispute_id IS NULL
+            AND c.opened_by_user_id = ${asker.userId}::uuid`
+      : sql`(${business})`;
   }
 
   /** The columns a ticket row needs, listed once so the list and the thread cannot diverge. */
@@ -201,6 +219,9 @@ export class SupportService {
   private get joins() {
     return sql`
       FROM conversations c
+      -- sb is the thread's SUBJECT booking — how both sides of a three-party thread reach it.
+      -- (No backticks in here: they would end this sql template.)
+      LEFT JOIN bookings sb ON sb.id = c.booking_id
       LEFT JOIN (
         SELECT conversation_id, count(*) AS n FROM messages
         WHERE internal = false GROUP BY conversation_id

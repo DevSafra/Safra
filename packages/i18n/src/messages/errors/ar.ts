@@ -136,6 +136,7 @@ export const ar = {
     'لا يمكن فتح نزاع على هذا الحجز. النزاع متاح للحجوزات المدفوعة فقط.',
   'dispute.already_open': 'لديك نزاع مفتوح على هذا الحجز للسبب نفسه.',
   'conversation.not_found_or_closed': 'المحادثة غير موجودة أو مغلقة.',
+  'conversation.recipient_not_found': 'لم يُعثر على المُرسل إليه.',
   'campaign.not_found': 'لم يُعثر على هذه الحملة.',
   'gift_card.code_invalid': 'رمز بطاقة الهدية غير صحيح. تحقّق منه وحاول مرة أخرى.',
   'ad.target_url_invalid': 'الرابط غير صالح — يجب أن يبدأ بـ http أو https.',

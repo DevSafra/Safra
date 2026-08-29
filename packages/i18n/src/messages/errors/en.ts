@@ -145,6 +145,7 @@ export const en = {
   'dispute.already_open':
     'You already have an open dispute about this booking for that reason.',
   'conversation.not_found_or_closed': 'Conversation not found or closed.',
+  'conversation.recipient_not_found': 'Recipient not found.',
   'campaign.not_found': 'Campaign not found.',
   'gift_card.code_invalid': 'That gift card code is not valid. Check it and try again.',
   'ad.target_url_invalid': 'That link is not valid — it must start with http or https.',
