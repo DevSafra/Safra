@@ -74,6 +74,21 @@ export default async function CustomerPage({
           <Ltr>{customer.reference}</Ltr>
         </p>
         <h1 className="mt-1 text-2xl font-semibold text-text">{customer.fullName}</h1>
+        {/*
+          «مراسلة» — the entry point Bashar asked for on 2026-08-29.
+
+          A link rather than a form: it carries the recipient into الرسائل's composer, which is the
+          one place a conversation is started. A second composer on this screen would be a parallel
+          messaging surface, which is the reason إرسال بدائل was a link too.
+        */}
+        <p className="mt-2">
+          <Link
+            href={`/messages?to=customer&ref=${encodeURIComponent(customer.reference)}`}
+            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3.5 py-1.5 text-[11.5px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold lg:min-h-0"
+          >
+            {t.sections.messages.messageAction}
+          </Link>
+        </p>
       </header>
 
       <Section title={c.identity}>

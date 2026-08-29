@@ -1693,7 +1693,15 @@ export type ThreadMessage = z.infer<typeof messageSchema>;
 export async function getThread(reference: string) {
   return staffFetch(
     `/admin/conversations/${encodeURIComponent(reference)}`,
-    z.object({ closed: z.boolean(), messages: z.array(messageSchema) }),
+    z.object({
+      closed: z.boolean(),
+      /* What the thread IS — the screen showed a bare reference over a list of messages. */
+      subjectKind: z.string(),
+      subjectReference: z.string().nullable(),
+      customer: z.string().nullable(),
+      partner: z.string().nullable(),
+      messages: z.array(messageSchema),
+    }),
   );
 }
 

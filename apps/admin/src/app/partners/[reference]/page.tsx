@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 
@@ -84,6 +85,21 @@ export default async function PartnerPage({
       <header>
         <p className="text-xs text-faint">{partner.reference}</p>
         <h1 className="mt-1 text-2xl font-semibold text-text">{partner.legalName}</h1>
+        {/*
+          «مراسلة» — writing to this host.
+
+          A link rather than a form: it carries the recipient into الرسائل's composer, which is the
+          one place a conversation is started. A second composer here would be a parallel messaging
+          surface, which is why إرسال بدائل is a link too.
+        */}
+        <p className="mt-2">
+          <Link
+            href={`/messages?to=partner&ref=${encodeURIComponent(partner.reference)}`}
+            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3.5 py-1.5 text-[11.5px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold lg:min-h-0"
+          >
+            {t.sections.messages.messageAction}
+          </Link>
+        </p>
         <p className="mt-1 text-sm text-muted">
           {fill(t.sections.partnerDetail.tradingAs, {
             name: `${partner.displayName} · ${partner.partnerType.nameAr ?? partner.partnerType.nameEn} · ${

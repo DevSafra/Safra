@@ -7,7 +7,9 @@ import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import { FootNote, Ltr, StatusPill } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { fill, t } from '@/lib/strings';
+import { t } from '@/lib/strings';
+import { conversationKind, partyLine } from '@/lib/conversation';
+import { StartConversation } from '@/components/start-conversation';
 import { returnQuery, rowAnchor } from '@/lib/search-params';
 import { listParamsFor } from '@/lib/table-size';
 import { refuseSection } from '@/components/section-refusal';
@@ -42,6 +44,15 @@ export default async function MessagesPage({
 
   const { q, page, size } = await listParamsFor('messages', searchParams);
 
+  /*
+    «مراسلة» on a customer, a partner or a booking lands here with the recipient already chosen, so
+    the composer opens itself. Read as plain strings and handed to the form as DEFAULTS — the API
+    resolves the reference inside the reader's own scope, so nothing here is trusted.
+  */
+  const query = await searchParams;
+  const to = typeof query['to'] === 'string' ? query['to'] : undefined;
+  const ref = typeof query['ref'] === 'string' ? query['ref'] : undefined;
+
   // Carried into every thread link, so «رجوع» on the thread screen comes back here.
   const back = returnQuery({ page, size, q });
 
@@ -59,6 +70,8 @@ export default async function MessagesPage({
           size={size}
           placeholder={t.sections.messages.searchPlaceholder}
         />
+
+        <StartConversation defaultTo={to} defaultReference={ref} />
 
         {result === 'unauthenticated' ? (
           <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
@@ -113,7 +126,14 @@ export default async function MessagesPage({
 }
 
 function Thread({ thread, back }: { thread: ConversationItem; back: string }) {
-  const other = thread.customer ?? thread.partner ?? '—';
+  /*
+    The glyph is the first letter of whoever is NOT SAFRA. `partner` first on a host's own thread,
+    because that is who the conversation is with — the customer column is empty there.
+  */
+  const other =
+    (thread.subjectKind === 'partner'
+      ? (thread.partner ?? thread.customer)
+      : (thread.customer ?? thread.partner)) ?? t.sections.messages.unknownParty;
 
   return (
     <Link
@@ -129,11 +149,29 @@ function Thread({ thread, back }: { thread: ConversationItem; back: string }) {
 
       <span className="min-w-[200px] flex-1">
         <span className="flex flex-wrap items-center gap-2">
-          <span className="text-[13px] font-bold text-text">
-            {fill(t.sections.messages.parties, {
-              customer: other,
-              partner: thread.partner ?? '—',
-            })}
+          {/*
+            `data-parties` so the browser sweep can read the LINE rather than the row.
+
+            Asserting over the row's whole text was vacuous: the avatar glyph is part of it, so a
+            «same party on both sides» check compared «ف فندق قصر الشرق» against «فندق قصر الشرق»
+            and passed over exactly the defect it was written for.
+          */}
+          <span
+            data-parties={thread.subjectKind}
+            className="text-[13px] font-bold text-text"
+          >
+            {partyLine(thread.subjectKind, thread.customer, thread.partner)}
+          </span>
+          {/*
+            What KIND of thread this is, on every row.
+
+            Four shapes render in this list and they were told apart only by decoding a reference
+            prefix — and a ticket had no reference of its own to decode, so two tickets from one
+            host were indistinguishable. The word is the thing a reader actually needs before
+            deciding whether to open it.
+          */}
+          <span className="rounded-full border border-line px-2 py-px text-[10px] font-bold text-faint">
+            {conversationKind(thread.subjectKind)}
           </span>
           {thread.subjectReference ? (
             <Ltr className="text-[11px] text-sky">{thread.subjectReference}</Ltr>

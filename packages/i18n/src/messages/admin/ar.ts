@@ -1621,6 +1621,32 @@ export const ar = {
       closingThread: 'جارٍ الإنهاء…',
       closeThreadHint: 'تُحفظ الرسائل ويُخطَر صاحب الطلب. لا يمكن الرد بعد الإنهاء.',
       closedNotice: 'انتهت هذه المحادثة. الرسائل محفوظة، ولا يمكن إضافة رد.',
+      /* Two parties, where a thread has two. «العميل ↔ سفرة ↔ الشريك» is for a booking only. */
+      partiesWith: '{name} ↔ سفرة',
+      kindBooking: 'حجز',
+      kindDispute: 'نزاع',
+      kindPartner: 'شريك',
+      kindSupport: 'دعم',
+      unknownParty: 'غير محدَّد',
+      compose: 'محادثة جديدة',
+      composeCancel: 'إلغاء',
+      composeTo: 'إلى',
+      composeToCustomer: 'عميل',
+      composeToPartner: 'شريك',
+      composeToBooking: 'حجز — العميل والشريك معاً',
+      composeReference: 'المرجع',
+      composeReferenceHint: 'مرجع العميل أو الشريك أو الحجز، كما يظهر في سجلّه',
+      composeBody: 'الرسالة',
+      composeSend: 'إرسال',
+      composeSending: 'جارٍ الإرسال…',
+      composeNote:
+        'المحادثة على حجز تضم العميل والشريك معاً. إن كانت هناك محادثة مفتوحة مع الطرف نفسه تُضاف الرسالة إليها بدل فتح محادثة ثانية.',
+      /* The section note describes a booking thread; a two-party one gets its own. */
+      noteTwoParty:
+        'محادثة بين هذا الطرف وسفرة. يُمنع تبادل أرقام هواتف أو بيانات تواصل مباشرة، وتُحجب تلقائياً.',
+      threadWith: 'المحادثة مع',
+      threadSubject: 'الموضوع',
+      messageAction: 'مراسلة',
       note: 'دردشة ثلاثية: العميل، سفرة، الشريك — سفرة تراقب وتوجّه. يُمنع تبادل أرقام هواتف أو بيانات تواصل مباشرة قبل تأكيد الحجز، وتُحجب تلقائياً.',
       redactionNote: 'الحجب يطبَّق على ردود الموظفين أيضاً، ولا يُحفظ النص الأصلي.',
     },
@@ -2671,6 +2697,7 @@ export const ar = {
     'dispute.acknowledged': 'استلام نزاع للمراجعة',
     'dispute.notified': 'إشعار أطراف النزاع بالإغلاق',
     'dispute.evidence_added': 'إضافة دليل إلى نزاع',
+    'conversation.started': 'بدء محادثة',
     'conversation.closed': 'إنهاء محادثة',
     'dispute.resolved': 'إغلاق نزاع لصالح العميل',
     'dispute.rejected': 'رفض نزاع',
@@ -3023,6 +3050,13 @@ export const ar = {
      */
     payloadKey: {
       reason: 'السبب',
+      /*
+        `conversation.started`: who SAFRA wrote to, by reference, and whether the message joined a
+        thread that was already open rather than starting one. The recipient is a REFERENCE — never
+        a name or an address — because this log is read by more people than the record is.
+      */
+      recipient: 'المُرسل إليه',
+      continued: 'أُضيفت إلى محادثة قائمة',
       /*
         Written by `ad_invoice.paid` — WHICH campaign the money settled, beside the amount and its
         currency. Uncatalogued until an invoice was actually paid, because

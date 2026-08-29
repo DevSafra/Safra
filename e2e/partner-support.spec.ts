@@ -232,10 +232,6 @@ test.describe('الدعم', () => {
     const staffPage = await staffContext.newPage();
 
     try {
-      await staffPage.goto(`${ADMIN}/messages/${reference}`, {
-        waitUntil: 'domcontentloaded',
-      });
-
       /*
         The badge, located the way الشركاء and النزاعات locate theirs — the span inside the SIDEBAR's
         own nav link. By role and name it collides with `BackLink`, whose accessible name is «الرجوع
@@ -244,10 +240,38 @@ test.describe('الدعم', () => {
         Something unread exists by construction: this test opened a ticket a moment ago. A sidebar
         with no badge here means the counter never reached it.
       */
-      await expect(
-        staffPage.locator('.console-sidebar nav a[href="/messages"] span.rounded-full'),
-        'الرسائل must carry the unread count',
-      ).toBeVisible();
+      const badge = staffPage.locator(
+        '.console-sidebar nav a[href="/messages"] span.rounded-full',
+      );
+
+      await staffPage.goto(`${ADMIN}/messages`, { waitUntil: 'domcontentloaded' });
+      await expect(badge, 'الرسائل must carry the unread count').toBeVisible();
+
+      const numeric = async (): Promise<number> =>
+        Number(((await badge.textContent()) ?? '').replace(/[^\d]/g, ''));
+
+      const waiting = await numeric();
+
+      expect(waiting, 'a thread is waiting on staff').toBeGreaterThan(0);
+
+      /*
+        ── Reading is what brings it down ──
+
+        `unread_for_staff` was cleared by a REPLY and by a CLOSE and by nothing else, so a thread
+        read and judged to need no answer stayed counted for ever and the number only went up. The
+        POST comes from an effect that runs when the screen actually renders — a prefetch is not
+        somebody reading — so this waits for the count rather than reading it straight back.
+      */
+      await staffPage.goto(`${ADMIN}/messages/${reference}`, {
+        waitUntil: 'domcontentloaded',
+      });
+
+      await expect
+        .poll(numeric, {
+          message: 'reading a thread must bring the الرسائل badge down',
+          timeout: 20_000,
+        })
+        .toBe(waiting - 1);
 
       const close = staffPage.getByRole('button', {
         name: adminAr.sections.messages.closeThread,

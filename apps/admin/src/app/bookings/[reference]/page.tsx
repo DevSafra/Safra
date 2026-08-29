@@ -93,6 +93,21 @@ export default async function BookingPage({
       <header>
         <p className="font-mono text-xs text-faint">{booking.reference}</p>
         <h1 className="mt-1 text-2xl font-semibold text-text">{booking.property.name}</h1>
+        {/*
+          «مراسلة» — the customer AND the host, in ONE thread.
+
+          A link rather than a form: it carries the recipient into الرسائل's composer, which is the
+          one place a conversation is started. A second composer here would be a parallel messaging
+          surface, which is why إرسال بدائل is a link too.
+        */}
+        <p className="mt-2">
+          <Link
+            href={`/messages?to=booking&ref=${encodeURIComponent(booking.reference)}`}
+            className="inline-flex min-h-10 items-center rounded-lg border border-line px-3.5 py-1.5 text-[11.5px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold lg:min-h-0"
+          >
+            {t.sections.messages.messageAction}
+          </Link>
+        </p>
         <p className="mt-1 text-sm text-muted">
           {booking.stay.children > 0
             ? plural(t.sections.bookingDetail.stayWithChildren, {

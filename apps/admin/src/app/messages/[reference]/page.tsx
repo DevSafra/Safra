@@ -7,6 +7,9 @@ import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { FootNote, Ltr } from '@/components/admin-table';
 import { ReplyForm } from '@/components/reply-form';
 import { CloseThreadButton } from '@/components/close-thread-button';
+import { MarkThreadRead } from '@/components/mark-thread-read';
+import { StatusPill } from '@/components/admin-table';
+import { conversationKind, partyLine, subjectHref } from '@/lib/conversation';
 import { BackLink } from '@/components/back-link';
 import { backTarget } from '@/lib/search-params';
 import { fill, t } from '@/lib/strings';
@@ -59,6 +62,43 @@ export default async function ThreadPage({
         <ConsolePanel>
           <BackLink target={back} section={t.nav.messages} />
 
+          {/*
+            Who this is with, what it is about, and whether it is still open.
+
+            The screen printed «CNV-023801» and a list of messages: an operator had to read the
+            messages to work out whether they were looking at a ticket, a dispute or a booking, and
+            there was nothing at all naming the person on the other side.
+          */}
+          {result === 'unauthenticated' || result === 'failed' ? null : (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-b border-line pb-3">
+              <span className="text-[13px] font-bold text-text">
+                {partyLine(result.subjectKind, result.customer, result.partner)}
+              </span>
+              <span className="rounded-full border border-line px-2 py-px text-[10px] font-bold text-faint">
+                {conversationKind(result.subjectKind)}
+              </span>
+              {result.subjectReference
+                ? (() => {
+                    const href = subjectHref(result.subjectKind, result.subjectReference);
+
+                    /* The booking or the dispute it is about, opened from here. */
+                    return href ? (
+                      <a href={href} className="text-[11px] text-sky hover:underline">
+                        <Ltr>{result.subjectReference}</Ltr>
+                      </a>
+                    ) : (
+                      <Ltr className="text-[11px] text-sky">
+                        {result.subjectReference}
+                      </Ltr>
+                    );
+                  })()
+                : null}
+              {result.closed ? (
+                <StatusPill tone="faint">{t.sections.messages.closed}</StatusPill>
+              ) : null}
+            </div>
+          )}
+
           {result === 'unauthenticated' ? (
             <p className="mt-3 text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
           ) : result === 'failed' ? (
@@ -77,11 +117,26 @@ export default async function ThreadPage({
             </ul>
           )}
 
-          <FootNote>{t.sections.messages.note}</FootNote>
+          {/*
+            The three-party note is true of a BOOKING thread and of nothing else.
+
+            It was printed under every thread, so a host's own ticket — which structurally cannot
+            have a third party — carried «دردشة ثلاثية: العميل، سفرة، الشريك» beneath two messages
+            between two people. The redaction half is true everywhere, and both sentences say it.
+          */}
+          <FootNote>
+            {result === 'unauthenticated' ||
+            result === 'failed' ||
+            result.subjectKind === 'booking'
+              ? t.sections.messages.note
+              : t.sections.messages.noteTwoParty}
+          </FootNote>
         </ConsolePanel>
 
         {result === 'unauthenticated' || result === 'failed' ? null : (
           <ConsolePanel>
+            {/* Reading is taking — see the component. */}
+            <MarkThreadRead reference={reference} />
             {/*
               A closed thread takes no reply — the API refuses it — so the box is not offered over
               one. The notice replaces it rather than sitting beside a disabled control, because
