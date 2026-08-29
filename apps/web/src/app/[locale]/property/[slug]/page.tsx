@@ -425,7 +425,19 @@ export default async function PropertyPage({
                   exposing partner contact details before confirmation.
                 */}
                 <Link
-                  href={`/${locale}/support?property=${property.reference}`}
+                  /*
+                    `/account/support`, which is where الدعم actually lives.
+
+                    This pointed at `/${locale}/support` — a route that has never existed — so
+                    «اسأل سفرة» on every property page answered 404. Found by sweeping every
+                    internal link against the routes each app really serves (2026-08-29); nothing
+                    HTTP-level could see it, because the page around it returns 200.
+
+                    The `?property=` it also carried is gone: the support screen reads `cursor` and
+                    nothing else, so it was a parameter that looked handled and was not. Prefilling
+                    the question with the property is a real improvement and a separate decision.
+                  */
+                  href={`/${locale}/account/support`}
                   className="mt-2 block rounded-lg border border-line px-5 py-3 text-center text-sm text-muted transition-colors hover:border-gold hover:text-gold"
                 >
                   {t('askSafra')}
