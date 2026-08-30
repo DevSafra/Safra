@@ -29,3 +29,4 @@ export {
   type SliderLabels,
 } from './image-slider.js';
 export { ConfirmDialog, useConfirm, type ConfirmRequest } from './confirm-dialog.js';
+export { Modal } from './modal.js';

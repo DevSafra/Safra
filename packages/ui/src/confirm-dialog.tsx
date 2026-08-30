@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
+
+import { Modal } from './modal.js';
 
 /** What a popup asks, and the words it asks with. All of them the caller's own. */
 export interface ConfirmRequest {
@@ -60,62 +62,12 @@ export function ConfirmDialog({
   readonly request: ConfirmRequest | null;
   readonly onResolve: (confirmed: boolean) => void;
 }) {
-  const frame = useRef<HTMLDivElement>(null);
+  /*
+    Declared before the early return: hooks may not sit behind a condition. It is the button that
+    must hold the focus when the popup opens — «إلغاء» for a destructive question, the confirm
+    otherwise — and `Modal` focuses whatever this points at.
+  */
   const initial = useRef<HTMLButtonElement>(null);
-
-  const cancel = useCallback(() => onResolve(false), [onResolve]);
-
-  useEffect(() => {
-    if (!request) return undefined;
-
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') cancel();
-
-      /*
-        Tab is kept inside the frame.
-
-        A popup the keyboard can walk out of is modal in appearance only: the reader tabs into the
-        page behind it, presses Enter on something they cannot see, and the popup is still open
-        over whatever that did.
-      */
-      if (event.key !== 'Tab') return;
-
-      const focusable = frame.current?.querySelectorAll<HTMLElement>('button');
-
-      if (!focusable || focusable.length === 0) return;
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-
-      if (!first || !last) return;
-
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener('keydown', onKey);
-
-    /* The page behind must not scroll while a popup is over it. */
-    const previous = document.body.style.overflow;
-
-    document.body.style.overflow = 'hidden';
-
-    /* Focus moves in, and the element that had it is given it back on close. */
-    const returnTo = document.activeElement;
-
-    initial.current?.focus();
-
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = previous;
-      if (returnTo instanceof HTMLElement) returnTo.focus();
-    };
-  }, [request, cancel]);
 
   if (!request) return null;
 
@@ -123,64 +75,65 @@ export function ConfirmDialog({
   const asks = request.cancelLabel !== undefined;
 
   return (
-    <div
-      /*
-        `alertdialog`, not `dialog`: this interrupts to ask something that cannot wait, and a screen
-        reader announces its description immediately rather than only on focus.
-      */
+    /*
+      `alertdialog`, not `dialog`: this interrupts to ask something that cannot wait, and a screen
+      reader announces its description immediately rather than only on focus.
+
+      Everything about Escape, the backdrop, the focus trap, scroll-locking and returning focus is
+      `Modal`'s — written once, so a form modal and a confirmation cannot drift apart on the half
+      that is easy to get wrong.
+    */
+    <Modal
+      title={request.title}
       role="alertdialog"
-      aria-modal="true"
-      aria-labelledby="safra-confirm-title"
-      aria-describedby="safra-confirm-message"
-      onClick={cancel}
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/70 p-4"
+      labelledBy="safra-confirm-title"
+      describedBy="safra-confirm-message"
+      width="max-w-md"
+      initialFocus={initial}
+      onClose={() => onResolve(false)}
     >
-      <div
-        ref={frame}
-        /* Clicks inside must not reach the backdrop's handler. */
-        onClick={(event) => event.stopPropagation()}
-        className="grid w-full max-w-md gap-3 rounded-[14px] border border-line bg-card p-5 shadow-2xl"
-      >
-        <h2 id="safra-confirm-title" className="text-[15px] font-bold text-text">
-          {request.title}
-        </h2>
+      <h2 id="safra-confirm-title" className="text-[15px] font-bold text-text">
+        {request.title}
+      </h2>
 
-        <p
-          id="safra-confirm-message"
-          className="text-[12.5px] leading-relaxed text-text2"
-        >
-          {request.message}
-        </p>
+      <p id="safra-confirm-message" className="text-[12.5px] leading-relaxed text-text2">
+        {request.message}
+      </p>
 
-        {/*
+      {/*
           The confirm sits at the END of the row and the cancel before it, so the destructive
           button is never the one under a thumb reaching for the edge of a phone.
         */}
-        <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
-          {asks ? (
-            <button
-              type="button"
-              ref={danger ? initial : undefined}
-              onClick={cancel}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-xs font-bold text-muted transition-colors hover:text-text lg:min-h-0"
-            >
-              {request.cancelLabel}
-            </button>
-          ) : null}
-
+      <div className="mt-1 flex flex-wrap items-center justify-end gap-2">
+        {asks ? (
           <button
             type="button"
-            ref={danger && asks ? undefined : initial}
-            onClick={() => onResolve(true)}
-            className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg px-4.5 py-2 text-xs font-bold transition-opacity hover:opacity-90 lg:min-h-0 ${
-              danger ? 'bg-bad text-white' : 'bg-gold text-ink'
-            }`}
+            /*
+              The CANCEL of a destructive question holds the focus, so somebody pressing Enter out
+              of habit cancels rather than deletes. Handed to `Modal` as `initialFocus` rather than
+              set with `autoFocus`: a child's effect runs before its parent's, so `autoFocus` was
+              overridden by the frame focus a moment later.
+            */
+            ref={danger ? initial : undefined}
+            onClick={() => onResolve(false)}
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-xs font-bold text-muted transition-colors hover:text-text lg:min-h-0"
           >
-            {request.confirmLabel}
+            {request.cancelLabel}
           </button>
-        </div>
+        ) : null}
+
+        <button
+          type="button"
+          ref={danger && asks ? undefined : initial}
+          onClick={() => onResolve(true)}
+          className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg px-4.5 py-2 text-xs font-bold transition-opacity hover:opacity-90 lg:min-h-0 ${
+            danger ? 'bg-bad text-white' : 'bg-gold text-ink'
+          }`}
+        >
+          {request.confirmLabel}
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
