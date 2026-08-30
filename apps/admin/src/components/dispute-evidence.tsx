@@ -137,10 +137,21 @@ export function DisputeEvidence({
   /**
    * Sends a file — as a new piece of evidence, or as the second half of a replacement.
    *
-   * A replacement is a REMOVAL followed by an upload, two audited events, rather than new bytes
+   * A replacement is an upload followed by a REMOVAL, two audited events, rather than new bytes
    * under an old id: a row whose bytes changed would make the resolution unreadable against what
-   * the decision was actually made from. The order matters — the old one goes first, so a failure
-   * to upload leaves a file with one photograph missing rather than two identical ones.
+   * the decision was actually made from.
+   *
+   * ## The order, which was wrong and cost a photograph every time
+   *
+   * It retired the old one FIRST, reasoning that a failed upload would leave a file one photograph
+   * short rather than holding two of the same. That trade is backwards. A duplicate is harmless and
+   * the operator can delete it; a retired row cannot be restored from this console, so every
+   * refused upload — a picture under 400×400, a PDF, a file over the size limit — silently
+   * destroyed the evidence it was meant to replace. Measured on 2026-08-30: three failed replaces
+   * took a dispute from seven photographs to five.
+   *
+   * So the new one goes in first, and the old one is retired only once there is something to
+   * replace it WITH.
    */
   async function send(chosen: File): Promise<void> {
     const replaced = replacing;
@@ -149,8 +160,6 @@ export function DisputeEvidence({
     setError(null);
 
     try {
-      if (replaced !== null && !(await retire(replaced))) return;
-
       const body = new FormData();
 
       body.append('file', chosen);
@@ -165,6 +174,9 @@ export function DisputeEvidence({
 
         return;
       }
+
+      /* Only now, and a failure here leaves a duplicate rather than a gap. */
+      if (replaced !== null) await retire(replaced);
 
       setSlow(false);
       router.refresh();

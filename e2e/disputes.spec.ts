@@ -278,6 +278,70 @@ test.describe('النزاعات', () => {
   });
 
   /**
+   * A REFUSED replacement keeps the photograph it was going to replace.
+   *
+   * ## The bug (Bashar, 2026-08-30)
+   *
+   * «حدث خطأ ما. حاول مرة أخرى.» — and behind that message, worse: «استبدال» retired the old
+   * photograph FIRST and uploaded second, so every refused upload destroyed the evidence it was
+   * meant to replace. Measured that day: three refusals took a dispute from seven photographs to
+   * five, and a retired row cannot be restored from this console.
+   *
+   * The order is now upload-then-retire, so the worst case is a duplicate the operator can delete.
+   *
+   * ## And the refusal says what is wrong
+   *
+   * The API answered `upload.image_too_small` with `params: { min: 400 }` all along; every reader
+   * resolved the code and dropped the params, so `errorMessage` refused to print a half-filled
+   * template and fell back to the generic sentence. Twenty-six messages were unreachable that way.
+   */
+  test('a refused replacement keeps the photograph, and says why', async ({ page }) => {
+    await page.goto('/disputes?size=25');
+    await page.waitForSelector('article');
+
+    const card = page
+      .locator('article')
+      .filter({ has: page.locator('[data-evidence]') })
+      .first();
+
+    test.skip((await card.count()) === 0, 'No rendered evidence in the queue.');
+
+    const before = await card.locator('[data-evidence]').count();
+    const chooser = page.waitForEvent('filechooser');
+
+    await card.locator('[data-evidence-replace]').first().click();
+
+    /* Under 400×400 — a real refusal from the pipeline, not a mocked one. */
+    await (await chooser).setFiles('e2e/fixtures/too-small.jpg');
+
+    /*
+      The MESSAGE names the limit. A `count()` before `textContent()` deliberately: waiting for an
+      element that correctly does not exist is how a probe of this hangs for its whole timeout.
+    */
+    const error = card.locator('p.text-bad').first();
+
+    await expect(error).toBeVisible({ timeout: 20_000 });
+    await expect(error).toContainText('400');
+
+    /*
+      And nothing was lost — the assertion this test exists for, made AFTER A RELOAD.
+
+      Counting the thumbnails in place proves nothing: the failure path shows the message and
+      returns without refreshing, so the card still draws the photograph the database has already
+      retired. Written that way first, and the mutation that restores the bug passed against it.
+      The reload is what makes this read the server's answer rather than a stale DOM.
+    */
+    await page.reload();
+
+    const same = page
+      .locator('article')
+      .filter({ has: page.locator('[data-evidence]') })
+      .first();
+
+    await expect(same.locator('[data-evidence]')).toHaveCount(before);
+  });
+
+  /**
    * The queue is ordered as a queue, and it says how much is frozen.
    *
    * A dispute holds the partner's payout, so «مستحقات مجمّدة» is money the platform is sitting on.
