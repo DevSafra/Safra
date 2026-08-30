@@ -1,5 +1,7 @@
-import { cityLocalNow } from '@safra/contracts';
+import { cityLocalNow, currencyDecimals, symbolTrails } from '@safra/contracts';
 import { ARABIC_WESTERN_DIGITS } from '@safra/i18n';
+
+import { t } from '@/lib/strings';
 
 /**
  * The primary launch market's zone — the same fallback `SearchService.resolveTimezone` uses.
@@ -25,21 +27,20 @@ export function marketToday(): string {
 /**
  * An amount with its symbol, in the position that reads correctly.
  *
- * The same rule the console follows (§4.1): SYP puts `ل.س` after the number because it is Arabic
- * text and belongs at the Arabic end; everything else prefixes a Latin symbol. A trailing ISO code
- * gets REORDERED by the bidirectional algorithm inside an RTL line and renders as `USD 95.00`,
- * which reads as a label rather than an amount.
+ * The same rule the console follows (§4.1), and now literally the same code: an Arabic-script
+ * symbol goes after the number because it belongs at the Arabic end, a Latin one prefixes it. A
+ * trailing ISO code gets REORDERED by the bidirectional algorithm inside an RTL line and renders
+ * as `USD 95.00`, which reads as a label rather than an amount.
+ *
+ * Three things were decided here and all three were wrong. The SYMBOLS were a private copy of the
+ * console's table, five codes deep, so a unit priced in dirhams rendered «100.00 AED» — the code,
+ * because the map had no entry — and a symbol is copy, which `docs/i18n.md` says belongs in the
+ * catalogue. The SCALE was hard-coded to two, so a JOD or IQD amount lost its third decimal. The
+ * POSITION was a list of three codes naming two the platform has retired.
  *
  * Western digits throughout: every figure a partner sees here reconciles against a payout, and no
  * bank statement is written in Arabic-Indic numerals.
  */
-const SYMBOLS: Record<string, string> = {
-  USD: '$',
-  EUR: '€',
-  SYP: 'ل.س',
-  JOD: 'د.أ',
-  LBP: 'ل.ل',
-};
 
 export function amount(value: string | null | undefined, currency: string): string {
   if (value === null || value === undefined) return '—';
@@ -58,15 +59,14 @@ export function amount(value: string | null | undefined, currency: string): stri
 
   if (!Number.isFinite(parsed)) return '—';
 
+  const scale = currencyDecimals(currency);
   const money = parsed.toLocaleString(ARABIC_WESTERN_DIGITS, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: scale,
+    maximumFractionDigits: scale,
   });
-  const symbol = SYMBOLS[currency] ?? currency;
+  const symbol = t.currencySymbol[currency] ?? currency;
 
-  return currency === 'SYP' || currency === 'JOD' || currency === 'LBP'
-    ? `${money} ${symbol}`
-    : `${symbol}${money}`;
+  return symbolTrails(symbol) ? `${money} ${symbol}` : `${symbol}${money}`;
 }
 
 /** A count, grouped. */

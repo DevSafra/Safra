@@ -214,4 +214,23 @@ describe('formatMoney — a blank is not zero', () => {
       expect(formatMoney(bad, 'USD', 'en')).toContain('USD');
     },
   );
+
+  /**
+   * The CURRENCY's scale, not two.
+   *
+   * `maximumFractionDigits: 2` overrode the table `Intl` already carries, so a three-decimal
+   * currency lost a digit here exactly as it did in the console and the partner portal —
+   * `10.125` rendered `10.13`. A customer reading a price is the one reader who cannot check it
+   * against anything.
+   */
+  it('keeps the third decimal of a three-decimal currency', () => {
+    expect(formatMoney('10.125', 'JOD', 'en')).toContain('10.125');
+    expect(formatMoney('10.125', 'IQD', 'en')).toContain('10.125');
+  });
+
+  it('still writes two for a two-decimal currency, and none for a whole price', () => {
+    expect(formatMoney('10.1', 'USD', 'en')).toContain('10.10');
+    /* A round price reads better without the zeros — unchanged, and asserted so it stays. */
+    expect(formatMoney('65', 'USD', 'en')).not.toContain('.00');
+  });
 });

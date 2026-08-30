@@ -123,3 +123,48 @@ export const CURRENCY_CATALOGUE: readonly CurrencyOption[] = [
 export function currencyOption(code: string): CurrencyOption | undefined {
   return CURRENCY_CATALOGUE.find((one) => one.code === code.toUpperCase());
 }
+
+/**
+ * How many decimals an amount in this currency is WRITTEN with.
+ *
+ * ## Why every formatter must ask
+ *
+ * Three apps decided this separately and all three were wrong for the same currencies. The console
+ * carried a one-entry list, `{ JOD: 3 }`, hand-written when JOD was the currency in front of
+ * somebody; IQD is also three and was never added, so the console truncated it. The partner portal
+ * hard-coded two. The customer site passed `maximumFractionDigits: 2` to `Intl`, overriding the
+ * table `Intl` already has. So `10.125` rendered `10.13` on all three — the exact truncation this
+ * catalogue's own note says taking `decimals` from the code exists to prevent.
+ *
+ * Two for anything not listed, which is the right answer for the overwhelming majority of ISO 4217
+ * and the same answer the three lists gave. `Intl`'s own table is deliberately not used: it answers
+ * for every code in the world, including ones this platform will never price in, and a wrong answer
+ * there is invisible — the reasoning the money-key list in the console is written with.
+ */
+export function currencyDecimals(code: string): number {
+  return currencyOption(code)?.decimals ?? 2;
+}
+
+/**
+ * Whether a currency's symbol is written AFTER the number rather than before it.
+ *
+ * ## The rule, rather than the list of codes that currently satisfy it
+ *
+ * «ل.س is Arabic text and belongs at the Arabic end; everything else prefixes a Latin symbol» —
+ * the console and the partner portal both stated that reasoning and then encoded it as
+ * `currency === 'SYP' || currency === 'JOD' || currency === 'LBP'`, a list frozen on the day it
+ * was typed. It named two currencies the platform has since retired, and named NONE of the six a
+ * staff member can now add on المدن — so «د.إ100.00» would have rendered an Arabic symbol glued to
+ * the front of a Latin number, which is the bidirectional failure the reasoning describes.
+ *
+ * A list of codes decays; the rule does not. The question is about the SYMBOL's script, so it is
+ * asked of the symbol: an Arabic-script symbol trails, everything else leads. `\p{Script=Arabic}`
+ * is the literal statement of «is Arabic text», not an approximation of it.
+ *
+ * Takes the symbol rather than the code, because the symbol is COPY — `docs/i18n.md` is explicit
+ * that «the symbol (ل.س) is copy and is in the catalogue; the code is not» — and this function
+ * must answer for whatever a locale's catalogue holds, not for what this file happens to seed.
+ */
+export function symbolTrails(symbol: string): boolean {
+  return /\p{Script=Arabic}/u.test(symbol);
+}

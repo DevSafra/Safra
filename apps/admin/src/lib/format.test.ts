@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dateRange, money, rate, shortDate } from './format';
+import { amount, dateRange, money, rate, shortDate } from './format';
 
 /**
  * The separator `dateRange` writes inside a date: a `U+002D` hyphen fenced by `U+2060` WORD
@@ -154,5 +154,41 @@ describe('rate', () => {
   it('reports a dash for nothing, and for nonsense', () => {
     expect(rate(null)).toBe('—');
     expect(rate('not-a-rate')).toBe('—');
+  });
+});
+
+/**
+ * `amount` — the figure, its symbol, and the two facts that decide how both are written.
+ *
+ * Neither was a decision this file should have been making. The SCALE was a one-entry map,
+ * `{ JOD: 3 }`, written when JOD was the currency in front of somebody — IQD is also three and was
+ * never added, so the console truncated it exactly as the hard-coded two had truncated JOD. The
+ * POSITION was `currency === 'SYP' || 'JOD' || 'LBP'`, a list naming two currencies the platform
+ * has retired and none of the six المدن can now add. Both now come from `@safra/contracts`.
+ */
+describe('amount', () => {
+  it('places an Arabic-script symbol after the number and a Latin one before it', () => {
+    expect(amount('100.00', 'SYP').trimEnd().endsWith('ل.س')).toBe(true);
+    expect(amount('100.00', 'USD').startsWith('$')).toBe(true);
+  });
+
+  /* The six a staff member can add on المدن, which no list here has ever named. */
+  it('writes a currency added after this file was, and puts its symbol correctly', () => {
+    expect(amount('100.00', 'AED').trimEnd().endsWith('د.إ')).toBe(true);
+    expect(amount('100.00', 'AED')).not.toContain('AED');
+
+    expect(amount('100.00', 'TRY').startsWith('₺')).toBe(true);
+  });
+
+  it('keeps the third decimal of a three-decimal currency', () => {
+    expect(amount('10.125', 'JOD')).toContain('10.125');
+    expect(amount('10.125', 'IQD')).toContain('10.125');
+    expect(amount('10.1', 'USD')).toContain('10.10');
+  });
+
+  /* Absent is a dash, never a zero — a fabricated figure is worse than a missing one. */
+  it('reports a dash for nothing', () => {
+    expect(amount(null, 'USD')).toBe('—');
+    expect(amount(undefined, 'USD')).toBe('—');
   });
 });

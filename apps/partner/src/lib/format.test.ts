@@ -110,6 +110,34 @@ describe('amount', () => {
     expect(amount('100.00', 'USD').startsWith('$')).toBe(true);
   });
 
+  /**
+   * A currency the console can ADD renders as money, not as its code.
+   *
+   * The symbols were a private five-entry copy of the console's table, so anything المدن could
+   * add — dirhams, riyals, lira — fell through to «100.00 AED». The rule is about the symbol's
+   * SCRIPT, so an Arabic one trails even though no list here has ever named AED.
+   */
+  it('writes a currency added after this file was, and puts its symbol correctly', () => {
+    expect(amount('100.00', 'AED').trimEnd().endsWith('د.إ')).toBe(true);
+    expect(amount('100.00', 'AED')).not.toContain('AED');
+
+    expect(amount('100.00', 'GBP').startsWith('£')).toBe(true);
+  });
+
+  /**
+   * The currency's own scale, not two.
+   *
+   * Hard-coded here, so `10.125 JOD` rendered `10.13` — a partner reconciling a payout against a
+   * bank statement reading a third decimal the platform had rounded away.
+   */
+  it('keeps the third decimal of a three-decimal currency', () => {
+    expect(amount('10.125', 'JOD')).toContain('10.125');
+    expect(amount('10.125', 'IQD')).toContain('10.125');
+
+    /* And still writes exactly two for a two-decimal one, rather than whatever it was given. */
+    expect(amount('10.1', 'USD')).toContain('10.10');
+  });
+
   it('does not round a zero away', () => {
     expect(amount('0.00', 'USD')).toContain('0.00');
   });

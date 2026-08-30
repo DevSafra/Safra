@@ -1,3 +1,5 @@
+import { currencyDecimals } from '@safra/contracts';
+
 import type { Locale } from '@/i18n/routing';
 
 interface Translated {
@@ -82,12 +84,23 @@ export function formatMoney(
     return `${amount} ${currency}`.trim();
   }
 
+  /*
+    The CURRENCY's own scale, not two.
+
+    `maximumFractionDigits: 2` overrode the table `Intl` already has, so a three-decimal currency
+    lost a digit here exactly as it did in the console and the partner portal: `10.125` rendered
+    `10.13`. The scale comes from `@safra/contracts` rather than from `Intl` so that all three
+    apps answer the same question the same way — the console cannot use `Intl`'s table without
+    also inheriting answers for codes this platform will never price in.
+  */
+  const scale = currencyDecimals(currency);
+
   return new Intl.NumberFormat(locale === 'ar' ? 'ar-SY' : locale, {
     style: 'currency',
     currency,
     // Whole prices read better without trailing zeros; fractions still show them.
-    minimumFractionDigits: options.exact || !Number.isInteger(value) ? 2 : 0,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: options.exact || !Number.isInteger(value) ? scale : 0,
+    maximumFractionDigits: scale,
     // Western digits across all locales, matching the prototype.
     numberingSystem: 'latn',
   }).format(value);

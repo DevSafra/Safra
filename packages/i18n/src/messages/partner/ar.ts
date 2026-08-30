@@ -1645,4 +1645,32 @@ export const ar = {
         'رُفض الحجز بعد أن أتمّ الضيف الدفع، فاستُرد المبلغ له وسُجّلت المخالفة.',
     } as Record<string, string>,
   },
+
+  /**
+   * How each currency's symbol is WRITTEN — «ل.س», «$».
+   *
+   * Here rather than in a `const` in `apps/partner/src/lib/format.ts`, where it was: the symbol is
+   * copy — `docs/i18n.md` says «the symbol (ل.س) is copy and is in the catalogue; the code is not»
+   * — and a table in a component file is invisible to the task of adding a language. It was also
+   * the console's table typed a second time, five codes deep, and both stopped at the five the
+   * platform traded in before المدن could add a currency: a unit priced in dirhams rendered
+   * «100.00 AED», the raw code, because the map had no entry and fell back to it.
+   *
+   * A locale with no symbol for a currency still falls back to the CODE, which is correct rather
+   * than blank. The POSITION is not here — it follows from the symbol's script and is
+   * `symbolTrails` in `@safra/contracts`, so it cannot be a list that goes stale.
+   */
+  currencySymbol: {
+    USD: '$',
+    EUR: '€',
+    SYP: 'ل.س',
+    JOD: 'د.أ',
+    LBP: 'ل.ل',
+    TRY: '₺',
+    AED: 'د.إ',
+    SAR: 'ر.س',
+    EGP: 'ج.م',
+    IQD: 'د.ع',
+    GBP: '£',
+  } as Record<string, string>,
 } as const;

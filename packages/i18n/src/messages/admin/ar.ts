@@ -3962,6 +3962,12 @@ export const ar = {
     SYP: 'ل.س',
     JOD: 'د.أ',
     LBP: 'ل.ل',
+    TRY: '₺',
+    AED: 'د.إ',
+    SAR: 'ر.س',
+    EGP: 'ج.م',
+    IQD: 'د.ع',
+    GBP: '£',
   } as Record<string, string>,
 
   errors: {

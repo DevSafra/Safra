@@ -11,6 +11,8 @@
  * Formatting is neither server nor client work, so it lives here with no imports beyond the
  * string table and the locale constant, and both sides can use it.
  */
+import { currencyDecimals, symbolTrails } from '@safra/contracts';
+
 import { ARABIC_WESTERN_DIGITS } from '@/lib/numerals';
 import { fill, t } from '@/lib/strings';
 
@@ -31,21 +33,6 @@ export function money(amount: string | null | undefined, decimals = 2): string {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
-}
-
-/**
- * How many decimals a currency is written with.
- *
- * Two was hard-coded here, which was right for every currency SAFRA has traded in and wrong for
- * one it lists: JOD has three, and `10.125 JOD` rendered as `10.13` — the console rounding away a
- * digit the database now stores. A written list rather than `Intl`'s own table, for the reason the
- * money-key list gives: a lookup that answers for every ISO code would also answer for codes this
- * platform will never price in, and a wrong answer there is invisible.
- */
-const CURRENCY_DECIMALS: Record<string, number> = { JOD: 3 };
-
-function decimalsOf(currency: string): number {
-  return CURRENCY_DECIMALS[currency] ?? 2;
 }
 
 /** A count, grouped. */
@@ -243,18 +230,20 @@ const SYMBOLS = t.currencySymbol;
 /**
  * An amount with its symbol, in the position that reads correctly.
  *
- * SYP puts its symbol after the number because ل.س is Arabic text and belongs at the Arabic
- * end; everything else prefixes a Latin symbol. Callers wrap the result in `Ltr` so the whole
- * run is treated as one left-to-right token.
+ * An Arabic-script symbol goes after the number because it belongs at the Arabic end; a Latin one
+ * prefixes it. Callers wrap the result in `Ltr` so the whole run is treated as one left-to-right
+ * token.
+ *
+ * Both facts come from `@safra/contracts` rather than from lists written here. The scale was a
+ * one-entry map, `{ JOD: 3 }`, which missed IQD — also three — and the position was a written list
+ * of three codes, two of them since retired and none of the six a staff member can now ADD on
+ * المدن. A currency the console offers must not render «د.إ100.00».
  */
 export function amount(value: string | null | undefined, currency: string): string {
   if (value === null || value === undefined) return t.admin.noData;
 
   const symbol = SYMBOLS[currency] ?? currency;
-  /* The currency's own scale — three for JOD, two for the rest. */
-  const written = money(value, decimalsOf(currency));
+  const written = money(value, currencyDecimals(currency));
 
-  return currency === 'SYP' || currency === 'JOD' || currency === 'LBP'
-    ? `${written} ${symbol}`
-    : `${symbol}${written}`;
+  return symbolTrails(symbol) ? `${written} ${symbol}` : `${symbol}${written}`;
 }
