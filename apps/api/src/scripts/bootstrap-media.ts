@@ -63,10 +63,23 @@ function readOnlyPolicy(bucket: string): string {
 
           A wildcard would also be wrong for a reason no convenience outweighs: identity documents
           live in this bucket under their own prefix and are served through signed URLs precisely
-          because they are private. `cities/*` is deliberately absent — `ImageService.keyFor`
-          accepts the kind and nothing calls it, so adding it would open a prefix nothing writes.
+          because they are private, and `disputes/*` holds photographs of the inside of somebody's
+          home filed in a complaint — streamed through an authorised route for the same reason.
+          Neither is in this list and neither may join it; `media-policy.integration.test.ts` fails
+          if either does, and fails again if a prefix a public page needs is missing.
+
+          `cities/*` DID join it, on 2026-08-30. It was absent on the stated grounds that
+          «ImageService.keyFor accepts the kind and nothing calls it, so adding it would open a
+          prefix nothing writes» — true when written, and no longer: the console uploads city
+          photography and §5.4's hero band renders it on a public page. Its absence produced
+          exactly the silent 403 this comment predicts — URL right, object stored, row `ready`,
+          browser rendering nothing.
         */
-        Resource: [`arn:aws:s3:::${bucket}/properties/*`, `arn:aws:s3:::${bucket}/ads/*`],
+        Resource: [
+          `arn:aws:s3:::${bucket}/properties/*`,
+          `arn:aws:s3:::${bucket}/ads/*`,
+          `arn:aws:s3:::${bucket}/cities/*`,
+        ],
       },
     ],
   });
@@ -120,8 +133,8 @@ async function main(): Promise<void> {
   );
 
   console.log(
-    `Anonymous read enabled for ${bucket}/properties/* and ${bucket}/ads/*. ` +
-      'Identity documents stay private.',
+    `Anonymous read enabled for ${bucket}/properties/*, ${bucket}/ads/* and ` +
+      `${bucket}/cities/*. Identity documents and dispute evidence stay private.`,
   );
 }
 
