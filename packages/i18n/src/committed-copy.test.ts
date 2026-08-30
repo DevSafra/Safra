@@ -109,27 +109,40 @@ describe('what we committed, not what is in the tree', () => {
         expect(defined.size).toBeGreaterThan(5);
       });
 
-      it('has every catalogue block its committed screens read', () => {
-        const missing = new Map<string, string[]>();
+      /*
+        Given room, because this shells out to `git show` ONCE PER SCREEN.
 
-        for (const path of trackedSources(app)) {
-          const source = committed(path);
+        It reads ~250 committed files through git, which is a second or two alone and comfortably
+        past vitest's 5-second default when the rest of the suite is running beside it. It timed
+        out three times in one session on 2026-08-30 while asserting nothing — a red run whose
+        cause is the clock teaches everybody to re-run rather than to read, which is worse than a
+        slow test. The bound is generous rather than tuned: this is not a performance assertion.
+      */
+      it(
+        'has every catalogue block its committed screens read',
+        { timeout: 60_000 },
+        () => {
+          const missing = new Map<string, string[]>();
 
-          if (source === null) continue;
+          for (const path of trackedSources(app)) {
+            const source = committed(path);
 
-          const unresolved = [...blocksRead(source)].filter(
-            (block) => !defined.has(block),
-          );
+            if (source === null) continue;
 
-          if (unresolved.length > 0) missing.set(path, unresolved);
-        }
+            const unresolved = [...blocksRead(source)].filter(
+              (block) => !defined.has(block),
+            );
 
-        expect(
-          Object.fromEntries(missing),
-          'These COMMITTED files read catalogue blocks that are not in the COMMITTED catalogue. ' +
-            'The working tree compiles and nobody else can build this. Commit the copy.',
-        ).toEqual({});
-      });
+            if (unresolved.length > 0) missing.set(path, unresolved);
+          }
+
+          expect(
+            Object.fromEntries(missing),
+            'These COMMITTED files read catalogue blocks that are not in the COMMITTED catalogue. ' +
+              'The working tree compiles and nobody else can build this. Commit the copy.',
+          ).toEqual({});
+        },
+      );
     });
   }
 });
