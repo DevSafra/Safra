@@ -84,6 +84,8 @@ export const CONSOLE_SECTION_PERMISSIONS = {
   messages: P.MESSAGE_READ,
   whatsapp: P.NOTIFICATION_READ,
   geo: P.SETTINGS_READ,
+  /* الفئات — the same authority as المدن: reading which categories exist is reading geography. */
+  cityCategories: P.SETTINGS_READ,
   reports: P.REPORT_READ,
   settings: P.SETTINGS_READ,
   audit: P.AUDIT_LOG_READ,

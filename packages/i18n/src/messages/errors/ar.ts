@@ -187,6 +187,8 @@ export const ar = {
   'geo.city_unknown': 'المدينة غير معروفة.',
   'geo.city_not_found': 'لم يُعثر على هذه المدينة.',
   'geo.country_not_found': 'لم يُعثر على الدولة.',
+  'geo.category_not_found': 'لم يُعثر على الفئة.',
+  'geo.category_in_use': 'الفئة مستخدمة في مدن — يمكن إيقافها بدل حذفها.',
   'geo.code_taken': 'هذا الرمز مستخدم بالفعل.',
   'geo.slug_taken': 'هذا المعرّف مستخدم في هذه الدولة.',
   'geo.timezone_invalid': 'المنطقة الزمنية غير صالحة.',

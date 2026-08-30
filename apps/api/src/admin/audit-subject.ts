@@ -266,6 +266,13 @@ const SOURCES: Record<string, Source> = {
     label: sql`name_ar`,
     href: null,
   },
+  /* Its own screen since 2026-08-30 — الفئات — so the entry leads to where it is managed. */
+  city_category: {
+    table: 'city_categories',
+    reference: sql`code`,
+    label: sql`name_ar`,
+    href: () => '/city-categories',
+  },
   /* `/geo` since 2026-08-30: a city is editable there, so the entry can lead somewhere. */
   city: {
     table: 'cities',

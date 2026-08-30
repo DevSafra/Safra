@@ -23,9 +23,11 @@ import {
   couponActiveSchema,
   couponCreateSchema,
   couponUpdateSchema,
+  createCityCategorySchema,
   createCitySchema,
   createCountrySchema,
   createCurrencySchema,
+  updateCityCategorySchema,
   updateCitySchema,
   updateCountrySchema,
   updateCurrencySchema,
@@ -34,9 +36,11 @@ import {
   pageQuerySchema,
   setStaffScopeSchema,
   type CouponActiveInput,
+  type CreateCityCategoryInput,
   type CreateCityInput,
   type CreateCountryInput,
   type CreateCurrencyInput,
+  type UpdateCityCategoryInput,
   type UpdateCityInput,
   type UpdateCountryInput,
   type UpdateCurrencyInput,
@@ -60,6 +64,7 @@ import { FinanceService } from './finance.service.js';
 import { PromotionsService } from './promotions.service.js';
 import { GeoService } from './geo.service.js';
 import { GeoWriteService } from './geo-write.service.js';
+import { GeoCategoryService } from './geo-category.service.js';
 import { ReportsService } from './reports.service.js';
 import { StaffOverviewService } from './staff-overview.service.js';
 import { ExportRequestService } from './export-request.service.js';
@@ -154,6 +159,7 @@ export class RegistriesController {
     private readonly promotions: PromotionsService,
     private readonly geo: GeoService,
     private readonly geoWrite: GeoWriteService,
+    private readonly geoCategories: GeoCategoryService,
     private readonly reports: ReportsService,
     private readonly staffOverview: StaffOverviewService,
     private readonly emergency: EmergencyService,
@@ -547,6 +553,41 @@ export class RegistriesController {
     Nothing here deletes. A country, city or currency is referenced by bookings and ledger rows
     that outlive the decision to stop selling there; `isActive` is how a market closes.
   */
+
+  /*
+    ── الفئات ────────────────────────────────────────────────────────────────
+
+    Their own screen, so their own routes. `SETTINGS_READ` opens the list because the geography
+    screen already reads them to draw its category column; changing one is `GEO_MANAGE`, the same
+    authority that opens and closes a market.
+  */
+
+  @Get('geo/categories')
+  @RequirePermissions(P.SETTINGS_READ)
+  async cityCategories() {
+    return { categories: await this.geoCategories.list() };
+  }
+
+  @Post('geo/categories')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoCategoryService records city_category.created inside the transaction.')
+  async createCityCategory(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(createCityCategorySchema)) body: CreateCityCategoryInput,
+  ) {
+    return this.geoCategories.create(user, body);
+  }
+
+  @Patch('geo/categories/:code')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoCategoryService records city_category.updated inside the transaction.')
+  async updateCityCategory(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('code') code: string,
+    @Body(new ZodValidationPipe(updateCityCategorySchema)) body: UpdateCityCategoryInput,
+  ) {
+    return this.geoCategories.update(user, code, body);
+  }
 
   @Post('geo/currencies')
   @RequirePermissions(P.GEO_MANAGE)

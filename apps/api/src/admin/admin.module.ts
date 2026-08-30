@@ -35,6 +35,7 @@ import { FinanceService } from './finance.service.js';
 import { PromotionsService } from './promotions.service.js';
 import { GeoService } from './geo.service.js';
 import { GeoWriteService } from './geo-write.service.js';
+import { GeoCategoryService } from './geo-category.service.js';
 import { ReportsService } from './reports.service.js';
 import { StaffOverviewService } from './staff-overview.service.js';
 import { EmergencyService } from './emergency.service.js';
@@ -108,6 +109,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     PromotionsService,
     GeoService,
     GeoWriteService,
+    GeoCategoryService,
     ReportsService,
     StaffOverviewService,
     EmergencyService,

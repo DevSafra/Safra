@@ -5,6 +5,7 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -51,6 +52,41 @@ export const countries = pgTable('countries', {
   /** SRS §1.3: Syria, Jordan and Lebanon at launch; others are future scope. */
   isLaunchMarket: boolean('is_launch_market').notNull().default(false),
   isActive: boolean('is_active').notNull().default(true),
+  ...timestamps,
+});
+
+/**
+ * The city categories — «الفئات» — as a TABLE rather than an enum (Bashar, 2026-08-30).
+ *
+ * ## Why it moved
+ *
+ * `city_category` was a `pgEnum` with four members, so «manage the categories» was a migration and
+ * a deployment, not a screen. Every other reference set on this platform is already a table for
+ * exactly that reason — `amenities` says it outright: «Admin-managed so a new filter (§5.5) needs
+ * no deploy» — and city categories were the one that was not.
+ *
+ * ## The enum is not dropped
+ *
+ * `cities.categories` keeps its `city_category[]` column, populated in step with this table, and
+ * migration `post/0018` backfills the pair. Dropping the column would rewrite `catalog.service`,
+ * the customer city page, the home page's category strip and the geography screen in the same
+ * commit as a schema change — and a Postgres enum cannot lose a member while a column still holds
+ * it. The join is the authority for what a city IS; the array stays as the read path until those
+ * callers move, and `GeoCategoryService` writes both.
+ *
+ * `code` rather than a numeric id in the URL, matching `property_types` and `amenities`: it is
+ * what the seed, the catalogues and every existing filter already key on.
+ */
+export const cityCategories = pgTable('city_categories', {
+  id: primaryId(),
+  /** `coastal` | `mountain` | `desert` | `historic` | whatever staff add next. */
+  code: text('code').notNull().unique(),
+  nameAr: text('name_ar').notNull(),
+  nameEn: text('name_en').notNull(),
+  nameDe: text('name_de').notNull(),
+  /** Retired rather than deleted: a city may still be filed under it. */
+  isActive: boolean('is_active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
   ...timestamps,
 });
 
@@ -107,6 +143,28 @@ export const cities = pgTable(
  * apply — city photos are usually licensed stock, and stripping metadata avoids
  * republishing a photographer's embedded details by accident.
  */
+/**
+ * Which categories a city is filed under.
+ *
+ * A join rather than an array column, matching `unit_amenities`: an array cannot carry a foreign
+ * key, so a category retired or renamed would leave orphan strings in every city that held it.
+ */
+export const cityCategoryLinks = pgTable(
+  'city_category_links',
+  {
+    cityId: foreignId('city_id')
+      .notNull()
+      .references(() => cities.id),
+    categoryId: foreignId('category_id')
+      .notNull()
+      .references(() => cityCategories.id),
+  },
+  (t) => [
+    primaryKey({ columns: [t.cityId, t.categoryId] }),
+    index('city_category_links_category_idx').on(t.categoryId),
+  ],
+);
+
 export const cityImages = pgTable(
   'city_images',
   {

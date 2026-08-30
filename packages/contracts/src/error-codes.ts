@@ -289,6 +289,9 @@ export const ERROR = {
   GEO_CITY_UNKNOWN: 'geo.city_unknown',
   GEO_CITY_NOT_FOUND: 'geo.city_not_found',
   GEO_COUNTRY_NOT_FOUND: 'geo.country_not_found',
+  GEO_CATEGORY_NOT_FOUND: 'geo.category_not_found',
+  /* A category still filed against a city cannot be removed — it is retired instead. */
+  GEO_CATEGORY_IN_USE: 'geo.category_in_use',
   /* A code or slug already in use — cities are unique per country, codes globally. */
   GEO_CODE_TAKEN: 'geo.code_taken',
   GEO_SLUG_TAKEN: 'geo.slug_taken',

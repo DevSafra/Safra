@@ -76,6 +76,7 @@ const SECTION_HANDLERS: Record<
   messages: [CommsController, 'listConversations', 'getConversations'],
   whatsapp: [CommsController, 'listNotifications', 'getNotifications'],
   geo: [RegistriesController, 'geography', 'getGeography'],
+  cityCategories: [RegistriesController, 'cityCategories', 'getCityCategories'],
   reports: [RegistriesController, 'reportCards', 'getReports'],
   settings: [AdminOperationsController, 'listSettings', 'getSettings'],
   audit: [AdminOperationsController, 'auditLog', 'getAuditLog'],

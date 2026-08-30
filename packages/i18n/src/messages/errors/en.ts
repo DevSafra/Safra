@@ -198,6 +198,9 @@ export const en = {
   'geo.city_unknown': 'Unknown city.',
   'geo.city_not_found': 'City not found.',
   'geo.country_not_found': 'Country not found.',
+  'geo.category_not_found': 'Category not found.',
+  'geo.category_in_use':
+    'That category is used by cities — deactivate it instead of removing it.',
   'geo.code_taken': 'That code is already in use.',
   'geo.slug_taken': 'That slug is already used in this country.',
   'geo.timezone_invalid': 'That is not a valid time zone.',

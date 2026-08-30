@@ -204,6 +204,8 @@ export const AUDIT_ACTIONS = [
   'dispute.evidence_added',
   'dispute.evidence_removed',
   /* A support thread ended from the console rather than by the person who opened it. */
+  'city_category.created',
+  'city_category.updated',
   'city.created',
   'city.updated',
   'country.created',

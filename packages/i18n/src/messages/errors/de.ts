@@ -227,6 +227,9 @@ export const de = {
   'geo.city_unknown': 'Unbekannte Stadt.',
   'geo.city_not_found': 'Stadt nicht gefunden.',
   'geo.country_not_found': 'Land nicht gefunden.',
+  'geo.category_not_found': 'Kategorie nicht gefunden.',
+  'geo.category_in_use':
+    'Diese Kategorie wird von Städten verwendet — deaktivieren statt entfernen.',
   'geo.code_taken': 'Dieser Code wird bereits verwendet.',
   'geo.slug_taken': 'Dieser Bezeichner wird in diesem Land bereits verwendet.',
   'geo.timezone_invalid': 'Keine gültige Zeitzone.',
