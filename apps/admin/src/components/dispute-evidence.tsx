@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+import { ImageSliderFrame, type SliderImage } from '@safra/ui';
+
 import { t, apiErrorOf } from '@/lib/strings';
 
 /** How often, and how many times, the card asks whether a photograph has finished rendering. */
@@ -48,6 +50,11 @@ export function DisputeEvidence({
   const [error, setError] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
 
+  /* The photograph being looked at, and the one being replaced — see `send`. */
+  const [preview, setPreview] = useState<number | null>(null);
+  const [replacing, setReplacing] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
+
   const pending = evidence.filter((one) => !one.rendered).length;
 
   /*
@@ -92,11 +99,58 @@ export function DisputeEvidence({
     return () => clearInterval(timer);
   }, [pending, router]);
 
+  /**
+   * Retires one photograph. Shared by «حذف» and by the second half of «استبدال».
+   *
+   * Returns whether it worked, so a replace can stop rather than ending with the old picture gone
+   * and the new one never sent.
+   */
+  async function retire(id: string): Promise<boolean> {
+    const response = await fetch(`/api/disputes/evidence/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      setError(apiErrorOf(await response.json().catch(() => null)));
+
+      return false;
+    }
+
+    return true;
+  }
+
+  async function remove(id: string): Promise<void> {
+    if (!window.confirm(c.evidenceConfirmRemove)) return;
+
+    setRemoving(id);
+    setError(null);
+
+    try {
+      if (await retire(id)) router.refresh();
+    } catch {
+      setError(t.errors.unreachable);
+    } finally {
+      setRemoving(null);
+    }
+  }
+
+  /**
+   * Sends a file — as a new piece of evidence, or as the second half of a replacement.
+   *
+   * A replacement is a REMOVAL followed by an upload, two audited events, rather than new bytes
+   * under an old id: a row whose bytes changed would make the resolution unreadable against what
+   * the decision was actually made from. The order matters — the old one goes first, so a failure
+   * to upload leaves a file with one photograph missing rather than two identical ones.
+   */
   async function send(chosen: File): Promise<void> {
+    const replaced = replacing;
+
     setBusy(true);
     setError(null);
 
     try {
+      if (replaced !== null && !(await retire(replaced))) return;
+
       const body = new FormData();
 
       body.append('file', chosen);
@@ -118,9 +172,25 @@ export function DisputeEvidence({
       setError(t.errors.unreachable);
     } finally {
       setBusy(false);
+      setReplacing(null);
       if (file.current) file.current.value = '';
     }
   }
+
+  /*
+    Only what has been RENDERED can be previewed — the worker writes the variants, and a frame over
+    a placeholder shows nothing. Built from the list rather than stored, so a refresh cannot leave a
+    stale picture on screen.
+  */
+  const slides: SliderImage[] = evidence
+    .filter((one) => one.rendered)
+    .map((one) => ({
+      id: one.id,
+      thumb: fileHref(one.id),
+      full: fileHref(one.id),
+      caption: one.fileName,
+      badge: one.byStaff ? c.evidenceFiledByStaff : c.evidenceFiledByCustomer,
+    }));
 
   if (closed && evidence.length === 0) return null;
 
@@ -140,30 +210,60 @@ export function DisputeEvidence({
             </span>
           ) : (
             /*
-              A link, so a photograph can be opened at its own size — the whole point of it is to be
-              looked at closely. `alt=""` because the picture IS the content: a description invented
-              here would be a claim about somebody's room that nobody made.
+              A thumbnail that OPENS IN PLACE, and its two controls under it.
+
+              It was an `<a target="_blank">` to the raw file: looking at a photograph meant leaving
+              the dispute, and a decision is made by reading the complaint and the picture together
+              (Bashar, 2026-08-30). `alt=""` because the picture IS the content — a description
+              invented here would be a claim about somebody's room that nobody made.
             */
-            <a
-              key={one.id}
-              href={fileHref(one.id)}
-              target="_blank"
-              rel="noreferrer"
-              title={one.fileName}
-              data-evidence={one.id}
-              className="block"
-            >
-              <img
-                src={fileHref(one.id)}
-                alt=""
-                loading="lazy"
-                className={`h-16 w-20 rounded-lg border object-cover transition-colors ${
-                  one.byStaff
-                    ? 'border-[rgba(var(--skyA),0.5)]'
-                    : 'border-line hover:border-[rgba(var(--goldA),0.5)]'
-                }`}
-              />
-            </a>
+            <span key={one.id} className="grid gap-1">
+              <button
+                type="button"
+                onClick={() => setPreview(slides.findIndex((s) => s.id === one.id))}
+                title={one.fileName}
+                aria-label={c.evidenceOpen}
+                data-evidence={one.id}
+                className="block cursor-pointer"
+              >
+                <img
+                  src={fileHref(one.id)}
+                  alt=""
+                  loading="lazy"
+                  className={`h-16 w-20 rounded-lg border object-cover transition-colors ${
+                    one.byStaff
+                      ? 'border-[rgba(var(--skyA),0.5)]'
+                      : 'border-line hover:border-[rgba(var(--goldA),0.5)]'
+                  }`}
+                />
+              </button>
+
+              {closed ? null : (
+                <span className="flex items-center justify-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={busy || removing !== null}
+                    data-evidence-replace={one.id}
+                    onClick={() => {
+                      setReplacing(one.id);
+                      file.current?.click();
+                    }}
+                    className="cursor-pointer text-[10px] text-faint transition-colors hover:text-gold disabled:opacity-50"
+                  >
+                    {c.evidenceReplace}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || removing !== null}
+                    data-evidence-remove={one.id}
+                    onClick={() => void remove(one.id)}
+                    className="cursor-pointer text-[10px] text-faint transition-colors hover:text-bad disabled:opacity-50"
+                  >
+                    {removing === one.id ? c.evidenceRemoving : c.evidenceRemove}
+                  </button>
+                </span>
+              )}
+            </span>
           ),
         )}
 
@@ -199,6 +299,26 @@ export function DisputeEvidence({
       {error ? (
         <p className="mt-1.5 text-[11px] font-semibold text-bad">{error}</p>
       ) : null}
+
+      {/* What «حذف» actually does, said before it is pressed rather than after. */}
+      {closed || evidence.length === 0 ? null : (
+        <p className="mt-1.5 text-[10.5px] text-faint2">{c.evidenceRemoveNote}</p>
+      )}
+
+      {/*
+        The SHARED previewer, not a dialog of this card's own (Bashar, 2026-08-30).
+
+        The tiles stay here because they carry «استبدال» and «حذف» underneath, which no other
+        gallery has; the frame — keyboard, focus, scroll-lock, the position counter — is
+        `ImageSliderFrame`'s, so a photograph is read the same way here as on a property review.
+        A dialog rather than a new tab: the picture is read AGAINST the complaint beside it.
+      */}
+      <ImageSliderFrame
+        images={slides}
+        at={preview}
+        onChange={setPreview}
+        labels={t.sections.slider}
+      />
     </div>
   );
 }

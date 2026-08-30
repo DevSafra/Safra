@@ -254,6 +254,94 @@ export class DisputeEvidenceService {
   }
 
   /**
+   * Retiring one photograph — «حذف».
+   *
+   * ## Why a table built append-only now has a removal
+   *
+   * Its own note said «evidence that can be edited or removed after the fact is not evidence»,
+   * which is right about the RECORD and wrong about the frame. A photograph gets filed by mistake,
+   * twice, or with somebody else's face and address in it, and a file that can never be corrected
+   * is its own integrity problem — and a compliance one where the frame holds personal data
+   * nobody consented to. Bashar asked for it on 2026-08-30.
+   *
+   * ## So nothing is destroyed
+   *
+   * `deleted_at`, never a DELETE, with `dispute.evidence_removed` beside it: the row stays, who
+   * removed it and when is answerable from the audit log, and the picture stops counting and stops
+   * being served. «Replace» on the console is this followed by an upload — two audited events —
+   * rather than new bytes under an old id, because a row whose bytes changed would make the
+   * resolution unreadable against what the decision was actually made from.
+   *
+   * ## A closed dispute takes no removals
+   *
+   * The same rule, and the same sentence, as `add`: the file is the record of a decision that has
+   * been made, and emptying it afterwards leaves a resolution nobody can check.
+   *
+   * ## Staff only, scoped, and idempotent
+   *
+   * The customer's route does not reach here. A second press finds a row already retired and
+   * answers «nothing changed» rather than an error, because the card can be double-clicked.
+   */
+  async remove(
+    claims: AccessTokenClaims | undefined,
+    evidenceId: string,
+  ): Promise<{ removed: boolean }> {
+    const found = await this.db.execute<{
+      id: string;
+      dispute_id: string;
+      status: string;
+      city_id: string | null;
+      file_name: string;
+      already: boolean;
+    }>(sql`
+      SELECT e.id, e.dispute_id, d.status::text AS status, b.city_id, e.file_name,
+             (e.deleted_at IS NOT NULL) AS already
+      FROM dispute_evidence e
+      JOIN disputes d      ON d.id = e.dispute_id AND d.deleted_at IS NULL
+      LEFT JOIN bookings b ON b.id = d.booking_id
+      WHERE e.id = ${evidenceId}::uuid
+        AND ${scopeFilter(claims, 'b.city_id')}
+      LIMIT 1
+    `);
+
+    const evidence = found.rows[0];
+
+    /* An id outside this reader's cities answers exactly as one that does not exist. */
+    if (!evidence) throw notFound(ERROR.DISPUTE_NOT_FOUND);
+
+    assertCanWrite(claims, evidence.city_id);
+
+    if (evidence.status === 'resolved' || evidence.status === 'rejected') {
+      throw badRequest(ERROR.DISPUTE_ALREADY_CLOSED);
+    }
+
+    /* Already retired: nothing changes, and no audit row for an event that did not happen. */
+    if (evidence.already) return { removed: false };
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE dispute_evidence SET deleted_at = now()
+        WHERE id = ${evidence.id}::uuid AND deleted_at IS NULL
+      `);
+
+      await this.audit.record(
+        {
+          actorUserId: claims?.sub,
+          actorRole: claims?.role,
+          action: 'dispute.evidence_removed',
+          subjectType: 'dispute',
+          subjectId: evidence.dispute_id,
+          /* The name it was filed under, so the log says WHICH photograph went. */
+          before: { uploadedAs: evidence.file_name },
+        },
+        tx as unknown as Database,
+      );
+    });
+
+    return { removed: true };
+  }
+
+  /**
    * The photographs on one dispute, oldest first.
    *
    * No scope check of its own: both callers have already resolved the dispute under their own
@@ -274,7 +362,7 @@ export class DisputeEvidenceService {
              to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS at,
              (uploaded_by_user_id IS NOT NULL) AS by_staff
       FROM dispute_evidence
-      WHERE dispute_id = ${disputeId}::uuid
+      WHERE dispute_id = ${disputeId}::uuid AND deleted_at IS NULL
       ORDER BY created_at, id
     `);
 
@@ -322,7 +410,8 @@ export class DisputeEvidenceService {
             JOIN disputes d           ON d.id = e.dispute_id AND d.deleted_at IS NULL
             JOIN customer_profiles c  ON c.id = d.customer_profile_id
             LEFT JOIN bookings b      ON b.id = d.booking_id
-            WHERE e.id = ${evidenceId}::uuid AND c.user_id = ${claims?.sub}::uuid
+            WHERE e.id = ${evidenceId}::uuid AND e.deleted_at IS NULL
+              AND c.user_id = ${claims?.sub}::uuid
             LIMIT 1
           `
         : sql`
@@ -330,7 +419,7 @@ export class DisputeEvidenceService {
             FROM dispute_evidence e
             JOIN disputes d      ON d.id = e.dispute_id AND d.deleted_at IS NULL
             LEFT JOIN bookings b ON b.id = d.booking_id
-            WHERE e.id = ${evidenceId}::uuid
+            WHERE e.id = ${evidenceId}::uuid AND e.deleted_at IS NULL
               AND ${scopeFilter(claims, 'b.city_id')}
             LIMIT 1
           `,

@@ -217,6 +217,24 @@ export class CommsController {
       .send(file.bytes);
   }
 
+  /**
+   * Retiring one photograph — «حذف».
+   *
+   * `DISPUTE_MANAGE`, the same permission that adds one: a reader who may not settle a dispute has
+   * no business changing what it is decided from. `assertCanWrite` inside the service refuses a
+   * `read_only` member who may look at the queue, and a closed dispute refuses everybody.
+   */
+  @Delete('disputes/evidence/:evidenceId')
+  @RequirePermissions(P.DISPUTE_MANAGE)
+  @AuditExempt('DisputeEvidenceService records dispute.evidence_removed transactionally.')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  async removeDisputeEvidence(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+  ) {
+    return this.disputeEvidence.remove(user, evidenceId);
+  }
+
   @Post('disputes/:reference/acknowledge')
   @RequirePermissions(P.DISPUTE_MANAGE)
   @AuditExempt('DisputeService records dispute.acknowledged inside the transaction.')

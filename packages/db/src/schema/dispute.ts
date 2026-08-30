@@ -120,9 +120,18 @@ export const disputes = pgTable(
 /**
  * Evidence attached to a dispute — EC-007's customer photos above all.
  *
- * Append-only: `createdAt` with no `updatedAt` or `deletedAt`. Evidence that can be edited or
- * removed after the fact is not evidence, and the handoff says the photos "تظهر داخل ملف
- * النزاع" — they are part of the record, not an attachment to it.
+ * Append-only in the sense that matters: nothing is ever UPDATED or physically deleted. A row can
+ * be RETIRED — `deletedAt` — and that is not a weakening of the rule, it is the rule surviving
+ * contact with the world. This table was built with no removal at all, on the reasoning that
+ * «evidence that can be edited or removed after the fact is not evidence». That is right about the
+ * record and wrong about the frame: a photograph gets filed by mistake, twice, or with somebody
+ * else's face and address in it, and a file that can never be corrected is its own integrity
+ * problem — and a compliance one where the frame holds personal data nobody consented to.
+ *
+ * So removal is a soft delete with `dispute.evidence_removed` in the audit log beside it: the row
+ * stays, who removed it and when is answerable, and it stops counting and stops being served. A
+ * closed dispute takes no removals, for the same reason it takes no additions — the resolution
+ * must stay readable against what was in front of the person who wrote it.
  *
  * The bytes live in object storage behind the same abstraction as partner documents; this
  * table holds the key. No file is served without an authorization check per request.
@@ -152,6 +161,8 @@ export const disputeEvidence = pgTable(
     variantWidths: integer('variant_widths').array(),
     /** Null when the customer uploaded it. */
     uploadedByUserId: foreignId('uploaded_by_user_id').references(() => users.id),
+    /** Retired rather than destroyed — see the note above. Who did it is in the audit log. */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     ...createdAt,
   },
   (t) => [index('dispute_evidence_dispute_idx').on(t.disputeId, t.createdAt)],

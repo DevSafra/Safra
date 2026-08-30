@@ -426,4 +426,142 @@ describeIfDb('evidence on a dispute', () => {
     );
     expect(fetched, 'the widest variant at or below the target').toContain('-800.avif');
   });
+
+  /* ── Removing one, which the table was built not to allow ─────────────────── */
+
+  /**
+   * A photograph filed by mistake can be retired, and nothing is destroyed.
+   *
+   * The table's own note said «evidence that can be edited or removed after the fact is not
+   * evidence». Right about the record, wrong about the frame — a duplicate, a wrong file, somebody
+   * else's face in shot. Bashar asked for it on 2026-08-30, so removal is a SOFT delete with an
+   * audit row: the row stays and is answerable, the picture stops counting and stops being served.
+   */
+  it('retires a photograph without destroying the row, and records who did', async () => {
+    const added = await service.addAsStaff(staff(), reference, {
+      buffer: PHOTO,
+      originalname: 'wrong-room.jpg',
+    });
+
+    expect(await service.forDispute(disputeId)).toHaveLength(1);
+
+    await expect(service.remove(staff(), added.id)).resolves.toEqual({ removed: true });
+
+    /* Gone from the file… */
+    expect(await service.forDispute(disputeId)).toHaveLength(0);
+
+    /* …and still THERE, which is the whole point of a soft delete. */
+    const row = await db.execute<{ n: string; retired: boolean }>(sql`
+      SELECT count(*)::text AS n, bool_and(deleted_at IS NOT NULL) AS retired
+      FROM dispute_evidence WHERE id = ${added.id}::uuid
+    `);
+
+    expect(row.rows[0]).toMatchObject({ n: '1', retired: true });
+
+    const logged = await db.execute<{ actor: string | null; before: unknown }>(sql`
+      SELECT actor_user_id AS actor, before FROM audit_log
+      WHERE action = 'dispute.evidence_removed' AND subject_id = ${disputeId}::uuid
+      ORDER BY created_at DESC LIMIT 1
+    `);
+
+    expect(logged.rows[0]?.actor).toBe(staffId);
+    /* WHICH photograph went, by the name it was filed under. */
+    expect(JSON.stringify(logged.rows[0]?.before)).toContain('wrong-room.jpg');
+  });
+
+  /** The bytes stop being served the moment the row is retired — for staff and for the customer. */
+  it('stops serving a retired photograph to anybody', async () => {
+    const added = await service.addAsCustomer(customer(), reference, {
+      buffer: PHOTO,
+      originalname: 'room.jpg',
+    });
+
+    /* The worker has not run in this suite, and an unrendered row is served to nobody. */
+    await db.execute(sql`
+      UPDATE dispute_evidence SET variant_widths = ARRAY[400, 800]
+      WHERE id = ${added.id}::uuid
+    `);
+
+    /* The control: it is served while it is live. */
+    await expect(
+      service.readFile(added.id, customer(), 'customer'),
+    ).resolves.toBeTruthy();
+
+    await service.remove(staff(), added.id);
+
+    await expect(
+      service.readFile(added.id, customer(), 'customer'),
+    ).rejects.toMatchObject({ response: { code: ERROR.DISPUTE_NOT_FOUND } });
+
+    await expect(service.readFile(added.id, staff(), 'staff')).rejects.toMatchObject({
+      response: { code: ERROR.DISPUTE_NOT_FOUND },
+    });
+  });
+
+  /** A second press is an ordinary thing to do to a card. It must not write a second audit row. */
+  it('does nothing on a second removal, and says so', async () => {
+    const added = await service.addAsStaff(staff(), reference, {
+      buffer: PHOTO,
+      originalname: 'twice.jpg',
+    });
+
+    await service.remove(staff(), added.id);
+
+    await expect(service.remove(staff(), added.id)).resolves.toEqual({ removed: false });
+
+    const logged = await db.execute<{ n: string }>(sql`
+      SELECT count(*)::text AS n FROM audit_log
+      WHERE action = 'dispute.evidence_removed' AND subject_id = ${disputeId}::uuid
+    `);
+
+    expect(logged.rows[0]?.n).toBe('1');
+  });
+
+  /**
+   * A closed dispute takes no removals, for the same reason it takes no additions: the resolution
+   * must stay readable against what was in front of the person who wrote it.
+   */
+  it('refuses to empty the file of a dispute that is already settled', async () => {
+    const added = await service.addAsStaff(staff(), reference, {
+      buffer: PHOTO,
+      originalname: 'settled.jpg',
+    });
+
+    await db.execute(sql`
+      UPDATE disputes
+      SET status = 'resolved', resolution = 'تمت التسوية.', closed_at = now()
+      WHERE id = ${disputeId}::uuid
+    `);
+
+    await expect(service.remove(staff(), added.id)).rejects.toMatchObject({
+      response: { code: ERROR.DISPUTE_ALREADY_CLOSED },
+    });
+
+    /* And it is still in the file. */
+    expect(await service.forDispute(disputeId)).toHaveLength(1);
+  });
+
+  /** Scope, both ways: an id outside a reader's cities answers as one that does not exist. */
+  it('refuses a removal from another city, and allows one in its own', async () => {
+    const added = await service.addAsStaff(staff(), reference, {
+      buffer: PHOTO,
+      originalname: 'scoped.jpg',
+    });
+
+    const elsewhere = await db.execute<{ id: string }>(sql`
+      SELECT id::text FROM cities WHERE id <> ${cityId}::uuid AND deleted_at IS NULL LIMIT 1
+    `);
+    const away = elsewhere.rows[0]?.id;
+
+    expect(away, 'a second city to be scoped away from').toBeTruthy();
+
+    await expect(service.remove(staff([away ?? '']), added.id)).rejects.toMatchObject({
+      response: { code: ERROR.DISPUTE_NOT_FOUND },
+    });
+
+    /* The control: the operator whose city it is can. */
+    await expect(service.remove(staff([cityId]), added.id)).resolves.toEqual({
+      removed: true,
+    });
+  });
 });

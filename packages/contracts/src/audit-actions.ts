@@ -202,6 +202,7 @@ export const AUDIT_ACTIONS = [
   'dispute.notified',
   /* A photograph filed on a dispute — by the customer, or by staff on their behalf. */
   'dispute.evidence_added',
+  'dispute.evidence_removed',
   /* A support thread ended from the console rather than by the person who opened it. */
   'conversation.started',
   'conversation.closed',

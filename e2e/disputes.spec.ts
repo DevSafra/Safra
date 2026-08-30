@@ -234,6 +234,50 @@ test.describe('النزاعات', () => {
   });
 
   /**
+   * A photograph can be LOOKED AT, replaced and removed — and the previewer is the shared one.
+   *
+   * Asked for by Bashar on 2026-08-30. The thumbnail opened the raw file in a new tab, so reading
+   * the picture meant leaving the complaint it was about, and there was no way to correct a
+   * photograph filed by mistake. Removal is a soft delete with an audit row — see the service —
+   * so this asserts the picture leaves the CARD, not that a row was destroyed.
+   */
+  test('opens a photograph in the shared previewer, and can remove it', async ({
+    page,
+  }) => {
+    await page.goto('/disputes?size=25');
+    await page.waitForSelector('article');
+
+    const thumbnails = page.locator('[data-evidence]');
+
+    /* Narrower than «no button»: an empty evidence set is the only honest reason to skip. */
+    test.skip((await thumbnails.count()) === 0, 'No rendered evidence in the queue.');
+
+    await thumbnails.first().click();
+
+    /*
+      The ONE previewer — `ImageSliderFrame` from `@safra/ui`, per the project rule. Its position
+      counter is the cheapest proof that this is the shared frame and not a bespoke dialog.
+    */
+    const frame = page.getByRole('dialog');
+
+    await expect(frame).toBeVisible();
+    await expect(frame).toContainText('/');
+
+    /* Escape closes it, which a hand-rolled dialog is exactly what keeps forgetting. */
+    await page.keyboard.press('Escape');
+    await expect(frame).toHaveCount(0);
+
+    // ── and it can be removed ────────────────────────────────────────────────
+    const before = await thumbnails.count();
+    const remove = page.locator('[data-evidence-remove]').first();
+
+    page.once('dialog', (confirm) => void confirm.accept());
+    await remove.click();
+
+    await expect(thumbnails).toHaveCount(before - 1, { timeout: 20_000 });
+  });
+
+  /**
    * The queue is ordered as a queue, and it says how much is frozen.
    *
    * A dispute holds the partner's payout, so «مستحقات مجمّدة» is money the platform is sitting on.

@@ -283,7 +283,7 @@ export class DisputeService {
                'variantWidths', variant_widths,
                'byStaff', uploaded_by_user_id IS NOT NULL)
                ORDER BY created_at, id) AS items
-      FROM dispute_evidence GROUP BY dispute_id
+      FROM dispute_evidence WHERE deleted_at IS NULL GROUP BY dispute_id
       ) ev ON ev.dispute_id = d.id
       WHERE ${sql.join(conditions, sql` AND `)}`;
 
