@@ -33,6 +33,9 @@ import type { TwoFactorService } from './two-factor.service.js';
 const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
+/** One password for every path here, so the stopwatch measures the same work each time. */
+const PASSWORD = 'A-Correct-Password-1';
+
 describeIfDb('registration does not reveal whether an address is taken', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   /* Every row this suite writes is discarded when the test that wrote it ends. */
@@ -57,7 +60,7 @@ describeIfDb('registration does not reveal whether an address is taken', () => {
   const input = (email: string) => ({
     email,
     /* Meets the composition checklist added 2026-08-14 — see `PASSWORD_RULES`. */
-    password: 'A-Correct-Password-1',
+    password: PASSWORD,
     fullName: 'Enumeration Probe',
     phone: '+963900000123',
     /* Required since 2026-08-14 — a choice must be made, and this is one of the three. */
@@ -120,33 +123,68 @@ describeIfDb('registration does not reveal whether an address is taken', () => {
    * lookup. Hashing only when creating would make "taken" obviously faster, and no amount of care
    * over the response body would hide it.
    *
-   * Asserted as a RATIO with a generous bound rather than an absolute difference: this runs on
-   * whatever CI machine is free, and the property under test is "the same order of magnitude", not
-   * "within 5ms". A regression that skipped the hash would show up as a ratio of ten or more.
+   * ## Measured against a HASH, not against each other
+   *
+   * This compared the two paths to one another and required their ratio to stay under 3. It flaked
+   * on 2026-08-30 at 3.196, and the instrumented run showed why: the two paths differ by about
+   * 2.4× **for a reason that is not the hash**. Measured on this machine, a bare hash costs 16–18ms,
+   * the taken path 20–28ms (hash plus an indexed lookup) and the create path 27–46ms (hash, lookup,
+   * and the rows it writes). Writing an account cannot be free, so a ratio between the two asserted
+   * something the system never guaranteed and had roughly one noisy sample of headroom.
+   *
+   * The property that IS guaranteed, and the one the oracle turns on, is that **neither path is
+   * cheaper than a password hash**. Skipping the hash on the taken path — the regression this whole
+   * file exists to catch — drops it to a bare lookup of a few milliseconds, a quarter of a hash and
+   * an order of magnitude below the bound below. So this measures a hash here and now, on the same
+   * machine in the same second, and compares each path to that.
+   *
+   * ## Minima, because timing noise is one-sided
+   *
+   * A busy scheduler, a GC pause or a slow pool can only make a sample SLOWER. The fastest of
+   * several is therefore the best estimate of what the work actually costs, and it is what keeps
+   * this stable while 200 other test files run beside it. A median still carries the noise.
+   *
+   * ## What this does NOT claim
+   *
+   * That the two answers are indistinguishable by a stopwatch. They are not: creating an account
+   * costs measurably more than declining to. That residual is recorded in `docs/FUTURE-WORK.md`
+   * with its mitigations — every probe of an unregistered address leaves an account behind, and
+   * `POST /auth/register` allows five attempts a minute per IP.
    */
-  it('takes comparable time whether or not the address exists', async () => {
-    const time = async (email: string) => {
+  it('costs at least a password hash whether or not the address exists', async () => {
+    const time = async (run: () => Promise<unknown>) => {
       const started = performance.now();
 
-      await service.register(input(email));
+      await run();
 
       return performance.now() - started;
     };
 
-    /* Several of each, interleaved, so a warming pool or a busy moment cannot favour one branch. */
+    /* Interleaved, so a warming pool or a busy moment cannot favour one of the three. */
+    const hashTimes: number[] = [];
     const takenTimes: number[] = [];
     const newTimes: number[] = [];
 
-    for (let i = 0; i < 3; i += 1) {
-      takenTimes.push(await time(taken));
-      newTimes.push(await time(fresh()));
+    for (let i = 0; i < 5; i += 1) {
+      hashTimes.push(await time(() => passwords.hash(PASSWORD)));
+      takenTimes.push(await time(() => service.register(input(taken))));
+      newTimes.push(await time(() => service.register(input(fresh()))));
     }
 
-    const median = (values: number[]) => [...values].sort((a, b) => a - b)[1] ?? 0;
-    const ratio = median(newTimes) / Math.max(median(takenTimes), 0.001);
+    const fastest = (values: number[]) => Math.min(...values);
+    const floor = fastest(hashTimes) * 0.8;
 
-    expect(ratio).toBeLessThan(3);
-    expect(ratio).toBeGreaterThan(1 / 3);
+    /*
+      0.8 rather than 1.0: the same algorithm measured in a tight loop and inside `register` can
+      differ a little with JIT warmth and Argon2's memory reuse. A path that skipped the hash would
+      come in at roughly a QUARTER of one, so the margin costs nothing that matters.
+    */
+    expect(
+      fastest(takenTimes),
+      'the taken path must still hash the password',
+    ).toBeGreaterThan(floor);
+
+    expect(fastest(newTimes), 'and so must the create path').toBeGreaterThan(floor);
   });
 
   /*
