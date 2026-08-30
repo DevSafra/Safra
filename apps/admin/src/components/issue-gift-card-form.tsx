@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import type { GiftCardCurrency } from '@safra/contracts';
+import { preferredCurrency, type GiftCardCurrency } from '@safra/contracts';
 
 import { t, apiErrorOf } from '@/lib/strings';
 import { TableToolbar } from './table-toolbar';
@@ -50,7 +50,17 @@ export function GiftCardsToolbar({
 
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<GiftCardCurrency>(currencies[0] ?? 'USD');
+  /*
+    The platform's standard currency, not `currencies[0]`.
+
+    `GIFT_CARD_CURRENCIES` is written SYP-first because that is the order its reasoning is written
+    in, so the first entry decided what a staff-issued card was DENOMINATED in whenever nobody
+    touched the select — a card in SYP where USD was meant is out by four orders of magnitude, and
+    SAFRA has to honour it. `preferredCurrency` is the one answer to «which when nobody said».
+  */
+  const [currency, setCurrency] = useState<GiftCardCurrency>(
+    preferredCurrency(currencies),
+  );
   const [expiresOn, setExpiresOn] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');

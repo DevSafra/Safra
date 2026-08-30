@@ -6,7 +6,7 @@ import { useState } from 'react';
 import {
   AD_BILLING_PERIODS,
   ADVERTISER_KINDS,
-  DEFAULT_MONEY_CURRENCY,
+  preferredCurrency,
   type AdBillingPeriod,
   type AdvertiserKind,
 } from '@safra/contracts';
@@ -73,18 +73,12 @@ export function AdsToolbar({
   const [billing, setBilling] = useState<AdBillingPeriod>('monthly');
   const [price, setPrice] = useState('');
   /*
-    The platform's documented default, not `currencies[0]`.
-
-    `DEFAULT_MONEY_CURRENCY` is the single answer to «which currency when nobody has said»;
-    the first entry of a geography list is an accident of that list's ordering, and it decides
-    what an advertiser is billed in when an operator does not touch the select. Falls back to the
-    first offered code only if the default is not among them.
+    The platform's standard currency, not `currencies[0]` — it decides what an advertiser is
+    billed in when an operator does not touch the select. This reasoning was written here first
+    and is now `preferredCurrency`, shared, because three other forms had the same decision to
+    make and made it by taking the first entry of a list.
   */
-  const [currency, setCurrency] = useState(
-    currencies.includes(DEFAULT_MONEY_CURRENCY)
-      ? DEFAULT_MONEY_CURRENCY
-      : (currencies[0] ?? DEFAULT_MONEY_CURRENCY),
-  );
+  const [currency, setCurrency] = useState<string>(preferredCurrency(currencies));
   const [startsOn, setStartsOn] = useState('');
   const [endsOn, setEndsOn] = useState('');
 

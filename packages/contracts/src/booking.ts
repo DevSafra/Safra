@@ -143,6 +143,33 @@ export const COMPENSATION_CURRENCIES = ['USD', 'EUR', 'SYP'] as const;
 export const DEFAULT_MONEY_CURRENCY = 'USD';
 
 /**
+ * Which currency a picker STARTS on, given the codes it may offer.
+ *
+ * ## Why this is a function and not `currencies[0]`
+ *
+ * Four forms chose their default by taking the first entry of a list, and the first entry of a
+ * list is an accident of that list's ordering: the geography read orders the ACCOUNTING currency
+ * first, and `GIFT_CARD_CURRENCIES` is written SYP-first because that is the order its reasoning
+ * was written in. So issuing a gift card and creating a coupon both defaulted to SYP — and SYP
+ * and USD differ by four orders of magnitude, which is the whole reason «no amount without its
+ * currency» exists. An operator who does not touch the select gets the platform's standard
+ * currency, everywhere, in every app (Bashar, 2026-08-30).
+ *
+ * Falls back to the first offered code only when the standard one is not on offer at all, and to
+ * the standard itself when nothing is offered — a select with no options is a broken screen, not
+ * a reason to invent a different currency.
+ */
+export function preferredCurrency<T extends string>(
+  currencies: readonly T[],
+): T | typeof DEFAULT_MONEY_CURRENCY {
+  return (
+    currencies.find((one) => one === DEFAULT_MONEY_CURRENCY) ??
+    currencies[0] ??
+    DEFAULT_MONEY_CURRENCY
+  );
+}
+
+/**
  * §9.4's «تعويض» — a wallet credit made because of a booking.
  *
  * ## Credit only, unlike the general wallet adjustment

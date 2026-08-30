@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { COUPON_TYPES, type CouponType } from '@safra/contracts';
+import { COUPON_TYPES, preferredCurrency, type CouponType } from '@safra/contracts';
 
 import { t, apiErrorOf, label } from '@/lib/strings';
 import { TableToolbar } from './table-toolbar';
@@ -45,7 +45,8 @@ export function CouponsToolbar({
   const [type, setType] = useState<CouponType>('campaign');
   const [valueKind, setValueKind] = useState<'percent' | 'fixed'>('percent');
   const [value, setValue] = useState('');
-  const [currency, setCurrency] = useState(currencies[0] ?? 'USD');
+  /* The platform's standard currency — see `preferredCurrency`, not this list's ordering. */
+  const [currency, setCurrency] = useState<string>(preferredCurrency(currencies));
   const [maxDiscount, setMaxDiscount] = useState('');
   const [minBooking, setMinBooking] = useState('');
   const [startsOn, setStartsOn] = useState('');
