@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { TableToolbar } from '@/components/table-toolbar';
 import { t, apiErrorOf } from '@/lib/strings';
 
 /** The three things SAFRA can address a thread to. */
@@ -12,6 +13,16 @@ type Recipient = (typeof RECIPIENTS)[number];
 
 function isRecipient(value: string | undefined): value is Recipient {
   return RECIPIENTS.includes((value ?? '') as Recipient);
+}
+
+/** The shape to type, per recipient — the placeholder is the only hint of the prefix. */
+function referencePlaceholder(to: Recipient): string {
+  const c = t.sections.messages;
+
+  if (to === 'partner') return c.composeReferencePartner;
+  if (to === 'booking') return c.composeReferenceBooking;
+
+  return c.composeReferenceCustomer;
 }
 
 /**
@@ -36,11 +47,29 @@ function isRecipient(value: string | undefined): value is Recipient {
  * A form permanently above the inbox would push the queue down the page, and the queue is what this
  * screen is for. It opens by itself when a link arrives carrying a recipient — «مراسلة» on a
  * customer, a partner or a booking — so the common path is one press from the record.
+ *
+ * ## It owns the bar, so the control can sit IN it
+ *
+ * Bashar asked (2026-08-30) for «محادثة جديدة» beside the search rather than under it. The two
+ * halves — a trigger on the bar's line and a panel at the table's full width — are `TableToolbar`'s
+ * own `end` and `below` slots, and they must share one piece of state, so this component renders
+ * the bar instead of sitting beneath it. `end` is `ms-auto`, which on an Arabic screen is the
+ * visual LEFT; `below` exists because a `w-full` panel inside `end` resolves to its content width
+ * and lands in a third of the row.
  */
 export function StartConversation({
+  action,
+  query,
+  size,
+  placeholder,
   defaultTo,
   defaultReference,
 }: {
+  /** The search form's target and current state — passed straight through to `TableToolbar`. */
+  readonly action: string;
+  readonly query: string | undefined;
+  readonly size: number;
+  readonly placeholder: string;
   readonly defaultTo?: string | undefined;
   readonly defaultReference?: string | undefined;
 }) {
@@ -99,22 +128,19 @@ export function StartConversation({
     }
   }
 
-  if (!open) {
-    return (
-      <div className="mb-3 flex">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
-        >
-          {c.compose}
-        </button>
-      </div>
-    );
-  }
+  const trigger = (
+    <button
+      type="button"
+      onClick={() => setOpen(!open)}
+      aria-expanded={open}
+      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+    >
+      {c.compose}
+    </button>
+  );
 
-  return (
-    <div className="mb-3 grid gap-3 rounded-[10px] border border-line bg-field p-3.5">
+  const form = (
+    <div className="grid gap-3 rounded-[10px] border border-line bg-field p-3.5">
       <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
         {c.composeTo}
         <select
@@ -142,7 +168,9 @@ export function StartConversation({
           name="reference"
           value={reference}
           onChange={(event) => setReference(event.target.value)}
-          className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+          /* The prefix is the whole hint: it changes with the recipient above it. */
+          placeholder={referencePlaceholder(to)}
+          className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text placeholder:text-faint"
         />
         <span className="text-[10.5px] font-normal text-faint2">
           {c.composeReferenceHint}
@@ -156,7 +184,8 @@ export function StartConversation({
           value={body}
           onChange={(event) => setBody(event.target.value)}
           rows={4}
-          className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text"
+          placeholder={c.composeBodyPlaceholder}
+          className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text placeholder:text-faint"
         />
       </label>
 
@@ -182,5 +211,16 @@ export function StartConversation({
         </button>
       </div>
     </div>
+  );
+
+  return (
+    <TableToolbar
+      action={action}
+      query={query}
+      size={size}
+      placeholder={placeholder}
+      end={trigger}
+      below={open ? form : null}
+    />
   );
 }

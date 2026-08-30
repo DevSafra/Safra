@@ -6,7 +6,6 @@ import { count, shortDateTime } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
 import { TablePagination } from '@/components/table-pagination';
 import { FootNote, Ltr, StatusPill } from '@/components/admin-table';
-import { TableToolbar } from '@/components/table-toolbar';
 import { t } from '@/lib/strings';
 import { conversationKind, partyLine } from '@/lib/conversation';
 import { StartConversation } from '@/components/start-conversation';
@@ -64,14 +63,20 @@ export default async function MessagesPage({
   return (
     <ConsoleShell title={t.nav.messages} counts={counts}>
       <ConsolePanel>
-        <TableToolbar
+        {/*
+          The bar is the composer's, so «محادثة جديدة» can sit ON it rather than under it (Bashar,
+          2026-08-30). The trigger and the panel it opens share one piece of state, and they belong
+          on two different rows — the toolbar's own `end` and `below` slots — which is why this
+          renders `TableToolbar` instead of standing beside it.
+        */}
+        <StartConversation
           action="/messages"
           query={q}
           size={size}
           placeholder={t.sections.messages.searchPlaceholder}
+          defaultTo={to}
+          defaultReference={ref}
         />
-
-        <StartConversation defaultTo={to} defaultReference={ref} />
 
         {result === 'unauthenticated' ? (
           <p className="text-[12.5px] text-muted">{t.dashboard.sessionExpired}</p>
