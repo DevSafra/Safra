@@ -19,7 +19,21 @@ export interface CurrencySeed {
   decimals: number;
 }
 
-/** §1.4: SYP is the internal accounting currency; USD is the pricing anchor. */
+/**
+ * §1.4: SYP is the internal accounting currency; USD is the pricing anchor.
+ *
+ * ## Three, and only three (Bashar, 2026-08-30)
+ *
+ * JOD and LBP were seeded and neither could ever price anything: `fx_rates` holds one pair,
+ * USD→SYP, and `rateBetween` REFUSES rather than defaulting to 1 for a pair it cannot reach. So a
+ * Jordanian visitor met «الأردن · JOD» on the geography screen and a booking that could not be
+ * quoted — a currency offered by the platform and refused by it. Bashar had already said not to
+ * invent rates for them; this removes the offer instead.
+ *
+ * They are not deleted from an existing database — `0017_currencies_syp_usd_eur.sql` retires them
+ * with `deleted_at`, because a row is cheaper to keep than a foreign key is to unpick, and nothing
+ * referenced either beyond Jordan's display currency.
+ */
 export const CURRENCIES: CurrencySeed[] = [
   {
     code: 'SYP',
@@ -43,22 +57,6 @@ export const CURRENCIES: CurrencySeed[] = [
     nameEn: 'Euro',
     nameDe: 'Euro',
     symbol: '€',
-    decimals: 2,
-  },
-  {
-    code: 'JOD',
-    nameAr: 'دينار أردني',
-    nameEn: 'Jordanian Dinar',
-    nameDe: 'Jordanischer Dinar',
-    symbol: 'د.أ',
-    decimals: 3,
-  },
-  {
-    code: 'LBP',
-    nameAr: 'ليرة لبنانية',
-    nameEn: 'Lebanese Pound',
-    nameDe: 'Libanesisches Pfund',
-    symbol: 'ل.ل',
     decimals: 2,
   },
 ];
@@ -87,7 +85,8 @@ export const COUNTRIES: CountrySeed[] = [
     nameAr: 'الأردن',
     nameEn: 'Jordan',
     nameDe: 'Jordanien',
-    displayCurrency: 'JOD',
+    /* USD, like the other two: JOD has no rate and cannot price a booking. See `CURRENCIES`. */
+    displayCurrency: 'USD',
     isLaunchMarket: true,
   },
   {

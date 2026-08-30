@@ -138,6 +138,10 @@ export class GeoService {
         ORDER BY f.effective_from DESC
         LIMIT 1
       ) fx ON TRUE
+      -- Retired currencies are gone from the screen, not greyed out on it: this list has no
+      -- status column, so a retired row would read as an offer the platform still makes.
+      -- JOD and LBP were retired on 2026-08-30 -- see post/0017.
+      WHERE c.deleted_at IS NULL
       ORDER BY (c.code = 'SYP') DESC, c.code
     `);
 
