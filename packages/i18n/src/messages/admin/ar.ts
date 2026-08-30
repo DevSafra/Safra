@@ -401,6 +401,20 @@ export const ar = {
       close: 'إغلاق المعاينة',
     },
 
+    /*
+      The system's popup — «تأكيد» / «إلغاء» (Bashar, 2026-08-30).
+
+      Section-neutral, because the popup is: five surfaces asked the same question through the
+      BROWSER's `confirm()`, which shows the origin and answers in English. The words belong to a
+      catalogue for the same reason every other word does; a default inside `@safra/ui` would be
+      invisible to the task of adding a language.
+    */
+    dialog: {
+      confirm: 'تأكيد',
+      cancel: 'إلغاء',
+      close: 'حسناً',
+    },
+
     /**
      * طلبات الشراكة — who has asked to join, and what was done about it.
      *
@@ -1598,6 +1612,8 @@ export const ar = {
       evidenceOpen: 'معاينة',
       evidenceReplace: 'استبدال',
       evidenceRemove: 'حذف',
+      /* A dialog TITLE, not the button label: «حذف» alone is not a heading. */
+      evidenceRemoveTitle: 'حذف دليل من النزاع',
       evidenceRemoving: 'جارٍ الحذف…',
       evidenceConfirmRemove: 'يُحذف من ملف النزاع ويُسجَّل من حذفه ومتى. تابع؟',
       evidenceRemoveNote:

@@ -852,6 +852,20 @@ export const ar = {
    * dispute about "the room looked nothing like the photo" is unanswerable if the photo is gone.
    */
   /* The one image previewer's words — see the console's `slider` block and the project rule. */
+  /*
+    The system's popup — «تأكيد» / «إلغاء» (Bashar, 2026-08-30).
+
+    Section-neutral, because the popup is: five surfaces asked the same question through the
+    BROWSER's `confirm()`, which shows the origin and answers in English. The words belong to a
+    catalogue for the same reason every other word does; a default inside `@safra/ui` would be
+    invisible to the task of adding a language.
+  */
+  dialog: {
+    confirm: 'تأكيد',
+    cancel: 'إلغاء',
+    close: 'حسناً',
+  },
+
   slider: {
     title: 'معاينة الصور',
     open: 'معاينة الصورة',
@@ -892,6 +906,8 @@ export const ar = {
     moveUp: 'تقديم',
     moveDown: 'تأخير',
     archive: 'أرشفة',
+    /* A dialog TITLE, not the button label: «حذف» alone is not a heading. */
+    archiveTitle: 'أرشفة صورة',
     archiveConfirm: 'تُؤرشَف الصورة ولا تُحذف — تبقى سجلاً لما عرضه الإعلان. متابعة؟',
     /**
      * Alt text, per language.
@@ -1166,6 +1182,8 @@ export const ar = {
     suspend: 'إيقاف',
     restore: 'إعادة التفعيل',
     remove: 'إزالة',
+    /* A dialog TITLE, not the button label: «حذف» alone is not a heading. */
+    removeTitle: 'إزالة موظف',
     /* Named, because four identical «إزالة» buttons in a list are indistinguishable to a reader
        using a screen reader, and to anybody who has scrolled. */
     removeLabel: 'إزالة {name}',
@@ -1281,6 +1299,8 @@ export const ar = {
     /* The list. */
     edit: 'تعديل',
     remove: 'حذف',
+    /* A dialog TITLE, not the button label: «حذف» alone is not a heading. */
+    removeTitle: 'حذف دور موظفين',
     /* Named, because a list of roles offers one «حذف» per row and they are otherwise identical. */
     editLabel: 'تعديل الدور {name}',
     removeLabel: 'حذف الدور {name}',
@@ -1381,6 +1401,8 @@ export const ar = {
     checkIn: 'تسجيل الوصول',
     checkedIn: 'تم تسجيل الوصول',
     undo: 'تراجع',
+    /* A dialog TITLE, not the button label: «حذف» alone is not a heading. */
+    undoTitle: 'التراجع عن تسجيل الوصول',
     working: 'جارٍ التنفيذ…',
     /* Named, because a list of arrivals offers one identical button per row. */
     checkInLabel: 'تسجيل وصول {name}',

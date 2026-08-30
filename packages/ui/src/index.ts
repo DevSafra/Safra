@@ -28,3 +28,4 @@ export {
   type SliderImage,
   type SliderLabels,
 } from './image-slider.js';
+export { ConfirmDialog, useConfirm, type ConfirmRequest } from './confirm-dialog.js';
