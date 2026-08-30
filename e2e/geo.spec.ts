@@ -24,6 +24,9 @@ test.use({ storageState: STAFF_STATE });
 
 const c = t.sections.geo;
 
+/** `MAX_IMAGES_PER_CITY` in `city-images.controller.ts` — the API's refusal, mirrored. */
+const MAX_CITY_IMAGES = 12;
+
 test('the three add controls are real, not disabled placeholders', async ({ page }) => {
   await page.goto('/geo');
 
@@ -134,27 +137,53 @@ test('the currency code is chosen, and the symbol follows it', async ({ page }) 
 test('a city can be edited, and given the photograph §5.4 asks for', async ({ page }) => {
   await page.goto('/geo');
 
-  const marker = page.locator('[data-city-images="damascus"]');
+  /*
+    A city with ROOM, not a hardcoded one.
+
+    This spec uploads a photograph every run and cannot tidy up after itself — `city_images` is
+    append-only with a soft delete and the console offers no removal — so the city it names fills
+    up. Damascus reached the twelve-image cap, and the failure then looked exactly like a broken
+    upload: the count did not move, and the reason was a refusal inside the form nobody read.
+    Choosing a city under the cap keeps the spec testing the PATH rather than the accumulation.
+  */
+  const counted = await page.locator('[data-city-images]').evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      slug: node.getAttribute('data-city-images') ?? '',
+      images: Number(/\d+/.exec(node.textContent ?? '')?.[0] ?? '0'),
+    })),
+  );
+
+  const target = counted.find((one) => one.images < MAX_CITY_IMAGES)?.slug;
+
+  test.skip(target === undefined, 'every city is at its photograph cap.');
+
+  const marker = page.locator(`[data-city-images="${target}"]`);
   const before = ((await marker.textContent()) ?? '').trim();
 
-  await page.locator('[data-city-edit="damascus"]').click();
+  await page.locator(`[data-city-edit="${target}"]`).click();
 
   /*
-    The form opens BELOW the table at full width, not inside a cell. It was rendered in the cell
-    first: a five-track grid given six columns squeezes every track, «البتراء» came out «تراء», and
-    the form folded into a 40px column and stretched two thousand pixels down the page.
+    The form opens in a POPUP over the page (Bashar, 2026-08-30), not inside a table cell and not
+    in a panel under the table. It was rendered in the cell first: a five-track grid given six
+    columns squeezes every track, «البتراء» came out «تراء», and the form folded into a 40px
+    column and stretched two thousand pixels down the page. The panel that replaced it was
+    readable and pushed every row below it down, which is what the popup fixes.
   */
-  const form = page.locator('[data-city-form="damascus"]');
+  const form = page.locator(`[data-city-form="${target}"]`);
 
   await expect(form).toBeVisible();
+  await expect(
+    page.getByRole('dialog'),
+    'the editor is a popup, not a panel under the table',
+  ).toBeVisible();
   expect(
     (await form.boundingBox())?.width ?? 0,
-    'the editor is a panel, not a table cell',
+    'the editor is a form, not a table cell',
   ).toBeGreaterThan(400);
 
   const chooser = page.waitForEvent('filechooser');
 
-  await page.locator('[data-city-image-add="damascus"]').click();
+  await page.locator(`[data-city-image-add="${target}"]`).click();
   await (await chooser).setFiles('e2e/fixtures/room-one.jpg');
 
   await expect
@@ -187,4 +216,104 @@ test('the city hero is a photograph, and it loads', async ({ page, request }) =>
   await expect
     .poll(async () => hero.evaluate((img: HTMLImageElement) => img.naturalWidth))
     .toBeGreaterThan(0);
+});
+
+/**
+ * Editing a country and a currency — a POPUP, and the writes that had no caller.
+ *
+ * ## Two things at once, and both were asked for
+ *
+ * «Can you get the page المدن والدول والعملات completely done and implement a CRUD for every
+ * table» — `PATCH /admin/geo/countries/:code` and `/currencies/:code` shipped behind `GEO_MANAGE`
+ * with proxy routes in this app and NOTHING called either: both lists were create-and-read.
+ *
+ * «When I click on edit button of a contry I should get a popup not a form under the table» —
+ * hence `getByRole('dialog')` rather than a bounding box. A panel under a list pushes every row
+ * below it down, and the reader loses their place in the list they were working through.
+ */
+test('a country opens a popup, and the popup saves', async ({ page }) => {
+  await page.goto('/geo');
+
+  await page.locator('[data-country-edit="SY"]').click();
+
+  const dialog = page.getByRole('dialog');
+
+  await expect(dialog, 'editing a country must open a popup').toBeVisible();
+  await expect(page.locator('[data-country-form="SY"]')).toBeVisible();
+
+  /* Escape closes it — a popup the keyboard cannot dismiss is modal in appearance only. */
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+
+  /* And it writes: the same name back, so the row is unchanged and the PATCH is exercised. */
+  await page.locator('[data-country-edit="SY"]').click();
+
+  const nameAr = page.locator('[data-country-form="SY"] input').first();
+  const before = (await nameAr.inputValue()).trim();
+
+  await nameAr.fill(before);
+  await page.getByRole('dialog').getByRole('button', { name: c.save }).click();
+
+  await expect(page.getByRole('dialog')).toBeHidden({ timeout: 20_000 });
+  await expect(page.locator('main')).toContainText(before);
+});
+
+test('a currency opens a popup, and the accounting one cannot be withdrawn', async ({
+  page,
+}) => {
+  await page.goto('/geo');
+
+  await page.locator('[data-currency-edit="SYP"]').click();
+
+  const form = page.locator('[data-currency-form="SYP"]');
+
+  await expect(page.getByRole('dialog')).toBeVisible();
+
+  /*
+    `ledger_entries.amount_syp` measures every posting the platform has ever made, so «stop
+    offering SYP» is not a thing this screen may express. The control is disabled AND says why —
+    a control that is merely inert teaches nothing. The endpoint refuses it too; this is the
+    courtesy, and `geo-write.integration.test.ts` holds the control.
+  */
+  await expect(form.locator('input[type=checkbox]')).toBeDisabled();
+  await expect(form).toContainText(c.accountingLocked);
+
+  /* The code and the symbol follow ISO 4217 and are shown rather than typed. */
+  const readOnly = form.locator('input[disabled]');
+
+  await expect(readOnly.first()).toBeDisabled();
+});
+
+/**
+ * Every box in a row is the same height (Bashar, 2026-08-30, with two screenshots).
+ *
+ * A grid item stretches to its row's height by default, so a field carrying a HINT made the plain
+ * field beside it grow to match — the height of a text box was decided by whether its neighbour
+ * had explanatory text under it. Both screenshots were of a row of three where «الاسم بالعربية»
+ * was visibly taller than «رمز الدولة».
+ *
+ * Measured rather than eyeballed, because that is the only version of this that survives the next
+ * person adding a hint.
+ */
+test('every field on both forms is the same height', async ({ page }) => {
+  await page.goto('/geo');
+
+  for (const marker of ['currency', 'country', 'city']) {
+    await page.locator(`[data-geo-add="${marker}"]`).click();
+
+    const boxes = page.locator(
+      `[data-geo-form="${marker}"] input:not([type=checkbox]), [data-geo-form="${marker}"] select`,
+    );
+    const heights = await boxes.evaluateAll((nodes) =>
+      nodes.map((node) => Math.round(node.getBoundingClientRect().height)),
+    );
+
+    expect(heights.length, `the ${marker} form must have fields`).toBeGreaterThan(2);
+    expect(
+      [...new Set(heights)],
+      `every box on the ${marker} form is one height, not a height per neighbour`,
+    ).toHaveLength(1);
+
+    await page.locator(`[data-geo-add="${marker}"]`).click();
+  }
 });

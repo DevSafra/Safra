@@ -68,7 +68,8 @@ test('a category added here can be put on a city', async ({ page }) => {
   await fields.nth(1).fill(name);
   await fields.nth(2).fill('Probe');
   await fields.nth(3).fill('Probe');
-  await form.getByRole('button', { name: t.sections.geo.save }).click();
+  /* «إضافة» — a create says create, the same word the three forms on المدن use. */
+  await form.getByRole('button', { name: t.sections.geo.create }).click();
 
   await expect(page.locator(`[data-category-edit="${code}"]`)).toBeVisible({
     timeout: 20_000,
@@ -82,4 +83,87 @@ test('a category added here can be put on a city', async ({ page }) => {
 
   await expect(option, 'a new category must be selectable on a city').toBeVisible();
   await expect(page.locator('[data-city-form="damascus"]')).toContainText(name);
+});
+
+/**
+ * Editing a category opens a POPUP, and its code is fixed (Bashar, 2026-08-30).
+ *
+ * The code is what the seed, the three catalogues and every existing filter key on, so it is
+ * chosen once and shown thereafter. A form under the table pushed the whole list down; the popup
+ * is the same `Modal` the country, currency and city editors open into — one shell, so Escape,
+ * the focus trap and the scroll lock are not learnt four times.
+ */
+test('editing a category is a popup, with the code shown and not editable', async ({
+  page,
+}) => {
+  await page.goto('/city-categories');
+  await page.locator('[data-category-edit="coastal"]').click();
+
+  const dialog = page.getByRole('dialog');
+
+  await expect(dialog, 'editing a category must open a popup').toBeVisible();
+
+  const form = page.locator('[data-category-form="coastal"]');
+
+  await expect(form.locator('input').first()).toBeDisabled();
+  await expect(form.locator('input').first()).toHaveValue('coastal');
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+});
+
+/**
+ * The arrows reorder the list, and the order STICKS.
+ *
+ * `sort_order` decides the order every picker offers these in — the city editor, the add-city
+ * form and the public filter — and it had no control at all: the column existed, the API accepted
+ * it, and nothing could write it. Asserted across a RELOAD, because a client-side swap that never
+ * reached the database would look identical until somebody came back to the page.
+ *
+ * It also moves the row BACK, so the spec leaves the order it found. The suite shares one account
+ * and one database; a spec that quietly reorders a reference list changes what a later spec sees.
+ */
+test('the arrows reorder the categories, and the order survives a reload', async ({
+  page,
+}) => {
+  await page.goto('/city-categories');
+
+  const codes = async (): Promise<string[]> =>
+    page
+      .locator('[data-category-edit]')
+      .evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute('data-category-edit') ?? ''),
+      );
+
+  const before = await codes();
+
+  test.skip(before.length < 2, 'reordering needs at least two categories.');
+
+  const second = before[1] ?? '';
+
+  await page.locator(`[data-category-up="${second}"]`).click();
+
+  await expect.poll(async () => (await codes())[0], { timeout: 20_000 }).toBe(second);
+
+  await page.reload();
+  expect((await codes())[0], 'the new order must have reached the database').toBe(second);
+
+  /* Put it back, so the next spec and the next RUN see the order this one found. */
+  await page.locator(`[data-category-down="${second}"]`).click();
+  await expect.poll(async () => (await codes())[1], { timeout: 20_000 }).toBe(second);
+});
+
+/** The same height complaint as المدن, on this screen — see `geo.spec.ts`. */
+test('every field on the category form is the same height', async ({ page }) => {
+  await page.goto('/city-categories');
+  await page.locator('[data-category-add]').click();
+
+  const heights = await page
+    .locator('[data-category-form="add"] input:not([type=checkbox])')
+    .evaluateAll((nodes) =>
+      nodes.map((node) => Math.round(node.getBoundingClientRect().height)),
+    );
+
+  expect(heights.length).toBeGreaterThan(2);
+  expect([...new Set(heights)], 'one height, not a height per neighbour').toHaveLength(1);
 });

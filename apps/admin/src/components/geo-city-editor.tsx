@@ -3,11 +3,12 @@
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
-import { ImageSliderFrame, useConfirm, type SliderImage } from '@safra/ui';
+import { ImageSliderFrame, Modal, useConfirm, type SliderImage } from '@safra/ui';
 
 import { AdminTable, StatusPill, type AdminColumn } from '@/components/admin-table';
+import { Actions, CheckboxField, Field, Panel, Row } from '@/components/geo-form';
 import { count } from '@/lib/format';
-import { t, apiErrorOf, cityCategories, fill } from '@/lib/strings';
+import { t, apiErrorOf, fill } from '@/lib/strings';
 
 /**
  * The categories a city may be filed under — from the DATABASE, not a constant.
@@ -48,10 +49,12 @@ export interface EditableCity {
  * `city_images` held nothing for any of the nine cities while the public city page rendered a
  * gradient where the design asks for photography. Bashar asked for all of it (2026-08-30).
  *
- * ## Inline, not a detail screen
+ * ## A popup, not a detail screen and not a panel
  *
  * Nine rows, three editable fields and a handful of photographs. A separate route would be a
- * navigation, a back link and a returnQuery for a form that fits under the row it belongs to.
+ * navigation, a back link and a returnQuery for a form this small. A panel under the table pushed
+ * every row below it down the page, so Bashar asked for a popup (2026-08-30) — the same `Modal`
+ * the country and currency editors open into.
  *
  * ## Closing a city says what it costs
  *
@@ -158,142 +161,127 @@ function CityForm({
   }
 
   return (
-    <div
-      data-city-form={city.slug}
-      className="mt-3 grid gap-3 rounded-[10px] border border-line bg-field p-3.5 text-start"
-    >
-      <p className="text-[11.5px] font-bold text-gold">
-        {c.editCity} — {city.nameAr}
-      </p>
-
-      {/*
+    <Modal title={`${c.editCity} — ${city.nameAr}`} onClose={onClose} width="max-w-3xl">
+      <Panel
+        heading={`${c.editCity} — ${city.nameAr}`}
+        marker={city.slug}
+        attribute="data-city-form"
+        bare
+      >
+        {/*
         No `dir` on any field — the page's own direction. A Latin run like `Asia/Damascus` lays out
         correctly inside an RTL field without being told, and `dir="ltr"` would move the field's
         start edge away from its label.
       */}
-      <div className="grid gap-2 sm:grid-cols-3">
-        <Field label={c.nameAr} value={nameAr} onChange={setNameAr} />
-        <Field label={c.nameEn} value={nameEn} onChange={setNameEn} />
-        <Field label={c.nameDe} value={nameDe} onChange={setNameDe} />
-      </div>
+        <Row>
+          <Field label={c.nameAr} value={nameAr} onChange={setNameAr} />
+          <Field label={c.nameEn} value={nameEn} onChange={setNameEn} />
+          <Field label={c.nameDe} value={nameDe} onChange={setNameDe} />
+        </Row>
 
-      <Field
-        label={c.timezone}
-        value={timezone}
-        onChange={setTimezone}
-        hint={c.timezoneHint}
-      />
+        <Row>
+          <Field
+            label={c.timezone}
+            value={timezone}
+            onChange={setTimezone}
+            hint={c.timezoneHint}
+          />
+        </Row>
 
-      <fieldset className="grid gap-1.5">
-        <legend className="text-[11.5px] font-semibold text-muted">
-          {c.categoriesLabel}
-        </legend>
-        <div className="flex flex-wrap gap-2">
-          {options.map((option) => (
-            <label
-              key={option.code}
-              className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-text2"
-            >
-              <input
-                type="checkbox"
-                data-category-option={option.code}
-                checked={categories.includes(option.code)}
-                onChange={(event) =>
-                  setCategories((current) =>
-                    event.target.checked
-                      ? [...current, option.code]
-                      : current.filter((one) => one !== option.code),
-                  )
-                }
-                className="size-[15px] cursor-pointer accent-gold"
-              />
-              {/* The row's own name, so a category renamed on الفئات reads correctly here. */}
-              {option.nameAr}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+        <fieldset className="grid gap-1.5">
+          <legend className="text-[11.5px] font-semibold text-muted">
+            {c.categoriesLabel}
+          </legend>
+          <div className="flex flex-wrap gap-2">
+            {options.map((option) => (
+              <label
+                key={option.code}
+                className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-text2"
+              >
+                <input
+                  type="checkbox"
+                  data-category-option={option.code}
+                  checked={categories.includes(option.code)}
+                  onChange={(event) =>
+                    setCategories((current) =>
+                      event.target.checked
+                        ? [...current, option.code]
+                        : current.filter((one) => one !== option.code),
+                    )
+                  }
+                  className="size-[15px] cursor-pointer accent-gold"
+                />
+                {/* The row's own name, so a category renamed on الفئات reads correctly here. */}
+                {option.nameAr}
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
-      <label className="flex cursor-pointer items-center gap-2.5 text-[12.5px] text-text2">
-        <input
-          type="checkbox"
-          checked={isActive}
-          onChange={(event) => setIsActive(event.target.checked)}
-          className="size-[15px] cursor-pointer accent-gold"
-        />
-        {c.activeLabel}
-      </label>
+        <CheckboxField label={c.activeLabel} checked={isActive} onChange={setIsActive} />
 
-      {/* ── The photographs §5.4 asks for ─────────────────────────────────── */}
-      <div className="grid gap-1.5 border-t border-line pt-3">
-        <span className="text-[11.5px] font-semibold text-muted">{c.images}</span>
+        {/* ── The photographs §5.4 asks for ─────────────────────────────────── */}
+        <div className="grid gap-1.5 border-t border-line pt-3">
+          <span className="text-[11.5px] font-semibold text-muted">{c.images}</span>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {city.heroUrl ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {city.heroUrl ? (
+              <button
+                type="button"
+                onClick={() => setPreview(0)}
+                aria-label={t.sections.slider.open}
+                className="block cursor-pointer"
+              >
+                <img
+                  src={city.heroUrl}
+                  alt=""
+                  loading="lazy"
+                  className="h-16 w-24 rounded-lg border border-line object-cover"
+                />
+              </button>
+            ) : null}
+
             <button
               type="button"
-              onClick={() => setPreview(0)}
-              aria-label={t.sections.slider.open}
-              className="block cursor-pointer"
+              disabled={busy}
+              data-city-image-add={city.slug}
+              onClick={() => file.current?.click()}
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-dashed border-line px-3 py-1.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:opacity-50 lg:min-h-0"
             >
-              <img
-                src={city.heroUrl}
-                alt=""
-                loading="lazy"
-                className="h-16 w-24 rounded-lg border border-line object-cover"
-              />
+              {busy ? c.imagesUploading : c.imagesAdd}
             </button>
-          ) : null}
 
-          <button
-            type="button"
-            disabled={busy}
-            data-city-image-add={city.slug}
-            onClick={() => file.current?.click()}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-dashed border-line px-3 py-1.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:opacity-50 lg:min-h-0"
-          >
-            {busy ? c.imagesUploading : c.imagesAdd}
-          </button>
-
-          {/*
+            {/*
             `accept` is a COURTESY, not the control. The server refuses anything whose magic bytes
             are not a supported photograph, before a byte reaches storage.
           */}
-          <input
-            ref={file}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="sr-only"
-            onChange={(event) => {
-              const chosen = event.target.files?.[0];
+            <input
+              ref={file}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              onChange={(event) => {
+                const chosen = event.target.files?.[0];
 
-              if (chosen) void upload(chosen);
-            }}
-          />
+                if (chosen) void upload(chosen);
+              }}
+            />
+          </div>
+
+          <p className="text-[10.5px] text-faint2">{c.imagesNote}</p>
         </div>
 
-        <p className="text-[10.5px] text-faint2">{c.imagesNote}</p>
-      </div>
-
-      {error ? <p className="text-[11px] font-semibold text-bad">{error}</p> : null}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void save()}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4.5 py-2 text-xs font-bold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
-        >
-          {busy ? c.saving : c.save}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-xs font-bold text-muted transition-colors hover:text-text lg:min-h-0"
-        >
-          {c.cancel}
-        </button>
-      </div>
+        <Actions
+          busy={busy}
+          ready
+          error={error}
+          saveLabel={c.save}
+          busyLabel={c.saving}
+          cancelLabel={c.cancel}
+          onSave={() => void save()}
+          onClose={onClose}
+        />
+      </Panel>
 
       <ImageSliderFrame
         images={slides}
@@ -303,7 +291,7 @@ function CityForm({
       />
 
       {dialog}
-    </div>
+    </Modal>
   );
 }
 
@@ -329,7 +317,8 @@ const CITY_COLUMNS: readonly AdminColumn<EditableCity>[] = [
   {
     key: 'category',
     header: t.sections.geo.colCategory,
-    render: (row) => <span className="text-muted">{cityCategories(row.category)}</span>,
+    /* Already the categories' own Arabic names — see `GeoService.cities`. */
+    render: (row) => <span className="text-muted">{row.category}</span>,
   },
   {
     key: 'properties',
@@ -424,31 +413,5 @@ export function GeoCities({
         />
       ) : null}
     </>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  hint,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly onChange: (value: string) => void;
-  readonly hint?: string | undefined;
-}) {
-  return (
-    <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-      {label}
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text placeholder:text-faint"
-      />
-      {hint ? (
-        <span className="text-[10.5px] font-normal text-faint2">{hint}</span>
-      ) : null}
-    </label>
   );
 }

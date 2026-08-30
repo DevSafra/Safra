@@ -2,14 +2,14 @@ import Link from 'next/link';
 
 import { getCityCategories, getGeography, type Geography } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { money, shortDate } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
-import { FootNote, Ltr } from '@/components/admin-table';
+import { FootNote } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { t, plural } from '@/lib/strings';
+import { t } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
 import { mediaBase, mediaUrl } from '@safra/session';
 import { AddCity, AddCountry, AddCurrency } from '@/components/geo-add-forms';
+import { CountryRows, CurrencyRows } from '@/components/geo-row-editors';
 import { GeoCities } from '@/components/geo-city-editor';
 import { refuseSection } from '@/components/section-refusal';
 
@@ -179,25 +179,8 @@ function Countries({
     <ConsolePanel>
       <AddCountry title={t.sections.geo.countries} currencies={currencies} />
 
-      <ul className="grid gap-2 text-[12.5px]">
-        {rows.map((row) => (
-          <li
-            key={row.code}
-            className="flex flex-wrap items-center gap-2.5 rounded-[9px] border border-line bg-field px-3 py-2.5"
-          >
-            <span className="font-bold text-text">{row.nameAr}</span>
-            <span className="text-[11px] text-faint">
-              {row.currencyCode ?? t.admin.noData} ·{' '}
-              {plural(t.sections.geo.activeCities, { n: row.activeCities })}
-            </span>
-            <span
-              className={`ms-auto text-[11px] font-bold ${row.isActive ? 'text-ok' : 'text-faint'}`}
-            >
-              {row.isActive ? t.sections.geo.active : t.sections.geo.inactive}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {/* Each row opens its own editor — the writes that had no caller until 2026-08-30. */}
+      <CountryRows rows={rows} currencies={currencies} />
     </ConsolePanel>
   );
 }
@@ -210,44 +193,7 @@ function Currencies({ rows }: { rows: Geography['currencies'] }) {
         existing={rows.map((one) => one.code)}
       />
 
-      <ul className="grid gap-2 text-[12.5px]">
-        {rows.map((row) => (
-          <li
-            key={row.code}
-            className="flex flex-wrap items-center gap-2.5 rounded-[9px] border border-line bg-field px-3 py-2.5"
-          >
-            <span className="font-bold text-text">
-              {row.nameAr} {row.symbol}
-            </span>
-
-            {row.isAccounting ? (
-              <span className="rounded-full bg-[rgba(var(--goldA),0.14)] px-2.5 py-0.5 text-[10px] font-extrabold text-gold">
-                {t.sections.geo.accounting}
-              </span>
-            ) : null}
-
-            {/*
-              A missing rate is called out in red rather than shown as a dash. The platform
-              REFUSES to price a booking without one, so an unconfigured currency is a live
-              defect waiting for a customer to find — this is where it should be caught.
-            */}
-            <span className="ms-auto text-[11.5px]">
-              {row.rateToSyp === null ? (
-                <span className="font-bold text-bad">{t.sections.geo.noRate}</span>
-              ) : (
-                <Ltr className="text-muted">
-                  = {money(row.rateToSyp)} ل.س
-                  {row.rateSetAt ? (
-                    <span className="ms-1.5 text-[10.5px] text-faint">
-                      {shortDate(row.rateSetAt)}
-                    </span>
-                  ) : null}
-                </Ltr>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <CurrencyRows rows={rows} />
 
       <FootNote>{t.sections.geo.note}</FootNote>
       <p className="mt-1 text-[11px] text-faint">

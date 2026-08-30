@@ -1320,7 +1320,10 @@ const geoSchema = z.object({
     z.object({
       code: z.string(),
       nameAr: z.string(),
+      nameEn: z.string(),
+      nameDe: z.string(),
       currencyCode: z.string().nullable(),
+      isLaunchMarket: z.boolean(),
       activeCities: z.number(),
       isActive: z.boolean(),
     }),
@@ -1329,7 +1332,10 @@ const geoSchema = z.object({
     z.object({
       code: z.string(),
       nameAr: z.string(),
+      nameEn: z.string(),
+      nameDe: z.string(),
       symbol: z.string(),
+      isActive: z.boolean(),
       isAccounting: z.boolean(),
       rateToSyp: z.string().nullable(),
       rateSetAt: z.string().nullable(),

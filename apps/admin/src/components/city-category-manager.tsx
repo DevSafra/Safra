@@ -3,15 +3,16 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { useConfirm } from '@safra/ui';
+import { Modal, useConfirm } from '@safra/ui';
 
 import { AdminTable, StatusPill, type AdminColumn } from '@/components/admin-table';
+import { Actions, CheckboxField, Field, Panel, Row } from '@/components/geo-form';
 import type { CityCategory } from '@/lib/api';
 import { count } from '@/lib/format';
 import { t, apiErrorOf, fill, plural } from '@/lib/strings';
 
-/** The design's `grid-template-columns` for this table. */
-const TEMPLATE = '.9fr 1fr 1fr 1fr .7fr .7fr .6fr';
+/** The design's `grid-template-columns` for this table — the last track is the two arrows. */
+const TEMPLATE = '.9fr 1fr 1fr 1fr .6fr .7fr .6fr .7fr';
 
 /**
  * الفئات — city categories, managed on a screen rather than in a migration.
@@ -39,11 +40,58 @@ export function CityCategoryManager({
 }: {
   readonly categories: readonly CityCategory[];
 }) {
+  const router = useRouter();
   const c = t.sections.cityCategories;
   const [editing, setEditing] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
+  const [moving, setMoving] = useState(false);
 
   const open = categories.find((one) => one.code === editing) ?? null;
+
+  /**
+   * Moves one category one place, and REWRITES the whole order to match what is on screen.
+   *
+   * ## Why it does not simply swap two values
+   *
+   * `sort_order` decides the order every picker offers these in — the city editor, the add-city
+   * form and the public filter — and the backfill gave the seeded rows values that need not be
+   * distinct. Swapping two equal numbers changes nothing while reporting success, which is the
+   * quiet failure this codebase keeps finding. So the new order is computed from the list the
+   * reader is looking at, and every row whose position changed is written with its INDEX.
+   *
+   * At most a dozen rows, and only the rows that actually moved are sent.
+   */
+  async function move(code: string, by: -1 | 1): Promise<void> {
+    const from = categories.findIndex((one) => one.code === code);
+    const to = from + by;
+
+    if (from < 0 || to < 0 || to >= categories.length) return;
+
+    const next = [...categories];
+    const [row] = next.splice(from, 1);
+
+    if (!row) return;
+
+    next.splice(to, 0, row);
+
+    setMoving(true);
+
+    try {
+      for (const [index, one] of next.entries()) {
+        if (one.sortOrder === index) continue;
+
+        await fetch(`/api/geo/categories/${encodeURIComponent(one.code)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sortOrder: index }),
+        });
+      }
+
+      router.refresh();
+    } finally {
+      setMoving(false);
+    }
+  }
 
   const columns: readonly AdminColumn<CityCategory>[] = [
     {
@@ -81,6 +129,44 @@ export function CityCategoryManager({
           {row.isActive ? c.active : c.inactive}
         </StatusPill>
       ),
+    },
+    {
+      key: 'order',
+      header: c.colOrder,
+      render: (row) => {
+        const at = categories.findIndex((one) => one.code === row.code);
+
+        return (
+          <span className="flex items-center gap-1">
+            {/*
+              The arrows are NOT mirrored on this RTL screen. Up is up: a column ordered top to
+              bottom reads the same in every language, and mirroring it would make «نقل لأعلى»
+              move a row down. Each says where it goes in `aria-label`, because two identical
+              glyphs in twelve rows are otherwise indistinguishable to a screen reader.
+            */}
+            <button
+              type="button"
+              disabled={moving || at <= 0}
+              data-category-up={row.code}
+              aria-label={`${c.moveUp} — ${row.nameAr}`}
+              onClick={() => void move(row.code, -1)}
+              className="cursor-pointer rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              disabled={moving || at < 0 || at >= categories.length - 1}
+              data-category-down={row.code}
+              aria-label={`${c.moveDown} — ${row.nameAr}`}
+              onClick={() => void move(row.code, 1)}
+              className="cursor-pointer rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              ↓
+            </button>
+          </span>
+        );
+      },
     },
     {
       key: 'edit',
@@ -184,7 +270,7 @@ function AddCategory({ onClose }: { readonly onClose: () => void }) {
   }
 
   return (
-    <Panel heading={c.addTitle} marker="add">
+    <Panel heading={c.addTitle} marker="add" attribute="data-category-form">
       <Row>
         <Field label={c.code} value={code} onChange={setCode} hint={c.codeHint} />
         <Field label={c.colNameAr} value={nameAr} onChange={setNameAr} />
@@ -198,6 +284,9 @@ function AddCategory({ onClose }: { readonly onClose: () => void }) {
         busy={busy}
         error={error}
         ready={code !== '' && nameAr !== ''}
+        saveLabel={t.sections.geo.create}
+        busyLabel={t.sections.geo.creating}
+        cancelLabel={t.sections.geo.cancel}
         onSave={() => void send()}
         onClose={onClose}
       />
@@ -269,126 +358,47 @@ function EditCategory({
   }
 
   return (
-    <Panel heading={`${c.editTitle} — ${category.nameAr}`} marker={category.code}>
-      <Row>
-        <Field label={c.colNameAr} value={nameAr} onChange={setNameAr} />
-        <Field label={c.colNameEn} value={nameEn} onChange={setNameEn} />
-        <Field label={c.colNameDe} value={nameDe} onChange={setNameDe} />
-      </Row>
+    /* A popup, like every other edit on this screen and on المدن — Bashar, 2026-08-30. */
+    <Modal
+      title={`${c.editTitle} — ${category.nameAr}`}
+      onClose={onClose}
+      width="max-w-3xl"
+    >
+      <Panel
+        heading={`${c.editTitle} — ${category.nameAr}`}
+        marker={category.code}
+        attribute="data-category-form"
+        bare
+      >
+        <Row>
+          <Field label={c.code} value={category.code} disabled hint={c.codeHint} />
+        </Row>
 
-      <p className="text-[10.5px] text-faint2">
-        {plural(c.cityCount, { n: category.cities })}
-      </p>
+        <Row>
+          <Field label={c.colNameAr} value={nameAr} onChange={setNameAr} />
+          <Field label={c.colNameEn} value={nameEn} onChange={setNameEn} />
+          <Field label={c.colNameDe} value={nameDe} onChange={setNameDe} />
+        </Row>
 
-      <label className="flex cursor-pointer items-center gap-2.5 text-[12.5px] text-text2">
-        <input
-          type="checkbox"
-          checked={isActive}
-          onChange={(event) => setIsActive(event.target.checked)}
-          className="size-[15px] cursor-pointer accent-gold"
+        <p className="text-[10.5px] text-faint2">
+          {plural(c.cityCount, { n: category.cities })}
+        </p>
+
+        <CheckboxField label={c.activeLabel} checked={isActive} onChange={setIsActive} />
+
+        <Actions
+          busy={busy}
+          error={error}
+          ready={nameAr !== ''}
+          saveLabel={t.sections.geo.save}
+          busyLabel={t.sections.geo.saving}
+          cancelLabel={t.sections.geo.cancel}
+          onSave={() => void save()}
+          onClose={onClose}
         />
-        {c.activeLabel}
-      </label>
-
-      <Actions
-        busy={busy}
-        error={error}
-        ready={nameAr !== ''}
-        onSave={() => void save()}
-        onClose={onClose}
-      />
+      </Panel>
 
       {dialog}
-    </Panel>
-  );
-}
-
-function Panel({
-  heading,
-  marker,
-  children,
-}: {
-  readonly heading: string;
-  readonly marker: string;
-  readonly children: React.ReactNode;
-}) {
-  return (
-    <div
-      data-category-form={marker}
-      className="mb-3 grid w-full gap-3 rounded-[10px] border border-line bg-field p-4 text-start"
-    >
-      <p className="text-[11.5px] font-bold text-gold">{heading}</p>
-      {children}
-    </div>
-  );
-}
-
-function Actions({
-  busy,
-  error,
-  ready,
-  onSave,
-  onClose,
-}: {
-  readonly busy: boolean;
-  readonly error: string | null;
-  readonly ready: boolean;
-  readonly onSave: () => void;
-  readonly onClose: () => void;
-}) {
-  const c = t.sections.geo;
-
-  return (
-    <>
-      {error ? <p className="text-[11px] font-semibold text-bad">{error}</p> : null}
-
-      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-        <button
-          type="button"
-          disabled={busy || !ready}
-          onClick={onSave}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4.5 py-2 text-xs font-bold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
-        >
-          {busy ? c.saving : c.save}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-xs font-bold text-muted transition-colors hover:text-text lg:min-h-0"
-        >
-          {c.cancel}
-        </button>
-      </div>
-    </>
-  );
-}
-
-function Row({ children }: { readonly children: React.ReactNode }) {
-  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</div>;
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  hint,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly onChange: (value: string) => void;
-  readonly hint?: string | undefined;
-}) {
-  return (
-    <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-      {label}
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text placeholder:text-faint"
-      />
-      {hint ? (
-        <span className="text-[10.5px] font-normal text-faint2">{hint}</span>
-      ) : null}
-    </label>
+    </Modal>
   );
 }

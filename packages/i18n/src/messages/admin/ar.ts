@@ -419,6 +419,11 @@ export const ar = {
       empty: 'لا فئات بعد.',
       cityCount:
         '{n, plural, zero {لا مدن} one {مدينة واحدة} two {مدينتان} few {# مدن} many {# مدينة} other {# مدينة}}',
+      /* Reordering: the order these are OFFERED in, on every picker and every public filter. */
+      colOrder: 'الترتيب',
+      moveUp: 'نقل لأعلى',
+      moveDown: 'نقل لأسفل',
+      reordering: 'يُحفظ الترتيب…',
     },
 
     slider: {
@@ -1162,6 +1167,23 @@ export const ar = {
       saving: 'جارٍ الحفظ…',
       create: 'إضافة',
       addCityTitle: 'مدينة جديدة',
+      activeCitiesShort: '{n} مدينة نشطة',
+      editCountry: 'تعديل الدولة',
+      editCurrency: 'تعديل العملة',
+      countryActive: 'مفعَّلة — تظهر مدنها في البحث العام',
+      currencyActive: 'مفعَّلة — تُعرض الأسعار بها',
+      /* Both are decisions with a reach beyond the row, so both say what they cost. */
+      closeCountryTitle: 'إيقاف دولة',
+      closeCountryBody:
+        'تختفي الدولة و{n} من مدنها النشطة من البحث العام. الحجوزات القائمة لا تتأثر، ويمكن تفعيلها مجدداً.',
+      closeCurrencyTitle: 'إيقاف عملة',
+      closeCurrencyBody:
+        'لن تُعرض الأسعار بها ولن تُتاح للاختيار. ما سُعِّر بها سابقاً يبقى كما هو، ويمكن تفعيلها مجدداً.',
+      accountingLocked: 'العملة المحاسبية لا تُوقف — كل السجل المالي مقوَّم بها.',
+      symbolFixed: 'الرمز والخانات العشرية يتبعان رمز العملة ولا يُعدَّلان.',
+      moveUp: 'أعلى',
+      moveDown: 'أسفل',
+      order: 'الترتيب',
       addCountryTitle: 'دولة جديدة',
       addCurrencyTitle: 'عملة جديدة',
       creating: 'جارٍ الإضافة…',
@@ -3192,8 +3214,17 @@ export const ar = {
         a name or an address — because this log is read by more people than the record is.
       */
       recipient: 'المُرسل إليه',
-      /* The Arabic name a category or a city was given — «ساحلية», «دمشق». */
+      /* The three names a category, a city, a country or a currency was given. */
       nameAr: 'الاسم بالعربية',
+      nameEn: 'الاسم بالإنجليزية',
+      nameDe: 'الاسم بالألمانية',
+      /* `city_category.updated`: how many cities were filed under it when it was retired. */
+      cities: 'عدد المدن',
+      /* `country.updated`: what listings in that market are PRICED in, and whether it is open. */
+      displayCurrencyCode: 'عملة العرض',
+      isLaunchMarket: 'سوق إطلاق',
+      /* `city_category.updated`: where it sits in every picker that offers the set. */
+      sortOrder: 'الترتيب',
       /*
         `Audited`'s own envelope: the interceptor records the handler's return value under this
         key. It surfaced for the first time on 2026-08-30 with `city_image.uploaded`, because

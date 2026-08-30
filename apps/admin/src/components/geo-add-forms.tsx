@@ -3,9 +3,17 @@
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
-import { CURRENCY_CATALOGUE, currencyOption } from '@safra/contracts';
+import { CURRENCY_CATALOGUE, currencyOption, preferredCurrency } from '@safra/contracts';
 
 import type { CategoryOption } from '@/components/geo-city-editor';
+import {
+  Actions,
+  CheckboxField,
+  Field,
+  Panel,
+  Row,
+  SelectField,
+} from '@/components/geo-form';
 import { t, apiErrorOf } from '@/lib/strings';
 
 /**
@@ -81,27 +89,22 @@ export function AddCurrency({
           standard, and typing one lets «USD» be saved beside «€» — every dollar on the platform
           then renders with a euro sign, and nothing refuses it.
         */}
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-          {c.currencyCode}
-          <select
-            name="code"
-            value={code}
-            onChange={(event) => choose(event.target.value)}
-            className="cursor-pointer rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
-          >
-            <option value="" disabled>
-              {c.currencyChoose}
+        <SelectField
+          label={c.currencyCode}
+          name="code"
+          value={code}
+          onChange={choose}
+          hint={c.currencyCodeHint}
+        >
+          <option value="" disabled>
+            {c.currencyChoose}
+          </option>
+          {available.map((one) => (
+            <option key={one.code} value={one.code}>
+              {`${one.code} · ${one.nameAr}`}
             </option>
-            {available.map((one) => (
-              <option key={one.code} value={one.code}>
-                {`${one.code} · ${one.nameAr}`}
-              </option>
-            ))}
-          </select>
-          <span className="text-[10.5px] font-normal text-faint2">
-            {c.currencyCodeHint}
-          </span>
-        </label>
+          ))}
+        </SelectField>
 
         {/*
           Disabled and filled from the code above. It is shown rather than hidden because an
@@ -109,23 +112,13 @@ export function AddCurrency({
           a field that is absent teaches nothing, and one that is editable is a way to get it
           wrong. `decimals` is not shown at all: it changes no rendering an operator can check.
         */}
-        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-          {c.symbol}
-          <input
-            name="symbol"
-            value={chosen?.symbol ?? ''}
-            readOnly
-            disabled
-            aria-describedby="currency-symbol-note"
-            className="cursor-not-allowed rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-faint"
-          />
-          <span
-            id="currency-symbol-note"
-            className="text-[10.5px] font-normal text-faint2"
-          >
-            {c.symbolFromCode}
-          </span>
-        </label>
+        <Field
+          label={c.symbol}
+          name="symbol"
+          value={chosen?.symbol ?? ''}
+          disabled
+          hint={c.symbolFromCode}
+        />
       </Row>
       <Row>
         <Field label={c.nameAr} value={nameAr} onChange={setNameAr} />
@@ -153,11 +146,10 @@ export function AddCountry({
 
     The list is ordered with the ACCOUNTING currency first — SYP — and defaulting to it would
     price a new market in the unit the ledger measures rather than the one §1.4 calls the pricing
-    anchor. Both existing launch markets display in USD.
+    anchor. Both existing launch markets display in USD. `preferredCurrency` is that decision,
+    shared with every other picker rather than spelled out per form.
   */
-  const [currency, setCurrency] = useState(
-    currencies.find((one) => one === 'USD') ?? currencies[0] ?? '',
-  );
+  const [currency, setCurrency] = useState<string>(preferredCurrency(currencies));
   const [launch, setLaunch] = useState(false);
 
   return (
@@ -196,30 +188,22 @@ export function AddCountry({
         platform does not hold breaks every listing in it — the API refuses that, and offering the
         choice as free text would make the refusal the operator's first discovery of the rule.
       */}
-      <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-        {c.currency}
-        <select
+      <Row>
+        <SelectField
+          label={c.currency}
+          name="displayCurrencyCode"
           value={currency}
-          onChange={(event) => setCurrency(event.target.value)}
-          className="cursor-pointer rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+          onChange={setCurrency}
         >
           {currencies.map((one) => (
             <option key={one} value={one}>
               {one}
             </option>
           ))}
-        </select>
-      </label>
+        </SelectField>
+      </Row>
 
-      <label className="flex cursor-pointer items-center gap-2.5 text-[12.5px] text-text2">
-        <input
-          type="checkbox"
-          checked={launch}
-          onChange={(event) => setLaunch(event.target.checked)}
-          className="size-[15px] cursor-pointer accent-gold"
-        />
-        {c.launchMarket}
-      </label>
+      <CheckboxField label={c.launchMarket} checked={launch} onChange={setLaunch} />
     </AddForm>
   );
 }
@@ -261,20 +245,20 @@ export function AddCity({
         categories,
       }}
     >
-      <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-        {c.country}
-        <select
+      <Row>
+        <SelectField
+          label={c.country}
+          name="countryCode"
           value={countryCode}
-          onChange={(event) => setCountryCode(event.target.value)}
-          className="cursor-pointer rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+          onChange={setCountryCode}
         >
           {countries.map((one) => (
             <option key={one} value={one}>
               {one}
             </option>
           ))}
-        </select>
-      </label>
+        </SelectField>
+      </Row>
 
       <Row>
         <Field label={c.slug} value={slug} onChange={setSlug} hint={c.slugHint} />
@@ -409,66 +393,21 @@ function AddForm({
       </div>
 
       {open ? (
-        <div
-          data-geo-form={marker}
-          className="mb-3 grid w-full gap-3 rounded-[10px] border border-line bg-field p-4 text-start"
-        >
-          <p className="text-[11.5px] font-bold text-gold">{heading}</p>
-
+        <Panel heading={heading} marker={marker}>
           {children}
 
-          {error ? <p className="text-[11px] font-semibold text-bad">{error}</p> : null}
-
-          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-            <button
-              type="button"
-              disabled={busy || !ready}
-              onClick={() => void send()}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4.5 py-2 text-xs font-bold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
-            >
-              {busy ? c.creating : c.create}
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-xs font-bold text-muted transition-colors hover:text-text lg:min-h-0"
-            >
-              {c.cancel}
-            </button>
-          </div>
-        </div>
+          <Actions
+            busy={busy}
+            ready={ready}
+            error={error}
+            saveLabel={c.create}
+            busyLabel={c.creating}
+            cancelLabel={c.cancel}
+            onSave={() => void send()}
+            onClose={() => setOpen(false)}
+          />
+        </Panel>
       ) : null}
     </>
-  );
-}
-
-/** A row of fields that share the width — one column on a phone, several on a laptop. */
-function Row({ children }: { readonly children: ReactNode }) {
-  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</div>;
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  hint,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly onChange: (value: string) => void;
-  readonly hint?: string | undefined;
-}) {
-  return (
-    <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-      {label}
-      <input
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text placeholder:text-faint"
-      />
-      {hint ? (
-        <span className="text-[10.5px] font-normal text-faint2">{hint}</span>
-      ) : null}
-    </label>
   );
 }
