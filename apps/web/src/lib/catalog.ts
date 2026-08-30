@@ -86,6 +86,30 @@ const cityDetailSchema = z.object({
     nameEn: z.string(),
     nameDe: z.string(),
   }),
+  /*
+    §5.4's hero band, hero first then by sort order.
+
+    The API has served these since `city_images` was written and this schema dropped them on the
+    floor — a strict object silently discarding a field is invisible, which is why the page could
+    say «no image pipeline exists» while one did. Nothing here is defaulted: an empty array means
+    the city genuinely has no photograph, and the page draws its gradient.
+  */
+  images: z
+    .array(
+      z.object({
+        fileKey: z.string(),
+        variantWidths: z.array(z.number()),
+        width: z.number().nullable(),
+        height: z.number().nullable(),
+        alt: z.object({
+          ar: z.string().nullable(),
+          en: z.string().nullable(),
+          de: z.string().nullable(),
+        }),
+        isHero: z.boolean(),
+      }),
+    )
+    .default([]),
 });
 
 export type CityDetail = z.infer<typeof cityDetailSchema>;

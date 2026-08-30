@@ -7,7 +7,8 @@ import { PropertyCard } from '@/components/property-card';
 import { SearchForm } from '@/components/search-form';
 import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { getCities, getCity } from '@/lib/catalog';
-import { localisedDescription, localisedName } from '@/lib/localise';
+import { localisedDescription, localisedName, localisedText } from '@/lib/localise';
+import { imageUrl as cityImageUrl } from '@/lib/property';
 import { searchSafely } from '@/lib/api';
 import { todayInDamascus } from '@/lib/settings';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -141,23 +142,48 @@ export default async function CityPage({
   const description = localisedDescription(city, locale);
   const tags = pickTags(city, locale);
 
+  /* Hero first, then the first by sort order — the API already returns them in that order. */
+  const hero = city.images[0] ?? null;
+
   return (
     <>
       {/*
-        §5.4 asks for the top third of the page to be city photography, and this is a token-driven
-        gradient instead — deliberately, rather than a stock photo standing in for real content.
+        §5.4's «أول ثلثها صور عالية الجودة» — the photograph if the city has one.
 
-        The reason is no longer «no image pipeline exists». It does: `city_images`, the
-        `admin/cities/:slug/images` controller behind `GEO_MANAGE`, the re-encoding worker and the
-        variant widths are all built. What is missing is a way to USE them — no console screen
-        uploads one, so `city_images` holds nothing for any of the nine cities, and this read does
-        not fetch them either. Corrected 2026-08-30; recorded in `docs/FUTURE-WORK.md`.
+        It could not have one until 2026-08-30: the pipeline was built, `city_images` and its
+        `GEO_MANAGE` controller and the re-encoding worker all existed, and NOTHING CALLED THEM, so
+        every city held zero rows and this page said «no image pipeline exists yet». The console
+        can upload one now, and this reads it.
+
+        The gradient stays as the fallback rather than a stock photo standing in for real content:
+        a city with no photograph looks deliberately unfinished, which is the honest state.
       */}
       <section className="relative border-b border-line">
-        <div
-          aria-hidden
-          className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-20%,color-mix(in_oklab,var(--color-sky)_28%,transparent),transparent_65%)]"
-        />
+        {hero ? (
+          <>
+            {/* AVIF first, WebP as the fallback — both produced by the upload pipeline. */}
+            <picture>
+              <source srcSet={cityImageUrl(hero, 1600, 'avif')} type="image/avif" />
+              <source srcSet={cityImageUrl(hero, 1600, 'webp')} type="image/webp" />
+              <img
+                src={cityImageUrl(hero, 1600, 'webp')}
+                alt={localisedText(hero.alt, locale) ?? ''}
+                className="absolute inset-0 h-full w-full object-cover"
+                loading="eager"
+              />
+            </picture>
+            {/*
+              A scrim, because the copy above sits ON the photograph and a light sky would take the
+              breadcrumb with it. `aria-hidden`: it is contrast, not content.
+            */}
+            <div aria-hidden className="absolute inset-0 bg-bg/70" />
+          </>
+        ) : (
+          <div
+            aria-hidden
+            className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-20%,color-mix(in_oklab,var(--color-sky)_28%,transparent),transparent_65%)]"
+          />
+        )}
         <div className="relative mx-auto max-w-6xl px-4 py-14 sm:py-20">
           <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
             {/*
