@@ -3,9 +3,10 @@
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
-import { t, apiErrorOf, cityCategories } from '@/lib/strings';
+import { CURRENCY_CATALOGUE, currencyOption } from '@safra/contracts';
 
-const CATEGORIES = ['coastal', 'mountain', 'desert', 'historic'] as const;
+import type { CategoryOption } from '@/components/geo-city-editor';
+import { t, apiErrorOf } from '@/lib/strings';
 
 /**
  * «+ إضافة دولة» / «+ إضافة عملة» / «+ إضافة مدينة» — the three buttons that did nothing.
@@ -27,13 +28,42 @@ const CATEGORIES = ['coastal', 'mountain', 'desert', 'historic'] as const;
  * Each posts to the API, whose schema is the authority on shape and whose `GEO_MANAGE` check is
  * the authority on permission. A currency's code is validated as ISO 4217 there, not here.
  */
-export function AddCurrency({ title }: { readonly title: string }) {
+export function AddCurrency({
+  title,
+  existing,
+}: {
+  readonly title: string;
+  /** Codes already on the platform — offering one of them would only earn a 409. */
+  readonly existing: readonly string[];
+}) {
   const c = t.sections.geo;
   const [code, setCode] = useState('');
   const [nameAr, setNameAr] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [nameDe, setNameDe] = useState('');
-  const [symbol, setSymbol] = useState('');
+
+  const available = CURRENCY_CATALOGUE.filter((one) => !existing.includes(one.code));
+  const chosen = currencyOption(code);
+
+  /**
+   * Choosing a code fills everything the code decides, and the names it is usually read by.
+   *
+   * The symbol and the minor-unit digits are not editable — they are properties of ISO 4217, and
+   * the API takes them from the code regardless of what a form sends. The NAMES are prefilled
+   * rather than fixed: «دولار أمريكي» is a translation, and a catalogue's suggestion is a starting
+   * point somebody may legitimately word differently.
+   */
+  function choose(next: string): void {
+    setCode(next);
+
+    const option = currencyOption(next);
+
+    if (!option) return;
+
+    setNameAr(option.nameAr);
+    setNameEn(option.nameEn);
+    setNameDe(option.nameDe);
+  }
 
   return (
     <AddForm
@@ -41,18 +71,61 @@ export function AddCurrency({ title }: { readonly title: string }) {
       label={c.addCurrency}
       heading={c.addCurrencyTitle}
       marker="currency"
-      ready={code !== '' && nameAr !== '' && symbol !== ''}
+      ready={code !== '' && nameAr !== ''}
       path="/api/geo/currencies"
-      body={{ code, nameAr, nameEn: nameEn || nameAr, nameDe: nameDe || nameAr, symbol }}
+      body={{ code, nameAr, nameEn: nameEn || nameAr, nameDe: nameDe || nameAr }}
     >
       <Row>
-        <Field
-          label={c.currencyCode}
-          value={code}
-          onChange={setCode}
-          hint={c.currencyCodeHint}
-        />
-        <Field label={c.symbol} value={symbol} onChange={setSymbol} />
+        {/*
+          A MENU, not a text box (Bashar, 2026-08-30). A currency code is an identifier from a
+          standard, and typing one lets «USD» be saved beside «€» — every dollar on the platform
+          then renders with a euro sign, and nothing refuses it.
+        */}
+        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+          {c.currencyCode}
+          <select
+            name="code"
+            value={code}
+            onChange={(event) => choose(event.target.value)}
+            className="cursor-pointer rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+          >
+            <option value="" disabled>
+              {c.currencyChoose}
+            </option>
+            {available.map((one) => (
+              <option key={one.code} value={one.code}>
+                {`${one.code} · ${one.nameAr}`}
+              </option>
+            ))}
+          </select>
+          <span className="text-[10.5px] font-normal text-faint2">
+            {c.currencyCodeHint}
+          </span>
+        </label>
+
+        {/*
+          Disabled and filled from the code above. It is shown rather than hidden because an
+          operator adding a currency should SEE what will be printed beside every amount in it —
+          a field that is absent teaches nothing, and one that is editable is a way to get it
+          wrong. `decimals` is not shown at all: it changes no rendering an operator can check.
+        */}
+        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+          {c.symbol}
+          <input
+            name="symbol"
+            value={chosen?.symbol ?? ''}
+            readOnly
+            disabled
+            aria-describedby="currency-symbol-note"
+            className="cursor-not-allowed rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-faint"
+          />
+          <span
+            id="currency-symbol-note"
+            className="text-[10.5px] font-normal text-faint2"
+          >
+            {c.symbolFromCode}
+          </span>
+        </label>
       </Row>
       <Row>
         <Field label={c.nameAr} value={nameAr} onChange={setNameAr} />
@@ -154,9 +227,12 @@ export function AddCountry({
 export function AddCity({
   title,
   countries,
+  categories: options,
 }: {
   readonly title: string;
   readonly countries: readonly string[];
+  /** From `city_categories`, so a category added on الفئات is selectable here immediately. */
+  readonly categories: readonly CategoryOption[];
 }) {
   const c = t.sections.geo;
   const [countryCode, setCountryCode] = useState(countries[0] ?? '');
@@ -220,24 +296,24 @@ export function AddCity({
           {c.categoriesLabel}
         </legend>
         <div className="flex flex-wrap gap-2">
-          {CATEGORIES.map((category) => (
+          {options.map((option) => (
             <label
-              key={category}
+              key={option.code}
               className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-text2"
             >
               <input
                 type="checkbox"
-                checked={categories.includes(category)}
+                checked={categories.includes(option.code)}
                 onChange={(event) =>
                   setCategories((current) =>
                     event.target.checked
-                      ? [...current, category]
-                      : current.filter((one) => one !== category),
+                      ? [...current, option.code]
+                      : current.filter((one) => one !== option.code),
                   )
                 }
                 className="size-[15px] cursor-pointer accent-gold"
               />
-              {cityCategories(category)}
+              {option.nameAr}
             </label>
           ))}
         </div>

@@ -69,31 +69,87 @@ describeIfDb('creating and correcting geography', () => {
 
   /* ── Currencies ─────────────────────────────────────────────────────────── */
 
-  it('adds a currency, and says so in the audit log', async () => {
-    const code = `Q${suffix}`;
-
+  /**
+   * The symbol and the decimals come from the CODE, never from the caller.
+   *
+   * JOD carries THREE minor-unit digits, and a currency stored with two truncates 10.125 to 10.13
+   * on the way in — the defect `0049_concerned_eternals.sql` exists to undo. Asserting the stored
+   * row rather than the response is what makes this about the database.
+   */
+  it('adds a currency with the symbol and decimals its code carries', async () => {
+    /* Retired in post/0017, so the code is free and its facts are unmistakable. */
     await expect(
       service.createCurrency(staff(), {
-        code,
-        nameAr: 'عملة اختبار',
-        nameEn: 'Test',
-        nameDe: 'Test',
-        symbol: '¤',
-        decimals: 2,
+        code: 'JOD',
+        nameAr: 'دينار أردني',
+        nameEn: 'Jordanian Dinar',
+        nameDe: 'Jordanischer Dinar',
       }),
-    ).resolves.toEqual({ code });
+    ).resolves.toEqual({ code: 'JOD' });
 
-    const row = await db.execute<{ symbol: string; is_active: boolean }>(sql`
-      SELECT symbol, is_active FROM currencies WHERE code = ${code}
+    const row = await db.execute<{
+      symbol: string;
+      decimals: number;
+      is_active: boolean;
+    }>(sql`
+      SELECT symbol, decimals, is_active FROM currencies
+      WHERE code = 'JOD' AND deleted_at IS NULL
     `);
 
-    expect(row.rows[0]).toMatchObject({ symbol: '¤', is_active: true });
+    expect(row.rows[0]).toMatchObject({ symbol: 'د.أ', decimals: 3, is_active: true });
 
     const logged = await auditRow('currency.created');
 
     expect(logged?.actor).toBe(staffId);
     /* The CODE, not the row id — an operator reading سجل التدقيق must not have to look it up. */
-    expect(JSON.stringify(logged?.after)).toContain(code);
+    expect(JSON.stringify(logged?.after)).toContain('JOD');
+  });
+
+  /**
+   * A retired currency comes back as the SAME row, not a second one.
+   *
+   * The clash check read every row, so once `post/0017` retired JOD and LBP neither could be added
+   * again — «that code is already in use» about a currency the screen does not show. And the fix
+   * must reinstate rather than insert: the id is what bookings, wallet movements and ledger rows
+   * point at, so a second row would leave the history pointing at the retired one.
+   */
+  it('reinstates a retired currency in place, keeping its id', async () => {
+    const was = await db.execute<{ id: string }>(sql`
+      SELECT id::text FROM currencies WHERE code = 'LBP'
+    `);
+
+    const before = was.rows[0]?.id;
+
+    expect(before, 'LBP is retired in this database').toBeTruthy();
+
+    await service.createCurrency(staff(), {
+      code: 'LBP',
+      nameAr: 'ليرة لبنانية',
+      nameEn: 'Lebanese Pound',
+      nameDe: 'Libanesisches Pfund',
+    });
+
+    const now = await db.execute<{ id: string; n: string; retired: boolean }>(sql`
+      SELECT id::text, (deleted_at IS NOT NULL) AS retired,
+             (SELECT count(*)::text FROM currencies WHERE code = 'LBP') AS n
+      FROM currencies WHERE code = 'LBP' AND deleted_at IS NULL
+    `);
+
+    expect(now.rows[0]?.id, 'the same row, so history still resolves').toBe(before);
+    expect(now.rows[0]?.retired).toBe(false);
+    expect(now.rows[0]?.n, 'one row, not two').toBe('1');
+  });
+
+  /** A code outside the catalogue is refused rather than stored half-known. */
+  it('refuses a code it has no symbol or decimals for', async () => {
+    await expect(
+      service.createCurrency(staff(), {
+        code: 'ZZZ',
+        nameAr: 'مجهولة',
+        nameEn: 'Unknown',
+        nameDe: 'Unknown',
+      }),
+    ).rejects.toMatchObject({ response: { code: ERROR.GEO_CURRENCY_UNKNOWN } });
   });
 
   it('refuses a currency code that already exists', async () => {
@@ -103,8 +159,6 @@ describeIfDb('creating and correcting geography', () => {
         nameAr: 'مكرر',
         nameEn: 'Dup',
         nameDe: 'Dup',
-        symbol: '$',
-        decimals: 2,
       }),
     ).rejects.toMatchObject({ response: { code: ERROR.GEO_CODE_TAKEN } });
   });
@@ -183,6 +237,56 @@ describeIfDb('creating and correcting geography', () => {
     /* An ARRAY of two, not a tuple — see `categoriesLiteral` on why that is worth asserting. */
     expect(row.rows[0]?.categories).toEqual(['coastal', 'historic']);
     expect(row.rows[0]?.timezone).toBe('Asia/Damascus');
+  });
+
+  /**
+   * A city is filed under its categories in the JOIN, and in the legacy array beside it.
+   *
+   * `city_category_links` became the authority on 2026-08-30 when الفئات stopped being a pgEnum
+   * and became a table staff can manage. `cities.categories` stays written because four readers
+   * still use it — the customer city page, the home page's strip, `catalog.service` and the
+   * geography screen. A write that updated one and not the other would show a category on one
+   * surface and not the next, which is invisible until somebody compares two screens.
+   */
+  it('files a city in the join and in the array, and keeps them in step', async () => {
+    const slug = `linked-${suffix.toLowerCase()}`;
+
+    await service.createCity(staff(), {
+      countryCode: 'SY',
+      slug,
+      nameAr: 'مدينة مرتبطة',
+      nameEn: 'Linked',
+      nameDe: 'Linked',
+      timezone: 'Asia/Damascus',
+      categories: ['coastal', 'historic'],
+    });
+
+    const both = await db.execute<{ links: string[]; arr: string[] }>(sql`
+      SELECT (SELECT array_agg(cc.code ORDER BY cc.code)
+              FROM city_category_links l
+              JOIN city_categories cc ON cc.id = l.category_id
+              WHERE l.city_id = c.id) AS links,
+             (SELECT array_agg(x ORDER BY x) FROM unnest(c.categories::text[]) AS x) AS arr
+      FROM cities c WHERE c.slug = ${slug}
+    `);
+
+    expect(both.rows[0]?.links).toEqual(['coastal', 'historic']);
+    expect(both.rows[0]?.arr).toEqual(['coastal', 'historic']);
+
+    /* And correcting them REPLACES rather than accumulates. */
+    await service.updateCity(staff(), slug, { categories: ['desert'] });
+
+    const after = await db.execute<{ links: string[]; arr: string[] }>(sql`
+      SELECT (SELECT array_agg(cc.code)
+              FROM city_category_links l
+              JOIN city_categories cc ON cc.id = l.category_id
+              WHERE l.city_id = c.id) AS links,
+             (SELECT array_agg(x) FROM unnest(c.categories::text[]) AS x) AS arr
+      FROM cities c WHERE c.slug = ${slug}
+    `);
+
+    expect(after.rows[0]?.links).toEqual(['desert']);
+    expect(after.rows[0]?.arr).toEqual(['desert']);
   });
 
   /**

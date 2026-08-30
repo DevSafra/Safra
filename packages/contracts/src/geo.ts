@@ -22,21 +22,33 @@ import { ERROR } from './error-codes.js';
  * stays, and everything already priced in it still reads.
  */
 
-/** The four the schema allows — a city may hold several, e.g. Petra is desert AND historic. */
-export const cityCategorySchema = z.enum(['coastal', 'mountain', 'desert', 'historic']);
-
 /**
  * A public URL segment, so it is Latin, lowercase and hyphenated — never the Arabic name.
  *
  * `/ar/city/دمشق` would be percent-encoded into something nobody can read, share or paste, and
  * the slug is unique per country rather than globally: two countries may each have a «طرابلس».
  */
-const slug = z
+export const slugPattern = z
   .string()
   .trim()
   .min(2)
   .max(40)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, ERROR.GEO_SLUG_FORMAT);
+
+const slug = slugPattern;
+
+/**
+ * A city category, by CODE — not an enum any more.
+ *
+ * It was `z.enum(['coastal', 'mountain', 'desert', 'historic'])`, which was the schema's own list
+ * and became wrong the day `city_categories` became a table staff manage: a category added on
+ * الفئات would have been refused by the contract before it reached the service. The set is now in
+ * the database, so the SHAPE is checked here and MEMBERSHIP is checked there — the service refuses
+ * a code no live category carries.
+ *
+ * A city may hold several: Petra is desert AND historic.
+ */
+export const cityCategorySchema = slug;
 
 const name = z.string().trim().min(1).max(80);
 
@@ -108,15 +120,27 @@ export const updateCountrySchema = z
   })
   .strict();
 
+/**
+ * Adding a currency: the CODE, and the names it is read by.
+ *
+ * ## The symbol and the decimals are not inputs
+ *
+ * They are properties of the code — `CURRENCY_CATALOGUE` holds all three together and the service
+ * looks them up. Taking a symbol from the form let «USD» be saved with «€», which renders every
+ * dollar on the platform with a euro sign and nothing refuses it; taking `decimals` from the form
+ * let JOD be stored with two, which truncates 10.125 to 10.13 on the way in — the defect
+ * `0049_concerned_eternals.sql` exists to undo. Bashar asked for the menu (2026-08-30); this is
+ * what makes the menu the authority rather than a convenience.
+ *
+ * The names stay editable: «دولار أمريكي» is a translation, not a property of ISO 4217, and the
+ * catalogue's are a starting point the form prefills.
+ */
 export const createCurrencySchema = z
   .object({
     code: currencyCode,
     nameAr: name,
     nameEn: name,
     nameDe: name,
-    symbol: z.string().trim().min(1).max(8),
-    /** Minor-unit digits: 2 for USD, 0 for JPY. */
-    decimals: z.number().int().min(0).max(4).default(2),
   })
   .strict();
 
@@ -125,10 +149,39 @@ export const updateCurrencySchema = z
     nameAr: name.optional(),
     nameEn: name.optional(),
     nameDe: name.optional(),
-    symbol: z.string().trim().min(1).max(8).optional(),
     isActive: z.boolean().optional(),
   })
   .strict();
+
+/**
+ * A city category — «الفئة» — now that they are rows rather than enum members.
+ *
+ * `code` is the identifier every catalogue, filter and seed already keys on, so it is chosen once
+ * and never edited: renaming it would orphan the translations and every link that used it. The
+ * NAMES are what a person changes.
+ */
+export const createCityCategorySchema = z
+  .object({
+    code: slug,
+    nameAr: name,
+    nameEn: name,
+    nameDe: name,
+  })
+  .strict();
+
+export const updateCityCategorySchema = z
+  .object({
+    nameAr: name.optional(),
+    nameEn: name.optional(),
+    nameDe: name.optional(),
+    /** Retired rather than deleted: cities already filed under it keep their link. */
+    isActive: z.boolean().optional(),
+    sortOrder: z.number().int().min(0).max(999).optional(),
+  })
+  .strict();
+
+export type CreateCityCategoryInput = z.infer<typeof createCityCategorySchema>;
+export type UpdateCityCategoryInput = z.infer<typeof updateCityCategorySchema>;
 
 export type CreateCityInput = z.infer<typeof createCitySchema>;
 export type UpdateCityInput = z.infer<typeof updateCitySchema>;

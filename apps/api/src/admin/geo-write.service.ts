@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import {
+  currencyOption,
   ERROR,
   type CreateCityInput,
   type CreateCountryInput,
@@ -96,22 +97,62 @@ export class GeoWriteService {
     actor: AccessTokenClaims | undefined,
     input: CreateCurrencyInput,
   ): Promise<{ code: string }> {
-    const clash = await this.db.execute<{ code: string }>(sql`
-      SELECT code FROM currencies WHERE code = ${input.code} LIMIT 1
+    /*
+      A RETIRED code is free again.
+
+      This read every row, so once `post/0017` retired JOD and LBP neither could ever be added
+      back — «that code is already in use» about a currency the screen does not show and the reads
+      filter out. Retiring is how this platform stops offering something; it is not a tombstone
+      that blocks the name for ever.
+
+      Reinstating one is `UPDATE … deleted_at = NULL` rather than a second row, because the id is
+      what bookings, wallet movements and ledger rows point at — a new row would leave the history
+      pointing at the retired one.
+    */
+    const clash = await this.db.execute<{ code: string; retired: boolean }>(sql`
+      SELECT code, (deleted_at IS NOT NULL) AS retired
+      FROM currencies WHERE code = ${input.code} LIMIT 1
     `);
 
     /*
       Checked before the insert AND unique in the database. The check gives the operator a
       sentence naming the clash; the constraint is what makes it true under a second request.
     */
-    if (clash.rows[0]) throw conflict(ERROR.GEO_CODE_TAKEN);
+    const existing = clash.rows[0];
+
+    if (existing && !existing.retired) throw conflict(ERROR.GEO_CODE_TAKEN);
+
+    /*
+      The symbol and the minor-unit digits come from the CODE, never from the request.
+
+      A caller supplying both could store «USD» with «€» — every dollar on the platform then
+      renders with a euro sign, and nothing refuses it — or JOD with two decimals, which truncates
+      10.125 to 10.13 on the way in. Both are properties of ISO 4217, so the catalogue is the
+      authority and a code outside it is refused rather than half-known.
+    */
+    const known = currencyOption(input.code);
+
+    if (!known) throw badRequest(ERROR.GEO_CURRENCY_UNKNOWN);
 
     await this.db.transaction(async (tx) => {
-      await tx.execute(sql`
-        INSERT INTO currencies (code, name_ar, name_en, name_de, symbol, decimals, is_active)
-        VALUES (${input.code}, ${input.nameAr}, ${input.nameEn}, ${input.nameDe},
-                ${input.symbol}, ${input.decimals}, true)
-      `);
+      await tx.execute(
+        existing
+          ? sql`
+              UPDATE currencies SET
+                deleted_at = NULL, is_active = true,
+                name_ar = ${input.nameAr}, name_en = ${input.nameEn},
+                name_de = ${input.nameDe},
+                symbol = ${known.symbol}, decimals = ${known.decimals},
+                updated_at = now()
+              WHERE code = ${input.code}
+            `
+          : sql`
+              INSERT INTO currencies
+                (code, name_ar, name_en, name_de, symbol, decimals, is_active)
+              VALUES (${input.code}, ${input.nameAr}, ${input.nameEn}, ${input.nameDe},
+                      ${known.symbol}, ${known.decimals}, true)
+            `,
+      );
 
       await this.audit.record(
         {
@@ -119,7 +160,13 @@ export class GeoWriteService {
           actorRole: actor?.role,
           action: 'currency.created',
           subjectType: 'currency',
-          after: { code: input.code, symbol: input.symbol, decimals: input.decimals },
+          after: {
+            code: input.code,
+            symbol: known.symbol,
+            decimals: known.decimals,
+            /* Whether this brought a retired currency back, which is not the same event. */
+            reinstated: existing !== undefined,
+          },
         },
         tx as unknown as Database,
       );
@@ -143,10 +190,9 @@ export class GeoWriteService {
   ): Promise<{ code: string }> {
     const before = await this.db.execute<{
       name_ar: string;
-      symbol: string;
       is_active: boolean;
     }>(sql`
-      SELECT name_ar, symbol, is_active FROM currencies
+      SELECT name_ar, is_active FROM currencies
       WHERE code = ${code} AND deleted_at IS NULL LIMIT 1
     `);
 
@@ -160,7 +206,7 @@ export class GeoWriteService {
           name_ar   = coalesce(${input.nameAr ?? null}, name_ar),
           name_en   = coalesce(${input.nameEn ?? null}, name_en),
           name_de   = coalesce(${input.nameDe ?? null}, name_de),
-          symbol    = coalesce(${input.symbol ?? null}, symbol),
+          /* No symbol here: it belongs to the CODE, and the code is not editable. */
           is_active = coalesce(${input.isActive ?? null}, is_active),
           updated_at = now()
         WHERE code = ${code} AND deleted_at IS NULL
@@ -271,6 +317,62 @@ export class GeoWriteService {
     return { code };
   }
 
+  /**
+   * Files a city under a set of categories — the JOIN, and the legacy array beside it.
+   *
+   * `city_category_links` is the authority. `cities.categories` is a `city_category[]` still read
+   * by the customer city page, the home page's category strip, `catalog.service` and the geography
+   * screen, so it is written in step for every code that HAS an enum member — the four that
+   * predate `city_categories`. A category staff added since has no member and lives only in the
+   * join, which is why the array is a read path being retired rather than a second source of
+   * truth. Recorded in FUTURE-WORK.
+   */
+  private async setCategories(
+    tx: Database,
+    cityId: string,
+    codes: readonly string[],
+  ): Promise<void> {
+    await tx.execute(sql`
+      DELETE FROM city_category_links WHERE city_id = ${cityId}::uuid
+    `);
+
+    if (codes.length > 0) {
+      const list = sql.join(
+        codes.map((code) => sql`${code}`),
+        sql`, `,
+      );
+
+      /*
+        Every code must name a LIVE category, and a request naming one that does not is refused
+        rather than quietly filed under fewer categories than it asked for. The console builds its
+        checkboxes from this same table, so reaching this is a tampered request or a stale tab —
+        and «some of what you sent was ignored» is the answer neither of them should get.
+      */
+      const found = await tx.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM city_categories
+        WHERE code IN (${list}) AND deleted_at IS NULL
+      `);
+
+      if (Number(found.rows[0]?.n ?? 0) !== new Set(codes).size) {
+        throw badRequest(ERROR.GEO_CATEGORY_NOT_FOUND);
+      }
+
+      await tx.execute(sql`
+        INSERT INTO city_category_links (city_id, category_id)
+        SELECT ${cityId}::uuid, cc.id
+        FROM city_categories cc
+        WHERE cc.code IN (${list}) AND cc.deleted_at IS NULL
+        ON CONFLICT DO NOTHING
+      `);
+    }
+
+    /* Only the four with an enum member; anything newer is in the join alone. */
+    await tx.execute(sql`
+      UPDATE cities SET categories = ${sql.raw(categoriesLiteral(codes))}, updated_at = now()
+      WHERE id = ${cityId}::uuid
+    `);
+  }
+
   /* ── Cities ─────────────────────────────────────────────────────────────── */
 
   async createCity(
@@ -291,13 +393,19 @@ export class GeoWriteService {
     if (clash.rows[0]) throw conflict(ERROR.GEO_SLUG_TAKEN);
 
     await this.db.transaction(async (tx) => {
-      await tx.execute(sql`
+      const made = await tx.execute<{ id: string }>(sql`
         INSERT INTO cities
           (country_id, slug, name_ar, name_en, name_de, timezone, categories, is_active)
         VALUES (${country}::uuid, ${input.slug}, ${input.nameAr}, ${input.nameEn},
-                ${input.nameDe}, ${input.timezone},
-                ${sql.raw(categoriesLiteral(input.categories))}, true)
+                ${input.nameDe}, ${input.timezone}, '{}'::city_category[], true)
+        RETURNING id::text
       `);
+
+      const cityId = made.rows[0]?.id;
+
+      if (!cityId) throw notFound(ERROR.GEO_CITY_NOT_FOUND);
+
+      await this.setCategories(tx as unknown as Database, cityId, input.categories);
 
       await this.audit.record(
         {
@@ -352,14 +460,14 @@ export class GeoWriteService {
           name_de   = coalesce(${input.nameDe ?? null}, name_de),
           timezone  = coalesce(${input.timezone ?? null}, timezone),
           is_active = coalesce(${input.isActive ?? null}, is_active),
-          categories = ${
-            input.categories === undefined
-              ? sql`categories`
-              : sql.raw(categoriesLiteral(input.categories))
-          },
           updated_at = now()
         WHERE id = ${row.id}::uuid
       `);
+
+      /* Absent from the payload means «leave them», not «clear them». */
+      if (input.categories !== undefined) {
+        await this.setCategories(tx as unknown as Database, row.id, input.categories);
+      }
 
       await this.audit.record(
         {
@@ -392,13 +500,18 @@ export class GeoWriteService {
  * what keeps that true if the schema and this function ever drift.
  */
 function categoriesLiteral(categories: readonly string[]): string {
-  const allowed = new Set(['coastal', 'mountain', 'desert', 'historic']);
+  /*
+    The four the ENUM knows, which is not the same set as the table any more.
 
-  for (const category of categories) {
-    if (!allowed.has(category)) throw badRequest(ERROR.REQUEST_VALIDATION_FAILED);
-  }
+    A category staff added since `city_categories` became a table has no enum member, and a
+    Postgres enum cannot gain one from a request. Those live in the join alone — filtered out here
+    rather than rejected, because refusing a legitimate category would make the table's whole
+    purpose unreachable.
+  */
+  const inEnum = new Set(['coastal', 'mountain', 'desert', 'historic']);
+  const known = categories.filter((category) => inEnum.has(category));
 
-  return categories.length === 0
+  return known.length === 0
     ? `'{}'::city_category[]`
-    : `ARRAY[${categories.map((c) => `'${c}'`).join(',')}]::city_category[]`;
+    : `ARRAY[${known.map((c) => `'${c}'`).join(',')}]::city_category[]`;
 }

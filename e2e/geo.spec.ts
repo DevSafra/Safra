@@ -89,6 +89,42 @@ test('offers three currencies, in forms that fill their panel', async ({ page })
 });
 
 /**
+ * The currency code is a MENU, and the symbol follows it (Bashar, 2026-08-30).
+ *
+ * A code is an identifier from a standard, and the symbol and the minor-unit digits are properties
+ * OF it. As free text, «USD» could be saved beside «€» — every dollar on the platform then renders
+ * with a euro sign and nothing refuses it — and JOD could be stored with two decimals, which
+ * truncates 10.125 to 10.13 on the way in. The API takes both from the code regardless of what a
+ * form sends; this asserts the FORM cannot even suggest otherwise.
+ */
+test('the currency code is chosen, and the symbol follows it', async ({ page }) => {
+  await page.goto('/geo');
+  await page.locator('[data-geo-add="currency"]').click();
+
+  const form = page.locator('[data-geo-form="currency"]');
+  const symbol = form.locator('input[name=symbol]');
+
+  await expect(symbol, 'the symbol is not something to type').toBeDisabled();
+
+  await form.locator('select[name=code]').selectOption('TRY');
+
+  await expect(symbol).toHaveValue('₺');
+
+  /* Choosing a different code moves it — a stale symbol would be the same defect, one step later. */
+  await form.locator('select[name=code]').selectOption('GBP');
+  await expect(symbol).toHaveValue('£');
+
+  /*
+    And a currency the platform already holds is not offered: choosing one could only earn a 409,
+    and a menu whose entries are refusals teaches the operator nothing.
+  */
+  const codes = await form.locator('select[name=code] option').allInnerTexts();
+
+  expect(codes.join(' ')).not.toContain('USD');
+  expect(codes.join(' ')).not.toContain('EUR');
+});
+
+/**
  * A city row opens an editor, and the editor takes a photograph.
  *
  * `city_images`, its `GEO_MANAGE` controller and the re-encoding worker all existed and nothing

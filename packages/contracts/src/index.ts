@@ -8,6 +8,7 @@ export * from './calendar.js';
 export * from './enforcement.js';
 export * from './error-codes.js';
 export * from './fx.js';
+export * from './currency-catalogue.js';
 export * from './geo.js';
 export * from './gift-card.js';
 export * from './invoice.js';

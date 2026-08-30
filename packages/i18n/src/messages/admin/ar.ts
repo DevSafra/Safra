@@ -148,6 +148,7 @@ export const ar = {
     messages: 'الرسائل',
     whatsapp: 'واتساب والبريد',
     geo: 'المدن والدول والعملات',
+    cityCategories: 'الفئات',
     reports: 'التقارير',
     settings: 'الإعدادات',
     staffRoles: 'أدوار الموظفين',
@@ -393,6 +394,33 @@ export const ar = {
       evidence and an ad creative all open the SAME component, and a copy of these keys per screen
       is how four galleries came to behave four different ways.
     */
+    cityCategories: {
+      title: 'فئات المدن',
+      note: 'الفئة تصف المدينة على صفحتها وفي البحث العام — «ساحلية»، «تاريخية». تُستخدم في المدن ولا تُحذف: يمكن إيقافها فتختفي من الاختيار وتبقى المدن المصنّفة تحتها كما هي.',
+      colCode: 'المعرّف',
+      colNameAr: 'الاسم بالعربية',
+      colNameEn: 'الاسم بالإنجليزية',
+      colNameDe: 'الاسم بالألمانية',
+      colCities: 'المدن',
+      colStatus: 'الحالة',
+      active: 'مفعَّلة',
+      inactive: 'موقوفة',
+      add: '+ إضافة فئة',
+      addTitle: 'فئة جديدة',
+      edit: 'تعديل',
+      editTitle: 'تعديل الفئة',
+      code: 'المعرّف',
+      codeHint: 'يظهر في الروابط ولا يُعدَّل بعد الإنشاء — أحرف لاتينية صغيرة وشرطات',
+      activeLabel: 'مفعَّلة — تظهر عند تصنيف مدينة',
+      /* Retiring one is the decision with a consequence, so it says what the consequence is. */
+      deactivateTitle: 'إيقاف فئة',
+      deactivateBody:
+        'تختفي من اختيار الفئات، وتبقى {n} من المدن مصنّفة تحتها كما هي. يمكن تفعيلها مجدداً.',
+      empty: 'لا فئات بعد.',
+      cityCount:
+        '{n, plural, zero {لا مدن} one {مدينة واحدة} two {مدينتان} few {# مدن} many {# مدينة} other {# مدينة}}',
+    },
+
     slider: {
       title: 'معاينة الصور',
       open: 'معاينة الصورة',
@@ -1147,7 +1175,9 @@ export const ar = {
       country: 'الدولة',
       currency: 'العملة',
       currencyCode: 'رمز العملة',
-      currencyCodeHint: 'ثلاثة أحرف لاتينية كبيرة، مثل USD',
+      currencyCodeHint: 'يُختار من القائمة — الرمز والخانات العشرية تتبعه',
+      currencyChoose: 'اختر عملة…',
+      symbolFromCode: 'يُملأ تلقائياً من رمز العملة ولا يُعدَّل',
       countryCode: 'رمز الدولة',
       countryCodeHint: 'حرفان لاتينيان كبيران، مثل SY',
       symbol: 'الرمز',
@@ -2726,6 +2756,7 @@ export const ar = {
     /* Reached the catalogue the same way a dispute did: the first time one was closed. */
     conversation: 'محادثة',
     city: 'مدينة',
+    city_category: 'فئة مدن',
     country: 'دولة',
     currency: 'عملة',
     /* The role definition itself, not an employee — `EmployeeRolesService` audits against it. */
@@ -2794,6 +2825,8 @@ export const ar = {
     'dispute.notified': 'إشعار أطراف النزاع بالإغلاق',
     'dispute.evidence_added': 'إضافة دليل إلى نزاع',
     'dispute.evidence_removed': 'حذف دليل من نزاع',
+    'city_category.created': 'إضافة فئة مدن',
+    'city_category.updated': 'تعديل فئة مدن',
     'city.created': 'إضافة مدينة',
     'city.updated': 'تعديل مدينة',
     'country.created': 'إضافة دولة',
@@ -3159,6 +3192,8 @@ export const ar = {
         a name or an address — because this log is read by more people than the record is.
       */
       recipient: 'المُرسل إليه',
+      /* The Arabic name a category or a city was given — «ساحلية», «دمشق». */
+      nameAr: 'الاسم بالعربية',
       /*
         `Audited`'s own envelope: the interceptor records the handler's return value under this
         key. It surfaced for the first time on 2026-08-30 with `city_image.uploaded`, because
