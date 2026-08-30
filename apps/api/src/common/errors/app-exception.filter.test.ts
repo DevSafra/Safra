@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Logger, NotFoundException } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Logger,
+  NotFoundException,
+  PayloadTooLargeException,
+} from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ERROR } from '@safra/contracts';
@@ -297,6 +303,50 @@ describe('AppExceptionFilter', () => {
    * row would carry the Argon2id hash and the encrypted TOTP secret. `JsonLogger` cannot catch it
    * because its redaction works on object keys and this is one flat string.
    */
+  /**
+   * An oversized UPLOAD says so, and says the limit (Bashar, 2026-08-30).
+   *
+   * `FileInterceptor`'s own `fileSize` limit rejects before any of our code runs and Nest builds
+   * the refusal itself, with no `code` in it. Every client then reads a body it cannot name and
+   * shows «حدث خطأ ما» — the message Bashar met replacing a dispute photograph. Our own
+   * `ImageService.inspect` answers the same condition precisely; this is the case where the bytes
+   * never reach it.
+   */
+  it('names an uncoded 413 from the upload interceptor, with the limit', () => {
+    const sent = run(new PayloadTooLargeException('File too large'));
+
+    expect(sent.status).toBe(HttpStatus.PAYLOAD_TOO_LARGE);
+    expect(sent.body).toMatchObject({
+      code: ERROR.UPLOAD_FILE_TOO_LARGE,
+      params: { maxMb: 10 },
+    });
+
+    /* And it fills the message the reader is actually shown. */
+    expect(errorMessage(ERROR.UPLOAD_FILE_TOO_LARGE, 'ar', { maxMb: 10 })).not.toMatch(
+      /\{\w+\}/,
+    );
+  });
+
+  /**
+   * A 413 somebody wrote DELIBERATELY is left alone.
+   *
+   * `ImageService.inspect` throws one carrying `upload.file_too_large` and its own params. Keying
+   * the rewrite on the absence of a code is what stops this filter overwriting a refusal that was
+   * already precise — and this is the assertion that says so.
+   */
+  it('leaves a coded 413 exactly as it was thrown', () => {
+    const sent = run(
+      new PayloadTooLargeException({
+        statusCode: 413,
+        code: ERROR.UPLOAD_FILE_TOO_LARGE,
+        message: 'Original.',
+        params: { maxMb: 4 },
+      }),
+    );
+
+    expect(sent.body).toMatchObject({ message: 'Original.', params: { maxMb: 4 } });
+  });
+
   describe('what reaches the log', () => {
     /** Shaped like `DrizzleQueryError`: a `query`, a `params` array, and both in the message. */
     function queryError(): Error {

@@ -116,6 +116,25 @@ export function isCapacityFailure(error: unknown): boolean {
   });
 }
 
+/** The single upload limit every `FileInterceptor` in this API is configured with, in megabytes. */
+const MAX_UPLOAD_MB = 10;
+
+/**
+ * Multer's file-size refusal, told apart from our own.
+ *
+ * `ImageService.inspect` throws a `PayloadTooLargeException` that already carries
+ * `upload.file_too_large`; multer's carries nothing. Keying on the ABSENCE of a code is what keeps
+ * this from re-shaping a refusal somebody wrote deliberately.
+ */
+export function isUncodedFileTooLarge(exception: unknown): boolean {
+  if (!(exception instanceof HttpException)) return false;
+  if (exception.getStatus() !== Number(HttpStatus.PAYLOAD_TOO_LARGE)) return false;
+
+  const body: unknown = exception.getResponse();
+
+  return typeof body !== 'object' || body === null || !('code' in body);
+}
+
 /**
  * A body the parser refused to buffer.
  *
@@ -154,6 +173,31 @@ export class AppExceptionFilter implements ExceptionFilter {
         `Error after the response had started; the client sees a truncated body. ` +
           `${describeError(exception)}`,
       );
+      return;
+    }
+
+    /*
+      Multer's own file-size limit, which throws an UNCODED 413.
+
+      `FileInterceptor(..., { limits: { fileSize } })` rejects before any of our code runs, and Nest
+      builds the refusal itself: `{statusCode: 413, error: 'Payload Too Large', message: 'File too
+      large'}`. The passthrough below is right for every other framework exception and wrong for
+      this one: every client then reads a body with no `code` and shows «حدث خطأ ما», which is what
+      a staff member met replacing a dispute photograph with an oversized file on 2026-08-30.
+      `ImageService.inspect` names the same condition precisely when the bytes reach it; this makes
+      the answer identical when they never do.
+    */
+    if (isUncodedFileTooLarge(exception)) {
+      this.logger.warn('Refused an oversized upload at the interceptor.');
+
+      response.status(HttpStatus.PAYLOAD_TOO_LARGE).json({
+        statusCode: HttpStatus.PAYLOAD_TOO_LARGE,
+        code: ERROR.UPLOAD_FILE_TOO_LARGE,
+        message: 'File too large.',
+        /* The limit itself, which is the only thing that makes the refusal actionable. */
+        params: { maxMb: MAX_UPLOAD_MB },
+      });
+
       return;
     }
 
