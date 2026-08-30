@@ -5112,6 +5112,34 @@ requirements (1, 7, 10), six stand as accepted, and one (12) was added and accep
 
 ## 8. Known risks and traps
 
+### Registration is ~2× slower for an address that is NOT taken — an accepted, bounded leak
+
+Found 2026-08-30 while fixing a flaky timing assertion, and the flake turned out to be the
+symptom rather than the bug.
+
+`registration-enumeration.integration.test.ts` required the two paths to stay within 3× of each
+other. Instrumented on this machine: a bare Argon2id hash costs **16–18ms**, the taken path
+**20–28ms** (hash plus an indexed lookup) and the create path **27–46ms** (hash, lookup, and the
+rows it writes). The ratio sits at about 2.4 and had crossed 3 under a loaded run. It was not
+noise — it is the account creation, and **writing an account cannot be free**.
+
+**What is closed.** The cheap discriminator is gone: the password is hashed on BOTH paths, before
+the existence check, so the taken path cannot collapse to a bare lookup. The status code, the
+response body and the wording are identical. Those are asserted directly, and the stopwatch test
+now measures each path against a HASH measured in the same second rather than against the other
+path — a regression that skipped the hash comes in at a quarter of a hash, which that test catches
+with an 8× margin instead of the old one's single noisy sample.
+
+**What remains.** An attacker who can time the endpoint precisely can still distinguish «taken»
+from «new», because creating rows takes measurable time. Two things bound it, and neither is a
+fix: `POST /auth/register` allows **five attempts a minute per IP**, and every probe of an
+address that is NOT registered **leaves an account behind** — the oracle is loud and
+self-limiting in exactly the direction an enumerator does not want.
+
+**What closing it would take.** Deferring account creation to a background job so both paths
+return after the same work — a real design change to the registration flow, and a decision for
+Bashar rather than a test fix. Recorded here rather than silently accepted by widening a bound.
+
 ### An INTERMITTENT hydration error on the customer app's footer — open, low severity
 
 Found 2026-08-29 by watching `pageerror` across every page of all three apps while driving them
