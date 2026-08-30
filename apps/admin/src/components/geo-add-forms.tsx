@@ -27,7 +27,7 @@ const CATEGORIES = ['coastal', 'mountain', 'desert', 'historic'] as const;
  * Each posts to the API, whose schema is the authority on shape and whose `GEO_MANAGE` check is
  * the authority on permission. A currency's code is validated as ISO 4217 there, not here.
  */
-export function AddCurrency() {
+export function AddCurrency({ title }: { readonly title: string }) {
   const c = t.sections.geo;
   const [code, setCode] = useState('');
   const [nameAr, setNameAr] = useState('');
@@ -37,38 +37,61 @@ export function AddCurrency() {
 
   return (
     <AddForm
+      title={title}
       label={c.addCurrency}
+      heading={c.addCurrencyTitle}
       marker="currency"
       ready={code !== '' && nameAr !== '' && symbol !== ''}
       path="/api/geo/currencies"
       body={{ code, nameAr, nameEn: nameEn || nameAr, nameDe: nameDe || nameAr, symbol }}
     >
-      <Field
-        label={c.currencyCode}
-        value={code}
-        onChange={setCode}
-        hint={c.currencyCodeHint}
-      />
-      <Field label={c.nameAr} value={nameAr} onChange={setNameAr} />
-      <Field label={c.nameEn} value={nameEn} onChange={setNameEn} />
-      <Field label={c.nameDe} value={nameDe} onChange={setNameDe} />
-      <Field label={c.symbol} value={symbol} onChange={setSymbol} />
+      <Row>
+        <Field
+          label={c.currencyCode}
+          value={code}
+          onChange={setCode}
+          hint={c.currencyCodeHint}
+        />
+        <Field label={c.symbol} value={symbol} onChange={setSymbol} />
+      </Row>
+      <Row>
+        <Field label={c.nameAr} value={nameAr} onChange={setNameAr} />
+        <Field label={c.nameEn} value={nameEn} onChange={setNameEn} />
+        <Field label={c.nameDe} value={nameDe} onChange={setNameDe} />
+      </Row>
     </AddForm>
   );
 }
 
-export function AddCountry({ currencies }: { readonly currencies: readonly string[] }) {
+export function AddCountry({
+  title,
+  currencies,
+}: {
+  readonly title: string;
+  readonly currencies: readonly string[];
+}) {
   const c = t.sections.geo;
   const [code, setCode] = useState('');
   const [nameAr, setNameAr] = useState('');
   const [nameEn, setNameEn] = useState('');
   const [nameDe, setNameDe] = useState('');
-  const [currency, setCurrency] = useState(currencies[0] ?? '');
+  /*
+    USD, not the first in the list.
+
+    The list is ordered with the ACCOUNTING currency first — SYP — and defaulting to it would
+    price a new market in the unit the ledger measures rather than the one §1.4 calls the pricing
+    anchor. Both existing launch markets display in USD.
+  */
+  const [currency, setCurrency] = useState(
+    currencies.find((one) => one === 'USD') ?? currencies[0] ?? '',
+  );
   const [launch, setLaunch] = useState(false);
 
   return (
     <AddForm
+      title={title}
       label={c.addCountry}
+      heading={c.addCountryTitle}
       marker="country"
       ready={code !== '' && nameAr !== '' && currency !== ''}
       path="/api/geo/countries"
@@ -81,15 +104,19 @@ export function AddCountry({ currencies }: { readonly currencies: readonly strin
         isLaunchMarket: launch,
       }}
     >
-      <Field
-        label={c.countryCode}
-        value={code}
-        onChange={setCode}
-        hint={c.countryCodeHint}
-      />
-      <Field label={c.nameAr} value={nameAr} onChange={setNameAr} />
-      <Field label={c.nameEn} value={nameEn} onChange={setNameEn} />
-      <Field label={c.nameDe} value={nameDe} onChange={setNameDe} />
+      <Row>
+        <Field
+          label={c.countryCode}
+          value={code}
+          onChange={setCode}
+          hint={c.countryCodeHint}
+        />
+        <Field label={c.nameAr} value={nameAr} onChange={setNameAr} />
+      </Row>
+      <Row>
+        <Field label={c.nameEn} value={nameEn} onChange={setNameEn} />
+        <Field label={c.nameDe} value={nameDe} onChange={setNameDe} />
+      </Row>
 
       {/*
         A SELECT of currencies that exist, not a text box. A country priced in a currency the
@@ -124,7 +151,13 @@ export function AddCountry({ currencies }: { readonly currencies: readonly strin
   );
 }
 
-export function AddCity({ countries }: { readonly countries: readonly string[] }) {
+export function AddCity({
+  title,
+  countries,
+}: {
+  readonly title: string;
+  readonly countries: readonly string[];
+}) {
   const c = t.sections.geo;
   const [countryCode, setCountryCode] = useState(countries[0] ?? '');
   const [slug, setSlug] = useState('');
@@ -136,7 +169,9 @@ export function AddCity({ countries }: { readonly countries: readonly string[] }
 
   return (
     <AddForm
+      title={title}
       label={c.addCity}
+      heading={c.addCityTitle}
       marker="city"
       ready={countryCode !== '' && slug !== '' && nameAr !== '' && timezone !== ''}
       path="/api/geo/cities"
@@ -165,16 +200,20 @@ export function AddCity({ countries }: { readonly countries: readonly string[] }
         </select>
       </label>
 
-      <Field label={c.slug} value={slug} onChange={setSlug} hint={c.slugHint} />
-      <Field label={c.nameAr} value={nameAr} onChange={setNameAr} />
-      <Field label={c.nameEn} value={nameEn} onChange={setNameEn} />
-      <Field label={c.nameDe} value={nameDe} onChange={setNameDe} />
-      <Field
-        label={c.timezone}
-        value={timezone}
-        onChange={setTimezone}
-        hint={c.timezoneHint}
-      />
+      <Row>
+        <Field label={c.slug} value={slug} onChange={setSlug} hint={c.slugHint} />
+        <Field
+          label={c.timezone}
+          value={timezone}
+          onChange={setTimezone}
+          hint={c.timezoneHint}
+        />
+      </Row>
+      <Row>
+        <Field label={c.nameAr} value={nameAr} onChange={setNameAr} />
+        <Field label={c.nameEn} value={nameEn} onChange={setNameEn} />
+        <Field label={c.nameDe} value={nameDe} onChange={setNameDe} />
+      </Row>
 
       <fieldset className="grid gap-1.5">
         <legend className="text-[11.5px] font-semibold text-muted">
@@ -207,8 +246,23 @@ export function AddCity({ countries }: { readonly countries: readonly string[] }
   );
 }
 
-/** The trigger, the panel and the submit — written once for all three. */
+/**
+ * The panel's heading, its trigger and the form beneath — written once for all three.
+ *
+ * ## Why this owns the heading row
+ *
+ * The trigger sat in a `<span className="ms-auto">` beside the panel's `<h2>`, and the form opened
+ * INSIDE it. `ms-auto` sizes to its content, so the form rendered in a 230px column against the
+ * left edge with the panel's whole right half empty — Bashar screenshotted it. `TableToolbar`
+ * documents this exact trap for its own `below` slot: «a `w-full` child resolves to the content
+ * width and a form placed there renders in a third of the row».
+ *
+ * So the component takes the heading too, and the form is a sibling of the heading ROW rather than
+ * a child of the thing pinned to its end.
+ */
 function AddForm({
+  title,
+  heading,
   label,
   marker,
   ready,
@@ -216,6 +270,10 @@ function AddForm({
   body,
   children,
 }: {
+  /** The panel's own «دول الإطلاق» / «العملات» / «المدن». */
+  readonly title: string;
+  /** The form's own heading — «إضافة دولة», so an open panel says what it is collecting. */
+  readonly heading: string;
   readonly label: string;
   /** `data-geo-add` value, so a browser test can find one form among three. */
   readonly marker: string;
@@ -257,47 +315,60 @@ function AddForm({
     }
   }
 
-  if (!open) {
-    return (
-      <button
-        type="button"
-        data-geo-add={marker}
-        onClick={() => setOpen(true)}
-        className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
-      >
-        {label}
-      </button>
-    );
-  }
-
   return (
-    <div
-      data-geo-form={marker}
-      className="mt-2 grid w-full gap-2.5 rounded-[10px] border border-line bg-field p-3.5 text-start"
-    >
-      {children}
-
-      {error ? <p className="text-[11px] font-semibold text-bad">{error}</p> : null}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          disabled={busy || !ready}
-          onClick={() => void send()}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4.5 py-2 text-xs font-bold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
-        >
-          {busy ? c.creating : c.create}
-        </button>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-xs font-bold text-muted transition-colors hover:text-text lg:min-h-0"
-        >
-          {c.cancel}
-        </button>
+    <>
+      <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
+        <h2 className="text-[14px] font-extrabold text-gold">{title}</h2>
+        <span className="ms-auto">
+          <button
+            type="button"
+            data-geo-add={marker}
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+          >
+            {label}
+          </button>
+        </span>
       </div>
-    </div>
+
+      {open ? (
+        <div
+          data-geo-form={marker}
+          className="mb-3 grid w-full gap-3 rounded-[10px] border border-line bg-field p-4 text-start"
+        >
+          <p className="text-[11.5px] font-bold text-gold">{heading}</p>
+
+          {children}
+
+          {error ? <p className="text-[11px] font-semibold text-bad">{error}</p> : null}
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
+            <button
+              type="button"
+              disabled={busy || !ready}
+              onClick={() => void send()}
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4.5 py-2 text-xs font-bold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+            >
+              {busy ? c.creating : c.create}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-xs font-bold text-muted transition-colors hover:text-text lg:min-h-0"
+            >
+              {c.cancel}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
+}
+
+/** A row of fields that share the width — one column on a phone, several on a laptop. */
+function Row({ children }: { readonly children: ReactNode }) {
+  return <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{children}</div>;
 }
 
 function Field({

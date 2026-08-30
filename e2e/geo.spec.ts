@@ -40,6 +40,55 @@ test('the three add controls are real, not disabled placeholders', async ({ page
 });
 
 /**
+ * Three currencies on the screen, and the forms are usable panels rather than slivers.
+ *
+ * ## The currencies (Bashar, 2026-08-30)
+ *
+ * «keep the currency only (usd, euro, syp)». JOD and LBP were seeded and neither could ever price
+ * anything — one FX pair exists, USD→SYP, and `rateBetween` refuses rather than defaulting.
+ *
+ * ## The layout
+ *
+ * The form opened inside a `<span className="ms-auto">`, which sizes to its content, so eight
+ * fields rendered in a 230px column against the edge of an otherwise empty panel. Bashar
+ * screenshotted it. Asserting the WIDTH is what makes that reproducible: it is a live layout
+ * failure, invisible to a type checker and to any HTTP-level check.
+ */
+test('offers three currencies, in forms that fill their panel', async ({ page }) => {
+  await page.goto('/geo');
+
+  /*
+    The whole screen, not a panel: `.filter({ hasText })` matched the HEADING ROW first — a div
+    holding «العملات + إضافة عملة» and nothing else — so the assertion read an element that could
+    never contain a symbol. The three symbols and the two absences are unambiguous on the page as
+    a whole, which is what this is really about.
+  */
+  const screen = page.locator('main');
+
+  await expect(screen).toContainText('ل.س');
+  await expect(screen).toContainText('€');
+  await expect(screen).toContainText('$');
+
+  /* And nothing the platform cannot price — «د.أ» is JOD's symbol, «ل.ل» is LBP's. */
+  await expect(screen).not.toContainText('د.أ');
+  await expect(screen).not.toContainText('ل.ل');
+
+  for (const marker of ['country', 'city']) {
+    await page.locator(`[data-geo-add="${marker}"]`).click();
+
+    const width =
+      (await page.locator(`[data-geo-form="${marker}"]`).boundingBox())?.width ?? 0;
+
+    expect(
+      width,
+      `the ${marker} form must fill its panel, not a sliver of it`,
+    ).toBeGreaterThan(400);
+
+    await page.locator(`[data-geo-add="${marker}"]`).click();
+  }
+});
+
+/**
  * A city row opens an editor, and the editor takes a photograph.
  *
  * `city_images`, its `GEO_MANAGE` controller and the re-encoding worker all existed and nothing

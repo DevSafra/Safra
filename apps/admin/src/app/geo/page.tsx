@@ -95,14 +95,15 @@ export default async function GeoPage({
           </div>
 
           <ConsolePanel>
-            <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
-              <h2 className="text-[14.5px] font-extrabold text-gold">
-                {t.sections.geo.cities}
-              </h2>
-              <div className="ms-auto flex flex-wrap items-center gap-2.5">
-                <AddCity countries={result.countries.map((one) => one.code)} />
-              </div>
-            </div>
+            {/*
+              The form owns this row — see `AddForm`. It rendered inside an `ms-auto` wrapper
+              first, which sizes to its content, so an eight-field form came out 230px wide
+              against the edge of an otherwise empty panel.
+            */}
+            <AddCity
+              title={t.sections.geo.cities}
+              countries={result.countries.map((one) => one.code)}
+            />
 
             <TableToolbar
               action="/geo"
@@ -155,14 +156,7 @@ function Countries({
 }) {
   return (
     <ConsolePanel>
-      <div className="mb-2.5 flex items-center gap-2.5">
-        <h2 className="text-[14px] font-extrabold text-gold">
-          {t.sections.geo.countries}
-        </h2>
-        <span className="ms-auto">
-          <AddCountry currencies={currencies} />
-        </span>
-      </div>
+      <AddCountry title={t.sections.geo.countries} currencies={currencies} />
 
       <ul className="grid gap-2 text-[12.5px]">
         {rows.map((row) => (
@@ -190,14 +184,7 @@ function Countries({
 function Currencies({ rows }: { rows: Geography['currencies'] }) {
   return (
     <ConsolePanel>
-      <div className="mb-2.5 flex items-center gap-2.5">
-        <h2 className="text-[14px] font-extrabold text-gold">
-          {t.sections.geo.currencies}
-        </h2>
-        <span className="ms-auto">
-          <AddCurrency />
-        </span>
-      </div>
+      <AddCurrency title={t.sections.geo.currencies} />
 
       <ul className="grid gap-2 text-[12.5px]">
         {rows.map((row) => (
