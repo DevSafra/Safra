@@ -1126,6 +1126,48 @@ export const ar = {
     },
 
     geo: {
+      /* ── Editing a city, and the three «+ إضافة» forms (Bashar, 2026-08-30) ── */
+      edit: 'تعديل',
+      editCity: 'تعديل المدينة',
+      cancel: 'إلغاء',
+      save: 'حفظ',
+      saving: 'جارٍ الحفظ…',
+      create: 'إضافة',
+      creating: 'جارٍ الإضافة…',
+      nameAr: 'الاسم بالعربية',
+      nameEn: 'الاسم بالإنجليزية',
+      nameDe: 'الاسم بالألمانية',
+      slug: 'المعرّف',
+      slugHint: 'يظهر في الرابط: أحرف لاتينية صغيرة وأرقام وشرطات',
+      timezone: 'المنطقة الزمنية',
+      timezoneHint: 'مثل Asia/Damascus — يُحسب عليها إغلاق حجز اليوم نفسه',
+      country: 'الدولة',
+      currency: 'العملة',
+      currencyCode: 'رمز العملة',
+      currencyCodeHint: 'ثلاثة أحرف لاتينية كبيرة، مثل USD',
+      countryCode: 'رمز الدولة',
+      countryCodeHint: 'حرفان لاتينيان كبيران، مثل SY',
+      symbol: 'الرمز',
+      decimals: 'الخانات العشرية',
+      launchMarket: 'سوق إطلاق',
+      categoriesLabel: 'الفئات',
+      activeLabel: 'نشطة — تظهر في البحث العام',
+      /* Closing a city removes its listings from public search — said before it is done. */
+      closeCityTitle: 'إيقاف مدينة',
+      closeCityBody:
+        'تختفي المدينة و{n} من عقاراتها المنشورة من البحث العام. الحجوزات القائمة لا تتأثر، ويمكن تفعيلها مجدداً.',
+      images: 'الصور',
+      imagesNone: 'لا صور',
+      imagesCount: '{n} صورة',
+      imagesAdd: '+ إضافة صورة',
+      imagesUploading: 'جارٍ الرفع…',
+      imagesRemove: 'حذف',
+      imagesRemoveTitle: 'حذف صورة مدينة',
+      imagesConfirmRemove: 'تُحذف الصورة من صفحة المدينة. تابع؟',
+      imagesNote:
+        'أول ثلث صفحة المدينة صور — تُعاد ترميزها على الخادم وتُجرَّد بياناتها الوصفية.',
+      imagesHero: 'الغلاف',
+
       countries: 'دول الإطلاق',
       addCountry: '+ إضافة دولة',
       currencies: 'العملات',
@@ -2680,6 +2722,9 @@ export const ar = {
     dispute: 'نزاع',
     /* Reached the catalogue the same way a dispute did: the first time one was closed. */
     conversation: 'محادثة',
+    city: 'مدينة',
+    country: 'دولة',
+    currency: 'عملة',
     /* The role definition itself, not an employee — `EmployeeRolesService` audits against it. */
     partner_employee_role: 'دور موظف شريك',
     /* A role definition for SAFRA's OWN staff — «مدير عام», «مشرف حجوزات». */
@@ -2746,6 +2791,12 @@ export const ar = {
     'dispute.notified': 'إشعار أطراف النزاع بالإغلاق',
     'dispute.evidence_added': 'إضافة دليل إلى نزاع',
     'dispute.evidence_removed': 'حذف دليل من نزاع',
+    'city.created': 'إضافة مدينة',
+    'city.updated': 'تعديل مدينة',
+    'country.created': 'إضافة دولة',
+    'country.updated': 'تعديل دولة',
+    'currency.created': 'إضافة عملة',
+    'currency.updated': 'تعديل عملة',
     'conversation.started': 'بدء محادثة',
     'conversation.closed': 'إنهاء محادثة',
     'dispute.resolved': 'إغلاق نزاع لصالح العميل',
@@ -3105,6 +3156,13 @@ export const ar = {
         a name or an address — because this log is read by more people than the record is.
       */
       recipient: 'المُرسل إليه',
+      /*
+        `Audited`'s own envelope: the interceptor records the handler's return value under this
+        key. It surfaced for the first time on 2026-08-30 with `city_image.uploaded`, because
+        nothing had ever called that route — `audit-catalogue` reads the TABLE, so a payload
+        nothing writes is a payload nothing can flag.
+      */
+      result: 'النتيجة',
       continued: 'أُضيفت إلى محادثة قائمة',
       /*
         Written by `ad_invoice.paid` — WHICH campaign the money settled, beside the amount and its

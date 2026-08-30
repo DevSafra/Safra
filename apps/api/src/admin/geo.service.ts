@@ -27,10 +27,28 @@ export interface CurrencyRow {
 export interface GeoCityRow {
   readonly slug: string;
   readonly nameAr: string;
+  readonly nameEn: string;
+  readonly nameDe: string;
   readonly country: string;
+  readonly countryCode: string;
+  /** The joined display string the table's single cell shows. */
   readonly category: string;
+  /** The raw values, so an editor can show which are ticked. */
+  readonly categories: readonly string[];
+  readonly timezone: string;
   readonly properties: number;
   readonly isActive: boolean;
+  /**
+   * The photographs behind §5.4's «أول ثلثها صور عالية الجودة».
+   *
+   * The count and the hero, so the table can say whether a city HAS any without a second round
+   * trip. `city_images`, its controller and the re-encoding worker have all existed since the
+   * table was written and nothing ever called them: nine cities, zero rows, and a public city page
+   * rendering a gradient where the design asks for photography.
+   */
+  readonly images: number;
+  readonly heroKey: string | null;
+  readonly heroWidths: readonly number[] | null;
 }
 
 /**
@@ -148,24 +166,49 @@ export class GeoService {
     const result = await this.db.execute<{
       slug: string;
       name_ar: string;
+      name_en: string;
+      name_de: string;
       country: string;
+      country_code: string;
       category: string;
+      categories: string[];
+      timezone: string;
       properties: number;
       is_active: boolean;
+      images: number;
+      hero_key: string | null;
+      hero_widths: number[] | null;
     }>(sql`
-      SELECT ci.slug, ci.name_ar,
+      SELECT ci.slug, ci.name_ar, ci.name_en, ci.name_de,
              coalesce(co.name_ar, '—')  AS country,
+             coalesce(co.code, '')      AS country_code,
              -- categories is an ARRAY: a city can be coastal AND historic, as Latakia is.
              -- Joined into one string because the design's category column is a single cell.
              coalesce(array_to_string(ci.categories, ' · '), '—') AS category,
+             ci.categories::text[]      AS categories,
+             ci.timezone,
              coalesce(pr.n, 0)::int     AS properties,
-             ci.is_active
+             ci.is_active,
+             coalesce(im.n, 0)::int     AS images,
+             hero.file_key              AS hero_key,
+             hero.variant_widths        AS hero_widths
       FROM cities ci
       LEFT JOIN countries co ON co.id = ci.country_id
       LEFT JOIN (
         SELECT city_id, count(*) AS n FROM properties
         WHERE status = 'published' GROUP BY city_id
       ) pr ON pr.city_id = ci.id
+      LEFT JOIN (
+        SELECT city_id, count(*) AS n FROM city_images
+        WHERE deleted_at IS NULL GROUP BY city_id
+      ) im ON im.city_id = ci.id
+      -- The hero, or the first image where none is flagged: a city with photographs must show one.
+      LEFT JOIN LATERAL (
+        SELECT file_key, variant_widths FROM city_images
+        WHERE city_id = ci.id AND deleted_at IS NULL
+        ORDER BY is_hero DESC, sort_order, created_at
+        LIMIT 1
+      ) hero ON TRUE
       ${filter}
       ORDER BY ci.is_active DESC, ci.name_ar
     `);
@@ -173,10 +216,18 @@ export class GeoService {
     return result.rows.map((row) => ({
       slug: row.slug,
       nameAr: row.name_ar,
+      nameEn: row.name_en,
+      nameDe: row.name_de,
       country: row.country,
+      countryCode: row.country_code,
       category: row.category,
+      categories: row.categories,
+      timezone: row.timezone,
       properties: row.properties,
       isActive: row.is_active,
+      images: row.images,
+      heroKey: row.hero_key,
+      heroWidths: row.hero_widths,
     }));
   }
 }

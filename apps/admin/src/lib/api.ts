@@ -1339,10 +1339,19 @@ const geoSchema = z.object({
     z.object({
       slug: z.string(),
       nameAr: z.string(),
+      nameEn: z.string(),
+      nameDe: z.string(),
       country: z.string(),
+      countryCode: z.string(),
       category: z.string(),
+      categories: z.array(z.string()),
+      timezone: z.string(),
       properties: z.number(),
       isActive: z.boolean(),
+      /* §5.4's city photography — nullable, never defaulted: no hero means no photograph. */
+      images: z.number(),
+      heroKey: z.string().nullable(),
+      heroWidths: z.array(z.number()).nullable(),
     }),
   ),
 });

@@ -2,18 +2,15 @@ import Link from 'next/link';
 
 import { getGeography, type Geography } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
-import { count, money, shortDate } from '@/lib/format';
+import { money, shortDate } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
-import {
-  AdminTable,
-  FootNote,
-  Ltr,
-  StatusPill,
-  type AdminColumn,
-} from '@/components/admin-table';
+import { FootNote, Ltr } from '@/components/admin-table';
 import { TableToolbar } from '@/components/table-toolbar';
-import { cityCategories, t, plural } from '@/lib/strings';
+import { t, plural } from '@/lib/strings';
 import { listParams } from '@/lib/search-params';
+import { mediaBase, mediaUrl } from '@safra/session';
+import { AddCity, AddCountry, AddCurrency } from '@/components/geo-add-forms';
+import { GeoCities } from '@/components/geo-city-editor';
 import { refuseSection } from '@/components/section-refusal';
 
 /**
@@ -23,20 +20,29 @@ import { refuseSection } from '@/components/section-refusal';
  * values adjusted by staff, not constants a developer edits and deploys. The handoff says it
  * outright — "أسعار الصرف تُعدَّل من هنا لا من الكود".
  *
- * ## Read-only, and the add buttons say so
+ * ## Writable since 2026-08-30
  *
- * Adding a country, city or currency has real consequences — a city with no images and no
- * properties would appear in public search — and each needs its own validated form plus an audit
- * entry. The buttons are rendered disabled with the reason instead of wired to nothing.
+ * The three «+ إضافة» buttons were rendered disabled, and every city row was a dead end: a market
+ * could be opened only by a migration and could not be closed at all. Bashar asked for all of it,
+ * and P-005 had asked for it first — launch geography is an OPERATIONAL value staff adjust.
  *
- * FX rates are the exception: they already have a full write path with audited history on its own
- * screen, so they are DISPLAYED here and edited there. Duplicating the editor would create two
- * ways to change the number that prices every booking.
+ * Nothing DELETES. A country, city or currency is referenced by bookings and ledger rows that
+ * outlive any decision to stop selling there; `isActive` is how a market closes.
+ *
+ * FX rates remain the exception in the other direction: they already have a full write path with
+ * audited history on their own screen, so they are DISPLAYED here and edited there. Duplicating
+ * the editor would create two ways to change the number that prices every booking.
  */
 export const dynamic = 'force-dynamic';
 
-/** The design's `grid-template-columns` for the cities table, verbatim. */
-const TEMPLATE = '1.2fr .9fr 1fr .8fr .9fr';
+/**
+ * The design's `grid-template-columns` for the cities table, plus a track for the editor.
+ *
+ * The sixth was missing when the trigger was added, and a five-track grid given six columns does
+ * not overflow — it SQUEEZES, so «البتراء» rendered as «تراء» and the last column was 40px wide.
+ * Invisible to a type checker and to every HTTP-level check; the screenshot is what showed it.
+ */
+const TEMPLATE = '1.1fr .8fr .9fr .7fr .8fr 1.1fr';
 
 export default async function GeoPage({
   searchParams,
@@ -58,6 +64,15 @@ export default async function GeoPage({
 
   const [result, counts] = await Promise.all([getGeography(q), sidebarCounts()]);
 
+  /*
+    The media host if one is configured, and the API's development route otherwise — `mediaBase`
+    owns that choice, and reading `NEXT_PUBLIC_MEDIA_URL` here would be a second opinion on it.
+  */
+  const media = mediaBase({
+    NEXT_PUBLIC_MEDIA_URL: process.env['NEXT_PUBLIC_MEDIA_URL'],
+    API_URL: process.env['API_URL'],
+  });
+
   return (
     <ConsoleShell title={t.nav.geo} counts={counts}>
       {result === 'unauthenticated' ? (
@@ -72,7 +87,10 @@ export default async function GeoPage({
         <div className="grid gap-4">
           {/* Two cards side by side, as the design lays them out. */}
           <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-            <Countries rows={result.countries} />
+            <Countries
+              rows={result.countries}
+              currencies={result.currencies.map((one) => one.code)}
+            />
             <Currencies rows={result.currencies} />
           </div>
 
@@ -82,7 +100,7 @@ export default async function GeoPage({
                 {t.sections.geo.cities}
               </h2>
               <div className="ms-auto flex flex-wrap items-center gap-2.5">
-                <Disabled>{t.sections.geo.addCity}</Disabled>
+                <AddCity countries={result.countries.map((one) => one.code)} />
               </div>
             </div>
 
@@ -93,13 +111,31 @@ export default async function GeoPage({
               placeholder={t.sections.geo.searchPlaceholder}
             />
 
-            <AdminTable
-              columns={CITY_COLUMNS}
-              rows={result.cities}
+            <GeoCities
+              cities={result.cities.map((row) => ({
+                slug: row.slug,
+                nameAr: row.nameAr,
+                nameEn: row.nameEn,
+                nameDe: row.nameDe,
+                timezone: row.timezone,
+                categories: row.categories,
+                isActive: row.isActive,
+                properties: row.properties,
+                images: row.images,
+                /* Null when the city has no photograph — never a guessed address. */
+                heroUrl:
+                  row.heroKey && row.heroWidths
+                    ? mediaUrl(
+                        media,
+                        { fileKey: row.heroKey, variantWidths: row.heroWidths },
+                        400,
+                        'webp',
+                      )
+                    : null,
+                country: row.country,
+                category: row.category,
+              }))}
               template={TEMPLATE}
-              rowKey={(row) => row.slug}
-              minWidth={600}
-              empty={t.table.empty}
             />
 
             <FootNote>{t.sections.geo.citiesNote}</FootNote>
@@ -110,7 +146,13 @@ export default async function GeoPage({
   );
 }
 
-function Countries({ rows }: { rows: Geography['countries'] }) {
+function Countries({
+  rows,
+  currencies,
+}: {
+  rows: Geography['countries'];
+  currencies: readonly string[];
+}) {
   return (
     <ConsolePanel>
       <div className="mb-2.5 flex items-center gap-2.5">
@@ -118,7 +160,7 @@ function Countries({ rows }: { rows: Geography['countries'] }) {
           {t.sections.geo.countries}
         </h2>
         <span className="ms-auto">
-          <Disabled>{t.sections.geo.addCountry}</Disabled>
+          <AddCountry currencies={currencies} />
         </span>
       </div>
 
@@ -153,7 +195,7 @@ function Currencies({ rows }: { rows: Geography['currencies'] }) {
           {t.sections.geo.currencies}
         </h2>
         <span className="ms-auto">
-          <Disabled>{t.sections.geo.addCurrency}</Disabled>
+          <AddCurrency />
         </span>
       </div>
 
@@ -206,50 +248,5 @@ function Currencies({ rows }: { rows: Geography['currencies'] }) {
         </Link>
       </p>
     </ConsolePanel>
-  );
-}
-
-const CITY_COLUMNS: readonly AdminColumn<Geography['cities'][number]>[] = [
-  {
-    key: 'city',
-    header: t.sections.geo.cities,
-    render: (row) => <span className="font-semibold text-text">{row.nameAr}</span>,
-  },
-  {
-    key: 'country',
-    header: t.sections.geo.colCountry,
-    render: (row) => <span className="text-text2">{row.country}</span>,
-  },
-  {
-    key: 'category',
-    header: t.sections.geo.colCategory,
-    render: (row) => <span className="text-muted">{cityCategories(row.category)}</span>,
-  },
-  {
-    key: 'properties',
-    header: t.sections.geo.colProperties,
-    render: (row) => <span className="text-text2">{count(row.properties)}</span>,
-  },
-  {
-    key: 'status',
-    header: t.table.colStatus,
-    render: (row) => (
-      <StatusPill tone={row.isActive ? 'ok' : 'faint'}>
-        {row.isActive ? t.sections.geo.active : t.sections.geo.inactive}
-      </StatusPill>
-    ),
-  },
-];
-
-/** An action the design shows and the platform cannot yet perform. */
-function Disabled({ children }: { children: React.ReactNode }) {
-  return (
-    <span
-      aria-disabled="true"
-      title={t.nav.notBuilt}
-      className="cursor-not-allowed rounded-lg border border-line px-3.5 py-1.5 text-[11.5px] font-bold text-faint2"
-    >
-      {children}
-    </span>
   );
 }
