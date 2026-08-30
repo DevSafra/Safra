@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
-import { errorMessage } from '@safra/i18n';
+import { errorMessage, errorParams } from '@safra/i18n';
 import { isErrorCode, partnerApplicationSchema } from '@safra/contracts';
 
 import type { Locale } from '@/i18n/routing';
@@ -144,7 +144,11 @@ export function PartnerApplicationForm({
             ? String(payload.code)
             : '';
 
-        setFailure(isErrorCode(code) ? errorMessage(code, locale) : t('failed'));
+        setFailure(
+          isErrorCode(code)
+            ? errorMessage(code, locale, errorParams(payload))
+            : t('failed'),
+        );
 
         return;
       }

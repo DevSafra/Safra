@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { isErrorCode } from '@safra/contracts';
-import { errorMessage, type Locale } from '@safra/i18n';
+import { errorMessage, errorParams, type Locale } from '@safra/i18n';
 
 /**
  * Raising a dispute.
@@ -99,7 +99,11 @@ export function DisputeForm({
             : '';
 
         /* Only OUR codes are translated: an error body must not become a way to print chosen text. */
-        setError(isErrorCode(code) ? errorMessage(code, locale) : labels.failed);
+        setError(
+          isErrorCode(code)
+            ? errorMessage(code, locale, errorParams(payload))
+            : labels.failed,
+        );
 
         return;
       }

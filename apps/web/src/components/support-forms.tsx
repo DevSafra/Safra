@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { isErrorCode } from '@safra/contracts';
-import { errorMessage } from '@safra/i18n';
+import { errorMessage, errorParams } from '@safra/i18n';
 
 import type { Locale } from '@/i18n/routing';
 
@@ -72,7 +72,11 @@ export function SupportForm({
             : '';
 
         /* Only OUR codes are translated — an error body must not become a way to print chosen text. */
-        setError(isErrorCode(code) ? errorMessage(code, locale) : labels.failed);
+        setError(
+          isErrorCode(code)
+            ? errorMessage(code, locale, errorParams(payload))
+            : labels.failed,
+        );
 
         return;
       }

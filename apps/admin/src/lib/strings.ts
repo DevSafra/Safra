@@ -1,6 +1,6 @@
 import IntlMessageFormat from 'intl-messageformat';
 
-import { adminAr, errorMessage, fill, type Locale } from '@safra/i18n';
+import { adminAr, errorFromBody, errorMessage, fill, type Locale } from '@safra/i18n';
 
 /**
  * The staff console's copy, and the lookups that read it.
@@ -490,15 +490,18 @@ export function apiError(code: string | null): string {
  * `code` first, then `message`, and the fallback is not laziness: the console's own BFF routes
  * refuse malformed bodies before the API is called and put the CODE in `message`, because there is
  * no upstream response to copy a `code` from. One reader, both shapes.
+ *
+ * ## And it forwards the PARAMS, which is the second half of the same lesson
+ *
+ * This read the code and dropped `params`, so a message carrying `{min}` could not be filled and
+ * `errorMessage` fell back to the generic sentence — correctly, since it refuses to print a
+ * surviving placeholder. Twenty-six messages were unreachable that way. Bashar found it on
+ * 2026-08-30 replacing a dispute photograph: the API said «at least 400×400» and the screen said
+ * «حدث خطأ ما». The extraction now lives in `@safra/i18n` so the partner and customer apps cannot
+ * get it wrong separately.
  */
 export function apiErrorOf(body: unknown): string {
-  if (typeof body !== 'object' || body === null) return apiError(null);
-
-  if ('code' in body && typeof body.code === 'string') return apiError(body.code);
-  if ('message' in body && typeof body.message === 'string')
-    return apiError(body.message);
-
-  return apiError(null);
+  return errorFromBody(body, CONSOLE_LOCALE);
 }
 
 /**

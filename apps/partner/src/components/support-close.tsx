@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { isErrorCode } from '@safra/contracts';
-import { errorMessage } from '@safra/i18n';
+import { errorMessage, errorParams } from '@safra/i18n';
 
 import { t } from '@/lib/strings';
 
@@ -58,7 +58,11 @@ export function SupportClose({ reference }: { readonly reference: string }) {
             : '';
 
         /* Only OUR codes are translated — an error body must not become a way to print chosen text. */
-        setError(isErrorCode(code) ? errorMessage(code, 'ar') : t.support.closeFailed);
+        setError(
+          isErrorCode(code)
+            ? errorMessage(code, 'ar', errorParams(payload))
+            : t.support.closeFailed,
+        );
 
         return;
       }

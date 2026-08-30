@@ -43,6 +43,71 @@ type ErrorCatalogue = Partial<Record<string, string>>;
  * `conversation.not_found_or_closed` has been shown an implementation detail; a user reading
  * nothing at all cannot tell a failure from a slow network.
  */
+/**
+ * The message for an API REFUSAL, read from the response body.
+ *
+ * ## The bug this fixes
+ *
+ * Bashar hit «حدث خطأ ما. حاول مرة أخرى.» replacing a dispute photograph on 2026-08-30. The API
+ * had answered precisely — `upload.image_too_small`, with `params: { min: 400 }` — and the console
+ * showed nothing of it.
+ *
+ * Every caller resolved the CODE and dropped the PARAMS. `errorMessage` then found a template
+ * carrying `{min}`, could not fill it, and did the right thing with the wrong information: it
+ * refuses to print a surviving placeholder and falls back to the generic sentence. So **twenty-six
+ * parameterised messages could never render in any app** — every size limit, every range, every
+ * «الحد الأقصى {max}» — and each one read as «something went wrong».
+ *
+ * It survived because nothing was broken enough to fail: the screen showed Arabic, just the wrong
+ * Arabic, and each app had written its own two-line extraction that looked obviously correct.
+ *
+ * ## So there is one reader, here
+ *
+ * It takes the BODY rather than a code, because the params only exist on the body. `code` first,
+ * then `message` — the console's own BFF routes refuse malformed bodies before the API is called
+ * and put the code in `message`, having no upstream response to copy a `code` from.
+ */
+/**
+ * The `params` of an API refusal, cleaned to what a message can substitute.
+ *
+ * Two apps had written this privately — `asParams` in `checkout-form` and again in `auth-form` —
+ * and the five other refusal readers had not written it at all, which is why every parameterised
+ * message read as «حدث خطأ ما». Strings and numbers only: a nested object or an array in a
+ * template would render as `[object Object]`, and the body is not ours to trust in shape.
+ */
+export function errorParams(body: unknown): Record<string, string | number> | undefined {
+  const raw =
+    typeof body === 'object' && body !== null && 'params' in body
+      ? (body as { params?: unknown }).params
+      : undefined;
+
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return undefined;
+
+  const clean: Record<string, string | number> = {};
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === 'string' || typeof value === 'number') clean[key] = value;
+  }
+
+  return Object.keys(clean).length > 0 ? clean : undefined;
+}
+
+export function errorFromBody(body: unknown, locale: Locale = DEFAULT_LOCALE): string {
+  if (typeof body !== 'object' || body === null) return errorMessage(null, locale);
+
+  const params = errorParams(body);
+
+  if ('code' in body && typeof body.code === 'string') {
+    return errorMessage(body.code, locale, params);
+  }
+
+  if ('message' in body && typeof body.message === 'string') {
+    return errorMessage(body.message, locale, params);
+  }
+
+  return errorMessage(null, locale);
+}
+
 export function errorMessage(
   code: string | null | undefined,
   locale: Locale = DEFAULT_LOCALE,
