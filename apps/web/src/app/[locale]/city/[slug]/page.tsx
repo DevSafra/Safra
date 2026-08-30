@@ -11,7 +11,6 @@ import { localisedDescription, localisedName, localisedText } from '@/lib/locali
 import { imageUrl as cityImageUrl } from '@/lib/property';
 import { searchSafely } from '@/lib/api';
 import { todayInDamascus } from '@/lib/settings';
-import { dynamicMessage } from '@/lib/dynamic-message';
 
 /**
  * City page (SRS §5.4).
@@ -89,7 +88,6 @@ export default async function CityPage({
 
   const t = await getTranslations('city');
   const tnav = await getTranslations('nav');
-  const tc = await getTranslations('cityCategories');
   const ts = await getTranslations('search');
 
   const cities = await getCities();
@@ -207,7 +205,7 @@ export default async function CityPage({
           </nav>
 
           <p className="mt-4 text-sm tracking-wide text-sky">
-            {city.categories.map((c) => dynamicMessage(tc, c, c)).join(' · ')}
+            {city.categories.map((c) => localisedName(c, locale)).join(' · ')}
           </p>
           <h1 className="mt-2 font-display text-4xl font-bold text-gold sm:text-5xl">
             {name}

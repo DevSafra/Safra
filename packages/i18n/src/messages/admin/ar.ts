@@ -3840,13 +3840,6 @@ export const ar = {
       transport: 'نقل',
       other: 'أخرى',
     } as Record<string, string>,
-
-    cityCategory: {
-      coastal: 'ساحلية',
-      mountain: 'جبلية',
-      desert: 'صحراوية',
-      historic: 'تاريخية',
-    } as Record<string, string>,
   },
 
   /**

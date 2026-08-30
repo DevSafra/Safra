@@ -9,6 +9,31 @@ import { ERROR } from '@safra/contracts';
 import { notFound } from '../common/errors/app-error.js';
 
 /**
+ * One city's ACTIVE categories, as a jsonb array of `{code, nameAr, nameEn, nameDe}`.
+ *
+ * Written once and used by both readers below, because a list and the detail page showing
+ * different categories for the same city is a defect nobody would look for. Correlated on `c.id`,
+ * so it goes wherever `cities c` is in scope. `sort_order` is what الفئات's arrows write, so the
+ * order a customer reads is the order staff chose.
+ */
+const CITY_CATEGORIES_JSON = sql`
+  coalesce((
+    SELECT jsonb_agg(
+             jsonb_build_object(
+               'code', cc.code,
+               'nameAr', cc.name_ar,
+               'nameEn', cc.name_en,
+               'nameDe', cc.name_de
+             )
+             ORDER BY cc.sort_order, cc.code
+           )
+    FROM city_category_links l
+    JOIN city_categories cc ON cc.id = l.category_id
+    WHERE l.city_id = c.id AND cc.is_active AND cc.deleted_at IS NULL
+  ), '[]'::jsonb)
+`;
+
+/**
  * Public reference data for the storefront (SRS §5.1, §5.4).
  *
  * Read-only and cacheable: cities, property types and amenities change through the
@@ -22,18 +47,32 @@ export class CatalogService {
   /**
    * Cities for the search selector and the destinations grid.
    *
-   * ## `to_jsonb(c.categories)`, never the bare column
+   * ## Categories come from the TABLE, not from `cities.categories`
    *
-   * `categories` is an array of a Postgres ENUM, and node-postgres parses arrays only for element
-   * types it has a built-in parser for. Selected bare, the column arrives as the LITERAL string
-   * `'{historic}'` while the generic below promises `string[]` — and a generic on `db.execute` is
-   * an assertion, not a check, so nothing failed.
+   * They were read from the `city_category[]` column, which is a frozen enum: a category staff
+   * add on الفئات has no member there, so it could never reach the public site. The page existed
+   * and the rest of the platform could not see what it wrote — «built and connected to nothing»
+   * one layer down. `city_category_links` is the authority (see `GeoWriteService.setCategories`),
+   * so the read follows it, and «displayed on the entire system» becomes true rather than true
+   * for the four categories that happened to predate the screen (Bashar, 2026-08-30).
    *
-   * The consumer then swallowed it: `apps/web/src/lib/catalog.ts` validates the response and falls
-   * back to an empty list rather than throwing, which is right for a reference endpoint that
-   * blipped and exactly wrong here. The public home page rendered its destinations grid and its
-   * city selector EMPTY, permanently, while `/cities/:slug` — which goes through the query builder,
-   * where Drizzle parses the literal itself — kept working.
+   * Retired categories are excluded here and kept on the console: a customer must not be offered
+   * a filter the platform has withdrawn, while staff still need to see what a city is filed under.
+   *
+   * ## The names travel with the code
+   *
+   * Like `partner_types` and every other reference row, and for the reason `docs/i18n.md` gives:
+   * a code resolved against a catalogue in the web app is a code that renders as itself the day
+   * somebody adds a fifth category. These are DATA — a row's own name in three languages — not
+   * copy written in a component.
+   *
+   * ## `to_jsonb`, never a bare array
+   *
+   * node-postgres parses arrays only for element types it has a built-in parser for. Selected
+   * bare, an enum array arrived as the LITERAL string `'{historic}'` while the generic promised
+   * `string[]` — and a generic on `db.execute` is an assertion, not a check, so nothing failed.
+   * The consumer then swallowed it and the destinations grid rendered EMPTY, permanently. The
+   * aggregate below is jsonb for the same reason.
    */
   async cities() {
     const rows = await this.db.execute<{
@@ -42,14 +81,13 @@ export class CatalogService {
       name_en: string;
       name_de: string;
       country_code: string;
-      categories: string[];
+      categories: { code: string; nameAr: string; nameEn: string; nameDe: string }[];
       published_count: string;
     }>(sql`
       SELECT
         c.slug, c.name_ar, c.name_en, c.name_de,
         co.code AS country_code,
-        -- An enum array reaches the driver as a literal string unless it is cast. See above.
-        to_jsonb(c.categories) AS categories,
+        ${CITY_CATEGORIES_JSON} AS categories,
         -- The count shown on a destination card must reflect what a visitor can
         -- actually book, so unpublished inventory is excluded.
         (
@@ -85,7 +123,6 @@ export class CatalogService {
         descriptionAr: true,
         descriptionEn: true,
         descriptionDe: true,
-        categories: true,
         tagsAr: true,
         tagsEn: true,
         tagsDe: true,
@@ -100,6 +137,19 @@ export class CatalogService {
 
     if (!city) throw notFound(ERROR.GEO_CITY_NOT_FOUND);
 
+    /*
+      The SAME read as the list — see `CITY_CATEGORIES_JSON`. It is a second query rather than a
+      join on the query builder because the builder cannot express a correlated aggregate, and one
+      indexed lookup on a page that is already fetching photographs is not the cost worth avoiding.
+    */
+    const categories = await this.db.execute<{
+      categories: { code: string; nameAr: string; nameEn: string; nameDe: string }[];
+    }>(sql`
+      SELECT ${CITY_CATEGORIES_JSON} AS categories
+      FROM cities c
+      WHERE c.slug = ${slug} AND c.deleted_at IS NULL
+    `);
+
     // §5.4's hero band. Hero first, then by sort order.
     const images = await this.db.execute<Record<string, unknown>>(sql`
       SELECT i.file_key, i.variant_widths, i.width, i.height,
@@ -112,6 +162,8 @@ export class CatalogService {
 
     return {
       ...city,
+      /* From `city_categories`, so a category staff added is on this page too. */
+      categories: categories.rows[0]?.categories ?? [],
       images: images.rows.map((r) => ({
         fileKey: r['file_key'],
         variantWidths: (r['variant_widths'] as number[] | null) ?? [],

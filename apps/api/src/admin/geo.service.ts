@@ -8,7 +8,11 @@ import { DATABASE } from '../database/database.module.js';
 export interface CountryRow {
   readonly code: string;
   readonly nameAr: string;
+  /* The other two names and the launch flag, so the row can be EDITED without a second fetch. */
+  readonly nameEn: string;
+  readonly nameDe: string;
   readonly currencyCode: string | null;
+  readonly isLaunchMarket: boolean;
   readonly activeCities: number;
   readonly isActive: boolean;
 }
@@ -16,7 +20,17 @@ export interface CountryRow {
 export interface CurrencyRow {
   readonly code: string;
   readonly nameAr: string;
+  readonly nameEn: string;
+  readonly nameDe: string;
   readonly symbol: string;
+  /**
+   * Whether the platform still offers it.
+   *
+   * Absent until 2026-08-30, when currencies became editable: a list with no state renders a
+   * deactivated currency identically to a live one, which is an offer the platform has withdrawn
+   * and the screen still appears to make.
+   */
+  readonly isActive: boolean;
   /** True for the accounting currency — the one everything is measured in. */
   readonly isAccounting: boolean;
   /** Rate to the accounting currency, or null when none is configured. */
@@ -76,12 +90,16 @@ export class GeoService {
     const result = await this.db.execute<{
       code: string;
       name_ar: string;
+      name_en: string;
+      name_de: string;
       currency_code: string | null;
+      is_launch_market: boolean;
       active_cities: number;
       is_active: boolean;
     }>(sql`
-      SELECT co.code, co.name_ar,
+      SELECT co.code, co.name_ar, co.name_en, co.name_de,
              cur.code                       AS currency_code,
+             co.is_launch_market,
              coalesce(ci.n, 0)::int         AS active_cities,
              co.is_active
       FROM countries co
@@ -95,7 +113,10 @@ export class GeoService {
     return result.rows.map((row) => ({
       code: row.code,
       nameAr: row.name_ar,
+      nameEn: row.name_en,
+      nameDe: row.name_de,
       currencyCode: row.currency_code,
+      isLaunchMarket: row.is_launch_market,
       activeCities: row.active_cities,
       isActive: row.is_active,
     }));
@@ -113,12 +134,15 @@ export class GeoService {
     const result = await this.db.execute<{
       code: string;
       name_ar: string;
+      name_en: string;
+      name_de: string;
       symbol: string;
+      is_active: boolean;
       is_accounting: boolean;
       rate_to_syp: string | null;
       rate_set_at: string | null;
     }>(sql`
-      SELECT c.code, c.name_ar, c.symbol,
+      SELECT c.code, c.name_ar, c.name_en, c.name_de, c.symbol, c.is_active,
              (c.code = 'SYP') AS is_accounting,
              fx.rate::text    AS rate_to_syp,
              to_char(fx.effective_from AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS rate_set_at
@@ -148,7 +172,10 @@ export class GeoService {
     return result.rows.map((row) => ({
       code: row.code,
       nameAr: row.name_ar,
+      nameEn: row.name_en,
+      nameDe: row.name_de,
       symbol: row.symbol,
+      isActive: row.is_active,
       isAccounting: row.is_accounting,
       rateToSyp: row.is_accounting ? '1' : row.rate_to_syp,
       rateSetAt: row.rate_set_at,
@@ -186,10 +213,29 @@ export class GeoService {
       SELECT ci.slug, ci.name_ar, ci.name_en, ci.name_de,
              coalesce(co.name_ar, '—')  AS country,
              coalesce(co.code, '')      AS country_code,
-             -- categories is an ARRAY: a city can be coastal AND historic, as Latakia is.
-             -- Joined into one string because the design's category column is a single cell.
-             coalesce(array_to_string(ci.categories, ' · '), '—') AS category,
-             ci.categories::text[]      AS categories,
+             -- ── What a city is filed under, read from city_category_links ───────────
+             --
+             -- Both of these came off ci.categories, the frozen city_category[] column, so a
+             -- category staff added on الفئات appeared in NEITHER: not in the table's cell, and
+             -- not ticked in the editor that wrote it. The links table is the authority — see
+             -- GeoWriteService.setCategories — so both follow it.
+             --
+             -- The cell carries the ARABIC NAMES because the design's category column is one
+             -- cell and a code is not a word; the editor gets CODES because a checkbox is keyed
+             -- by the identifier, not by a name somebody may rename tomorrow. A city can be
+             -- coastal AND historic, as Latakia is, hence an aggregate rather than a column.
+             coalesce((
+               SELECT string_agg(cc.name_ar, ' · ' ORDER BY cc.sort_order, cc.code)
+               FROM city_category_links l
+               JOIN city_categories cc ON cc.id = l.category_id
+               WHERE l.city_id = ci.id AND cc.deleted_at IS NULL
+             ), '—')                    AS category,
+             coalesce((
+               SELECT array_agg(cc.code ORDER BY cc.sort_order, cc.code)
+               FROM city_category_links l
+               JOIN city_categories cc ON cc.id = l.category_id
+               WHERE l.city_id = ci.id AND cc.deleted_at IS NULL
+             ), '{}')::text[]           AS categories,
              ci.timezone,
              coalesce(pr.n, 0)::int     AS properties,
              ci.is_active,

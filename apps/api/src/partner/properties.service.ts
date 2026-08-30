@@ -314,6 +314,7 @@ export class PropertiesService {
       attributes: string[] | null;
       badges: string[] | null;
       city_name_ar: string | null;
+      city_categories: string[] | null;
       property_type: string | null;
       cover_key: string | null;
       cover_widths: number[] | null;
@@ -326,6 +327,18 @@ export class PropertiesService {
              pr.status::text AS status,
              pr.rating::text AS rating, pr.reviews_count, pr.attributes, pr.badges,
              ci.name_ar AS city_name_ar,
+             -- The CITY's categories, in the partner's language — «ساحلية · تاريخية».
+             -- Read from city_category_links, the authority, so a category staff add on الفئات
+             -- reaches this dashboard the same day it reaches the public site (Bashar,
+             -- 2026-08-30). Retired ones are excluded: a partner reading what kind of
+             -- destination they are listing in should see what SAFRA currently says, not what
+             -- it used to. A NAME, not a code, for the same reason city is ci.name_ar here.
+             coalesce((
+               SELECT array_agg(cc.name_ar ORDER BY cc.sort_order, cc.code)
+               FROM city_category_links l
+               JOIN city_categories cc ON cc.id = l.category_id
+               WHERE l.city_id = ci.id AND cc.is_active AND cc.deleted_at IS NULL
+             ), '{}') AS city_categories,
              pt.code    AS property_type,
              img.file_key AS cover_key,
              img.variant_widths AS cover_widths,
@@ -367,6 +380,8 @@ export class PropertiesService {
       attributes: row.attributes ?? [],
       badges: row.badges ?? [],
       city: row.city_name_ar,
+      /* Always an array, so the card never has to guard before mapping. */
+      cityCategories: row.city_categories ?? [],
       propertyType: row.property_type,
       /*
         The KEY and its rendered widths, not a URL. The media base differs per environment and the

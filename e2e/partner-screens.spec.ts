@@ -71,6 +71,47 @@ test.describe('تعديل العقار', () => {
     await expect(page.getByText('لم يُبنَ هذا القسم بعد')).toHaveCount(0);
   });
 
+  /**
+   * الفئات reaches the partner dashboard too (Bashar, 2026-08-30).
+   *
+   * ## Two different things that look alike
+   *
+   * The gold chips are the partner's OWN choice from `TRIP_ATTRIBUTES`; these grey ones are
+   * SAFRA's classification of the destination, managed on الفئات and not theirs to set. The list
+   * is named, because two rows of chips with no stated difference say the opposite of the rule.
+   *
+   * ## Why the NAME and not the code
+   *
+   * A code would render `coastal` on a page of Arabic. The row's own `name_ar` travels from the
+   * API, the same way `city` does — and it comes from `city_category_links`, so a category staff
+   * add appears here without a deployment. `property-vocabulary.test.ts` holds the other half:
+   * that the server refuses a tag a partner invented.
+   */
+  test('the card shows the destination’s categories, which the partner does not set', async ({
+    page,
+  }) => {
+    await page.goto(`${BASE}/properties`);
+
+    const chips = page.getByRole('list', { name: t.properties.cityCategoriesLabel });
+
+    await expect(chips.first()).toBeVisible();
+
+    const text = ((await chips.first().textContent()) ?? '').trim();
+
+    expect(
+      text.length,
+      'a destination category must be named, not empty',
+    ).toBeGreaterThan(0);
+    /* A code, not a word — the failure this replaces. */
+    expect(text).not.toMatch(/[a-z]{4,}/);
+
+    /* And nothing on this screen offers to edit them: they are SAFRA's, not the partner's. */
+    await expect(
+      chips.first().getByRole('button'),
+      'the destination’s categories are read-only here',
+    ).toHaveCount(0);
+  });
+
   test('a draft offers the form, and a change survives a reload', async ({ page }) => {
     const reference = await findReference(page, DRAFT);
 

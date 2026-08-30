@@ -201,6 +201,33 @@ function Card({ property }: { readonly property: PartnerProperty }) {
           </ul>
         ) : null}
 
+        {/*
+          The DESTINATION's categories — SAFRA's classification of the city, managed on الفئات and
+          shown here so this dashboard reads the same vocabulary as the public site (Bashar,
+          2026-08-30).
+
+          Deliberately NOT the same chip as the row above it. Those are the partner's own choice
+          from `TRIP_ATTRIBUTES`; these are not theirs to choose, and two identical-looking rows
+          would say the opposite. `aria-label` names the list, because «ساحلية» beside «إطلالة على
+          البحر» is otherwise two rows of chips with no stated difference.
+        */}
+        {property.cityCategories.length > 0 ? (
+          <ul
+            aria-label={t.properties.cityCategoriesLabel}
+            className="mt-1.5 flex flex-wrap gap-1.5"
+          >
+            {property.cityCategories.map((category) => (
+              <li
+                key={category}
+                title={t.properties.cityCategoriesNote}
+                className="rounded-full border border-line px-2 py-0.5 text-[11px] text-muted"
+              >
+                {category}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
         <div className="mt-auto pt-3.5">
           {property.fromPrice ? (
             <p className="text-[17px] font-extrabold text-gold">

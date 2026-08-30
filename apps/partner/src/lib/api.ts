@@ -99,6 +99,14 @@ const propertySchema = z.object({
   attributes: z.array(z.string()),
   badges: z.array(z.string()),
   city: z.string().nullable(),
+  /**
+   * The CITY's categories — SAFRA's, not this partner's.
+   *
+   * Managed on الفئات and read here so the same vocabulary reaches every surface. A partner
+   * cannot add to it, which is the point: the tags they choose are `TRIP_ATTRIBUTES`, a fixed
+   * shared list, and the category of the destination is SAFRA's classification of the city.
+   */
+  cityCategories: z.array(z.string()),
   propertyType: z.string().nullable(),
   coverKey: z.string().nullable(),
   coverWidths: z.array(z.number()),

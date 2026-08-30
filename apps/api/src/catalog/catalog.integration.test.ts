@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
@@ -55,11 +56,48 @@ describeIfDb('CatalogService', () => {
       expect(Array.isArray(city.categories), `${city.slug} categories`).toBe(true);
 
       for (const category of city.categories) {
-        expect(typeof category).toBe('string');
-        /* The literal would arrive as one string still wearing its braces. */
-        expect(category).not.toMatch(/[{}]/);
+        /*
+          A ROW, with its own names — not a bare code resolved against a catalogue in the web app.
+          Each name is asserted separately rather than by shape alone: a category whose Arabic
+          name arrived empty would render a blank chip, and `toBeTruthy` on the object would not
+          notice. The brace check stays because the aggregate is still jsonb: a literal that
+          reached the driver unparsed would arrive as one string wearing its braces.
+        */
+        expect(typeof category.code).toBe('string');
+        expect(category.code).not.toMatch(/[{}]/);
+        expect(category.nameAr.length, `${category.code} nameAr`).toBeGreaterThan(0);
+        expect(category.nameEn.length, `${category.code} nameEn`).toBeGreaterThan(0);
+        expect(category.nameDe.length, `${category.code} nameDe`).toBeGreaterThan(0);
       }
     }
+  });
+
+  /**
+   * The whole reason الفئات became a table: a category staff ADD must reach the public site.
+   *
+   * The read was `cities.categories`, a frozen `city_category[]`, so a category created on the
+   * console had no enum member and could never appear here — the screen wrote rows the rest of
+   * the platform could not see. This inserts one the enum does not contain and asserts it
+   * arrives, which is the only version of this assertion the old read could not have passed.
+   */
+  it('carries a category the enum never had', async () => {
+    await db.execute(sql`
+      INSERT INTO city_categories (code, name_ar, name_en, name_de, sort_order)
+      VALUES ('riverside', 'نهرية', 'Riverside', 'Am Fluss', 99)
+    `);
+
+    await db.execute(sql`
+      INSERT INTO city_category_links (city_id, category_id)
+      SELECT c.id, cc.id
+      FROM cities c, city_categories cc
+      WHERE cc.code = 'riverside' AND c.is_active AND c.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const cities = await catalog.cities();
+    const codes = cities.flatMap((city) => city.categories.map((one) => one.code));
+
+    expect(codes).toContain('riverside');
   });
 
   /**

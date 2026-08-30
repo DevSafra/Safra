@@ -29,13 +29,30 @@ async function read<T>(path: string, schema: z.ZodType<T>, fallback: T): Promise
   }
 }
 
+/**
+ * A city category — a ROW on الفئات, carrying its own name in all three languages.
+ *
+ * It was `z.array(z.string())` of codes resolved against a catalogue in this app. That froze the
+ * set: a category staff add on the console has no catalogue entry, so it rendered as `riverside`
+ * on a page of Arabic. Reference rows travel with their names here — `partnerTypeSchema` below
+ * has done it since «انضم كشريك» shipped — and a name from the database is DATA, not copy.
+ */
+const cityCategorySchema = z.object({
+  code: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string(),
+  nameDe: z.string(),
+});
+
+export type CityCategory = z.infer<typeof cityCategorySchema>;
+
 const citySchema = z.object({
   slug: z.string(),
   nameAr: z.string(),
   nameEn: z.string(),
   nameDe: z.string(),
   countryCode: z.string(),
-  categories: z.array(z.string()),
+  categories: z.array(cityCategorySchema),
   propertyCount: z.number(),
 });
 
@@ -73,7 +90,7 @@ const cityDetailSchema = z.object({
   descriptionAr: z.string().nullable(),
   descriptionEn: z.string().nullable(),
   descriptionDe: z.string().nullable(),
-  categories: z.array(z.string()),
+  categories: z.array(cityCategorySchema),
   tagsAr: z.array(z.string()),
   tagsEn: z.array(z.string()),
   tagsDe: z.array(z.string()),

@@ -96,12 +96,6 @@
     "sea_view": "Meerblick",
     "wifi": "WLAN"
   },
-  "cityCategories": {
-    "coastal": "Küste",
-    "mountain": "Berge",
-    "desert": "Wüste",
-    "historic": "Historisch"
-  },
   "propertyTypes": {
     "hotel": "Hotel",
     "apartment": "Möblierte Wohnung",

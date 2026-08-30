@@ -96,12 +96,6 @@
     "sea_view": "إطلالة على البحر",
     "wifi": "واي فاي"
   },
-  "cityCategories": {
-    "coastal": "ساحلية",
-    "mountain": "جبلية",
-    "desert": "صحراوية",
-    "historic": "تاريخية"
-  },
   "propertyTypes": {
     "hotel": "فندق",
     "apartment": "شقة مفروشة",

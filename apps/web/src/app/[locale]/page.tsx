@@ -22,7 +22,6 @@ export default async function HomePage({
   setRequestLocale(locale);
 
   const t = await getTranslations('home');
-  const tc = await getTranslations('cityCategories');
   const tt = await getTranslations('propertyTypes');
 
   // Fetched in parallel: three independent reference reads should not serialise.
@@ -85,8 +84,9 @@ export default async function HomePage({
                     {localisedName(city, locale)}
                   </h3>
                   <p className="mt-1 text-sm text-faint">
+                    {/* The row's OWN name — see `cityCategorySchema`. */}
                     {city.categories
-                      .map((category) => dynamicMessage(tc, category, category))
+                      .map((category) => localisedName(category, locale))
                       .join(' · ')}
                   </p>
                 </div>

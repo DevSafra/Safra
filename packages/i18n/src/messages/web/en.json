@@ -96,12 +96,6 @@
     "sea_view": "Sea view",
     "wifi": "Wi-Fi"
   },
-  "cityCategories": {
-    "coastal": "Coastal",
-    "mountain": "Mountain",
-    "desert": "Desert",
-    "historic": "Historic"
-  },
   "propertyTypes": {
     "hotel": "Hotel",
     "apartment": "Furnished apartment",

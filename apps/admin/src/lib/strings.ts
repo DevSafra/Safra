@@ -80,14 +80,6 @@ export function label(
   return map[value] ?? value;
 }
 
-/** A city's `categories` array arrives pre-joined; translate each part. */
-export function cityCategories(joined: string): string {
-  return joined
-    .split(' · ')
-    .map((part) => t.enums.cityCategory[part] ?? part)
-    .join(' · ');
-}
-
 /**
  * A cancellation reason, which is EITHER a `system.*` code or a person's own sentence.
  *

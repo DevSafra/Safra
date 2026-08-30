@@ -817,6 +817,14 @@ export const ar = {
     attributesLabel:
       'صفات الرحلة — نفس صفات صفحة الإقامات؛ اختر حتى 4 لتظهر للزوار وتُستخدم في الفلترة',
     attributesTooMany: 'اخترت أكثر من 4 صفات. أزل واحدة قبل الإرسال.',
+    /*
+      The CITY's categories, which SAFRA sets and a partner reads. Named on the card so the two
+      chip rows cannot be mistaken for one another: the gold chips are the partner's own choice
+      from a fixed list, these grey ones are the destination's classification.
+    */
+    cityCategoriesLabel: 'فئة الوجهة',
+    cityCategoriesNote:
+      'تحدّدها سفرة للمدينة وتظهر للزوار — لا يمكن تعديلها من هنا، وصفات الرحلة تُختار من القائمة الموحّدة أعلاه.',
     submit: 'إرسال للمراجعة',
     submitting: 'جارٍ الإرسال…',
     cancelForm: 'إلغاء',
