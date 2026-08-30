@@ -144,9 +144,14 @@ export default async function CityPage({
   return (
     <>
       {/*
-        §5.4 asks for the top third of the page to be city photography. No image
-        pipeline exists yet (roadmap item 73), so this is a token-driven gradient
-        placeholder rather than a stock photo standing in for real content.
+        §5.4 asks for the top third of the page to be city photography, and this is a token-driven
+        gradient instead — deliberately, rather than a stock photo standing in for real content.
+
+        The reason is no longer «no image pipeline exists». It does: `city_images`, the
+        `admin/cities/:slug/images` controller behind `GEO_MANAGE`, the re-encoding worker and the
+        variant widths are all built. What is missing is a way to USE them — no console screen
+        uploads one, so `city_images` holds nothing for any of the nine cities, and this read does
+        not fetch them either. Corrected 2026-08-30; recorded in `docs/FUTURE-WORK.md`.
       */}
       <section className="relative border-b border-line">
         <div

@@ -3945,9 +3945,18 @@ record one on the geography screen today. Two further points worth deciding at t
 - **The inverse is derived, not stored.** `SYP → USD` is computed as `1 / 13000`, which holds while a
   rate is a pure ratio and stops holding the moment a spread is baked into it.
 
-### O-web-2 — Two public links point at pages that do not exist
+### O-web-2 — Two public links point at pages that do not exist — RESOLVED 2026-08-30
 
-**Status:** open, product decision · **Owner:** **Bashar** · **Recorded:** 2026-08-12
+**Status:** **resolved 2026-08-30** — neither link is reachable from the site any more ·
+**Recorded:** 2026-08-12
+
+> **Closed.** `/{locale}/support?property=…` was the property page's «اسأل سفرة»; it now points at
+> `/{locale}/account/support`, which is where الدعم actually lives — found by sweeping every literal
+> and interpolated internal link in all three apps against the routes each really serves. Nothing
+> links to `/{locale}/partner` any longer either; «سجّل كشريك» goes to `/partners/join`, which
+> exists. The sweep reports zero unresolved links across the three apps, which is what makes this
+> answerable rather than believed. The product question below — whether those pages should EXIST —
+> was never the defect and is not what this item was tracking.
 
 Found by the crawl above:
 
