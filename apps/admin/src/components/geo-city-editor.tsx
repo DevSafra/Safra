@@ -9,8 +9,17 @@ import { AdminTable, StatusPill, type AdminColumn } from '@/components/admin-tab
 import { count } from '@/lib/format';
 import { t, apiErrorOf, cityCategories, fill } from '@/lib/strings';
 
-/** The four the schema allows. A city may hold several — Petra is desert AND historic. */
-const CATEGORIES = ['coastal', 'mountain', 'desert', 'historic'] as const;
+/**
+ * The categories a city may be filed under — from the DATABASE, not a constant.
+ *
+ * It was a four-member array here and a four-member `pgEnum` there, so adding «ريفية» on الفئات
+ * created a row nothing could select: the page existed and changed nothing, which is worse than
+ * not having it. The active rows are passed down from the server, where they were read.
+ */
+export interface CategoryOption {
+  readonly code: string;
+  readonly nameAr: string;
+}
 
 export interface EditableCity {
   /* The two the table's own columns draw, carried so one row type serves both. */
@@ -51,9 +60,11 @@ export interface EditableCity {
  */
 function CityForm({
   city,
+  categories: options,
   onClose,
 }: {
   readonly city: EditableCity;
+  readonly categories: readonly CategoryOption[];
   readonly onClose: () => void;
 }) {
   const router = useRouter();
@@ -178,24 +189,26 @@ function CityForm({
           {c.categoriesLabel}
         </legend>
         <div className="flex flex-wrap gap-2">
-          {CATEGORIES.map((category) => (
+          {options.map((option) => (
             <label
-              key={category}
+              key={option.code}
               className="flex cursor-pointer items-center gap-1.5 text-[11.5px] text-text2"
             >
               <input
                 type="checkbox"
-                checked={categories.includes(category)}
+                data-category-option={option.code}
+                checked={categories.includes(option.code)}
                 onChange={(event) =>
                   setCategories((current) =>
                     event.target.checked
-                      ? [...current, category]
-                      : current.filter((one) => one !== category),
+                      ? [...current, option.code]
+                      : current.filter((one) => one !== option.code),
                   )
                 }
                 className="size-[15px] cursor-pointer accent-gold"
               />
-              {cityCategories(category)}
+              {/* The row's own name, so a category renamed on الفئات reads correctly here. */}
+              {option.nameAr}
             </label>
           ))}
         </div>
@@ -347,9 +360,12 @@ const CITY_COLUMNS: readonly AdminColumn<EditableCity>[] = [
  */
 export function GeoCities({
   cities,
+  categories,
   template,
 }: {
   readonly cities: readonly EditableCity[];
+  /** The ACTIVE categories, read from `city_categories` — see `CategoryOption`. */
+  readonly categories: readonly CategoryOption[];
   readonly template: string;
 }) {
   const c = t.sections.geo;
@@ -400,7 +416,12 @@ export function GeoCities({
         its state — the fields are initialised from props, and React would keep the old values.
       */}
       {open ? (
-        <CityForm key={open.slug} city={open} onClose={() => setEditing(null)} />
+        <CityForm
+          key={open.slug}
+          city={open}
+          categories={categories}
+          onClose={() => setEditing(null)}
+        />
       ) : null}
     </>
   );

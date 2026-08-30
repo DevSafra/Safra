@@ -35,6 +35,7 @@ export const CONSOLE_SECTION_PATHS: Readonly<Record<ConsoleSection, string>> = {
   messages: '/messages',
   whatsapp: '/comms',
   geo: '/geo',
+  cityCategories: '/city-categories',
   reports: '/reports',
   settings: '/settings',
   audit: '/audit',

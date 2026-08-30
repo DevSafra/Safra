@@ -117,8 +117,11 @@ test.describe('every admin section the design specifies', () => {
       .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''));
 
     /*
-      Twenty-ONE rows: the design's eighteen, plus «طلبات الشراكة» (Bashar, 2026-08-19),
-      «أدوار الموظفين» (Bashar, 2026-08-23) and «وضع الطوارئ» (2026-08-24).
+      Twenty-TWO rows: the design's eighteen, plus «طلبات الشراكة» (Bashar, 2026-08-19),
+      «أدوار الموظفين» (Bashar, 2026-08-23), «وضع الطوارئ» (2026-08-24) and «الفئات»
+      (Bashar, 2026-08-30) — city categories, which stopped being a `pgEnum` and became a table
+      staff manage, so they needed a screen. It sits directly under «المدن والدول والعملات»
+      because a category is a property OF a city.
 
       Emergency Mode used to be header-only and this comment used to say so. Gating the console
       broke that: مركز القيادة opens on `booking.read_all`, so a role carrying
@@ -132,7 +135,7 @@ test.describe('every admin section the design specifies', () => {
       working rather than getting in the way — so the number goes up by one and the reason for the
       new entry is recorded beside it.
     */
-    expect(hrefs.length).toBe(21);
+    expect(hrefs.length).toBe(22);
 
     for (const href of hrefs) {
       const response = await page.goto(href);

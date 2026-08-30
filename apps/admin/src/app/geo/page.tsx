@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-import { getGeography, type Geography } from '@/lib/api';
+import { getCityCategories, getGeography, type Geography } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { money, shortDate } from '@/lib/format';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
@@ -62,7 +62,26 @@ export default async function GeoPage({
 
   const { q, size } = await listParams(searchParams);
 
-  const [result, counts] = await Promise.all([getGeography(q), sidebarCounts()]);
+  const [result, categoryResult, counts] = await Promise.all([
+    getGeography(q),
+    getCityCategories(),
+    sidebarCounts(),
+  ]);
+
+  /*
+    The ACTIVE categories, for the pickers.
+
+    A retired one still labels the cities already filed under it — that is what retiring means —
+    but it must not be offered as a new choice. A failed read leaves the pickers empty rather than
+    the screen broken: a console that refused to render a table because it could not list
+    categories would be worse than one that cannot classify a city this minute.
+  */
+  const categories =
+    categoryResult === 'failed' || categoryResult === 'unauthenticated'
+      ? []
+      : categoryResult.categories
+          .filter((one) => one.isActive)
+          .map((one) => ({ code: one.code, nameAr: one.nameAr }));
 
   /*
     The media host if one is configured, and the API's development route otherwise — `mediaBase`
@@ -103,6 +122,7 @@ export default async function GeoPage({
             <AddCity
               title={t.sections.geo.cities}
               countries={result.countries.map((one) => one.code)}
+              categories={categories}
             />
 
             <TableToolbar
@@ -136,6 +156,7 @@ export default async function GeoPage({
                 country: row.country,
                 category: row.category,
               }))}
+              categories={categories}
               template={TEMPLATE}
             />
 
@@ -184,7 +205,10 @@ function Countries({
 function Currencies({ rows }: { rows: Geography['currencies'] }) {
   return (
     <ConsolePanel>
-      <AddCurrency title={t.sections.geo.currencies} />
+      <AddCurrency
+        title={t.sections.geo.currencies}
+        existing={rows.map((one) => one.code)}
+      />
 
       <ul className="grid gap-2 text-[12.5px]">
         {rows.map((row) => (

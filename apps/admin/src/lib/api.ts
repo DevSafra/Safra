@@ -1358,6 +1358,26 @@ const geoSchema = z.object({
 
 export type Geography = z.infer<typeof geoSchema>;
 
+const cityCategorySchema = z.object({
+  code: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string(),
+  nameDe: z.string(),
+  isActive: z.boolean(),
+  sortOrder: z.number(),
+  /* How many live cities carry it — what makes retiring one a visible decision. */
+  cities: z.number(),
+});
+
+export type CityCategory = z.infer<typeof cityCategorySchema>;
+
+export async function getCityCategories() {
+  return staffFetch(
+    '/admin/geo/categories',
+    z.object({ categories: z.array(cityCategorySchema) }),
+  );
+}
+
 export async function getGeography(q?: string) {
   const search = q ? `?q=${encodeURIComponent(q)}` : '';
 
