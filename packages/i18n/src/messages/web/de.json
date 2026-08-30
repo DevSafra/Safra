@@ -137,7 +137,15 @@
     "reviewsVerified": "Aus einem abgeschlossenen Aufenthalt",
     "save": "Zu Favoriten hinzufügen",
     "saved": "In Favoriten gespeichert",
-    "saveFailed": "Speichern fehlgeschlagen. Bitte erneut versuchen."
+    "saveFailed": "Speichern fehlgeschlagen. Bitte erneut versuchen.",
+    "slider": {
+      "title": "Fotos der Unterkunft",
+      "open": "Foto ansehen",
+      "previous": "Vorheriges Foto",
+      "next": "Nächstes Foto",
+      "close": "Vorschau schließen",
+      "viewAll": "Alle Fotos ansehen ({n})"
+    }
   },
   "city": {
     "availableStays": "Verfügbare Unterkünfte in {city}",

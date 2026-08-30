@@ -137,7 +137,15 @@
     "reviewsVerified": "From a completed stay",
     "save": "Save to favourites",
     "saved": "Saved to favourites",
-    "saveFailed": "Could not save. Try again."
+    "saveFailed": "Could not save. Try again.",
+    "slider": {
+      "title": "Property photos",
+      "open": "View photo",
+      "previous": "Previous photo",
+      "next": "Next photo",
+      "close": "Close preview",
+      "viewAll": "View all photos ({n})"
+    }
   },
   "city": {
     "availableStays": "Available stays in {city}",

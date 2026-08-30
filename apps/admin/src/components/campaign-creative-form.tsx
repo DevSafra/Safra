@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+import { ImageSliderFrame } from '@safra/ui';
+
 import { t, apiErrorOf } from '@/lib/strings';
 
 /**
@@ -91,6 +93,8 @@ export function CampaignCreativeForm({
   const [staged, setStaged] = useState<Staged>({ kind: 'none' });
   /** Set when the poll below has given up, so the tile stops claiming to be working. */
   const [slow, setSlow] = useState(false);
+  /* 0 when the creative is open at full size, null when it is not — the one previewer. */
+  const [preview, setPreview] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const trigger = useRef<HTMLButtonElement>(null);
@@ -464,11 +468,23 @@ export function CampaignCreativeForm({
                       uploaded is ever displayed, for the same reason nothing it uploaded is ever
                       served.
                     */
-                    <img
-                      src={imageUrl}
-                      alt=""
-                      className="h-20 w-32 rounded-lg border border-line object-cover"
-                    />
+                    /*
+                      The thumbnail OPENS at full size, through the one previewer (project rule,
+                      2026-08-30). A creative is approved or rejected on how it looks, and this
+                      showed it at 128×80 with no way to see more.
+                    */
+                    <button
+                      type="button"
+                      onClick={() => setPreview(0)}
+                      aria-label={t.sections.slider.open}
+                      className="block cursor-pointer"
+                    >
+                      <img
+                        src={imageUrl}
+                        alt=""
+                        className="h-20 w-32 rounded-lg border border-line object-cover"
+                      />
+                    </button>
                   ) : (
                     <span className="grid h-20 w-32 place-items-center rounded-lg border border-dashed border-line px-2 text-center text-[10.5px] text-faint">
                       {imageStatus === 'processing'
@@ -592,6 +608,14 @@ export function CampaignCreativeForm({
           </div>
         </div>
       ) : null}
+
+      {/* The one previewer — see the project rule. `imageUrl` is null until the worker has run. */}
+      <ImageSliderFrame
+        images={imageUrl ? [{ id: 'creative', thumb: imageUrl, full: imageUrl }] : []}
+        at={preview}
+        onChange={setPreview}
+        labels={t.sections.slider}
+      />
     </>
   );
 }

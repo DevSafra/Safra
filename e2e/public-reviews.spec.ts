@@ -18,6 +18,9 @@ import ar from '../packages/i18n/src/messages/web/ar.json' assert { type: 'json'
  */
 const SLUG = 'qasr-al-sharq-malki';
 
+/** A listing that actually has photographs — the reviews fixture has none. */
+const GALLERY_SLUG = 'qasr-al-sharq-apartments';
+
 test.use({ baseURL: 'http://localhost:3000' });
 
 test.describe('reviews on a property page', () => {
@@ -88,6 +91,42 @@ test.describe('reviews on a property page', () => {
    * `rating: '4.9', reviewsCount: 118` as literals, and a listing showed «★ ٤٫٩ من ١١٨ تقييماً»
    * with not one review behind it. A trigger owns both columns now.
    */
+  /**
+   * Every photograph is reachable, through the one previewer.
+   *
+   * The grid shows a cover and two thumbnails — right for the first paint, and wrong as the only
+   * thing a person can see: a listing with fourteen photographs published eleven that nobody could
+   * reach. Bashar made one slider a rule on 2026-08-30, and this is that slider, not a fourth
+   * gallery — its position counter and its arrows are the proof.
+   */
+  test('opens every photograph in the shared previewer', async ({ page }) => {
+    await page.goto(`/ar/property/${GALLERY_SLUG}`);
+
+    const viewAll = page.getByRole('button', { name: /عرض كل الصور/ });
+
+    /* Narrower than «no button»: a listing with no photographs is the only honest reason to skip. */
+    test.skip((await viewAll.count()) === 0, 'This listing has no photographs.');
+
+    await viewAll.click();
+
+    const frame = page.getByRole('dialog');
+
+    await expect(frame).toBeVisible();
+
+    const first = await frame.innerText();
+
+    /*
+      → means the NEXT picture, on an Arabic page as on an English one. An arrow key is a physical
+      direction of travel, not a reading direction, and mirroring it here would make the keyboard
+      disagree with itself when the same person opens the console.
+    */
+    await page.keyboard.press('ArrowRight');
+    await expect(frame).not.toHaveText(first);
+
+    await page.keyboard.press('Escape');
+    await expect(frame).toHaveCount(0);
+  });
+
   test('a listing with no reviews shows the empty state, not a fabricated score', async ({
     request,
   }) => {

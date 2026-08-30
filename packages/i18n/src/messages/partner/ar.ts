@@ -851,6 +851,15 @@ export const ar = {
    * that a photograph is evidence of what a listing claimed on the day somebody booked it. A
    * dispute about "the room looked nothing like the photo" is unanswerable if the photo is gone.
    */
+  /* The one image previewer's words — see the console's `slider` block and the project rule. */
+  slider: {
+    title: 'معاينة الصور',
+    open: 'معاينة الصورة',
+    previous: 'الصورة السابقة',
+    next: 'الصورة التالية',
+    close: 'إغلاق المعاينة',
+  },
+
   images: {
     title: 'صور العقار',
     /*

@@ -386,6 +386,21 @@ export const ar = {
    * quoted exactly and must not be paraphrased.
    */
   sections: {
+    /*
+      The one image previewer's words — «معاينة» (Bashar, 2026-08-30).
+
+      Section-neutral because the slider is section-neutral: the property review, a dispute's
+      evidence and an ad creative all open the SAME component, and a copy of these keys per screen
+      is how four galleries came to behave four different ways.
+    */
+    slider: {
+      title: 'معاينة الصور',
+      open: 'معاينة الصورة',
+      previous: 'الصورة السابقة',
+      next: 'الصورة التالية',
+      close: 'إغلاق المعاينة',
+    },
+
     /**
      * طلبات الشراكة — who has asked to join, and what was done about it.
      *
@@ -1580,6 +1595,15 @@ export const ar = {
       */
       evidenceTitle: 'الأدلة',
       evidenceAdd: '+ إضافة دليل',
+      evidenceOpen: 'معاينة',
+      evidenceReplace: 'استبدال',
+      evidenceRemove: 'حذف',
+      evidenceRemoving: 'جارٍ الحذف…',
+      evidenceConfirmRemove: 'يُحذف من ملف النزاع ويُسجَّل من حذفه ومتى. تابع؟',
+      evidenceRemoveNote:
+        'الحذف يُسجَّل في سجل التدقيق. الاستبدال حذفٌ ثم رفع صورة جديدة.',
+      evidenceFiledByStaff: 'من موظف',
+      evidenceFiledByCustomer: 'من العميل',
       evidenceUploading: 'جارٍ الرفع…',
       evidenceProcessing: 'جارٍ المعالجة…',
       evidenceSlow: 'لم تكتمل بعد',
@@ -1636,6 +1660,14 @@ export const ar = {
       composeToBooking: 'حجز — العميل والشريك معاً',
       composeReference: 'المرجع',
       composeReferenceHint: 'مرجع العميل أو الشريك أو الحجز، كما يظهر في سجلّه',
+      /*
+        The SHAPE to type, per recipient — zeros so it reads as an example rather than a record.
+        A reference prefix is a documented i18n exception; the rest is the reader's own digits.
+      */
+      composeReferenceCustomer: 'CUS-000000',
+      composeReferencePartner: 'PAR-000000',
+      composeReferenceBooking: 'BKG-2026-000000',
+      composeBodyPlaceholder: 'اكتب رسالتك…',
       composeBody: 'الرسالة',
       composeSend: 'إرسال',
       composeSending: 'جارٍ الإرسال…',
@@ -2697,6 +2729,7 @@ export const ar = {
     'dispute.acknowledged': 'استلام نزاع للمراجعة',
     'dispute.notified': 'إشعار أطراف النزاع بالإغلاق',
     'dispute.evidence_added': 'إضافة دليل إلى نزاع',
+    'dispute.evidence_removed': 'حذف دليل من نزاع',
     'conversation.started': 'بدء محادثة',
     'conversation.closed': 'إنهاء محادثة',
     'dispute.resolved': 'إغلاق نزاع لصالح العميل',

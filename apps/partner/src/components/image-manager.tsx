@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { MAX_PROPERTY_IMAGES, isErrorCode } from '@safra/contracts';
+import { ImageSliderFrame, type SliderImage } from '@safra/ui';
 import { errorMessage } from '@safra/i18n';
 
 import type { PropertyImage } from '@/lib/api';
@@ -56,6 +57,19 @@ export function ImageManager({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* Which photograph is open in the shared previewer — see the project rule on one slider. */
+  const [preview, setPreview] = useState<number | null>(null);
+
+  /* The previewable set and a tile's place in it, so an id maps to the frame's index. */
+  const ready = images.filter((image) => image.status === 'ready');
+  const slides: SliderImage[] = ready.map((image) => ({
+    id: image.id,
+    thumb: image.urls.thumbnail,
+    full: image.urls.large,
+    ...(image.alt.ar ? { caption: image.alt.ar } : {}),
+    ...(image.isCover ? { badge: t.images.cover } : {}),
+  }));
+  const readyIndexOf = (id: string): number => ready.findIndex((one) => one.id === id);
 
   const rendering = images.some((image) => image.status === 'processing');
 
@@ -252,6 +266,17 @@ export function ImageManager({
         </span>
       </div>
 
+      {/*
+        Only a READY picture can be previewed: a `processing` row carries the URLs its variants
+        will have and none of them resolves yet, which is why the tile draws a placeholder for it.
+      */}
+      <ImageSliderFrame
+        images={slides}
+        at={preview}
+        onChange={setPreview}
+        labels={t.slider}
+      />
+
       {images.length === 0 ? (
         <p className="text-[12.5px] text-faint">{t.images.empty}</p>
       ) : (
@@ -279,11 +304,24 @@ export function ImageManager({
                   this screen could show somebody who has just uploaded a photograph.
                 */}
                 {image.status === 'ready' ? (
-                  <img
-                    src={image.urls.thumbnail}
-                    alt={image.alt.ar ?? ''}
-                    className="h-full w-full object-cover"
-                  />
+                  /*
+                    The tile OPENS the picture (Bashar, 2026-08-30). A partner checking what they
+                    have published could see only a 150px tile of it, which is not enough to tell a
+                    dark room from a badly exposed one — and the previewer already existed on the
+                    console. The tiles stay here because they carry the cover and alt controls.
+                  */
+                  <button
+                    type="button"
+                    onClick={() => setPreview(readyIndexOf(image.id))}
+                    aria-label={`${t.slider.open} ${index + 1}`}
+                    className="block h-full w-full cursor-pointer"
+                  >
+                    <img
+                      src={image.urls.thumbnail}
+                      alt={image.alt.ar ?? ''}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
                 ) : (
                   <div className="flex h-full w-full flex-col items-center justify-center gap-1 px-3 text-center">
                     <span

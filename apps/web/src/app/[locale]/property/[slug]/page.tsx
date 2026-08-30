@@ -5,6 +5,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { SaveButton } from '@/components/save-button';
+import { PropertyGallery } from '@/components/property-gallery';
 import { localisedName, localisedText } from '@/lib/localise';
 import { getProperty, imageUrl, type PropertyDetail } from '@/lib/property';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -155,7 +156,7 @@ export default async function PropertyPage({
       </nav>
 
       {/* ── Gallery ────────────────────────────────────────────────────────── */}
-      <Gallery property={property} locale={locale} name={name} />
+      <Gallery property={property} locale={locale} name={name} t={t} />
 
       <header className="mt-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -459,10 +460,13 @@ function Gallery({
   property,
   locale,
   name,
+  t,
 }: {
   property: PropertyDetail;
   locale: Locale;
   name: string;
+  /* The page's own `property` namespace, so this reads the same catalogue as everything above. */
+  t: Awaited<ReturnType<typeof getTranslations<'property'>>>;
 }) {
   if (property.images.length === 0) {
     return (
@@ -475,45 +479,73 @@ function Gallery({
 
   const [cover, ...rest] = property.images;
 
-  return (
-    <div className="mt-6 grid gap-2 sm:grid-cols-[2fr_1fr]">
-      {cover ? (
-        <picture>
-          {/* AVIF first, WebP as the fallback — both produced by the upload pipeline. */}
-          <source srcSet={imageUrl(cover, 1600, 'avif')} type="image/avif" />
-          <source srcSet={imageUrl(cover, 1600, 'webp')} type="image/webp" />
-          <img
-            src={imageUrl(cover, 1600, 'webp')}
-            alt={localisedText(cover.alt, locale) ?? name}
-            width={cover.width ?? 1600}
-            height={cover.height ?? 1000}
-            className="h-64 w-full rounded-card border border-line object-cover sm:h-80"
-            loading="eager"
-          />
-        </picture>
-      ) : null}
+  /*
+    EVERY photograph, not the three the grid has room for.
 
-      {rest.length > 0 ? (
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-1">
-          {rest.slice(0, 2).map((image) => (
-            <li key={image.fileKey}>
-              <picture>
-                <source srcSet={imageUrl(image, 800, 'avif')} type="image/avif" />
-                <source srcSet={imageUrl(image, 800, 'webp')} type="image/webp" />
-                <img
-                  src={imageUrl(image, 800, 'webp')}
-                  alt={localisedText(image.alt, locale) ?? name}
-                  width={image.width ?? 800}
-                  height={image.height ?? 600}
-                  className="h-32 w-full rounded-card border border-line object-cover sm:h-[9.5rem]"
-                  loading="lazy"
-                />
-              </picture>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
+    The grid shows a cover and two thumbnails — right for the first paint, and wrong as the only
+    thing a person can see: a listing with fourteen photographs published eleven that nobody could
+    reach. The previewer is `@safra/ui`'s, per the project rule on one slider.
+  */
+  const slides = property.images.map((image) => ({
+    id: image.fileKey,
+    thumb: imageUrl(image, 800, 'webp'),
+    full: imageUrl(image, 1600, 'webp'),
+    ...(localisedText(image.alt, locale)
+      ? { caption: localisedText(image.alt, locale) }
+      : {}),
+  }));
+
+  return (
+    <PropertyGallery
+      images={slides}
+      labels={{
+        title: t('slider.title'),
+        open: t('slider.open'),
+        previous: t('slider.previous'),
+        next: t('slider.next'),
+        close: t('slider.close'),
+      }}
+      viewAllLabel={t('slider.viewAll', { n: property.images.length })}
+    >
+      <div className="mt-6 grid gap-2 sm:grid-cols-[2fr_1fr]">
+        {cover ? (
+          <picture>
+            {/* AVIF first, WebP as the fallback — both produced by the upload pipeline. */}
+            <source srcSet={imageUrl(cover, 1600, 'avif')} type="image/avif" />
+            <source srcSet={imageUrl(cover, 1600, 'webp')} type="image/webp" />
+            <img
+              src={imageUrl(cover, 1600, 'webp')}
+              alt={localisedText(cover.alt, locale) ?? name}
+              width={cover.width ?? 1600}
+              height={cover.height ?? 1000}
+              className="h-64 w-full rounded-card border border-line object-cover sm:h-80"
+              loading="eager"
+            />
+          </picture>
+        ) : null}
+
+        {rest.length > 0 ? (
+          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-1">
+            {rest.slice(0, 2).map((image) => (
+              <li key={image.fileKey}>
+                <picture>
+                  <source srcSet={imageUrl(image, 800, 'avif')} type="image/avif" />
+                  <source srcSet={imageUrl(image, 800, 'webp')} type="image/webp" />
+                  <img
+                    src={imageUrl(image, 800, 'webp')}
+                    alt={localisedText(image.alt, locale) ?? name}
+                    width={image.width ?? 800}
+                    height={image.height ?? 600}
+                    className="h-32 w-full rounded-card border border-line object-cover sm:h-[9.5rem]"
+                    loading="lazy"
+                  />
+                </picture>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </PropertyGallery>
   );
 }
 
