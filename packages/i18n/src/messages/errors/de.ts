@@ -226,6 +226,13 @@ export const de = {
   'customer.not_found': 'Kundenprofil nicht gefunden.',
   'geo.city_unknown': 'Unbekannte Stadt.',
   'geo.city_not_found': 'Stadt nicht gefunden.',
+  'geo.country_not_found': 'Land nicht gefunden.',
+  'geo.code_taken': 'Dieser Code wird bereits verwendet.',
+  'geo.slug_taken': 'Dieser Bezeichner wird in diesem Land bereits verwendet.',
+  'geo.timezone_invalid': 'Keine gültige Zeitzone.',
+  'geo.slug_format':
+    'Ein Bezeichner darf nur Kleinbuchstaben, Ziffern und Bindestriche enthalten.',
+  'geo.country_code_format': 'Ein Ländercode besteht aus zwei Großbuchstaben.',
   'geo.currency_unknown': 'Unbekannte Währung.',
   'setting.value_flat_or_percent': '{key} muss „flat“ oder „percent“ sein.',
   'setting.value_sanctions_policy':

@@ -288,6 +288,15 @@ export const ERROR = {
   CUSTOMER_NOT_FOUND: 'customer.not_found',
   GEO_CITY_UNKNOWN: 'geo.city_unknown',
   GEO_CITY_NOT_FOUND: 'geo.city_not_found',
+  GEO_COUNTRY_NOT_FOUND: 'geo.country_not_found',
+  /* A code or slug already in use — cities are unique per country, codes globally. */
+  GEO_CODE_TAKEN: 'geo.code_taken',
+  GEO_SLUG_TAKEN: 'geo.slug_taken',
+  /* Not an IANA zone. The same-day cutoff is 17:00 in the CITY's time, so this is load-bearing. */
+  GEO_TIMEZONE_INVALID: 'geo.timezone_invalid',
+  /* A slug is a public URL segment: lowercase Latin, digits and hyphens, never the Arabic name. */
+  GEO_SLUG_FORMAT: 'geo.slug_format',
+  GEO_COUNTRY_CODE_FORMAT: 'geo.country_code_format',
   GEO_CURRENCY_UNKNOWN: 'geo.currency_unknown',
   SETTING_VALUE_FLAT_OR_PERCENT: 'setting.value_flat_or_percent',
   SETTING_VALUE_SANCTIONS_POLICY: 'setting.value_sanctions_policy',

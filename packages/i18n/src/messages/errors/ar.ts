@@ -186,6 +186,12 @@ export const ar = {
   'customer.not_found': 'لم يُعثر على ملف هذا العميل.',
   'geo.city_unknown': 'المدينة غير معروفة.',
   'geo.city_not_found': 'لم يُعثر على هذه المدينة.',
+  'geo.country_not_found': 'لم يُعثر على الدولة.',
+  'geo.code_taken': 'هذا الرمز مستخدم بالفعل.',
+  'geo.slug_taken': 'هذا المعرّف مستخدم في هذه الدولة.',
+  'geo.timezone_invalid': 'المنطقة الزمنية غير صالحة.',
+  'geo.slug_format': 'المعرّف يقبل أحرفاً لاتينية صغيرة وأرقاماً وشرطات فقط.',
+  'geo.country_code_format': 'رمز الدولة حرفان لاتينيان كبيران.',
   'geo.currency_unknown': 'العملة غير معروفة.',
   'setting.value_flat_or_percent': 'قيمة {key} يجب أن تكون «ثابت» أو «نسبة».',
   'setting.value_sanctions_policy':

@@ -23,11 +23,23 @@ import {
   couponActiveSchema,
   couponCreateSchema,
   couponUpdateSchema,
+  createCitySchema,
+  createCountrySchema,
+  createCurrencySchema,
+  updateCitySchema,
+  updateCountrySchema,
+  updateCurrencySchema,
   giftCardCancelSchema,
   giftCardIssueSchema,
   pageQuerySchema,
   setStaffScopeSchema,
   type CouponActiveInput,
+  type CreateCityInput,
+  type CreateCountryInput,
+  type CreateCurrencyInput,
+  type UpdateCityInput,
+  type UpdateCountryInput,
+  type UpdateCurrencyInput,
   type CouponCreateInput,
   type CouponUpdateInput,
   type GiftCardCancelInput,
@@ -47,6 +59,7 @@ import { RegistryService } from './registry.service.js';
 import { FinanceService } from './finance.service.js';
 import { PromotionsService } from './promotions.service.js';
 import { GeoService } from './geo.service.js';
+import { GeoWriteService } from './geo-write.service.js';
 import { ReportsService } from './reports.service.js';
 import { StaffOverviewService } from './staff-overview.service.js';
 import { ExportRequestService } from './export-request.service.js';
@@ -140,6 +153,7 @@ export class RegistriesController {
     private readonly finance: FinanceService,
     private readonly promotions: PromotionsService,
     private readonly geo: GeoService,
+    private readonly geoWrite: GeoWriteService,
     private readonly reports: ReportsService,
     private readonly staffOverview: StaffOverviewService,
     private readonly emergency: EmergencyService,
@@ -520,6 +534,81 @@ export class RegistriesController {
     ]);
 
     return { countries, currencies, cities };
+  }
+
+  /*
+    ── The three «+ إضافة» buttons, and the row a city finally has ───────────
+
+    `GEO_MANAGE` on every one: `SETTINGS_READ` above opens the screen, and reading which markets
+    exist is not the same authority as opening or closing one. Each is `AuditExempt` because
+    `GeoWriteService` records inside the transaction — a row written and an audit line missing is
+    the pair this codebase keeps refusing to allow.
+
+    Nothing here deletes. A country, city or currency is referenced by bookings and ledger rows
+    that outlive the decision to stop selling there; `isActive` is how a market closes.
+  */
+
+  @Post('geo/currencies')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoWriteService records currency.created inside the transaction.')
+  async createCurrency(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(createCurrencySchema)) body: CreateCurrencyInput,
+  ) {
+    return this.geoWrite.createCurrency(user, body);
+  }
+
+  @Patch('geo/currencies/:code')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoWriteService records currency.updated inside the transaction.')
+  async updateCurrency(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('code') code: string,
+    @Body(new ZodValidationPipe(updateCurrencySchema)) body: UpdateCurrencyInput,
+  ) {
+    return this.geoWrite.updateCurrency(user, code.toUpperCase(), body);
+  }
+
+  @Post('geo/countries')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoWriteService records country.created inside the transaction.')
+  async createCountry(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(createCountrySchema)) body: CreateCountryInput,
+  ) {
+    return this.geoWrite.createCountry(user, body);
+  }
+
+  @Patch('geo/countries/:code')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoWriteService records country.updated inside the transaction.')
+  async updateCountry(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('code') code: string,
+    @Body(new ZodValidationPipe(updateCountrySchema)) body: UpdateCountryInput,
+  ) {
+    return this.geoWrite.updateCountry(user, code.toUpperCase(), body);
+  }
+
+  @Post('geo/cities')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoWriteService records city.created inside the transaction.')
+  async createCity(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Body(new ZodValidationPipe(createCitySchema)) body: CreateCityInput,
+  ) {
+    return this.geoWrite.createCity(user, body);
+  }
+
+  @Patch('geo/cities/:slug')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoWriteService records city.updated inside the transaction.')
+  async updateCity(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('slug') slug: string,
+    @Body(new ZodValidationPipe(updateCitySchema)) body: UpdateCityInput,
+  ) {
+    return this.geoWrite.updateCity(user, slug, body);
   }
 
   // ── التقارير ───────────────────────────────────────────────────────────────

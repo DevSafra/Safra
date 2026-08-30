@@ -197,6 +197,12 @@ export const en = {
   'customer.not_found': 'No such customer profile.',
   'geo.city_unknown': 'Unknown city.',
   'geo.city_not_found': 'City not found.',
+  'geo.country_not_found': 'Country not found.',
+  'geo.code_taken': 'That code is already in use.',
+  'geo.slug_taken': 'That slug is already used in this country.',
+  'geo.timezone_invalid': 'That is not a valid time zone.',
+  'geo.slug_format': 'A slug takes lowercase Latin letters, digits and hyphens only.',
+  'geo.country_code_format': 'A country code is two upper-case Latin letters.',
   'geo.currency_unknown': 'Unknown currency.',
   'setting.value_flat_or_percent': '{key} must be "flat" or "percent".',
   'setting.value_sanctions_policy':

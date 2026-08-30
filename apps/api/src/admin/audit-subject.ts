@@ -187,6 +187,23 @@ const SOURCES: Record<string, Source> = {
     and `audit-anonymity` holds that line for every other subject here. `CNV-000042` is what the
     inbox shows and what the console route takes, so the entry names the thing a reader can open.
   */
+  /*
+    Geography is keyed by CODE and SLUG, not by a uuid — `city.created` and its siblings record the
+    code in `after`, and this resolves the row itself so سجل التدقيق names «دمشق» rather than an
+    identifier. `href` is the screen, not a detail route: the three lists live on one page.
+  */
+  country: {
+    table: 'countries',
+    reference: sql`code`,
+    label: sql`name_ar`,
+    href: () => '/geo',
+  },
+  currency: {
+    table: 'currencies',
+    reference: sql`code`,
+    label: sql`name_ar`,
+    href: () => '/geo',
+  },
   conversation: {
     table: 'conversations',
     reference: sql`reference`,
@@ -249,11 +266,12 @@ const SOURCES: Record<string, Source> = {
     label: sql`name_ar`,
     href: null,
   },
+  /* `/geo` since 2026-08-30: a city is editable there, so the entry can lead somewhere. */
   city: {
     table: 'cities',
     reference: sql`slug`,
     label: sql`name_ar`,
-    href: null,
+    href: () => '/geo',
   },
   staff_role: {
     table: 'staff_roles',
