@@ -269,10 +269,34 @@ test.describe('النزاعات', () => {
 
     // ── and it can be removed ────────────────────────────────────────────────
     const before = await thumbnails.count();
-    const remove = page.locator('[data-evidence-remove]').first();
 
-    page.once('dialog', (confirm) => void confirm.accept());
-    await remove.click();
+    /*
+      A NATIVE dialog would fire this, and none may: the browser's popup shows the origin and
+      answers in English, which is the whole reason `useConfirm` exists (Bashar, 2026-08-30).
+      Registered before the click, so a regression to `window.confirm` trips it rather than hanging.
+    */
+    let native = false;
+
+    page.on('dialog', (dialog) => {
+      native = true;
+      void dialog.dismiss();
+    });
+
+    await page.locator('[data-evidence-remove]').first().click();
+
+    const popup = page.getByRole('alertdialog');
+
+    await expect(popup).toBeVisible();
+    expect(native, 'the browser popup must not be used').toBe(false);
+
+    /*
+      Focus starts on «إلغاء» for a destructive question, so somebody pressing Enter out of habit
+      cancels rather than deletes. The red button is the visible half of that; this is the half
+      that protects a person.
+    */
+    await expect(page.locator(':focus')).toHaveText(t.sections.dialog.cancel);
+
+    await popup.getByRole('button', { name: t.sections.dialog.confirm }).click();
 
     await expect(thumbnails).toHaveCount(before - 1, { timeout: 20_000 });
   });

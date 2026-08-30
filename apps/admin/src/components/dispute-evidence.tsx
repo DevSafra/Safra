@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
-import { ImageSliderFrame, type SliderImage } from '@safra/ui';
+import { ImageSliderFrame, useConfirm, type SliderImage } from '@safra/ui';
 
 import { t, apiErrorOf } from '@/lib/strings';
 
@@ -44,6 +44,8 @@ export function DisputeEvidence({
 }) {
   const router = useRouter();
   const c = t.sections.disputes;
+  /* The system's popup, not the browser's — see `ConfirmDialog`. */
+  const { ask, dialog } = useConfirm();
 
   const [busy, setBusy] = useState(false);
   const [slow, setSlow] = useState(false);
@@ -120,7 +122,16 @@ export function DisputeEvidence({
   }
 
   async function remove(id: string): Promise<void> {
-    if (!window.confirm(c.evidenceConfirmRemove)) return;
+    const go = await ask({
+      title: c.evidenceRemoveTitle,
+      message: c.evidenceConfirmRemove,
+      confirmLabel: t.sections.dialog.confirm,
+      cancelLabel: t.sections.dialog.cancel,
+      /* Destructive: the confirm is red and the focus starts on «إلغاء». */
+      tone: 'danger',
+    });
+
+    if (!go) return;
 
     setRemoving(id);
     setError(null);
@@ -331,6 +342,8 @@ export function DisputeEvidence({
         onChange={setPreview}
         labels={t.sections.slider}
       />
+
+      {dialog}
     </div>
   );
 }

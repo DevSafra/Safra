@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 import { ERROR } from '@safra/contracts';
+import { useConfirm } from '@safra/ui';
 
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { fill, t } from '@/lib/strings';
@@ -231,6 +232,8 @@ export function EmployeeActions({
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* The system's popup, not the browser's — see `ConfirmDialog`. */
+  const { ask, dialog } = useConfirm();
 
   async function send(init: { method: string; body?: unknown }): Promise<void> {
     if (busy) return;
@@ -316,11 +319,17 @@ export function EmployeeActions({
           disabled={busy}
           aria-label={fill(t.employees.removeLabel, { name: employee.fullName })}
           onClick={() => {
-            if (
-              window.confirm(fill(t.employees.removeConfirm, { name: employee.fullName }))
-            ) {
-              void send({ method: 'DELETE' });
-            }
+            void (async () => {
+              const go = await ask({
+                title: t.employees.removeTitle,
+                message: fill(t.employees.removeConfirm, { name: employee.fullName }),
+                confirmLabel: t.dialog.confirm,
+                cancelLabel: t.dialog.cancel,
+                tone: 'danger',
+              });
+
+              if (go) void send({ method: 'DELETE' });
+            })();
           }}
           className="cursor-pointer rounded-lg border border-bad/50 px-3 py-1.5 text-[12.5px] text-bad transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
         >
@@ -337,6 +346,8 @@ export function EmployeeActions({
           {error}
         </p>
       ) : null}
+
+      {dialog}
     </div>
   );
 }

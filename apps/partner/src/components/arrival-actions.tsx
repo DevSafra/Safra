@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { useConfirm } from '@safra/ui';
+
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { fill, t } from '@/lib/strings';
 import type { PartnerArrival } from '@/lib/api';
@@ -31,6 +33,8 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* The system's popup, not the browser's — see `ConfirmDialog`. */
+  const { ask, dialog } = useConfirm();
 
   const checkedIn = arrival.status === 'checked_in';
 
@@ -77,13 +81,18 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
               disabled={busy}
               aria-label={fill(t.arrivals.undoLabel, { name: arrival.guestName })}
               onClick={() => {
-                if (
-                  window.confirm(
-                    fill(t.arrivals.undoConfirm, { name: arrival.guestName }),
-                  )
-                ) {
-                  void send('undo-check-in');
-                }
+                void (async () => {
+                  const go = await ask({
+                    title: t.arrivals.undoTitle,
+                    message: fill(t.arrivals.undoConfirm, { name: arrival.guestName }),
+                    confirmLabel: t.dialog.confirm,
+                    cancelLabel: t.dialog.cancel,
+                    /* Not destructive, but it IS a correction to a recorded fact. */
+                    tone: 'danger',
+                  });
+
+                  if (go) void send('undo-check-in');
+                })();
               }}
               className="cursor-pointer rounded-lg border border-line px-3 py-1.5 text-[12.5px] text-muted transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -113,6 +122,8 @@ export function ArrivalActions({ arrival }: { arrival: PartnerArrival }) {
           {error}
         </p>
       ) : null}
+
+      {dialog}
     </div>
   );
 }

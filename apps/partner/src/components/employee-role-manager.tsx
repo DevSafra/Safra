@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { useConfirm } from '@safra/ui';
+
 import {
   ERROR,
   PARTNER_SECTION_PERMISSIONS,
@@ -265,13 +267,21 @@ export function EmployeeRoleManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /* The system's popup, not the browser's — see `ConfirmDialog`. */
+  const { ask, dialog } = useConfirm();
 
   async function remove(role: PartnerEmployeeRoleDetail): Promise<void> {
     if (busyId) return;
 
-    if (!window.confirm(fill(t.employeeRoles.confirmRemove, { name: role.name }))) {
-      return;
-    }
+    const go = await ask({
+      title: t.employeeRoles.removeTitle,
+      message: fill(t.employeeRoles.confirmRemove, { name: role.name }),
+      confirmLabel: t.dialog.confirm,
+      cancelLabel: t.dialog.cancel,
+      tone: 'danger',
+    });
+
+    if (!go) return;
 
     setBusyId(role.id);
     setError(null);
@@ -386,6 +396,8 @@ export function EmployeeRoleManager({
           )}
         </ul>
       )}
+
+      {dialog}
     </div>
   );
 }

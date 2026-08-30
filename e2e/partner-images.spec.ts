@@ -119,6 +119,24 @@ async function upload(page: Page, fixture: string): Promise<string> {
  * Runs before the assertions rather than after them: an "after" cleanup does not run when a test
  * fails, and the run after a failure would then start from a state no assertion described.
  */
+/** Counts any BROWSER popup that appears; the product must never raise one. */
+let nativeDialogs = 0;
+
+/**
+ * Presses «تأكيد» in the system's popup, which every destructive control asks through.
+ *
+ * `window.confirm` was what these controls used until 2026-08-30, so this spec accepted a native
+ * dialogue. It now asserts there is none: the popup is a component, and a control that fell back
+ * to the browser would show the origin and answer in English.
+ */
+async function confirmPopup(page: Page): Promise<void> {
+  const popup = page.getByRole('alertdialog');
+
+  await expect(popup).toBeVisible({ timeout: 10_000 });
+  await popup.getByRole('button', { name: t.dialog.confirm }).click();
+  await expect(popup).toHaveCount(0);
+}
+
 async function normalise(page: Page): Promise<void> {
   /*
     Bounded rather than `while (true)`: if archiving ever stopped both removing a card AND raising
@@ -131,6 +149,7 @@ async function normalise(page: Page): Promise<void> {
     if (before === 0) return;
 
     await cards(page).first().getByRole('button', { name: t.images.archive }).click();
+    await confirmPopup(page);
 
     /* It either goes, or the listing refuses to give up its last image. */
     await expect
@@ -147,8 +166,16 @@ async function normalise(page: Page): Promise<void> {
 
 test.describe('معرض صور العقار', () => {
   test.beforeEach(async ({ page }) => {
-    /* Registered once for the whole test: accepting an already-handled dialog throws. */
-    page.on('dialog', (dialog) => void dialog.accept());
+    /*
+      The BROWSER's dialogue must never appear (Bashar, 2026-08-30): archiving asks through
+      `useConfirm`, which is a component. This is registered to FAIL if a native one ever returns,
+      rather than to accept it — a spec that accepts both cannot tell them apart.
+    */
+    page.on('dialog', (dialog) => {
+      nativeDialogs += 1;
+      void dialog.dismiss();
+    });
+    nativeDialogs = 0;
 
     const reference = await findReference(page, SLUG);
 
@@ -301,6 +328,7 @@ test.describe('معرض صور العقار', () => {
     const total = await cards(page).count();
 
     await cardFor(page, first).getByRole('button', { name: t.images.archive }).click();
+    await confirmPopup(page);
 
     await expect(cards(page)).toHaveCount(total - 1);
     await expect(cardFor(page, first)).toHaveCount(0);
@@ -314,13 +342,18 @@ test.describe('معرض صور العقار', () => {
       const before = await cards(page).count();
 
       await cards(page).first().getByRole('button', { name: t.images.archive }).click();
+      await confirmPopup(page);
       await expect(cards(page)).toHaveCount(before - 1);
     }
 
     await cards(page).first().getByRole('button', { name: t.images.archive }).click();
+    await confirmPopup(page);
 
     await expect(alertText(page)).toContainText(t.images.lastImage);
     await expect(cards(page)).toHaveCount(1);
+
+    /* And no BROWSER popup appeared at any point in this test — see the note in `beforeEach`. */
+    expect(nativeDialogs, 'the browser popup must not be used').toBe(0);
   });
 
   test('يرفع عدة صور دفعة واحدة ويحافظ على الترتيب', async ({ page }) => {

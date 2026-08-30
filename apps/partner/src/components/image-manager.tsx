@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { MAX_PROPERTY_IMAGES, isErrorCode } from '@safra/contracts';
-import { ImageSliderFrame, type SliderImage } from '@safra/ui';
+import { ImageSliderFrame, type SliderImage, useConfirm } from '@safra/ui';
 import { errorMessage } from '@safra/i18n';
 
 import type { PropertyImage } from '@/lib/api';
@@ -59,6 +59,8 @@ export function ImageManager({
   const [error, setError] = useState<string | null>(null);
   /* Which photograph is open in the shared previewer — see the project rule on one slider. */
   const [preview, setPreview] = useState<number | null>(null);
+  /* The system's popup, not the browser's — see `ConfirmDialog`. */
+  const { ask, dialog } = useConfirm();
 
   /* The previewable set and a tile's place in it, so an id maps to the frame's index. */
   const ready = images.filter((image) => image.status === 'ready');
@@ -277,6 +279,8 @@ export function ImageManager({
         labels={t.slider}
       />
 
+      {dialog}
+
       {images.length === 0 ? (
         <p className="text-[12.5px] text-faint">{t.images.empty}</p>
       ) : (
@@ -373,11 +377,21 @@ export function ImageManager({
                   />
                   <Small
                     onClick={() => {
-                      if (!window.confirm(t.images.archiveConfirm)) return;
+                      void (async () => {
+                        const go = await ask({
+                          title: t.images.archiveTitle,
+                          message: t.images.archiveConfirm,
+                          confirmLabel: t.dialog.confirm,
+                          cancelLabel: t.dialog.cancel,
+                          tone: 'danger',
+                        });
 
-                      void act(`/api/properties/${reference}/images/${image.id}`, {
-                        method: 'DELETE',
-                      });
+                        if (!go) return;
+
+                        void act(`/api/properties/${reference}/images/${image.id}`, {
+                          method: 'DELETE',
+                        });
+                      })();
                     }}
                     label={t.images.archive}
                     disabled={busy}

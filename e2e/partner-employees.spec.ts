@@ -386,17 +386,29 @@ test.describe('الموظفون', () => {
 
       // ── Remove, which asks first ────────────────────────────────────────────
       /*
-        Removing is the one that cannot be undone, so the browser's own dialogue stands in front of
-        it. Accepting it here proves the confirmation is wired to the request rather than merely
-        rendered — a dialogue nobody handles blocks the click and the row would simply stay.
+        Removing is the one that cannot be undone, so a confirmation stands in front of it. It is
+        the SYSTEM's popup, not the browser's (Bashar, 2026-08-30) — pressing «تأكيد» here proves
+        the confirmation is wired to the request rather than merely rendered, and the listener
+        asserts no native dialogue takes its place.
       */
-      page.once('dialog', (dialog) => void dialog.accept());
+      let native = false;
+
+      page.on('dialog', (dialog) => {
+        native = true;
+        void dialog.dismiss();
+      });
 
       await row
         .getByRole('button', {
           name: fill(t.employees.removeLabel, { name: 'ليلى الاستقبال' }),
         })
         .click();
+
+      const popup = page.getByRole('alertdialog');
+
+      await expect(popup).toBeVisible();
+      expect(native, 'the browser popup must not be used').toBe(false);
+      await popup.getByRole('button', { name: t.dialog.confirm }).click();
 
       await expect(page.locator('li').filter({ hasText: address })).toHaveCount(0, {
         timeout: 15_000,
