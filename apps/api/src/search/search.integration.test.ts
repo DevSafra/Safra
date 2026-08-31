@@ -91,6 +91,36 @@ describeIfDb('SearchService', () => {
 
   // ─── What is bookable ──────────────────────────────────────────────────────
 
+  /**
+   * A withdrawn market does not SELL — the path this rule reaches that takes money.
+   *
+   * Bashar (2026-08-31) reported that deactivating a country left its cities active. Of the three
+   * customer-facing paths that rule touches, this is the one that matters most: search never
+   * checked `cities.is_active` or the country's, so a market taken off the destinations grid kept
+   * every one of its properties bookable.
+   *
+   * Both halves are asserted with an opposite control — the same query returning results before
+   * the flag moves — because «search found nothing» is what a broken fixture looks like too.
+   */
+  it('sells nothing in a city that has been withdrawn', async () => {
+    expect(await slugs(), 'the fixtures must be findable first').not.toHaveLength(0);
+
+    await db.execute(sql`UPDATE cities SET is_active = false WHERE slug = ${citySlug}`);
+
+    expect(await slugs(), 'a closed city sells nothing').toHaveLength(0);
+  });
+
+  it('sells nothing in a city whose COUNTRY has been withdrawn', async () => {
+    expect(await slugs(), 'the fixtures must be findable first').not.toHaveLength(0);
+
+    await db.execute(sql`
+      UPDATE countries SET is_active = false
+      WHERE id = (SELECT country_id FROM cities WHERE slug = ${citySlug})
+    `);
+
+    expect(await slugs(), 'a closed market sells nothing').toHaveLength(0);
+  });
+
   it('returns published properties that have a unit free for the dates', async () => {
     const found = await slugs();
 

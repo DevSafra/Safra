@@ -375,10 +375,20 @@ export class SearchService {
         FROM bookable b
         JOIN properties p            ON p.id = b.property_id
         JOIN cities ci               ON ci.id = p.city_id
+        -- The market has to be OPEN — the city's flag and its country's (Bashar, 2026-08-31).
+        --
+        -- Neither was checked, so deactivating a city or a country took it off the destinations
+        -- grid and left every property in it BOOKABLE through search. Of the three paths this
+        -- rule reaches, this is the one that takes money: a withdrawn market that still sells is
+        -- worse than one that is merely still listed.
+        --
+        -- A join rather than an EXISTS: countries holds three rows and the lookup is on a
+        -- primary key, so the planner treats it as a constant-ish probe on the hot path.
+        JOIN countries co            ON co.id = ci.country_id AND co.is_active
         JOIN property_types pt       ON pt.id = p.property_type_id
         JOIN cancellation_policies cp ON cp.id = p.cancellation_policy_id
         JOIN currencies cur          ON cur.id = b.currency_id
-        WHERE TRUE
+        WHERE ci.is_active
           ${query.citySlug ? sql`AND ci.slug = ${query.citySlug}` : sql``}
           ${query.propertyTypeCode ? sql`AND pt.code = ${query.propertyTypeCode}` : sql``}
           ${query.minPrice !== undefined ? sql`AND b.stay_total >= ${query.minPrice}` : sql``}

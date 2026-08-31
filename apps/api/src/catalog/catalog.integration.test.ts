@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { ERROR } from '@safra/contracts';
 import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { CatalogService } from './catalog.service.js';
@@ -108,6 +109,92 @@ describeIfDb('CatalogService', () => {
     const cities = await catalog.cities();
 
     expect(cities.some((city) => city.categories.length > 0)).toBe(true);
+  });
+
+  /**
+   * Closing a market actually closes it — Bashar, 2026-08-31.
+   *
+   * «When I deactivate a country, its cities will be still activated.» The grid joined `countries`
+   * for the code and never looked at its flag, so every city of a closed country stayed in the
+   * destinations grid and in the search selector. The confirmation the console shows when closing
+   * one NAMES how many cities it affects, which was a promise this read did not keep.
+   *
+   * Derived, not cascaded: the city keeps its own `is_active`, so re-opening the country restores
+   * exactly what was there rather than switching on cities somebody closed deliberately. The last
+   * assertion is what holds that — without it a cascade would pass every other case here.
+   */
+  it('drops the cities of a closed country, and brings back exactly what was there', async () => {
+    const before = await catalog.cities();
+
+    expect(before.length, 'the seeded cities must exist').toBeGreaterThan(0);
+
+    const country = before[0]?.countryCode ?? '';
+    const theirs = before.filter((one) => one.countryCode === country).map((c) => c.slug);
+
+    expect(theirs.length, 'the first country must have cities').toBeGreaterThan(0);
+
+    /* One of its cities is closed on its own, so re-opening must NOT switch it back on. */
+    const closedAlready = theirs[0] ?? '';
+
+    await db.execute(sql`
+      UPDATE cities SET is_active = false WHERE slug = ${closedAlready}
+    `);
+    await db.execute(sql`UPDATE countries SET is_active = false WHERE code = ${country}`);
+
+    const during = await catalog.cities();
+
+    for (const slug of theirs) {
+      expect(
+        during.map((one) => one.slug),
+        `${slug} while the market is closed`,
+      ).not.toContain(slug);
+    }
+
+    await db.execute(sql`UPDATE countries SET is_active = true WHERE code = ${country}`);
+
+    const after = (await catalog.cities()).map((one) => one.slug);
+
+    for (const slug of theirs) {
+      if (slug === closedAlready) continue;
+      expect(after, `${slug} comes back`).toContain(slug);
+    }
+
+    expect(after, 'a city closed on its own stays closed').not.toContain(closedAlready);
+  });
+
+  /**
+   * A withdrawn city's PAGE is gone too, not merely unlisted.
+   *
+   * §5.4's page is indexed, so «somebody holding the URL» includes every search engine that ever
+   * crawled it. A market taken off the grid that still answers 200 on its own page is still open
+   * to the visitors who matter.
+   */
+  it('refuses the page of a city that has been withdrawn', async () => {
+    const [live] = await catalog.cities();
+
+    expect(live, 'a live city is needed').toBeDefined();
+
+    /* The opposite control: it resolves while the city is open. */
+    await expect(catalog.city(live?.slug ?? '')).resolves.toBeTruthy();
+
+    await db.execute(sql`UPDATE cities SET is_active = false WHERE slug = ${live?.slug}`);
+
+    await expect(catalog.city(live?.slug ?? '')).rejects.toMatchObject({
+      response: { code: ERROR.GEO_CITY_NOT_FOUND },
+    });
+  });
+
+  it('refuses the page of a city whose country is closed', async () => {
+    const [live] = await catalog.cities();
+
+    await db.execute(sql`
+      UPDATE countries SET is_active = false
+      WHERE code = ${live?.countryCode ?? ''}
+    `);
+
+    await expect(catalog.city(live?.slug ?? '')).rejects.toMatchObject({
+      response: { code: ERROR.GEO_CITY_NOT_FOUND },
+    });
   });
 
   /** A destination card shows this count, so a string would render `NaN` cities. */

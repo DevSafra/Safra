@@ -96,7 +96,18 @@ export class CatalogService {
         ) AS published_count
       FROM cities c
       JOIN countries co ON co.id = c.country_id
-      WHERE c.is_active AND c.deleted_at IS NULL
+      -- The COUNTRY has to be open too (Bashar, 2026-08-31).
+      --
+      -- «When I deactivate a country, its cities will be still activated.» This join has always
+      -- been here, for the code, and never checked the flag: closing a market left every one of
+      -- its cities in the destinations grid and in the search selector. The confirmation the
+      -- console shows when closing one NAMES how many cities it affects, which was a promise the
+      -- read did not keep.
+      --
+      -- Derived rather than cascaded: the city keeps its OWN is_active, so re-opening the country
+      -- restores exactly what was there rather than switching on cities somebody had closed
+      -- deliberately.
+      WHERE c.is_active AND co.is_active AND c.deleted_at IS NULL
       ORDER BY c.sort_order, c.slug
     `);
 
@@ -111,10 +122,26 @@ export class CatalogService {
     }));
   }
 
-  /** A single city page (§5.4) — description, tags and category. */
+  /**
+   * A single city page (§5.4) — description, tags and category.
+   *
+   * ## Withdrawn means unreachable, not merely unlisted
+   *
+   * This read checked neither the city's flag nor its country's, so a city taken off the
+   * destinations grid still rendered its own page to anybody holding the URL — and §5.4's page is
+   * indexed, so «holding the URL» includes every search engine that ever crawled it. A withdrawn
+   * market that answers 200 is a market that is still open to the only visitors who matter here.
+   *
+   * `notFound` rather than a «closed» page, deliberately: what a city IS while withdrawn is not
+   * something the design describes, and inventing a state would be inventing product.
+   */
   async city(slug: string) {
     const city = await this.db.query.cities.findFirst({
-      where: and(eq(schema.cities.slug, slug), isNull(schema.cities.deletedAt)),
+      where: and(
+        eq(schema.cities.slug, slug),
+        eq(schema.cities.isActive, true),
+        isNull(schema.cities.deletedAt),
+      ),
       columns: {
         slug: true,
         nameAr: true,
@@ -131,11 +158,28 @@ export class CatalogService {
         longitude: true,
       },
       with: {
-        country: { columns: { code: true, nameAr: true, nameEn: true, nameDe: true } },
+        country: {
+          columns: {
+            code: true,
+            nameAr: true,
+            nameEn: true,
+            nameDe: true,
+            /* Read only to enforce the rule below — never returned to a visitor. */
+            isActive: true,
+          },
+        },
       },
     });
 
-    if (!city) throw notFound(ERROR.GEO_CITY_NOT_FOUND);
+    /*
+      A city in a CLOSED country is closed. The country's flag cannot be expressed in the query
+      builder's `where` without a join it does not offer here, so it is checked on the row — one
+      condition, and the same answer either way.
+    */
+    if (!city || !city.country.isActive) throw notFound(ERROR.GEO_CITY_NOT_FOUND);
+
+    /* Never leaked onward: the visitor is told the city is not there, not why. */
+    const { isActive: _countryIsActive, ...country } = city.country;
 
     /*
       The SAME read as the list — see `CITY_CATEGORIES_JSON`. It is a second query rather than a
@@ -162,6 +206,7 @@ export class CatalogService {
 
     return {
       ...city,
+      country,
       /* From `city_categories`, so a category staff added is on this page too. */
       categories: categories.rows[0]?.categories ?? [],
       images: images.rows.map((r) => ({
