@@ -89,6 +89,9 @@ export function CityPhotographs({
         />
       ))}
 
+      {/* The two orders differ on purpose — see `GeoService.cities`. */}
+      <p className="text-[10.5px] text-faint2">{c.imagesOrderNote}</p>
+
       <ImageSliderFrame
         images={slides}
         at={preview}

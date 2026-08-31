@@ -35,6 +35,8 @@ export interface EditableCity {
   readonly categories: readonly string[];
   readonly isActive: boolean;
   readonly properties: number;
+  readonly countryActive: boolean;
+  readonly sortOrder: number;
   readonly images: number;
   readonly heroUrl: string | null;
   /** Every photograph with what it says — see `CityPhotographs`. */
@@ -435,11 +437,23 @@ const CITY_COLUMNS: readonly AdminColumn<EditableCity>[] = [
   {
     key: 'status',
     header: t.table.colStatus,
-    render: (row) => (
-      <StatusPill tone={row.isActive ? 'ok' : 'faint'}>
-        {row.isActive ? t.sections.geo.active : t.sections.geo.inactive}
-      </StatusPill>
-    ),
+    /*
+      A city in a CLOSED country reads «الدولة موقوفة», not «نشطة».
+
+      Its own flag may well be true, and the row was not lying about the column — it was lying
+      about what the column MEANS: nothing in that country is offered to a visitor or bookable
+      through search, so «نشطة» stated something untrue about a place nobody could reach
+      (Bashar, 2026-08-31). `warn` rather than `faint`, because this is not the same as a city
+      somebody switched off and the two must not read alike on one screen.
+    */
+    render: (row) =>
+      row.countryActive ? (
+        <StatusPill tone={row.isActive ? 'ok' : 'faint'}>
+          {row.isActive ? t.sections.geo.active : t.sections.geo.inactive}
+        </StatusPill>
+      ) : (
+        <StatusPill tone="warn">{t.sections.geo.countryClosed}</StatusPill>
+      ),
   },
 ];
 
@@ -464,16 +478,102 @@ export function GeoCities({
   readonly categories: readonly CategoryOption[];
   readonly template: string;
 }) {
+  const router = useRouter();
   const c = t.sections.geo;
   const [editing, setEditing] = useState<string | null>(null);
+  const [moving, setMoving] = useState(false);
 
   const open = cities.find((city) => city.slug === editing) ?? null;
+
+  /**
+   * Moves a city one place in the PUBLIC destinations grid.
+   *
+   * ## Why the whole order is rewritten rather than two values swapped
+   *
+   * The same reasoning الفئات is built on. `sort_order` values need not be distinct — every seeded
+   * city was written with the same default — and swapping two equal numbers changes nothing while
+   * reporting success, which is the quiet failure this codebase keeps finding. So the new order is
+   * computed from the list on screen and every row whose position changed is written with its
+   * INDEX. Only the rows that actually moved are sent.
+   *
+   * The list on screen IS the public order — the console read sorts by `sort_order` for exactly
+   * this reason — so what the operator drags is what a visitor gets.
+   */
+  async function move(slug: string, by: -1 | 1): Promise<void> {
+    const from = cities.findIndex((one) => one.slug === slug);
+    const to = from + by;
+
+    if (from < 0 || to < 0 || to >= cities.length) return;
+
+    const next = [...cities];
+    const [row] = next.splice(from, 1);
+
+    if (!row) return;
+
+    next.splice(to, 0, row);
+
+    setMoving(true);
+
+    try {
+      for (const [index, one] of next.entries()) {
+        if (one.sortOrder === index) continue;
+
+        await fetch(`/api/geo/cities/${encodeURIComponent(one.slug)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sortOrder: index }),
+        });
+      }
+
+      router.refresh();
+    } finally {
+      setMoving(false);
+    }
+  }
 
   return (
     <>
       <AdminTable
         columns={[
           ...CITY_COLUMNS,
+          {
+            key: 'order',
+            header: c.colOrder,
+            render: (row) => {
+              const at = cities.findIndex((one) => one.slug === row.slug);
+
+              return (
+                <span className="flex items-center gap-1">
+                  {/*
+                    Up is up. NOT mirrored on this RTL screen: a column ordered top to bottom reads
+                    the same in every language, and mirroring would make «نقل لأعلى» move a row
+                    down. Each names its direction and its city, because eighteen identical glyphs
+                    are otherwise indistinguishable to a screen reader.
+                  */}
+                  <button
+                    type="button"
+                    disabled={moving || at <= 0}
+                    data-city-up={row.slug}
+                    aria-label={`${c.cityMoveUp} — ${row.nameAr}`}
+                    onClick={() => void move(row.slug, -1)}
+                    className="cursor-pointer rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    disabled={moving || at < 0 || at >= cities.length - 1}
+                    data-city-down={row.slug}
+                    aria-label={`${c.cityMoveDown} — ${row.nameAr}`}
+                    onClick={() => void move(row.slug, 1)}
+                    className="cursor-pointer rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
+                  >
+                    ↓
+                  </button>
+                </span>
+              );
+            },
+          },
           {
             key: 'edit',
             header: c.edit,

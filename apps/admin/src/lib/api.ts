@@ -1354,6 +1354,10 @@ const geoSchema = z.object({
       timezone: z.string(),
       properties: z.number(),
       isActive: z.boolean(),
+      /* Its place in the public destinations grid — what the arrows on المدن write. */
+      sortOrder: z.number(),
+      /* A city in a closed country is unreachable whatever its own flag says. */
+      countryActive: z.boolean(),
       /* §5.4's city photography — nullable, never defaulted: no hero means no photograph. */
       images: z.number(),
       heroKey: z.string().nullable(),

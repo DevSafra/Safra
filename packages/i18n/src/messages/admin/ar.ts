@@ -1199,6 +1199,18 @@ export const ar = {
       imageMoveUp: 'نقل الصورة لأعلى',
       imageMoveDown: 'نقل الصورة لأسفل',
       imageSaved: 'حُفظ',
+      /* Said out loud, because the two orders are deliberately different. */
+      imagesOrderNote:
+        'الأسهم ترتّب الصور هنا وعلى صفحة المدينة. الصورة الرئيسية تظهر أولاً للزوار مهما كان موضعها في هذه القائمة.',
+
+      /* ── Where a city sits in the PUBLIC destinations grid (Bashar, 2026-08-31) ── */
+      colOrder: 'الترتيب',
+      /* A city whose COUNTRY is closed: not bookable, whatever its own flag says. */
+      countryClosed: 'الدولة موقوفة',
+      cityMoveUp: 'نقل المدينة لأعلى',
+      cityMoveDown: 'نقل المدينة لأسفل',
+      orderNote:
+        'الترتيب هنا هو ترتيب الوجهات على الصفحة الرئيسية العامة. المدن الموقوفة لا تظهر للزوار لكنها تحتفظ بمكانها.',
 
       /* ── Deleting a row, which nothing could do before 2026-08-31 ── */
       remove: 'حذف',
@@ -2053,9 +2065,29 @@ export const ar = {
         'رفع عقد جديد من النوع نفسه يجعل السابق «مُستبدَلاً» ولا يحذفه — أي شروط كانت سارية يوم حجز مُتنازع عليه سؤال يُطرح فعلاً.',
     },
 
+    /**
+     * الإعدادات — the operational values the platform reads at runtime (§9.3, P-005).
+     *
+     * ## Why so much of this block is UNITS
+     *
+     * The screen this copy replaced printed the stored value and nothing beside it: `0.07` for a
+     * seven-per-cent commission, `120` for a two-hour SLA, `17` for a five-o'clock cutoff and `10`
+     * for a ten-dollar fine. Each of those needs a unit before it can be READ, and two of them are
+     * money — which the standing rule of 2026-08-25 says may never be written without its
+     * currency. So the units are catalogue entries, not suffixes typed beside a number in a
+     * component.
+     *
+     * The unit WORDS are ICU plurals, because Arabic has six forms and «١٢٠ دقائق» is wrong for
+     * everything from eleven to ninety-nine. The NUMBER is deliberately not inside the plural
+     * message: figures on this console are Western digits so they reconcile against a runbook and a
+     * migration (see `format.ts`), while the noun beside them still has to agree with the count.
+     */
     settings: {
-      title: 'Rules Engine — قيم تشغيلية قابلة للتعديل دون كود (P-005)',
-      hint: 'أي تعديل هنا يتطلب صلاحية مالية ويُسجَّل في سجل التدقيق مع IP والجهاز والوقت.',
+      title: 'القيم التشغيلية',
+      hint: 'كل قيمة هنا يقرأها النظام أثناء التشغيل، وتعديلها لا يحتاج إصداراً جديداً. الحجوزات القائمة لا يُعاد حسابها: كل حجز يحفظ لقطة من القيم التي أُنشئ بها.',
+      /* The consequence of pressing «حفظ», said before it is pressed rather than after. */
+      auditNote:
+        'التعديل يتطلب صلاحية مالية، ويُسجَّل في سجل التدقيق مع مَن غيّره ومتى ومن أي جهاز.',
       save: 'حفظ',
       saving: 'جارٍ الحفظ…',
       change: 'تعديل',
@@ -2065,10 +2097,80 @@ export const ar = {
       mode: 'النمط',
       enabled: 'مفعّل',
       disabled: 'معطّل',
-      reason: 'سبب التعديل — يُسجَّل مع التغيير',
+      reason: 'سبب التعديل — يظهر في سجل التدقيق (اختياري)',
       lastChanged: 'آخر تعديل: {who} · {when}',
-      saveFailed: 'تعذّر حفظ هذه القيمة.',
-      /** Hints per value schema, so the operator knows the expected form before typing. */
+      neverChanged: 'لم يُعدَّل من هذه الشاشة',
+
+      /*
+        The filter, and the counts beside it.
+
+        Seventeen settings today and the list only grows: `search.max_nights` and
+        `booking.same_day_cutoff_hour` sit in different groups five hundred pixels apart, and
+        finding one by scrolling is the part of this screen an operator does most often.
+      */
+      filterLabel: 'ابحث في الإعدادات',
+      filterPlaceholder: 'اسم الإعداد أو مفتاحه…',
+      filterClear: 'مسح البحث',
+      /**
+       * The three figures as ONE message, not three.
+       *
+       * Assembled separately they would not agree with each other: `plural`'s `#` is formatted by
+       * ICU, which writes Arabic-Indic digits in `ar`, and a number passed through `count()` is
+       * Western. «١٧ إعداد · 14 قابل للتعديل» in one line is the result. One message means one
+       * formatter.
+       */
+      counts:
+        '{total, plural, one {إعداد واحد} two {إعدادان} few {# إعدادات} many {# إعداداً} other {# إعداد}} · {editable} قابل للتعديل · {readOnly} للقراءة فقط',
+      countShown: 'ظهر {shown} من {total}',
+      noMatch: 'لا إعداد يطابق «{query}».',
+
+      /*
+        The value, and what the platform actually stores.
+
+        Both are shown because they differ for a rate: the reader means «٧٪» and the row holds
+        `0.07`, and the field they type into wants the fraction. Printing only one of the two is
+        how somebody saves 7 into a field that accepts 0 to 1 and meets a validation error they
+        cannot explain.
+      */
+      stored: 'المخزَّن: {value}',
+      currently: 'القيمة الحالية',
+      keyLabel: 'مفتاح الإعداد',
+      readOnly: 'للقراءة فقط',
+
+      /* Units. The number is formatted by the console; these inflect the noun beside it. */
+      unitMinutes:
+        '{n, plural, one {دقيقة} two {دقيقتان} few {دقائق} many {دقيقة} other {دقيقة}}',
+      unitNights:
+        '{n, plural, one {ليلة} two {ليلتان} few {ليالٍ} many {ليلة} other {ليلة}}',
+      unitHours:
+        '{n, plural, one {ساعة} two {ساعتان} few {ساعات} many {ساعة} other {ساعة}}',
+      /** «١٢٠ دقيقة» is a duration nobody holds in mind; «ساعتان» is. Shown only when it divides. */
+      alsoHours: '= {hours}',
+      cityTime: 'بتوقيت المدينة',
+      /** The percentage a rate MEANS, printed beside the fraction it is stored as. */
+      ratePercent: '= {percent}',
+
+      /**
+       * Why a money row may not be in the currency it names.
+       *
+       * `money.always_usd` overrides every money setting's own currency, and it is ON by default.
+       * A row reading «١٠٫٠٠ د.أ» while the platform charges ten dollars is the misreading this
+       * line exists to prevent — see `money-settings.service.ts`, which is where the override is
+       * actually applied.
+       */
+      alwaysUsdNote: 'يُقرأ بالدولار: «اعتبار كل القيم المالية بالدولار الأمريكي» مفعّل.',
+
+      /*
+        A boolean saves on the switch, so the question is asked BEFORE the change rather than
+        offering a form afterwards. Every one of these takes effect on the platform immediately.
+      */
+      toggleTitle: 'تغيير إعداد',
+      toggleEnable: 'تفعيل «{name}»؟ يسري على المنصة فوراً.',
+      toggleDisable: 'تعطيل «{name}»؟ يسري على المنصة فوراً.',
+      /** The grant switches revoke sessions on the way DOWN — §rbac, and the reason for a danger tone. */
+      toggleRevokes:
+        'تعطيل «{name}» يُبطل كل جلسات ذلك الدور فوراً، ويُخرج من يعمل الآن من حسابه.',
+
       /**
        * The four groups the seventeen settings are sorted into.
        *
@@ -2091,10 +2193,12 @@ export const ar = {
       groupPermissions: 'الصلاحيات',
       groupPermissionsNote:
         'منح صلاحيات في وقت التشغيل. التمكين يسري خلال 15 دقيقة؛ الإلغاء يُبطل كل جلسات ذلك الدور فوراً.',
+      /** Hints per value schema, so the operator knows the expected form before typing. */
       hintRate: 'كسر بين 0 و 1 — نسبة 7٪ تُكتب 0.07',
       hintPercent: 'رقم من 0 إلى 100',
       hintHourOfDay: 'ساعة من 0 إلى 23 بتوقيت المدينة',
       hintInt: 'رقم صحيح',
+      hintMoney: 'مبلغ موجب — العملة تبقى كما هي',
       feeFlat: 'ثابت — مبلغ لكل حجز',
       feePercent: 'نسبة — حصة من قيمة الإقامة',
 
@@ -2111,9 +2215,15 @@ export const ar = {
         advisory: 'استرشادي — يُسجَّل الفحص ولا يمنع شيئاً',
         off: 'معطّل — لا يُعرض الفحص إطلاقاً',
       },
-      /** Shown for a schema this form cannot validate, naming the schema. */
-      notEditable:
-        'هذا الإعداد من نوع {schema}، ولا يستطيع هذا النموذج التحقق منه. تعديله من حقل عام قد يعطّله بصمت، فيبقى تغييره قراراً يُراجع.',
+      /**
+       * Shown for a schema this form cannot validate, naming the schema.
+       *
+       * One line rather than the paragraph it replaced. The paragraph was rendered in a bordered
+       * box on every read-only row, so two of them appeared side by side saying the same thing at
+       * twice the height of the setting they were about. The substance survives: this type cannot
+       * be checked here, so changing it stays a reviewed decision.
+       */
+      notEditable: 'نوع {schema} لا يمكن التحقق منه من هذه الشاشة — يُعدَّل بمراجعة.',
     },
 
     /**

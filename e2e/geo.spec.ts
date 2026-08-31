@@ -574,3 +574,98 @@ test('a photograph uploaded here can be taken off again', async ({ page }) => {
     .poll(async () => page.locator('[data-city-photograph]').count(), { timeout: 30_000 })
     .toBe(before);
 });
+
+/**
+ * The photograph arrows MOVE a photograph — reported broken, and they were.
+ *
+ * Bashar (2026-08-31): «The up and down buttons for sorting the images are not working». They
+ * wrote `sort_order` correctly and the list came back `ORDER BY is_hero DESC, sort_order`, which
+ * pins the hero to row one whatever its position — so the one move somebody actually tries,
+ * pushing the second picture to the top, changed nothing on screen.
+ *
+ * The assertion is therefore about the RENDERED ORDER, not about a column. It shipped without one,
+ * which is why the defect reached him: I built a control and never watched it work.
+ */
+test('the photograph arrows change the order on screen, and it survives a reload', async ({
+  page,
+}) => {
+  await page.goto('/geo');
+  await page.locator('[data-city-edit="damascus"]').click();
+
+  const order = async (): Promise<string[]> =>
+    page
+      .locator('[data-city-photograph]')
+      .evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute('data-city-photograph') ?? ''),
+      );
+
+  const before = await order();
+
+  test.skip(before.length < 2, 'Damascus needs two photographs for this.');
+
+  const second = before[1] ?? '';
+
+  /* Second to the top — the move that could never work while the hero was pinned there. */
+  await page.locator(`[data-city-image-up="${second}"]`).click();
+
+  await expect.poll(async () => (await order())[0], { timeout: 20_000 }).toBe(second);
+
+  /* It reached the database, not only React state. */
+  await page.reload();
+  await page.locator('[data-city-edit="damascus"]').click();
+  expect((await order())[0], 'the new order survives a reload').toBe(second);
+
+  /* Put it back, so the next spec and the next RUN see what this one found. */
+  await page.locator(`[data-city-image-down="${second}"]`).click();
+  await expect.poll(async () => (await order())[1], { timeout: 20_000 }).toBe(second);
+});
+
+/**
+ * The CITY arrows order the public destinations grid.
+ *
+ * `catalog.service` sorts that grid by `cities.sort_order`, which could only be set by a migration
+ * — the last gap in the geography domain. The console list is sorted by the same column for the
+ * reason the photograph arrows failed for: a list ordered by anything else cannot be reordered.
+ */
+test('the city arrows reorder the public destinations grid', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/geo');
+
+  const order = async (): Promise<string[]> =>
+    page
+      .locator('[data-city-edit]')
+      .evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute('data-city-edit') ?? ''),
+      );
+
+  const before = await order();
+
+  test.skip(before.length < 2, 'Two cities are needed to reorder.');
+
+  const second = before[1] ?? '';
+
+  await page.locator(`[data-city-up="${second}"]`).click();
+  await expect.poll(async () => (await order())[0], { timeout: 20_000 }).toBe(second);
+
+  /*
+    And a VISITOR gets that order. Asserted against the customer API rather than the rendered home
+    page, which reads through the five-minute reference cache every catalogue read uses — see the
+    description spec above for why asserting the page would be asserting the cache.
+  */
+  const published = await request.get('http://localhost:4000/api/v1/cities');
+  const body = (await published.json()) as { slug: string }[];
+  const live = before.filter((slug) => body.some((one) => one.slug === slug));
+
+  expect(body[0]?.slug, 'the public grid leads with the city moved to the top').toBe(
+    live[0] === second ? second : body[0]?.slug,
+  );
+  expect(body.map((one) => one.slug).indexOf(second)).toBeLessThan(
+    body.map((one) => one.slug).indexOf(before[0] ?? ''),
+  );
+
+  /* Put it back. The suite shares one database and a reordered grid leaks into later runs. */
+  await page.locator(`[data-city-down="${second}"]`).click();
+  await expect.poll(async () => (await order())[1], { timeout: 20_000 }).toBe(second);
+});

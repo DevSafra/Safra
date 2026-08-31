@@ -42,7 +42,7 @@ export const dynamic = 'force-dynamic';
  * not overflow — it SQUEEZES, so «البتراء» rendered as «تراء» and the last column was 40px wide.
  * Invisible to a type checker and to every HTTP-level check; the screenshot is what showed it.
  */
-const TEMPLATE = '1.1fr .8fr .9fr .7fr .8fr 1.1fr';
+const TEMPLATE = '1.1fr .8fr .9fr .6fr .7fr .6fr 1.1fr';
 
 export default async function GeoPage({
   searchParams,
@@ -142,6 +142,8 @@ export default async function GeoPage({
                 categories: row.categories,
                 isActive: row.isActive,
                 properties: row.properties,
+                sortOrder: row.sortOrder,
+                countryActive: row.countryActive,
                 images: row.images,
                 /* Null when the city has no photograph — never a guessed address. */
                 heroUrl:
