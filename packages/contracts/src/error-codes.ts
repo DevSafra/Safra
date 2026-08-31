@@ -172,7 +172,6 @@ export const ERROR = {
   PAYOUT_PARTNER_NOT_SCREENED: 'payout.partner_not_screened',
   PARTNER_ALREADY_VERIFIED: 'partner.already_verified',
   /** §8.1 — «يجب رفع وثائق التحقق قبل تفعيل الحساب». */
-  PARTNER_DOCUMENTS_MISSING: 'partner.documents_missing',
   PARTNER_PROFILE_MISSING: 'partner.profile_missing',
   PARTNER_TYPE_UNKNOWN: 'partner.type_unknown',
   PROPERTY_NOT_FOUND: 'property.not_found',
@@ -182,7 +181,6 @@ export const ERROR = {
   UNIT_NOT_FOUND: 'unit.not_found',
   UNIT_NOT_FOUND_OR_RANGE_EMPTY: 'unit.not_found_or_range_empty',
   DOCUMENT_NOT_FOUND: 'document.not_found',
-  DOCUMENT_REJECTION_REASON_REQUIRED: 'document.rejection_reason_required',
   UPLOAD_FILE_MISSING: 'upload.file_missing',
   UPLOAD_FILE_EMPTY: 'upload.file_empty',
   UPLOAD_FILE_TOO_LARGE: 'upload.file_too_large',
@@ -497,8 +495,6 @@ export const ERROR = {
   VALIDATION_REJECTION_NOTES_REQUIRED: 'validation.rejection_notes_required',
   VALIDATION_SANCTIONS_BODY_TOO_SMALL: 'validation.sanctions_body_too_small',
   VALIDATION_SANCTIONS_SOURCE: 'validation.sanctions_source',
-  VALIDATION_DOCUMENT_REJECTION_NOTES_REQUIRED:
-    'validation.document_rejection_notes_required',
   BOOKING_TRANSITION_INVALID: 'booking.transition_invalid',
   REQUEST_IDEMPOTENCY_KEY_REUSED: 'request.idempotency_key_reused',
   /*

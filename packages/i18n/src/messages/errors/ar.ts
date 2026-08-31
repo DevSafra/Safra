@@ -89,8 +89,6 @@ export const ar = {
   'payout.frozen_by_dispute': 'نزاع مفتوح يجمّد استحقاق التحويل لهذه الحجوزات.',
   'payout.partner_not_screened': 'لا يمكن إطلاق التحويل قبل فحص العقوبات لهذا الشريك.',
   'partner.already_verified': 'تم التحقق من هذا الشريك بالفعل.',
-  'partner.documents_missing':
-    'لا يمكن اعتماد الشريك قبل رفع وثائق التحقق: هوية أو سجل تجاري، وإثبات ملكية أو عقد إدارة.',
   'partner.profile_missing': 'هذا الحساب غير مرتبط بملف شريك.',
   'partner.type_unknown': 'نوع الشريك غير معروف.',
   'property.not_found': 'لم يُعثر على هذا العقار.',
@@ -100,7 +98,6 @@ export const ar = {
   'unit.not_found': 'لم يُعثر على هذه الوحدة.',
   'unit.not_found_or_range_empty': 'لم يُعثر على الوحدة، أو المدة المحددة فارغة.',
   'document.not_found': 'لم يُعثر على هذا المستند.',
-  'document.rejection_reason_required': 'رفض المستند يتطلب سبباً مكتوباً.',
   'upload.file_missing': 'لم يُرفع أي ملف.',
   'upload.file_empty': 'الملف المرفوع فارغ.',
   'upload.file_too_large': 'حجم الملف يتجاوز {maxMb} ميغابايت.',
@@ -344,8 +341,6 @@ export const ar = {
     'ملف قائمة العقوبات أصغر من أن يكون قائمة مُوحَّدة؛ يبدو أن التنزيل ناقص.',
   'validation.sanctions_source':
     'مصدر القائمة غير معروف. حدِّد القائمة التي يجري استيرادها.',
-  'validation.document_rejection_notes_required':
-    'الرفض يتطلب ملاحظات توضح الخطأ في المستند.',
   'booking.transition_invalid': 'لا يمكن نقل الحجز إلى هذه الحالة من حالته الحالية.',
   'request.idempotency_key_reused': 'مفتاح العملية مستخدم بالفعل لطلب مختلف.',
 

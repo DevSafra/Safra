@@ -111,8 +111,6 @@ export const de = {
   'payout.partner_not_screened':
     'Diese Auszahlung kann erst nach der Sanktionsprüfung des Partners freigegeben werden.',
   'partner.already_verified': 'Der Partner ist bereits verifiziert.',
-  'partner.documents_missing':
-    'Ein Partner kann nicht freigegeben werden, bevor die Prüfdokumente vorliegen: Ausweis oder Handelsregisterauszug sowie Eigentumsnachweis oder Verwaltungsvertrag.',
   'partner.profile_missing': 'Dieses Konto ist keinem Partnerprofil zugeordnet.',
   'partner.type_unknown': 'Unbekannter Partnertyp.',
   'property.not_found': 'Objekt nicht gefunden.',
@@ -123,8 +121,6 @@ export const de = {
   'unit.not_found': 'Einheit nicht gefunden.',
   'unit.not_found_or_range_empty': 'Einheit nicht gefunden oder der Zeitraum ist leer.',
   'document.not_found': 'Dokument nicht gefunden.',
-  'document.rejection_reason_required':
-    'Für die Ablehnung eines Dokuments ist eine Begründung erforderlich.',
   'upload.file_missing': 'Es wurde keine Datei hochgeladen.',
   'upload.file_empty': 'Die hochgeladene Datei ist leer.',
   'upload.file_too_large': 'Die Datei ist größer als {maxMb} MB.',
@@ -428,8 +424,6 @@ export const de = {
     'Diese Datei ist zu klein für eine konsolidierte Sanktionsliste; der Download wirkt abgeschnitten.',
   'validation.sanctions_source':
     'Unbekannte Listenquelle. Geben Sie an, welche Liste importiert wird.',
-  'validation.document_rejection_notes_required':
-    'Eine Ablehnung erfordert Hinweise dazu, was mit dem Dokument nicht stimmt.',
   'booking.transition_invalid':
     'Eine Buchung kann von ihrem aktuellen Status nicht in diesen Status wechseln.',
   'request.idempotency_key_reused':

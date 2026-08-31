@@ -480,9 +480,9 @@ export function partnerContractCountersignedMail(input: {
  * The partner has signed and returned it; the contract is in force.
  *
  * To STAFF, so the reference and the console URL are safe to carry, and the partner is spoken of
- * in the third person. Sent to every active super admin, the same recipients and the same
- * reasoning as `partnerDocumentsCompleteMail`: this is the message that says the last thing
- * standing before approval is done.
+ * in the third person. Sent to every active super admin: this is the message that says the last
+ * thing standing before approval is done — which, since المستندات was removed on 2026-08-31, it
+ * now literally is.
  */
 export function partnerContractReturnedMail(input: {
   to: string;
@@ -496,25 +496,6 @@ export function partnerContractReturnedMail(input: {
     ...compose((m) => m.partnerContractReturned, input.locale, {
       reference: input.reference,
       displayName: input.displayName,
-      url: input.url,
-    }),
-  };
-}
-
-export function partnerDocumentsCompleteMail(input: {
-  to: string;
-  reference: string;
-  displayName: string;
-  documentCount: number;
-  url: string;
-  locale: string;
-}): OutgoingMail {
-  return {
-    to: input.to,
-    ...compose((m) => m.partnerDocumentsComplete, input.locale, {
-      reference: input.reference,
-      displayName: input.displayName,
-      documentCount: input.documentCount,
       url: input.url,
     }),
   };

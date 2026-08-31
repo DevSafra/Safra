@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 import { localeSchema, phoneSchema } from './auth.js';
 import { ERROR } from './error-codes.js';
-import { PARTNER_DOCUMENT_KINDS, type PartnerDocumentKind } from './property.js';
 
 /**
  * Onboarding a partner IN PERSON — the super admin and the partner, sitting together
@@ -164,55 +163,3 @@ export interface PartnerOnboardResult {
    */
   readonly accountExisted: boolean;
 }
-
-/**
- * The documents §8.1 wants on file before a partner is approved.
- *
- * A CHECKLIST, not a gate. `verifyPartner` does not consult it and deliberately so: the sanctions
- * feed already taught this codebase what happens when onboarding is made to depend on a control
- * that can be unavailable (see `review.service.ts`), and a partner who is standing in the room
- * with a passport but whose commercial register is with their accountant is a conversation, not a
- * refusal. The screen shows what is outstanding; the reviewer decides.
- */
-export const PARTNER_ONBOARDING_REQUIRED_DOCUMENTS = [
-  'identity',
-  'commercial_register',
-] as const satisfies readonly PartnerDocumentKind[];
-
-/**
- * Proof of the right to let, which comes in one of two shapes.
- *
- * An owner has a title deed; a manager has a management contract. Requiring both would refuse
- * every partner who is only one of the two, and requiring neither would let a partner be approved
- * with no evidence they may let the property at all.
- */
-export const PARTNER_ONBOARDING_RIGHT_TO_LET_DOCUMENTS = [
-  'ownership_proof',
-  'management_contract',
-] as const satisfies readonly PartnerDocumentKind[];
-
-/**
- * Which required documents are still missing, given what has been uploaded.
- *
- * Takes the kinds rather than the rows so the console and any future gate answer from the same
- * function instead of two hand-written comparisons that drift. Returns `right_to_let` as a single
- * pseudo-kind when neither of its two alternatives is present — the reader needs to know one of
- * them is wanted, not that both are.
- */
-export function missingOnboardingDocuments(
-  uploaded: readonly string[],
-): readonly (PartnerDocumentKind | 'right_to_let')[] {
-  const present = new Set(uploaded);
-
-  const missing: (PartnerDocumentKind | 'right_to_let')[] =
-    PARTNER_ONBOARDING_REQUIRED_DOCUMENTS.filter((kind) => !present.has(kind));
-
-  if (!PARTNER_ONBOARDING_RIGHT_TO_LET_DOCUMENTS.some((kind) => present.has(kind))) {
-    missing.push('right_to_let');
-  }
-
-  return missing;
-}
-
-/** Every kind the console's upload control offers, in the order §8.1 asks for them. */
-export const PARTNER_ONBOARDING_DOCUMENT_ORDER = PARTNER_DOCUMENT_KINDS;

@@ -300,19 +300,6 @@ const RENDERERS: {
     shows: 'PAR-000042',
   },
   {
-    name: 'partnerDocumentsCompleteMail',
-    entry: 'partnerDocumentsComplete',
-    render: (locale) =>
-      templates.partnerDocumentsCompleteMail({
-        ...SAMPLE,
-        locale,
-        reference: 'PAR-000042',
-        displayName: 'فندق قصر الشرق',
-        documentCount: 3,
-      }),
-    shows: 'PAR-000042',
-  },
-  {
     name: 'partnerContractReadyMail',
     entry: 'partnerContractReady',
     render: (locale) =>

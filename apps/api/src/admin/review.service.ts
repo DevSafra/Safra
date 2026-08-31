@@ -267,7 +267,6 @@ export class ReviewService {
           createdAt: true,
         },
         with: {
-          documents: { columns: { kind: true, status: true, fileName: true } },
           city: { columns: { slug: true, nameAr: true } },
         },
         orderBy: (p, { asc }) => [asc(p.createdAt)],
@@ -576,17 +575,6 @@ export class ReviewService {
           response because it is the machine identifier; the name is what a person reads.
         */
         partnerType: { columns: { code: true, nameAr: true, nameEn: true } },
-        documents: {
-          columns: {
-            id: true,
-            kind: true,
-            fileName: true,
-            status: true,
-            reviewNotes: true,
-            reviewedAt: true,
-            createdAt: true,
-          },
-        },
       },
     });
 
@@ -1057,14 +1045,6 @@ export class ReviewService {
       SELECT 'partners_unscreened', COUNT(*)::text
         FROM partners WHERE sanctions_screened_at IS NULL AND deleted_at IS NULL
           AND ${scopeFilter(actor, 'city_id')}
-      UNION ALL
-      -- Documents sent and not yet looked at. See the note on the same counter in
-      -- DashboardService: the upload itself moved no number that staff could see.
-      SELECT 'partner_documents_pending_review', COUNT(*)::text
-        FROM partner_documents pd
-        JOIN partners pdp ON pdp.id = pd.partner_id AND pdp.deleted_at IS NULL
-        WHERE pd.status = 'pending' AND pd.deleted_at IS NULL
-          AND ${scopeFilter(actor, 'pdp.city_id')}
       UNION ALL
       -- Disputes still waiting on SAFRA — the sidebar badge beside النزاعات (Bashar, 2026-08-27).
       --

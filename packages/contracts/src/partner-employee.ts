@@ -43,7 +43,8 @@ import { PERMISSIONS as P, type Permission } from './permissions.js';
  * - `PARTNER_CONTRACT_SIGN_OWN` — signing and reading the partnership agreement. A member of staff
  *   at a hotel must not be able to bind the hotel.
  * - `PARTNER_DOCUMENT_MANAGE_OWN` — the owner's verification documents, including their identity
- *   papers. §14 personal data and the most sensitive thing this platform stores about a partner.
+ *   papers. REMOVED on 2026-08-31 with المستندات itself (Bashar); it is named here because the
+ *   correction below is about it, and a lesson that loses its subject stops teaching anything.
  *
  * ## A correction worth keeping, because the original was worse than wrong
  *
@@ -53,7 +54,8 @@ import { PERMISSIONS as P, type Permission } from './permissions.js';
  * `support_agent` and never by `partner` — so withholding it from employees withheld nothing, and
  * no partner-side route could have been guarded by it without locking the owner out.
  *
- * The six routes that actually mattered — three contract, three document — were guarded by
+ * The six routes that actually mattered — three contract, three document (the latter retired with
+ * المستندات in August 2026) — were guarded by
  * `PROPERTY_MANAGE_OWN`, which employees DO hold because managing listings is the job. So a
  * receptionist could counter-sign their employer's contract with SAFRA, file verification
  * documents in the owner's name, and download the owner's identity documents. Every test passed;

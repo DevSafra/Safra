@@ -81,8 +81,7 @@ export default async function ContractsPage({
   /*
     The reader's ROLE decides whether this page has anything to show them at all.
 
-    An employee holds neither `PARTNER_CONTRACT_SIGN_OWN` nor `PARTNER_DOCUMENT_MANAGE_OWN`, so
-    both fetches below answer 403 — which `partnerFetch` reports as `'unauthenticated'`, and the
+    An employee does not hold `PARTNER_CONTRACT_SIGN_OWN`, so the fetch below answers 403 — which `partnerFetch` reports as `'unauthenticated'`, and the
     screen would say «انتهت الجلسة». Their session is fine; sending them to sign in again over a
     permission is advice that cannot work.
 
@@ -200,9 +199,14 @@ export default async function ContractsPage({
  * pointing at a finished process is noise.
  */
 function Steps({ stage }: { readonly stage: Stage }) {
-  const reached = stage === 'done' ? 3 : stage === 'waiting' ? 2 : 1;
+  /*
+    Two steps since 2026-08-31, not three. «إرسال المستندات» was the first, and المستندات was
+    removed — there is nothing for the partner to send before SAFRA decides, so a step describing
+    an action they cannot take would be a progress line pointing at nothing.
+  */
+  const reached = stage === 'done' ? 2 : 1;
 
-  const labels = [t.contracts.stepUpload, t.contracts.stepReview, t.contracts.stepReady];
+  const labels = [t.contracts.stepReview, t.contracts.stepReady];
 
   return (
     <ol className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[12px]">

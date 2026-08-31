@@ -69,11 +69,6 @@ export function contractKind(kind: string): string {
   return t.contractKinds[kind] ?? kind.replace(/_/g, ' ');
 }
 
-/** A verification document's kind in Arabic, named for the person uploading it. */
-export function documentKind(kind: string): string {
-  return t.documentKinds[kind] ?? kind.replace(/_/g, ' ');
-}
-
 /** An availability day's state, in Arabic. Unknown values fall back to the raw value. */
 export function dayStatus(status: string): string {
   return partnerAr.dayStatus[status] ?? status;

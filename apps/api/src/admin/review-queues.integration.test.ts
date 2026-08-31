@@ -34,7 +34,6 @@ describeIfDb('verification queues', () => {
   /* Every row this suite writes is discarded when the test that wrote it ends. */
   let db: Database;
   let review: ReviewService;
-  let reference: string;
 
   beforeEach(async () => {
     await harness.begin();
@@ -55,7 +54,13 @@ describeIfDb('verification queues', () => {
       { PARTNER_URL: 'https://partner.example' } as Env,
     );
 
-    reference = await createPendingPartnerWithDocument(db);
+    /*
+      Seeded so the queue is never empty. Its reference is no longer held: the case that looked
+      this partner up by reference was «resolves a partner's uploaded documents», and المستندات
+      was removed on 2026-08-31. The paging cases compare rows against each other, not against
+      a fixture.
+    */
+    await createPendingPartner(db);
   });
 
   afterEach(async () => {
@@ -75,39 +80,22 @@ describeIfDb('verification queues', () => {
    * query executes and that its nested relations resolve — which is precisely what
    * was broken.
    */
-  it('lists pending partners with their documents and city resolved', async () => {
+  it('lists pending partners with their city resolved', async () => {
     const queue = await review.pendingPartners({ page: 1, limit: 50 });
 
     expect(queue.items.length).toBeGreaterThan(0);
 
     for (const partner of queue.items) {
-      expect(Array.isArray(partner.documents)).toBe(true);
       expect(typeof partner.city.slug).toBe('string');
     }
   });
 
-  /**
-   * And the seeded partner's document resolves through the relation.
-   *
-   * Walks the PAGES rather than asking for one big one. The queue became paged on 2026-08-20 and
-   * `limit` is capped at 100 by `pageQuerySchema`, so the old `pendingPartners(5000)` is no longer
-   * expressible — which is the point of the change: nothing can ask for the whole queue at once.
-   */
-  it('resolves a partner’s uploaded documents', async () => {
-    let mine: { documents: { kind: string }[]; city: { slug: string } } | undefined;
-
-    for (let page = 1; page <= 40 && !mine; page += 1) {
-      const queue = await review.pendingPartners({ page, limit: 100 });
-
-      if (queue.items.length === 0) break;
-
-      mine = queue.items.find((p) => p.reference === reference);
-    }
-
-    expect(mine?.documents).toHaveLength(1);
-    expect(mine?.documents[0]?.kind).toBe('commercial_register');
-    expect(mine?.city.slug).toBe('damascus');
-  });
+  /*
+    «resolves a partner's uploaded documents» stood here until 2026-08-31, when المستندات was
+    removed (Bashar) and the queue stopped carrying them. What it really guarded — that the queue
+    is PAGED and that a partner can be found by walking the pages — is covered by the pagination
+    cases below, which is why it is not replaced with a weaker version of itself.
+  */
 
   it('lists pending properties without throwing', async () => {
     const queue = await review.pendingProperties({ page: 1, limit: 10 });
@@ -218,7 +206,7 @@ async function dispute(
   `);
 }
 
-async function createPendingPartnerWithDocument(db: Database): Promise<string> {
+async function createPendingPartner(db: Database): Promise<string> {
   const id = randomUUID();
   const userId = randomUUID();
   const email = `queue-test-${id.slice(0, 8)}@safra.test`;
@@ -233,11 +221,6 @@ async function createPendingPartnerWithDocument(db: Database): Promise<string> {
            'Addr', '+963900000030', ${email}
     FROM partner_types pt, cities c
     WHERE pt.code = 'accommodation' AND c.slug = 'damascus' LIMIT 1`);
-
-  await db.execute(sql`
-    INSERT INTO partner_documents (partner_id, kind, file_key, file_name)
-    VALUES (${id}::uuid, 'commercial_register',
-            ${`partners/${id}/documents/${randomUUID()}.pdf`}, 'register.pdf')`);
 
   const rows = await db.execute<{ reference: string }>(
     sql`SELECT reference FROM partners WHERE id = ${id}::uuid`,

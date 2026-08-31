@@ -88,7 +88,7 @@ export function isLocked(
  * The portal admits two roles since 2026-08-23 and they are not interchangeable. `partnerId` is
  * the same for both — an employee sees the business's bookings and calendars, which is the point —
  * but the OWNER'S OWN surfaces are not theirs: the partnership agreement and the verification
- * documents are guarded by `PARTNER_CONTRACT_SIGN_OWN` and `PARTNER_DOCUMENT_MANAGE_OWN`, and an
+ * the contract is guarded by `PARTNER_CONTRACT_SIGN_OWN`, and an
  * employee holds neither.
  *
  * Without this, an employee reaching العقود والمستندات gets two 403s, `partnerFetch` reports them

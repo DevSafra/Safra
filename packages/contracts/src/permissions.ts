@@ -60,6 +60,16 @@ export const PERMISSIONS = {
   PARTNER_READ: 'partner.read',
   PARTNER_APPROVE: 'partner.approve',
   PARTNER_SUSPEND: 'partner.suspend',
+  /**
+   * Sanctions screening — despite the name.
+   *
+   * It was the permission over «المستندات», which was removed on 2026-08-31. Two routes still
+   * carry it and neither is about documents: `GET sanctions/status` and
+   * `POST partners/:reference/sanctions-screening`. The NAME is now wrong and the grant is not:
+   * one staff role in the database holds this string, so renaming the constant means rewriting
+   * `staff_roles.permissions` in a migration. Recorded as debt rather than renamed quietly, since
+   * a permission that silently changes value is how a role loses an authority nobody notices.
+   */
   PARTNER_DOCUMENT_REVIEW: 'partner.document_review',
 
   /** Reading the «طلبات الشراكة» queue — who has asked to join. */
@@ -141,7 +151,6 @@ export const PERMISSIONS = {
    * handle the owner's private papers". Harmless while those were the same person; not harmless
    * from the moment employees existed.
    */
-  PARTNER_DOCUMENT_MANAGE_OWN: 'partner_document.manage_own',
   /**
    * The COMMERCIAL contract between SAFRA and a partner — distinct from the documents the
    * partner submits for verification.
@@ -252,12 +261,14 @@ const PARTNER: Permission[] = [
   /* الرد and إبلاغ — the two remedies P-006 allows. Hiding is not among them. */
   P.REVIEW_RESPOND_OWN,
   /*
-    The owner's own papers: the partnership agreement, and the documents SAFRA verifies the
-    business on. Held by the partner, absent from `PARTNER_EMPLOYEE_PERMISSIONS` — a receptionist
-    does not sign the hotel's contract or handle the owner's identity documents.
+    The owner's own papers — the partnership agreement. Held by the partner, absent from
+    `PARTNER_EMPLOYEE_PERMISSIONS`: a receptionist does not sign the hotel's contract.
+
+    `PARTNER_DOCUMENT_MANAGE_OWN` sat beside it until 2026-08-31, when المستندات was removed
+    (Bashar). It guarded nothing after that and no role in the database held it, so it went with
+    the feature rather than staying as a grant over routes that no longer exist.
   */
   P.PARTNER_CONTRACT_SIGN_OWN,
-  P.PARTNER_DOCUMENT_MANAGE_OWN,
   /*
     Managing its own employees — and deliberately NOT in `PARTNER_EMPLOYEE_PERMISSIONS`.
 

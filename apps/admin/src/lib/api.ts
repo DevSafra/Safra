@@ -108,9 +108,6 @@ const pendingPartnerSchema = z.object({
   verification: z.string(),
   sanctionsScreenedAt: z.union([z.string(), z.date(), z.null()]).nullable(),
   createdAt: z.union([z.string(), z.date()]).transform((v) => new Date(v).toISOString()),
-  documents: z.array(
-    z.object({ kind: z.string(), status: z.string(), fileName: z.string() }),
-  ),
   city: z.object({ slug: z.string(), nameAr: z.string() }),
 });
 
@@ -248,18 +245,6 @@ const timestamp = z
   .nullable()
   .transform((v) => (v === null ? null : new Date(v).toISOString()));
 
-const partnerDocumentSchema = z.object({
-  id: z.string(),
-  kind: z.string(),
-  fileName: z.string(),
-  status: z.string(),
-  reviewNotes: z.string().nullable(),
-  reviewedAt: timestamp,
-  createdAt: timestamp,
-});
-
-export type PartnerDocument = z.infer<typeof partnerDocumentSchema>;
-
 const partnerDetailSchema = z.object({
   /*
     The suspension record, or null when the partner is trading normally.
@@ -340,7 +325,6 @@ const partnerDetailSchema = z.object({
     nameAr: z.string(),
     nameEn: z.string(),
   }),
-  documents: z.array(partnerDocumentSchema),
   properties: z.array(
     z.object({
       reference: z.string(),

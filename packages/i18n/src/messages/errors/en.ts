@@ -95,8 +95,6 @@ export const en = {
   'payout.partner_not_screened':
     'This payout cannot be released before the partner has been screened.',
   'partner.already_verified': 'Partner is already verified.',
-  'partner.documents_missing':
-    'A partner cannot be approved before the verification documents are on file: an identity document or a commercial register, and proof of ownership or a management contract.',
   'partner.profile_missing': 'This account is not linked to a partner profile.',
   'partner.type_unknown': 'Unknown partner type.',
   'property.not_found': 'Property not found.',
@@ -106,7 +104,6 @@ export const en = {
   'unit.not_found': 'Unit not found.',
   'unit.not_found_or_range_empty': 'Unit not found, or the date range is empty.',
   'document.not_found': 'Document not found.',
-  'document.rejection_reason_required': 'Rejecting a document requires a reason.',
   'upload.file_missing': 'No file was uploaded.',
   'upload.file_empty': 'The uploaded file is empty.',
   'upload.file_too_large': 'That file is larger than {maxMb} MB.',
@@ -378,8 +375,6 @@ export const en = {
   'validation.sanctions_body_too_small':
     'That file is too small to be a consolidated sanctions list; the download looks truncated.',
   'validation.sanctions_source': 'Unknown list source. Say which list is being imported.',
-  'validation.document_rejection_notes_required':
-    'A rejection requires notes explaining what is wrong with the document.',
   'booking.transition_invalid':
     'A booking cannot move to that state from its current one.',
   'request.idempotency_key_reused':

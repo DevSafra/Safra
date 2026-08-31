@@ -14,29 +14,6 @@ export const ar = {
   /* A PIPE, never a dash — see the admin catalogue's `meta.title` for the reason. */
   brand: 'سفرة | لوحة الشريك',
 
-  /** الدعم — a partner asking SAFRA for help (Bashar, 2026-08-12). */
-  /**
-   * العقود والمستندات — what SAFRA sent, and what SAFRA needs back (Bashar, 2026-08-19).
-   *
-   * Two halves of one obligation, on one screen, because they are the two things standing between
-   * an accepted application and a verified account: read and sign the contract, send the documents.
-   */
-  /** `PARTNER_DOCUMENT_KINDS` in @safra/contracts, named for the person uploading them. */
-  documentKinds: {
-    identity: 'هوية أو جواز سفر',
-    commercial_register: 'سجل تجاري',
-    ownership_proof: 'إثبات ملكية',
-    management_contract: 'عقد إدارة',
-    /*
-      «تأكيد مصرفي», matching the console (Bashar, 2026-08-21).
-
-      The partner app said «تأكيد بنكي» and the reviewer's screen said «تأكيد مصرفي» — the same
-      document under two names, which is a problem the moment a partner and a reviewer discuss it
-      on الدعم. Neither is wrong; having both is.
-    */
-    bank_confirmation: 'تأكيد مصرفي',
-  } as Record<string, string>,
-
   /** `partner_contract_kind` in the schema. */
   contractKinds: {
     base: 'عقد شراكة أساسي',
@@ -67,8 +44,8 @@ export const ar = {
   } as Record<string, string>,
 
   contracts: {
-    title: 'العقود والمستندات',
-    intro: 'هنا عقد الشراكة الذي أرسلته سفرة، والمستندات المطلوبة للتحقق من حسابك.',
+    title: 'العقود',
+    intro: 'هنا عقد الشراكة الذي أرسلته سفرة.',
 
     contractsTitle: 'عقود الشراكة',
     contractsEmpty: 'لم يصلك عقد بعد. يُرفع العقد بعد قبول طلب الشراكة.',
@@ -139,16 +116,9 @@ export const ar = {
       'أرسلت سفرة نسخة جديدة من العقد، لذلك لم يعد توقيعك السابق سارياً. نزّل النسخة الجديدة، وقّعها بخط اليد، ثم ارفعها من جديد.',
     signWaitingSafra:
       'بانتظار توقيع سفرة. سيصلك إشعار على بريدك حين يصبح جاهزاً لتوقيعك.',
-    documentsTitle: 'مستندات التحقق',
-    documentsIntro: 'ارفع المستندات التي يحتاجها فريق سفرة للتحقق من نشاطك.',
-    documentsEmpty: 'لم ترفع أي مستند بعد.',
     documentStatus: 'الحالة',
     documentUploaded: 'تاريخ الرفع',
-    documentNotes: 'ملاحظات المراجع',
-    upload: 'إرسال المستندات',
-    uploading: 'جارٍ الرفع…',
     file: 'الملف',
-    uploadFailed: 'تعذّر رفع المستند. حاول مرة أخرى.',
 
     /*
       ── One field per document, all required (Bashar, 2026-08-21) ────────────────────────────
@@ -157,9 +127,7 @@ export const ar = {
       times. A field per kind makes the list the form: what is asked for, what has arrived, and
       what is still missing are all one thing to read.
     */
-    uploadAllIntro: 'كل المستندات التالية مطلوبة. اختر ملفًا لكل واحد ثم أرسلها معًا.',
     uploadRemaining: 'ما زال مطلوبًا: {n}',
-    uploadAllSent: 'أرسلت كل المستندات المطلوبة.',
     /** Beside a kind whose document has already arrived, so the row is not an empty demand. */
     uploadDone: 'أُرسل',
     uploadReplace: 'إرسال بديل',
@@ -191,18 +159,11 @@ export const ar = {
       same words at first, which put one heading twice on one screen — a reader scanning for the
       list finds the form, and neither heading tells them which is which.
     */
-    uploadTitle: 'إرسال مستند',
-    onboardingLead:
-      'خطوة واحدة تفصلك عن استخدام لوحة الشريك: أرسل مستنداتك ووقّع العقد. تظهر بقية اللوحة بعد أن يعتمدها فريق سفرة.',
 
-    stepUpload: 'إرسال المستندات',
     stepReview: 'مراجعة سفرة',
     stepReady: 'لوحة الشريك',
 
     /** Stage one: nothing has arrived yet. */
-    stageEmptyTitle: 'ابدأ بإرسال مستنداتك',
-    stageEmptyBody:
-      'أرسل المستندات الخمسة المطلوبة أدناه. تبدأ المراجعة بعد وصولها كلها، ويُراجَع كل مستند على حدة.',
 
     /*
       Stage between one and two, since all five documents became required (Bashar, 2026-08-21).
@@ -211,9 +172,6 @@ export const ar = {
       منك الآن» — false, and false in the direction that stops them. The panel is the "what to do
       now" line on this page, so it has to distinguish a set that is complete from one that is not.
     */
-    stagePartialTitle: 'بقيت مستندات',
-    stagePartialBody:
-      'أرسل ما تبقّى من المستندات المطلوبة. تبدأ المراجعة بعد وصولها كلها.',
 
     /** Stage two: everything sent, nothing decided. */
     stageWaitingTitle: 'وصلت مستنداتك',
@@ -230,7 +188,6 @@ export const ar = {
     stageDoneBody: 'حسابك جاهز. لوحة الشريك متاحة الآن بكل أقسامها.',
 
     /** What SAFRA asks for, listed where it is asked for rather than in an email. */
-    neededTitle: 'ما نحتاجه منك',
     /*
       Five lines, matching the five fields exactly — and unconditional, because the form is.
 
@@ -239,12 +196,6 @@ export const ar = {
       it says it needs is read as a mistake, and the partner stops at الدعم to ask which is true.
       See the note in `document-upload.tsx` on what that conditionality would cost to restore.
     */
-    neededIdentity: 'هوية أو جواز سفر للشخص الموقّع.',
-    neededRegister: 'سجل تجاري للكيان القانوني.',
-    neededOwnership: 'سند ملكية يثبت حق التأجير.',
-    neededManagement: 'عقد إدارة الإقامة.',
-    neededBank: 'تأكيد مصرفي بحساب التحويلات.',
-    neededNote: 'صور واضحة أو ملفات PDF. الحد الأقصى {max} ميغابايت للملف.',
 
     /** The counter above the list — a number a person can check against what they sent. */
     /*
@@ -252,8 +203,6 @@ export const ar = {
       leaves its old row behind — a line counting rows says «1 يحتاج إعادة إرسال» about a document
       that was replaced and approved days ago (Bashar, 2026-08-21).
     */
-    countSent:
-      'أرسلت {sent} من {total} مستندات · {approved} معتمد · {rejected} يحتاج إعادة إرسال',
     lockedNote: 'تظهر بقية أقسام اللوحة بعد اعتماد حسابك.',
   },
 
@@ -313,7 +262,7 @@ export const ar = {
     calendars: 'التقويمات',
     reviews: 'التقييمات',
     payouts: 'مستحقاتي',
-    contracts: 'العقود والمستندات',
+    contracts: 'العقود',
     arrivals: 'الوصول اليوم',
     violations: 'المخالفات',
     employees: 'الموظفون',
