@@ -1,29 +1,18 @@
-import { PARTNER_DOCUMENT_KINDS } from '@safra/contracts';
 import { statusTone } from '@safra/ui';
 
 import {
   getMyContracts,
-  getMyDocuments,
   getMyProfile,
   sidebarBadges,
   type PartnerContract,
-  type PartnerDocument,
 } from '@/lib/api';
 import { isLocked, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { count } from '@/lib/format';
 import { ContractSigning } from '@/components/contract-signing';
-import { DocumentUpload } from '@/components/document-upload';
 import { TONES } from '@/lib/tones';
-import {
-  contractKind,
-  contractStatus,
-  documentKind,
-  fill,
-  t,
-  verificationStatus,
-} from '@/lib/strings';
+import { contractKind, contractStatus, t } from '@/lib/strings';
 
 /**
  * العقود والمستندات — steps 4, 5 and 6 of «انضم كشريك» (Bashar, 2026-08-19).
@@ -65,11 +54,15 @@ import {
  */
 export const dynamic = 'force-dynamic';
 
-/** The per-file cap the API enforces on a document upload. Stated where it is asked for. */
-const MAX_UPLOAD_MB = 10;
-
-/** The stage the account is in, decided once and rendered once. */
-type Stage = 'empty' | 'partial' | 'waiting' | 'fix' | 'done';
+/**
+ * The stage the account is in, decided once and rendered once.
+ *
+ * Two of the five went with المستندات on 2026-08-31 (Bashar: «We should remove this section
+ * completely»): `empty` and `partial` described how much of a document set had arrived, and there
+ * is no document set any more. What is left is the only question this page can still answer — is
+ * SAFRA still looking, has it said no, or is the partner through.
+ */
+type Stage = 'waiting' | 'fix' | 'done';
 
 export default async function ContractsPage({
   searchParams,
@@ -143,16 +136,13 @@ export default async function ContractsPage({
     );
   }
 
-  const [contractsResult, documentsResult] = await Promise.all([
-    getMyContracts(),
-    getMyDocuments(),
-  ]);
+  const [contractsResult] = await Promise.all([getMyContracts()]);
 
-  if (contractsResult === 'unauthenticated' || documentsResult === 'unauthenticated') {
+  if (contractsResult === 'unauthenticated') {
     return shell(<p className="text-sm text-muted">{t.dashboard.sessionExpired}</p>);
   }
 
-  if (contractsResult === 'failed' || documentsResult === 'failed') {
+  if (contractsResult === 'failed') {
     return shell(<p className="text-sm text-muted">{t.contracts.loadFailed}</p>);
   }
 
@@ -161,80 +151,24 @@ export default async function ContractsPage({
       ? 'pending'
       : profile.verification;
 
-  const documents = documentsResult.documents;
-
   /*
-    Everything on this screen is about KINDS, not about rows.
+    The stage, from the account's own state and nothing else.
 
-    `partner_documents` is append-only: replacing a rejected passport adds a row and leaves the
-    rejected one where it was. So the state of a kind is the state of its NEWEST row — the list
-    arrives `ORDER BY created_at DESC`, so that is the first match — and any count taken over rows
-    describes history rather than the present.
-
-    That distinction is the bug Bashar reported on 2026-08-21: the stage was chosen by
-    `documents.filter(d => d.status === 'rejected').length > 0`, which counts rows. Once ANY
-    document had ever been rejected the partner was told «مستند يحتاج إعادة إرسال» for ever — after
-    they had replaced it, and after a reviewer had approved the replacement. The panel described a
-    row nobody could act on, on a screen whose only job is to say what to do next.
-  */
-  const newestByKind = new Map(
-    PARTNER_DOCUMENT_KINDS.map((kind) => [
-      kind,
-      documents.find((document) => document.kind === kind),
-    ]),
-  );
-
-  const states = [...newestByKind.values()];
-
-  /** Sent and not sent back — the kind needs nothing further. */
-  const settled = states.filter(
-    (newest) => newest !== undefined && newest.status !== 'rejected',
-  ).length;
-  const approved = states.filter((newest) => newest?.status === 'approved').length;
-  /** The kind's LATEST attempt was rejected, so this one is the partner's to act on. */
-  const needsResend = states.filter((newest) => newest?.status === 'rejected').length;
-  const sentKinds = states.filter((newest) => newest !== undefined).length;
-
-  /*
-    The stage, in the order a partner meets it.
-
-    `fix` outranks `waiting` on purpose: a partner with two documents under review and one sent
-    back has something to DO, and «لا حاجة لأي إجراء منك الآن» would be false for exactly the
-    person who needs to act.
-
-    `partial` exists because all five kinds became required on 2026-08-21.
+    It was derived from how many document KINDS had arrived and whether any newest row had been
+    sent back. With المستندات gone there is one fact left: what SAFRA has decided.
   */
   const stage: Stage =
     verification === 'approved'
       ? 'done'
-      : needsResend > 0 || verification === 'rejected'
+      : verification === 'rejected'
         ? 'fix'
-        : documents.length === 0
-          ? 'empty'
-          : settled < PARTNER_DOCUMENT_KINDS.length
-            ? 'partial'
-            : 'waiting';
+        : 'waiting';
 
   return shell(
     <>
       {locked ? <Steps stage={stage} /> : null}
 
       <StagePanel stage={stage} />
-
-      {/*
-        What is asked for, listed BEFORE the form. It was only in the «انضم كشريك» page on the
-        customer site — a page the partner saw once, days earlier, before they had an account.
-      */}
-      {stage === 'empty' || stage === 'partial' || stage === 'fix' ? <Needed /> : null}
-
-      {verification === 'approved' ? null : (
-        <section>
-          <h2 className="mb-2 text-[14.5px] font-extrabold text-gold">
-            {t.contracts.uploadTitle}
-          </h2>
-          <DocumentUpload sent={documents} />
-        </section>
-      )}
 
       <section>
         <h2 className="mb-2 text-[14.5px] font-extrabold text-gold">
@@ -251,28 +185,6 @@ export default async function ContractsPage({
           </ul>
         )}
       </section>
-
-      {documents.length === 0 ? null : (
-        <section>
-          <h2 className="mb-1 text-[14.5px] font-extrabold text-gold">
-            {t.contracts.documentsTitle}
-          </h2>
-          <p className="mb-3 text-[12px] text-faint">
-            {fill(t.contracts.countSent, {
-              sent: sentKinds,
-              total: PARTNER_DOCUMENT_KINDS.length,
-              approved,
-              rejected: needsResend,
-            })}
-          </p>
-
-          <ul className="grid gap-2">
-            {documents.map((document) => (
-              <DocumentCard key={document.id} document={document} />
-            ))}
-          </ul>
-        </section>
-      )}
 
       {locked ? (
         <p className="text-[11.5px] text-faint2">{t.contracts.lockedNote}</p>
@@ -344,23 +256,11 @@ function StagePanel({ stage }: { readonly stage: Stage }) {
             body: t.contracts.stageFixBody,
             tone: 'bad',
           }
-        : stage === 'waiting'
-          ? {
-              title: t.contracts.stageWaitingTitle,
-              body: t.contracts.stageWaitingBody,
-              tone: 'gold',
-            }
-          : stage === 'partial'
-            ? {
-                title: t.contracts.stagePartialTitle,
-                body: t.contracts.stagePartialBody,
-                tone: 'gold',
-              }
-            : {
-                title: t.contracts.stageEmptyTitle,
-                body: t.contracts.stageEmptyBody,
-                tone: 'gold',
-              };
+        : {
+            title: t.contracts.stageWaitingTitle,
+            body: t.contracts.stageWaitingBody,
+            tone: 'gold',
+          };
 
   return (
     <section
@@ -376,12 +276,6 @@ function StagePanel({ stage }: { readonly stage: Stage }) {
       <h2 className="text-[14px] font-bold text-text">{copy.title}</h2>
       <p className="mt-1 text-[12.5px] leading-relaxed text-text2">{copy.body}</p>
 
-      {stage === 'empty' ? (
-        <p className="mt-1.5 text-[12.5px] leading-relaxed text-text2">
-          {t.contracts.onboardingLead}
-        </p>
-      ) : null}
-
       {/*
         No call to action on the finished panel (Bashar, 2026-08-21).
 
@@ -390,35 +284,6 @@ function StagePanel({ stage }: { readonly stage: Stage }) {
         sidebar unlocks the moment verification lands, «لوحة التحكم» is its first item, and a button
         that duplicates a nav link is a second thing to keep pointing at the right place.
       */}
-    </section>
-  );
-}
-
-/** What SAFRA asks for — on the screen where it is sent, not only in the application form. */
-function Needed() {
-  return (
-    <section className="rounded-xl border border-line bg-card px-4 py-3.5">
-      <h2 className="text-[13.5px] font-bold text-text">{t.contracts.neededTitle}</h2>
-      <ul className="mt-2 grid gap-1.5 text-[12.5px] leading-relaxed text-text2">
-        {[
-          t.contracts.neededIdentity,
-          t.contracts.neededRegister,
-          t.contracts.neededOwnership,
-          t.contracts.neededManagement,
-          t.contracts.neededBank,
-        ].map((line) => (
-          <li key={line} className="flex gap-2">
-            <span aria-hidden="true" className="text-gold">
-              ―
-            </span>
-            <span>{line}</span>
-          </li>
-        ))}
-      </ul>
-      {/* The size cap the API enforces, localised through  like every other number. */}
-      <p className="mt-2 text-[11.5px] text-faint">
-        {fill(t.contracts.neededNote, { max: count(MAX_UPLOAD_MB) })}
-      </p>
     </section>
   );
 }
@@ -575,35 +440,5 @@ function ContractHistory({ contract }: { readonly contract: PartnerContract }) {
         ))}
       </ol>
     </div>
-  );
-}
-
-function DocumentCard({ document }: { readonly document: PartnerDocument }) {
-  return (
-    <li className="grid gap-1 rounded-xl border border-line bg-card px-3.5 py-3">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="text-[13px] font-bold text-text">
-          {documentKind(document.kind)}
-        </span>
-        <span
-          className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${TONES[statusTone(document.status)]}`}
-        >
-          {verificationStatus(document.status)}
-        </span>
-        <span className="text-[11.5px] text-faint">
-          {t.contracts.documentUploaded} <Ltr>{document.createdAt.slice(0, 10)}</Ltr>
-        </span>
-      </div>
-
-      {/*
-        The reviewer's note, shown to the partner deliberately. It is what tells them what to send
-        instead — a rejected document with no reason produces a support ticket, not a better upload.
-      */}
-      {document.reviewNotes ? (
-        <p className="text-[12px] leading-relaxed text-text2">
-          {t.contracts.documentNotes}: {document.reviewNotes}
-        </p>
-      ) : null}
-    </li>
   );
 }

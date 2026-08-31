@@ -686,24 +686,6 @@ export async function getMyContracts() {
   );
 }
 
-const partnerDocumentSchema = z.object({
-  id: z.string(),
-  kind: z.string(),
-  status: z.string(),
-  fileName: z.string(),
-  reviewNotes: z.string().nullable(),
-  createdAt: z.string(),
-});
-
-export type PartnerDocument = z.infer<typeof partnerDocumentSchema>;
-
-export async function getMyDocuments() {
-  return partnerFetch(
-    '/partner/documents',
-    z.object({ documents: z.array(partnerDocumentSchema) }),
-  );
-}
-
 // ─── الدعم (Bashar, 2026-08-12) ───────────────────────────────────────────────
 
 /**

@@ -149,56 +149,17 @@ test.describe('onboarding a partner in person', () => {
       page.getByRole('button', { name: onboarding.resendInvitation }),
     ).toBeVisible();
 
-    /* Step ② starts outstanding, and says WHICH documents are wanted rather than just "no". */
-    await expect(
-      page
-        .getByText(t.enums.documentKind['identity'] as string, { exact: false })
-        .first(),
-    ).toBeVisible();
-
-    /* ── The document upload, through the multipart BFF route ── */
-    await page
-      .getByLabel(onboarding.documentFile)
-      .setInputFiles('e2e/fixtures/room-one.jpg');
-
-    await page.getByRole('button', { name: onboarding.upload }).click();
-
     /*
-      The uploaded document appears in the list below. Asserted on the LIST rather than on the
-      success line, because the success line is client state and the list is the server's answer —
-      only the second one proves the row exists.
+      المستندات is GONE (Bashar, 2026-08-31): «We should remove this section completely … When the
+      super admin accept the partner, the partner should see the dashboard after sign in.»
+
+      What this walk used to do here — pick a kind, upload through the multipart BFF route, watch
+      the row appear, then repeat because §8.1 wanted one from each pair — has no screen and no
+      endpoint any more. Approval no longer waits on paperwork, so the sitting goes straight from
+      the partner's details to the contract.
     */
-    await expect(
-      page
-        .locator('[data-document-kind], li')
-        .filter({
-          hasText: t.enums.documentKind['identity'] as string,
-        })
-        .first(),
-    ).toBeVisible({ timeout: 15_000 });
 
-    /*
-      A SECOND document, and §8.1 is the reason rather than thoroughness.
-
-      Approval refuses without one from each pair the SRS names — «هوية أو سجل تجاري» and «إثبات
-      ملكية أو عقد إدارة» — since 2026-08-26. With only the identity on file this walk ended at a
-      refusal, which is the gate working and the spec describing the world before it.
-    */
-    await page.selectOption('select[name="kind"]', 'ownership_proof');
-    await page
-      .getByLabel(onboarding.documentFile)
-      .setInputFiles('e2e/fixtures/room-one.jpg');
-
-    await page.getByRole('button', { name: onboarding.upload }).click();
-
-    await expect(
-      page
-        .locator('[data-document-kind], li')
-        .filter({ hasText: t.enums.documentKind['ownership_proof'] as string })
-        .first(),
-    ).toBeVisible({ timeout: 15_000 });
-
-    /* ── ③ The contract. Generating it is the step SAFRA does before anybody signs ── */
+    /* ── ② The contract. Generating it is the step SAFRA does before anybody signs ── */
     await expect(page.getByText(onboarding.contractStateNone)).toBeVisible();
 
     await page.getByRole('button', { name: t.sections.partnerContract.generate }).click();
@@ -275,7 +236,7 @@ test.describe('onboarding a partner in person', () => {
     */
     await expect(page.getByText(t.sections.partnerContract.historyTitle)).toBeVisible();
 
-    /* ── ⑤ The approval control is reachable, and approving takes ── */
+    /* ── ④ The approval control is reachable, and approving takes ── */
     await expect(
       page.getByRole('button', { name: t.sections.verifyPartner.approve }),
     ).toBeVisible();
