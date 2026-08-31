@@ -5,7 +5,6 @@ import { notFound } from 'next/navigation';
 import { getContracts, getPartner, getSanctionsStatus } from '@/lib/api';
 import { Ltr, StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
-import { DocumentReview } from '@/components/document-review';
 import { ScreeningPanel } from '@/components/screening-panel';
 import { DEFAULT_SANCTIONS_POLICY } from '@safra/contracts';
 
@@ -233,23 +232,6 @@ export default async function PartnerPage({
             }
           />
         </dl>
-      </Section>
-
-      {/* ── §8.1 documents, reviewed one at a time (item 121) ─────────────── */}
-      <Section title={t.sections.partnerDetail.documents}>
-        {partner.documents.length === 0 ? (
-          <p className="rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm text-gold">
-            {t.sections.partnerDetail.noDocuments}
-          </p>
-        ) : (
-          <ul className="grid gap-2">
-            {partner.documents.map((document) => (
-              <li key={document.id}>
-                <DocumentReview document={document} />
-              </li>
-            ))}
-          </ul>
-        )}
       </Section>
 
       {/* ── The contract (Bashar, 2026-08-21) ─────────────────────────────── */}

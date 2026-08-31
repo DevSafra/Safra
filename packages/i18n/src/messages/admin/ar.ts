@@ -869,11 +869,15 @@ export const ar = {
       resent: 'أُرسلت الدعوة من جديد إلى {email}. صلاحيتها 72 ساعة.',
       resendFailed: 'تعذّرت إعادة إرسال الدعوة.',
 
+      /*
+        Four steps since 2026-08-31, not five. «المستندات» was removed on Bashar's instruction —
+        «We should remove this section completely … When the super admin accept the partner, the
+        partner should see the dashboard after sign in» — and approval no longer waits on it.
+      */
       step1: 'بيانات الشريك',
-      step2: 'المستندات',
-      step3: 'العقد',
-      step4: 'فحص العقوبات',
-      step5: 'الموافقة',
+      step2: 'العقد',
+      step3: 'فحص العقوبات',
+      step4: 'الموافقة',
 
       /* ── Documents ── */
       documentsIntro:

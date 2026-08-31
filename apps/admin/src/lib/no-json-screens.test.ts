@@ -161,7 +161,6 @@ describe('routes a browser navigates to', () => {
 
     expect(found).toStrictEqual([
       'admin/api/contracts/*/file/*',
-      'admin/api/documents/*/file',
       'admin/api/table-page-size',
       'admin/bookings/exports/download/*',
       'admin/bookings/exports/request',

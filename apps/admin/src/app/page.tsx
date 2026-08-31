@@ -327,21 +327,6 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
         }
       : null,
     /*
-      Above the two queue rows in urgency but listed after them, because it is the same work seen
-      differently: a document waiting IS a partner waiting, counted by the thing that arrived.
-
-      `/partners` rather than a documents registry, because there is no such screen — a document is
-      reviewed on the partner it belongs to, which is where the reviewer needs the rest of the
-      context anyway.
-    */
-    counters.partner_documents_pending_review > 0
-      ? {
-          code: 'P-002',
-          text: `${count(counters.partner_documents_pending_review)} ${t.admin.attentionDocuments}`,
-          href: '/partners',
-        }
-      : null,
-    /*
       `href` is required now that every row has one — see EC-008 above.
 
       It was optional, and the dimmed no-destination branch below went with it. Both are gone rather

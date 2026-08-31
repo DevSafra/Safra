@@ -184,8 +184,7 @@ export default async function PartnersPage({
                         {partner.legalName}
                       </span>
                       <span className="block text-[11px] text-faint">
-                        <Ltr>{partner.reference}</Ltr> · {partner.city.nameAr} ·{' '}
-                        {partner.documents.length} {t.dashboard.documents}
+                        <Ltr>{partner.reference}</Ltr> · {partner.city.nameAr}
                       </span>
                     </span>
 

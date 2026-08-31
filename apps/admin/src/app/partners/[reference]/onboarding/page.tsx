@@ -1,20 +1,14 @@
 import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 
-import {
-  canFileJointContract,
-  DEFAULT_SANCTIONS_POLICY,
-  missingOnboardingDocuments,
-} from '@safra/contracts';
+import { canFileJointContract, DEFAULT_SANCTIONS_POLICY } from '@safra/contracts';
 
 import { getContracts, getPartner, getSanctionsStatus } from '@/lib/api';
 import { Ltr, StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
-import { DocumentReview } from '@/components/document-review';
 import { PartnerContractPanel } from '@/components/partner-contract-panel';
 import { PartnerLocation } from '@/components/partner-location';
 import { PartnerAccountState } from '@/components/partner-account-state';
-import { PartnerDocumentUpload } from '@/components/partner-document-upload';
 import { ScreeningPanel } from '@/components/screening-panel';
 import { VerifyPartner } from '@/components/verify-partner';
 import { BackLink } from '@/components/back-link';
@@ -128,7 +122,6 @@ export default async function PartnerOnboardingPage({
     about whether the paperwork was collected. Whether each is acceptable is the review decision
     on the row itself, which is a separate control with its own permission.
   */
-  const missing = missingOnboardingDocuments(partner.documents.map((doc) => doc.kind));
 
   /* `active` means both parties have signed — the state the approval step wants to see. */
   const contractActive = contractRows.some((contract) => contract.status === 'active');
@@ -235,44 +228,10 @@ export default async function PartnerOnboardingPage({
         />
       </Step>
 
-      {/* ── ② The documents ────────────────────────────────────────────────── */}
+      {/* ── ② The contract, in the order the steps have to happen ──────────── */}
       <Step
         number={2}
         title={t.sections.partnerOnboarding.step2}
-        state={missing.length === 0 ? 'done' : 'outstanding'}
-        note={
-          missing.length === 0
-            ? t.sections.partnerOnboarding.documentsComplete
-            : fill(t.sections.partnerOnboarding.documentsRequired, {
-                kinds: missing.map(documentKindLabel).join(' · '),
-              })
-        }
-      >
-        <p className="mb-3 text-[12.5px] leading-relaxed text-muted">
-          {t.sections.partnerOnboarding.documentsIntro}
-        </p>
-
-        <PartnerDocumentUpload reference={partner.reference} />
-
-        {partner.documents.length === 0 ? (
-          <p className="mt-3 text-[12.5px] text-faint">
-            {t.sections.partnerOnboarding.noDocumentsYet}
-          </p>
-        ) : (
-          <ul className="mt-3 grid gap-2">
-            {partner.documents.map((document) => (
-              <li key={document.id}>
-                <DocumentReview document={document} />
-              </li>
-            ))}
-          </ul>
-        )}
-      </Step>
-
-      {/* ── ③ The contract, in the order the steps have to happen ──────────── */}
-      <Step
-        number={3}
-        title={t.sections.partnerOnboarding.step3}
         state={contractActive ? 'done' : 'outstanding'}
         note={t.sections.partnerOnboarding[contractState]}
       >
@@ -309,11 +268,11 @@ export default async function PartnerOnboardingPage({
         />
       </Step>
 
-      {/* ── ④ Screening. Advisory by policy, so it is marked as such ───────── */}
+      {/* ── ③ Screening. Advisory by policy, so it is marked as such ───────── */}
       {policy === 'off' ? null : (
         <Step
-          number={4}
-          title={t.sections.partnerOnboarding.step4}
+          number={3}
+          title={t.sections.partnerOnboarding.step3}
           state={screened ? 'done' : policy === 'required' ? 'outstanding' : 'optional'}
           note={
             screened
@@ -334,10 +293,10 @@ export default async function PartnerOnboardingPage({
         </Step>
       )}
 
-      {/* ── ⑤ The approval — the only irreversible thing on this screen ────── */}
+      {/* ── ④ The approval — the only irreversible thing on this screen ────── */}
       <Step
-        number={5}
-        title={t.sections.partnerOnboarding.step5}
+        number={4}
+        title={t.sections.partnerOnboarding.step4}
         state={approved ? 'done' : 'outstanding'}
         note={
           approved
@@ -400,19 +359,6 @@ function contractStateOf(
   }
 
   return 'contractStateNone';
-}
-
-/**
- * The Arabic name of a required document kind.
- *
- * `right_to_let` is the pseudo-kind `missingOnboardingDocuments` returns when neither a title deed
- * nor a management contract is on file — the reader needs to know one of the two is wanted, not
- * that both are, so it has its own phrase rather than being a list of two.
- */
-function documentKindLabel(kind: string): string {
-  return kind === 'right_to_let'
-    ? t.sections.partnerOnboarding.rightToLet
-    : label(t.enums.documentKind, kind);
 }
 
 function Shell({
