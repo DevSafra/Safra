@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react';
 
+import { TIMEZONE_CATALOGUE, utcOffset } from '@safra/contracts';
+
 /**
  * The form primitives every geography panel is built from.
  *
@@ -141,6 +143,69 @@ export function Prose({
         <span className="text-[10.5px] font-normal text-faint2">{hint}</span>
       ) : null}
     </label>
+  );
+}
+
+/**
+ * «المنطقة الزمنية» as a MENU (Bashar, 2026-08-31), not a text box.
+ *
+ * ## Why this is its own component
+ *
+ * Two forms need it — adding a city and editing one — and it carries a rule neither should have to
+ * remember: a city already stored with a zone outside the catalogue keeps it. Without that, opening
+ * the editor for such a city would show the select on its first option and SAVE that on the next
+ * «حفظ», silently moving the city's booking cutoff. A constrained field that quietly discards the
+ * value it was given is worse than the text box it replaced.
+ *
+ * ## Why the offset is shown
+ *
+ * «Asia/Amman» and «Asia/Beirut» are two names an operator cannot tell apart by eye, and the offset
+ * is the thing they are actually choosing between. It is computed, never written down: an offset is
+ * a fact about a date and changes twice a year in some of these zones.
+ *
+ * The identifier itself stays Latin and untranslated — `docs/i18n.md` lists an identifier from a
+ * standard as an exception, the same reason a currency CODE is not copy.
+ */
+export function TimezoneField({
+  label,
+  value,
+  onChange,
+  hint,
+  now,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly hint?: string | undefined;
+  /**
+   * The instant offsets are computed against.
+   *
+   * Passed in rather than read here so the server and the browser agree on the first paint: a
+   * `new Date()` inside a component renders one string on the server and possibly another on the
+   * client, which is a hydration mismatch that appears twice a year and never in a test.
+   */
+  readonly now: Date;
+}) {
+  /* The catalogue, plus whatever this city already has — see the note above. */
+  const options =
+    TIMEZONE_CATALOGUE.includes(value) || value === ''
+      ? TIMEZONE_CATALOGUE
+      : [value, ...TIMEZONE_CATALOGUE];
+
+  return (
+    <SelectField
+      label={label}
+      name="timezone"
+      value={value}
+      onChange={onChange}
+      hint={hint}
+    >
+      {options.map((zone) => (
+        <option key={zone} value={zone}>
+          {`${zone} · ${utcOffset(zone, now)}`}
+        </option>
+      ))}
+    </SelectField>
   );
 }
 

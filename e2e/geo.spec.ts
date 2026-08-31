@@ -669,3 +669,60 @@ test('the city arrows reorder the public destinations grid', async ({
   await page.locator(`[data-city-down="${second}"]`).click();
   await expect.poll(async () => (await order())[1], { timeout: 20_000 }).toBe(second);
 });
+
+/**
+ * «المنطقة الزمنية» is CHOSEN, not typed (Bashar, 2026-08-31).
+ *
+ * The zone is load-bearing: §5.3's same-day cutoff is 17:00 in the CITY's local time, so a city
+ * created with a plausible-looking wrong zone closes its own bookings at the wrong hour, silently,
+ * for as long as nobody notices. The API refuses a zone `Intl` cannot resolve, which catches a
+ * typo and not a mistake.
+ *
+ * The second assertion is the one that matters more: a city already stored with a zone outside the
+ * catalogue must KEEP it. A select that dropped it would show its first option and save that on
+ * the next «حفظ» — a constrained field that quietly discards the value it was given is worse than
+ * the text box it replaced.
+ */
+test('the timezone is a menu, and it never drops the value a city already has', async ({
+  page,
+}) => {
+  await page.goto('/geo');
+  await page.locator('[data-geo-add="city"]').click();
+
+  const form = page.locator('[data-geo-form="city"]');
+  const zone = form.locator('select[name=timezone]');
+
+  await expect(zone, 'the zone is chosen, not typed').toBeVisible();
+
+  const offered = await zone.locator('option').allInnerTexts();
+
+  /* Every market that exists, and the offset that separates two names by eye. */
+  expect(offered.join(' ')).toContain('Asia/Damascus');
+  expect(offered.join(' ')).toContain('Asia/Amman');
+  expect(offered.join(' ')).toContain('Asia/Beirut');
+  expect(offered.join(' '), 'the offset says which is which').toMatch(
+    /UTC[+-]\d{2}:\d{2}/,
+  );
+
+  await page.locator('[data-geo-add="city"]').click();
+
+  /* And an existing city opens on ITS OWN zone, not on whatever happens to be first. */
+  await page.locator('[data-city-edit="damascus"]').click();
+
+  const editor = page.locator('[data-city-form="damascus"] select[name=timezone]');
+
+  await expect(editor).toHaveValue('Asia/Damascus');
+
+  /*
+    Saving without touching it leaves the zone alone. This is the regression the picker could
+    introduce: a select whose value did not match any option would post its first one.
+  */
+  await page.getByRole('dialog').locator('[data-geo-save]').click();
+  await expect(page.getByRole('dialog')).toBeHidden({ timeout: 20_000 });
+
+  await page.locator('[data-city-edit="damascus"]').click();
+  await expect(
+    page.locator('[data-city-form="damascus"] select[name=timezone]'),
+    'the zone survives a save nobody touched it in',
+  ).toHaveValue('Asia/Damascus');
+});

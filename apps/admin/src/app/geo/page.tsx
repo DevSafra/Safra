@@ -87,6 +87,15 @@ export default async function GeoPage({
     The media host if one is configured, and the API's development route otherwise — `mediaBase`
     owns that choice, and reading `NEXT_PUBLIC_MEDIA_URL` here would be a second opinion on it.
   */
+  /*
+    ONE instant for the whole render, so the timezone pickers agree.
+
+    Read here rather than inside the components: a `new Date()` per component renders one offset on
+    the server and possibly another on the client, which is a hydration mismatch that shows up
+    twice a year and never in a test.
+  */
+  const now = new Date();
+
   const media = mediaBase({
     NEXT_PUBLIC_MEDIA_URL: process.env['NEXT_PUBLIC_MEDIA_URL'],
     API_URL: process.env['API_URL'],
@@ -123,6 +132,7 @@ export default async function GeoPage({
               title={t.sections.geo.cities}
               countries={result.countries.map((one) => one.code)}
               categories={categories}
+              now={now}
             />
 
             <TableToolbar
@@ -186,6 +196,7 @@ export default async function GeoPage({
               }))}
               categories={categories}
               template={TEMPLATE}
+              now={now}
             />
 
             <FootNote>{t.sections.geo.citiesNote}</FootNote>

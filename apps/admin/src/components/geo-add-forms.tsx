@@ -13,6 +13,7 @@ import {
   Panel,
   Row,
   SelectField,
+  TimezoneField,
 } from '@/components/geo-form';
 import { t, apiErrorOf } from '@/lib/strings';
 
@@ -212,11 +213,14 @@ export function AddCity({
   title,
   countries,
   categories: options,
+  now,
 }: {
   readonly title: string;
   readonly countries: readonly string[];
   /** From `city_categories`, so a category added on الفئات is selectable here immediately. */
   readonly categories: readonly CategoryOption[];
+  /** The instant timezone offsets are computed against — see `TimezoneField`. */
+  readonly now: Date;
 }) {
   const c = t.sections.geo;
   const [countryCode, setCountryCode] = useState(countries[0] ?? '');
@@ -262,11 +266,13 @@ export function AddCity({
 
       <Row>
         <Field label={c.slug} value={slug} onChange={setSlug} hint={c.slugHint} />
-        <Field
+        {/* A MENU, not a text box — see `TimezoneField`. */}
+        <TimezoneField
           label={c.timezone}
           value={timezone}
           onChange={setTimezone}
           hint={c.timezoneHint}
+          now={now}
         />
       </Row>
       <Row>

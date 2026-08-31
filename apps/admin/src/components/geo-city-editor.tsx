@@ -7,7 +7,15 @@ import { Modal, useConfirm } from '@safra/ui';
 
 import { AdminTable, StatusPill, type AdminColumn } from '@/components/admin-table';
 import { CityPhotographs, type CityPhotograph } from '@/components/city-photographs';
-import { Actions, CheckboxField, Field, Panel, Prose, Row } from '@/components/geo-form';
+import {
+  Actions,
+  CheckboxField,
+  Field,
+  Panel,
+  Prose,
+  Row,
+  TimezoneField,
+} from '@/components/geo-form';
 import { count } from '@/lib/format';
 import { t, apiErrorOf, fill } from '@/lib/strings';
 
@@ -92,10 +100,13 @@ function parseTags(value: string): string[] {
 function CityForm({
   city,
   categories: options,
+  now,
   onClose,
 }: {
   readonly city: EditableCity;
   readonly categories: readonly CategoryOption[];
+  /** The instant timezone offsets are computed against — see `TimezoneField`. */
+  readonly now: Date;
   readonly onClose: () => void;
 }) {
   const router = useRouter();
@@ -271,11 +282,13 @@ function CityForm({
         </Row>
 
         <Row>
-          <Field
+          {/* A MENU, not a text box — see `TimezoneField`. */}
+          <TimezoneField
             label={c.timezone}
             value={timezone}
             onChange={setTimezone}
             hint={c.timezoneHint}
+            now={now}
           />
         </Row>
 
@@ -472,11 +485,14 @@ export function GeoCities({
   cities,
   categories,
   template,
+  now,
 }: {
   readonly cities: readonly EditableCity[];
   /** The ACTIVE categories, read from `city_categories` — see `CategoryOption`. */
   readonly categories: readonly CategoryOption[];
   readonly template: string;
+  /** The instant timezone offsets are computed against — see `TimezoneField`. */
+  readonly now: Date;
 }) {
   const router = useRouter();
   const c = t.sections.geo;
@@ -616,6 +632,7 @@ export function GeoCities({
           key={open.slug}
           city={open}
           categories={categories}
+          now={now}
           onClose={() => setEditing(null)}
         />
       ) : null}
