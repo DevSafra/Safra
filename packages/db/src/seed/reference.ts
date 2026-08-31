@@ -613,7 +613,13 @@ export const SETTINGS: {
     key: 'booking.confirmation_window_minutes',
     value: 120,
     valueSchema: 'positiveInt',
-    descriptionAr: 'مهلة تأكيد الشريك (ساعتان)',
+    /*
+      The «(ساعتان)» is gone: a label must not state the VALUE beside it.
+
+      It was true for 120 and becomes a lie the moment somebody sets 180 — and the screen prints
+      «120 دقيقة» next to it now, so the label was also saying it twice.
+    */
+    descriptionAr: 'مهلة الشريك لتأكيد الحجز',
     descriptionEn: 'Partner confirmation SLA in minutes (§6.4)',
   },
   {
@@ -627,7 +633,15 @@ export const SETTINGS: {
     key: 'booking.pending_payment_timeout_minutes',
     value: 30,
     valueSchema: 'positiveInt',
-    descriptionAr: 'مهلة Pending Payment — يلغى الحجز تلقائياً إن لم يكتمل الدفع',
+    /*
+      No English inside an Arabic sentence.
+
+      It read «مهلة Pending Payment» — the name of a booking status, in English, in the middle of
+      the label an operator reads on الإعدادات (Bashar, 2026-08-31). The console names its settings
+      from `@safra/i18n` now and this column is only the fallback, but a fallback that reaches a
+      screen reaches it in the reader's language too. `post/0019` backfills the seeded row.
+    */
+    descriptionAr: 'مهلة انتظار الدفع — يُلغى الحجز تلقائياً إن لم يكتمل',
     descriptionEn: 'Pending payment expiry; booking auto-cancels (EC-001)',
   },
   {

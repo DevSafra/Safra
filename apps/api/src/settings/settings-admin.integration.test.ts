@@ -63,10 +63,20 @@ describeIfDb('SettingsAdminService', () => {
      * to repeat that predicate exactly or Postgres rejects it — a detail of the index
      * that a test has no business depending on.
      */
+    /*
+      An ARABIC description too, because this row is permanent and الإعدادات renders it.
+
+      The console labels a setting from `@safra/i18n`, falling back to `description_ar`. With only
+      an English description this fixture appeared to an operator as its own KEY —
+      `test.settings_admin_fixture`, with no explanation. «Test fixtures» is a documented exception
+      to the copy rule (`docs/i18n.md`), but a fixture that reaches a real screen still has to reach
+      it in the reader's language. `post/0019` backfills the row that already exists.
+    */
     await db.execute(sql`
-      INSERT INTO settings (key, scope, value, value_schema, description_en)
+      INSERT INTO settings (key, scope, value, value_schema, description_en, description_ar)
       SELECT ${KEY}, 'global', ${JSON.stringify(ORIGINAL_VALUE)}::jsonb, 'positiveInt',
-             'Integration-test fixture for the settings editor. Read by no code; safe to ignore.'
+             'Integration-test fixture for the settings editor. Read by no code; safe to ignore.',
+             'صف اختباري يستخدمه فحص محرر الإعدادات. لا يقرأه أي كود، ولا يؤثر تغييره على شيء.'
       WHERE NOT EXISTS (
         SELECT 1 FROM settings WHERE key = ${KEY} AND deleted_at IS NULL
       )
