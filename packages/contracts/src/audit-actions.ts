@@ -185,6 +185,8 @@ export const AUDIT_ACTIONS = [
   'property_image.reordered',
   'city_image.uploaded',
   'city_image.archived',
+  /* Its alt text, credit, order, or which photograph §5.4's band draws. */
+  'city_image.updated',
   'unit.created',
   'unit.updated',
   'calendar.range_updated',

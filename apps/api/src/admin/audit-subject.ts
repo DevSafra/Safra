@@ -280,6 +280,28 @@ const SOURCES: Record<string, Source> = {
     label: sql`name_ar`,
     href: () => '/geo',
   },
+  /*
+    A city PHOTOGRAPH. This subject type has existed since city photography shipped and no row
+    ever carried it, because the archive endpoint had no caller — so the resolver was never asked
+    and the gap was invisible. Managing a photograph from the console (Bashar, 2026-08-31) wrote
+    the first, and the sweep that reads `audit_log` rather than the source caught it immediately.
+
+    A photograph has no reference of its own that a reader would recognise, so it borrows its
+    CITY's: «دمشق» is what somebody scanning سجل التدقيق needs, and the file key is a uuid under a
+    prefix. `href` leads to المدن، where the photograph is managed — the same destination `city`
+    uses, because that is where the entry can actually be acted on.
+  */
+  city_image: {
+    table: 'city_images',
+    /*
+      Correlated subqueries rather than a JOIN in `table`: the resolver selects `id` and filters on
+      it unqualified, so a joined table would make that ambiguous and the statement would fail for
+      every entry of this type.
+    */
+    reference: sql`(SELECT c.slug FROM cities c WHERE c.id = city_images.city_id)`,
+    label: sql`(SELECT c.name_ar FROM cities c WHERE c.id = city_images.city_id)`,
+    href: () => '/geo',
+  },
   staff_role: {
     table: 'staff_roles',
     reference: sql`NULL`,
