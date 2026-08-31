@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -27,6 +28,13 @@ test.describe('الإعلانات', () => {
    * to obtain one. A test that seeded an advertiser directly would pass over exactly that gap.
    */
   test('creates an advertiser, a campaign, and its invoices', async ({ page }) => {
+    /*
+      Longer than the default: this walk creates an advertiser and a campaign, edits the creative,
+      and then reloads TWICE to prove the description persists and can be cleared. Thirty seconds
+      was enough before those reloads and is not now.
+    */
+    test.setTimeout(90_000);
+
     await page.goto('/ads');
 
     await page.getByRole('button', { name: /معلن جديد/ }).click();
@@ -194,11 +202,59 @@ test.describe('الإعلانات', () => {
     const edited = `إعلان معدَّل ${stamp}`;
 
     await dialog.getByLabel('العنوان بالعربية').fill(edited);
+
+    /*
+      The DESCRIPTION, saved in the same press (Bashar, 2026-08-31).
+
+      Asserted here rather than in a test of its own: an empty registry renders no `<table>` at
+      all, so a standalone test would have had to skip on a fresh database — and it did, silently,
+      on the run that was supposed to prove this feature. This flow creates the campaign it edits,
+      so the row is always there.
+    */
+    const described = `وصف تجريبي ${stamp}`;
+
+    await dialog.getByLabel(t.sections.ads.fDescriptionAr).fill(described);
     await expect(save).toBeEnabled();
     await save.click();
 
     await expect(dialog, 'the dialog closes on a successful save').toBeHidden();
     await expect(page.locator('tbody tr').first()).toContainText(advertiserName);
+
+    /*
+      The description survives a reload, and emptying the box CLEARS it.
+
+      The clearing half is the one that needs a browser: the API tells «leave this» from «clear
+      this» by whether the key is present, and only the form decides which it sends. A dialog that
+      omitted an emptied box would let an operator add a description and never remove one.
+    */
+    await page.reload();
+    await page
+      .locator('tbody tr')
+      .first()
+      .getByRole('button', { name: 'تعديل', exact: true })
+      .click();
+
+    const reopened = page.getByRole('dialog');
+
+    await expect(reopened.getByLabel(t.sections.ads.fDescriptionAr)).toHaveValue(
+      described,
+    );
+
+    await reopened.getByLabel(t.sections.ads.fDescriptionAr).fill('');
+    await reopened.getByRole('button', { name: 'حفظ', exact: true }).click();
+    await expect(reopened).toBeHidden({ timeout: 20_000 });
+
+    await page.reload();
+    await page
+      .locator('tbody tr')
+      .first()
+      .getByRole('button', { name: 'تعديل', exact: true })
+      .click();
+
+    await expect(
+      page.getByRole('dialog').getByLabel(t.sections.ads.fDescriptionAr),
+      'an emptied description is cleared, not left behind',
+    ).toHaveValue('');
 
     /*
       And the row SHOWS the new headline (Bashar, 2026-08-27).
@@ -624,67 +680,4 @@ test.describe('الإعلانات', () => {
       expect(sideways, `the page scrolls sideways at ${width}px`).toBe(false);
     }
   });
-});
-
-/**
- * A campaign carries a DESCRIPTION, and emptying it takes it off (Bashar, 2026-08-31).
- *
- * The round trip is the assertion: written, reloaded, still there — then cleared, reloaded, gone.
- * The clearing half is the one that needs a browser, because the API distinguishes «leave this»
- * from «clear this» by whether the key is present, and only the form decides which it sends. A
- * dialog that omitted an emptied box would let an operator add a description and never remove one.
- */
-test('الإعلانات › a campaign description is written, kept, and cleared', async ({
-  page,
-}) => {
-  await page.goto('/ads');
-
-  const row = page.locator('tbody tr').first();
-
-  test.skip((await row.count()) === 0, 'No campaign on this database to edit.');
-
-  await row.getByRole('button', { name: 'تعديل', exact: true }).click();
-
-  const dialog = page.getByRole('dialog');
-
-  await expect(dialog).toBeVisible();
-
-  const arabic = dialog.getByLabel(t.sections.ads.fDescriptionAr);
-  const written = `وصف تجريبي ${Math.random().toString(36).slice(2, 7)}`;
-
-  await expect(arabic, 'the description is on the edit dialog').toBeVisible();
-
-  await arabic.fill(written);
-  await dialog.getByRole('button', { name: 'حفظ', exact: true }).click();
-  await expect(dialog).toBeHidden({ timeout: 20_000 });
-
-  /* It survives a reload — a value held only in React state would not. */
-  await page.reload();
-  await page
-    .locator('tbody tr')
-    .first()
-    .getByRole('button', { name: 'تعديل', exact: true })
-    .click();
-  await expect(
-    page.getByRole('dialog').getByLabel(t.sections.ads.fDescriptionAr),
-  ).toHaveValue(written);
-
-  /* And emptying the box CLEARS it, rather than leaving the old text in place. */
-  await page.getByRole('dialog').getByLabel(t.sections.ads.fDescriptionAr).fill('');
-  await page
-    .getByRole('dialog')
-    .getByRole('button', { name: 'حفظ', exact: true })
-    .click();
-  await expect(page.getByRole('dialog')).toBeHidden({ timeout: 20_000 });
-
-  await page.reload();
-  await page
-    .locator('tbody tr')
-    .first()
-    .getByRole('button', { name: 'تعديل', exact: true })
-    .click();
-  await expect(
-    page.getByRole('dialog').getByLabel(t.sections.ads.fDescriptionAr),
-    'an emptied description is cleared, not left behind',
-  ).toHaveValue('');
 });
