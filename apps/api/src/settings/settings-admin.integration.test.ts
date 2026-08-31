@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { ERROR } from '@safra/contracts';
+import { ADMIN_DISPLAY_NAME, ERROR } from '@safra/contracts';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
@@ -211,6 +211,64 @@ describeIfDb('SettingsAdminService', () => {
       await admin.update(KEY, 92, undefined, {});
 
       expect(await settings.get(KEY, 0)).toBe(92);
+    });
+  });
+
+  /**
+   * A super admin's ADDRESS never leaves the database on either read.
+   *
+   * `PUT /admin/settings/:key` requires `SETTINGS_UPDATE`, which is super admin only, so every
+   * actor these two queries can return is a super admin — while `SETTINGS_READ` is granted to
+   * operations and above. Both queries selected `u.email` raw until 2026-08-31, so الإعدادات
+   * printed the platform owner's address on every row that had ever been changed.
+   *
+   * ## Both directions, and that is the point
+   *
+   * «Withheld» is indistinguishable from «absent» without a control that the ordinary case still
+   * works: a query that returned `null` for everybody would pass a one-sided assertion and break
+   * the screen. And the assertion is on the VALUE returned, not `not.toContain(email)` — a privacy
+   * assertion phrased as «this particular string is absent» only ever protects the string it names,
+   * which is how `users.full_name` walked around the audit specs in August.
+   */
+  describe('who changed it', () => {
+    const staffUser = async (email: string, role: string): Promise<string> => {
+      const inserted = await db.execute<{ id: string }>(sql`
+        INSERT INTO users (full_name, email, role, status, preferred_locale, password_hash)
+        VALUES ('Fixture Person', ${email}, ${role}::user_role, 'active', 'ar', 'x')
+        RETURNING id
+      `);
+
+      const id = inserted.rows[0]?.id;
+
+      if (!id) throw new Error('the fixture user was not created');
+
+      return id;
+    };
+
+    it('reads a super admin as «Admin», on the row and in the history', async () => {
+      const userId = await staffUser('owner.fixture@safra.test', 'super_admin');
+
+      await admin.update(KEY, 101, 'pseudonym check', { userId, role: 'super_admin' });
+
+      const row = (await admin.list()).find((setting) => setting.key === KEY);
+      const history = await admin.history(KEY, 1);
+
+      expect(row?.updatedByEmail).toBe(ADMIN_DISPLAY_NAME);
+      expect(history[0]?.changedByEmail).toBe(ADMIN_DISPLAY_NAME);
+    });
+
+    /** The control: an ordinary colleague IS named, or the substitution above proves nothing. */
+    it('still names an ordinary staff member', async () => {
+      const email = 'ops.fixture@safra.test';
+      const userId = await staffUser(email, 'operations_manager');
+
+      await admin.update(KEY, 102, 'control', { userId, role: 'operations_manager' });
+
+      const row = (await admin.list()).find((setting) => setting.key === KEY);
+      const history = await admin.history(KEY, 1);
+
+      expect(row?.updatedByEmail).toBe(email);
+      expect(history[0]?.changedByEmail).toBe(email);
     });
   });
 

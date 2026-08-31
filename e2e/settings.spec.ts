@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 import { ar as t } from '../packages/i18n/src/messages/admin/ar.js';
+import { ADMIN_DISPLAY_NAME } from '../packages/contracts/src/actor.js';
 
 /**
  * الإعدادات, driven the way an operator drives it.
@@ -331,8 +332,17 @@ test.describe('الإعدادات — changing a value', () => {
     await nights.getByRole('button', { name: t.sections.settings.save }).click();
 
     await expect(nights).toContainText('89');
-    /* The row now names who changed it — the line is absent on a seeded default. */
-    await expect(nights).toContainText('@');
+
+    /*
+      The row now names who changed it — the line is absent on a seeded default.
+
+      «Admin», not an address: `SETTINGS_UPDATE` is super admin only, so every actor a settings
+      read can return is one, and the pseudonym rule of 2026-08-23 says that account is shown by
+      its platform name. Both queries selected `u.email` raw until 2026-08-31, which printed the
+      owner's address to every operations user on every row that had ever been changed.
+    */
+    await expect(nights).toContainText(ADMIN_DISPLAY_NAME);
+    await expect(nights).not.toContainText('@');
 
     await nights.getByRole('button', { name: t.sections.settings.change }).click();
     await nights.locator('input[inputmode="decimal"]').fill('90');

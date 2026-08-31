@@ -4,6 +4,7 @@ import { sql } from 'drizzle-orm';
 import type { Database } from '@safra/db';
 import { isSanctionsPolicy, type Role } from '@safra/contracts';
 
+import { actorName } from '../common/actor-name.sql.js';
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from './settings.service.js';
@@ -41,6 +42,21 @@ export interface EditableSetting {
  * An audit row (§15) and a `settings_history` row, in the same transaction as the
  * write. The history table exists to answer "what was the commission in March?", and
  * a booking's snapshot is only explicable alongside it.
+ *
+ * ## Both reads substitute «Admin» for a super admin's address
+ *
+ * `actorName` in the SELECT, not a mask in the console — the point is that the address never
+ * leaves the database (see `common/actor-name.sql.ts`).
+ *
+ * It matters MORE here than almost anywhere: `PUT /admin/settings/:key` requires
+ * `SETTINGS_UPDATE`, which is super admin only, so **every actor these two queries can return is a
+ * super admin.** `SETTINGS_READ` is granted to operations and above. Both queries selected
+ * `u.email` raw, so الإعدادات printed the platform owner's address on every row that had ever been
+ * changed, to every operations user — the pseudonym rule of 2026-08-23, broken on the one path
+ * where it cannot be broken by accident about anybody else.
+ *
+ * Found on 2026-08-31 while putting `settings_history` on screen, which would have multiplied the
+ * same leak by every entry in the log.
  */
 @Injectable()
 export class SettingsAdminService {
@@ -63,7 +79,7 @@ export class SettingsAdminService {
       updated_by_email: string | null;
     }>(sql`
       SELECT s.key, s.value, s.value_schema, s.description_en, s.description_ar,
-             s.updated_at::text, u.email AS updated_by_email
+             s.updated_at::text, ${actorName(sql`u.email`, sql`u.role`)} AS updated_by_email
       FROM settings s
       LEFT JOIN users u ON u.id = s.updated_by_user_id
       WHERE s.scope = 'global' AND s.deleted_at IS NULL
@@ -183,7 +199,8 @@ export class SettingsAdminService {
       created_at: string;
     }>(sql`
       SELECT h.previous_value, h.new_value, h.reason,
-             u.email AS changed_by_email, h.created_at::text
+             ${actorName(sql`u.email`, sql`u.role`)} AS changed_by_email,
+             h.created_at::text
       FROM settings_history h
       LEFT JOIN users u ON u.id = h.changed_by_user_id
       WHERE h.key = ${key}
