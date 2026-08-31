@@ -5,11 +5,6 @@ import { AuthModule } from '../auth/auth.module.js';
 
 import { CalendarService } from './calendar.service.js';
 import { PartnerDashboardService } from './dashboard.service.js';
-import {
-  AdminPartnerDocumentsController,
-  PartnerDocumentsController,
-} from './documents.controller.js';
-import { PartnerDocumentsService } from './partner-documents.service.js';
 import { PartnerImagesController } from './images.controller.js';
 import { PartnerController } from './partner.controller.js';
 import {
@@ -49,8 +44,6 @@ import { PropertyImageService } from './property-images.service.js';
   controllers: [
     PartnerController,
     PartnerImagesController,
-    PartnerDocumentsController,
-    AdminPartnerDocumentsController,
     PartnerApplicationController,
     AdminPartnerApplicationController,
     PartnerInvitationController,
@@ -69,7 +62,6 @@ import { PropertyImageService } from './property-images.service.js';
     CalendarService,
     PartnerApplicationService,
     PartnerContractReadService,
-    PartnerDocumentsService,
     /*
       One invitation path, shared. Both routes to a partner account — accepting a request and
       onboarding somebody in person — issue the same link with the same lifetime, and two copies

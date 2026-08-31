@@ -5,7 +5,6 @@ import { PARTNER_EMPLOYEE_PERMISSIONS, type Permission } from '@safra/contracts'
 
 import { PERMISSIONS_KEY } from '../rbac/decorators.js';
 import { PartnerContractsController } from './partner-contracts.controller.js';
-import { PartnerDocumentsController } from './documents.controller.js';
 
 /**
  * What a partner's EMPLOYEE can actually reach, read off the routes rather than off the allow-list.
@@ -71,13 +70,14 @@ function reachableByEmployee(required: Permission[]): boolean {
  * Controllers whose every route belongs to the OWNER alone.
  *
  * Not "mostly the owner" — an employee reaching any handler on these is a defect. The partnership
- * agreement is between SAFRA and the person who signed it, and the verification documents are that
- * person's identity papers.
+ * agreement is between SAFRA and the person who signed it.
+ *
+ * «partner documents» was the second entry until 2026-08-31, when المستندات was removed (Bashar).
+ * The lesson it recorded — an employee could once upload documents in the owner's name and
+ * download the owner's identity papers, and every test passed — is why this file exists, so it is
+ * written down here rather than deleted with the controller it was about.
  */
-const OWNER_ONLY = [
-  ['partner contracts', PartnerContractsController],
-  ['partner documents', PartnerDocumentsController],
-] as const;
+const OWNER_ONLY = [['partner contracts', PartnerContractsController]] as const;
 
 describe('what a partner employee can reach', () => {
   for (const [label, controller] of OWNER_ONLY) {
