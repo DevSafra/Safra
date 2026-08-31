@@ -15,6 +15,8 @@ import {
 } from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
+import { describeError } from '../common/errors/safe-error.js';
+import { ImageService } from '../storage/image.service.js';
 import { DATABASE } from '../database/database.module.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
@@ -48,6 +50,8 @@ export class GeoWriteService {
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly audit: AuditService,
+    /* Only for `deleteCity`, which reclaims the storage its photographs occupied. */
+    private readonly images: ImageService,
   ) {}
 
   /**
@@ -510,6 +514,14 @@ export class GeoWriteService {
 
     if (used > 0) throw conflict(ERROR.GEO_CITY_IN_USE, { n: used });
 
+    /*
+      The keys are read BEFORE the transaction, so the objects that have to go are known while the
+      rows still name them. Nothing is removed yet — see below for why the order matters.
+    */
+    const photographs = await this.db.execute<{ file_key: string }>(sql`
+      SELECT file_key FROM city_images WHERE city_id = ${id}::uuid
+    `);
+
     await this.db.transaction(async (tx) => {
       /* The city's own children, so neither outlives it holding something else hostage. */
       await tx.execute(sql`DELETE FROM city_category_links WHERE city_id = ${id}::uuid`);
@@ -529,11 +541,54 @@ export class GeoWriteService {
           action: 'city.deleted',
           subjectType: 'city',
           before: { slug, nameAr: row.name_ar },
-          after: { slug },
+          /* How much storage this reclaimed, so the audit row answers «what happened to them». */
+          after: { slug, images: photographs.rows.length },
         },
         tx as unknown as Database,
       );
     });
+
+    /*
+      ── The bytes go too (Bashar, 2026-08-31) ─────────────────────────────────────────────
+      «Please go ahead and clean up the storage objects as well when a city is deleted. I do not
+      see a strong reason to keep orphaned objects indefinitely if the corresponding records have
+      been removed.»
+
+      ## Why this is a deliberate exception to P-003, and a narrow one
+
+      P-003 keeps the bytes of a soft-deleted image because an audit row names a file key, and a
+      key that resolves to nothing makes that record unverifiable. That reasoning holds while the
+      SUBJECT still exists — a retired photograph on a live city is still evidence about that city.
+      It stops holding here: the city itself is gone, and what is left is an object no row points
+      at and no screen can reach. The audit row records how MANY were removed rather than pointing
+      at keys it can no longer resolve.
+
+      Scoped to this path only. `DELETE /cities/:slug/images/:imageId` stays a soft delete with its
+      bytes intact, and so does every other image in the platform.
+
+      ## After the commit, and never inside it
+
+      A transaction can roll back; `DELETE` on a bucket cannot. Removing objects first, or inside
+      the transaction, would destroy photographs for a delete that then failed — the city would
+      still be there and its pictures would not. So the database is the thing that commits, and the
+      storage follows.
+
+      ## A failure here is logged, not thrown
+
+      The city IS deleted; the work succeeded. Answering the operator with an error because a
+      bucket call failed would tell them the delete did not happen when it did, and they would try
+      again on a row that is already gone. What is left behind is an orphaned object — exactly the
+      state the platform was in before this existed — and the log line names the key so it can be
+      swept up.
+    */
+    for (const photograph of photographs.rows) {
+      await this.images.remove(photograph.file_key).catch((error: unknown) => {
+        this.logger.warn(
+          `City ${slug} deleted, but its objects under ${photograph.file_key} remain: ` +
+            describeError(error),
+        );
+      });
+    }
 
     return { slug };
   }

@@ -7,6 +7,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 import { AuditService } from '../common/audit/audit.service.js';
 import { GeoCategoryService } from './geo-category.service.js';
 import { GeoWriteService } from './geo-write.service.js';
+import type { ImageService } from '../storage/image.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
@@ -31,7 +32,10 @@ describeIfDb('managing city categories', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
   const service = new GeoCategoryService(db, new AuditService(db));
-  const cities = new GeoWriteService(db, new AuditService(db));
+  /* Nothing here deletes a city that HAS photographs; the stub is only to satisfy the shape. */
+  const cities = new GeoWriteService(db, new AuditService(db), {
+    remove: () => Promise.resolve(),
+  } as unknown as ImageService);
 
   let staffId = '';
   let suffix = '';

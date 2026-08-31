@@ -6,6 +6,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { GeoWriteService } from './geo-write.service.js';
+import type { ImageService } from '../storage/image.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
@@ -28,7 +29,21 @@ const describeIfDb = DATABASE_URL ? describe : describe.skip;
 describeIfDb('creating and correcting geography', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
-  const service = new GeoWriteService(db, new AuditService(db));
+  /*
+    A recording stand-in for `ImageService`, so the test can see which keys were removed.
+    A real one would need a bucket; what is under test is WHICH objects the delete asks for and
+    WHEN — not sharp, and not S3.
+  */
+  const removed: string[] = [];
+  const images = {
+    remove: (fileKey: string) => {
+      removed.push(fileKey);
+
+      return Promise.resolve();
+    },
+  } as unknown as ImageService;
+
+  const service = new GeoWriteService(db, new AuditService(db), images);
 
   let staffId = '';
   /** A code that cannot collide with the seeded set, per test. */
@@ -50,6 +65,7 @@ describeIfDb('creating and correcting geography', () => {
     ).rows[0];
 
   beforeEach(async () => {
+    removed.length = 0;
     await harness.begin();
 
     const made = await db.execute<{ id: string }>(sql`
@@ -462,6 +478,84 @@ describeIfDb('creating and correcting geography', () => {
       expect(logged?.actor).toBe(staffId);
       /* The SLUG, so سجل التدقيق names the city rather than a uuid nobody can resolve. */
       expect(JSON.stringify(logged?.before)).toContain(city.slug);
+    });
+
+    /**
+     * The photographs go with the city — the bytes, not only the rows.
+     *
+     * Bashar (2026-08-31): «clean up the storage objects as well when a city is deleted. I do not
+     * see a strong reason to keep orphaned objects indefinitely if the corresponding records have
+     * been removed.» A deliberate, narrow exception to P-003, which keeps a soft-deleted image's
+     * bytes so an audit row naming its key stays verifiable — reasoning that holds while the city
+     * exists and stops when it does not.
+     *
+     * Asserted at the KEY level rather than against a bucket: what is under test is which objects
+     * the delete asks for, and that it asks for every one of them.
+     */
+    it('removes the objects of every photograph the city had', async () => {
+      const city = await spareCity();
+
+      const keys = [`cities/${city.slug}/one`, `cities/${city.slug}/two`];
+
+      for (const key of keys) {
+        await db.execute(sql`
+          INSERT INTO city_images (city_id, file_key, width, height, variant_widths)
+          VALUES (${city.id}::uuid, ${key}, 1600, 900, '{480,960,1600}')
+        `);
+      }
+
+      await service.deleteCity(staff(), city.slug);
+
+      expect([...removed].sort(), 'every key, and only those keys').toEqual(
+        [...keys].sort(),
+      );
+
+      /* And the rows are retired too — the bytes and the record go together. */
+      const live = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM city_images
+        WHERE city_id = ${city.id}::uuid AND deleted_at IS NULL
+      `);
+
+      expect(live.rows[0]?.n).toBe('0');
+
+      /* The audit row says HOW MANY, since it can no longer point at keys that resolve. */
+      const logged = await auditRow('city.deleted');
+
+      expect(JSON.stringify(logged?.after)).toContain('"images":2');
+    });
+
+    /**
+     * A REFUSED delete touches no object at all.
+     *
+     * This is the ordering the implementation is built around: the database commits first and the
+     * bucket follows, because a transaction can roll back and a bucket delete cannot. Without this
+     * assertion, removing the objects before the reference check would look identical — until the
+     * day somebody refused a delete and lost the photographs anyway.
+     */
+    it('leaves every object alone when the delete is refused', async () => {
+      const city = await spareCity();
+
+      await db.execute(sql`
+        INSERT INTO city_images (city_id, file_key, width, height, variant_widths)
+        VALUES (${city.id}::uuid, ${`cities/${city.slug}/kept`}, 1600, 900, '{480}')
+      `);
+
+      await db.execute(sql`
+        INSERT INTO properties
+          (partner_id, city_id, property_type_id, cancellation_policy_id,
+           reference, slug, name_ar, name_en, name_de, description_ar, address, status)
+        VALUES ((SELECT id FROM partners LIMIT 1), ${city.id}::uuid,
+                (SELECT id FROM property_types LIMIT 1),
+                (SELECT id FROM cancellation_policies LIMIT 1),
+                'PRO-999902', ${`probe-keep-${city.slug}`}, 'عقار', 'P', 'P', 'وصف',
+                'شارع', 'draft')
+      `);
+
+      await expect(service.deleteCity(staff(), city.slug)).rejects.toMatchObject({
+        response: { code: ERROR.GEO_CITY_IN_USE },
+      });
+
+      expect(removed, 'a refused delete destroys nothing').toEqual([]);
     });
 
     it('refuses a city a property points at, and names how many', async () => {
