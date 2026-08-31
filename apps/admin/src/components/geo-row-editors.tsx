@@ -121,6 +121,7 @@ function CountryForm({
   const [launch, setLaunch] = useState(country.isLaunchMarket);
   const [isActive, setIsActive] = useState(country.isActive);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save(): Promise<void> {
@@ -169,6 +170,49 @@ function CountryForm({
       setError(t.errors.unreachable);
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Removes the row, once somebody has confirmed what that costs.
+   *
+   * The refusal is the interesting path: the API answers a coded 409 naming how many records are
+   * holding the row, and `apiErrorOf` resolves it to «لا يمكن حذف … — أوقفها بدل حذفها». That
+   * sentence is the whole reason the control is offered rather than hidden — a person who cannot
+   * delete a city needs to learn WHY and what to do instead, and a missing button teaches neither.
+   */
+  async function remove(): Promise<void> {
+    const go = await ask({
+      title: c.deleteCountryTitle,
+      message: c.deleteCountryBody,
+      confirmLabel: t.sections.dialog.confirm,
+      cancelLabel: t.sections.dialog.cancel,
+      tone: 'danger',
+    });
+
+    if (!go) return;
+
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/geo/countries/${encodeURIComponent(country.code)}`,
+        { method: 'DELETE' },
+      );
+
+      if (!response.ok) {
+        setError(apiErrorOf(await response.json().catch(() => null)));
+
+        return;
+      }
+
+      onClose();
+      router.refresh();
+    } catch {
+      setError(t.errors.unreachable);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -230,8 +274,12 @@ function CountryForm({
           saveLabel={c.save}
           busyLabel={c.saving}
           cancelLabel={c.cancel}
+          deleteLabel={c.remove}
+          deletingLabel={c.removing}
+          deleting={deleting}
           onSave={() => void save()}
           onClose={onClose}
+          onDelete={() => void remove()}
         />
       </Panel>
 
@@ -324,6 +372,7 @@ function CurrencyForm({
   const [nameDe, setNameDe] = useState(currency.nameDe);
   const [isActive, setIsActive] = useState(currency.isActive);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save(): Promise<void> {
@@ -364,6 +413,49 @@ function CurrencyForm({
       setError(t.errors.unreachable);
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * Removes the row, once somebody has confirmed what that costs.
+   *
+   * The refusal is the interesting path: the API answers a coded 409 naming how many records are
+   * holding the row, and `apiErrorOf` resolves it to «لا يمكن حذف … — أوقفها بدل حذفها». That
+   * sentence is the whole reason the control is offered rather than hidden — a person who cannot
+   * delete a city needs to learn WHY and what to do instead, and a missing button teaches neither.
+   */
+  async function remove(): Promise<void> {
+    const go = await ask({
+      title: c.deleteCurrencyTitle,
+      message: c.deleteCurrencyBody,
+      confirmLabel: t.sections.dialog.confirm,
+      cancelLabel: t.sections.dialog.cancel,
+      tone: 'danger',
+    });
+
+    if (!go) return;
+
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/geo/currencies/${encodeURIComponent(currency.code)}`,
+        { method: 'DELETE' },
+      );
+
+      if (!response.ok) {
+        setError(apiErrorOf(await response.json().catch(() => null)));
+
+        return;
+      }
+
+      onClose();
+      router.refresh();
+    } catch {
+      setError(t.errors.unreachable);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -416,6 +508,14 @@ function CurrencyForm({
           saveLabel={c.save}
           busyLabel={c.saving}
           cancelLabel={c.cancel}
+          {...(currency.isAccounting
+            ? {}
+            : {
+                deleteLabel: c.remove,
+                deletingLabel: c.removing,
+                deleting,
+                onDelete: () => void remove(),
+              })}
           onSave={() => void save()}
           onClose={onClose}
         />

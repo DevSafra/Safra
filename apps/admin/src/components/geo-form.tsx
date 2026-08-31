@@ -178,7 +178,19 @@ export function Panel({
   );
 }
 
-/** Save, cancel, and the refusal — separated from the fields by a rule. */
+/**
+ * Save, cancel, the refusal — and, on an editor, delete.
+ *
+ * ## Why delete sits at the far END of the row
+ *
+ * `ms-auto` puts it against the opposite edge from «حفظ», with the whole width between them. A
+ * destructive control beside the one somebody presses every time is a mis-click waiting to happen,
+ * and this row is pressed on every edit. It is also the only control here that is not gold or
+ * grey: red is the one signal that reads before the word does.
+ *
+ * Omitted entirely when `onDelete` is absent — the add forms have nothing to delete, and a
+ * disabled «حذف» on a form that is creating something would be a control explaining nothing.
+ */
 export function Actions({
   busy,
   ready,
@@ -186,8 +198,12 @@ export function Actions({
   saveLabel,
   busyLabel,
   cancelLabel,
+  deleteLabel,
+  deletingLabel,
+  deleting,
   onSave,
   onClose,
+  onDelete,
 }: {
   readonly busy: boolean;
   readonly ready: boolean;
@@ -195,8 +211,13 @@ export function Actions({
   readonly saveLabel: string;
   readonly busyLabel: string;
   readonly cancelLabel: string;
+  readonly deleteLabel?: string | undefined;
+  readonly deletingLabel?: string | undefined;
+  readonly deleting?: boolean | undefined;
   readonly onSave: () => void;
   readonly onClose: () => void;
+  /** Absent on a create form. Present on an editor, where the row already exists. */
+  readonly onDelete?: (() => void) | undefined;
 }) {
   return (
     <>
@@ -218,6 +239,18 @@ export function Actions({
         >
           {cancelLabel}
         </button>
+
+        {onDelete && deleteLabel ? (
+          <button
+            type="button"
+            data-geo-delete
+            disabled={busy || deleting}
+            onClick={onDelete}
+            className="ms-auto inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-bad/45 px-4 py-2 text-xs font-bold text-bad transition-colors hover:bg-bad/10 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          >
+            {deleting ? (deletingLabel ?? deleteLabel) : deleteLabel}
+          </button>
+        ) : null}
       </div>
     </>
   );

@@ -317,3 +317,97 @@ test('every field on both forms is the same height', async ({ page }) => {
     await page.locator(`[data-geo-add="${marker}"]`).click();
   }
 });
+
+/**
+ * Deleting — the control that did not exist, and the refusal that has to teach.
+ *
+ * Bashar (2026-08-31): «I can add/edit everything on the page المدن والدول والعملات but I can not
+ * delete». The interesting half is not that a delete works; it is what a person meets when it
+ * CANNOT. Syria holds cities, so the country delete must refuse, and the console must turn the
+ * API's coded 409 into a sentence naming why and what to do instead — not «حدث خطأ ما», and not a
+ * button that quietly does nothing.
+ *
+ * This is the whole chain in one press: proxy route, permission, reference count, error code,
+ * catalogue lookup, rendered Arabic. Nothing below the browser can see all of it.
+ */
+test('a country holding cities refuses to be deleted, and says why', async ({ page }) => {
+  await page.goto('/geo');
+  await page.locator('[data-country-edit="SY"]').click();
+
+  const dialog = page.getByRole('dialog');
+
+  await expect(dialog.locator('[data-geo-delete]')).toBeVisible();
+  await dialog.locator('[data-geo-delete]').click();
+
+  /* The confirmation is the system's popup, and destructive, so «إلغاء» holds the focus. */
+  const confirm = page.getByRole('alertdialog');
+
+  await expect(confirm).toContainText(c.deleteCountryTitle);
+  await confirm.getByRole('button', { name: t.sections.dialog.confirm }).click();
+
+  /* A SENTENCE, in Arabic, naming the alternative — never a raw code and never a generic error. */
+  const form = page.locator('[data-country-form="SY"]');
+
+  await expect(form).toContainText('لا يمكن حذف دولة');
+  await expect(form).not.toContainText('geo.');
+  await expect(form).not.toContainText(t.errors.unknown);
+
+  /* And Syria is still there. A refused delete must not half-happen. */
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-country-edit="SY"]')).toBeVisible();
+});
+
+/**
+ * A currency added and then removed — the happy path, end to end, leaving nothing behind.
+ *
+ * TRY is in the catalogue, is not seeded, and nothing prices anything in it, so it is the one code
+ * this can use without touching a currency the platform trades in. The spec creates it precisely
+ * so that deleting it is safe: a spec that deleted a REAL row would be a spec that breaks the
+ * environment it runs in.
+ */
+test('a currency nothing uses can be added and then deleted', async ({ page }) => {
+  await page.goto('/geo');
+
+  await page.locator('[data-geo-add="currency"]').click();
+
+  const form = page.locator('[data-geo-form="currency"]');
+
+  await form.locator('select[name=code]').selectOption('TRY');
+  await form.getByRole('button', { name: c.create }).click();
+
+  const row = page.locator('[data-currency-edit="TRY"]');
+
+  await expect(row).toBeVisible({ timeout: 20_000 });
+
+  await row.click();
+  await page.getByRole('dialog').locator('[data-geo-delete]').click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: t.sections.dialog.confirm })
+    .click();
+
+  await expect(row, 'the row is gone from the list').toBeHidden({ timeout: 20_000 });
+});
+
+/**
+ * The accounting currency offers no delete at all.
+ *
+ * `ledger_entries.amount_syp` is denominated in it, so this is not a row that becomes removable
+ * when the reference counts reach zero. The API refuses it with its own code — `geo-write`'s
+ * integration suite holds that — and the console does not offer the control, because a button
+ * whose only outcome is a refusal is a button that teaches nothing.
+ */
+test('the accounting currency has no delete control', async ({ page }) => {
+  await page.goto('/geo');
+  await page.locator('[data-currency-edit="SYP"]').click();
+
+  const dialog = page.getByRole('dialog');
+
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('[data-geo-delete]')).toHaveCount(0);
+
+  /* The opposite control: another currency in the same dialog DOES offer it. */
+  await page.keyboard.press('Escape');
+  await page.locator('[data-currency-edit="USD"]').click();
+  await expect(page.getByRole('dialog').locator('[data-geo-delete]')).toBeVisible();
+});

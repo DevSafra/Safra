@@ -310,6 +310,7 @@ function EditCategory({
   const [nameDe, setNameDe] = useState(category.nameDe);
   const [isActive, setIsActive] = useState(category.isActive);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save(): Promise<void> {
@@ -357,6 +358,49 @@ function EditCategory({
     }
   }
 
+  /**
+   * Removes the row, once somebody has confirmed what that costs.
+   *
+   * The refusal is the interesting path: the API answers a coded 409 naming how many cities are
+   * filed under this category, and `apiErrorOf` resolves it to a sentence saying so and naming
+   * «أوقفها» as the alternative. That is the whole reason the control is OFFERED rather than
+   * hidden — a person who cannot delete needs to learn why and what to do instead.
+   */
+  async function remove(): Promise<void> {
+    const go = await ask({
+      title: c.deleteTitle,
+      message: c.deleteBody,
+      confirmLabel: t.sections.dialog.confirm,
+      cancelLabel: t.sections.dialog.cancel,
+      tone: 'danger',
+    });
+
+    if (!go) return;
+
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `/api/geo/categories/${encodeURIComponent(category.code)}`,
+        { method: 'DELETE' },
+      );
+
+      if (!response.ok) {
+        setError(apiErrorOf(await response.json().catch(() => null)));
+
+        return;
+      }
+
+      onClose();
+      router.refresh();
+    } catch {
+      setError(t.errors.unreachable);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     /* A popup, like every other edit on this screen and on المدن — Bashar, 2026-08-30. */
     <Modal
@@ -393,8 +437,12 @@ function EditCategory({
           saveLabel={t.sections.geo.save}
           busyLabel={t.sections.geo.saving}
           cancelLabel={t.sections.geo.cancel}
+          deleteLabel={c.remove}
+          deletingLabel={c.removing}
+          deleting={deleting}
           onSave={() => void save()}
           onClose={onClose}
+          onDelete={() => void remove()}
         />
       </Panel>
 

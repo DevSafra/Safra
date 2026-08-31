@@ -167,3 +167,68 @@ test('every field on the category form is the same height', async ({ page }) => 
   expect(heights.length).toBeGreaterThan(2);
   expect([...new Set(heights)], 'one height, not a height per neighbour').toHaveLength(1);
 });
+
+/**
+ * A category can be DELETED, not only retired — Bashar, 2026-08-31: «also on the page الفئات same».
+ *
+ * Retiring is right for one cities use and wrong for one added by mistake, which then sits in the
+ * list for ever with «موقوفة» beside it. The spec creates its own so that deleting it is safe, and
+ * so that it leaves nothing behind — every other case in this file deliberately does.
+ */
+test('a category nothing is filed under can be deleted', async ({ page }) => {
+  const code = `gone-${Math.random().toString(36).slice(2, 7)}`;
+
+  await page.goto('/city-categories');
+  await page.locator('[data-category-add]').click();
+
+  const form = page.locator('[data-category-form="add"]');
+  const fields = form.locator('input');
+
+  await fields.nth(0).fill(code);
+  await fields.nth(1).fill(`فئة ${code}`);
+  await fields.nth(2).fill('Probe');
+  await fields.nth(3).fill('Probe');
+  await form.getByRole('button', { name: t.sections.geo.create }).click();
+
+  const row = page.locator(`[data-category-edit="${code}"]`);
+
+  await expect(row).toBeVisible({ timeout: 20_000 });
+
+  await row.click();
+  await page.getByRole('dialog').locator('[data-geo-delete]').click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: t.sections.dialog.confirm })
+    .click();
+
+  await expect(row, 'the row is gone from the table').toBeHidden({ timeout: 20_000 });
+});
+
+/**
+ * A category cities ARE filed under refuses, and says why.
+ *
+ * «ساحلية» is seeded and Latakia carries it, so this is the refusal a person actually meets. The
+ * sentence must name deactivation as the alternative — one that fails with «حدث خطأ ما» teaches
+ * the operator nothing and they try again.
+ */
+test('a category in use refuses to be deleted, and names the alternative', async ({
+  page,
+}) => {
+  await page.goto('/city-categories');
+  await page.locator('[data-category-edit="coastal"]').click();
+
+  await page.getByRole('dialog').locator('[data-geo-delete]').click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: t.sections.dialog.confirm })
+    .click();
+
+  const form = page.locator('[data-category-form="coastal"]');
+
+  /* The catalogue's own words — «يمكن إيقافها بدل حذفها» — not a paraphrase written here. */
+  await expect(form).toContainText('إيقافها');
+  await expect(form).not.toContainText('geo.');
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-category-edit="coastal"]')).toBeVisible();
+});
