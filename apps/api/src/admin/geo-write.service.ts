@@ -856,6 +856,7 @@ export class GeoWriteService {
       sql`name_de   = coalesce(${input.nameDe ?? null}, name_de)`,
       sql`timezone  = coalesce(${input.timezone ?? null}, timezone)`,
       sql`is_active = coalesce(${input.isActive ?? null}, is_active)`,
+      sql`sort_order = coalesce(${input.sortOrder ?? null}, sort_order)`,
       sql`updated_at = now()`,
     ];
 

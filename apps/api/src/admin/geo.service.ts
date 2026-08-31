@@ -53,6 +53,17 @@ export interface GeoCityRow {
   readonly properties: number;
   readonly isActive: boolean;
   /**
+   * Whether its COUNTRY is open.
+   *
+   * A city in a closed country is not offered anywhere a visitor can reach, whatever its own flag
+   * says — so a console that printed «نشطة» beside it was stating something untrue about a place
+   * nobody could book. Carried rather than derived on the client because the rule belongs with
+   * the read that enforces it.
+   */
+  readonly countryActive: boolean;
+  /** Its place in the PUBLIC destinations grid — `catalog.service` orders by this. */
+  readonly sortOrder: number;
+  /**
    * The photographs behind §5.4's «أول ثلثها صور عالية الجودة».
    *
    * The count and the hero, so the table can say whether a city HAS any without a second round
@@ -251,6 +262,8 @@ export class GeoService {
       timezone: string;
       properties: number;
       is_active: boolean;
+      country_active: boolean;
+      sort_order: number;
       images: number;
       photographs: GeoCityImage[];
       description_ar: string | null;
@@ -291,6 +304,8 @@ export class GeoService {
              ci.timezone,
              coalesce(pr.n, 0)::int     AS properties,
              ci.is_active,
+             coalesce(co.is_active, false) AS country_active,
+             ci.sort_order,
              ci.description_ar, ci.description_en, ci.description_de,
              ci.tags_ar, ci.tags_en, ci.tags_de,
              coalesce(im.n, 0)::int     AS images,
@@ -309,7 +324,17 @@ export class GeoService {
                           'isHero', p.is_hero,
                           'sortOrder', p.sort_order
                         )
-                        ORDER BY p.is_hero DESC, p.sort_order, p.created_at
+                        -- sort_order ALONE, which is what the arrows write.
+                        --
+                        -- It was is_hero DESC first, mirroring the public read. That pinned the
+                        -- hero to row one whatever its position, so pressing the up arrow on row
+                        -- two wrote sort_order correctly and the list did not move: the control
+                        -- looked dead (Bashar, 2026-08-31). A list ordered by something other
+                        -- than the value its own arrows write cannot be reordered.
+                        --
+                        -- The public read still draws the hero first -- it is chosen by the FLAG,
+                        -- not by position, and the badge on this screen says which one it is.
+                        ORDER BY p.sort_order, p.created_at
                       )
                FROM city_images p
                WHERE p.city_id = ci.id AND p.deleted_at IS NULL
@@ -334,7 +359,13 @@ export class GeoService {
         LIMIT 1
       ) hero ON TRUE
       ${filter}
-      ORDER BY ci.is_active DESC, ci.name_ar
+      -- The PUBLIC order, because that is the thing being managed (Bashar, 2026-08-31).
+      -- It was is_active DESC, name_ar -- a reasonable way to READ a list and a useless way to
+      -- reorder one: the arrows would have moved rows around in an order nobody sees. The
+      -- catalogue service sorts the destinations grid by sort_order, so this does too, and the
+      -- slug breaks a tie the same way it does there. Backticks are absent on purpose: they
+      -- terminate the sql template they sit inside.
+      ORDER BY ci.sort_order, ci.slug
     `);
 
     return result.rows.map((row) => ({
@@ -349,6 +380,8 @@ export class GeoService {
       timezone: row.timezone,
       properties: row.properties,
       isActive: row.is_active,
+      countryActive: row.country_active,
+      sortOrder: row.sort_order,
       images: row.images,
       photographs: row.photographs,
       descriptionAr: row.description_ar,

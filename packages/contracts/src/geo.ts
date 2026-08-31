@@ -121,6 +121,15 @@ export const updateCitySchema = z
     tagsAr: tags.optional(),
     tagsEn: tags.optional(),
     tagsDe: tags.optional(),
+    /**
+     * Where the city sits in the PUBLIC destinations grid.
+     *
+     * `catalog.service` orders that grid by this column, so it decides which cities a visitor sees
+     * first on the home page — and it could only be set by a migration. `coalesce` is enough for
+     * it, unlike the prose beside it: the column is `NOT NULL` with a default, so it has no empty
+     * state and «leave it» is the only thing an absent value can mean.
+     */
+    sortOrder: z.number().int().min(0).max(999).optional(),
   })
   .strict();
 

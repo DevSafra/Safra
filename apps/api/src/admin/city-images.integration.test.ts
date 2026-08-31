@@ -6,6 +6,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { CityImagesController } from './city-images.controller.js';
+import { GeoService } from './geo.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import type { ImageService } from '../storage/image.service.js';
 
@@ -170,6 +171,47 @@ describeIfDb('managing a city photograph', () => {
     await controller.update(staff(), slug, id, { sortOrder: 0 });
 
     expect(await image(id)).toMatchObject({ sort_order: 0, alt_ar: 'وصف' });
+  });
+
+  /**
+   * Reordering CHANGES the order the console reads back.
+   *
+   * ## The defect this exists to catch, which shipped without it
+   *
+   * The console listed photographs `ORDER BY is_hero DESC, sort_order`, mirroring the public read.
+   * That pins the hero to row one whatever its position, so pressing the up arrow on row two wrote
+   * `sort_order` correctly and the list did not move — the control looked dead, and Bashar
+   * reported exactly that. A list ordered by something other than the value its own arrows write
+   * cannot be reordered.
+   *
+   * So the assertion is not «the column changed». It is «the READ came back in the new order»,
+   * which is the only version of it the broken code could not have passed.
+   */
+  it('reorders the list the console reads back, hero included', async () => {
+    const [first, second] = ids as [string, string];
+
+    /* The hero is the first photograph, exactly as the upload leaves it. */
+    expect((await image(first))?.is_hero).toBe(true);
+
+    /* Move the SECOND above the hero — the case that could never work. */
+    await controller.update(staff(), slug, second, { sortOrder: 0 });
+    await controller.update(staff(), slug, first, { sortOrder: 1 });
+
+    /*
+      Read through `GeoService.cities()` — the query the CONSOLE actually runs.
+
+      The first version of this assertion wrote its own `ORDER BY sort_order` and checked that,
+      which proves the column changed and says nothing about the order the screen receives. That is
+      the shape «a test whose fixture cannot reach the field it protects» warns about: it would
+      have passed against the very defect it claims to catch.
+    */
+    const listed = await new GeoService(db).cities();
+    const city = listed.find((one) => one.slug === slug);
+
+    expect(city?.photographs.map((one) => one.id)).toEqual([second, first]);
+
+    /* And the hero flag is untouched: order and hero are separate decisions. */
+    expect((await image(first))?.is_hero, 'reordering does not move the hero').toBe(true);
   });
 
   /** A photograph of ANOTHER city is not this city's to edit — the slug is part of the lookup. */
