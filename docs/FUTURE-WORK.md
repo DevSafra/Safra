@@ -2479,6 +2479,49 @@ to drop `badge: 'staff'` from `NAV`.
 
 **To unblock:** Bashar, on what the number should mean — or a decision to remove it.
 
+### O-ui-4 — `settings_history` is written on every change and cannot be read anywhere
+
+**Status:** open · **Severity:** Medium · **Owner:** Bashar, then engineering · **Recorded:**
+2026-08-31, found while redesigning الإعدادات
+
+`SettingsAdminService.history(key, limit)` exists, is complete, returns the previous value, the new
+value, the reason and who changed it — and **nothing calls it.** There is no controller route and no
+screen. `apps/api/src/settings/settings-admin.service.ts` writes a `settings_history` row inside the
+same transaction as every setting change, and its own docblock states why: "The history table exists
+to answer 'what was the commission in March?', and a booking's snapshot is only explicable alongside
+it."
+
+That question is currently unanswerable outside `psql`. A booking from March carries a snapshot of a
+7% commission; the only way to learn when 7% stopped being true is a manual query. The console shows
+one line — «آخر تعديل: who · when» — which is the LAST change and says nothing about the ones before
+it.
+
+This is the shape of «Before deleting, ask what it DID»: a write that only looks dead, sitting
+beside a read that never existed.
+
+**What it would take.** A `GET /admin/settings/:key/history` on the existing service method, and a
+disclosure on the row that lists the entries — previous → new, the reason, who, when. The service
+layer is done; this is a route, a client function and a panel. Roughly the size of the redesign that
+found it. **Not started: it is a feature nobody asked for, and it is Bashar's call.**
+
+### O-test-3 — the settings integration test leaves a row on the screen, one per test process
+
+**Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-31
+
+الإعدادات shows `test.owned_by_pid_84194`, `test.owned_by_pid_84260` and
+`test.settings_admin_fixture` in «إعدادات أخرى» on the development database.
+`settings-admin.integration.test.ts` creates them and does not remove them, and the key is
+namespaced by process id, so **the list grows by one row per test run that uses a new PID** — for
+ever.
+
+The screen is right to show them. It refuses to hide a key on purpose: "a settings screen that
+silently omits a key is worse than an untidy section — the setting still governs the platform, and
+hiding it means nobody knows it is there." So the fix belongs in the test, not in the console.
+
+**What it would take.** A `DELETE FROM settings WHERE key LIKE 'test.%'` in the suite's teardown,
+plus a one-off delete of the rows already there. Ten minutes. Deliberately not done as part of the
+redesign: it is a change to somebody else's test file and nobody asked for it.
+
 ### O-partner-7 — FIXED: a second telephone call used to erase the first one's note
 
 **Status:** **FIXED** 2026-08-20 · **Severity:** Medium — silent data loss on a screen an operator
