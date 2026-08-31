@@ -105,8 +105,13 @@ export class GeoService {
       FROM countries co
       LEFT JOIN currencies cur ON cur.id = co.display_currency_id
       LEFT JOIN (
-        SELECT country_id, count(*) AS n FROM cities WHERE is_active GROUP BY country_id
+        SELECT country_id, count(*) AS n FROM cities
+        WHERE is_active AND deleted_at IS NULL GROUP BY country_id
       ) ci ON ci.country_id = co.id
+      -- A DELETED country is gone from the screen, like a retired currency below. The filter was
+      -- absent because nothing could delete one until 2026-08-31; a soft delete with no filter
+      -- would have left the row sitting there looking untouched.
+      WHERE co.deleted_at IS NULL
       ORDER BY co.is_active DESC, co.name_ar
     `);
 
@@ -190,9 +195,16 @@ export class GeoService {
    * registries — noted here so the next person does not have to rediscover why it differs.
    */
   async cities(q?: string): Promise<GeoCityRow[]> {
+    /*
+      A deleted city is gone from the screen. Written into BOTH branches rather than appended,
+      because `WHERE a OR b` plus `AND deleted_at IS NULL` needs the search terms bracketed — an
+      appended clause would have bound only to the slug half and left deleted cities matching by
+      name. Cheaper to write it twice than to be subtly wrong once.
+    */
     const filter = q
-      ? sql`WHERE ci.name_ar ILIKE ${`%${q}%`} OR ci.slug ILIKE ${`${q}%`}`
-      : sql``;
+      ? sql`WHERE ci.deleted_at IS NULL
+              AND (ci.name_ar ILIKE ${`%${q}%`} OR ci.slug ILIKE ${`${q}%`})`
+      : sql`WHERE ci.deleted_at IS NULL`;
 
     const result = await this.db.execute<{
       slug: string;

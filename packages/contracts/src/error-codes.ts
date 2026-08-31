@@ -290,8 +290,20 @@ export const ERROR = {
   GEO_CITY_NOT_FOUND: 'geo.city_not_found',
   GEO_COUNTRY_NOT_FOUND: 'geo.country_not_found',
   GEO_CATEGORY_NOT_FOUND: 'geo.category_not_found',
-  /* A category still filed against a city cannot be removed — it is retired instead. */
+  /*
+    ── Deleting geography: a row goes only when NOTHING points at it ──────────────────────
+    Bashar (2026-08-31): «I can add/edit everything on the page المدن والدول والعملات but I can
+    not delete». A reference row is pointed at by records that outlive any decision to stop using
+    it — a booking names its city and its currency for ever — so the delete refuses rather than
+    orphaning them, and says what is holding it. Deactivating remains the answer for a row that
+    IS in use, which is why every one of these messages names it.
+  */
   GEO_CATEGORY_IN_USE: 'geo.category_in_use',
+  GEO_CITY_IN_USE: 'geo.city_in_use',
+  GEO_COUNTRY_IN_USE: 'geo.country_in_use',
+  GEO_CURRENCY_IN_USE: 'geo.currency_in_use',
+  /* SYP: `ledger_entries.amount_syp` is denominated in it, so it is not a row anyone may remove. */
+  GEO_CURRENCY_ACCOUNTING: 'geo.currency_accounting',
   /* A code or slug already in use — cities are unique per country, codes globally. */
   GEO_CODE_TAKEN: 'geo.code_taken',
   GEO_SLUG_TAKEN: 'geo.slug_taken',

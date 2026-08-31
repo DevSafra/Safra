@@ -421,6 +421,12 @@ export const ar = {
         '{n, plural, zero {لا مدن} one {مدينة واحدة} two {مدينتان} few {# مدن} many {# مدينة} other {# مدينة}}',
       /* Reordering: the order these are OFFERED in, on every picker and every public filter. */
       colOrder: 'الترتيب',
+      /* ── Deleting a category (Bashar, 2026-08-31: «also on the page الفئات same») ── */
+      remove: 'حذف',
+      removing: 'جارٍ الحذف…',
+      deleteTitle: 'حذف فئة',
+      deleteBody:
+        'يُحذف السجل من القوائم. لا يمكن حذف فئة مصنَّفة تحتها مدن — عندها أوقفها بدل حذفها. يمكن إضافتها من جديد بالمعرّف نفسه فتعود كما كانت.',
       moveUp: 'نقل لأعلى',
       moveDown: 'نقل لأسفل',
       reordering: 'يُحفظ الترتيب…',
@@ -1168,6 +1174,18 @@ export const ar = {
       create: 'إضافة',
       addCityTitle: 'مدينة جديدة',
       activeCitiesShort: '{n} مدينة نشطة',
+      /* ── Deleting a row, which nothing could do before 2026-08-31 ── */
+      remove: 'حذف',
+      removing: 'جارٍ الحذف…',
+      deleteCityTitle: 'حذف مدينة',
+      deleteCityBody:
+        'يُحذف السجل نهائياً من القوائم مع صوره وفئاته. لا يمكن حذف مدينة يشير إليها عقار أو حجز أو شريك — عندها أوقفها بدل حذفها. يمكن إضافتها من جديد بالمعرّف نفسه.',
+      deleteCountryTitle: 'حذف دولة',
+      deleteCountryBody:
+        'يُحذف السجل من القوائم. لا يمكن حذف دولة تحتوي على مدن — احذف مدنها أولاً أو أوقفها. يمكن إضافتها من جديد بالرمز نفسه فتعود كما كانت.',
+      deleteCurrencyTitle: 'حذف عملة',
+      deleteCurrencyBody:
+        'يُحذف السجل من القوائم. لا يمكن حذف عملة مستخدمة في تسعير أو حجز أو محفظة — عندها أوقفها بدل حذفها. يمكن إضافتها من جديد بالرمز نفسه.',
       editCountry: 'تعديل الدولة',
       editCurrency: 'تعديل العملة',
       countryActive: 'مفعَّلة — تظهر مدنها في البحث العام',
@@ -2849,12 +2867,16 @@ export const ar = {
     'dispute.evidence_removed': 'حذف دليل من نزاع',
     'city_category.created': 'إضافة فئة مدن',
     'city_category.updated': 'تعديل فئة مدن',
+    'city_category.deleted': 'حذف فئة مدن',
     'city.created': 'إضافة مدينة',
     'city.updated': 'تعديل مدينة',
+    'city.deleted': 'حذف مدينة',
     'country.created': 'إضافة دولة',
     'country.updated': 'تعديل دولة',
+    'country.deleted': 'حذف دولة',
     'currency.created': 'إضافة عملة',
     'currency.updated': 'تعديل عملة',
+    'currency.deleted': 'حذف عملة',
     'conversation.started': 'بدء محادثة',
     'conversation.closed': 'إنهاء محادثة',
     'dispute.resolved': 'إغلاق نزاع لصالح العميل',
@@ -3225,6 +3247,11 @@ export const ar = {
       isLaunchMarket: 'سوق إطلاق',
       /* `city_category.updated`: where it sits in every picker that offers the set. */
       sortOrder: 'الترتيب',
+      /* `*.created`: the code had been DELETED and adding it back restored the row. */
+      reinstated: 'أُعيد تفعيله',
+      /* `currency.created`: both taken from the ISO code, never from the form — see CURRENCY_CATALOGUE. */
+      symbol: 'الرمز',
+      decimals: 'عدد الخانات العشرية',
       /*
         `Audited`'s own envelope: the interceptor records the handler's return value under this
         key. It surfaced for the first time on 2026-08-30 with `city_image.uploaded`, because

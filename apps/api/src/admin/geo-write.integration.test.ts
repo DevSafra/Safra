@@ -409,4 +409,219 @@ describeIfDb('creating and correcting geography', () => {
       service.updateCity(staff(), 'no-such-city', { isActive: false }),
     ).rejects.toMatchObject({ response: { code: ERROR.GEO_CITY_NOT_FOUND } });
   });
+
+  /* ── Deleting ───────────────────────────────────────────────────────────── */
+
+  /**
+   * Deleting geography — added on 2026-08-31 because nothing could.
+   *
+   * Bashar: «I can add/edit everything on the page المدن والدول والعملات but I can not delete».
+   *
+   * ## What each case is really guarding
+   *
+   * Not that the delete works — that is the easy half. That it REFUSES when something points at
+   * the row, and that the refusal is the coded one the console can turn into a sentence. A delete
+   * that silently succeeded against a referenced row would either be rejected by the foreign key
+   * as a 500 the reader cannot act on, or — if the key were ever relaxed — leave a booking whose
+   * city cannot be named.
+   *
+   * Every refusal is paired with the OPPOSITE control: the same row, with nothing pointing at it,
+   * deleting cleanly. «Refused» and «this code path is broken» are indistinguishable without it.
+   */
+  describe('deleting', () => {
+    /** A city nothing points at, so a test can delete it or hang one reference on it. */
+    const spareCity = async (): Promise<{ id: string; slug: string }> => {
+      const slug = `probe-${suffix.toLowerCase()}${Math.random().toString(36).slice(2, 6)}`;
+
+      const made = await db.execute<{ id: string }>(sql`
+        INSERT INTO cities (country_id, slug, name_ar, name_en, name_de, timezone)
+        VALUES ((SELECT id FROM countries WHERE deleted_at IS NULL ORDER BY code LIMIT 1),
+                ${slug}, 'مدينة اختبار', 'Probe', 'Probe', 'Asia/Damascus')
+        RETURNING id::text
+      `);
+
+      return { id: made.rows[0]?.id ?? '', slug };
+    };
+
+    it('removes a city nothing points at, and says so in the log', async () => {
+      const city = await spareCity();
+
+      await expect(service.deleteCity(staff(), city.slug)).resolves.toEqual({
+        slug: city.slug,
+      });
+
+      const gone = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM cities
+        WHERE slug = ${city.slug} AND deleted_at IS NULL
+      `);
+
+      expect(gone.rows[0]?.n).toBe('0');
+
+      const logged = await auditRow('city.deleted');
+
+      expect(logged?.actor).toBe(staffId);
+      /* The SLUG, so سجل التدقيق names the city rather than a uuid nobody can resolve. */
+      expect(JSON.stringify(logged?.before)).toContain(city.slug);
+    });
+
+    it('refuses a city a property points at, and names how many', async () => {
+      const city = await spareCity();
+
+      await db.execute(sql`
+        INSERT INTO properties
+          (partner_id, city_id, property_type_id, cancellation_policy_id,
+           reference, slug, name_ar, name_en, name_de, description_ar, address, status)
+        VALUES ((SELECT id FROM partners LIMIT 1), ${city.id}::uuid,
+                (SELECT id FROM property_types LIMIT 1),
+                (SELECT id FROM cancellation_policies LIMIT 1),
+                'PRO-999901', ${`probe-prop-${city.slug}`}, 'عقار', 'P', 'P', 'وصف',
+                'شارع', 'draft')
+      `);
+
+      await expect(service.deleteCity(staff(), city.slug)).rejects.toMatchObject({
+        response: { code: ERROR.GEO_CITY_IN_USE },
+      });
+
+      /* And it is still there — a refused delete must not half-happen. */
+      const alive = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM cities
+        WHERE slug = ${city.slug} AND deleted_at IS NULL
+      `);
+
+      expect(alive.rows[0]?.n).toBe('1');
+    });
+
+    /**
+     * The city's OWN children go with it, and do not block it.
+     *
+     * A category link is a record about nothing but this city. Left behind it would keep the
+     * CATEGORY undeletable for ever, pointing at a city nobody can see — «Before deleting, ask
+     * what it DID», in reverse.
+     */
+    it('takes the city’s own category links with it rather than being blocked by them', async () => {
+      const city = await spareCity();
+
+      await db.execute(sql`
+        INSERT INTO city_category_links (city_id, category_id)
+        VALUES (${city.id}::uuid, (SELECT id FROM city_categories
+                                   WHERE deleted_at IS NULL ORDER BY sort_order LIMIT 1))
+      `);
+
+      await expect(service.deleteCity(staff(), city.slug)).resolves.toBeTruthy();
+
+      const links = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM city_category_links WHERE city_id = ${city.id}::uuid
+      `);
+
+      expect(links.rows[0]?.n, 'the links go with the city').toBe('0');
+    });
+
+    it('refuses a country that still holds cities, and removes an empty one', async () => {
+      const code = `Q${suffix.slice(0, 1)}`;
+
+      await service.createCountry(staff(), {
+        code,
+        nameAr: 'دولة اختبار',
+        nameEn: 'Probe',
+        nameDe: 'Probe',
+        displayCurrencyCode: 'USD',
+        isLaunchMarket: false,
+      });
+
+      /* Empty: it goes. */
+      await expect(service.deleteCountry(staff(), code)).resolves.toEqual({ code });
+
+      /* Added back by the same code — the reinstate path, which is what makes this reversible. */
+      await service.createCountry(staff(), {
+        code,
+        nameAr: 'دولة اختبار',
+        nameEn: 'Probe',
+        nameDe: 'Probe',
+        displayCurrencyCode: 'USD',
+        isLaunchMarket: false,
+      });
+
+      await db.execute(sql`
+        INSERT INTO cities (country_id, slug, name_ar, name_en, name_de, timezone)
+        VALUES ((SELECT id FROM countries WHERE code = ${code}),
+                ${`probe-city-${code.toLowerCase()}`}, 'مدينة', 'P', 'P', 'Asia/Damascus')
+      `);
+
+      await expect(service.deleteCountry(staff(), code)).rejects.toMatchObject({
+        response: { code: ERROR.GEO_COUNTRY_IN_USE },
+      });
+    });
+
+    /**
+     * A country whose only city was DELETED still holds it.
+     *
+     * The count is deliberately of every row, not the live ones: a soft-deleted city keeps its
+     * `country_id`, so a country that looks empty on screen is still pointed at, and a delete that
+     * counted only live cities would hit the foreign key as a 500.
+     */
+    it('still counts a soft-deleted city against its country', async () => {
+      const code = `R${suffix.slice(0, 1)}`;
+
+      await service.createCountry(staff(), {
+        code,
+        nameAr: 'دولة اختبار',
+        nameEn: 'Probe',
+        nameDe: 'Probe',
+        displayCurrencyCode: 'USD',
+        isLaunchMarket: false,
+      });
+
+      const slug = `probe-dead-${code.toLowerCase()}`;
+
+      await db.execute(sql`
+        INSERT INTO cities (country_id, slug, name_ar, name_en, name_de, timezone, deleted_at)
+        VALUES ((SELECT id FROM countries WHERE code = ${code}),
+                ${slug}, 'مدينة', 'P', 'P', 'Asia/Damascus', now())
+      `);
+
+      await expect(service.deleteCountry(staff(), code)).rejects.toMatchObject({
+        response: { code: ERROR.GEO_COUNTRY_IN_USE },
+      });
+    });
+
+    it('removes an unused currency and refuses one a unit is priced in', async () => {
+      await service.createCurrency(staff(), {
+        code: 'GBP',
+        nameAr: 'جنيه إسترليني',
+        nameEn: 'Pound Sterling',
+        nameDe: 'Pfund Sterling',
+      });
+
+      await expect(service.deleteCurrency(staff(), 'GBP')).resolves.toEqual({
+        code: 'GBP',
+      });
+
+      /* USD prices the platform's units, so it is not removable. */
+      await expect(service.deleteCurrency(staff(), 'USD')).rejects.toMatchObject({
+        response: { code: ERROR.GEO_CURRENCY_IN_USE },
+      });
+    });
+
+    /**
+     * SYP is refused for a REASON of its own, not because the counts happen to be non-zero.
+     *
+     * `ledger_entries.amount_syp` is denominated in it and the table is append-only, so it must
+     * stay refused on a hypothetical day when nothing else points at it. A separate code, so the
+     * console can say something true rather than «مستخدمة في 0 سجلاً».
+     */
+    it('refuses the accounting currency outright', async () => {
+      await expect(service.deleteCurrency(staff(), 'SYP')).rejects.toMatchObject({
+        response: { code: ERROR.GEO_CURRENCY_ACCOUNTING },
+      });
+    });
+
+    it('refuses a code that is not there rather than reporting success', async () => {
+      await expect(service.deleteCurrency(staff(), 'ZZZ')).rejects.toMatchObject({
+        response: { code: ERROR.GEO_CURRENCY_UNKNOWN },
+      });
+      await expect(service.deleteCity(staff(), 'no-such-city')).rejects.toMatchObject({
+        response: { code: ERROR.GEO_CITY_NOT_FOUND },
+      });
+    });
+  });
 });

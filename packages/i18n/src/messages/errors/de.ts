@@ -229,7 +229,15 @@ export const de = {
   'geo.country_not_found': 'Land nicht gefunden.',
   'geo.category_not_found': 'Kategorie nicht gefunden.',
   'geo.category_in_use':
-    'Diese Kategorie wird von Städten verwendet — deaktivieren statt entfernen.',
+    'Diese Kategorie ist {n} Städten zugeordnet — deaktivieren statt entfernen.',
+  'geo.city_in_use':
+    'Eine Stadt, auf die {n} Datensätze verweisen (Unterkünfte, Buchungen, Partner…), kann nicht gelöscht werden. Deaktivieren Sie sie stattdessen.',
+  'geo.country_in_use':
+    'Ein Land mit {n} Städten kann nicht gelöscht werden. Löschen Sie zuerst seine Städte oder deaktivieren Sie es.',
+  'geo.currency_in_use':
+    'Eine Währung, die von {n} Datensätzen verwendet wird, kann nicht gelöscht werden. Deaktivieren Sie sie stattdessen.',
+  'geo.currency_accounting':
+    'Die Buchungswährung kann nicht gelöscht werden — jeder Journaleintrag lautet auf sie.',
   'geo.code_taken': 'Dieser Code wird bereits verwendet.',
   'geo.slug_taken': 'Dieser Bezeichner wird in diesem Land bereits verwendet.',
   'geo.timezone_invalid': 'Keine gültige Zeitzone.',

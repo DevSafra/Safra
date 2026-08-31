@@ -212,6 +212,15 @@ export const AUDIT_ACTIONS = [
   'country.updated',
   'currency.created',
   'currency.updated',
+  /*
+    Deleting geography (Bashar, 2026-08-31). Soft, and only when nothing points at the row — the
+    audit line is what makes the removal answerable afterwards, and it names the CODE or the SLUG
+    rather than an id so سجل التدقيق reads without a lookup.
+  */
+  'city_category.deleted',
+  'city.deleted',
+  'country.deleted',
+  'currency.deleted',
   'conversation.started',
   'conversation.closed',
   'dispute.resolved',

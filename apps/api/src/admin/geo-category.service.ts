@@ -93,23 +93,40 @@ export class GeoCategoryService {
     actor: AccessTokenClaims | undefined,
     input: CreateCityCategoryInput,
   ): Promise<{ code: string }> {
-    const clash = await this.db.execute<{ code: string }>(sql`
-      SELECT code FROM city_categories WHERE code = ${input.code} LIMIT 1
+    /*
+      A deleted code is reinstated rather than refused — see `createCountry` for the reasoning.
+      `city_categories.code` is uniquely constrained with no `deleted_at` predicate, so without
+      this a category deleted by mistake could never be added back.
+    */
+    const clash = await this.db.execute<{ retired: boolean }>(sql`
+      SELECT (deleted_at IS NOT NULL) AS retired
+      FROM city_categories WHERE code = ${input.code} LIMIT 1
     `);
 
-    if (clash.rows[0]) throw conflict(ERROR.GEO_CODE_TAKEN);
+    const existing = clash.rows[0];
+
+    if (existing && !existing.retired) throw conflict(ERROR.GEO_CODE_TAKEN);
 
     await this.db.transaction(async (tx) => {
-      /*
+      if (existing) {
+        await tx.execute(sql`
+          UPDATE city_categories SET
+            name_ar = ${input.nameAr}, name_en = ${input.nameEn}, name_de = ${input.nameDe},
+            is_active = true, deleted_at = NULL, updated_at = now()
+          WHERE code = ${input.code}
+        `);
+      } else {
+        /*
         Appended, not inserted at a position. `sort_order` decides the order a reader sees, and a
         new category taking somebody else's number would silently reorder the strip on the customer
         home page — a change nobody asked for, made by adding something unrelated.
       */
-      await tx.execute(sql`
-        INSERT INTO city_categories (code, name_ar, name_en, name_de, sort_order)
-        VALUES (${input.code}, ${input.nameAr}, ${input.nameEn}, ${input.nameDe},
-                (SELECT coalesce(max(sort_order), 0) + 1 FROM city_categories))
-      `);
+        await tx.execute(sql`
+          INSERT INTO city_categories (code, name_ar, name_en, name_de, sort_order)
+          VALUES (${input.code}, ${input.nameAr}, ${input.nameEn}, ${input.nameDe},
+                  (SELECT coalesce(max(sort_order), 0) + 1 FROM city_categories))
+        `);
+      }
 
       await this.audit.record(
         {
@@ -117,7 +134,11 @@ export class GeoCategoryService {
           actorRole: actor?.role,
           action: 'city_category.created',
           subjectType: 'city_category',
-          after: { code: input.code, nameAr: input.nameAr },
+          after: {
+            code: input.code,
+            nameAr: input.nameAr,
+            reinstated: existing !== undefined,
+          },
         },
         tx as unknown as Database,
       );
@@ -174,6 +195,65 @@ export class GeoCategoryService {
             a consequence, and a flag alone cannot answer «what did that change» afterwards.
           */
           after: { code, ...input, cities: row.cities },
+        },
+        tx as unknown as Database,
+      );
+    });
+
+    return { code };
+  }
+
+  /**
+   * Removes a category, unless a city is filed under it.
+   *
+   * Bashar (2026-08-31): «also on the page الفئات same». Retiring — `is_active = false` — was the
+   * only way out, and it is the right answer for a category cities USE: they keep their link and
+   * the word still renders wherever it already appears. It is the wrong answer for one added by
+   * mistake, which then sits in the list for ever with «موقوفة» beside it.
+   *
+   * So: filed under nothing, and it goes. Filed under something, and the refusal says how many —
+   * `GEO_CATEGORY_IN_USE`, the code this catalogue has carried since الفئات shipped and which
+   * nothing had ever thrown.
+   *
+   * The count is of LINKS, including those from a soft-deleted city, because the link row itself is
+   * what the foreign key protects. `list()` counts only live cities, which is right for a column a
+   * person reads and wrong for a question about whether a row can be removed.
+   */
+  async remove(
+    actor: AccessTokenClaims | undefined,
+    code: string,
+  ): Promise<{ code: string }> {
+    const found = await this.db.execute<{
+      id: string;
+      name_ar: string;
+      links: number;
+    }>(sql`
+      SELECT cc.id::text, cc.name_ar,
+             (SELECT count(*)::int FROM city_category_links l WHERE l.category_id = cc.id) AS links
+      FROM city_categories cc
+      WHERE cc.code = ${code} AND cc.deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const row = found.rows[0];
+
+    if (!row) throw notFound(ERROR.GEO_CATEGORY_NOT_FOUND);
+    if (row.links > 0) throw conflict(ERROR.GEO_CATEGORY_IN_USE, { n: row.links });
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE city_categories SET deleted_at = now(), updated_at = now()
+        WHERE id = ${row.id}::uuid
+      `);
+
+      await this.audit.record(
+        {
+          actorUserId: actor?.sub,
+          actorRole: actor?.role,
+          action: 'city_category.deleted',
+          subjectType: 'city_category',
+          before: { code, nameAr: row.name_ar },
+          after: { code },
         },
         tx as unknown as Database,
       );

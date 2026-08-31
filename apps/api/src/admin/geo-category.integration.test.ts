@@ -36,6 +36,15 @@ describeIfDb('managing city categories', () => {
   let staffId = '';
   let suffix = '';
 
+  /** The most recent audit row for an action — a write with no audit line is the pair we refuse. */
+  const auditRow = async (action: string) =>
+    (
+      await db.execute<{ actor: string | null; before: unknown }>(sql`
+        SELECT actor_user_id AS actor, before FROM audit_log
+        WHERE action = ${action} ORDER BY created_at DESC LIMIT 1
+      `)
+    ).rows[0];
+
   const staff = (): AccessTokenClaims =>
     ({
       sub: staffId,
@@ -239,5 +248,106 @@ describeIfDb('managing city categories', () => {
     expect(after.slice(0, before.length).map((one) => one.code)).toEqual(
       before.map((one) => one.code),
     );
+  });
+
+  /**
+   * Deleting a category — Bashar, 2026-08-31: «also on the page الفئات same».
+   *
+   * Retiring was the only way out, and it is right for a category cities USE: they keep their link
+   * and the word still renders wherever it already appears. It is the wrong answer for one added by
+   * mistake, which then sits in the list for ever with «موقوفة» beside it.
+   *
+   * `GEO_CATEGORY_IN_USE` had existed in the catalogue since الفئات shipped and NOTHING had ever
+   * thrown it — a code with no thrower, which is the same shape as a button with no handler.
+   */
+  it('removes a category nothing is filed under, and logs it by code', async () => {
+    const code = `unused-${suffix}`;
+
+    await service.create(staff(), {
+      code,
+      nameAr: 'غير مستخدمة',
+      nameEn: 'Unused',
+      nameDe: 'Ungenutzt',
+    });
+
+    await expect(service.remove(staff(), code)).resolves.toEqual({ code });
+
+    const listed = await service.list();
+
+    expect(
+      listed.map((one) => one.code),
+      'gone from the list',
+    ).not.toContain(code);
+
+    const logged = await auditRow('city_category.deleted');
+
+    expect(logged?.actor).toBe(staffId);
+    expect(JSON.stringify(logged?.before)).toContain(code);
+  });
+
+  /**
+   * A category a city carries is refused, and the SAME category deletes once the city is gone.
+   *
+   * The second half is the opposite control. Without it this passes against a `remove` that
+   * refuses everything — including the case above, which uses a different category and could not
+   * catch it.
+   */
+  it('refuses a category a city is filed under, and allows it once nothing is', async () => {
+    const code = `steppe-del-${suffix}`;
+
+    await service.create(staff(), {
+      code,
+      nameAr: 'سهلية',
+      nameEn: 'Steppe',
+      nameDe: 'Steppe',
+    });
+
+    const slug = `plain-del-${suffix}`;
+
+    await cities.createCity(staff(), {
+      countryCode: 'SY',
+      slug,
+      nameAr: 'سهل',
+      nameEn: 'Plain',
+      nameDe: 'Ebene',
+      timezone: 'Asia/Damascus',
+      categories: [code],
+    });
+
+    await expect(service.remove(staff(), code)).rejects.toMatchObject({
+      response: { code: ERROR.GEO_CATEGORY_IN_USE },
+    });
+
+    /* Deleting the CITY takes its links with it, and the category is then free. */
+    await cities.deleteCity(staff(), slug);
+
+    await expect(service.remove(staff(), code)).resolves.toEqual({ code });
+  });
+
+  /** A deleted code can be added back — otherwise the unique constraint makes delete one-way. */
+  it('lets a deleted code be added again, restoring the row', async () => {
+    const code = `revive-${suffix}`;
+
+    await service.create(staff(), {
+      code,
+      nameAr: 'أولى',
+      nameEn: 'First',
+      nameDe: 'Erste',
+    });
+    await service.remove(staff(), code);
+
+    await expect(
+      service.create(staff(), {
+        code,
+        nameAr: 'ثانية',
+        nameEn: 'Second',
+        nameDe: 'Zweite',
+      }),
+    ).resolves.toEqual({ code });
+
+    const back = (await service.list()).find((one) => one.code === code);
+
+    expect(back?.nameAr, 'the new names win').toBe('ثانية');
+    expect(back?.isActive).toBe(true);
   });
 });

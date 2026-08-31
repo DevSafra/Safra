@@ -143,6 +143,17 @@ export const COMPENSATION_CURRENCIES = ['USD', 'EUR', 'SYP'] as const;
 export const DEFAULT_MONEY_CURRENCY = 'USD';
 
 /**
+ * The unit of account — what SAFRA SETTLES in, as opposed to what it quotes in.
+ *
+ * `ledger_entries.amount_syp` is denominated in this and the column is append-only, so unlike
+ * `DEFAULT_MONEY_CURRENCY` it is not a preference anybody may change: 71,463 rows are already in
+ * it and none of them can be converted. It is written down because four places spelled `'SYP'`
+ * to mean this and a fifth was about to — the currency delete, which must refuse it outright
+ * rather than letting it become removable the day the reference counts happen to reach zero.
+ */
+export const ACCOUNTING_CURRENCY = 'SYP';
+
+/**
  * Which currency a picker STARTS on, given the codes it may offer.
  *
  * ## Why this is a function and not `currencies[0]`

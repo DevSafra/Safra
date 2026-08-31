@@ -610,6 +610,54 @@ export class RegistriesController {
     return this.geoWrite.updateCurrency(user, code.toUpperCase(), body);
   }
 
+  /*
+    ── Deleting geography ──────────────────────────────────────────────────────────────────
+    Bashar (2026-08-31): «I can add/edit everything on the page المدن والدول والعملات but I can
+    not delete», and «also on the page الفئات same». Behind `GEO_MANAGE`, the same permission the
+    creates and the edits are behind: a person who may add a city may remove one they added by
+    mistake. What they may NOT do is remove one anything points at — that is the service's
+    reference check, not a permission, because it is about the data rather than the person.
+  */
+  @Delete('geo/currencies/:code')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoWriteService records currency.deleted inside the transaction.')
+  async deleteCurrency(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('code') code: string,
+  ) {
+    return this.geoWrite.deleteCurrency(user, code.toUpperCase());
+  }
+
+  @Delete('geo/countries/:code')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoWriteService records country.deleted inside the transaction.')
+  async deleteCountry(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('code') code: string,
+  ) {
+    return this.geoWrite.deleteCountry(user, code.toUpperCase());
+  }
+
+  @Delete('geo/cities/:slug')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoWriteService records city.deleted inside the transaction.')
+  async deleteCity(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('slug') slug: string,
+  ) {
+    return this.geoWrite.deleteCity(user, slug);
+  }
+
+  @Delete('geo/categories/:code')
+  @RequirePermissions(P.GEO_MANAGE)
+  @AuditExempt('GeoCategoryService records city_category.deleted inside the transaction.')
+  async deleteCityCategory(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('code') code: string,
+  ) {
+    return this.geoCategories.remove(user, code);
+  }
+
   @Post('geo/countries')
   @RequirePermissions(P.GEO_MANAGE)
   @AuditExempt('GeoWriteService records country.created inside the transaction.')

@@ -200,7 +200,15 @@ export const en = {
   'geo.country_not_found': 'Country not found.',
   'geo.category_not_found': 'Category not found.',
   'geo.category_in_use':
-    'That category is used by cities — deactivate it instead of removing it.',
+    'That category is filed against {n} cities — deactivate it instead of removing it.',
+  'geo.city_in_use':
+    'A city referenced by {n} records (properties, bookings, partners…) cannot be deleted. Deactivate it instead.',
+  'geo.country_in_use':
+    'A country holding {n} cities cannot be deleted. Delete its cities first, or deactivate it.',
+  'geo.currency_in_use':
+    'A currency used by {n} records cannot be deleted. Deactivate it instead.',
+  'geo.currency_accounting':
+    'The accounting currency cannot be deleted — every ledger entry is denominated in it.',
   'geo.code_taken': 'That code is already in use.',
   'geo.slug_taken': 'That slug is already used in this country.',
   'geo.timezone_invalid': 'That is not a valid time zone.',
