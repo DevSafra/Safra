@@ -2479,48 +2479,64 @@ to drop `badge: 'staff'` from `NAV`.
 
 **To unblock:** Bashar, on what the number should mean — or a decision to remove it.
 
-### O-ui-4 — `settings_history` is written on every change and cannot be read anywhere
+### O-ui-4 — FIXED: `settings_history` is on screen, after being unreadable since the schema existed
 
-**Status:** open · **Severity:** Medium · **Owner:** Bashar, then engineering · **Recorded:**
-2026-08-31, found while redesigning الإعدادات
+**Status:** **FIXED** 2026-08-31 · **Severity:** Medium · **Asked for by:** Bashar, 2026-08-31
+(«do the gaps»)
 
-`SettingsAdminService.history(key, limit)` exists, is complete, returns the previous value, the new
-value, the reason and who changed it — and **nothing calls it.** There is no controller route and no
-screen. `apps/api/src/settings/settings-admin.service.ts` writes a `settings_history` row inside the
-same transaction as every setting change, and its own docblock states why: "The history table exists
-to answer 'what was the commission in March?', and a booking's snapshot is only explicable alongside
-it."
+**Two corrections to what this entry said when it was opened on the same day.** It claimed "there is
+no controller route and no screen". Half of that was wrong: `GET /admin/settings/:key/history` had
+existed on `AdminOperationsController` all along, guarded by `SETTINGS_READ`, with the service method
+behind it complete. Only the CONSOLE side was missing — so the estimate was too big and the diagnosis
+misdescribed the code. Checking before quoting is the lesson; the route was ten lines above the `PUT`
+that was already in use.
 
-That question is currently unanswerable outside `psql`. A booking from March carries a snapshot of a
-7% commission; the only way to learn when 7% stopped being true is a manual query. The console shows
-one line — «آخر تعديل: who · when» — which is the LAST change and says nothing about the ones before
-it.
+**What was true.** `settings_history` is written inside the same transaction as every setting change
+and nothing read it, so «what was the commission in March?» — the question the table's own docblock
+gives as its reason for existing — was answerable only in `psql`. The screen showed one line, «آخر
+تعديل: who · when», which is the LAST change and says nothing about the ones before it.
 
-This is the shape of «Before deleting, ask what it DID»: a write that only looks dead, sitting
-beside a read that never existed.
+**The fix.** «التفاصيل» on every row: the technical key, the value's type in Arabic, and the full
+change log. `apps/admin/src/app/api/settings/[key]/history/route.ts` proxies the existing endpoint;
+`setting-details.tsx` fetches on first open (eighteen rows means eighteen queries, and nobody reads
+eighteen logs) and parses the payload with a zod schema rather than casting it.
 
-**What it would take.** A `GET /admin/settings/:key/history` on the existing service method, and a
-disclosure on the row that lists the entries — previous → new, the reason, who, when. The service
-layer is done; this is a route, a client function and a panel. Roughly the size of the redesign that
-found it. **Not started: it is a feature nobody asked for, and it is Bashar's call.**
+Each entry reads «من {previous} إلى {next}» through the same formatter the row uses, so the log
+carries units and currencies too — «من $10.00 إلى $12.00», never «من 10 إلى 12». That is the rule
+`strings.test.ts` holds `timeline_events.payload` and `audit_log.after` to, applied to one more
+payload a person reads. The log scrolls inside its own box: the API returns up to fifty entries and a
+drawer that added fifty rows would push every setting below it off the screen.
 
-### O-test-3 — the settings integration test leaves a row on the screen, one per test process
+Held by `e2e/settings.spec.ts` — the drawer opens, the key is absent until it does, a never-changed
+setting says so, and a save then reads back with its unit.
 
-**Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-31
+### O-test-3 — FIXED: the two dead test rows are gone, and the one that must stay speaks Arabic
 
-الإعدادات shows `test.owned_by_pid_84194`, `test.owned_by_pid_84260` and
-`test.settings_admin_fixture` in «إعدادات أخرى» on the development database.
-`settings-admin.integration.test.ts` creates them and does not remove them, and the key is
-namespaced by process id, so **the list grows by one row per test run that uses a new PID** — for
-ever.
+**Status:** **FIXED** 2026-08-31 · **Severity:** Low · **Asked for by:** Bashar, 2026-08-31
 
-The screen is right to show them. It refuses to hide a key on purpose: "a settings screen that
-silently omits a key is worse than an untidy section — the setting still governs the platform, and
-hiding it means nobody knows it is there." So the fix belongs in the test, not in the console.
+**Correction to what this entry said when it was opened.** It proposed `DELETE FROM settings WHERE
+key LIKE 'test.%'` in the suite's teardown. That would have failed, and the reason is written in the
+test it was aimed at: `settings_history` holds a foreign key to `settings.id` and is append-only by
+trigger, so **any setting that has ever been edited can never be deleted.** The current test already
+handles this correctly — it keeps ONE stable key precisely so only one permanent row can exist.
 
-**What it would take.** A `DELETE FROM settings WHERE key LIKE 'test.%'` in the suite's teardown,
-plus a one-off delete of the rows already there. Ten minutes. Deliberately not done as part of the
-redesign: it is a change to somebody else's test file and nobody asked for it.
+**What was actually there.** Three rows, with two different causes.
+`test.owned_by_pid_84194` and `test.owned_by_pid_84260` are residue from an EARLIER version of that
+test, which keyed its fixture by process id — the exact mistake the current docblock describes and
+avoids. Nothing creates them now and neither has a single history row, so they were deletable.
+`test.settings_admin_fixture` has 42 history rows, is permanent by design, and had only an English
+`description_en` — so الإعدادات showed an operator its raw KEY with no explanation.
+
+**The fix.** `packages/db/migrations/post/0019_settings_test_residue.sql` deletes the two orphans
+(guarded on the absence of history rather than trusting the observation) and backfills an Arabic
+description on the row that stays. The test's own INSERT now writes `description_ar` too, so a fresh
+database never reproduces it.
+
+The same migration corrects two SEEDED descriptions that were on the same screen: «مهلة Pending
+Payment …», an English status name inside an Arabic label, and «مهلة تأكيد الشريك (ساعتان)», a label
+stating the current VALUE — false the moment somebody sets 180 minutes, and printed beside it anyway
+now as «120 دقيقة». `settings` is seeded once and never truncated, so correcting the seed alone would
+have reached a fresh database and no existing one.
 
 ### O-partner-7 — FIXED: a second telephone call used to erase the first one's note
 
