@@ -6,6 +6,7 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -287,6 +288,27 @@ export const partners = pgTable(
      * must not be readable as it.
      */
     sanctionsPolicyAtApproval: text('sanctions_policy_at_approval'),
+
+    /**
+     * What SAFRA takes from this partner's bookings, when it differs from the platform rate.
+     *
+     * NULL means «use `commission.partner_rate`» — the global setting every booking has always
+     * priced against — and is NOT the same as `0`, which is a negotiated zero-commission deal.
+     * A default here would have made those two indistinguishable the moment somebody agreed one.
+     *
+     * Set by hand, per partner, by a super admin (Bashar, 2026-08-31). `numeric(5,4)` holds a rate
+     * to four decimal places: 0.0725 is 7.25%, which is the granularity a negotiated rate is
+     * actually written at.
+     */
+    commissionRate: numeric('commission_rate', { precision: 5, scale: 4 }),
+    /**
+     * The most SAFRA will take from ONE booking under that rate, in USD.
+     *
+     * NULL means no ceiling. Denominated in USD because that is what the platform quotes in and
+     * what 24,264 of 24,264 bookings are priced in; a booking in another currency converts through
+     * the recorded FX rate, and `PricingService` says what it does when no rate exists.
+     */
+    commissionCapUsd: numeric('commission_cap_usd', { precision: 12, scale: 2 }),
 
     /** SRS §8.5: internal score starts at 100 and drives "SAFRA recommends". */
     score: integer('score').notNull().default(100),

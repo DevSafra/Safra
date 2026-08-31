@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
@@ -8,11 +8,12 @@ import { FxRateService } from '../fx/fx-rate.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import {
   applyRate,
+  divideDecimalStrings,
   fromMinor,
   multiplyDecimalStrings,
   toMinor,
 } from '../common/money.js';
-import { ERROR } from '@safra/contracts';
+import { DEFAULT_MONEY_CURRENCY, ERROR } from '@safra/contracts';
 import { notFound, badRequest } from '../common/errors/app-error.js';
 
 /**
@@ -47,11 +48,67 @@ export interface PriceBreakdown {
 
 @Injectable()
 export class PricingService {
+  private readonly logger = new Logger(PricingService.name);
+
   constructor(
     @Inject(DATABASE) private readonly db: Database,
     private readonly settings: SettingsService,
     private readonly fx: FxRateService,
   ) {}
+
+  /**
+   * Holds a partner's commission to the ceiling they negotiated.
+   *
+   * ## Why the cap is in USD and the commission is not
+   *
+   * The cap is a term of a contract — «12%, never more than $50 a booking» — and a contract is
+   * written in one currency. The commission is computed in the BOOKING's currency, which is USD
+   * for every booking the platform has taken but is not guaranteed to be: 57 units are priced in
+   * SYP. So the cap converts, and it converts through SYP because that is the pair every recorded
+   * rate is against.
+   *
+   * ## When the pair cannot be derived
+   *
+   * The cap is NOT applied, and the partner is charged the uncapped commission. That is the wrong
+   * answer in the partner's favour, and it is the least bad of three: refusing to price the stay
+   * would stop a sale over a configuration gap, and guessing a rate would invent money. It is
+   * logged with the partner's reference so it is findable rather than silent — and it cannot
+   * happen at all while bookings are priced in USD, which is the only currency any of them use.
+   */
+  private async capCommission(
+    commissionMinor: bigint,
+    capUsd: string | null,
+    currencyCode: string,
+    scale: number,
+  ): Promise<bigint> {
+    if (capUsd === null) return commissionMinor;
+
+    let capMinor: bigint;
+
+    if (currencyCode === DEFAULT_MONEY_CURRENCY) {
+      capMinor = toMinor(capUsd, scale);
+    } else {
+      try {
+        const [usdToSyp, ownToSyp] = await Promise.all([
+          this.fx.rateToSyp(DEFAULT_MONEY_CURRENCY),
+          this.fx.rateToSyp(currencyCode),
+        ]);
+
+        const capInSyp = multiplyDecimalStrings(capUsd, usdToSyp, 8);
+
+        capMinor = toMinor(divideDecimalStrings(capInSyp, ownToSyp, scale), scale);
+      } catch {
+        this.logger.warn(
+          `Commission cap of ${capUsd} USD not applied: no rate between ` +
+            `${DEFAULT_MONEY_CURRENCY} and ${currencyCode}.`,
+        );
+
+        return commissionMinor;
+      }
+    }
+
+    return commissionMinor < capMinor ? commissionMinor : capMinor;
+  }
 
   /**
    * Computes a booking's money from the unit's real per-night prices.
@@ -80,15 +137,23 @@ export class PricingService {
       currency_code: string;
       currency_id: string;
       decimals: number;
+      commission_rate: string | null;
+      commission_cap_usd: string | null;
     }>(sql`
       SELECT
         d.day::date::text AS date,
         COALESCE(ad.price, u.base_price)::text AS price,
         cur.code AS currency_code,
         cur.id::text AS currency_id,
-        cur.decimals
+        cur.decimals,
+        -- This partner's negotiated terms, NULL when they are on the platform rate.
+        -- Joined here rather than fetched separately so a quote is still one round trip.
+        pa.commission_rate::text  AS commission_rate,
+        pa.commission_cap_usd::text AS commission_cap_usd
       FROM units u
       JOIN currencies cur ON cur.id = u.currency_id
+      JOIN properties prop ON prop.id = u.property_id
+      JOIN partners pa ON pa.id = prop.partner_id
       CROSS JOIN generate_series(
         ${input.checkIn}::date, ${input.checkOut}::date - INTERVAL '1 day', INTERVAL '1 day'
       ) AS d(day)
@@ -137,8 +202,25 @@ export class PricingService {
         : toMinor(feeValue.toFixed(scale), scale);
 
     // ── Partner commission (§2.1) ───────────────────────────────────────────
-    const partnerRate = await this.settings.getNumber('commission.partner_rate', 0);
-    const partnerCommissionMinor = applyRate(baseMinor, partnerRate);
+    /*
+      This partner's own rate when they have one, the platform's when they do not.
+
+      NULL is «use the platform rate» and 0 is a negotiated zero-commission deal — the reason the
+      column is nullable rather than defaulted. `??` distinguishes them; `||` would not, and would
+      quietly bill a zero-commission partner the platform rate.
+    */
+    const negotiatedRate =
+      first.commission_rate === null ? null : Number(first.commission_rate);
+    const partnerRate =
+      negotiatedRate ?? (await this.settings.getNumber('commission.partner_rate', 0));
+
+    const uncappedCommissionMinor = applyRate(baseMinor, partnerRate);
+    const partnerCommissionMinor = await this.capCommission(
+      uncappedCommissionMinor,
+      first.commission_cap_usd,
+      first.currency_code,
+      scale,
+    );
 
     /*
       The discount comes off the total the CUSTOMER pays, and off nothing else.

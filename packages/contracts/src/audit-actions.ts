@@ -119,6 +119,8 @@ export const AUDIT_ACTIONS = [
   'partner.sanctions_screened',
   'partner.two_factor_reset',
   'partner.invitation_accepted',
+  /* What SAFRA takes from this partner, agreed by hand — money terms, so both sides are logged. */
+  'partner.commission_set',
   'partner_document.uploaded',
   'partner_document.viewed',
   'partner_document.reviewed',

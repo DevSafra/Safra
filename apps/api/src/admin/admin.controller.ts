@@ -1,16 +1,18 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
 import {
   pageQuerySchema,
   PERMISSIONS as P,
   type PageQuery,
+  type PartnerCommissionInput,
   type PartnerTwoFactorResetInput,
   type PartnerVerifyInput,
   type PropertyReviewInput,
   type SanctionsImportInput,
   type SanctionsScreeningInput,
   partnerTwoFactorResetSchema,
+  partnerCommissionSchema,
   partnerVerifySchema,
   propertyReviewSchema,
   sanctionsImportSchema,
@@ -161,6 +163,26 @@ export class AdminController {
     body: PartnerTwoFactorResetInput,
   ) {
     return this.partnerTwoFactor.reset(user, reference, body.reason);
+  }
+
+  /**
+   * A partner's negotiated commission — the rate, the ceiling, or neither.
+   *
+   * `PARTNER_APPROVE`, the same authority that switches a partner on: agreeing what SAFRA takes
+   * from them is the same class of decision as agreeing to trade with them at all, and it is not
+   * something a support agent should be able to change.
+   */
+  @Put('partners/:reference/commission')
+  @RequirePermissions(P.PARTNER_APPROVE)
+  @AuditExempt(
+    'ReviewService records partner.commission_set inside the write transaction.',
+  )
+  async setCommission(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(partnerCommissionSchema)) body: PartnerCommissionInput,
+  ) {
+    return this.review.setCommission(user, reference, body);
   }
 
   @Post('partners/:reference/verify')

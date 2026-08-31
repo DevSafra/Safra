@@ -15,6 +15,7 @@ import {
   isSanctionsPolicy,
   type SanctionsPolicy,
   type SeenSection,
+  type PartnerCommissionInput,
 } from '@safra/contracts';
 
 import { actorName } from '../common/actor-name.sql.js';
@@ -554,6 +555,9 @@ export class ReviewService {
         verifiedAt: true,
         sanctionsScreenedAt: true,
         sanctionsScreeningResult: true,
+        /* The negotiated terms, so the detail screen can show and edit them. */
+        commissionRate: true,
+        commissionCapUsd: true,
         suspendedAt: true,
         suspendedReason: true,
         /*
@@ -919,6 +923,82 @@ export class ReviewService {
   }
 
   /** Records that screening was performed, with the provider's raw result. */
+  /**
+   * Sets a partner's negotiated commission — the rate, the ceiling, or neither.
+   *
+   * ## Both nulls carry meaning
+   *
+   * A null rate is «use the platform rate»; a null cap is «no ceiling». Neither is an absence to
+   * be defaulted away, which is why the columns are nullable and why this writes what it is given
+   * rather than coalescing: a partner who negotiated 0% and a partner nobody has negotiated with
+   * are different arrangements, and one of them would be billed wrongly by a `coalesce`.
+   *
+   * ## The audit row carries BOTH sides
+   *
+   * Money terms are the thing a partner disputes, so «what was it before» has to be answerable
+   * from the log rather than by reading a diff of a table nobody snapshots. `before` is read in
+   * the same transaction that writes `after`.
+   */
+  async setCommission(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+    input: PartnerCommissionInput,
+  ): Promise<{ reference: string }> {
+    const found = await this.db.execute<{
+      id: string;
+      city_id: string;
+      commission_rate: string | null;
+      commission_cap_usd: string | null;
+    }>(sql`
+      SELECT id::text, city_id::text, commission_rate::text, commission_cap_usd::text
+      FROM partners WHERE reference = ${reference} AND deleted_at IS NULL LIMIT 1
+    `);
+
+    const partner = found.rows[0];
+
+    if (!partner) throw notFound(ERROR.PARTNER_NOT_FOUND);
+
+    /*
+      A write outside scope is refused in both modes — see `reviewProperty`.
+
+      Caught by `scope-coverage.test.ts` rather than by review: the endpoint reached `partners` and
+      enforced nothing, so a staff member scoped to Damascus could have rewritten the commission of
+      a partner in Aleppo. Money terms are exactly the thing that sweep exists for.
+    */
+    assertCanWrite(claims, partner.city_id);
+
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql`
+        UPDATE partners SET
+          commission_rate = ${input.commissionRate},
+          commission_cap_usd = ${input.commissionCapUsd},
+          updated_at = now()
+        WHERE id = ${partner.id}::uuid
+      `);
+
+      await this.audit.record(
+        {
+          actorUserId: claims?.sub,
+          actorRole: claims?.role,
+          action: 'partner.commission_set',
+          subjectType: 'partner',
+          subjectId: partner.id,
+          before: {
+            commissionRate: partner.commission_rate,
+            commissionCapUsd: partner.commission_cap_usd,
+          },
+          after: {
+            commissionRate: input.commissionRate,
+            commissionCapUsd: input.commissionCapUsd,
+          },
+        },
+        tx as unknown as Database,
+      );
+    });
+
+    return { reference };
+  }
+
   /**
    * RUNS a screening against the imported list and records the result (ADR 0002).
    *

@@ -274,6 +274,31 @@ export type PropertyTypeActiveInput = z.infer<typeof propertyTypeActiveSchema>;
  */
 export const MAX_PROPERTY_IMAGES = 40;
 
+/**
+ * A partner's negotiated commission, set by hand by a super admin (Bashar, 2026-08-31).
+ *
+ * Both fields are nullable and both nulls MEAN something: a null rate is «use the platform rate»,
+ * a null cap is «no ceiling». Neither is a default — a partner who negotiated 0% and a partner
+ * nobody has negotiated with are different arrangements, and a schema that could not tell them
+ * apart would bill one of them wrongly.
+ *
+ * The rate is a FRACTION, not a percent: 0.0725 is 7.25%. The console shows percent because that
+ * is how a person says it and converts on the way in, which keeps the stored value the same shape
+ * as `commission.partner_rate` — two representations of one number in one system is how they
+ * drift.
+ *
+ * Capped at 0.5 because a commission over half the booking is a typo, not a deal, and this is the
+ * field where a misplaced decimal costs a partner half their revenue.
+ */
+export const partnerCommissionSchema = z
+  .object({
+    commissionRate: z.number().min(0).max(0.5).nullable(),
+    commissionCapUsd: z.number().min(0).max(1_000_000).nullable(),
+  })
+  .strict();
+
+export type PartnerCommissionInput = z.infer<typeof partnerCommissionSchema>;
+
 /** Staff decision on a partner's onboarding (§8.1). */
 export const partnerVerifySchema = z
   .object({
