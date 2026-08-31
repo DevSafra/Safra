@@ -42,23 +42,15 @@ export async function ConsoleShell({
   );
 }
 
-/** A section card, matching the dashboard's panels so the console reads as one surface. */
-export function ConsolePanel({
-  title,
-  children,
-}: {
-  title?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
-      {title ? (
-        <h2 className="mb-3 text-[14.5px] font-extrabold text-gold">{title}</h2>
-      ) : null}
-      {children}
-    </section>
-  );
-}
+/**
+ * Re-exported so the console's thirty-five `ConsolePanel` importers stay as they are.
+ *
+ * The component itself moved to `console-panel.tsx` when the settings board became a client
+ * component: this module is an async server component that reads cookies through
+ * `readerSections()`, so importing anything from it into the browser bundle fails the build. The
+ * panel is presentational and belongs on both sides of that line.
+ */
+export { ConsolePanel } from '@/components/console-panel';
 
 /**
  * A KPI card (§9.4: 24px/800 figure, 11.5px label, 10.5px sub; §9.5: 13px radius).

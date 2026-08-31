@@ -2098,8 +2098,12 @@ export const ar = {
       enabled: 'مفعّل',
       disabled: 'معطّل',
       reason: 'سبب التعديل — يظهر في سجل التدقيق (اختياري)',
+      /*
+        Shown only where there IS one. There is no «لم يُعدَّل» counterpart: fifteen of the
+        seventeen rows are seeded defaults, so the line would repeat fifteen times and say nothing
+        — its absence already says it.
+      */
       lastChanged: 'آخر تعديل: {who} · {when}',
-      neverChanged: 'لم يُعدَّل من هذه الشاشة',
 
       /*
         The filter, and the counts beside it.
@@ -2137,15 +2141,18 @@ export const ar = {
       keyLabel: 'مفتاح الإعداد',
       readOnly: 'للقراءة فقط',
 
-      /* Units. The number is formatted by the console; these inflect the noun beside it. */
+      /*
+        Units — the NOUN only, inflected by the count.
+
+        The number is formatted by the console in Western digits, for the three reasons
+        `ARABIC_WESTERN_DIGITS` gives, and drawn as its own isolated run beside these words. A
+        message carrying `#` would set ICU's Arabic-Indic digits next to the Western figure in the
+        row above it.
+      */
       unitMinutes:
         '{n, plural, one {دقيقة} two {دقيقتان} few {دقائق} many {دقيقة} other {دقيقة}}',
       unitNights:
         '{n, plural, one {ليلة} two {ليلتان} few {ليالٍ} many {ليلة} other {ليلة}}',
-      unitHours:
-        '{n, plural, one {ساعة} two {ساعتان} few {ساعات} many {ساعة} other {ساعة}}',
-      /** «١٢٠ دقيقة» is a duration nobody holds in mind; «ساعتان» is. Shown only when it divides. */
-      alsoHours: '= {hours}',
       cityTime: 'بتوقيت المدينة',
       /** The percentage a rate MEANS, printed beside the fraction it is stored as. */
       ratePercent: '= {percent}',

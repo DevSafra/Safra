@@ -1,50 +1,94 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { SANCTIONS_POLICIES } from '@safra/contracts';
+import type { ConfirmRequest } from '@safra/ui';
 
 import type { EditableSetting } from '@/lib/api';
+import { Chip, Ltr } from '@/components/admin-table';
 import { apiErrorOf, fill, t } from '@/lib/strings';
 import { shortDate } from '@/lib/format';
-
-/** Schemas this form knows how to render an input for. */
-const EDITABLE = new Set([
-  'rate',
-  'percent',
-  'positiveInt',
-  'hourOfDay',
-  'money',
-  'boolean',
-  'feeMode',
-  'sanctionsPolicy',
-]);
+import {
+  editableText,
+  isEditableSchema,
+  moneyOf,
+  ratePercentEcho,
+  schemaHint,
+  settingDisplay,
+  type SettingDisplay,
+} from '@/lib/settings-display';
 
 /**
- * One setting, with its own save (§9.3, P-005).
+ * One setting, read at a glance and saved on its own (§9.3, P-005).
  *
- * Per row rather than one form for the page. A bulk save turns somebody else's
- * concurrent edit into a silent revert, and it makes the audit trail read as though
- * one person changed everything at once — which is precisely the question the trail
- * exists to answer correctly.
+ * ## Saved per row, still
  *
- * The input is chosen from the setting's declared `valueSchema`, so a rate gets a
- * decimal field and a toggle gets a checkbox. Anything this form cannot validate is
- * shown read-only with the reason — `payment.provider_routing` is the live example:
- * a nested object where a typo would break payment routing.
+ * A bulk save turns somebody else's concurrent edit into a silent revert, and it makes the audit
+ * trail read as though one person changed everything at once — which is precisely the question the
+ * trail exists to answer correctly. Unchanged from the first version of this screen; the API is
+ * built the same way, one key per call.
+ *
+ * ## What changed, and why the row is a ROW now
+ *
+ * It was a cell in an `auto-fit` grid. Three consequences, all visible in a screenshot at 1440:
+ * the cells had unequal heights so nothing lined up across a group; «تعديل» was pushed to the far
+ * inline-end of each cell, which at 390px put the button on the line ABOVE the label it belonged
+ * to; and opening one editor reflowed the whole grid.
+ *
+ * A list of rows fixes all three by construction — the label reads down one column, the value down
+ * another, and an editor expands into the space under its own row.
+ *
+ * ## A boolean is a switch
+ *
+ * `money.always_usd` took four interactions to flip: «تعديل», the checkbox, «حفظ», and reading the
+ * result. It is one now, and the question that used to be implicit in a form is asked out loud
+ * first — every one of these takes effect on the platform immediately, and one of them signs
+ * everybody in a role out.
  */
-export function SettingRow({ setting }: { setting: EditableSetting }) {
+export function SettingRow({
+  setting,
+  alwaysUsd,
+  ask,
+}: {
+  setting: EditableSetting;
+  alwaysUsd: boolean;
+  /** The board's one `useConfirm().ask` — a dialog per row would be seventeen dialogs. */
+  ask: (request: ConfirmRequest) => Promise<boolean>;
+}) {
   const router = useRouter();
 
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [typed, setTyped] = useState('');
 
-  const editable = EDITABLE.has(setting.valueSchema);
+  const valueField = useRef<HTMLInputElement | HTMLSelectElement | null>(null);
+
+  const editable = isEditableSchema(setting.valueSchema);
+  const display = settingDisplay(setting, alwaysUsd);
+  const name = setting.descriptionAr ?? setting.key;
+
+  /*
+    Focus moves to the field when the editor opens.
+
+    A `useEffect` rather than `autoFocus`: the attribute is flagged by the a11y lint rule and it
+    also fires on the server-rendered pass, which would steal focus on a page load rather than on
+    a deliberate press.
+  */
+  useEffect(() => {
+    if (editing) valueField.current?.focus();
+  }, [editing]);
+
+  function open() {
+    setTyped(editableText(setting));
+    setError(null);
+    setEditing(true);
+  }
 
   async function save(value: unknown, reason: string) {
-    if (busy) return;
+    if (busy) return false;
 
     setBusy(true);
     setError(null);
@@ -63,65 +107,155 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
         const body: unknown = await response.json().catch(() => null);
         setError(apiErrorOf(body));
         setBusy(false);
-        return;
+        return false;
       }
 
       setEditing(false);
       router.refresh();
       setBusy(false);
+      return true;
     } catch {
       setError(t.errors.unreachable);
       setBusy(false);
+      return false;
     }
   }
 
-  return (
-    <div>
-      {/*
-        The design's field treatment: 11.5px label, the value at 13.5px, a unit suffix beside it
-        and a 10.5px hint below. The Arabic DESCRIPTION is the label, not the key — somebody
-        adjusting the commission is thinking about money, not about `commission.partner_rate`.
-        The key is still shown, small, because it is what an audit entry and a runbook name.
-      */}
-      <div className="flex flex-wrap items-start gap-2">
-        <label className="text-[11.5px] font-semibold text-muted">
-          {setting.descriptionAr ?? setting.key}
-        </label>
+  /**
+   * A flag, flipped after the consequence has been read.
+   *
+   * The danger tone is for the grants: `rbac.*` revokes every session of that role on the way
+   * DOWN, so somebody working right now is signed out. It paints the confirm red and puts the
+   * initial focus on «إلغاء», which is the half that protects a person.
+   */
+  async function toggle(next: boolean) {
+    const revokes = !next && setting.key.startsWith('rbac.');
 
-        {editable && !editing ? (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="ms-auto cursor-pointer rounded-md border border-line px-2.5 py-0.5 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
-          >
-            {t.sections.settings.change}
-          </button>
-        ) : null}
+    const confirmed = await ask({
+      title: t.sections.settings.toggleTitle,
+      message: revokes
+        ? fill(t.sections.settings.toggleRevokes, { name })
+        : fill(
+            next ? t.sections.settings.toggleEnable : t.sections.settings.toggleDisable,
+            { name },
+          ),
+      confirmLabel: t.sections.dialog.confirm,
+      cancelLabel: t.sections.dialog.cancel,
+      ...(revokes ? { tone: 'danger' as const } : {}),
+    });
+
+    if (!confirmed) return;
+
+    await save(next, '');
+  }
+
+  return (
+    /*
+      `data-setting-row` is the browser test's handle on one row, the way `data-status-pill` is its
+      handle on one status. Locating a row by its Arabic label would break on the next wording
+      change, which is copy and changes freely; the key is the row's identity.
+    */
+    <div
+      data-setting-row={setting.key}
+      className="border-t border-line2 py-3.5 first:border-t-0 first:pt-0"
+    >
+      {/*
+        Three columns at `sm` and up — label, value, action — and two below it, with the label
+        spanning them.
+
+        Below `sm` the value and the action share a line UNDER the label. Giving the action a line
+        of its own is what the `auto-fit` grid this replaced did at 390px, and because the cell was
+        `ms-auto` inside a wrapping flex row the button landed ABOVE the label it belonged to.
+      */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 sm:grid-cols-[minmax(0,22rem)_minmax(0,1fr)_auto] sm:gap-x-5">
+        <div className="col-span-2 min-w-0 sm:col-span-1">
+          {/*
+            The Arabic DESCRIPTION is the label, not the key — somebody adjusting the commission is
+            thinking about money, not about `commission.partner_rate`.
+          */}
+          <p className="text-[12.5px] leading-snug font-semibold text-text2">{name}</p>
+
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            {/*
+              The key stays on the row, small: it is what an audit entry, a runbook and a migration
+              name. Kept whole, dot included — `e2e/navigation.spec.ts` fails a bare lower_snake_case
+              run standing alone as an element's whole text, and the dotted key is not one.
+            */}
+            <Ltr className="font-mono text-[10px] text-faint2">{setting.key}</Ltr>
+
+            {editable ? null : <Chip tone="faint">{t.sections.settings.readOnly}</Chip>}
+          </p>
+
+          {/*
+            Only where there IS one. Fifteen of the seventeen rows are seeded defaults, so a
+            «never changed» counterpart would repeat fifteen times and say nothing.
+          */}
+          {setting.updatedByEmail ? (
+            <p className="mt-1 text-[10.5px] text-faint">
+              {fill(t.sections.settings.lastChanged, {
+                who: setting.updatedByEmail,
+                when: shortDate(setting.updatedAt),
+              })}
+            </p>
+          ) : null}
+
+          {editable ? null : (
+            <p className="mt-1 text-[10.5px] leading-relaxed text-faint">
+              {fill(t.sections.settings.notEditable, { schema: setting.valueSchema })}
+            </p>
+          )}
+        </div>
+
+        {display.kind === 'json' ? null : (
+          <>
+            {/*
+              The value in a column of its own, so a group of figures can be read down one edge.
+
+              The label column is CAPPED rather than `1fr`: with the value pinned to the far
+              inline-end of a 1380px console there were four hundred empty pixels between
+              «رسوم خدمة العميل» and `$1.99`, and pairing a label with its own value meant crossing
+              them. The cap puts the figures a short saccade from the words they belong to and
+              still lines them up.
+            */}
+            <div className="min-w-0">
+              <Value display={display} />
+            </div>
+
+            <div className="flex shrink-0 justify-end">
+              {editable && display.kind === 'flag' ? (
+                <Switch
+                  on={display.on}
+                  label={name}
+                  busy={busy}
+                  onToggle={() => void toggle(!display.on)}
+                />
+              ) : null}
+
+              {editable && display.kind !== 'flag' && !editing ? (
+                <button
+                  type="button"
+                  onClick={open}
+                  className="cursor-pointer rounded-md border border-line px-3 py-1 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
+                >
+                  {t.sections.settings.change}
+                </button>
+              ) : null}
+            </div>
+          </>
+        )}
       </div>
 
-      {!editing ? (
-        <p className="mt-1.5 text-[13.5px] font-bold text-text" dir="ltr">
-          {display(setting.value)}
-        </p>
-      ) : null}
-
-      <p className="mt-1 font-mono text-[10px] text-faint2" dir="ltr">
-        {setting.key}
-      </p>
-
-      {setting.updatedByEmail ? (
-        <p className="mt-1 text-[10.5px] text-faint">
-          {fill(t.sections.settings.lastChanged, {
-            who: setting.updatedByEmail,
-            when: shortDate(setting.updatedAt),
-          })}
-        </p>
-      ) : null}
-
-      {!editable ? (
-        <p className="mt-2 rounded border border-line bg-field px-2.5 py-2 text-[10.5px] leading-relaxed text-faint">
-          {fill(t.sections.settings.notEditable, { schema: setting.valueSchema })}
-        </p>
+      {/*
+        A routing table is not a value beside a label — it is a block, and it must scroll inside its
+        own box rather than push the page sideways.
+      */}
+      {display.kind === 'json' ? (
+        <pre
+          dir="ltr"
+          className="mt-2 overflow-x-auto rounded-[9px] border border-line bg-field p-2.5 font-mono text-[10.5px] leading-relaxed text-text2"
+        >
+          {display.text}
+        </pre>
       ) : null}
 
       {error ? (
@@ -132,36 +266,44 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
 
       {editing ? (
         <form
-          className="mt-3 grid gap-2"
+          className="mt-3 rounded-[11px] border border-[rgba(var(--goldA),0.22)] bg-field p-3.5"
           onSubmit={(event) => {
             event.preventDefault();
+
             const form = new FormData(event.currentTarget);
             const reason = form.get('reason');
 
             void save(
-              coerce(form.get('value'), setting.valueSchema, setting.value),
+              coerce(typed, setting.valueSchema, setting.value),
               typeof reason === 'string' ? reason : '',
             );
           }}
         >
-          <ValueInput setting={setting} />
-
-          <label className="grid gap-1">
-            <span className="text-[10.5px] text-faint2">
-              {t.sections.settings.reason}
-            </span>
-            <input
-              name="reason"
-              maxLength={500}
-              className="rounded-[9px] border border-line bg-field px-2.5 py-2 text-[12.5px] text-text"
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ValueInput
+              setting={setting}
+              typed={typed}
+              onTyped={setTyped}
+              fieldRef={valueField}
             />
-          </label>
 
-          <div className="flex gap-2">
+            <label className="grid content-start gap-1">
+              <span className="text-[10.5px] text-faint2">
+                {t.sections.settings.reason}
+              </span>
+              <input
+                name="reason"
+                maxLength={500}
+                className="rounded-[9px] border border-line bg-card px-2.5 py-2 text-[12.5px] text-text"
+              />
+            </label>
+          </div>
+
+          <div className="mt-3.5 flex flex-wrap items-center gap-2">
             <button
               type="submit"
               disabled={busy}
-              className="cursor-pointer rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-1.5 text-[11.5px] font-extrabold text-[#241A05] disabled:opacity-60"
+              className="cursor-pointer rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-1.5 text-[11.5px] font-extrabold text-[#241A05] disabled:cursor-default disabled:opacity-60"
             >
               {busy ? t.sections.settings.saving : t.sections.settings.save}
             </button>
@@ -172,6 +314,10 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
             >
               {t.sections.settings.cancel}
             </button>
+
+            <span className="text-[10.5px] text-faint">
+              {t.sections.settings.auditNote}
+            </span>
           </div>
         </form>
       ) : null}
@@ -179,32 +325,150 @@ export function SettingRow({ setting }: { setting: EditableSetting }) {
   );
 }
 
-/** The input the setting's own schema calls for. */
-function ValueInput({ setting }: { setting: EditableSetting }) {
-  const common =
-    'w-full rounded-[9px] border border-line bg-field px-3 py-2.5 text-[13.5px] text-text';
+/**
+ * The value, rendered the way its own kind asks to be.
+ *
+ * `json` is excluded by the TYPE, not by a branch that returns null: a routing table is a block
+ * under the row rather than a value beside the label, so it is drawn by the row itself. Excluding
+ * it here means adding a value kind cannot quietly fall through to the number rendering.
+ */
+function Value({ display }: { display: Exclude<SettingDisplay, { kind: 'json' }> }) {
+  if (display.kind === 'missing') {
+    return <span className="text-[13.5px] text-faint">{t.admin.noData}</span>;
+  }
 
-  if (setting.valueSchema === 'boolean') {
+  if (display.kind === 'flag') {
     return (
-      <label className="flex cursor-pointer items-center gap-2 text-[13px] text-text">
-        <input
-          type="checkbox"
-          name="value"
-          defaultChecked={setting.value === true}
-          className="size-[15px] cursor-pointer accent-gold"
-        />
-        {t.sections.settings.enabled}
-      </label>
+      <span
+        className={`text-[13.5px] font-bold ${display.on ? 'text-ok' : 'text-faint'}`}
+      >
+        {display.on ? t.sections.settings.enabled : t.sections.settings.disabled}
+      </span>
     );
   }
 
+  if (display.kind === 'choice') {
+    return (
+      <span className="block max-w-[30ch] text-[12.5px] leading-snug font-bold text-text">
+        {display.text}
+      </span>
+    );
+  }
+
+  if (display.kind === 'text') {
+    return (
+      <Ltr className="max-w-[30ch] text-[12.5px] leading-snug font-bold text-text">
+        {display.text}
+      </Ltr>
+    );
+  }
+
+  if (display.kind === 'money') {
+    return (
+      <>
+        <Ltr className="block text-[15px] font-extrabold text-text">{display.text}</Ltr>
+        {display.note ? (
+          <span className="mt-0.5 block max-w-[34ch] text-[10px] leading-relaxed text-warn">
+            {display.note}
+          </span>
+        ) : null}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {/*
+        The figure isolated, the Arabic unit beside it as ordinary text.
+
+        Not one string: «120 دقيقة» composed together and set in an RTL line renders as
+        «دقيقة 120», because the digits are a left-to-right run inside a right-to-left paragraph.
+        `docs/i18n.md` §9 — isolate the VALUE, never the label.
+      */}
+      <span className="block text-[15px] font-extrabold text-text">
+        <Ltr>{display.text}</Ltr>
+        {display.unit ? <span className="ms-1">{display.unit}</span> : null}
+      </span>
+
+      {/*
+        The aside is Arabic that may CONTAIN a figure — «المخزَّن: 0.07». It carries its own
+        isolate inside the string, so the element must NOT override the direction.
+      */}
+      {display.aside ? (
+        <span className="mt-0.5 block text-[10px] text-faint">{display.aside}</span>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * An on/off control, `role="switch"` so it announces its state rather than its label alone.
+ *
+ * 40px tall below `lg`, where the input is a finger, and compact above it — the console's own
+ * control floor, met by the element rather than by the zero-specificity rule in `globals.css`
+ * stretching a 24px track to 40.
+ *
+ * The knob travels toward the inline END when on, so it mirrors with the page. That is not in
+ * tension with «arrows are not mirrored»: an arrow key means a physical direction of travel
+ * through a list, and a switch means "further along the way this page reads".
+ */
+function Switch({
+  on,
+  label,
+  busy,
+  onToggle,
+}: {
+  on: boolean;
+  label: string;
+  busy: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={busy}
+      onClick={onToggle}
+      className="flex h-10 shrink-0 cursor-pointer items-center disabled:cursor-default disabled:opacity-60 lg:h-6"
+    >
+      <span
+        className={`flex h-5 w-9 items-center rounded-full p-0.5 transition-colors ${
+          on ? 'justify-end bg-ok' : 'justify-start bg-line'
+        }`}
+      >
+        <span className="block size-4 rounded-full bg-card" />
+      </span>
+    </button>
+  );
+}
+
+/** The input the setting's own schema calls for. */
+function ValueInput({
+  setting,
+  typed,
+  onTyped,
+  fieldRef,
+}: {
+  setting: EditableSetting;
+  typed: string;
+  onTyped: (value: string) => void;
+  fieldRef: RefObject<HTMLInputElement | HTMLSelectElement | null>;
+}) {
+  const common =
+    'w-full rounded-[9px] border border-line bg-card px-3 py-2.5 text-[13.5px] text-text';
+
   if (setting.valueSchema === 'feeMode') {
     return (
-      <label className="grid gap-1">
+      <label className="grid content-start gap-1">
         <span className="text-[10.5px] text-faint2">{t.sections.settings.mode}</span>
         <select
-          name="value"
-          defaultValue={String(setting.value)}
+          ref={(node) => {
+            fieldRef.current = node;
+          }}
+          value={typed}
+          onChange={(event) => onTyped(event.target.value)}
           className={`${common} cursor-pointer`}
         >
           <option value="flat">{t.sections.settings.feeFlat}</option>
@@ -223,11 +487,14 @@ function ValueInput({ setting }: { setting: EditableSetting }) {
   */
   if (setting.valueSchema === 'sanctionsPolicy') {
     return (
-      <label className="grid gap-1">
+      <label className="grid content-start gap-1">
         <span className="text-[10.5px] text-faint2">{t.sections.settings.policy}</span>
         <select
-          name="value"
-          defaultValue={String(setting.value)}
+          ref={(node) => {
+            fieldRef.current = node;
+          }}
+          value={typed}
+          onChange={(event) => onTyped(event.target.value)}
           className={`${common} cursor-pointer`}
         >
           {SANCTIONS_POLICIES.map((policy) => (
@@ -240,121 +507,87 @@ function ValueInput({ setting }: { setting: EditableSetting }) {
     );
   }
 
-  if (setting.valueSchema === 'money') {
-    /**
-     * Money may be stored as a bare number (USD) or `{ amount, currency }`. The
-     * input edits the AMOUNT and preserves whichever shape is already stored —
-     * silently converting one to the other would change what `money.always_usd`
-     * applies to.
-     */
-    const amount = scalarText(
-      typeof setting.value === 'object' && setting.value !== null
-        ? (setting.value as Record<string, unknown>)['amount']
-        : setting.value,
-    );
+  /**
+   * Money edits the AMOUNT and preserves the currency already stored.
+   *
+   * Silently converting `{ amount, currency }` to a bare number would re-denominate the row in
+   * USD, which is the choice `money.always_usd` exists to make explicit rather than accidental.
+   */
+  const currency =
+    setting.valueSchema === 'money' ? moneyOf(setting.value)?.currency : undefined;
 
-    return (
-      <label className="grid gap-1">
-        <span className="text-[10.5px] text-faint2">
-          {t.sections.settings.amount} ({currencyOf(setting.value) ?? 'USD'})
-        </span>
-        <input
-          name="value"
-          inputMode="decimal"
-          defaultValue={amount}
-          required
-          className={common}
-        />
-      </label>
-    );
-  }
-
-  const hint =
-    setting.valueSchema === 'rate'
-      ? t.sections.settings.hintRate
-      : setting.valueSchema === 'hourOfDay'
-        ? t.sections.settings.hintHourOfDay
-        : setting.valueSchema === 'percent'
-          ? t.sections.settings.hintPercent
-          : t.sections.settings.hintInt;
+  const echo = setting.valueSchema === 'rate' ? ratePercentEcho(typed) : null;
 
   return (
-    <label className="grid gap-1">
-      <span className="text-[10.5px] text-faint2">{t.sections.settings.value}</span>
+    <label className="grid content-start gap-1">
+      <span className="text-[10.5px] text-faint2">
+        {setting.valueSchema === 'money'
+          ? `${t.sections.settings.amount} (${currency})`
+          : t.sections.settings.value}
+      </span>
       <input
-        name="value"
+        ref={(node) => {
+          fieldRef.current = node;
+        }}
         inputMode="decimal"
-        defaultValue={scalarText(setting.value)}
+        value={typed}
+        onChange={(event) => onTyped(event.target.value)}
         required
         /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
         className={common}
       />
-      <span className="text-[10.5px] text-faint2">{hint}</span>
+      {/*
+        A rate is the one field whose unit differs from the unit the reader is thinking in, and
+        `0.7` for `0.07` passes validation while multiplying every commission by ten. The echo is
+        the only place that mistake becomes visible before it is saved — so it gets its own line
+        above the hint, in the gold the rest of the console uses for a live figure, rather than
+        being read as the first two words of a sentence about fractions.
+      */}
+      {echo ? <span className="text-[11px] font-bold text-gold">{echo}</span> : null}
+
+      <span className="text-[10.5px] text-faint2">{schemaHint(setting.valueSchema)}</span>
     </label>
   );
 }
 
 /**
- * Turns a form value into the JSON type the setting expects.
+ * Turns the typed text into the JSON type the setting expects.
  *
- * A checkbox yields `"on"` or nothing; a number input yields a string. Posting those
- * as-is would fail the API's per-schema validation — which is the correct outcome,
- * but a confusing one to hit from the form that was supposed to produce valid input.
+ * A number input yields a string, and posting that as-is would fail the API's per-schema
+ * validation — the correct outcome, but a confusing one to hit from the form that was supposed to
+ * produce valid input.
  */
-function coerce(
-  raw: FormDataEntryValue | null,
-  valueSchema: string,
-  current: unknown,
-): unknown {
-  if (valueSchema === 'boolean') return raw === 'on';
+function coerce(text: string, valueSchema: string, current: unknown): unknown {
+  const trimmed = text.trim();
 
-  const text = typeof raw === 'string' ? raw.trim() : '';
-
-  if (valueSchema === 'feeMode' || valueSchema === 'sanctionsPolicy') return text;
+  /* A boolean never reaches here — the switch posts a real boolean, with no form in between. */
+  if (valueSchema === 'feeMode' || valueSchema === 'sanctionsPolicy') return trimmed;
 
   /**
    * Money keeps whichever shape it already had.
    *
-   * A value stored as `{ amount, currency }` must not come back as a bare number:
-   * that would silently re-denominate it in USD, which is exactly what
-   * `money.always_usd` exists to make an explicit choice rather than an accident.
-   * Only the amount changed, so only the amount is replaced.
+   * A value stored as `{ amount, currency }` must not come back as a bare number: that would
+   * silently re-denominate it in USD, which is the choice `money.always_usd` exists to make
+   * explicit rather than accidental. Only the amount changed, so only the amount is replaced —
+   * and a row that states no currency of its own stays a bare number.
    */
   if (valueSchema === 'money') {
-    const currency = currencyOf(current);
+    const currency = statedCurrency(current);
 
-    return currency === null ? Number(text) : { amount: text, currency };
+    return currency === null ? Number(trimmed) : { amount: trimmed, currency };
   }
 
-  return Number(text);
-}
-
-function display(value: unknown): string {
-  if (typeof value === 'boolean') {
-    return value ? t.sections.settings.enabled : t.sections.settings.disabled;
-  }
-
-  if (value === null || value === undefined) return t.admin.noData;
-  if (typeof value === 'object') return JSON.stringify(value);
-
-  return scalarText(value);
+  return Number(trimmed);
 }
 
 /**
- * Renders a scalar as text, and anything else as empty.
+ * The currency the stored value ITSELF names, or `null` when it names none.
  *
- * `String(someObject)` yields "[object Object]" — which would silently become the
- * default value of an input, so a save would post that literal string. Narrowing
- * first means an unexpected shape leaves the field blank and visibly wrong.
+ * Deliberately not `moneyOf`, which fills in `DEFAULT_MONEY_CURRENCY` so a reader always sees a
+ * currency. Writing that default back would change a bare number into an object on the first save
+ * — a shape change nobody asked for, on a row every booking's pricing reads.
  */
-function scalarText(value: unknown): string {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-
-  return '';
-}
-
-function currencyOf(value: unknown): string | null {
+function statedCurrency(value: unknown): string | null {
   if (typeof value !== 'object' || value === null) return null;
 
   const currency = (value as Record<string, unknown>)['currency'];

@@ -1,8 +1,8 @@
 import { getSettings, type EditableSetting } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
 import { ConsolePanel, ConsoleShell } from '@/components/console-shell';
-import { FootNote } from '@/components/admin-table';
-import { SettingRow } from '@/components/setting-row';
+import { SettingsBoard, type SettingsGroup } from '@/components/settings-board';
+import { ALWAYS_USD_SETTING_KEY } from '@safra/contracts';
 import { t } from '@/lib/strings';
 import { refuseSection } from '@/components/section-refusal';
 
@@ -18,8 +18,12 @@ import { refuseSection } from '@/components/section-refusal';
  * The design shows eight fields in one `auto-fit` grid. That is right for eight; there are
  * seventeen settings here and more will arrive, so they are grouped by what a setting DOES.
  * Somebody adjusting the partner commission is thinking about money, not about the string
- * `commission.partner_rate`. Within each group the layout is the design's grid, and the field
- * treatment — label, value, unit suffix, hint line — is the design's exactly.
+ * `commission.partner_rate`.
+ *
+ * The field grid itself is gone. It put cells of unequal height in three columns so nothing lined
+ * up across a group, pushed «تعديل» to the far inline-end of each cell — which at 390px landed it
+ * on the line above its own label — and reflowed the whole group whenever one editor opened. The
+ * groups are lists of rows now; `setting-row.tsx` carries the reasoning.
  *
  * ## Saved per field, not with one button
  *
@@ -27,26 +31,41 @@ import { refuseSection } from '@/components/section-refusal';
  * writes an audited history row naming the value it replaced: one bulk submit would either
  * collapse several distinct decisions into one audit entry or write entries for fields nobody
  * touched. Documented in the gap report.
+ *
+ * ## Grouping happens here, filtering happens in the browser
+ *
+ * The prefixes below are ROUTING — which card a key belongs on — so they stay in the page next to
+ * the fetch. The words that name each group are catalogue entries. Searching is the client's, in
+ * `settings-board.tsx`, because a filter that could only see one card would be worse than none.
  */
 export const dynamic = 'force-dynamic';
 
-const GROUPS: ReadonlyArray<{ title: string; note: string; prefixes: string[] }> = [
+const GROUPS: ReadonlyArray<{
+  id: string;
+  title: string;
+  note: string;
+  prefixes: string[];
+}> = [
   {
+    id: 'money',
     title: t.sections.settings.groupMoney,
     note: t.sections.settings.groupMoneyNote,
     prefixes: ['commission.', 'money.', 'refund.'],
   },
   {
+    id: 'booking',
     title: t.sections.settings.groupBooking,
     note: t.sections.settings.groupBookingNote,
     prefixes: ['booking.'],
   },
   {
+    id: 'partners',
     title: t.sections.settings.groupPartners,
     note: t.sections.settings.groupPartnersNote,
     prefixes: ['partner.', 'wallet.'],
   },
   {
+    id: 'permissions',
     title: t.sections.settings.groupPermissions,
     note: t.sections.settings.groupPermissionsNote,
     prefixes: ['rbac.'],
@@ -83,7 +102,7 @@ export default async function SettingsPage() {
 
   const claimed = new Set<string>();
 
-  const groups = GROUPS.map((group) => {
+  const groups: SettingsGroup[] = GROUPS.map((group) => {
     const settings = result.settings.filter((setting) => {
       const belongs = group.prefixes.some((prefix) => setting.key.startsWith(prefix));
 
@@ -92,8 +111,8 @@ export default async function SettingsPage() {
       return belongs;
     });
 
-    return { ...group, settings };
-  });
+    return { id: group.id, title: group.title, note: group.note, settings };
+  }).filter((group) => group.settings.length > 0);
 
   /**
    * Anything unmatched still appears.
@@ -103,58 +122,32 @@ export default async function SettingsPage() {
    */
   const other = result.settings.filter((setting) => !claimed.has(setting.key));
 
+  if (other.length > 0) {
+    groups.push({
+      id: 'other',
+      title: t.sections.settings.groupOther,
+      note: t.sections.settings.groupOtherNote,
+      settings: other,
+    });
+  }
+
   return (
     <ConsoleShell title={t.nav.settings} counts={counts}>
-      <div className="grid gap-4">
-        <ConsolePanel>
-          <h2 className="text-[14.5px] font-extrabold text-gold">
-            {t.sections.settings.title}
-          </h2>
-          <FootNote>{t.sections.settings.hint}</FootNote>
-        </ConsolePanel>
-
-        {groups.map((group) =>
-          group.settings.length === 0 ? null : (
-            <Group
-              key={group.title}
-              title={group.title}
-              note={group.note}
-              settings={group.settings}
-            />
-          ),
-        )}
-
-        {other.length > 0 ? (
-          <Group
-            title={t.sections.settings.groupOther}
-            note={t.sections.settings.groupOtherNote}
-            settings={other}
-          />
-        ) : null}
-      </div>
+      <SettingsBoard groups={groups} alwaysUsd={alwaysUsd(result.settings)} />
     </ConsoleShell>
   );
 }
 
-function Group({
-  title,
-  note,
-  settings,
-}: {
-  title: string;
-  note: string;
-  settings: EditableSetting[];
-}) {
-  return (
-    <ConsolePanel title={title}>
-      <p className="mb-3.5 text-[11.5px] leading-relaxed text-faint">{note}</p>
+/**
+ * Whether `money.always_usd` is on, read from the SAME payload the rows came from.
+ *
+ * Not a second fetch and not a second read of the settings service. The override decides what a
+ * money row actually means, so it has to agree with the row printed beside it — a value read at a
+ * different moment could disagree with the amount it is annotating. Defaults to the seeded default
+ * (`true`) when the key is absent, which is what `MoneySettingsService` also falls back to.
+ */
+function alwaysUsd(settings: EditableSetting[]): boolean {
+  const row = settings.find((setting) => setting.key === ALWAYS_USD_SETTING_KEY);
 
-      {/* The design's `auto-fit / minmax(220px, 1fr)` field grid. */}
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-3.5">
-        {settings.map((setting) => (
-          <SettingRow key={setting.key} setting={setting} />
-        ))}
-      </div>
-    </ConsolePanel>
-  );
+  return typeof row?.value === 'boolean' ? row.value : true;
 }
