@@ -76,6 +76,20 @@ export type AdvertiserCreateInput = z.infer<typeof advertiserCreateSchema>;
  * barter — and one with no price simply generates no invoices. What is NOT allowed is a price
  * without a currency, which is the shape «no amount without its currency» exists to forbid.
  */
+/**
+ * The sentence under the headline (Bashar, 2026-08-31).
+ *
+ * `.nullable().optional()` and both mean different things, which is the whole reason it is not a
+ * plain optional string: OMITTED is «leave what is there», `null` is «clear it». A campaign is a
+ * complete advertisement without one — the card renders headline, advertiser and link — so an
+ * operator must be able to take a description off as well as put one on.
+ *
+ * 400 characters because it renders inside a card three-to-a-row on a laptop and one-per-row on a
+ * phone; longer than that is a paragraph the layout cannot hold, and the limit is the honest place
+ * to say so rather than letting it truncate.
+ */
+const adDescription = z.string().trim().min(2).max(400).nullable().optional();
+
 export const campaignCreateSchema = z
   .object({
     advertiserReference: z.string().trim().min(1).max(64),
@@ -83,6 +97,9 @@ export const campaignCreateSchema = z
     headlineAr: z.string().trim().min(2).max(120),
     headlineEn: z.string().trim().min(2).max(120),
     headlineDe: z.string().trim().min(2).max(120),
+    descriptionAr: adDescription,
+    descriptionEn: adDescription,
+    descriptionDe: adDescription,
     targetUrl: adTargetUrlSchema,
     billingPeriod: z.enum(AD_BILLING_PERIODS, { message: ERROR.VALIDATION_REQUIRED }),
     priceAmount: z
@@ -120,6 +137,9 @@ export const campaignUpdateSchema = z
     headlineAr: z.string().trim().min(2).max(120).optional(),
     headlineEn: z.string().trim().min(2).max(120).optional(),
     headlineDe: z.string().trim().min(2).max(120).optional(),
+    descriptionAr: adDescription,
+    descriptionEn: adDescription,
+    descriptionDe: adDescription,
     targetUrl: adTargetUrlSchema.optional(),
   })
   .strict();
@@ -140,6 +160,14 @@ export type AdInvoicePayInput = z.infer<typeof adInvoicePaySchema>;
 export interface DeliveredAd {
   readonly reference: string;
   readonly headline: string;
+  /**
+   * The sentence under the headline, or null.
+   *
+   * Nullable rather than an empty string: a campaign written before descriptions existed has none,
+   * and so does one whose operator chose not to write one. The card draws nothing for either,
+   * which is why the two need not be told apart here.
+   */
+  readonly description: string | null;
   readonly advertiser: string;
   readonly kind: AdvertiserKind;
   /** The CLICK path on SAFRA, never the advertiser's URL — see the delivery service. */

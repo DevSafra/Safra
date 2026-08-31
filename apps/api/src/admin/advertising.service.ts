@@ -53,6 +53,9 @@ export interface CampaignRow {
     `AD_READ`. The price and the window are deliberately NOT editable — see the contract.
   */
   readonly headlineAr: string;
+  readonly descriptionAr: string | null;
+  readonly descriptionEn: string | null;
+  readonly descriptionDe: string | null;
   readonly headlineEn: string;
   readonly headlineDe: string;
   readonly targetUrl: string;
@@ -214,7 +217,9 @@ export class AdvertisingService {
              to_char(c.starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS starts_at,
              to_char(c.ends_at   AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS ends_at,
              floor(extract(epoch FROM (c.ends_at - now())) / 86400)::int AS days_remaining,
-             c.headline_ar, c.headline_en, c.headline_de, c.target_url,
+             c.headline_ar, c.headline_en, c.headline_de,
+             c.description_ar, c.description_en, c.description_de,
+             c.target_url,
              c.image_file_key, c.image_variant_widths, c.image_status::text AS image_status,
              c.created_at
       ${fromWhere}
@@ -240,6 +245,9 @@ export class AdvertisingService {
         clicks: Number(row.clicks),
         daysRemaining: row.days_remaining,
         headlineAr: row.headline_ar,
+        descriptionAr: row.description_ar,
+        descriptionEn: row.description_en,
+        descriptionDe: row.description_de,
         headlineEn: row.headline_en,
         headlineDe: row.headline_de,
         targetUrl: row.target_url,
@@ -366,6 +374,9 @@ interface CampaignRowSql extends Record<string, unknown> {
   headline_ar: string;
   headline_en: string;
   headline_de: string;
+  description_ar: string | null;
+  description_en: string | null;
+  description_de: string | null;
   target_url: string;
   image_file_key: string | null;
   image_variant_widths: number[] | null;

@@ -126,7 +126,8 @@ export class AdManagementService {
       const made = await tx.execute<{ id: string; reference: string }>(sql`
         INSERT INTO ad_campaigns
           (advertiser_id, city_id, status, billing_period, price_amount, price_currency_id,
-           starts_at, ends_at, headline_ar, headline_en, headline_de, target_url,
+           starts_at, ends_at, headline_ar, headline_en, headline_de,
+           description_ar, description_en, description_de, target_url,
            created_by_user_id)
         VALUES (
           ${advertiserId}::uuid, ${cityId}::uuid, 'draft',
@@ -134,6 +135,8 @@ export class AdManagementService {
           ${input.priceAmount ?? null}::numeric, ${currencyId}::uuid,
           ${input.startsOn}::date, ${input.endsOn}::date,
           ${input.headlineAr}, ${input.headlineEn}, ${input.headlineDe},
+          ${input.descriptionAr ?? null}, ${input.descriptionEn ?? null},
+          ${input.descriptionDe ?? null},
           ${input.targetUrl}, ${claims.sub}::uuid
         )
         RETURNING id, reference
@@ -266,11 +269,23 @@ export class AdManagementService {
       const keep = (given: string | undefined, current: string): string =>
         given ?? current;
 
+      /*
+        The headlines coalesce and the descriptions cannot.
+
+        A headline is `NOT NULL`, so NULL can only ever mean «leave it». A description is
+        emptiable, and `coalesce` would make «clear this» and «leave this» the same request — an
+        operator could add a description and never take it off. So each description column is
+        written only when its key is present, which is the distinction the schema draws with
+        `.nullable().optional()`.
+      */
       await tx.execute(sql`
         UPDATE ad_campaigns SET
           headline_ar = coalesce(${input.headlineAr ?? null}, headline_ar),
           headline_en = coalesce(${input.headlineEn ?? null}, headline_en),
           headline_de = coalesce(${input.headlineDe ?? null}, headline_de),
+          description_ar = ${'descriptionAr' in input ? sql`${input.descriptionAr ?? null}` : sql`description_ar`},
+          description_en = ${'descriptionEn' in input ? sql`${input.descriptionEn ?? null}` : sql`description_en`},
+          description_de = ${'descriptionDe' in input ? sql`${input.descriptionDe ?? null}` : sql`description_de`},
           target_url  = ${keep(input.targetUrl, campaign.target_url)},
           updated_at  = now()
         WHERE id = ${campaign.id}::uuid

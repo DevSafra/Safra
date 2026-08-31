@@ -129,6 +129,20 @@ export const adCampaigns = pgTable(
     headlineDe: text('headline_de').notNull(),
 
     /**
+     * The sentence under the headline — what the ad SAYS, beyond what it is called.
+     *
+     * Three columns like the headline, because the customer app serves ar, en and de and this is
+     * operator-written text a person reads. NULLABLE, unlike the headline: a headline is what
+     * makes a card an advertisement and an ad without one is not renderable, while a description
+     * is an elaboration the card is complete without — the same reasoning the creative image is
+     * optional under. Every campaign written before 2026-08-31 has none, and none of them is
+     * broken by that.
+     */
+    descriptionAr: text('description_ar'),
+    descriptionEn: text('description_en'),
+    descriptionDe: text('description_de'),
+
+    /**
      * Where a click goes. Validated to http/https at the boundary.
      *
      * The click endpoint redirects to THIS column and never to anything in the request, so the

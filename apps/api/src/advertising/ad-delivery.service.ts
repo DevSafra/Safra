@@ -60,15 +60,33 @@ export class AdDeliveryService {
           ? sql`c.headline_de`
           : sql`c.headline_ar`;
 
+    /*
+      The description in the same language, falling back to ARABIC — the authored one.
+
+      A campaign written before 2026-08-31 has none in any language and answers null, which the
+      card renders by drawing nothing. A campaign whose operator wrote only the Arabic answers
+      Arabic to an English reader, which is the same fallback `localisedName` makes everywhere
+      else: something true in the wrong language beats an empty line.
+    */
+    const description =
+      locale === 'en'
+        ? sql`coalesce(c.description_en, c.description_ar)`
+        : locale === 'de'
+          ? sql`coalesce(c.description_de, c.description_ar)`
+          : sql`c.description_ar`;
+
     const rows = await this.db.execute<{
       reference: string;
       headline: string;
+      description: string | null;
       advertiser: string;
       kind: string;
       image_file_key: string | null;
       image_variant_widths: number[] | null;
     }>(sql`
-      SELECT c.reference, ${headline} AS headline, a.name AS advertiser,
+      SELECT c.reference, ${headline} AS headline,
+             ${description} AS description,
+             a.name AS advertiser,
              a.kind::text AS kind,
              -- Only a FINISHED render. A key whose variants are still being written is an address,
              -- not a picture, and a customer meeting it sees a broken image on their booking.
@@ -93,6 +111,7 @@ export class AdDeliveryService {
     return rows.rows.map((row) => ({
       reference: row.reference,
       headline: row.headline,
+      description: row.description,
       advertiser: row.advertiser,
       kind: row.kind as DeliveredAd['kind'],
       /*

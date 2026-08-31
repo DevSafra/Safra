@@ -74,6 +74,9 @@ describeIfDb('what the customer app is served', () => {
       headline_ar: 'مطعم الشام',
       headline_en: 'Sham Restaurant',
       headline_de: 'Restaurant Sham',
+      description_ar: null,
+      description_en: null,
+      description_de: null,
       target: 'https://example.test/menu',
       ...over,
     };
@@ -85,11 +88,13 @@ describeIfDb('what the customer app is served', () => {
         RETURNING id
       )
       INSERT INTO ad_campaigns (advertiser_id, city_id, status, starts_at, ends_at,
-                                headline_ar, headline_en, headline_de, target_url)
+                                headline_ar, headline_en, headline_de,
+                                description_ar, description_en, description_de, target_url)
       SELECT adv.id, (SELECT id FROM cities WHERE slug = ${v.slug}), ${v.status}::ad_status,
              now() + (${v.starts} * interval '1 day'),
              now() + (${v.ends} * interval '1 day'),
-             ${v.headline_ar}, ${v.headline_en}, ${v.headline_de}, ${v.target}
+             ${v.headline_ar}, ${v.headline_en}, ${v.headline_de},
+             ${v.description_ar}, ${v.description_en}, ${v.description_de}, ${v.target}
       FROM adv
       RETURNING reference
     `);
@@ -114,6 +119,41 @@ describeIfDb('what the customer app is served', () => {
 
     expect((await delivery.forCity(citySlug, 'en'))[0]?.headline).toBe('Sham Restaurant');
     expect((await delivery.forCity(citySlug, 'de'))[0]?.headline).toBe('Restaurant Sham');
+  });
+
+  /**
+   * The description, in the reader's language and absent when there is none.
+   *
+   * Added on 2026-08-31 (Bashar). Nullable unlike the headline: a card is a complete advertisement
+   * without one, and every campaign written before this existed has none in any language. The
+   * fallback to Arabic is the one every other translated field makes — something true in the wrong
+   * language beats an empty line — and it is asserted rather than assumed, because a campaign with
+   * only the Arabic written is the common case while an operator is still filling the form in.
+   */
+  it('serves the description in the reader’s language, and null when there is none', async () => {
+    await campaign();
+
+    /* The opposite control: with no description written, every locale answers null. */
+    expect((await delivery.forCity(citySlug, 'ar'))[0]?.description).toBeNull();
+    expect((await delivery.forCity(citySlug, 'en'))[0]?.description).toBeNull();
+  });
+
+  it('serves each language’s description, falling back to the Arabic', async () => {
+    await campaign({
+      description_ar: 'أطباق شامية في قلب المدينة',
+      description_en: 'Damascene dishes in the old city',
+    });
+
+    expect((await delivery.forCity(citySlug, 'ar'))[0]?.description).toBe(
+      'أطباق شامية في قلب المدينة',
+    );
+    expect((await delivery.forCity(citySlug, 'en'))[0]?.description).toBe(
+      'Damascene dishes in the old city',
+    );
+    /* No German written, so a German reader gets the authored language rather than nothing. */
+    expect((await delivery.forCity(citySlug, 'de'))[0]?.description).toBe(
+      'أطباق شامية في قلب المدينة',
+    );
   });
 
   /**

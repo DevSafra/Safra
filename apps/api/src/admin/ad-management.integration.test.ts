@@ -401,4 +401,80 @@ describeIfDb('creating and billing a campaign', () => {
 
     expect(after.rows[0]?.status).toBe('due');
   });
+
+  /**
+   * The description a campaign carries — written, changed, and taken off again.
+   *
+   * Bashar (2026-08-31). The case that needs saying is the LAST one: an omitted key leaves the
+   * description alone and `null` clears it, and a `coalesce` — which the headlines beside it
+   * legitimately use — would make those the same request. An operator could then add a description
+   * and never remove one, which is the shape this codebase keeps finding.
+   */
+  describe('a campaign’s description', () => {
+    const descriptionOf = async (reference: string) =>
+      (
+        await db.execute<{ ar: string | null; en: string | null; de: string | null }>(sql`
+          SELECT description_ar AS ar, description_en AS en, description_de AS de
+          FROM ad_campaigns WHERE reference = ${reference}
+        `)
+      ).rows[0];
+
+    it('is optional — a campaign without one is created and stores null', async () => {
+      const made = await campaign();
+
+      expect(await descriptionOf(made.reference)).toMatchObject({
+        ar: null,
+        en: null,
+        de: null,
+      });
+    });
+
+    it('is stored in each language it was written in', async () => {
+      const made = await campaign({
+        descriptionAr: 'مشاوي على الفحم منذ ١٩٦٠',
+        descriptionEn: 'Charcoal grill since 1960',
+      });
+
+      expect(await descriptionOf(made.reference)).toMatchObject({
+        ar: 'مشاوي على الفحم منذ ١٩٦٠',
+        en: 'Charcoal grill since 1960',
+        de: null,
+      });
+    });
+
+    it('leaves an omitted description alone and clears one sent as null', async () => {
+      const made = await campaign({
+        descriptionAr: 'الأصلي',
+        descriptionEn: 'The original',
+      });
+
+      /* Only the Arabic named — the English must survive untouched. */
+      await management.updateCampaign(STAFF(staffId), made.reference, {
+        descriptionAr: null,
+      });
+
+      expect(await descriptionOf(made.reference)).toMatchObject({
+        ar: null,
+        en: 'The original',
+      });
+    });
+
+    it('changes a description without disturbing the headline', async () => {
+      const made = await campaign({ descriptionAr: 'قديم' });
+
+      await management.updateCampaign(STAFF(staffId), made.reference, {
+        descriptionAr: 'جديد',
+      });
+
+      const row = await db.execute<{ headline: string; ar: string | null }>(sql`
+        SELECT headline_ar AS headline, description_ar AS ar
+        FROM ad_campaigns WHERE reference = ${made.reference}
+      `);
+
+      expect(row.rows[0]).toMatchObject({
+        headline: 'أفضل مشاوي في دمشق',
+        ar: 'جديد',
+      });
+    });
+  });
 });
