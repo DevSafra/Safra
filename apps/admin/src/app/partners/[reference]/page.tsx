@@ -10,6 +10,7 @@ import { DEFAULT_SANCTIONS_POLICY } from '@safra/contracts';
 
 import { PartnerContractPanel } from '@/components/partner-contract-panel';
 import { VerifyPartner } from '@/components/verify-partner';
+import { PartnerCommission } from '@/components/partner-commission';
 import { PartnerTwoFactor } from '@/components/partner-two-factor';
 import { PartnerSuspension } from '@/components/partner-suspension';
 import { BackLink, type BackTarget } from '@/components/back-link';
@@ -252,6 +253,19 @@ export default async function PartnerPage({
       </Section>
 
       {/* ── Sanctions screening (ADR 0002) ────────────────────────────────── */}
+      {/*
+        The negotiated commission (Bashar, 2026-08-31). Beside the contract rather than in
+        الإعدادات: `commission.partner_rate` is the PLATFORM's rate and belongs there; what one
+        partner agreed is a fact about that partner and belongs on their record.
+      */}
+      <Section title={t.sections.partnerDetail.commissionTitle}>
+        <PartnerCommission
+          reference={partner.reference}
+          rate={partner.commissionRate}
+          capUsd={partner.commissionCapUsd}
+        />
+      </Section>
+
       <Section title={t.sections.partnerDetail.sanctionsScreening}>
         <ScreeningPanel
           reference={partner.reference}

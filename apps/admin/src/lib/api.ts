@@ -281,6 +281,13 @@ const partnerDetailSchema = z.object({
   /** Provider payload, shape varies by provider — rendered as-is for the record. */
   sanctionsScreeningResult: z.unknown().nullable(),
   /*
+    The negotiated commission. `numeric` arrives as a STRING, and both are nullable with meaning:
+    a null rate is «the platform rate», a null cap is «no ceiling». `.nullable()` rather than a
+    default, so the screen can tell those apart from a value somebody actually chose.
+  */
+  commissionRate: z.string().nullable(),
+  commissionCapUsd: z.string().nullable(),
+  /*
     No `suspendedAt` / `suspendedReason` here. They were flat columns until 2026-08-24 and the API
     now destructures them INTO `suspension` above, so a screen cannot render a reason without the
     date and the author beside it — «موقوف» with nothing a reader can act on was the failure that

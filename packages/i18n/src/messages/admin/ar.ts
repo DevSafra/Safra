@@ -2712,7 +2712,20 @@ export const ar = {
         started by somebody else on another day, not finishing something of their own. The word has
         to work for both, because the common case is picking up a partner who came in weeks ago.
       */
-      continueOnboarding: 'متابعة مستندات الشريك',
+      /* «متابعة» — the onboarding sitting, which no longer includes documents. */
+      continueOnboarding: 'متابعة إجراءات الشريك',
+
+      /* ── The negotiated commission, set by hand per partner (Bashar, 2026-08-31) ── */
+      commissionTitle: 'العمولة',
+      commissionNote:
+        'اتركهما فارغين ليُطبَّق معدّل المنصة بلا حد أقصى. النسبة تُدخل كنسبة مئوية، والحد الأقصى بالدولار لكل حجز.',
+      commissionRate: 'نسبة العمولة (%)',
+      commissionRateHint: 'مثال: 7.25 — اتركه فارغاً لاستخدام معدّل المنصة',
+      commissionCap: 'الحد الأقصى للعمولة ($)',
+      commissionCapHint: 'أقصى ما تأخذه سفرة من الحجز الواحد — اتركه فارغاً بلا حد',
+      commissionPlatform: 'معدّل المنصة',
+      commissionNoCap: 'بلا حد أقصى',
+      commissionSaved: 'حُفظت شروط العمولة.',
       applicant: 'مُقدّم الطلب',
       email: 'البريد الإلكتروني',
       phone: 'الهاتف',
@@ -3153,6 +3166,7 @@ export const ar = {
     'dispute.notified': 'إشعار أطراف النزاع بالإغلاق',
     'dispute.evidence_added': 'إضافة دليل إلى نزاع',
     'dispute.evidence_removed': 'حذف دليل من نزاع',
+    'partner.commission_set': 'تحديد عمولة شريك',
     'city_category.created': 'إضافة فئة مدن',
     'city_category.updated': 'تعديل فئة مدن',
     'city_category.deleted': 'حذف فئة مدن',
@@ -3561,6 +3575,9 @@ export const ar = {
       altDe: 'الوصف البديل بالألمانية',
       credit: 'نسبة الصورة',
       isHero: 'الصورة الرئيسية',
+      /* `partner.commission_set` — both sides of a money term, so a dispute can be answered. */
+      commissionRate: 'نسبة العمولة',
+      commissionCapUsd: 'الحد الأقصى للعمولة',
       /*
         `Audited`'s own envelope: the interceptor records the handler's return value under this
         key. It surfaced for the first time on 2026-08-30 with `city_image.uploaded`, because

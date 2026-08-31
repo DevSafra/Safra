@@ -351,3 +351,62 @@ test.describe('responsive', () => {
     });
   }
 });
+
+/**
+ * The negotiated commission, set by hand on the partner's record.
+ *
+ * Bashar (2026-08-31): «add a نسبة العمولة in % and the max range in $ inputs on the partner
+ * details page … The super admin will define the values for each partner manually.»
+ *
+ * The assertion that matters is the ROUND TRIP: a rate typed as a percentage is stored as the
+ * fraction `commission.partner_rate` uses, and comes back as the same percentage. A form that
+ * saved 7.25 as 7.25 rather than 0.0725 would bill a partner seven hundred percent, and it would
+ * look completely correct on screen.
+ */
+test('a partner’s commission is set by hand, in percent, and survives a reload', async ({
+  page,
+}) => {
+  await page.goto('/partners');
+
+  const first = page.locator('a[href^="/partners/PAR-"]').first();
+
+  await expect(first).toBeVisible();
+  await first.click();
+  await page.waitForURL(/\/partners\/PAR-/);
+
+  const panel = page.locator('[data-partner-commission]');
+
+  await expect(panel, 'the commission inputs are on the partner record').toBeVisible();
+
+  const rate = panel.locator('input[name=commissionRate]');
+  const cap = panel.locator('input[name=commissionCapUsd]');
+
+  await rate.fill('7.25');
+  await cap.fill('50');
+  await panel.locator('[data-geo-save]').click();
+
+  await expect(panel).toContainText(t.sections.partnerDetail.commissionSaved, {
+    timeout: 20_000,
+  });
+
+  /* Percent in, percent out — the conversion happens on both edges or not at all. */
+  await page.reload();
+  await expect(page.locator('input[name=commissionRate]')).toHaveValue('7.25');
+  await expect(page.locator('input[name=commissionCapUsd]')).toHaveValue('50');
+
+  /*
+    And EMPTY is a value: it means «the platform rate, no ceiling», which the panel says in words
+    rather than leaving an empty box to be read as unfinished.
+  */
+  await page.locator('input[name=commissionRate]').fill('');
+  await page.locator('input[name=commissionCapUsd]').fill('');
+  await page.locator('[data-partner-commission] [data-geo-save]').click();
+
+  await expect(page.locator('[data-partner-commission]')).toContainText(
+    t.sections.partnerDetail.commissionPlatform,
+    { timeout: 20_000 },
+  );
+
+  await page.reload();
+  await expect(page.locator('input[name=commissionRate]')).toHaveValue('');
+});
