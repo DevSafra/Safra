@@ -1832,6 +1832,10 @@ const campaignItemSchema = z.object({
   headlineAr: z.string(),
   headlineEn: z.string(),
   headlineDe: z.string(),
+  /* Null where the campaign has none — a card is complete without one. */
+  descriptionAr: z.string().nullable(),
+  descriptionEn: z.string().nullable(),
+  descriptionDe: z.string().nullable(),
   targetUrl: z.string(),
   /*
     The creative. `.nullable()`, never `.default(null)` — a `.default()` would invent «no image» for

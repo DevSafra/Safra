@@ -231,6 +231,8 @@ export async function searchSafely(
 const deliveredAdSchema = z.object({
   reference: z.string(),
   headline: z.string(),
+  /* Null for a campaign whose operator wrote none — the card then draws nothing. */
+  description: z.string().nullable(),
   advertiser: z.string(),
   kind: z.string(),
   /** The CLICK path on SAFRA — never the advertiser's own URL. See `AdDeliveryService`. */

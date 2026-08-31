@@ -625,3 +625,66 @@ test.describe('الإعلانات', () => {
     }
   });
 });
+
+/**
+ * A campaign carries a DESCRIPTION, and emptying it takes it off (Bashar, 2026-08-31).
+ *
+ * The round trip is the assertion: written, reloaded, still there — then cleared, reloaded, gone.
+ * The clearing half is the one that needs a browser, because the API distinguishes «leave this»
+ * from «clear this» by whether the key is present, and only the form decides which it sends. A
+ * dialog that omitted an emptied box would let an operator add a description and never remove one.
+ */
+test('الإعلانات › a campaign description is written, kept, and cleared', async ({
+  page,
+}) => {
+  await page.goto('/ads');
+
+  const row = page.locator('tbody tr').first();
+
+  test.skip((await row.count()) === 0, 'No campaign on this database to edit.');
+
+  await row.getByRole('button', { name: 'تعديل', exact: true }).click();
+
+  const dialog = page.getByRole('dialog');
+
+  await expect(dialog).toBeVisible();
+
+  const arabic = dialog.getByLabel(t.sections.ads.fDescriptionAr);
+  const written = `وصف تجريبي ${Math.random().toString(36).slice(2, 7)}`;
+
+  await expect(arabic, 'the description is on the edit dialog').toBeVisible();
+
+  await arabic.fill(written);
+  await dialog.getByRole('button', { name: 'حفظ', exact: true }).click();
+  await expect(dialog).toBeHidden({ timeout: 20_000 });
+
+  /* It survives a reload — a value held only in React state would not. */
+  await page.reload();
+  await page
+    .locator('tbody tr')
+    .first()
+    .getByRole('button', { name: 'تعديل', exact: true })
+    .click();
+  await expect(
+    page.getByRole('dialog').getByLabel(t.sections.ads.fDescriptionAr),
+  ).toHaveValue(written);
+
+  /* And emptying the box CLEARS it, rather than leaving the old text in place. */
+  await page.getByRole('dialog').getByLabel(t.sections.ads.fDescriptionAr).fill('');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'حفظ', exact: true })
+    .click();
+  await expect(page.getByRole('dialog')).toBeHidden({ timeout: 20_000 });
+
+  await page.reload();
+  await page
+    .locator('tbody tr')
+    .first()
+    .getByRole('button', { name: 'تعديل', exact: true })
+    .click();
+  await expect(
+    page.getByRole('dialog').getByLabel(t.sections.ads.fDescriptionAr),
+    'an emptied description is cleared, not left behind',
+  ).toHaveValue('');
+});

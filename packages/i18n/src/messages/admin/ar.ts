@@ -1885,6 +1885,10 @@ export const ar = {
       fHeadlineEn: 'العنوان بالإنجليزية',
       fHeadlineDe: 'العنوان بالألمانية',
       fTargetUrl: 'الرابط (يبدأ بـ https)',
+      /* The sentence under the headline — optional, so the label says so. */
+      fDescriptionAr: 'الوصف بالعربية (اختياري)',
+      fDescriptionEn: 'الوصف بالإنجليزية (اختياري)',
+      fDescriptionDe: 'الوصف بالألمانية (اختياري)',
       fTargetPlaceholder: 'https://example.com',
       fBilling: 'دورة الفوترة',
       fPrice: 'السعر لكل دورة (اختياري)',

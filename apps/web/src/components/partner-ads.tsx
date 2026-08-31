@@ -95,6 +95,16 @@ export async function PartnerAds({
             ) : null}
 
             <p className="text-sm font-semibold text-text">{ad.headline}</p>
+
+            {/*
+              The description, when the campaign has one (Bashar, 2026-08-31). Between the headline
+              and the advertiser, which is where a reader looks for what the ad is actually about —
+              and absent entirely when there is none, rather than an empty line holding space.
+            */}
+            {ad.description ? (
+              <p className="text-xs leading-relaxed text-text2">{ad.description}</p>
+            ) : null}
+
             <p className="text-xs text-muted">{ad.advertiser}</p>
 
             <a

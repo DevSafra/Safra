@@ -581,6 +581,9 @@ function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[
                 headlineAr={row.headlineAr}
                 headlineEn={row.headlineEn}
                 headlineDe={row.headlineDe}
+                descriptionAr={row.descriptionAr}
+                descriptionEn={row.descriptionEn}
+                descriptionDe={row.descriptionDe}
                 targetUrl={row.targetUrl}
                 imageUrl={row.imageUrl}
                 imageStatus={row.imageStatus}

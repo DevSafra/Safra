@@ -69,6 +69,9 @@ export function AdsToolbar({
   const [headlineAr, setHeadlineAr] = useState('');
   const [headlineEn, setHeadlineEn] = useState('');
   const [headlineDe, setHeadlineDe] = useState('');
+  const [descriptionAr, setDescriptionAr] = useState('');
+  const [descriptionEn, setDescriptionEn] = useState('');
+  const [descriptionDe, setDescriptionDe] = useState('');
   const [targetUrl, setTargetUrl] = useState('');
   const [billing, setBilling] = useState<AdBillingPeriod>('monthly');
   const [price, setPrice] = useState('');
@@ -316,6 +319,42 @@ export function AdsToolbar({
             />
           </label>
 
+          {/*
+            Three descriptions, none of them required (Bashar, 2026-08-31).
+
+            A campaign is a complete advertisement without one — the card renders a headline, an
+            advertiser and a link — so an empty box is a choice rather than an unfinished form.
+            A textarea because this is a sentence: a one-line input for it would make an operator
+            scroll their own copy sideways to read it back.
+          */}
+          <label className={labelled}>
+            {c.fDescriptionAr}
+            <textarea
+              value={descriptionAr}
+              onChange={(e) => setDescriptionAr(e.target.value)}
+              rows={2}
+              className={field}
+            />
+          </label>
+          <label className={labelled}>
+            {c.fDescriptionEn}
+            <textarea
+              value={descriptionEn}
+              onChange={(e) => setDescriptionEn(e.target.value)}
+              rows={2}
+              className={`field-ltr ${field}`}
+            />
+          </label>
+          <label className={labelled}>
+            {c.fDescriptionDe}
+            <textarea
+              value={descriptionDe}
+              onChange={(e) => setDescriptionDe(e.target.value)}
+              rows={2}
+              className={`field-ltr ${field}`}
+            />
+          </label>
+
           <label className={labelled}>
             {c.fBilling}
             <select
@@ -398,6 +437,20 @@ export function AdsToolbar({
                   headlineAr: headlineAr.trim(),
                   headlineEn: headlineEn.trim(),
                   headlineDe: headlineDe.trim(),
+                  /*
+                    Omitted when blank, never sent as ''. The schema is `.nullable().optional()`,
+                    so an absent key is «no description» and an empty string would be a description
+                    two characters short of the minimum — a refusal for a field nobody filled in.
+                  */
+                  ...(descriptionAr.trim()
+                    ? { descriptionAr: descriptionAr.trim() }
+                    : {}),
+                  ...(descriptionEn.trim()
+                    ? { descriptionEn: descriptionEn.trim() }
+                    : {}),
+                  ...(descriptionDe.trim()
+                    ? { descriptionDe: descriptionDe.trim() }
+                    : {}),
                   targetUrl: targetUrl.trim(),
                   billingPeriod: billing,
                   /* A price and its currency travel together, or neither does. */

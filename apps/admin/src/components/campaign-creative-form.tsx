@@ -51,6 +51,9 @@ export function CampaignCreativeForm({
   headlineAr,
   headlineEn,
   headlineDe,
+  descriptionAr,
+  descriptionEn,
+  descriptionDe,
   targetUrl,
   imageUrl,
   imageStatus,
@@ -60,6 +63,10 @@ export function CampaignCreativeForm({
   readonly headlineAr: string;
   readonly headlineEn: string;
   readonly headlineDe: string;
+  /** Null where the campaign has none — see `campaignUpdateSchema`. */
+  readonly descriptionAr: string | null;
+  readonly descriptionEn: string | null;
+  readonly descriptionDe: string | null;
   readonly targetUrl: string;
   readonly imageUrl: string | null;
   readonly imageStatus: string | null;
@@ -80,6 +87,10 @@ export function CampaignCreativeForm({
   const [ar, setAr] = useState(headlineAr);
   const [en, setEn] = useState(headlineEn);
   const [de, setDe] = useState(headlineDe);
+  /* Null is «no description»; the box shows it as empty and sends it back as null. */
+  const [descAr, setDescAr] = useState(descriptionAr ?? '');
+  const [descEn, setDescEn] = useState(descriptionEn ?? '');
+  const [descDe, setDescDe] = useState(descriptionDe ?? '');
   const [target, setTarget] = useState(targetUrl);
   const [busy, setBusy] = useState(false);
   /*
@@ -110,6 +121,9 @@ export function CampaignCreativeForm({
     setAr(headlineAr);
     setEn(headlineEn);
     setDe(headlineDe);
+    setDescAr(descriptionAr ?? '');
+    setDescEn(descriptionEn ?? '');
+    setDescDe(descriptionDe ?? '');
     setTarget(targetUrl);
     setStaged({ kind: 'none' });
     setError(null);
@@ -203,6 +217,9 @@ export function CampaignCreativeForm({
     ar !== headlineAr ||
     en !== headlineEn ||
     de !== headlineDe ||
+    descAr !== (descriptionAr ?? '') ||
+    descEn !== (descriptionEn ?? '') ||
+    descDe !== (descriptionDe ?? '') ||
     target !== targetUrl ||
     staged.kind !== 'none';
 
@@ -257,6 +274,22 @@ export function CampaignCreativeForm({
         ...(ar !== headlineAr ? { headlineAr: ar.trim() } : {}),
         ...(en !== headlineEn ? { headlineEn: en.trim() } : {}),
         ...(de !== headlineDe ? { headlineDe: de.trim() } : {}),
+        /*
+          An emptied box sends `null`, not `''`.
+
+          The schema is `.nullable().optional()`: omitted leaves the description alone, null clears
+          it, and `''` would be two characters short of the minimum and refused. Without the null
+          an operator could add a description and never take one off.
+        */
+        ...(descAr !== (descriptionAr ?? '')
+          ? { descriptionAr: descAr.trim() === '' ? null : descAr.trim() }
+          : {}),
+        ...(descEn !== (descriptionEn ?? '')
+          ? { descriptionEn: descEn.trim() === '' ? null : descEn.trim() }
+          : {}),
+        ...(descDe !== (descriptionDe ?? '')
+          ? { descriptionDe: descDe.trim() === '' ? null : descDe.trim() }
+          : {}),
         ...(target !== targetUrl ? { targetUrl: target.trim() } : {}),
       };
 
@@ -284,6 +317,9 @@ export function CampaignCreativeForm({
         setAr(ar.trim());
         setEn(en.trim());
         setDe(de.trim());
+        setDescAr(descAr.trim());
+        setDescEn(descEn.trim());
+        setDescDe(descDe.trim());
         setTarget(target.trim());
       }
 
@@ -418,6 +454,40 @@ export function CampaignCreativeForm({
                   <input
                     value={de}
                     onChange={(event) => setDe(event.target.value)}
+                    className={`field-ltr ${field}`}
+                  />
+                </label>
+              </div>
+
+              {/*
+                The descriptions (Bashar, 2026-08-31). Emptying one CLEARS it — see `submit` — so
+                the three boxes are the whole control: there is no separate «remove description».
+              */}
+              <div className="grid gap-3">
+                <label className={labelled}>
+                  {c.fDescriptionAr}
+                  <textarea
+                    value={descAr}
+                    onChange={(event) => setDescAr(event.target.value)}
+                    rows={2}
+                    className={field}
+                  />
+                </label>
+                <label className={labelled}>
+                  {c.fDescriptionEn}
+                  <textarea
+                    value={descEn}
+                    onChange={(event) => setDescEn(event.target.value)}
+                    rows={2}
+                    className={`field-ltr ${field}`}
+                  />
+                </label>
+                <label className={labelled}>
+                  {c.fDescriptionDe}
+                  <textarea
+                    value={descDe}
+                    onChange={(event) => setDescDe(event.target.value)}
+                    rows={2}
                     className={`field-ltr ${field}`}
                   />
                 </label>
