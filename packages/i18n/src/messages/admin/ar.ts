@@ -1174,6 +1174,32 @@ export const ar = {
       create: 'إضافة',
       addCityTitle: 'مدينة جديدة',
       activeCitiesShort: '{n} مدينة نشطة',
+      /* ── A city's own prose, and what each photograph says (Bashar, 2026-08-31) ── */
+      descriptionAr: 'الوصف بالعربية',
+      descriptionEn: 'الوصف بالإنجليزية',
+      descriptionDe: 'الوصف بالألمانية',
+      descriptionHint:
+        'فقرة تظهر تحت اسم المدينة في الصفحة العامة. اتركها فارغة لإزالتها.',
+      tagsAr: 'الوسوم بالعربية',
+      tagsEn: 'الوسوم بالإنجليزية',
+      tagsDe: 'الوسوم بالألمانية',
+      tagsHint: 'حتى 8 وسوم، يفصل بينها فاصلة — مثل: المدينة القديمة، القلعة',
+      /* Per photograph: the alt text is what a قارئ الشاشة reads, and it was always empty. */
+      imageAlt: 'الوصف البديل',
+      imageAltHint: 'ما يقرأه قارئ الشاشة. اتركه فارغاً إن كانت الصورة زخرفية فقط.',
+      imageCredit: 'نسبة الصورة',
+      imageCreditHint: 'اسم المصوّر أو المصدر، إن كان الترخيص يشترطه',
+      imageHero: 'الصورة الرئيسية',
+      imageMakeHero: 'اجعلها الرئيسية',
+      imageNoAlt: 'بلا وصف بديل',
+      imageRemove: 'حذف الصورة',
+      imageRemoveTitle: 'حذف صورة',
+      imageRemoveBody:
+        'تختفي الصورة من صفحة المدينة العامة ومن هذه القائمة. لا يمكن التراجع من هنا — يمكن رفع صورة أخرى بدلاً منها.',
+      imageMoveUp: 'نقل الصورة لأعلى',
+      imageMoveDown: 'نقل الصورة لأسفل',
+      imageSaved: 'حُفظ',
+
       /* ── Deleting a row, which nothing could do before 2026-08-31 ── */
       remove: 'حذف',
       removing: 'جارٍ الحذف…',
@@ -2797,6 +2823,14 @@ export const ar = {
     conversation: 'محادثة',
     city: 'مدينة',
     city_category: 'فئة مدن',
+    /*
+      Reached this catalogue the way `dispute` and `conversation` did — the first time one was
+      actually written. `city_image.archived` had existed since city photography shipped and its
+      endpoint had NO CALLER, so no row ever carried this subject; giving the console a way to
+      manage a photograph (Bashar, 2026-08-31) produced the first, and `navigation.spec.ts`
+      caught «city_image» rendering raw on سجل التدقيق and on the staff activity list.
+    */
+    city_image: 'صورة مدينة',
     country: 'دولة',
     currency: 'عملة',
     /* The role definition itself, not an employee — `EmployeeRolesService` audits against it. */
@@ -2940,6 +2974,7 @@ export const ar = {
     'calendar.range_updated': 'تعديل مدى في التقويم',
     'city_image.uploaded': 'رفع صورة مدينة',
     'city_image.archived': 'أرشفة صورة مدينة',
+    'city_image.updated': 'تعديل صورة مدينة',
     'customer.profile_updated': 'تعديل ملف عميل',
     'gift_card.purchase': 'شراء بطاقة هدية',
     'advertiser.created': 'إضافة معلن',
@@ -3252,6 +3287,26 @@ export const ar = {
       /* `currency.created`: both taken from the ISO code, never from the form — see CURRENCY_CATALOGUE. */
       symbol: 'الرمز',
       decimals: 'عدد الخانات العشرية',
+      /*
+        `city.updated` and `city_image.updated` (Bashar, 2026-08-31). All fourteen surfaced at
+        once, because these are the first writes the console could make to a city's prose and to
+        what a photograph says — `audit-catalogue` reads the TABLE, so a payload nothing writes is
+        a payload nothing can flag.
+      */
+      timezone: 'المنطقة الزمنية',
+      categories: 'الفئات',
+      publishedProperties: 'العقارات المنشورة',
+      descriptionAr: 'الوصف بالعربية',
+      descriptionEn: 'الوصف بالإنجليزية',
+      descriptionDe: 'الوصف بالألمانية',
+      tagsAr: 'الوسوم بالعربية',
+      tagsEn: 'الوسوم بالإنجليزية',
+      tagsDe: 'الوسوم بالألمانية',
+      altAr: 'الوصف البديل بالعربية',
+      altEn: 'الوصف البديل بالإنجليزية',
+      altDe: 'الوصف البديل بالألمانية',
+      credit: 'نسبة الصورة',
+      isHero: 'الصورة الرئيسية',
       /*
         `Audited`'s own envelope: the interceptor records the handler's return value under this
         key. It surfaced for the first time on 2026-08-30 with `city_image.uploaded`, because

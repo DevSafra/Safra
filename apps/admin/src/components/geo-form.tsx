@@ -109,6 +109,41 @@ export function SelectField({
   );
 }
 
+/**
+ * A PARAGRAPH, for prose that renders as one.
+ *
+ * `Field`'s fixed 40px height is right for a name and wrong for a city description: a sentence in
+ * a one-line box is read by scrolling it sideways. It keeps the same border, radius and type scale
+ * so a row of three still lines up, and `items-start` on `Row` means a taller box does not stretch
+ * its neighbours — the defect the fixed height exists to prevent, in the other direction.
+ */
+export function Prose({
+  label,
+  value,
+  onChange,
+  hint,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+  readonly hint?: string | undefined;
+}) {
+  return (
+    <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+      {label}
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        rows={4}
+        className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text placeholder:text-faint"
+      />
+      {hint ? (
+        <span className="text-[10.5px] font-normal text-faint2">{hint}</span>
+      ) : null}
+    </label>
+  );
+}
+
 export function CheckboxField({
   label,
   checked,
@@ -227,6 +262,9 @@ export function Actions({
         <button
           type="button"
           disabled={busy || !ready}
+          /* Named, so a form containing other save buttons — a city and its photographs — can
+             still be submitted unambiguously by a browser test. */
+          data-geo-save
           onClick={onSave}
           className="inline-flex min-h-10 cursor-pointer items-center rounded-lg bg-gold px-4.5 py-2 text-xs font-bold text-ink transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >

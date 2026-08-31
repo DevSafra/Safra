@@ -153,6 +153,32 @@ export default async function GeoPage({
                         'webp',
                       )
                     : null,
+                /*
+                  Each photograph's own address, built HERE for the same reason the hero's is: the
+                  media base differs per environment and the pipeline never upscales, so only a
+                  server that has read the configuration can turn a key into a URL.
+                */
+                photographs: row.photographs.map((one) => ({
+                  id: one.id,
+                  url: mediaUrl(
+                    media,
+                    { fileKey: one.fileKey, variantWidths: one.variantWidths },
+                    400,
+                    'webp',
+                  ),
+                  altAr: one.altAr,
+                  altEn: one.altEn,
+                  altDe: one.altDe,
+                  credit: one.credit,
+                  isHero: one.isHero,
+                  sortOrder: one.sortOrder,
+                })),
+                descriptionAr: row.descriptionAr,
+                descriptionEn: row.descriptionEn,
+                descriptionDe: row.descriptionDe,
+                tagsAr: row.tagsAr,
+                tagsEn: row.tagsEn,
+                tagsDe: row.tagsDe,
                 country: row.country,
                 category: row.category,
               }))}

@@ -1358,6 +1358,31 @@ const geoSchema = z.object({
       images: z.number(),
       heroKey: z.string().nullable(),
       heroWidths: z.array(z.number()).nullable(),
+      /*
+        Every photograph with what it SAYS, so the editor can manage it rather than only count it.
+        `.nullable()` on each text column and never `.default('')` — an absent alt is a real state
+        with a meaning (a decorative image), and a default would invent a value the API never sent.
+      */
+      photographs: z.array(
+        z.object({
+          id: z.string(),
+          fileKey: z.string(),
+          variantWidths: z.array(z.number()),
+          altAr: z.string().nullable(),
+          altEn: z.string().nullable(),
+          altDe: z.string().nullable(),
+          credit: z.string().nullable(),
+          isHero: z.boolean(),
+          sortOrder: z.number(),
+        }),
+      ),
+      /* The prose §5.4 draws under the name, and the highlight strip beside it. */
+      descriptionAr: z.string().nullable(),
+      descriptionEn: z.string().nullable(),
+      descriptionDe: z.string().nullable(),
+      tagsAr: z.array(z.string()),
+      tagsEn: z.array(z.string()),
+      tagsDe: z.array(z.string()),
     }),
   ),
 });

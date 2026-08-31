@@ -3,10 +3,11 @@
 import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 
-import { ImageSliderFrame, Modal, useConfirm, type SliderImage } from '@safra/ui';
+import { Modal, useConfirm } from '@safra/ui';
 
 import { AdminTable, StatusPill, type AdminColumn } from '@/components/admin-table';
-import { Actions, CheckboxField, Field, Panel, Row } from '@/components/geo-form';
+import { CityPhotographs, type CityPhotograph } from '@/components/city-photographs';
+import { Actions, CheckboxField, Field, Panel, Prose, Row } from '@/components/geo-form';
 import { count } from '@/lib/format';
 import { t, apiErrorOf, fill } from '@/lib/strings';
 
@@ -36,6 +37,31 @@ export interface EditableCity {
   readonly properties: number;
   readonly images: number;
   readonly heroUrl: string | null;
+  /** Every photograph with what it says — see `CityPhotographs`. */
+  readonly photographs: readonly CityPhotograph[];
+  /** The prose §5.4 renders, editable here rather than only by a migration. */
+  readonly descriptionAr: string | null;
+  readonly descriptionEn: string | null;
+  readonly descriptionDe: string | null;
+  readonly tagsAr: readonly string[];
+  readonly tagsEn: readonly string[];
+  readonly tagsDe: readonly string[];
+}
+
+/**
+ * The tag strip, as one line a person types and as the array the API stores.
+ *
+ * A comma-separated field rather than a chip editor: eight short strings is a sentence's worth of
+ * typing, and a bespoke chip control would be a component to build, test and translate for a value
+ * that is edited a handful of times a year. Splitting on BOTH commas — «،» is the Arabic one, and
+ * an Arabic keyboard produces it — because a reader typing the punctuation their language uses
+ * must not silently end up with one long tag.
+ */
+function parseTags(value: string): string[] {
+  return value
+    .split(/[,،\n]/)
+    .map((one) => one.trim())
+    .filter((one) => one !== '');
 }
 
 /**
@@ -78,17 +104,18 @@ function CityForm({
   const [nameEn, setNameEn] = useState(city.nameEn);
   const [nameDe, setNameDe] = useState(city.nameDe);
   const [timezone, setTimezone] = useState(city.timezone);
+  const [descriptionAr, setDescriptionAr] = useState(city.descriptionAr ?? '');
+  const [descriptionEn, setDescriptionEn] = useState(city.descriptionEn ?? '');
+  const [descriptionDe, setDescriptionDe] = useState(city.descriptionDe ?? '');
+  const [tagsAr, setTagsAr] = useState(city.tagsAr.join('، '));
+  const [tagsEn, setTagsEn] = useState(city.tagsEn.join(', '));
+  const [tagsDe, setTagsDe] = useState(city.tagsDe.join(', '));
   const [categories, setCategories] = useState<string[]>([...city.categories]);
   const [isActive, setIsActive] = useState(city.isActive);
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<number | null>(null);
   const file = useRef<HTMLInputElement>(null);
-
-  const slides: SliderImage[] = city.heroUrl
-    ? [{ id: city.slug, thumb: city.heroUrl, full: city.heroUrl, caption: city.nameAr }]
-    : [];
 
   async function save(): Promise<void> {
     /*
@@ -114,7 +141,25 @@ function CityForm({
       const response = await fetch(`/api/geo/cities/${encodeURIComponent(city.slug)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nameAr, nameEn, nameDe, timezone, categories, isActive }),
+        /*
+          An empty description is sent as `null`, not `''` — the schema is `.nullable()`, so null
+          is «clear it» and omitting the key would be «leave it». `''` would store an empty string,
+          which reads the same on screen and is a different thing in the database.
+        */
+        body: JSON.stringify({
+          nameAr,
+          nameEn,
+          nameDe,
+          timezone,
+          categories,
+          isActive,
+          descriptionAr: descriptionAr.trim() === '' ? null : descriptionAr.trim(),
+          descriptionEn: descriptionEn.trim() === '' ? null : descriptionEn.trim(),
+          descriptionDe: descriptionDe.trim() === '' ? null : descriptionDe.trim(),
+          tagsAr: parseTags(tagsAr),
+          tagsEn: parseTags(tagsEn),
+          tagsDe: parseTags(tagsDe),
+        }),
       });
 
       if (!response.ok) {
@@ -232,6 +277,36 @@ function CityForm({
           />
         </Row>
 
+        {/*
+          ── The prose §5.4 draws, which was reachable only by a migration ────────────────
+          A textarea rather than a `Field`: this is a paragraph on the public city page, and a
+          one-line input for it would make the operator scroll a sentence sideways to read it.
+        */}
+        <Row>
+          <Prose
+            label={c.descriptionAr}
+            value={descriptionAr}
+            onChange={setDescriptionAr}
+            hint={c.descriptionHint}
+          />
+          <Prose
+            label={c.descriptionEn}
+            value={descriptionEn}
+            onChange={setDescriptionEn}
+          />
+          <Prose
+            label={c.descriptionDe}
+            value={descriptionDe}
+            onChange={setDescriptionDe}
+          />
+        </Row>
+
+        <Row>
+          <Field label={c.tagsAr} value={tagsAr} onChange={setTagsAr} hint={c.tagsHint} />
+          <Field label={c.tagsEn} value={tagsEn} onChange={setTagsEn} />
+          <Field label={c.tagsDe} value={tagsDe} onChange={setTagsDe} />
+        </Row>
+
         <fieldset className="grid gap-1.5">
           <legend className="text-[11.5px] font-semibold text-muted">
             {c.categoriesLabel}
@@ -268,23 +343,14 @@ function CityForm({
         <div className="grid gap-1.5 border-t border-line pt-3">
           <span className="text-[11.5px] font-semibold text-muted">{c.images}</span>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {city.heroUrl ? (
-              <button
-                type="button"
-                onClick={() => setPreview(0)}
-                aria-label={t.sections.slider.open}
-                className="block cursor-pointer"
-              >
-                <img
-                  src={city.heroUrl}
-                  alt=""
-                  loading="lazy"
-                  className="h-16 w-24 rounded-lg border border-line object-cover"
-                />
-              </button>
-            ) : null}
+          {/*
+            Every photograph, each managing itself — see `CityPhotographs`. It was ONE thumbnail
+            of the hero with no controls at all: no way to say what a picture shows, to move it,
+            to choose a different hero, or to take one off.
+          */}
+          <CityPhotographs slug={city.slug} photographs={city.photographs} />
 
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={busy}
@@ -330,13 +396,6 @@ function CityForm({
           onDelete={() => void remove()}
         />
       </Panel>
-
-      <ImageSliderFrame
-        images={slides}
-        at={preview}
-        onChange={setPreview}
-        labels={t.sections.slider}
-      />
 
       {dialog}
     </Modal>

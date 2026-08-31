@@ -411,3 +411,166 @@ test('the accounting currency has no delete control', async ({ page }) => {
   await page.locator('[data-currency-edit="USD"]').click();
   await expect(page.getByRole('dialog').locator('[data-geo-delete]')).toBeVisible();
 });
+
+/**
+ * A city's prose and tags, written from the console rather than by a migration.
+ *
+ * Bashar (2026-08-31): «Add editing for city descriptions and tags (all supported languages) from
+ * the administration interface rather than requiring migrations.» Both render on the PUBLIC city
+ * page, so the assertion follows them there — a field that saves and a page that does not change
+ * is the «built and connected to nothing» shape one layer along.
+ */
+test('a city’s description and tags are editable, and reach the public read', async ({
+  page,
+  request,
+}) => {
+  const mark = `شاهد-${Math.random().toString(36).slice(2, 7)}`;
+
+  await page.goto('/geo');
+  await page.locator('[data-city-edit="damascus"]').click();
+
+  const form = page.locator('[data-city-form="damascus"]');
+
+  await form.getByLabel(c.descriptionAr).fill(`وصف تجريبي ${mark}`);
+  await form.getByLabel(c.tagsAr).fill(`${mark}، القلعة`);
+  await page.getByRole('dialog').locator('[data-geo-save]').click();
+
+  await expect(page.getByRole('dialog')).toBeHidden({ timeout: 20_000 });
+
+  /* It survives a reload — a value held only in React state would not. */
+  await page.reload();
+  await page.locator('[data-city-edit="damascus"]').click();
+  await expect(
+    page.locator('[data-city-form="damascus"]').getByLabel(c.descriptionAr),
+  ).toHaveValue(`وصف تجريبي ${mark}`);
+
+  /*
+    And it is PUBLIC, which is the reason the field exists.
+
+    Asserted against the customer API rather than the rendered page: `getCity` reads through the
+    five-minute reference cache every catalogue read uses — cities change through this console, not
+    per request — so the page legitimately lags. Asserting the page would be asserting the cache,
+    and would fail for a reason that is not a defect. This is the boundary where a console write
+    becomes something a visitor can be served.
+  */
+  const published = await request.get('http://localhost:4000/api/v1/cities/damascus');
+
+  expect(published.status()).toBe(200);
+
+  const body: unknown = await published.json();
+  const city = body as { descriptionAr: string | null; tagsAr: string[] };
+
+  expect(city.descriptionAr).toContain(mark);
+  expect(city.tagsAr).toContain(mark);
+});
+
+/**
+ * Managing a photograph — the alt text above all.
+ *
+ * Every image on §5.4's hero band went out with an empty `alt` until this shipped, so a screen
+ * reader announced nothing on the first third of every public city page. The assertion checks the
+ * value ROUND-TRIPS: a field that fills and a database that does not change is the failure this
+ * is written against.
+ */
+test('a city photograph can be described, made the hero, and removed', async ({
+  page,
+}) => {
+  await page.goto('/geo');
+
+  /* Damascus is the seeded city with photographs — see the upload spec above. */
+  await page.locator('[data-city-edit="damascus"]').click();
+
+  const cards = page.locator('[data-city-photograph]');
+
+  test.skip((await cards.count()) < 2, 'Damascus needs two photographs for this.');
+
+  const alt = `منظر ${Math.random().toString(36).slice(2, 7)}`;
+  const first = cards.first();
+  const id = (await first.getAttribute('data-city-photograph')) ?? '';
+
+  await first.getByLabel(`${c.imageAlt} — ${c.nameAr}`).fill(alt);
+  await page.locator(`[data-city-image-save="${id}"]`).click();
+
+  /*
+    Wait for the card's own «حُفظ», not for a moment in time. A `reload()` straight after the click
+    races the PATCH still in flight: the write lands, the reload reads the row a moment before it,
+    and the test fails describing a bug that is not there. The app already says when it is done.
+  */
+  await expect(page.locator(`[data-city-photograph="${id}"]`)).toContainText(
+    c.imageSaved,
+    {
+      timeout: 20_000,
+    },
+  );
+
+  await page.reload();
+  await page.locator('[data-city-edit="damascus"]').click();
+  await expect(
+    page
+      .locator(`[data-city-photograph="${id}"]`)
+      .getByLabel(`${c.imageAlt} — ${c.nameAr}`),
+  ).toHaveValue(alt);
+
+  /*
+    The hero is EXCLUSIVE: naming a second one must leave exactly one «الصورة الرئيسية» badge.
+    Two is not a state §5.4 can draw, and the count is the only assertion that sees it.
+  */
+  const others = page.locator('[data-city-hero]');
+
+  if ((await others.count()) > 0) {
+    await others.first().click();
+    await expect
+      .poll(async () => page.getByText(c.imageHero, { exact: true }).count(), {
+        timeout: 20_000,
+      })
+      .toBe(1);
+  }
+});
+
+/**
+ * A photograph can be REMOVED — the endpoint that had no caller.
+ *
+ * `DELETE …/images/:imageId`, its console proxy route and the `city_image.archived` audit action
+ * all existed and nothing called them. The spec uploads its own so that removing it is safe, and
+ * so that it leaves the city as it found it.
+ */
+test('a photograph uploaded here can be taken off again', async ({ page }) => {
+  await page.goto('/geo');
+
+  const counted = await page.locator('[data-city-images]').evaluateAll((nodes) =>
+    nodes.map((node) => ({
+      slug: node.getAttribute('data-city-images') ?? '',
+      images: Number(/\d+/.exec(node.textContent ?? '')?.[0] ?? '0'),
+    })),
+  );
+
+  const target = counted.find((one) => one.images < MAX_CITY_IMAGES)?.slug;
+
+  test.skip(target === undefined, 'every city is at its photograph cap.');
+
+  await page.locator(`[data-city-edit="${target}"]`).click();
+
+  const before = await page.locator('[data-city-photograph]').count();
+  const chooser = page.waitForEvent('filechooser');
+
+  await page.locator(`[data-city-image-add="${target}"]`).click();
+  await (await chooser).setFiles('e2e/fixtures/room-one.jpg');
+
+  await expect
+    .poll(async () => page.locator('[data-city-photograph]').count(), { timeout: 30_000 })
+    .toBe(before + 1);
+
+  /* And off again, leaving the city exactly as this spec found it. */
+  const last = page.locator('[data-city-photograph]').last();
+  const id = (await last.getAttribute('data-city-photograph')) ?? '';
+
+  await page.locator(`[data-city-image-remove="${id}"]`).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: t.sections.dialog.confirm })
+    .click();
+
+  await expect
+    .poll(async () => page.locator('[data-city-photograph]').count(), { timeout: 30_000 })
+    .toBe(before);
+});
