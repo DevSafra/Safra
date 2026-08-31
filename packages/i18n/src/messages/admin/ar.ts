@@ -2105,6 +2105,123 @@ export const ar = {
       */
       lastChanged: 'آخر تعديل: {who} · {when}',
 
+      /**
+       * The NAME of each setting, in Arabic, from the catalogue.
+       *
+       * ## Why these are here and not read from the database
+       *
+       * `settings.description_ar` is a column, and a column holds ONE language. The screen used it
+       * as the label, which meant the one thing `docs/i18n.md` exists to prevent: adding a language
+       * to the console would not reach these words, and nothing would say so. Two of them were
+       * already wrong in a way that proves the point — the payment-timeout row read «مهلة Pending
+       * Payment» with an English status name in the middle of it, and the confirmation-window row
+       * read «مهلة تأكيد الشريك (ساعتان)», a label stating the CURRENT VALUE, which becomes a lie
+       * the moment somebody changes it to 180 minutes.
+       *
+       * The database description stays as the FALLBACK, so a setting seeded tomorrow still shows
+       * something rather than its key. The fallback direction is the safe one: a key nobody has
+       * named here reads as its Arabic description, and a key with neither reads as the key —
+       * which is what a missing translation is supposed to look like.
+       */
+      names: {
+        'commission.customer_fee_mode': 'طريقة حساب رسوم خدمة العميل',
+        'commission.customer_fee_value': 'رسوم خدمة العميل — تُضاف إلى كل حجز',
+        'commission.partner_rate': 'عمولة سفرة من الشريك — تُخصم من مستحقاته قبل التحويل',
+        'booking.confirmation_window_minutes': 'مهلة الشريك لتأكيد الحجز',
+        'booking.same_day_cutoff_hour': 'آخر ساعة يُقبل فيها حجز اليوم نفسه',
+        'booking.pending_payment_timeout_minutes':
+          'مهلة انتظار الدفع — يُلغى الحجز تلقائياً إن لم يكتمل',
+        'partner.first_violation_fine': 'غرامة الشريك عند أول مخالفة عدم رد',
+        'wallet.sla_compensation': 'تعويض محفظة العميل عند تجاوز الشريك مهلته',
+        'money.always_usd': 'اعتبار كل القيم المالية بالدولار الأمريكي',
+        'rbac.finance_can_manage_fx': 'السماح لمسؤول المالية بإدارة أسعار الصرف',
+        'compliance.sanctions_screening': 'إلزامية فحص العقوبات',
+        'refund.minimum_percent': 'الحد الأدنى لنسبة الاسترداد',
+        'payment.provider_routing': 'مزوّد الدفع المستخدم في كل بلد',
+        'payment.merchant_of_record': 'الجهة التعاقدية التي تحصّل المدفوعات',
+        'search.max_nights': 'أقصى عدد ليالٍ في الحجز الواحد',
+      } as Record<string, string>,
+
+      /**
+       * What KIND of value a setting holds, in Arabic.
+       *
+       * The screen printed «نوع json» and «نوع string» to an operator. Those are the names of Zod
+       * schemas — they belong to the machine that validates the value, and the reader's question is
+       * not «which schema» but «what sort of thing is this, and why can I not change it».
+       *
+       * A schema with no entry falls back to its own name, deliberately: that reads as a missing
+       * translation rather than as a label somebody chose.
+       */
+      valueTypes: {
+        rate: 'كسر بين صفر وواحد',
+        percent: 'نسبة مئوية',
+        positiveInt: 'رقم صحيح موجب',
+        hourOfDay: 'ساعة من اليوم',
+        money: 'مبلغ بعملته',
+        boolean: 'مفعّل أو معطّل',
+        feeMode: 'ثابت أو نسبة',
+        sanctionsPolicy: 'سياسة فحص عقوبات',
+        json: 'جدول مركَّب من عدة قيم',
+        string: 'نص حر',
+      } as Record<string, string>,
+
+      /**
+       * The payment routing table, as rows a person can read.
+       *
+       * It was `JSON.stringify(value, null, 2)` in a monospace block —
+       * `{"*":["manual_transfer"],"SY":["manual_transfer"]}` — which tells an operator nothing
+       * about which rail a Syrian customer will actually meet. The country comes from
+       * `Intl.DisplayNames`, the same documented exception `docs/i18n.md` makes for weekday names
+       * and for the customer app's country picker; the PROVIDER is a slug we chose, so it is copy.
+       */
+      routingCountry: 'البلد',
+      routingProvider: 'مزوّد الدفع',
+      /** The `*` entry: whatever is not named above it. */
+      routingFallback: 'كل البلدان الأخرى',
+      routingOrder: 'بترتيب الأولوية',
+      providers: {
+        manual_transfer: 'تحويل بنكي يدوي',
+      } as Record<string, string>,
+
+      /*
+        The technical drawer.
+
+        The raw key used to sit under every label in Latin monospace — eighteen of them on an
+        Arabic screen. It is an IDENTIFIER, which `docs/i18n.md` lists as «not copy» precisely
+        because a machine reads it, so it does not belong in the reading flow. It is still needed:
+        an audit entry, a runbook and a migration all name the key. So it moved in here, beside the
+        value's type and the change history — the three things a person opens on purpose.
+      */
+      details: 'التفاصيل',
+      detailsHide: 'إخفاء التفاصيل',
+      technicalKey: 'المفتاح التقني',
+      valueType: 'نوع القيمة',
+
+      /**
+       * The change history — `settings_history`, on screen at last.
+       *
+       * The table has been written inside the same transaction as every setting change since the
+       * schema existed, and until now nothing could read it. Its own reason for existing is that a
+       * March booking's snapshot says the fee was 1.99 and only this says when that stopped being
+       * true.
+       */
+      historyTitle: 'سجل التعديلات',
+      historyEmpty: 'لا تعديلات مسجَّلة على هذا الإعداد — قيمته هي التي أُنشئ بها.',
+      historyChange: 'من {previous} إلى {next}',
+      /**
+       * Who and when, for ONE entry in the log.
+       *
+       * Not `lastChanged`. Reusing that put «آخر تعديل» — «last change» — on all forty-two rows of
+       * a change log, which says the opposite of what a log is.
+       */
+      historyBy: '{who} · {when}',
+      historyReason: 'السبب: {reason}',
+      historyNoReason: 'بلا سبب مذكور',
+      historyLoading: 'جارٍ قراءة السجل…',
+      historyFailed: 'تعذّر قراءة سجل هذا الإعداد.',
+      /** A change with no user behind it — a migration or a script, not a person. */
+      historySystem: 'النظام',
+
       /*
         The filter, and the counts beside it.
 
@@ -2138,7 +2255,6 @@ export const ar = {
       */
       stored: 'المخزَّن: {value}',
       currently: 'القيمة الحالية',
-      keyLabel: 'مفتاح الإعداد',
       readOnly: 'للقراءة فقط',
 
       /*
@@ -2179,11 +2295,22 @@ export const ar = {
         'تعطيل «{name}» يُبطل كل جلسات ذلك الدور فوراً، ويُخرج من يعمل الآن من حسابه.',
 
       /**
-       * The four groups the seventeen settings are sorted into.
+       * The groups the settings are sorted into.
        *
        * Keyed by what a setting DOES rather than by its key prefix, which is the grouping the
        * screen presents — see the note on `settings/page.tsx`. The prefixes that map onto each
        * stay in the page: they are routing, not copy.
+       *
+       * ## الامتثال and الدفع were added because «إعدادات أخرى» was a junk drawer
+       *
+       * Bashar, 2026-08-31: «I do not like and understand this section as a normal user.» It held
+       * four unrelated things — how hard sanctions screening bites, the legal entity that collects
+       * money, the payment routing table, and three leftover test rows — under a heading that says
+       * only «these did not fit anywhere». A card whose title is «other» cannot be understood,
+       * because its contents have nothing in common by construction.
+       *
+       * So the two real subjects got their own cards and their own notes. «إعدادات أخرى» remains
+       * for a key nobody has classified yet, and on a clean database it now renders not at all.
        */
       groupMoney: 'المال — العمولات والرسوم والاسترداد',
       groupMoneyNote:
@@ -2194,9 +2321,15 @@ export const ar = {
       groupPartners: 'الشركاء والتعويضات',
       groupPartnersNote:
         'الغرامات، ورصيد المحفظة الذي يحصل عليه العميل عند تجاوز الشريك مهلته (P-007).',
+      groupCompliance: 'الامتثال',
+      groupComplianceNote:
+        'إلى أي حد تُلزم ضوابط الامتثال. هذا الإعداد يحدد ما إذا كان فحص العقوبات يمنع اعتماد شريك أو تحويل مستحقاته، أم يُسجَّل فقط.',
+      groupPayment: 'الدفع',
+      groupPaymentNote:
+        'مَن يحصّل المدفوعات، وأي مزوّد يُستخدم في كل بلد. الاثنان يُغيَّران بمراجعة هندسية لا من هذه الشاشة، لأن خطأ فيهما يوقف الدفع بصمت.',
       groupOther: 'إعدادات أخرى',
       groupOtherNote:
-        'إعدادات خارج المجموعات أعلاه. بعضها غير قابل للتعديل من هنا — يوضح الصف السبب.',
+        'إعدادات لم تُصنَّف بعد. يوضح كل صف نوعه وما إذا كان قابلاً للتعديل.',
       groupPermissions: 'الصلاحيات',
       groupPermissionsNote:
         'منح صلاحيات في وقت التشغيل. التمكين يسري خلال 15 دقيقة؛ الإلغاء يُبطل كل جلسات ذلك الدور فوراً.',
@@ -2223,14 +2356,14 @@ export const ar = {
         off: 'معطّل — لا يُعرض الفحص إطلاقاً',
       },
       /**
-       * Shown for a schema this form cannot validate, naming the schema.
+       * Why a row has no editor, said as a consequence rather than as a type name.
        *
-       * One line rather than the paragraph it replaced. The paragraph was rendered in a bordered
-       * box on every read-only row, so two of them appeared side by side saying the same thing at
-       * twice the height of the setting they were about. The substance survives: this type cannot
-       * be checked here, so changing it stays a reviewed decision.
+       * It read «نوع json لا يمكن التحقق منه من هذه الشاشة» — the name of a Zod schema, shown to
+       * an operator, in English, twice on one card. The reader's question is not «which schema»;
+       * it is «why can I not change this, and who can». So the sentence answers that, and the type
+       * moved to «التفاصيل» where somebody looking for it will find it in Arabic.
        */
-      notEditable: 'نوع {schema} لا يمكن التحقق منه من هذه الشاشة — يُعدَّل بمراجعة.',
+      notEditable: 'لا يُعدَّل من هذه الشاشة — تغييره يمرّ بمراجعة هندسية.',
     },
 
     /**

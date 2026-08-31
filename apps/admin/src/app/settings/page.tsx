@@ -45,6 +45,15 @@ const GROUPS: ReadonlyArray<{
   title: string;
   note: string;
   prefixes: string[];
+  /**
+   * Exact keys, for a setting whose PREFIX belongs to a different subject than the setting does.
+   *
+   * `search.max_nights` is the case that needed it: it is a booking rule — how long a stay may be
+   * — and its prefix is `search.`. Mapping the whole prefix into قواعد الحجز would file a future
+   * search-ranking setting there too, which would be wrong for the same reason «إعدادات أخرى» was
+   * wrong: a card is only understandable while everything on it has one subject.
+   */
+  keys?: string[];
 }> = [
   {
     id: 'money',
@@ -57,12 +66,37 @@ const GROUPS: ReadonlyArray<{
     title: t.sections.settings.groupBooking,
     note: t.sections.settings.groupBookingNote,
     prefixes: ['booking.'],
+    keys: ['search.max_nights'],
   },
   {
     id: 'partners',
     title: t.sections.settings.groupPartners,
     note: t.sections.settings.groupPartnersNote,
     prefixes: ['partner.', 'wallet.'],
+  },
+  /**
+   * الامتثال and الدفع exist because «إعدادات أخرى» was a junk drawer.
+   *
+   * Bashar, 2026-08-31: «I do not like and understand this section as a normal user.» It held four
+   * unrelated things — how hard sanctions screening bites, the legal entity that collects money,
+   * the payment routing table, and three leftover test rows — under a heading whose only claim is
+   * that its contents did not fit anywhere else. A card titled «other» cannot be understood by
+   * construction, because nothing in it has anything in common.
+   *
+   * So the two real subjects got cards of their own. «إعدادات أخرى» survives for a key nobody has
+   * classified yet, and on a clean database it now renders not at all.
+   */
+  {
+    id: 'compliance',
+    title: t.sections.settings.groupCompliance,
+    note: t.sections.settings.groupComplianceNote,
+    prefixes: ['compliance.'],
+  },
+  {
+    id: 'payment',
+    title: t.sections.settings.groupPayment,
+    note: t.sections.settings.groupPaymentNote,
+    prefixes: ['payment.'],
   },
   {
     id: 'permissions',
@@ -104,7 +138,9 @@ export default async function SettingsPage() {
 
   const groups: SettingsGroup[] = GROUPS.map((group) => {
     const settings = result.settings.filter((setting) => {
-      const belongs = group.prefixes.some((prefix) => setting.key.startsWith(prefix));
+      const belongs =
+        group.prefixes.some((prefix) => setting.key.startsWith(prefix)) ||
+        (group.keys?.includes(setting.key) ?? false);
 
       if (belongs) claimed.add(setting.key);
 

@@ -3,11 +3,16 @@ import { describe, expect, it } from 'vitest';
 import { t } from './strings';
 import {
   editableText,
+  historyChange,
   isEditableSchema,
   matchesFilter,
   ratePercentEcho,
+  routingRows,
   settingDisplay,
+  settingHistorySchema,
+  settingName,
   unitOf,
+  valueTypeName,
   type DisplayableSetting,
 } from './settings-display';
 
@@ -296,18 +301,25 @@ describe('the other schemas', () => {
     ).toEqual({ kind: 'choice', text: 'lenient' });
   });
 
-  it('pretty-prints a routing table instead of putting it on one line', () => {
+  /**
+   * A nested object with no reader is still SHOWN, pretty-printed.
+   *
+   * Hiding a setting is worse than an ugly one — the setting still governs the platform. The
+   * routing table has a reader now (see «the payment routing table» below); this is what happens
+   * to the next `json` setting, before anybody has written one for it.
+   */
+  it('pretty-prints an object it has no reader for, instead of one long line', () => {
     const display = settingDisplay(
       setting({
-        key: 'payment.provider_routing',
-        value: { SY: ['manual_transfer'] },
+        key: 'search.facet_weights',
+        value: { city: 2, price: 1 },
         valueSchema: 'json',
       }),
       true,
     );
 
     expect(display.kind === 'json' && display.text).toContain('\n');
-    expect(display.kind === 'json' && display.text).toContain('manual_transfer');
+    expect(display.kind === 'json' && display.text).toContain('city');
   });
 
   it('reads a string as a string', () => {
@@ -371,5 +383,294 @@ describe('the filter', () => {
     expect(
       matchesFilter({ key: 'test.owned_by_pid_1', descriptionAr: null }, 'عمولة'),
     ).toBe(false);
+  });
+});
+
+describe('the name a reader sees', () => {
+  /**
+   * The CATALOGUE wins over the database column.
+   *
+   * `settings.description_ar` is one column and therefore one language: using it as the label put
+   * the console's own words somewhere the task of adding a language cannot reach. Two of them were
+   * already wrong — «مهلة Pending Payment» carried an English status name, and «مهلة تأكيد الشريك
+   * (ساعتان)» stated the current VALUE, which stops being true when somebody sets 180 minutes.
+   */
+  it('takes the name from the catalogue, not from the database description', () => {
+    expect(
+      settingName({
+        key: 'booking.pending_payment_timeout_minutes',
+        descriptionAr: 'مهلة Pending Payment — يلغى الحجز تلقائياً إن لم يكتمل الدفع',
+      }),
+    ).toBe(t.sections.settings.names['booking.pending_payment_timeout_minutes']);
+
+    /* And the catalogue entry carries no English. */
+    expect(
+      settingName({
+        key: 'booking.pending_payment_timeout_minutes',
+        descriptionAr: null,
+      }),
+    ).not.toMatch(/[A-Za-z]/);
+  });
+
+  it('falls back to the database description, then to the key', () => {
+    expect(
+      settingName({ key: 'not.in.catalogue', descriptionAr: 'وصف من قاعدة البيانات' }),
+    ).toBe('وصف من قاعدة البيانات');
+    /* Neither — so the KEY, which is what a missing translation should look like. */
+    expect(settingName({ key: 'not.in.catalogue', descriptionAr: null })).toBe(
+      'not.in.catalogue',
+    );
+  });
+
+  it('names every seeded setting, so no row falls back to a Latin key', () => {
+    /*
+      The fifteen keys `packages/db/src/seed/reference.ts` creates. Written out rather than imported
+      because `@safra/db` is not a dependency of the console — and because a list somebody has to
+      edit is the point: a setting seeded without a name here reads as its key on an Arabic screen.
+    */
+    const seeded = [
+      'commission.customer_fee_mode',
+      'commission.customer_fee_value',
+      'commission.partner_rate',
+      'booking.confirmation_window_minutes',
+      'booking.same_day_cutoff_hour',
+      'booking.pending_payment_timeout_minutes',
+      'partner.first_violation_fine',
+      'wallet.sla_compensation',
+      'money.always_usd',
+      'rbac.finance_can_manage_fx',
+      'compliance.sanctions_screening',
+      'refund.minimum_percent',
+      'payment.provider_routing',
+      'payment.merchant_of_record',
+      'search.max_nights',
+    ];
+
+    for (const key of seeded) {
+      const name = settingName({ key, descriptionAr: null });
+
+      expect(name, `${key} has no Arabic name`).not.toBe(key);
+      expect(name, `${key} carries Latin text`).not.toMatch(/[A-Za-z]/);
+    }
+  });
+});
+
+describe('the kind of value, in Arabic', () => {
+  it('names the two types that reach the screen read-only', () => {
+    expect(valueTypeName('json')).toBe(t.sections.settings.valueTypes['json']);
+    expect(valueTypeName('string')).toBe(t.sections.settings.valueTypes['string']);
+    expect(valueTypeName('json')).not.toMatch(/[A-Za-z]/);
+  });
+
+  /** A schema nobody has named reads as its own name — a missing translation, looking like one. */
+  it('falls back to the schema name itself', () => {
+    expect(valueTypeName('zonedInterval')).toBe('zonedInterval');
+  });
+});
+
+describe('the payment routing table', () => {
+  const ROUTING = 'payment.provider_routing';
+
+  it('reads country and provider in the reader’s language', () => {
+    const rows = routingRows(ROUTING, {
+      SY: ['manual_transfer'],
+      '*': ['manual_transfer'],
+    });
+
+    expect(rows).not.toBeNull();
+    expect(rows?.[0]?.place).toBe('سوريا');
+    expect(rows?.[0]?.providers).toEqual([
+      t.sections.settings.providers['manual_transfer'],
+    ]);
+    /* Nothing Latin survives — that was the whole complaint about the JSON block. */
+    expect(rows?.flatMap((row) => [row.place, ...row.providers]).join(' ')).not.toMatch(
+      /[A-Za-z]/,
+    );
+  });
+
+  /**
+   * The `*` row sorts LAST, whatever order the object happens to be in.
+   *
+   * Key order in JSON is arbitrary, and «كل البلدان الأخرى» printed above «سوريا» reads as though
+   * the general case wins — the opposite of how `provider.registry` resolves it.
+   */
+  it('puts the fallback last and marks it as the fallback', () => {
+    const rows = routingRows(ROUTING, {
+      '*': ['manual_transfer'],
+      SY: ['manual_transfer'],
+    });
+
+    expect(rows?.map((row) => row.isFallback)).toEqual([false, true]);
+    expect(rows?.[1]?.place).toBe(t.sections.settings.routingFallback);
+  });
+
+  it('shows a provider nobody has named as its slug', () => {
+    const rows = routingRows(ROUTING, { SY: ['stripe_cards'] });
+
+    expect(rows?.[0]?.providers).toEqual(['stripe_cards']);
+  });
+
+  /**
+   * It speaks only for the key it understands.
+   *
+   * `Record<string, string[]>` is a shape other settings may take, and reading an unrelated one as
+   * «country → payment provider» would put confident nonsense on the screen. Anything else falls
+   * through to the JSON block, which is honest about not knowing.
+   */
+  it('refuses a different key with the same shape', () => {
+    expect(routingRows('search.facets', { SY: ['manual_transfer'] })).toBeNull();
+  });
+
+  it('refuses a shape it cannot read, rather than half-rendering it', () => {
+    expect(routingRows(ROUTING, { SY: 'manual_transfer' })).toBeNull();
+    expect(routingRows(ROUTING, { SY: ['manual_transfer'], JO: [7] })).toBeNull();
+    expect(routingRows(ROUTING, {})).toBeNull();
+    expect(routingRows(ROUTING, ['manual_transfer'])).toBeNull();
+    expect(routingRows(ROUTING, null)).toBeNull();
+  });
+
+  it('renders as rows through settingDisplay, not as JSON', () => {
+    const display = settingDisplay(
+      setting({
+        key: ROUTING,
+        value: { SY: ['manual_transfer'] },
+        valueSchema: 'json',
+      }),
+      true,
+    );
+
+    expect(display.kind).toBe('routing');
+  });
+
+  /** An unreadable `json` value still appears — hiding a setting is worse than an ugly one. */
+  it('falls back to pretty-printed JSON for a value it cannot read', () => {
+    const display = settingDisplay(
+      setting({ key: ROUTING, value: { SY: 7 }, valueSchema: 'json' }),
+      true,
+    );
+
+    expect(display.kind).toBe('json');
+  });
+});
+
+describe('the change history', () => {
+  const entry = (previousValue: unknown, newValue: unknown) => ({
+    previousValue,
+    newValue,
+    reason: null,
+    changedByEmail: 'ops@safra.test',
+    createdAt: '2026-08-31T10:00:00.000Z',
+  });
+
+  /**
+   * A change log is a payload a person reads, so the money rule applies to it.
+   *
+   * «من 10 إلى 12» about a fine is the same defect as a bare amount on the row above it — and it is
+   * the defect `strings.test.ts` holds `timeline_events.payload` and `audit_log.after` to.
+   */
+  it('carries the currency on both sides of a money change', () => {
+    const line = historyChange(
+      entry(10, 12),
+      setting({ key: 'partner.first_violation_fine', valueSchema: 'money' }),
+      true,
+    );
+
+    expect(line).toContain('$10.00');
+    expect(line).toContain('$12.00');
+  });
+
+  it('reads a rate change as the percentages it means', () => {
+    const line = historyChange(
+      entry(0.07, 0.08),
+      setting({ key: 'commission.partner_rate', valueSchema: 'rate' }),
+      true,
+    );
+
+    expect(line).toContain(`7${t.percentSign}`);
+    expect(line).toContain(`8${t.percentSign}`);
+  });
+
+  /**
+   * The isolate goes round the FIGURE, never round the whole value.
+   *
+   * `ltrIsolate('90 ليلة')` renders «ليلة 90»: the string is laid out left to right, so the Arabic
+   * noun lands on the wrong side of the digits. The drawer read «من ليلة 89 إلى ليلة 90» until this
+   * was split — the same swap the row itself was fixed for, one component further in.
+   *
+   * Asserted on the CONTROL CHARACTERS, because that is the difference. `U+2066 … U+2069` must
+   * contain the digits and nothing else.
+   */
+  it('isolates the figure alone, not the figure with its Arabic unit', () => {
+    const line = historyChange(
+      entry(89, 90),
+      setting({ key: 'search.max_nights', valueSchema: 'positiveInt' }),
+      true,
+    );
+
+    expect(line).toContain('\u2066' + '89' + '\u2069');
+    expect(line).toContain('\u2066' + '90' + '\u2069');
+    /* And the unit is outside it, as ordinary Arabic. */
+    expect(line).not.toContain('\u2066' + '90 ');
+  });
+
+  it('reads a duration change with its unit, and a flag as words', () => {
+    expect(
+      historyChange(
+        entry(120, 180),
+        setting({
+          key: 'booking.confirmation_window_minutes',
+          valueSchema: 'positiveInt',
+        }),
+        true,
+      ),
+    ).toContain('دقيقة');
+
+    expect(
+      historyChange(
+        entry(true, false),
+        setting({ key: 'money.always_usd', valueSchema: 'boolean' }),
+        true,
+      ),
+    ).toContain(t.sections.settings.disabled);
+  });
+
+  /** The FIRST change has no previous value — the row was created, not edited. */
+  it('says «لا بيانات» rather than «undefined» for a first change', () => {
+    const line = historyChange(
+      entry(null, 90),
+      setting({ key: 'search.max_nights', valueSchema: 'positiveInt' }),
+      true,
+    );
+
+    expect(line).toContain(t.admin.noData);
+    expect(line).not.toContain('null');
+  });
+
+  /**
+   * Parsed at the boundary, not cast.
+   *
+   * The two values are `unknown` by design, so nothing downstream would notice a payload that had
+   * lost its shape — the failure would surface as «[object Object]» inside a change log.
+   */
+  it('rejects a history payload that has lost its shape', () => {
+    expect(settingHistorySchema.safeParse({ history: [] }).success).toBe(true);
+    expect(settingHistorySchema.safeParse({}).success).toBe(false);
+    expect(
+      settingHistorySchema.safeParse({ history: [{ newValue: 1, reason: null }] })
+        .success,
+    ).toBe(false);
+    expect(
+      settingHistorySchema.safeParse({
+        history: [
+          {
+            previousValue: 1,
+            newValue: 2,
+            reason: null,
+            changedByEmail: null,
+            createdAt: '2026-08-31',
+          },
+        ],
+      }).success,
+    ).toBe(true);
   });
 });

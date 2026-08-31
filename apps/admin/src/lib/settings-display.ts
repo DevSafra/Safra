@@ -1,9 +1,11 @@
+import { z } from 'zod';
+
 import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 import { ltrIsolate } from '@safra/i18n';
 
 import { amount, count } from '@/lib/format';
 import { ARABIC_WESTERN_DIGITS } from '@/lib/numerals';
-import { fill, plural, t } from '@/lib/strings';
+import { CONSOLE_LOCALE, fill, plural, t } from '@/lib/strings';
 
 /**
  * How one operational setting is READ (§9.3, P-005).
@@ -96,7 +98,15 @@ export type SettingDisplay =
   | { readonly kind: 'flag'; readonly on: boolean }
   /** One of a named set — a fee mode, a sanctions policy — in the reader's words. */
   | { readonly kind: 'choice'; readonly text: string }
-  /** A nested object, pretty-printed. Read-only by construction. */
+  /**
+   * The payment routing table, as rows a person can read.
+   *
+   * Not `JSON.stringify` any more. `{"*":["manual_transfer"],"SY":["manual_transfer"]}` in a
+   * monospace block was the least legible thing on the screen and told an operator nothing about
+   * which rail a Syrian customer meets — see `routingRows`.
+   */
+  | { readonly kind: 'routing'; readonly rows: RoutingRow[] }
+  /** A nested object this console has no reader for, pretty-printed. Read-only by construction. */
   | { readonly kind: 'json'; readonly text: string }
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'missing' };
@@ -165,8 +175,12 @@ export function settingDisplay(
   }
 
   if (valueSchema === 'json') {
-    return value === null || value === undefined
-      ? { kind: 'missing' }
+    if (value === null || value === undefined) return { kind: 'missing' };
+
+    const rows = routingRows(setting.key, value);
+
+    return rows
+      ? { kind: 'routing', rows }
       : { kind: 'json', text: JSON.stringify(value, null, 2) };
   }
 
@@ -177,6 +191,112 @@ export function settingDisplay(
   if (typeof value === 'string' && value !== '') return { kind: 'text', text: value };
 
   return { kind: 'missing' };
+}
+
+/** One line of the payment routing table: a place, and the rails serving it in order. */
+export interface RoutingRow {
+  /** «سوريا», «كل البلدان الأخرى» — already in the reader's language. */
+  readonly place: string;
+  /** «تحويل بنكي يدوي», in preference order. */
+  readonly providers: string[];
+  /** True for the `*` entry, so the row can be drawn last and marked as the fallback. */
+  readonly isFallback: boolean;
+}
+
+/**
+ * `payment.provider_routing` as rows, or `null` when the value is not that shape.
+ *
+ * ## Why the key is checked, not just the shape
+ *
+ * `Record<string, string[]>` is a shape any number of future settings might have, and reading an
+ * unrelated one as «country → payment provider» would put confident nonsense on the screen. So
+ * this only speaks for the one key it understands; anything else falls through to the JSON block,
+ * which is honest about not knowing.
+ *
+ * The `*` row sorts LAST and is labelled as the fallback. In the stored object it may come first —
+ * key order in JSON is arbitrary — and «كل البلدان الأخرى» above «سوريا» reads as though the
+ * general case wins, which is the opposite of how the registry resolves it.
+ */
+export function routingRows(key: string, value: unknown): RoutingRow[] | null {
+  if (key !== ROUTING_KEY) return null;
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+
+  const entries = Object.entries(value as Record<string, unknown>);
+
+  if (entries.length === 0) return null;
+
+  const rows: RoutingRow[] = [];
+
+  for (const [place, providers] of entries) {
+    /* One bad entry invalidates the whole reading — a half-rendered routing table is worse. */
+    if (!Array.isArray(providers) || providers.some((one) => typeof one !== 'string')) {
+      return null;
+    }
+
+    rows.push({
+      place: place === '*' ? t.sections.settings.routingFallback : regionName(place),
+      providers: (providers as string[]).map(providerName),
+      isFallback: place === '*',
+    });
+  }
+
+  return rows.sort((a, b) => Number(a.isFallback) - Number(b.isFallback));
+}
+
+/** The one `json` setting this console can read. A written key, not a shape guess. */
+const ROUTING_KEY = 'payment.provider_routing';
+
+/**
+ * A country name in Arabic, from the platform rather than from a list written here.
+ *
+ * `Intl.DisplayNames` — the same documented exception `docs/i18n.md` makes for weekday names and
+ * for the customer app's country picker: 245 names in three languages is not copy anybody would
+ * translate by hand, and the platform already has them right.
+ *
+ * Falls back to the CODE, which is what a missing name should look like.
+ */
+function regionName(code: string): string {
+  try {
+    return new Intl.DisplayNames([CONSOLE_LOCALE], { type: 'region' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/**
+ * A payment provider in Arabic.
+ *
+ * Unlike a country, `manual_transfer` is a slug WE chose, so its name is copy. A slug with no
+ * entry reads as the slug — a missing translation, looking like one.
+ */
+function providerName(slug: string): string {
+  return t.sections.settings.providers[slug] ?? slug;
+}
+
+/**
+ * The setting's name in the reader's language.
+ *
+ * Catalogue first, then the database's own `description_ar`, then the key. The catalogue wins
+ * because `settings.description_ar` is one column and therefore one language: using it as the
+ * label put words on an Arabic-only screen that the task of adding a language cannot reach. Two of
+ * them were already wrong — «مهلة Pending Payment» carried an English status name, and «مهلة تأكيد
+ * الشريك (ساعتان)» stated the current VALUE, which stops being true the moment somebody changes it.
+ */
+export function settingName(setting: {
+  key: string;
+  descriptionAr: string | null;
+}): string {
+  return t.sections.settings.names[setting.key] ?? setting.descriptionAr ?? setting.key;
+}
+
+/**
+ * What kind of value the setting holds, in Arabic.
+ *
+ * The screen printed «نوع json» and «نوع string» — Zod schema names, in English, to an operator.
+ * A schema with no entry falls back to its own name so a miss looks like a missing translation.
+ */
+export function valueTypeName(valueSchema: string): string {
+  return t.sections.settings.valueTypes[valueSchema] ?? valueSchema;
 }
 
 /** A number, with the unit its schema or its key names. */
@@ -350,10 +470,105 @@ export function matchesFilter(
 
   if (needle === '') return true;
 
+  /*
+    The NAME as the reader sees it, which is the catalogue's — not the database description that
+    used to be the label. Searching the words on screen is the only search that behaves; the
+    description stays in the haystack too, since it is the fallback label for an unnamed key.
+  */
   return (
     normalise(setting.key).includes(needle) ||
+    normalise(settingName(setting)).includes(needle) ||
     normalise(setting.descriptionAr ?? '').includes(needle)
   );
+}
+
+/**
+ * One entry of `settings_history`, parsed at the boundary.
+ *
+ * A SCHEMA rather than a cast, because this arrives over the network — the project's rule 1, and
+ * the practical reason is that `previousValue` and `newValue` are `unknown` by design, so nothing
+ * downstream would notice a payload that had lost its shape. The two values stay `unknown`: they
+ * are whatever that setting's own `valueSchema` says, and `settingDisplay` is what reads them.
+ */
+export const settingHistorySchema = z.object({
+  history: z.array(
+    z.object({
+      previousValue: z.unknown(),
+      newValue: z.unknown(),
+      reason: z.string().nullable(),
+      changedByEmail: z.string().nullable(),
+      createdAt: z.string(),
+    }),
+  ),
+});
+
+export type SettingHistoryEntry = z.infer<typeof settingHistorySchema>['history'][number];
+
+/**
+ * One history entry as a sentence: «من 0.07 إلى 0.08».
+ *
+ * Both values go through `settingDisplay`, so the log gets the same units and the same currency
+ * the row does — «من $10.00 إلى $12.00», never «من 10 إلى 12». `audit_log.after` and
+ * `timeline_events.payload` are held to that by `strings.test.ts`; this is the same rule for the
+ * same reason, on a payload a person reads.
+ *
+ * Each value is isolated, because the sentence around them is Arabic and a bare `0.07` inside it
+ * would be reordered by the bidirectional algorithm.
+ */
+export function historyChange(
+  entry: SettingHistoryEntry,
+  setting: DisplayableSetting,
+  alwaysUsd: boolean,
+): string {
+  return fill(t.sections.settings.historyChange, {
+    previous: valueLine({ ...setting, value: entry.previousValue }, alwaysUsd),
+    next: valueLine({ ...setting, value: entry.newValue }, alwaysUsd),
+  });
+}
+
+/**
+ * A value as ONE line of text, with each FIGURE isolated and the Arabic around it left alone.
+ *
+ * ## The isolate goes round the figure, never round the line
+ *
+ * `ltrIsolate('90 ليلة')` renders «ليلة 90» — the same swap the row was fixed for, because the
+ * whole string is laid out left to right and the Arabic noun ends up on the wrong side of the
+ * digits. It read «من ليلة 89 إلى ليلة 90» in the drawer until this was split.
+ *
+ * So the composition happens here: the figure is isolated, the unit is ordinary Arabic beside it,
+ * and the sentence around both is Arabic too. `docs/i18n.md` §9 — isolate the VALUE, never the
+ * label.
+ *
+ * Deliberately reuses `settingDisplay` rather than formatting again: a second formatter is how the
+ * log and the row come to disagree about what the same number means.
+ */
+function valueLine(setting: DisplayableSetting, alwaysUsd: boolean): string {
+  const display = settingDisplay(setting, alwaysUsd);
+
+  switch (display.kind) {
+    case 'quantity':
+      return display.unit
+        ? `${ltrIsolate(display.text)} ${display.unit}`
+        : ltrIsolate(display.text);
+    /* `amount()` is already one left-to-right token — «$10.00», «10.00 ل.س». */
+    case 'money':
+      return ltrIsolate(display.text);
+    case 'flag':
+      return display.on ? t.sections.settings.enabled : t.sections.settings.disabled;
+    /* Arabic, from the catalogue. Isolating it would be the mistake this function documents. */
+    case 'choice':
+      return display.text;
+    case 'text':
+      return ltrIsolate(display.text);
+    case 'routing':
+      return display.rows
+        .map((row) => `${row.place}: ${row.providers.join(' · ')}`)
+        .join(' — ');
+    case 'json':
+      return ltrIsolate(display.text);
+    default:
+      return t.admin.noData;
+  }
 }
 
 /**

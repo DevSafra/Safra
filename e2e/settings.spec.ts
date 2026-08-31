@@ -35,6 +35,19 @@ test.use({ storageState: STAFF_STATE, viewport: { width: 1440, height: 900 } });
 
 const row = (page: Page, key: string) => page.locator(`[data-setting-row="${key}"]`);
 
+/*
+  The catalogue's loose maps index to `string | undefined` under `noUncheckedIndexedAccess`, and a
+  test must not paper over that with `!`: a missing entry should fail loudly here, not compare
+  against `undefined` and pass.
+*/
+const named = (map: Record<string, string>, key: string): string => {
+  const value = map[key];
+
+  if (!value) throw new Error(`the catalogue has no entry for ${key}`);
+
+  return value;
+};
+
 test.describe('الإعدادات — reading a value', () => {
   /**
    * No amount without its currency, asserted on the rows that ARE money.
@@ -130,16 +143,21 @@ test.describe('الإعدادات — reading a value', () => {
   /**
    * The routing table scrolls INSIDE its own box.
    *
-   * A pretty-printed JSON block is the one thing on this screen wide enough to push the page
-   * sideways, which in this console takes the sidebar with it.
+   * It is the one thing on this screen wide enough to push the page sideways, which in this console
+   * takes the sidebar with it. It was a pretty-printed JSON block and is a two-column table now —
+   * the assertion is on the BOX either way, because that is the property that matters.
    */
   test('the routing table scrolls in its own box', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 900 });
     await page.goto('/settings');
 
     const overflow = await row(page, 'payment.provider_routing')
-      .locator('pre')
-      .evaluate((node) => getComputedStyle(node).overflowX);
+      .locator('table')
+      .evaluate((node) => {
+        const box = node.parentElement;
+
+        return box ? getComputedStyle(box).overflowX : 'no box';
+      });
 
     expect(overflow).toBe('auto');
     expect(
@@ -388,5 +406,168 @@ test.describe('الإعدادات on a phone', () => {
     });
 
     expect(small).toEqual([]);
+  });
+});
+
+/**
+ * «All texts on the page should be written in the current language» — Bashar, 2026-08-31.
+ *
+ * The console is Arabic-only, and the screen was carrying four kinds of English at once: the raw
+ * setting key under every label, «نوع string» and «نوع json» (the names of Zod schemas), the
+ * payment routing table as `{"*":["manual_transfer"],"SY":[…]}`, and «مهلة Pending Payment» inside
+ * a seeded Arabic sentence.
+ *
+ * This is the CLASS, not the four instances: no element on the screen may have a machine
+ * identifier as its whole text. `e2e/navigation.spec.ts` sweeps for bare `lower_snake_case` across
+ * every section and cannot see a DOTTED key — `commission.partner_rate` passes it — which is
+ * exactly why eighteen of them sat there unnoticed.
+ */
+test.describe('الإعدادات is written in Arabic', () => {
+  test('no machine identifier reaches the reading flow', async ({ page }) => {
+    await page.goto('/settings');
+
+    const identifiers = await page.evaluate(() => {
+      const found: string[] = [];
+
+      for (const element of Array.from(document.querySelectorAll('main *'))) {
+        if (element.children.length > 0) continue;
+
+        const text = (element.textContent ?? '').trim();
+
+        /*
+          A lower-case Latin run joined by dots or underscores is a key, a slug or a schema name —
+          there is nothing else it can be. Capitalised Latin is left alone: «Safra Technologies
+          GmbH» is a legal entity's name and «Visa» is a brand, and neither translates.
+        */
+        if (text && /^[a-z][a-z0-9_.]*$/.test(text)) found.push(text);
+      }
+
+      return found;
+    });
+
+    expect(identifiers).toEqual([]);
+  });
+
+  /**
+   * The routing table, as rows.
+   *
+   * The country comes from `Intl.DisplayNames` and the rail from the catalogue, so «سوريا» and
+   * «تحويل بنكي يدوي» replace `SY` and `manual_transfer`. Asserted through the rendered table
+   * rather than the source, because the fallback is a pretty-printed JSON block and the difference
+   * between the two is invisible to a type.
+   */
+  test('the payment routing table reads as country and rail, not as JSON', async ({
+    page,
+  }) => {
+    await page.goto('/settings');
+
+    const routing = row(page, 'payment.provider_routing');
+
+    await expect(routing.locator('table')).toBeVisible();
+    await expect(routing.locator('pre')).toHaveCount(0);
+
+    const table = await routing.locator('table').innerText();
+
+    expect(table).toContain(t.sections.settings.routingCountry);
+    expect(table).toContain('سوريا');
+    expect(table).toContain(named(t.sections.settings.providers, 'manual_transfer'));
+    expect(table).toContain(t.sections.settings.routingFallback);
+    /* Nothing Latin survives in it — that was the complaint. */
+    expect(table).not.toMatch(/manual_transfer|"SY"/);
+  });
+
+  /** The two unrelated subjects that used to share «إعدادات أخرى» now have their own cards. */
+  test('compliance and payment are their own sections, not «other»', async ({ page }) => {
+    await page.goto('/settings');
+
+    const headings = await page.locator('main section h2').allTextContents();
+
+    expect(headings).toContain(t.sections.settings.groupCompliance);
+    expect(headings).toContain(t.sections.settings.groupPayment);
+
+    /* And the rows are inside them rather than in the drawer they came from. */
+    const compliance = page.locator('section').filter({
+      has: page.getByRole('heading', { name: t.sections.settings.groupCompliance }),
+    });
+
+    await expect(
+      compliance.locator('[data-setting-row="compliance.sanctions_screening"]'),
+    ).toBeVisible();
+  });
+});
+
+/**
+ * «التفاصيل» — the key, the value's type, and the change history.
+ *
+ * `settings_history` is written inside the same transaction as every setting change and, until
+ * 2026-08-31, could not be read anywhere: the API route existed and nothing called it. The table's
+ * whole reason for being is that a March booking's snapshot says the fee was 1.99 and only this
+ * says when that stopped being true.
+ */
+test.describe('الإعدادات — the details drawer', () => {
+  test('holds the technical key and the type, in Arabic', async ({ page }) => {
+    await page.goto('/settings');
+
+    const rate = row(page, 'commission.partner_rate');
+
+    /* Closed by default: the key is an identifier, not part of the reading flow. */
+    await expect(rate).not.toContainText('commission.partner_rate');
+
+    await rate.getByRole('button', { name: t.sections.settings.details }).click();
+
+    await expect(rate).toContainText(t.sections.settings.technicalKey);
+    await expect(rate).toContainText('commission.partner_rate');
+    await expect(rate).toContainText(named(t.sections.settings.valueTypes, 'rate'));
+
+    await rate.getByRole('button', { name: t.sections.settings.detailsHide }).click();
+    await expect(rate).not.toContainText('commission.partner_rate');
+  });
+
+  test('says so plainly when a setting has never been changed', async ({ page }) => {
+    await page.goto('/settings');
+
+    const fee = row(page, 'commission.customer_fee_mode');
+
+    await fee.getByRole('button', { name: t.sections.settings.details }).click();
+
+    await expect(fee).toContainText(t.sections.settings.historyTitle);
+    await expect(fee).toContainText(t.sections.settings.historyEmpty);
+  });
+
+  /**
+   * A change, then the log that records it — with the unit on both sides.
+   *
+   * «من 89 ليلة إلى 90 ليلة», never «من 89 إلى 90». A change log is a payload a person reads, so
+   * the rule that holds `audit_log.after` and `timeline_events.payload` holds this too.
+   *
+   * Restores the value before it ends: the suite shares one database.
+   */
+  test('records a change and reads it back with its unit', async ({ page }) => {
+    await page.goto('/settings');
+
+    const nights = row(page, 'search.max_nights');
+
+    await nights.getByRole('button', { name: t.sections.settings.change }).click();
+    await nights.locator('input[inputmode="decimal"]').fill('88');
+    await nights.locator('input[name="reason"]').fill('فحص المتصفح');
+    await nights.getByRole('button', { name: t.sections.settings.save }).click();
+
+    await expect(nights).toContainText('88');
+
+    await nights.getByRole('button', { name: t.sections.settings.details }).click();
+
+    await expect(nights).toContainText(t.sections.settings.historyTitle);
+    /* The reason travelled with the change. */
+    await expect(nights).toContainText('فحص المتصفح');
+    /* And the entry names the unit, not two bare numbers. */
+    await expect(nights.locator('ol')).toContainText('ليلة');
+    await expect(nights.locator('ol').first()).toContainText('88');
+
+    await nights.getByRole('button', { name: t.sections.settings.detailsHide }).click();
+    await nights.getByRole('button', { name: t.sections.settings.change }).click();
+    await nights.locator('input[inputmode="decimal"]').fill('90');
+    await nights.getByRole('button', { name: t.sections.settings.save }).click();
+
+    await expect(nights).toContainText('90');
   });
 });

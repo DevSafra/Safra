@@ -8,6 +8,7 @@ import type { ConfirmRequest } from '@safra/ui';
 
 import type { EditableSetting } from '@/lib/api';
 import { Chip, Ltr } from '@/components/admin-table';
+import { SettingDetails } from '@/components/setting-details';
 import { apiErrorOf, fill, t } from '@/lib/strings';
 import { shortDate } from '@/lib/format';
 import {
@@ -17,6 +18,7 @@ import {
   ratePercentEcho,
   schemaHint,
   settingDisplay,
+  settingName,
   type SettingDisplay,
 } from '@/lib/settings-display';
 
@@ -60,6 +62,7 @@ export function SettingRow({
   const router = useRouter();
 
   const [editing, setEditing] = useState(false);
+  const [showingDetails, setShowingDetails] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
@@ -68,7 +71,14 @@ export function SettingRow({
 
   const editable = isEditableSchema(setting.valueSchema);
   const display = settingDisplay(setting, alwaysUsd);
-  const name = setting.descriptionAr ?? setting.key;
+  /*
+    The catalogue's Arabic name, falling back to the database description and then to the key.
+
+    The database column held the label before, which meant the console's own words lived in one
+    language in one column — invisible to the task of adding a language, and already carrying
+    «Pending Payment» in the middle of an Arabic sentence.
+  */
+  const name = settingName(setting);
 
   /*
     Focus moves to the field when the editor opens.
@@ -170,21 +180,23 @@ export function SettingRow({
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 sm:grid-cols-[minmax(0,22rem)_minmax(0,1fr)_auto] sm:gap-x-5">
         <div className="col-span-2 min-w-0 sm:col-span-1">
           {/*
-            The Arabic DESCRIPTION is the label, not the key — somebody adjusting the commission is
-            thinking about money, not about `commission.partner_rate`.
+            The label is the setting's Arabic NAME from the catalogue — never the key.
+
+            The key used to sit right under it in Latin monospace, eighteen times down an Arabic
+            page. `docs/i18n.md` lists a setting key under «what is NOT copy» because a machine
+            reads it, which is precisely why it does not belong in a line a person reads. It is in
+            «التفاصيل», with the value's type and the change log (Bashar, 2026-08-31).
           */}
           <p className="text-[12.5px] leading-snug font-semibold text-text2">{name}</p>
 
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-            {/*
-              The key stays on the row, small: it is what an audit entry, a runbook and a migration
-              name. Kept whole, dot included — `e2e/navigation.spec.ts` fails a bare lower_snake_case
-              run standing alone as an element's whole text, and the dotted key is not one.
-            */}
-            <Ltr className="font-mono text-[10px] text-faint2">{setting.key}</Ltr>
-
-            {editable ? null : <Chip tone="faint">{t.sections.settings.readOnly}</Chip>}
-          </p>
+          {editable ? null : (
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <Chip tone="faint">{t.sections.settings.readOnly}</Chip>
+              <span className="text-[10.5px] leading-relaxed text-faint">
+                {t.sections.settings.notEditable}
+              </span>
+            </p>
+          )}
 
           {/*
             Only where there IS one. Fifteen of the seventeen rows are seeded defaults, so a
@@ -198,56 +210,110 @@ export function SettingRow({
               })}
             </p>
           ) : null}
-
-          {editable ? null : (
-            <p className="mt-1 text-[10.5px] leading-relaxed text-faint">
-              {fill(t.sections.settings.notEditable, { schema: setting.valueSchema })}
-            </p>
-          )}
         </div>
 
-        {display.kind === 'json' ? null : (
-          <>
-            {/*
-              The value in a column of its own, so a group of figures can be read down one edge.
+        {/*
+          The value in a column of its own, so a group of figures can be read down one edge.
 
-              The label column is CAPPED rather than `1fr`: with the value pinned to the far
-              inline-end of a 1380px console there were four hundred empty pixels between
-              «رسوم خدمة العميل» and `$1.99`, and pairing a label with its own value meant crossing
-              them. The cap puts the figures a short saccade from the words they belong to and
-              still lines them up.
-            */}
-            <div className="min-w-0">
-              <Value display={display} />
-            </div>
+          The label column is CAPPED rather than `1fr`: with the value pinned to the far inline-end
+          of a 1380px console there were four hundred empty pixels between «رسوم خدمة العميل» and
+          `$1.99`, and pairing a label with its own value meant crossing them. The cap puts the
+          figures a short saccade from the words they belong to and still lines them up.
 
-            <div className="flex shrink-0 justify-end">
-              {editable && display.kind === 'flag' ? (
-                <Switch
-                  on={display.on}
-                  label={name}
-                  busy={busy}
-                  onToggle={() => void toggle(!display.on)}
-                />
-              ) : null}
+          A block kind — a routing table — leaves this cell empty and draws itself under the row,
+          because it is a table and not a figure beside a label.
+        */}
+        <div className="min-w-0">
+          {isBlock(display) ? null : <Value display={display} />}
+        </div>
 
-              {editable && display.kind !== 'flag' && !editing ? (
-                <button
-                  type="button"
-                  onClick={open}
-                  className="cursor-pointer rounded-md border border-line px-3 py-1 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
-                >
-                  {t.sections.settings.change}
-                </button>
-              ) : null}
-            </div>
-          </>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {/*
+            «التفاصيل» is on EVERY row, editable or not: it is where the key, the value's type and
+            the change history live, and all three are questions a person asks about a setting they
+            cannot change just as often as about one they can.
+          */}
+          <button
+            type="button"
+            onClick={() => setShowingDetails(!showingDetails)}
+            aria-expanded={showingDetails}
+            className="cursor-pointer rounded-md px-2 py-1 text-[11px] text-faint transition-colors hover:text-gold"
+          >
+            {showingDetails
+              ? t.sections.settings.detailsHide
+              : t.sections.settings.details}
+          </button>
+
+          {editable && display.kind === 'flag' ? (
+            <Switch
+              on={display.on}
+              label={name}
+              busy={busy}
+              onToggle={() => void toggle(!display.on)}
+            />
+          ) : null}
+
+          {editable && display.kind !== 'flag' && !editing ? (
+            <button
+              type="button"
+              onClick={open}
+              className="cursor-pointer rounded-md border border-line px-3 py-1 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
+            >
+              {t.sections.settings.change}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/*
-        A routing table is not a value beside a label — it is a block, and it must scroll inside its
-        own box rather than push the page sideways.
+        The payment routing table, as rows rather than as the JSON it is stored as.
+
+        It was `JSON.stringify(value, null, 2)` in a monospace block. An operator's question is
+        «which rail will a Syrian customer meet», and `{"*":["manual_transfer"],"SY":[…]}` does not
+        answer it — the country was an ISO code and the rail was a slug, both in English, on an
+        Arabic screen (Bashar, 2026-08-31).
+      */}
+      {display.kind === 'routing' ? (
+        <div className="mt-2 overflow-x-auto rounded-[9px] border border-line bg-field">
+          <table className="w-full text-[11.5px]">
+            <thead>
+              <tr className="border-b border-line2 text-[10px] text-faint2">
+                <th scope="col" className="px-3 py-1.5 text-start font-semibold">
+                  {t.sections.settings.routingCountry}
+                </th>
+                <th scope="col" className="px-3 py-1.5 text-start font-semibold">
+                  {t.sections.settings.routingProvider}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {display.rows.map((row) => (
+                <tr key={row.place} className="border-t border-line2 first:border-t-0">
+                  <td
+                    className={`px-3 py-1.5 ${row.isFallback ? 'text-faint' : 'text-text2'}`}
+                  >
+                    {row.place}
+                  </td>
+                  <td className="px-3 py-1.5 text-text">
+                    {row.providers.join(' · ')}
+                    {/* Only worth saying when there is an order to state. */}
+                    {row.providers.length > 1 ? (
+                      <span className="ms-1.5 text-[10px] text-faint">
+                        {t.sections.settings.routingOrder}
+                      </span>
+                    ) : null}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {/*
+        A nested object this console has no reader for. Still shown — hiding a setting is worse than
+        an ugly one — and scrolling inside its own box, because a wide block must never push the
+        page sideways and take the sidebar with it.
       */}
       {display.kind === 'json' ? (
         <pre
@@ -257,6 +323,8 @@ export function SettingRow({
           {display.text}
         </pre>
       ) : null}
+
+      {showingDetails ? <SettingDetails setting={setting} alwaysUsd={alwaysUsd} /> : null}
 
       {error ? (
         <p role="alert" className="mt-2 text-[11.5px] text-bad">
@@ -325,14 +393,25 @@ export function SettingRow({
   );
 }
 
+/** A kind that draws itself UNDER the row rather than in the value column. */
+function isBlock(
+  display: SettingDisplay,
+): display is Extract<SettingDisplay, { kind: 'json' | 'routing' }> {
+  return display.kind === 'json' || display.kind === 'routing';
+}
+
 /**
  * The value, rendered the way its own kind asks to be.
  *
- * `json` is excluded by the TYPE, not by a branch that returns null: a routing table is a block
- * under the row rather than a value beside the label, so it is drawn by the row itself. Excluding
- * it here means adding a value kind cannot quietly fall through to the number rendering.
+ * The block kinds are excluded by the TYPE, not by a branch that returns null: a routing table is
+ * a table under the row, not a figure beside a label. Excluding them here means adding a value
+ * kind cannot quietly fall through to the number rendering.
  */
-function Value({ display }: { display: Exclude<SettingDisplay, { kind: 'json' }> }) {
+function Value({
+  display,
+}: {
+  display: Exclude<SettingDisplay, { kind: 'json' | 'routing' }>;
+}) {
   if (display.kind === 'missing') {
     return <span className="text-[13.5px] text-faint">{t.admin.noData}</span>;
   }
