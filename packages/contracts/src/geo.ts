@@ -86,6 +86,27 @@ export const createCitySchema = z
   })
   .strict();
 
+/**
+ * A city's own prose, and the highlight tags beside it.
+ *
+ * ## Why they are here rather than in a migration
+ *
+ * Both render on the PUBLIC city page — `description` as the paragraph under the name, `tags` as
+ * the strip of «المدينة القديمة» / «القلعة» — and neither could be written from anywhere but a
+ * migration until 2026-08-31. That is the same gap the geography rows themselves had: a value the
+ * business changes, reachable only by a deployment.
+ *
+ * `null` clears the description, which is different from omitting the field: omitted means «leave
+ * it», and a `.nullable()` rather than a `.default()` is what lets an operator empty one. The trap
+ * a `.default()` sets is recorded in the register — it invents a plausible value for something
+ * nobody sent.
+ *
+ * Tags are capped at eight and forty characters each because they render as a single strip on a
+ * phone; a ninth wraps the line and a fortieth character is a sentence, not a tag.
+ */
+const description = z.string().trim().max(2000).nullable();
+const tags = z.array(z.string().trim().min(1).max(40)).max(8);
+
 export const updateCitySchema = z
   .object({
     nameAr: name.optional(),
@@ -94,8 +115,44 @@ export const updateCitySchema = z
     timezone: z.string().trim().min(3).max(64).optional(),
     categories: z.array(cityCategorySchema).max(4).optional(),
     isActive: z.boolean().optional(),
+    descriptionAr: description.optional(),
+    descriptionEn: description.optional(),
+    descriptionDe: description.optional(),
+    tagsAr: tags.optional(),
+    tagsEn: tags.optional(),
+    tagsDe: tags.optional(),
   })
   .strict();
+
+/**
+ * What a person may change about a city PHOTOGRAPH, once it has been rendered.
+ *
+ * Nothing here touches the bytes: `file_key`, `width`, `height` and `variant_widths` are the
+ * worker's, and a form that could edit them would be a form that can make a row describe an object
+ * that is not there.
+ *
+ * `alt` is the one that matters beyond tidiness. §5.4's hero band is the first third of the public
+ * city page, and until now every one of those images went out with an empty `alt` — a screen
+ * reader announced nothing at all. It is nullable rather than required because an empty alt is the
+ * CORRECT answer for a purely decorative image, and forcing a sentence would produce invented
+ * descriptions of somebody's city.
+ *
+ * `isHero` is only ever set TRUE here. Unsetting it would leave a city with no hero and §5.4's
+ * band with nothing to draw; the way to move it is to name a different image, and the service
+ * clears the previous one in the same transaction.
+ */
+export const updateCityImageSchema = z
+  .object({
+    altAr: z.string().trim().max(160).nullable().optional(),
+    altEn: z.string().trim().max(160).nullable().optional(),
+    altDe: z.string().trim().max(160).nullable().optional(),
+    credit: z.string().trim().max(120).nullable().optional(),
+    isHero: z.literal(true).optional(),
+    sortOrder: z.number().int().min(0).max(99).optional(),
+  })
+  .strict();
+
+export type UpdateCityImageInput = z.infer<typeof updateCityImageSchema>;
 
 export const createCountrySchema = z
   .object({

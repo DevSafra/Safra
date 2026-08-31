@@ -841,15 +841,46 @@ export class GeoWriteService {
 
     if (!row) throw notFound(ERROR.GEO_CITY_NOT_FOUND);
 
+    /*
+      ── Built as a list of assignments, not one fixed statement ───────────────────────────
+      The names and the timezone are `NOT NULL` and use `coalesce`, where NULL means «leave it».
+
+      The prose and the tags cannot: both are EMPTIABLE, and `coalesce` makes «clear this» and
+      «leave this» the same request — a description could be written and never removed. The schema
+      distinguishes them (`omitted` vs `null`), so the statement has to as well, which means the
+      column only appears when the caller actually sent something for it.
+    */
+    const assignments: SQL[] = [
+      sql`name_ar   = coalesce(${input.nameAr ?? null}, name_ar)`,
+      sql`name_en   = coalesce(${input.nameEn ?? null}, name_en)`,
+      sql`name_de   = coalesce(${input.nameDe ?? null}, name_de)`,
+      sql`timezone  = coalesce(${input.timezone ?? null}, timezone)`,
+      sql`is_active = coalesce(${input.isActive ?? null}, is_active)`,
+      sql`updated_at = now()`,
+    ];
+
+    if ('descriptionAr' in input) {
+      assignments.push(sql`description_ar = ${input.descriptionAr ?? null}`);
+    }
+    if ('descriptionEn' in input) {
+      assignments.push(sql`description_en = ${input.descriptionEn ?? null}`);
+    }
+    if ('descriptionDe' in input) {
+      assignments.push(sql`description_de = ${input.descriptionDe ?? null}`);
+    }
+    if (input.tagsAr !== undefined) {
+      assignments.push(sql`tags_ar = ${textArray(input.tagsAr)}`);
+    }
+    if (input.tagsEn !== undefined) {
+      assignments.push(sql`tags_en = ${textArray(input.tagsEn)}`);
+    }
+    if (input.tagsDe !== undefined) {
+      assignments.push(sql`tags_de = ${textArray(input.tagsDe)}`);
+    }
+
     await this.db.transaction(async (tx) => {
       await tx.execute(sql`
-        UPDATE cities SET
-          name_ar   = coalesce(${input.nameAr ?? null}, name_ar),
-          name_en   = coalesce(${input.nameEn ?? null}, name_en),
-          name_de   = coalesce(${input.nameDe ?? null}, name_de),
-          timezone  = coalesce(${input.timezone ?? null}, timezone),
-          is_active = coalesce(${input.isActive ?? null}, is_active),
-          updated_at = now()
+        UPDATE cities SET ${sql.join(assignments, sql`, `)}
         WHERE id = ${row.id}::uuid
       `);
 
@@ -888,6 +919,25 @@ export class GeoWriteService {
  * of four enum members, so nothing caller-supplied reaches this string; the assertion below is
  * what keeps that true if the schema and this function ever drift.
  */
+/**
+ * A Postgres `text[]` from a JavaScript array, with every element BOUND.
+ *
+ * A JS array handed to a `sql` template expands to a TUPLE — `($1, $2)` — not an array, which is
+ * the trap `scope.sql.ts` records and which fails at runtime rather than at compile time. This
+ * builds `ARRAY[$1, $2]::text[]`, so the elements are still parameters: a tag is free text a
+ * person typed, and it must never reach the statement as text.
+ *
+ * An empty list is its own literal, because `ARRAY[]` has no type Postgres can infer.
+ */
+function textArray(values: readonly string[]): SQL {
+  if (values.length === 0) return sql`'{}'::text[]`;
+
+  return sql`ARRAY[${sql.join(
+    values.map((one) => sql`${one}`),
+    sql`, `,
+  )}]::text[]`;
+}
+
 function categoriesLiteral(categories: readonly string[]): string {
   /*
     The four the ENUM knows, which is not the same set as the table any more.

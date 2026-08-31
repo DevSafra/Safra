@@ -63,6 +63,39 @@ export interface GeoCityRow {
   readonly images: number;
   readonly heroKey: string | null;
   readonly heroWidths: readonly number[] | null;
+  /**
+   * Every photograph, with what it SAYS — so the editor can manage it (Bashar, 2026-08-31).
+   *
+   * The count and the hero above answer «does this city have pictures». They cannot answer «what
+   * is the alt text on the third one», which is the question §5.4's accessibility depends on: the
+   * hero band is the first third of the public city page and every image on it went out with an
+   * empty `alt` until this shipped.
+   *
+   * Bounded by `MAX_IMAGES_PER_CITY` (12) and by nine cities, on a screen that is a documented
+   * exception to pagination — see `geo-bounds.integration.test.ts`, which fails if that stops
+   * being true.
+   */
+  readonly photographs: readonly GeoCityImage[];
+  /** The prose §5.4 renders under the name, editable here rather than only by migration. */
+  readonly descriptionAr: string | null;
+  readonly descriptionEn: string | null;
+  readonly descriptionDe: string | null;
+  readonly tagsAr: readonly string[];
+  readonly tagsEn: readonly string[];
+  readonly tagsDe: readonly string[];
+}
+
+/** One city photograph, as the console manages it. Never the bytes — see `updateCityImageSchema`. */
+export interface GeoCityImage {
+  readonly id: string;
+  readonly fileKey: string;
+  readonly variantWidths: readonly number[];
+  readonly altAr: string | null;
+  readonly altEn: string | null;
+  readonly altDe: string | null;
+  readonly credit: string | null;
+  readonly isHero: boolean;
+  readonly sortOrder: number;
 }
 
 /**
@@ -219,6 +252,13 @@ export class GeoService {
       properties: number;
       is_active: boolean;
       images: number;
+      photographs: GeoCityImage[];
+      description_ar: string | null;
+      description_en: string | null;
+      description_de: string | null;
+      tags_ar: string[] | null;
+      tags_en: string[] | null;
+      tags_de: string[] | null;
       hero_key: string | null;
       hero_widths: number[] | null;
     }>(sql`
@@ -251,7 +291,29 @@ export class GeoService {
              ci.timezone,
              coalesce(pr.n, 0)::int     AS properties,
              ci.is_active,
+             ci.description_ar, ci.description_en, ci.description_de,
+             ci.tags_ar, ci.tags_en, ci.tags_de,
              coalesce(im.n, 0)::int     AS images,
+             -- Every photograph with its metadata, in the order §5.4's band draws them.
+             -- jsonb rather than a second query: nine cities, twelve pictures each at most.
+             coalesce((
+               SELECT jsonb_agg(
+                        jsonb_build_object(
+                          'id', p.id::text,
+                          'fileKey', p.file_key,
+                          'variantWidths', p.variant_widths,
+                          'altAr', p.alt_ar,
+                          'altEn', p.alt_en,
+                          'altDe', p.alt_de,
+                          'credit', p.credit,
+                          'isHero', p.is_hero,
+                          'sortOrder', p.sort_order
+                        )
+                        ORDER BY p.is_hero DESC, p.sort_order, p.created_at
+                      )
+               FROM city_images p
+               WHERE p.city_id = ci.id AND p.deleted_at IS NULL
+             ), '[]'::jsonb)            AS photographs,
              hero.file_key              AS hero_key,
              hero.variant_widths        AS hero_widths
       FROM cities ci
@@ -288,6 +350,14 @@ export class GeoService {
       properties: row.properties,
       isActive: row.is_active,
       images: row.images,
+      photographs: row.photographs,
+      descriptionAr: row.description_ar,
+      descriptionEn: row.description_en,
+      descriptionDe: row.description_de,
+      /* Always an array, so no consumer has to guard before mapping. */
+      tagsAr: row.tags_ar ?? [],
+      tagsEn: row.tags_en ?? [],
+      tagsDe: row.tags_de ?? [],
       heroKey: row.hero_key,
       heroWidths: row.hero_widths,
     }));

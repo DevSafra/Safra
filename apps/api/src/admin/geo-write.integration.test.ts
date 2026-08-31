@@ -426,6 +426,81 @@ describeIfDb('creating and correcting geography', () => {
     ).rejects.toMatchObject({ response: { code: ERROR.GEO_CITY_NOT_FOUND } });
   });
 
+  /**
+   * A city's prose and its tags — Bashar, 2026-08-31.
+   *
+   * Both render on the PUBLIC city page and were writable only by a migration. The subtlety is not
+   * that they save; it is that «clear this» and «leave this» are different requests, and `coalesce`
+   * — which every other column here uses — cannot express both. A description written once could
+   * never have been removed.
+   */
+  describe('a city’s public prose', () => {
+    const cityProse = async (slug: string) =>
+      (
+        await db.execute<{
+          description_ar: string | null;
+          description_en: string | null;
+          tags_ar: string[];
+        }>(sql`
+          SELECT description_ar, description_en, tags_ar FROM cities WHERE slug = ${slug}
+        `)
+      ).rows[0];
+
+    it('writes the description and the tags in every language', async () => {
+      await service.updateCity(staff(), 'damascus', {
+        descriptionAr: 'أقدم عاصمة مأهولة في العالم.',
+        descriptionEn: 'The oldest continuously inhabited capital.',
+        tagsAr: ['المدينة القديمة', 'القلعة'],
+      });
+
+      const row = await cityProse('damascus');
+
+      expect(row?.description_ar).toBe('أقدم عاصمة مأهولة في العالم.');
+      expect(row?.description_en).toBe('The oldest continuously inhabited capital.');
+      expect(row?.tags_ar).toEqual(['المدينة القديمة', 'القلعة']);
+    });
+
+    /**
+     * The half `coalesce` cannot do.
+     *
+     * `null` CLEARS; an omitted key LEAVES. Without the distinction a description could be written
+     * and never removed, and the test that only checked writing would never have noticed.
+     */
+    it('clears a description with null, and leaves an omitted one alone', async () => {
+      await service.updateCity(staff(), 'damascus', {
+        descriptionAr: 'نص مؤقت',
+        descriptionEn: 'Temporary',
+      });
+
+      await service.updateCity(staff(), 'damascus', { descriptionAr: null });
+
+      const row = await cityProse('damascus');
+
+      expect(row?.description_ar, 'null clears it').toBeNull();
+      expect(row?.description_en, 'an omitted key leaves it').toBe('Temporary');
+    });
+
+    it('empties the tag strip when given an empty list', async () => {
+      await service.updateCity(staff(), 'damascus', { tagsAr: ['واحد'] });
+      await service.updateCity(staff(), 'damascus', { tagsAr: [] });
+
+      expect((await cityProse('damascus'))?.tags_ar).toEqual([]);
+    });
+
+    /**
+     * A tag is free text somebody typed, so it must reach the statement as a PARAMETER.
+     *
+     * `textArray` builds `ARRAY[$1, $2]::text[]` rather than concatenating — a JS array handed to
+     * a `sql` template expands to a tuple, and the workaround somebody reaches for next is string
+     * interpolation. A quote round-tripping intact is what proves it did not.
+     */
+    it('stores a tag containing a quote exactly as typed', async () => {
+      await service.updateCity(staff(), 'damascus', { tagsAr: [`باب' شرقي`] });
+
+      expect((await cityProse('damascus'))?.tags_ar).toEqual([`باب' شرقي`]);
+    });
+  });
+
   /* ── Deleting ───────────────────────────────────────────────────────────── */
 
   /**
