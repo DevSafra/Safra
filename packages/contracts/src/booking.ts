@@ -154,6 +154,17 @@ export const DEFAULT_MONEY_CURRENCY = 'USD';
 export const ACCOUNTING_CURRENCY = 'SYP';
 
 /**
+ * The setting that overrides every money setting's own currency.
+ *
+ * Here rather than in the API because both sides now need it: the service APPLIES the override,
+ * and الإعدادات has to tell a reader that «١٠٫٠٠ د.أ» on screen is spent as ten dollars. A second
+ * `'money.always_usd'` spelled out in the console is exactly the drift the note on
+ * `DEFAULT_MONEY_CURRENCY` warns about — and the failure would be silent, because a key that no
+ * longer matches simply falls back to the default and says nothing.
+ */
+export const ALWAYS_USD_SETTING_KEY = 'money.always_usd';
+
+/**
  * Which currency a picker STARTS on, given the codes it may offer.
  *
  * ## Why this is a function and not `currencies[0]`

@@ -35,6 +35,7 @@
 export * from './locales.js';
 export * from './shape.js';
 export * from './fill.js';
+export * from './bidi.js';
 export * from './admin.js';
 export * from './partner.js';
 export * from './content.js';

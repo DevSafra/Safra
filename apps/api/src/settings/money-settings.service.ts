@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
+import { ALWAYS_USD_SETTING_KEY, DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import {
   MONEY_SCALE,
@@ -22,8 +22,15 @@ import { describeError } from '../common/errors/safe-error.js';
  */
 export { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
-/** When true, every money setting is USD whatever its own currency says. */
-export const ALWAYS_USD_KEY = 'money.always_usd';
+/**
+ * When true, every money setting is USD whatever its own currency says.
+ *
+ * RE-EXPORTED under the name its callers already use. The string itself moved to
+ * `@safra/contracts` when الإعدادات needed to say on screen that a JOD row is spent in dollars —
+ * same reasoning as `DEFAULT_MONEY_CURRENCY` above: two spellings of one key drift, and a key that
+ * no longer matches falls back to the default silently.
+ */
+export const ALWAYS_USD_KEY = ALWAYS_USD_SETTING_KEY;
 
 export interface MoneySetting {
   readonly amount: string;
