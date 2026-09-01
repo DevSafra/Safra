@@ -103,6 +103,7 @@ describe('no two statuses on one screen share a word', () => {
       ['payoutStatus', t.enums.payoutStatus],
       ['giftCardStatus', t.enums.giftCardStatus],
       ['couponStatus', t.enums.couponStatus],
+      ['couponPartnerStatus', t.enums.couponPartnerStatus],
       ['adStatus', t.enums.adStatus],
       ['adInvoiceStatus', t.enums.adInvoiceStatus],
       ['userStatus', t.enums.userStatus],

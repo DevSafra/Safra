@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 import { getCoupons, getGeography, type CouponItem } from '@/lib/api';
 import { sidebarCounts } from '@/lib/console';
@@ -14,6 +15,7 @@ import {
 
 import { t, label } from '@/lib/strings';
 import { listParamsFor } from '@/lib/table-size';
+import { returnQuery } from '@/lib/search-params';
 import { refuseSection } from '@/components/section-refusal';
 import { CouponsToolbar } from '@/components/coupons-toolbar';
 import { CouponActiveToggle } from '@/components/coupon-active-toggle';
@@ -60,6 +62,9 @@ export default async function CouponsPage({
 
   const { q, page, size } = await listParamsFor('coupons', searchParams);
 
+  /* Carried into every code link, so «رجوع» comes back to this page of this search. */
+  const back = returnQuery({ page, size, q });
+
   const [result, counts, geo] = await Promise.all([
     getCoupons({ q, page, limit: size }),
     sidebarCounts(),
@@ -96,7 +101,7 @@ export default async function CouponsPage({
         ) : (
           <>
             <AdminTable
-              columns={COLUMNS}
+              columns={columns(back)}
               rows={result.items}
               template={TEMPLATE}
               rowKey={(row) => row.code}
@@ -120,7 +125,7 @@ export default async function CouponsPage({
   );
 }
 
-const COLUMNS: readonly AdminColumn<CouponItem>[] = [
+const columns = (back: string): readonly AdminColumn<CouponItem>[] => [
   {
     key: 'code',
     header: t.sections.giftcards.colCode,
@@ -140,7 +145,19 @@ const COLUMNS: readonly AdminColumn<CouponItem>[] = [
       and does nothing. Two short lines are legible; a code sitting on top of the type beside it is
       not. Found by `table-overflow.spec.ts` at 1024, which is the width that regresses silently.
     */
-    render: (row) => <Ltr className="font-bold break-all text-sky">{row.code}</Ltr>,
+    /*
+      A LINK to the coupon's adoption since 2026-09-01 (Bashar). The code was already the row's
+      identity, so it is the thing to click; `returnQuery` carries the reader's page, size, search
+      and filter into the href so «رجوع» lands them back on the row they opened.
+    */
+    render: (row) => (
+      <Link
+        href={`/coupons/${encodeURIComponent(row.code)}${back}`}
+        className="font-bold break-all text-sky hover:underline"
+      >
+        <Ltr>{row.code}</Ltr>
+      </Link>
+    ),
   },
   {
     key: 'type',

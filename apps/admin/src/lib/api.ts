@@ -1302,6 +1302,51 @@ export async function getCoupons(params: ListParams) {
   return staffFetch(`/admin/coupons${listQuery(params)}`, offsetPage(couponItemSchema));
 }
 
+/** One partner's position on a coupon — see `couponParticipation` on the API. */
+const couponPartnerSchema = z.object({
+  reference: z.string(),
+  partner: z.string(),
+  city: z.string().nullable(),
+  status: z.enum(['pending', 'accepted', 'rejected']),
+  /* Null while pending. Never defaulted: «has not answered» is the state being counted. */
+  decidedAt: z.string().nullable(),
+});
+
+export type CouponPartner = z.infer<typeof couponPartnerSchema>;
+
+const couponTallySchema = z.object({ total: z.number(), capped: z.boolean() });
+
+export type CouponTally = z.infer<typeof couponTallySchema>;
+
+/**
+ * Coupon adoption: the three totals, and one page of one group.
+ *
+ * The counts describe the whole coupon and ignore the filter and the search — an operator asks
+ * «how is it going» and «who do I chase» in that order, and a count of the current page answers
+ * neither.
+ */
+export async function getCouponPartners(
+  code: string,
+  params: ListParams & { status?: string | undefined },
+) {
+  const query = new URLSearchParams(listQuery(params).replace(/^\?/, ''));
+
+  if (params.status) query.set('status', params.status);
+
+  return staffFetch(
+    `/admin/coupons/${encodeURIComponent(code)}/partners?${query.toString()}`,
+    z.object({
+      /* A tally, not a number: past `COUNT_CAP` the figure is a floor and must read as one. */
+      counts: z.object({
+        pending: couponTallySchema,
+        accepted: couponTallySchema,
+        rejected: couponTallySchema,
+      }),
+      partners: offsetPage(couponPartnerSchema),
+    }),
+  );
+}
+
 // ── المدن والدول والعملات ────────────────────────────────────────────────────
 
 const geoSchema = z.object({

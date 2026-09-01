@@ -1136,6 +1136,20 @@ export const ar = {
     },
 
     coupons: {
+      /* ── Coupon adoption: who took it up (Bashar, 2026-09-01) ── */
+      participationTitle: 'مشاركة الشركاء',
+      participationNote:
+        'يُعرض الكوبون على كل شريك مؤهَّل ولا يُطبَّق على عقاراته قبل قبوله. القبول نهائي ولا يمكن للشريك التراجع عنه.',
+      allPartners: 'الكل',
+      /* A capped group figure. «أكثر من» because past `COUNT_CAP` the number is a floor. */
+      countCapped: 'أكثر من {n}',
+      colPartner: 'الشريك',
+      colCity: 'المدينة',
+      colDecidedAt: 'تاريخ الرد',
+      noResponse: 'لم يردّ بعد',
+      partnersEmpty: 'لا شركاء في هذه المجموعة.',
+      searchPartners: 'ابحث باسم الشريك أو مرجعه',
+      openCoupon: 'عرض',
       searchPlaceholder: 'بحث بالكود أو النوع…',
       create: '+ كوبون جديد',
       /* ── The create form (Bashar, 2026-08-26) ────────────────────────────────────────────── */
@@ -4140,6 +4154,19 @@ export const ar = {
       active: 'نشط',
       suspended: 'موقوف',
       expired: 'منتهي',
+    } as Record<string, string>,
+
+    /**
+     * Whether a partner has taken up a coupon — `coupon_partner_status`.
+     *
+     * Here rather than beside the screen's own copy so `status-tone.test.ts` can compare these
+     * words against every other status word in the console. A status set that lives outside
+     * `enums` is a status set no sweep is holding to account.
+     */
+    couponPartnerStatus: {
+      pending: 'بانتظار الرد',
+      accepted: 'مقبول',
+      rejected: 'مرفوض',
     } as Record<string, string>,
 
     couponType: {

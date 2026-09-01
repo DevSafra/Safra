@@ -143,4 +143,76 @@ test.describe('creating a coupon', () => {
       expect(headers, `«${header}» is still shown`).toContain(header);
     }
   });
+  /**
+   * Who took the coupon, who refused it, and who has said nothing (Bashar, 2026-09-01).
+   *
+   * The counts describe the COUPON and the rows describe the FILTER — two different questions, and
+   * the reason this is asserted in a browser is that the chips are both readouts AND controls. A
+   * chip that narrowed the totals along with the table would answer «how is adoption going» with
+   * «one», which is the number of things matching the filter and not the number an operator wants.
+   *
+   * Driven from the registry rather than a typed URL, because reaching this screen at all is the
+   * part that was missing: the code cell was plain text until this change.
+   */
+  test('opens a coupon and shows who accepted, refused and has not replied', async ({
+    page,
+  }) => {
+    await page.goto('/coupons');
+
+    const code = page.locator('tbody tr').first().locator('a[href^="/coupons/"]');
+
+    await expect(code, 'the code opens the coupon').toBeVisible();
+
+    const opened = ((await code.textContent()) ?? '').trim();
+
+    await code.click();
+    await page.waitForURL(/\/coupons\/.+/);
+
+    await expect(page.getByRole('heading', { name: opened })).toBeVisible();
+    await expect(page.locator('main')).toContainText('مشاركة الشركاء');
+
+    /* The three groups, each with its own figure. */
+    const chips = page.locator('[data-participation-count]');
+
+    await expect(chips).toHaveCount(3);
+
+    const totals = await chips.allInnerTexts();
+
+    /* Somebody is owed a reply on a coupon this fresh — otherwise the filter proves nothing. */
+    const pending = page.locator('[data-participation-count="pending"]');
+
+    await pending.click();
+    await page.waitForURL(/status=pending/);
+
+    /* Narrowed the table… */
+    const states = await page.locator('[data-status-pill]').allInnerTexts();
+
+    for (const state of states) expect(state).toBe('بانتظار الرد');
+
+    /* …and left the counts alone, which is the whole point of the pair. */
+    expect(await chips.allInnerTexts()).toEqual(totals);
+
+    /* A partner who has not answered reads as that, not as a dash or an invented date. */
+    await expect(page.locator('tbody tr').first()).toContainText('لم يردّ بعد');
+
+    /* Every width the standing rule names, including the one that regresses silently. */
+    for (const width of [1440, 1024, 768, 390]) {
+      await page.setViewportSize({ width, height: 950 });
+      await page.waitForTimeout(60);
+
+      const sideways = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+      );
+
+      expect(sideways, `the page scrolls sideways at ${width}px`).toBe(false);
+    }
+
+    await page.setViewportSize({ width: 1440, height: 950 });
+
+    /* And «رجوع» lands back on the registry rather than anywhere the query string asked for. */
+    await page.getByRole('link', { name: /رجوع/ }).click();
+    await page.waitForURL(/\/coupons(\?|$)/);
+    await expect(page.getByRole('button', { name: /كوبون جديد/ })).toBeVisible();
+  });
 });

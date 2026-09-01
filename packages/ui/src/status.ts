@@ -251,6 +251,14 @@ export const VOCABULARIES: Readonly<Record<string, readonly string[]>> = {
   user: ['active', 'suspended', 'archived'],
   notification: ['queued', 'sent', 'delivered', 'failed'],
   /**
+   * Whether a partner has taken up a coupon — `coupon_partner_status`.
+   *
+   * Three values on one table, three tones. Each keeps the colour it has elsewhere: `pending` the
+   * amber of a queue waiting on somebody, `accepted` the green it has on طلبات الشراكة, `rejected`
+   * the red it has everywhere. Rule 1 is why they are not re-chosen here.
+   */
+  couponPartner: ['pending', 'accepted', 'rejected'],
+  /**
    * The payout lifecycle.
    *
    * Six values on one registry, so six distinct tones. `cancelled` is shared with bookings and
