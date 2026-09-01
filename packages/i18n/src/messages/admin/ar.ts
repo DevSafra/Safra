@@ -1818,6 +1818,9 @@ export const ar = {
       compensationHint: 'يُضاف فوراً إلى محفظة العميل بحركة مسجَّلة',
       closing: 'جارٍ الإغلاق…',
       confirmClose: 'تأكيد الإغلاق',
+      /* Why «تأكيد الإغلاق» is dark, shown only while it is. */
+      resolutionTooShort: 'اكتب قرار الإغلاق أولاً — عشرة أحرف على الأقل.',
+      amountInvalid: 'اكتب مبلغ التعويض رقماً، مثل 10.00 — أو أزِل علامة التعويض.',
     },
 
     messages: {
@@ -3787,6 +3790,13 @@ export const ar = {
       legalName: 'الاسم القانوني',
       address: 'العنوان',
       partner: 'الشريك',
+      /*
+        On `dispute.notified`: whether each side was told, and what they were told. Both keys
+        reached the live table the first time a dispute was closed on this database and neither had
+        a name, so سجل التدقيق printed the identifiers.
+      */
+      customer: 'العميل',
+      outcome: 'النتيجة',
       partnerType: 'نوع النشاط',
       partnerReference: 'مرجع الشريك',
       bookingReference: 'مرجع الحجز',

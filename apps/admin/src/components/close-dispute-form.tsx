@@ -26,6 +26,29 @@ import { t, apiErrorOf } from '@/lib/strings';
  * Ticking it credits the customer's wallet immediately, in the same transaction as the closure.
  * The label says so, because "compensation" alone does not distinguish a promise from a payment.
  */
+/** What the API, the database CHECK and this form all require of a resolution. */
+const MIN_RESOLUTION = 10;
+
+/**
+ * Arabic-Indic and Persian digits, and the separators that come with them, as ASCII.
+ *
+ * The console is Arabic-only, so «١٠٫٥٠» is not an exotic input — it is what the keyboard in front
+ * of the operator produces. Everything downstream speaks `numeric`, so the conversion happens once,
+ * here, at the point the value is read.
+ */
+function westernDigits(value: string): string {
+  return (
+    value
+      .trim()
+      .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+      .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+      /* «٫» is the Arabic decimal separator; a comma is what a European keyboard offers. */
+      .replace(/[٫,]/g, '.')
+      /* «٬» groups thousands and means nothing to a parser. */
+      .replace(/[٬\s]/g, '')
+  );
+}
+
 export function CloseDisputeForm({ reference }: { reference: string }) {
   const router = useRouter();
 
@@ -40,10 +63,31 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
   /*
     A compensation amount must look like money before the button arms. The API and the database
     both re-check; this stops the obvious typo from costing a round trip.
+
+    Read through `westernDigits`, because this console is Arabic and «١٠٫٠٠» is what somebody types
+    on an Arabic keyboard. It was tested against ASCII digits only, so those four characters left
+    the button dark with nothing on screen saying why (Bashar, 2026-09-01).
   */
-  const amountValid =
-    !compensate || /^\d{1,10}(\.\d{1,2})?$/.test(compensationAmount.trim());
-  const ready = resolution.trim().length >= 10 && amountValid && !busy;
+  const amount = westernDigits(compensationAmount);
+  const amountValid = !compensate || /^\d{1,10}(\.\d{1,2})?$/.test(amount);
+  const resolutionValid = resolution.trim().length >= MIN_RESOLUTION;
+  const ready = resolutionValid && amountValid && !busy;
+
+  /*
+    Why the button is dark, in words.
+
+    It disarms on two conditions and stated neither: a resolution under ten characters and an
+    amount that is not a figure both produced a grey button and silence. A control that refuses
+    without saying what it wants is indistinguishable from one that is broken — which is exactly
+    how it was reported.
+  */
+  const blocker = busy
+    ? null
+    : !resolutionValid
+      ? t.sections.disputes.resolutionTooShort
+      : !amountValid
+        ? t.sections.disputes.amountInvalid
+        : null;
 
   async function submit(): Promise<void> {
     setBusy(true);
@@ -60,7 +104,8 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
             resolution: resolution.trim(),
             ...(compensate
               ? {
-                  compensationAmount: compensationAmount.trim(),
+                  /* Normalised, so what was validated is what is sent. */
+                  compensationAmount: amount,
                   /*
                     USD, because that is the currency every operational amount on this console is
                     denominated in. A currency picker would invite crediting SYP by accident,
@@ -176,6 +221,9 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
           {error}
         </p>
       ) : null}
+
+      {/* Only while it is actually blocking — a permanent hint is noise nobody reads. */}
+      {blocker ? <p className="text-[11.5px] text-faint2">{blocker}</p> : null}
 
       <div className="flex flex-wrap gap-2.5">
         <button
