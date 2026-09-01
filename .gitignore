@@ -48,6 +48,13 @@ docker/volumes/
 # Consequence: these are NOT shared via the repo. Distribute them out of band.
 .claude/
 
+# Third-party agent skills installed with `npx skills add` (2026-09-01) — local only.
+# `.agents/skills/` is the shared store the installers write to; `.claude/skills/`
+# only symlinks into it and is already covered by `.claude/` above. Nothing under
+# either path is authored here, and none of it is a dependency of the build.
+.agents/
+skills-lock.json
+
 # Root CLAUDE.md only imports .claude/CLAUDE.md, which is ignored above — committing
 # it would leave a dangling reference in a fresh clone.
 CLAUDE.md
