@@ -29,7 +29,7 @@ import { refuseSection } from '@/components/section-refusal';
 export const dynamic = 'force-dynamic';
 
 /** The design's `grid-template-columns`, verbatim. */
-const TEMPLATE = '1.2fr 1fr .9fr .8fr 1.6fr 1fr';
+const TEMPLATE = '1.2fr 1fr 1.05fr .8fr 1.45fr 1fr';
 
 export default async function WalletPage({
   searchParams,
@@ -219,11 +219,24 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
           line that matters.
         */}
         {Number(row.restrictedAmount) > 0 ? (
-          <span className="text-[10.5px] whitespace-nowrap text-faint2">
-            {t.sections.wallet.restrictedPart}{' '}
-            <Ltr>
-              {money(row.restrictedAmount)} {row.currency}
-            </Ltr>
+          <span className="text-[10.5px] leading-snug text-faint2">
+            {t.sections.wallet.restrictedPart}
+            {/*
+              The figure only when it differs from the amount above it.
+
+              On most rows the whole movement is restricted, so printing it repeated the number
+              directly under itself — «+7.00 USD» over «منه غير قابل للسحب: 7.00 USD» — which read
+              as a rendering fault and was the widest thing in the column. A partial still says how
+              much, because that is the case the reader cannot work out for themselves.
+            */}
+            {Number(row.restrictedAmount) === Number(row.amount) ? null : (
+              <>
+                {' '}
+                <Ltr>
+                  {money(row.restrictedAmount)} {row.currency}
+                </Ltr>
+              </>
+            )}
           </span>
         ) : null}
       </div>

@@ -1064,8 +1064,14 @@ export const ar = {
       colCustomer: 'العميل',
       colReason: 'السبب',
       colBalanceAfter: 'الرصيد بعدها',
-      /* Under the amount, when a movement credited or spent money that cannot be withdrawn. */
-      restrictedPart: 'منه غير قابل للسحب:',
+      /*
+        Under the amount, when a movement credited or spent money that cannot be withdrawn.
+
+        Without «منه», and without a colon on the common row: where the whole movement is
+        restricted the cell prints this alone, and «منه غير قابل للسحب:» hanging with no figure
+        after it reads like a sentence that lost its ending.
+      */
+      restrictedPart: 'غير قابل للسحب',
       note: 'المحفظة تخزن تعويضات العملاء (P-007) — مثل 10$ عند فشل الشريك بالرد أول مرة — وتُستخدم مع بطاقة هدية ووسيلة دفع أخرى في عملية واحدة. كل حركة لها سبب مسجَّل.',
     },
 
