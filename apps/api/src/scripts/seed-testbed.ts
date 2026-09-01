@@ -906,6 +906,18 @@ async function build(db: Seeder): Promise<void> {
   );
   await db.execute(sql`DELETE FROM coupon_redemptions WHERE coupon_id IN (
     SELECT id FROM coupons WHERE partner_id IN (${testbedPartners}))`);
+  /*
+    The OFFER rows, both ways round.
+
+    `coupon_partners` points at a coupon AND at a partner, so it blocks the two deletes below for
+    two different reasons: a testbed partner offered any coupon, and any partner offered a testbed
+    coupon. Both are cleared here rather than one, which is the shape the cascade sweep checks for.
+  */
+  await db.execute(
+    sql`DELETE FROM coupon_partners WHERE partner_id IN (${testbedPartners})`,
+  );
+  await db.execute(sql`DELETE FROM coupon_partners WHERE coupon_id IN (
+    SELECT id FROM coupons WHERE partner_id IN (${testbedPartners}))`);
   await db.execute(sql`DELETE FROM coupons WHERE partner_id IN (${testbedPartners})`);
 
   await db.execute(sql`DELETE FROM partners WHERE id IN (${testbedPartners})`);

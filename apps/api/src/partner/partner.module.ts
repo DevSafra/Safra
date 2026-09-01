@@ -5,6 +5,8 @@ import { AuthModule } from '../auth/auth.module.js';
 
 import { CalendarService } from './calendar.service.js';
 import { PartnerDashboardService } from './dashboard.service.js';
+import { PartnerCouponsController } from './coupons.controller.js';
+import { PartnerCouponsService } from './partner-coupons.service.js';
 import { PartnerImagesController } from './images.controller.js';
 import { PartnerController } from './partner.controller.js';
 import {
@@ -44,6 +46,7 @@ import { PropertyImageService } from './property-images.service.js';
   controllers: [
     PartnerController,
     PartnerImagesController,
+    PartnerCouponsController,
     PartnerApplicationController,
     AdminPartnerApplicationController,
     PartnerInvitationController,
@@ -56,6 +59,7 @@ import { PropertyImageService } from './property-images.service.js';
     ViolationsController,
   ],
   providers: [
+    PartnerCouponsService,
     PropertiesService,
     PropertyImageService,
     PartnerDashboardService,

@@ -72,6 +72,10 @@ describeIfDb('the last redemption of a coupon', () => {
       await db.execute(
         sql`DELETE FROM coupon_redemptions WHERE ${inArray(schema.couponRedemptions.couponId, madeCoupons)}`,
       );
+      /* The offer rows too — they reference the coupon and would block the delete below. */
+      await db.execute(
+        sql`DELETE FROM coupon_partners WHERE ${inArray(schema.couponPartners.couponId, madeCoupons)}`,
+      );
       await db.execute(
         sql`DELETE FROM coupons WHERE ${inArray(schema.coupons.id, madeCoupons)}`,
       );
@@ -107,6 +111,16 @@ describeIfDb('the last redemption of a coupon', () => {
     `);
 
     madeCoupons.push(made.rows[0]?.id ?? '');
+
+    /*
+      Accepted by the partner whose bookings these races redeem against. Since 2026-09-01 a coupon
+      does nothing until its partner takes it up, and this file is about the LOCK — five customers
+      arriving at once — not about the offer, so it starts where those cases begin.
+    */
+    await db.execute(sql`
+      INSERT INTO coupon_partners (coupon_id, partner_id, status, decided_at)
+      VALUES (${made.rows[0]?.id}::uuid, ${partnerId}::uuid, 'accepted', now())
+    `);
 
     return code;
   }

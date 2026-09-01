@@ -132,6 +132,7 @@ describeIfDb('a coupon judged against a stay', () => {
       city_id: null,
       partner_id: null,
       is_active: true,
+      accepted: true,
       ...over,
     };
 
@@ -150,6 +151,21 @@ describeIfDb('a coupon judged against a stay', () => {
         ${values.city_id}::uuid, ${values.partner_id}::uuid, ${values.is_active}
       )
     `);
+
+    /*
+      ACCEPTED by the stay's partner, unless the case is about the acceptance itself.
+
+      A coupon does nothing until the partner takes it up (Bashar, 2026-09-01), so every case in
+      this file that is about some OTHER rule — the window, the caps, the scope — needs the offer
+      already accepted or it would be refused for the wrong reason and prove nothing. The two
+      cases that ARE about acceptance pass `accepted: false` and set up their own row.
+    */
+    if (values.accepted !== false) {
+      await db.execute(sql`
+        INSERT INTO coupon_partners (coupon_id, partner_id, status, decided_at)
+        SELECT id, ${partnerId}::uuid, 'accepted', now() FROM coupons WHERE code = ${code}
+      `);
+    }
 
     return code;
   }
@@ -302,5 +318,55 @@ describeIfDb('a coupon judged against a stay', () => {
     });
 
     expect(await refusal(code)).toBe(ERROR.COUPON_CURRENCY_MISMATCH);
+  });
+
+  /**
+   * A coupon does nothing until the partner has taken it up (Bashar, 2026-09-01).
+   *
+   * ## Why this is a refusal rather than a filter
+   *
+   * A partner who was offered and has not answered, and one who refused, get the SAME answer as a
+   * partner the coupon was never scoped to. That is deliberate: a customer must not be able to
+   * learn from a checkout page which partners declined a promotion.
+   *
+   * The accepted case is the opposite control. Without it a `judge` that refused every coupon
+   * would pass both of the refusal cases below and prove nothing.
+   */
+  describe('the partner has to have accepted it', () => {
+    it('refuses a coupon the partner has not answered', async () => {
+      const code = await coupon({ accepted: false });
+
+      await db.execute(sql`
+        INSERT INTO coupon_partners (coupon_id, partner_id)
+        SELECT id, ${partnerId}::uuid FROM coupons WHERE code = ${code}
+      `);
+
+      expect(await refusal(code)).toBe(ERROR.COUPON_NOT_FOR_PARTNER);
+    });
+
+    it('refuses a coupon the partner rejected', async () => {
+      const code = await coupon({ accepted: false });
+
+      await db.execute(sql`
+        INSERT INTO coupon_partners (coupon_id, partner_id, status, decided_at)
+        SELECT id, ${partnerId}::uuid, 'rejected', now() FROM coupons WHERE code = ${code}
+      `);
+
+      expect(await refusal(code)).toBe(ERROR.COUPON_NOT_FOR_PARTNER);
+    });
+
+    it('refuses a coupon the partner was never offered', async () => {
+      const code = await coupon({ accepted: false });
+
+      expect(await refusal(code)).toBe(ERROR.COUPON_NOT_FOR_PARTNER);
+    });
+
+    it('prices one the partner accepted', async () => {
+      const code = await coupon();
+
+      await expect(coupons.preview(code, stay())).resolves.toMatchObject({
+        code,
+      });
+    });
   });
 });

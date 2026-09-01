@@ -6,6 +6,7 @@ import { PARTNER_SECTION_PERMISSIONS, type Permission } from '@safra/contracts';
 
 import { PERMISSIONS_KEY } from './decorators.js';
 import { PartnerController } from '../partner/partner.controller.js';
+import { PartnerCouponsController } from '../partner/coupons.controller.js';
 import { PartnerContractsController } from '../partner/partner-contracts.controller.js';
 import { PartnerEmployeeRolesController } from '../partner/partner-employee-roles.controller.js';
 import { PartnerEmployeesController } from '../partner/partner-employees.controller.js';
@@ -56,6 +57,7 @@ const SECTION_HANDLERS: Partial<
   reviews: [PartnerReviewController, 'list', 'getMyReviews'],
   payouts: [PartnerPayoutController, 'list', 'getMyPayouts'],
   contracts: [PartnerContractsController, 'list', 'getMyContracts'],
+  coupons: [PartnerCouponsController, 'list', 'getMyCoupons'],
   employees: [PartnerEmployeesController, 'list', 'getMyEmployees'],
   employeeRoles: [PartnerEmployeeRolesController, 'list', 'getMyEmployeeRoles'],
 };

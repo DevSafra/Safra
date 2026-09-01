@@ -164,6 +164,8 @@ export const en = {
   'coupon.first_booking_only': 'This coupon is for a first booking only.',
   'coupon.currency_mismatch': 'The coupon currency differs from the booking currency.',
   'coupon.code_taken': 'That code is already in use.',
+  'coupon.already_decided':
+    'This coupon has already been decided. Acceptance is final and cannot be reversed.',
   'coupon.not_found': 'Coupon not found.',
   'coupon.window_order': 'The end date must be after the start date.',
   'coupon.percent_range': 'A percentage must be between 1 and 100.',

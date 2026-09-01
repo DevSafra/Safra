@@ -96,6 +96,7 @@ export class CouponService {
       coupon,
       context,
       await this.customerUses(this.db, coupon.id, context),
+      await this.partnerAccepted(this.db, coupon.id, context.partnerId),
     );
   }
 
@@ -119,6 +120,7 @@ export class CouponService {
       coupon,
       context,
       await this.customerUses(tx, coupon.id, context),
+      await this.partnerAccepted(tx, coupon.id, context.partnerId),
     );
 
     await tx.execute(sql`
@@ -210,7 +212,34 @@ export class CouponService {
    * `preview` and `redeem` share one set of rules rather than two that drift — the failure this
    * whole service would otherwise invite, where a code previews cleanly and refuses at checkout.
    */
-  private judge(coupon: CouponRow, context: CouponContext, uses: number): CouponMatch {
+  /**
+   * Whether this stay's partner has taken the coupon up.
+   *
+   * Read HERE rather than passed in by the caller: four call sites price a coupon and every one of
+   * them would need the same query, which is four chances for one of them to forget and quietly
+   * discount a partner who never agreed. `judge` still receives it as a fact and stays pure.
+   */
+  private async partnerAccepted(
+    handle: Database,
+    couponId: string,
+    partnerId: string,
+  ): Promise<boolean> {
+    const rows = await handle.execute<{ ok: boolean }>(sql`
+      SELECT true AS ok FROM coupon_partners
+      WHERE coupon_id = ${couponId}::uuid AND partner_id = ${partnerId}::uuid
+        AND status = 'accepted' AND deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    return rows.rows.length > 0;
+  }
+
+  private judge(
+    coupon: CouponRow,
+    context: CouponContext,
+    uses: number,
+    partnerAccepted: boolean,
+  ): CouponMatch {
     if (!coupon.is_active) throw badRequest(ERROR.COUPON_INACTIVE);
 
     const now = Date.now();
@@ -245,6 +274,17 @@ export class CouponService {
     }
 
     if (coupon.partner_id !== null && coupon.partner_id !== context.partnerId) {
+      throw badRequest(ERROR.COUPON_NOT_FOR_PARTNER);
+    }
+
+    /*
+      The partner has to have ACCEPTED it (Bashar, 2026-09-01).
+
+      Scope above says who a coupon was OFFERED to; this says who took it up. A partner who was
+      offered and has not answered, or who refused, is not discounted — and the same refusal covers
+      both, because a customer must not be told which partners declined a promotion.
+    */
+    if (!partnerAccepted) {
       throw badRequest(ERROR.COUPON_NOT_FOR_PARTNER);
     }
 

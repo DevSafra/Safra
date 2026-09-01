@@ -189,6 +189,8 @@ export const de = {
   'coupon.first_booking_only': 'Dieser Gutschein gilt nur für die erste Buchung.',
   'coupon.currency_mismatch': 'Die Währung des Gutscheins weicht von der Buchung ab.',
   'coupon.code_taken': 'Dieser Code wird bereits verwendet.',
+  'coupon.already_decided':
+    'Über diesen Gutschein wurde bereits entschieden. Eine Annahme ist endgültig.',
   'coupon.not_found': 'Gutschein nicht gefunden.',
   'coupon.window_order': 'Das Enddatum muss nach dem Startdatum liegen.',
   'coupon.percent_range': 'Ein Prozentsatz muss zwischen 1 und 100 liegen.',

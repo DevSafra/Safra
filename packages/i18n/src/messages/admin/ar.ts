@@ -3171,6 +3171,8 @@ export const ar = {
     'dispute.evidence_added': 'إضافة دليل إلى نزاع',
     'dispute.evidence_removed': 'حذف دليل من نزاع',
     'partner.commission_set': 'تحديد عمولة شريك',
+    'coupon.partner_accepted': 'قبول شريك لكوبون',
+    'coupon.partner_rejected': 'رفض شريك لكوبون',
     'city_category.created': 'إضافة فئة مدن',
     'city_category.updated': 'تعديل فئة مدن',
     'city_category.deleted': 'حذف فئة مدن',

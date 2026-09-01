@@ -48,7 +48,7 @@ export class CouponAdminService {
   ): Promise<{ id: string; code: string }> {
     if (!claims?.sub) throw badRequest(ERROR.INTERNAL_ACTOR_REQUIRED);
 
-    return this.db.transaction(async (tx) => {
+    const created = await this.db.transaction(async (tx) => {
       const currencyId = input.currency
         ? await this.lookup(
             tx as unknown as Database,
@@ -113,6 +113,39 @@ export class CouponAdminService {
 
       if (!row) throw conflict(ERROR.COUPON_CODE_TAKEN);
 
+      /*
+        ── Offer it to every eligible partner (Bashar, 2026-09-01) ─────────────────────────
+        A coupon changes the price a listing is advertised at, which is the partner's decision
+        rather than SAFRA's — so nobody is enrolled, everybody is ASKED. Each eligible partner gets
+        a pending row and decides in their own portal; only an acceptance makes their bookings
+        eligible for the discount.
+
+        «Eligible» is the coupon's own scope, read from the columns just written rather than from
+        the input: a city coupon reaches the partners in that city, a partner coupon reaches that
+        partner, and an unscoped one reaches everybody. Approved partners only — an application
+        still under review has no listings to discount and no portal to answer in.
+
+        In the SAME transaction as the coupon. A coupon that exists with nobody offered it is a
+        campaign that silently reaches no one, and it would look exactly like a working one.
+      */
+      const offered = await tx.execute<{ n: string }>(sql`
+        WITH eligible AS (
+          INSERT INTO coupon_partners (coupon_id, partner_id)
+          SELECT ${row.id}::uuid, p.id
+          FROM partners p
+          WHERE p.verification = 'approved'
+            AND p.deleted_at IS NULL
+            AND (${cityId}::uuid IS NULL OR p.city_id = ${cityId}::uuid)
+            AND (${partnerId}::uuid IS NULL OR p.id = ${partnerId}::uuid)
+          RETURNING partner_id
+        )
+        SELECT count(*)::text AS n FROM eligible
+      `);
+
+      this.logger.log(
+        `Coupon ${code} offered to ${offered.rows[0]?.n ?? '0'} partner(s).`,
+      );
+
       await this.audit.record(
         {
           actorUserId: claims.sub,
@@ -138,6 +171,8 @@ export class CouponAdminService {
 
       return { id: row.id, code };
     });
+
+    return created;
   }
 
   /**

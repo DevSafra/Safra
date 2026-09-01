@@ -55,6 +55,7 @@ export const CASCADE_HANDLES = new Set<string>([
   'booking_internal_notes',
   'booking_verifications',
   'coupon_redemptions',
+  'coupon_partners',
   'dispute_evidence',
   'favourites',
   'gift_card_transactions',

@@ -154,6 +154,8 @@ export const ar = {
   'coupon.first_booking_only': 'هذا الكوبون للحجز الأول فقط.',
   'coupon.currency_mismatch': 'عملة الكوبون تختلف عن عملة الحجز.',
   'coupon.code_taken': 'هذا الكود مستخدم بالفعل.',
+  'coupon.already_decided':
+    'سبق أن اتُّخذ القرار في هذا الكوبون. القبول نهائي ولا يمكن التراجع عنه.',
   'coupon.not_found': 'الكوبون غير موجود.',
   'coupon.window_order': 'تاريخ الانتهاء يجب أن يكون بعد تاريخ البدء.',
   'coupon.percent_range': 'النسبة يجب أن تكون بين 1 و100.',
