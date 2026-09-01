@@ -43,6 +43,23 @@ export const walletAdjustSchema = z
     currency: z.string().regex(/^[A-Z]{3}$/, ERROR.VALIDATION_CURRENCY_CODE),
 
     /**
+     * Whose money this is — and therefore whether the customer could ever take it out
+     * (Bashar, 2026-09-01).
+     *
+     * Required, with no default, on a CREDIT. It is the one thing about a manual movement that the
+     * reason cannot tell: «finance credited 40 USD» is a goodwill gesture or the correction of an
+     * overcharge, and those are opposite answers to «may this be paid out». A default would pick
+     * one silently — either quietly making compensation withdrawable, or quietly refusing a
+     * customer their own money back — so the operator says which, in a two-way choice they cannot
+     * skip.
+     *
+     * It is ignored on a debit, and deliberately not forbidden there: a debit takes restricted
+     * money first by the ordinary spending rule, so there is nothing to choose, and a schema that
+     * varied its shape by direction would make every caller branch before it could validate.
+     */
+    fund: z.enum(['compensation', 'customer']),
+
+    /**
      * Mandatory, and not a free-for-all length.
      *
      * An adjustment with no stated reason is unreviewable, which defeats the audit

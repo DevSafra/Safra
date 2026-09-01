@@ -414,6 +414,13 @@
       "when": 1788256174668,
       "tag": "0058_premium_snowbird",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1788266495743,
+      "tag": "0059_new_vermin",
+      "breakpoints": true
     }
   ]
 }

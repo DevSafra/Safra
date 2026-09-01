@@ -577,6 +577,15 @@ export const ERROR = {
    */
   WALLET_BALANCE_BELOW_AMOUNT: 'wallet.balance_below_amount',
   /**
+   * The balance is large enough and the WITHDRAWABLE part of it is not (Bashar, 2026-09-01).
+   *
+   * Its own code rather than a shortfall, because the two are different facts and a customer meets
+   * this one. «Your balance is too small» to somebody holding $35 is untrue; what is too small is
+   * the part of it that came from their own money — compensation SAFRA credited stays inside the
+   * platform. The three figures travel as `params` so each language decides the word order.
+   */
+  WALLET_NOT_WITHDRAWABLE: 'wallet.not_withdrawable',
+  /**
    * The second factor is not enrolled yet, on an otherwise valid session.
    *
    * NOT `auth.two_factor_setup_required`, which means "you called enable before setup". This one

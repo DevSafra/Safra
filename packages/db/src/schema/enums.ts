@@ -312,6 +312,16 @@ export const walletTxnReason = pgEnum('wallet_txn_reason', [
    * accompanying booking or compensation event.
    */
   'profile_claim',
+  /**
+   * Money leaving the wallet as CASH — a payout to the customer's own account.
+   *
+   * The reason exists before the feature does, deliberately (Bashar, 2026-09-01). It is the anchor
+   * for `wallet_transactions_withdrawal_is_unrestricted`, which refuses at the DATABASE any
+   * withdrawal row that consumes restricted money. Whoever builds the payout rails inherits the
+   * rule rather than having to remember it — and a rule that depends on being remembered by an
+   * unwritten service is not a rule.
+   */
+  'withdrawal',
 ]);
 
 /**

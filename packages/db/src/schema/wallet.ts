@@ -49,6 +49,26 @@ export const wallets = pgTable(
       .notNull()
       .references(() => customerProfiles.id),
     balance: money('balance').notNull().default('0'),
+    /**
+     * How much of `balance` may NOT be paid out to the customer (Bashar, 2026-09-01).
+     *
+     * SAFRA credits two kinds of money into one balance. Money the CUSTOMER funded — a refund of
+     * what they paid, a payment returned — is theirs, and a payout of it is SAFRA handing back what
+     * it was holding. Money SAFRA funded — an SLA compensation, a dispute resolution, goodwill, a
+     * gift card — is a promise to serve them, not a debt to settle in cash, and it must stay inside
+     * the platform. **`balance - restricted_balance` is what could ever leave.**
+     *
+     * A second cached number rather than a derived one, for the same reason `balance` is cached and
+     * a stricter one: it is the input to a REFUSAL. Both are written in the same transaction under
+     * the same row lock, and both are recomputable from `wallet_transactions` — `restricted_balance`
+     * is Σ(credit.restricted_amount) − Σ(debit.restricted_amount) exactly as `balance` is
+     * Σ(credit.amount) − Σ(debit.amount), so the reconciliation that already exists covers it.
+     *
+     * The CHECK that it never exceeds `balance` is in `post/0021`: a restricted part larger than the
+     * whole would make the withdrawable part negative, and a negative subtracted from a limit is how
+     * a limit becomes a licence.
+     */
+    restrictedBalance: money('restricted_balance').notNull().default('0'),
     currencyId: foreignId('currency_id')
       .notNull()
       .references(() => currencies.id),
@@ -70,6 +90,23 @@ export const walletTransactions = pgTable(
     direction: ledgerDirection('direction').notNull(),
     reason: walletTxnReason('reason').notNull(),
     amount: money('amount').notNull(),
+    /**
+     * How much of `amount` was restricted money — SAFRA-funded credit that cannot be paid out.
+     *
+     * On a CREDIT it is what this movement added to the restricted part: the whole amount for a
+     * compensation, zero for a refund of customer money, and for a refund of a booking paid partly
+     * from restricted credit, exactly the restricted part that booking consumed.
+     *
+     * On a DEBIT it is what this movement consumed FROM the restricted part. Restricted money is
+     * spent first (see `WalletService`), so a booking paid out of a compensated wallet records the
+     * compensation being used up here rather than leaving it to be reconstructed later.
+     *
+     * Recorded rather than derived. A derivation cannot survive money going out and coming back:
+     * a booking paid with compensation and then refunded would return as unclassified money and
+     * turn a credit that could never be withdrawn into one that could — which is the whole control,
+     * defeated by a cancellation. The row states what it did, so the return can undo exactly that.
+     */
+    restrictedAmount: money('restricted_amount').notNull().default('0'),
     currencyId: foreignId('currency_id')
       .notNull()
       .references(() => currencies.id),
