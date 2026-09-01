@@ -2,9 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql, type SQL } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { COUNT_CAP, type OffsetPage, offsetPage } from '@safra/contracts';
+import { COUNT_CAP, ERROR, type OffsetPage, offsetPage } from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
+import { notFound } from '../common/errors/app-error.js';
 
 /**
  * بطاقات الهدايا and الكوبونات (design handoff §8).
@@ -150,6 +151,142 @@ export class PromotionsService {
     );
   }
 
+  /**
+   * Who has taken a coupon up, who refused, and who has not answered (Bashar, 2026-09-01).
+   *
+   * ## Counts and a page, in one call
+   *
+   * The three counts are over the WHOLE set and the rows are one page of one status. An operator
+   * opens this to answer «how is adoption going» and then «who do I chase», and those are two
+   * questions: a count that only described the current page would answer neither.
+   *
+   * ## Capped, paged and searchable, like every other list here
+   *
+   * A coupon offered platform-wide reaches every approved partner — 2,667 on this database — so
+   * this is `OFFSET` + `COUNT_CAP` exactly as the registries are, and the search narrows by the
+   * partner's name or reference. The counts are capped too: past the cap the console prints
+   * «أكثر من…» rather than an exact figure it cannot stand behind.
+   */
+  async couponParticipation(
+    code: string,
+    query: {
+      limit: number;
+      page: number;
+      status?: string | undefined;
+      q?: string | undefined;
+    },
+  ): Promise<{
+    counts: Record<'pending' | 'accepted' | 'rejected', CouponPartnerTally>;
+    partners: OffsetPage<CouponPartnerRow>;
+  }> {
+    const found = await this.db.execute<{ id: string }>(sql`
+      SELECT id::text FROM coupons WHERE upper(code) = upper(${code}) AND deleted_at IS NULL
+      LIMIT 1
+    `);
+
+    const couponId = found.rows[0]?.id;
+
+    if (!couponId) throw notFound(ERROR.COUPON_NOT_FOUND);
+
+    const conditions: SQL[] = [
+      sql`cpn.coupon_id = ${couponId}::uuid`,
+      sql`cpn.deleted_at IS NULL`,
+      sql`p.deleted_at IS NULL`,
+    ];
+
+    if (query.status) {
+      conditions.push(sql`cpn.status = ${query.status}::coupon_partner_status`);
+    }
+
+    if (query.q) {
+      const term = `%${query.q}%`;
+
+      conditions.push(sql`(p.display_name ILIKE ${term} OR p.reference ILIKE ${term})`);
+    }
+
+    /* One fragment for the page and its count — they must describe the same set. */
+    const fromWhere = sql`
+      FROM coupon_partners cpn
+      JOIN partners p ON p.id = cpn.partner_id
+      LEFT JOIN cities ci ON ci.id = p.city_id
+      WHERE ${sql.join(conditions, sql` AND `)}`;
+
+    const [rows, total, counts] = await Promise.all([
+      this.db.execute<{
+        reference: string;
+        partner: string;
+        city: string | null;
+        status: string;
+        decided_at: string | null;
+      }>(sql`
+        SELECT p.reference, p.display_name AS partner, ci.name_ar AS city,
+               cpn.status::text AS status,
+               to_char(cpn.decided_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+                 AS decided_at
+        ${fromWhere}
+        ORDER BY cpn.decided_at DESC NULLS LAST, p.display_name
+        LIMIT ${query.limit} ${this.pageOffset(query)}
+      `),
+      this.countOf(fromWhere),
+      /*
+        The three totals, ignoring the status filter and the search — they describe the coupon,
+        not the current view.
+
+        Capped PER GROUP, not once over the union. One `LIMIT COUNT_CAP + 1` around all three
+        together stops reading at ten thousand rows and then splits whatever it happened to have
+        read, so past the cap every group is an arbitrary slice of itself — three exact-looking
+        figures, none of them true, with nothing to say so. A cap per group costs the same bounded
+        read and reports honestly: `total` stops at the cap and `capped` says it did.
+      */
+      this.db.execute<{ status: string; n: string }>(sql`
+        SELECT s.status::text AS status,
+               (
+                 SELECT count(*)::text
+                 FROM (
+                   SELECT 1
+                   FROM coupon_partners cpn
+                   JOIN partners p ON p.id = cpn.partner_id
+                   WHERE cpn.coupon_id = ${couponId}::uuid
+                     AND cpn.deleted_at IS NULL AND p.deleted_at IS NULL
+                     AND cpn.status = s.status
+                   LIMIT ${COUNT_CAP + 1}
+                 ) capped
+               ) AS n
+        FROM (
+          VALUES ('pending'::coupon_partner_status), ('accepted'), ('rejected')
+        ) AS s(status)
+      `),
+    ]);
+
+    /* `COUNT_CAP + 1` is what "there are more" looks like — the same reading `offsetPage` does. */
+    const tally = (name: string): CouponPartnerTally => {
+      const counted = Number(counts.rows.find((one) => one.status === name)?.n ?? 0);
+
+      return counted > COUNT_CAP
+        ? { total: COUNT_CAP, capped: true }
+        : { total: counted, capped: false };
+    };
+
+    return {
+      counts: {
+        pending: tally('pending'),
+        accepted: tally('accepted'),
+        rejected: tally('rejected'),
+      },
+      partners: offsetPage(
+        rows.rows.map((row) => ({
+          reference: row.reference,
+          partner: row.partner,
+          city: row.city,
+          status: row.status,
+          decidedAt: row.decided_at,
+        })),
+        total,
+        query,
+      ),
+    };
+  }
+
   async coupons(query: {
     limit: number;
     page: number;
@@ -242,6 +379,26 @@ export interface GiftCardRow {
   readonly status: string;
   readonly expiresAt: string | null;
   readonly buyer: string | null;
+}
+
+/** One partner's position on a coupon, as the console lists it. */
+/**
+ * How many partners are in one group, and whether the count stopped at `COUNT_CAP`.
+ *
+ * `capped` is not decoration: a capped total printed as an exact figure is a lie the reader has no
+ * way to detect, which is why the contract carries the flag rather than a bare number.
+ */
+export interface CouponPartnerTally {
+  total: number;
+  capped: boolean;
+}
+
+export interface CouponPartnerRow {
+  readonly reference: string;
+  readonly partner: string;
+  readonly city: string | null;
+  readonly status: string;
+  readonly decidedAt: string | null;
 }
 
 export interface CouponRow {

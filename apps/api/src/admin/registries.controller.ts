@@ -101,6 +101,16 @@ const bookingStatusSchema = z.enum([
   'disputed',
 ]);
 
+/**
+ * The coupon-adoption view: a page of partners, narrowed by their answer and by a search.
+ *
+ * `status` is an allow-list rather than free text — it becomes a cast to `coupon_partner_status`,
+ * and a value the enum does not know would be a 500 rather than a refusal.
+ */
+const couponPartnersQuerySchema = listQuerySchema.extend({
+  status: z.enum(['pending', 'accepted', 'rejected']).optional(),
+});
+
 const bookingListQuerySchema = listQuerySchema.extend({
   status: bookingStatusSchema.optional(),
   /**
@@ -511,6 +521,22 @@ export class RegistriesController {
     @Query(new ZodValidationPipe(listQuerySchema)) query: z.infer<typeof listQuerySchema>,
   ) {
     return this.promotions.coupons(query);
+  }
+
+  /**
+   * Who has taken one coupon up, who refused, and who has not answered.
+   *
+   * `COUPON_READ`, the same permission as the registry it is opened from: this is a view OF a
+   * coupon, and a reader who may see the campaign may see how it is going.
+   */
+  @Get('coupons/:code/partners')
+  @RequirePermissions(P.COUPON_READ)
+  async couponParticipation(
+    @Param('code') code: string,
+    @Query(new ZodValidationPipe(couponPartnersQuerySchema))
+    query: z.infer<typeof couponPartnersQuerySchema>,
+  ) {
+    return this.promotions.couponParticipation(code, query);
   }
 
   // ── المدن والدول والعملات ───────────────────────────────────────────────────
