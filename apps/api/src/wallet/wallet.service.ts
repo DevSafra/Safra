@@ -45,9 +45,51 @@ export interface WalletMovement {
   readonly note?: string | undefined;
 }
 
+/**
+ * A credit, and where the money came from (Bashar, 2026-09-01).
+ *
+ * Every credit must answer «could this ever be paid out in cash», and the answer is not a matter of
+ * taste — it is where the money came from. So the type asks each reason the question it can
+ * actually answer, and refuses to compile without one:
+ *
+ * - **`sla_compensation`, `gift_card_transfer`** — SAFRA's own money, or a bearer instrument. The
+ *   whole amount is restricted and there is nothing to decide, so there is no field to get wrong.
+ * - **`refund`** — a return of what a booking took from this wallet, so `bookingId` is REQUIRED and
+ *   the split is read back off that booking's own debits. A refund with no booking has no origin to
+ *   return to, and a caller who cannot name one is a caller who does not know what they are giving
+ *   back.
+ * - **`admin_adjustment`, `profile_claim`** — the reason cannot tell. Finance decides one
+ *   (goodwill or correction) and a profile claim carries across whatever the source wallet held, so
+ *   both state `restricted` explicitly, in the movement's own currency.
+ * - **`booking_payment`, `withdrawal`** — never credits. Money does not arrive by being spent.
+ */
+type Movement = Omit<WalletMovement, 'reason'>;
+
+export type WalletCredit =
+  | (Movement & { readonly reason: 'sla_compensation' | 'gift_card_transfer' })
+  | (Movement & { readonly reason: 'refund'; readonly bookingId: string })
+  | (Movement & {
+      readonly reason: 'admin_adjustment' | 'profile_claim';
+      /** How much of `amount` is restricted. `'0'` is a statement, not an omission. */
+      readonly restricted: string;
+    });
+
+/**
+ * A debit, and whether it is allowed to reach restricted money.
+ *
+ * `'any'` is the ordinary case — a booking spends whatever is there, restricted part first. Only a
+ * movement that takes money OUT of the platform passes `'withdrawable'`, and then the restricted
+ * part is invisible to it: not skipped over, not spent last, simply not available.
+ */
+export interface WalletDebit extends WalletMovement {
+  readonly from?: 'any' | 'withdrawable';
+}
+
 export interface WalletBalance {
   readonly walletId: string;
   readonly balance: string;
+  /** The part of `balance` that may never be paid out — see `wallets.restricted_balance`. */
+  readonly restrictedBalance: string;
   readonly currencyId: string;
   readonly currencyCode: string;
   /** `currencies.decimals` — two for USD, THREE for JOD. What a credit may round to. */
@@ -58,6 +100,25 @@ export interface WalletMovementResult extends WalletBalance {
   readonly transactionId: string;
   /** What actually moved, after any cross-currency conversion. */
   readonly appliedAmount: string;
+  /** How much of `appliedAmount` was restricted money — credited, or consumed. */
+  readonly restrictedApplied: string;
+}
+
+/**
+ * What is left after the restricted part is set aside.
+ *
+ * One function rather than a subtraction written wherever it is needed: it is the number a payout
+ * would be measured against, and «balance minus restricted» typed out by hand in five places is
+ * five chances to write `balance` on the day somebody is in a hurry.
+ */
+export function withdrawableOf(wallet: {
+  readonly balance: string;
+  readonly restrictedBalance: string;
+}): string {
+  const free =
+    toMinor(wallet.balance, MONEY_SCALE) - toMinor(wallet.restrictedBalance, MONEY_SCALE);
+
+  return fromMinor(free > 0n ? free : 0n, MONEY_SCALE);
 }
 
 /** One line of the customer-facing statement (§2.3). */
@@ -113,7 +174,7 @@ export class WalletService {
    * MUST be called inside the caller's transaction when it accompanies another
    * change (a cancellation, a refund, a ledger posting).
    */
-  async credit(tx: Database, movement: WalletMovement): Promise<WalletMovementResult> {
+  async credit(tx: Database, movement: WalletCredit): Promise<WalletMovementResult> {
     return this.move(tx, movement, 'credit');
   }
 
@@ -124,7 +185,7 @@ export class WalletService {
    * customer, not a credit line, and a negative balance would silently become a
    * debt the customer never agreed to.
    */
-  async debit(tx: Database, movement: WalletMovement): Promise<WalletMovementResult> {
+  async debit(tx: Database, movement: WalletDebit): Promise<WalletMovementResult> {
     return this.move(tx, movement, 'debit');
   }
 
@@ -146,7 +207,7 @@ export class WalletService {
    */
   private async move(
     tx: Database,
-    movement: WalletMovement,
+    movement: WalletCredit | WalletDebit,
     direction: 'credit' | 'debit',
   ): Promise<WalletMovementResult> {
     const requested = toMinor(movement.amount, MONEY_SCALE);
@@ -175,7 +236,7 @@ export class WalletService {
 
   private async applyLocked(
     tx: Database,
-    movement: WalletMovement,
+    movement: WalletCredit | WalletDebit,
     direction: 'credit' | 'debit',
   ): Promise<WalletMovementResult> {
     const wallet = await this.lockOrCreate(tx, movement);
@@ -193,9 +254,52 @@ export class WalletService {
 
     const appliedMinor = toMinor(applied, MONEY_SCALE);
     const currentMinor = toMinor(wallet.balance, MONEY_SCALE);
+    const restrictedMinor = toMinor(wallet.restrictedBalance, MONEY_SCALE);
+
+    /*
+      A movement that may not touch restricted money is measured against the WITHDRAWABLE part.
+
+      This is the enforcement point, and it is deliberately not a subtraction done by the caller: a
+      caller that read the balance, subtracted, and then asked for a debit would be reading outside
+      this lock, and between its read and its write a booking could have spent the very money it was
+      counting on. Inside the lock the two cannot disagree.
+
+      A separate code from an ordinary shortfall, because they need different sentences. Somebody
+      holding $35 who is told their balance is too small has been told something untrue; what is too
+      small is the part of it that is theirs.
+    */
+    if (direction === 'debit' && (movement as WalletDebit).from === 'withdrawable') {
+      const withdrawable = currentMinor - restrictedMinor;
+
+      if (appliedMinor > withdrawable) {
+        throw conflict(ERROR.WALLET_NOT_WITHDRAWABLE, {
+          withdrawable: fromMinor(withdrawable > 0n ? withdrawable : 0n, MONEY_SCALE),
+          restricted: wallet.restrictedBalance,
+          currency: wallet.currencyCode,
+          requested: applied,
+        });
+      }
+    }
+
+    /*
+      How much of this movement is restricted money, decided INSIDE the lock.
+
+      It has to be here rather than at the call site for the same reason the currency conversion is:
+      a debit's split depends on the balance it is spending against, and a balance read before the
+      lock is a balance that may already have moved.
+    */
+    const restrictedApplied =
+      direction === 'credit'
+        ? await this.restrictedCredit(tx, movement as WalletCredit, applied, wallet)
+        : this.restrictedDebit(movement, appliedMinor, restrictedMinor);
 
     const nextMinor =
       direction === 'credit' ? currentMinor + appliedMinor : currentMinor - appliedMinor;
+
+    const nextRestrictedMinor =
+      direction === 'credit'
+        ? restrictedMinor + restrictedApplied
+        : restrictedMinor - restrictedApplied;
 
     if (nextMinor < 0n) {
       /**
@@ -221,10 +325,13 @@ export class WalletService {
     }
 
     const nextBalance = fromMinor(nextMinor, MONEY_SCALE);
+    const nextRestricted = fromMinor(nextRestrictedMinor, MONEY_SCALE);
 
     await tx.execute(sql`
       UPDATE wallets
-      SET balance = ${nextBalance}, updated_at = now()
+      SET balance = ${nextBalance},
+          restricted_balance = ${nextRestricted},
+          updated_at = now()
       WHERE id = ${wallet.walletId}
     `);
 
@@ -236,11 +343,12 @@ export class WalletService {
      */
     const inserted = await tx.execute<{ id: string }>(sql`
       INSERT INTO wallet_transactions
-        (wallet_id, direction, reason, amount, currency_id, balance_after,
-         booking_id, created_by_user_id, note)
+        (wallet_id, direction, reason, amount, restricted_amount, currency_id,
+         balance_after, booking_id, created_by_user_id, note)
       VALUES (
         ${wallet.walletId}, ${direction}::ledger_direction,
-        ${movement.reason}::wallet_txn_reason, ${applied}, ${wallet.currencyId},
+        ${movement.reason}::wallet_txn_reason, ${applied},
+        ${fromMinor(restrictedApplied, MONEY_SCALE)}, ${wallet.currencyId},
         ${nextBalance}, ${movement.bookingId ?? null},
         ${movement.createdByUserId ?? null}, ${movement.note ?? null}
       )
@@ -256,11 +364,121 @@ export class WalletService {
       walletId: wallet.walletId,
       transactionId,
       balance: nextBalance,
+      restrictedBalance: nextRestricted,
       appliedAmount: applied,
+      restrictedApplied: fromMinor(restrictedApplied, MONEY_SCALE),
       currencyId: wallet.currencyId,
       currencyCode: wallet.currencyCode,
       currencyDecimals: wallet.currencyDecimals,
     };
+  }
+
+  /**
+   * How much of a CREDIT is restricted money.
+   *
+   * Three answers, one per shape of credit, and the type has already made the caller say which:
+   *
+   * - **A compensation or a gift card** is entirely SAFRA's, so all of it.
+   * - **A refund** returns what a booking took, so it returns it to the SAME parts it came from —
+   *   restricted first, capped at what that booking still owes back. This is the case the whole
+   *   design exists for: a booking paid with a $40 compensation and refunded would otherwise hand
+   *   back $40 of money the customer could take out in cash, and the control would be undone by
+   *   the most ordinary event in the system.
+   * - **An adjustment or a claim** is whatever the caller stated, clamped to what actually landed
+   *   after conversion so a rounded-down credit cannot end up more restricted than it is large.
+   */
+  private async restrictedCredit(
+    tx: Database,
+    movement: WalletCredit,
+    applied: string,
+    wallet: WalletBalance,
+  ): Promise<bigint> {
+    const appliedMinor = toMinor(applied, MONEY_SCALE);
+
+    /*
+      Positive tests, in the order the cases were described.
+
+      Written as «is it one of the two that need no field» first, it did not compile: TypeScript
+      narrows a union DISCRIMINANT to `never` but keeps the member, so `restricted` still appeared
+      to be missing on a branch it cannot reach. Asking each case what it IS costs nothing and the
+      narrowing then holds.
+    */
+    if (movement.reason === 'admin_adjustment' || movement.reason === 'profile_claim') {
+      const stated = toMinor(
+        await this.intoWalletCurrency(movement.restricted, movement.currencyId, wallet),
+        MONEY_SCALE,
+      );
+
+      if (stated < 0n) return 0n;
+
+      return stated > appliedMinor ? appliedMinor : stated;
+    }
+
+    if (movement.reason === 'refund') {
+      const owed = await this.restrictedOutstanding(
+        tx,
+        wallet.walletId,
+        movement.bookingId,
+      );
+
+      return owed < appliedMinor ? owed : appliedMinor;
+    }
+
+    /* A compensation or a gift card: all of it is SAFRA's, and there was nothing to decide. */
+    return appliedMinor;
+  }
+
+  /**
+   * How much restricted money a DEBIT consumes.
+   *
+   * Restricted first for ordinary spending, and this direction is the conservative one in both
+   * senses. It never tells somebody they still hold compensation they have already spent, and it
+   * leaves the customer's OWN money in the wallet — the part they could one day take out — rather
+   * than spending the withdrawable half on a booking and stranding a balance that can only ever be
+   * spent here.
+   *
+   * `from: 'withdrawable'` makes the restricted part invisible instead: the refusal has already
+   * happened in `move()`, so by here there is nothing restricted to take.
+   */
+  private restrictedDebit(
+    movement: WalletCredit | WalletDebit,
+    appliedMinor: bigint,
+    restrictedMinor: bigint,
+  ): bigint {
+    /* Only a debit reaches here, and only a debit carries `from` — a credit has no such field. */
+    if ('from' in movement && movement.from === 'withdrawable') return 0n;
+
+    return appliedMinor < restrictedMinor ? appliedMinor : restrictedMinor;
+  }
+
+  /**
+   * How much restricted money one booking has taken from this wallet and not yet given back.
+   *
+   * Read from the trail rather than kept as a counter on the booking: the rows already say it, and
+   * a counter is a second place for the same fact to be wrong. Every debit for the booking adds
+   * what it consumed, every credit against it subtracts what was returned, and the difference is
+   * what a further refund may still return as restricted.
+   *
+   * Never negative. A booking that has somehow been refunded more restricted money than it took
+   * must not turn the excess into a licence to restrict fresh money, and — more to the point — the
+   * remainder of any refund is customer money, which is exactly what stays withdrawable.
+   */
+  private async restrictedOutstanding(
+    tx: Database,
+    walletId: string,
+    bookingId: string,
+  ): Promise<bigint> {
+    const rows = await tx.execute<{ outstanding: string }>(sql`
+      SELECT COALESCE(SUM(
+        CASE WHEN direction = 'debit' THEN restricted_amount ELSE -restricted_amount END
+      ), 0)::text AS outstanding
+      FROM wallet_transactions
+      WHERE wallet_id = ${walletId} AND booking_id = ${bookingId}
+    `);
+
+    const outstanding = toMinor(rows.rows[0]?.outstanding ?? '0', MONEY_SCALE);
+
+    return outstanding > 0n ? outstanding : 0n;
   }
 
   /**
@@ -277,7 +495,7 @@ export class WalletService {
    */
   private async lockOrCreate(
     tx: Database,
-    movement: WalletMovement,
+    movement: WalletCredit | WalletDebit,
   ): Promise<WalletBalance> {
     const existing = await this.selectForUpdate(tx, movement.customerProfileId);
     if (existing) return existing;
@@ -310,11 +528,14 @@ export class WalletService {
     const rows = await tx.execute<{
       id: string;
       balance: string;
+      restricted_balance: string;
       currency_id: string;
       code: string;
       decimals: number;
     }>(sql`
-      SELECT w.id, w.balance::text AS balance, w.currency_id, cur.code, cur.decimals
+      SELECT w.id, w.balance::text AS balance,
+             w.restricted_balance::text AS restricted_balance,
+             w.currency_id, cur.code, cur.decimals
       FROM wallets w
       JOIN currencies cur ON cur.id = w.currency_id
       WHERE w.customer_profile_id = ${customerProfileId}
@@ -328,6 +549,7 @@ export class WalletService {
     return {
       walletId: row.id,
       balance: row.balance,
+      restrictedBalance: row.restricted_balance,
       currencyId: row.currency_id,
       currencyCode: row.code,
       currencyDecimals: Number(row.decimals),
@@ -402,11 +624,14 @@ export class WalletService {
     const rows = await this.db.execute<{
       id: string;
       balance: string;
+      restricted_balance: string;
       currency_id: string;
       code: string;
       decimals: number;
     }>(sql`
-      SELECT w.id, w.balance::text AS balance, w.currency_id, cur.code, cur.decimals
+      SELECT w.id, w.balance::text AS balance,
+             w.restricted_balance::text AS restricted_balance,
+             w.currency_id, cur.code, cur.decimals
       FROM wallets w
       JOIN currencies cur ON cur.id = w.currency_id
       WHERE w.customer_profile_id = ${customerProfileId}
@@ -419,6 +644,7 @@ export class WalletService {
     return {
       walletId: row.id,
       balance: row.balance,
+      restrictedBalance: row.restricted_balance,
       currencyId: row.currency_id,
       currencyCode: row.code,
       currencyDecimals: Number(row.decimals),
@@ -496,12 +722,15 @@ export class WalletService {
     const rows = await this.db.execute<{
       id: string;
       balance: string;
+      restricted_balance: string;
       currency_id: string;
       code: string;
       decimals: number;
       gift_balance: string;
     }>(sql`
-      SELECT w.id, w.balance::text AS balance, w.currency_id, cur.code, cur.decimals,
+      SELECT w.id, w.balance::text AS balance,
+             w.restricted_balance::text AS restricted_balance,
+             w.currency_id, cur.code, cur.decimals,
              greatest(
                0,
                least(
@@ -531,6 +760,7 @@ export class WalletService {
     return {
       walletId: row.id,
       balance: row.balance,
+      restrictedBalance: row.restricted_balance,
       currencyId: row.currency_id,
       currencyCode: row.code,
       currencyDecimals: Number(row.decimals),
@@ -639,6 +869,26 @@ export class WalletService {
     const rows = await this.db.execute<{ total: string }>(sql`
       SELECT COALESCE(SUM(
         CASE WHEN direction = 'credit' THEN amount ELSE -amount END
+      ), 0)::text AS total
+      FROM wallet_transactions
+      WHERE wallet_id = ${walletId}
+    `);
+
+    return fromMinor(toMinor(rows.rows[0]?.total ?? '0', MONEY_SCALE), MONEY_SCALE);
+  }
+
+  /**
+   * The same recomputation for the restricted part.
+   *
+   * `restricted_balance` stands in exactly the relation to `restricted_amount` that `balance`
+   * stands in to `amount`, so it gets the same treatment: the cache is a read optimisation and the
+   * append-only rows are the authority. A finance screen showing one beside the other is how drift
+   * in the number that GATES A PAYOUT gets noticed by the person who would authorise it.
+   */
+  async sumRestricted(walletId: string): Promise<string> {
+    const rows = await this.db.execute<{ total: string }>(sql`
+      SELECT COALESCE(SUM(
+        CASE WHEN direction = 'credit' THEN restricted_amount ELSE -restricted_amount END
       ), 0)::text AS total
       FROM wallet_transactions
       WHERE wallet_id = ${walletId}

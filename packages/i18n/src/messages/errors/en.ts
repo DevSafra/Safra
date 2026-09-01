@@ -177,7 +177,7 @@ export const en = {
     'This card cannot be cancelled — it is already used, expired or cancelled.',
   'gift_card.not_found': 'Gift card not found.',
   'gift_card.cash_only':
-    'Your current balance is not enough for this card. A gift card can only be bought with your current balance, not with gift card balance.',
+    'Your current balance is not enough for this card. A gift card can only be bought with your own money — not with gift card balance, and not with credit SAFRA has given you.',
   'gift_card.amount_invalid': 'Choose one of the available gift card amounts.',
   'wallet.insufficient_balance': 'Your wallet balance is not enough for this.',
   'support.message_too_short': 'Please describe the problem in a little more detail.',
@@ -385,6 +385,8 @@ export const en = {
   /* `O-api-2`, 2026-08-25 — the last refusals that answered a bare English sentence. */
   'wallet.balance_below_amount':
     'Your wallet holds {balance} {currency}, which is less than the {requested} {currency} needed.',
+  'wallet.not_withdrawable':
+    'The withdrawable part of your balance is {withdrawable} {currency}, which is less than the {requested} {currency} needed. {restricted} {currency} is credit from SAFRA: it can be spent on the platform but not withdrawn.',
   'auth.two_factor_enrolment_required':
     'Two-factor authentication is required for this account. Enrol before continuing.',
   'setting.value_not_positive_money':

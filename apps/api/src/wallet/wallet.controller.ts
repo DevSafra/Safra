@@ -49,6 +49,15 @@ export class WalletController {
               own figure rather than as a percentage or a flag, because محفظتي prints it as money.
             */
             giftBalance: wallet.giftBalance,
+            /*
+              The part that may never be paid out — gift money and compensation together
+              (Bashar, 2026-09-01).
+
+              Sent because the customer meets this rule: a gift card cannot be bought with it, and
+              a screen that showed one spendable figure and then refused the purchase would be
+              telling somebody their money is available and then acting as if it is not.
+            */
+            restrictedBalance: wallet.restrictedBalance,
             currencyCode: wallet.currencyCode,
           }
         : null,

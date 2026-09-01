@@ -167,7 +167,7 @@ export const ar = {
     'لا يمكن إلغاء هذه البطاقة — إمّا استُخدمت أو انتهت أو أُلغيت.',
   'gift_card.not_found': 'البطاقة غير موجودة.',
   'gift_card.cash_only':
-    'رصيدك الحالي لا يكفي لهذه البطاقة. لا يمكن شراء بطاقة هدية إلا من الرصيد الحالي، وليس من رصيد بطاقات الهدايا.',
+    'رصيدك الحالي لا يكفي لهذه البطاقة. لا تُشترى بطاقة الهدية إلا من رصيدك الخاص، وليس من رصيد بطاقات الهدايا أو من تعويض قدّمته سفرة.',
   'gift_card.amount_invalid': 'اختر أحد مبالغ بطاقات الهدايا المتاحة.',
   'wallet.insufficient_balance': 'رصيد محفظتك لا يكفي لهذه العملية.',
   'support.message_too_short': 'يرجى وصف المشكلة بتفصيل أكثر قليلاً.',
@@ -349,6 +349,8 @@ export const ar = {
   /* `O-api-2`, 2026-08-25 — the last refusals that answered a bare English sentence. */
   'wallet.balance_below_amount':
     'رصيد محفظتك {balance} {currency}، وهو أقل من {requested} {currency} المطلوبة.',
+  'wallet.not_withdrawable':
+    'الجزء القابل للسحب من رصيدك {withdrawable} {currency}، وهو أقل من {requested} {currency} المطلوبة. المبلغ {restricted} {currency} تعويضٌ من سفرة يُنفَق داخل المنصّة ولا يُسحب.',
   'auth.two_factor_enrolment_required':
     'هذا الحساب يتطلب المصادقة الثنائية. سجّلها قبل المتابعة.',
   'setting.value_not_positive_money':

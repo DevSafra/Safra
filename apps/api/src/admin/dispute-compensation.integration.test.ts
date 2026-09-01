@@ -259,6 +259,52 @@ describeIfDb('compensation paid on a resolved dispute', () => {
     }
   });
 
+  /**
+   * A dispute resolved in the customer's favour is compensation, not cash (Bashar, 2026-09-01).
+   *
+   * Named by him as one of the three examples, and asserted on this path rather than only on the
+   * wallet's, for the reason the SLA sweep's test gives: the rule lives in `WalletService`, and a
+   * caller that reached past it would be invisible to a test that only ever asks the service.
+   */
+  it('credits the compensation as money that cannot be withdrawn', async () => {
+    const dispute = await open();
+
+    await disputes.close(STAFF(staffId), dispute.reference, {
+      outcome: 'resolved',
+      resolution: 'عُوّض العميل عن الفارق في الوصف.',
+      compensationAmount: '10.00',
+      compensationCurrency: 'USD',
+    });
+
+    const movement = await db.execute<{ amount: string; restricted: string }>(sql`
+      SELECT wt.amount::text AS amount, wt.restricted_amount::text AS restricted
+      FROM wallet_transactions wt
+      JOIN wallets w ON w.id = wt.wallet_id
+      WHERE w.customer_profile_id = ${profileId}::uuid AND wt.direction = 'credit'
+      ORDER BY wt.created_at DESC LIMIT 1
+    `);
+
+    const row = movement.rows[0];
+
+    expect(row?.restricted, 'the whole credit is restricted').toBe(row?.amount);
+
+    /*
+      And the wallet agrees — about the compensation ONLY.
+
+      The fixture opens with 10 EUR that nobody classified, which stands in for money the customer
+      already had. After a 9.29 compensation the balance is 19.29 and exactly 9.29 of it is held
+      back: the credit restricted itself and left the rest alone. Asserting «all of it is
+      restricted» would have passed just as well against a rule that restricted the whole balance
+      on any compensation, which is the neighbouring bug.
+    */
+    const wallet = await db.execute<{ balance: string; restricted: string }>(sql`
+      SELECT balance::text AS balance, restricted_balance::text AS restricted
+      FROM wallets WHERE customer_profile_id = ${profileId}::uuid
+    `);
+
+    expect(wallet.rows[0]).toStrictEqual({ balance: '19.290', restricted: '9.290' });
+  });
+
   /** A currency the platform does not know is refused, not silently skipped. */
   it('refuses a currency code that is not on the platform', async () => {
     const dispute = await open();

@@ -137,7 +137,13 @@ describeIfDb('GiftCardService', () => {
       customerProfileId: profileId,
       amount,
       currencyId,
-      reason: 'refund',
+      /*
+        Customer money, explicitly. A card may only be bought with the withdrawable part of a
+        balance, so a fixture that credited compensation here would be refused — which is the rule
+        working, and not what this test is about.
+      */
+      reason: 'profile_claim',
+      restricted: '0',
     });
   }
 
@@ -711,6 +717,41 @@ describeIfDb('GiftCardService', () => {
     expect(split?.giftBalance, 'the gift part must be untouched by a purchase').toBe(
       '25.000',
     );
+  });
+
+  /**
+   * Nor with a compensation SAFRA credited (Bashar, 2026-09-01).
+   *
+   * The widened half of the same rule. A gift card is transferable — it leaves the platform in
+   * somebody else's hands — so «compensation stays inside the SAFRA ecosystem» would be a rule
+   * anybody could walk around by spending the compensation on a card. Asserted separately from the
+   * gift case below because they are now two different reasons a balance can be unavailable, and a
+   * single test would keep passing if either half were dropped.
+   */
+  it('refuses to buy a card with a compensation, even when the total covers it', async () => {
+    await fund('10.00');
+
+    /* Compensation, credited the way the SLA sweep credits it. */
+    await wallet.credit(db, {
+      customerProfileId: PROFILE_ID,
+      amount: '25.00',
+      currencyId: await idOfCurrency(db, 'USD'),
+      reason: 'sla_compensation',
+    });
+
+    /* The total is 35, so this is affordable — and still refused: only 10 of it is theirs. */
+    await expect(
+      giftCards.purchase(customer(), { amount: '25.00' }),
+    ).rejects.toMatchObject({
+      status: 400,
+      response: { code: 'gift_card.cash_only' },
+    });
+
+    /* And the compensation is still there, unspent, for a stay. */
+    const after = await wallet.composition(PROFILE_ID);
+
+    expect(after?.balance).toBe('35.000');
+    expect(after?.restrictedBalance).toBe('25.000');
   });
 
   /**

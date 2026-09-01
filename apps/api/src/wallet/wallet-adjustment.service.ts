@@ -85,6 +85,12 @@ export class WalletAdjustmentService {
               amount: input.amount,
               currencyId,
               reason: 'admin_adjustment',
+              /*
+                The operator's answer, in the requested currency — the service converts it with the
+                amount, so a 10 JOD goodwill credit into a USD wallet is restricted in full and not
+                to a figure computed against the wrong rate.
+              */
+              restricted: input.fund === 'compensation' ? input.amount : '0',
               createdByUserId: actor.userId,
               note: input.note,
             })
@@ -105,12 +111,28 @@ export class WalletAdjustmentService {
        */
       const fxRateToSyp = await this.fx.rateToSyp(movement.currencyCode);
 
+      /*
+        The books follow the same answer (Bashar, 2026-09-01).
+   
+        `wallet_adjustment` is a finance CORRECTION and `wallet_compensation` is money SAFRA paid
+        for a failure of its own — the enum has said so since they were separated, and until now
+        this route posted every manual credit to the first regardless of which it was. Now that the
+        operator states which, posting it anywhere else would leave the ledger disagreeing with the
+        wallet about the same movement, and «what did goodwill cost us this month» is exactly the
+        question that separation exists to answer.
+   
+        The debit direction stays on `wallet_adjustment`: a clawback is a correction whatever the
+        original credit was, and there is no fund to choose when the money is coming back.
+      */
       await this.ledger.post(
         handle,
         input.direction === 'credit'
           ? [
               {
-                account: 'wallet_adjustment',
+                account:
+                  input.fund === 'compensation'
+                    ? 'wallet_compensation'
+                    : 'wallet_adjustment',
                 direction: 'debit',
                 amount: movement.appliedAmount,
                 description: `Manual wallet credit: ${input.note}`,
@@ -179,6 +201,15 @@ export class WalletAdjustmentService {
             balance: movement.balance,
             currency: movement.currencyCode,
             direction: input.direction,
+            /*
+              WHOSE money, in the audit row (Bashar, 2026-09-01).
+
+              An adjustment is reviewed after the fact, and «finance credited 40 USD» does not say
+              whether they handed out goodwill or returned an overcharge — which is now a decision
+              the operator makes, and therefore a decision somebody may need to question. It is also
+              the only field that explains why the ledger leg went where it did.
+            */
+            fund: input.fund,
             requestedAmount: input.amount,
             requestedCurrency: input.currency,
             appliedAmount: movement.appliedAmount,

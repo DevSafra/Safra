@@ -203,7 +203,7 @@ export const de = {
     'Diese Karte kann nicht storniert werden — sie ist bereits eingelöst, abgelaufen oder storniert.',
   'gift_card.not_found': 'Geschenkkarte nicht gefunden.',
   'gift_card.cash_only':
-    'Ihr aktuelles Guthaben reicht für diese Karte nicht aus. Eine Geschenkkarte kann nur mit dem aktuellen Guthaben gekauft werden, nicht mit Geschenkkarten-Guthaben.',
+    'Ihr aktuelles Guthaben reicht für diese Karte nicht aus. Eine Geschenkkarte kann nur mit eigenem Guthaben gekauft werden — nicht mit Geschenkkarten-Guthaben und nicht mit einer Gutschrift von SAFRA.',
   'gift_card.amount_invalid':
     'Bitte einen der verfügbaren Geschenkkarten-Beträge wählen.',
   'wallet.insufficient_balance': 'Ihr Guthaben reicht dafür nicht aus.',
@@ -434,6 +434,8 @@ export const de = {
   /* `O-api-2`, 2026-08-25 — the last refusals that answered a bare English sentence. */
   'wallet.balance_below_amount':
     'Ihr Guthaben beträgt {balance} {currency} und liegt damit unter den benötigten {requested} {currency}.',
+  'wallet.not_withdrawable':
+    'Der auszahlbare Teil Ihres Guthabens beträgt {withdrawable} {currency} und liegt damit unter den benötigten {requested} {currency}. {restricted} {currency} sind eine Gutschrift von SAFRA: auf der Plattform einsetzbar, aber nicht auszahlbar.',
   'auth.two_factor_enrolment_required':
     'Für dieses Konto ist eine Zwei-Faktor-Authentisierung erforderlich. Richten Sie sie ein, bevor Sie fortfahren.',
   'setting.value_not_positive_money':

@@ -7,7 +7,7 @@ import { createRollbackDatabase, type Database } from '@safra/db';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { WalletAdjustmentService } from './wallet-adjustment.service.js';
-import { WalletService } from './wallet.service.js';
+import { WalletService, withdrawableOf } from './wallet.service.js';
 import type { FxRateService } from '../fx/fx-rate.service.js';
 import { ERROR } from '@safra/contracts';
 import { codeOf } from '../common/errors/app-error.js';
@@ -142,7 +142,7 @@ describeIfDb('customer wallet', () => {
         customerProfileId: profileId,
         amount: '5.55',
         currencyId: usd,
-        reason: 'refund',
+        reason: 'sla_compensation',
       });
 
       expect(second.balance).toBe('15.550');
@@ -162,7 +162,7 @@ describeIfDb('customer wallet', () => {
           customerProfileId: profileId,
           amount,
           currencyId: usd,
-          reason: 'refund',
+          reason: 'sla_compensation',
         });
       }
 
@@ -180,7 +180,7 @@ describeIfDb('customer wallet', () => {
           customerProfileId: profileId,
           amount: '0.000',
           currencyId: usd,
-          reason: 'refund',
+          reason: 'sla_compensation',
         }),
       ).rejects.toThrow(/positive amount/i);
 
@@ -189,7 +189,7 @@ describeIfDb('customer wallet', () => {
           customerProfileId: profileId,
           amount: '-5.00',
           currencyId: usd,
-          reason: 'refund',
+          reason: 'sla_compensation',
         }),
       ).rejects.toThrow(/positive amount/i);
     });
@@ -208,6 +208,7 @@ describeIfDb('customer wallet', () => {
         amount: '10.000',
         currencyId: await currencyId(db, 'USD'),
         reason: 'admin_adjustment',
+        restricted: '0',
       });
 
       await expect(attempt).rejects.toThrow();
@@ -368,7 +369,7 @@ describeIfDb('customer wallet', () => {
           customerProfileId: profileId,
           amount,
           currencyId: usd,
-          reason: 'refund',
+          reason: 'sla_compensation',
         });
       }
 
@@ -394,7 +395,7 @@ describeIfDb('customer wallet', () => {
             customerProfileId: profileId,
             amount,
             currencyId: usd,
-            reason: 'refund',
+            reason: 'sla_compensation',
           });
         }
       });
@@ -422,7 +423,7 @@ describeIfDb('customer wallet', () => {
         customerProfileId: profileId,
         amount: '1.00',
         currencyId: await currencyId(db, 'USD'),
-        reason: 'refund',
+        reason: 'sla_compensation',
       });
 
       const current = await wallet.findByCustomer(profileId);
@@ -478,6 +479,7 @@ describeIfDb('customer wallet', () => {
         {
           amount: '25.000',
           direction: 'credit',
+          fund: 'compensation',
           currency: 'USD',
           note: 'تعويض ودّي عن تأخّر تسجيل الوصول.',
         },
@@ -486,12 +488,58 @@ describeIfDb('customer wallet', () => {
 
       expect(result.balance).toBe('25.000');
 
+      /* Restricted in full: goodwill is SAFRA's money and stays inside the platform. */
+      expect(result.restrictedApplied).toBe('25.000');
+      expect(result.restrictedBalance).toBe('25.000');
+
       /**
        * The deferred balance trigger would already have rejected an unbalanced
        * group at COMMIT, so reaching here proves it balanced. This asserts the
        * SHAPE — the goodwill went to its own expense account rather than being
        * netted against commission revenue.
+       *
+       * `wallet_compensation`, not `wallet_adjustment`: once finance states that a credit is
+       * goodwill rather than a correction, the books have to agree with the wallet about the same
+       * movement (Bashar, 2026-09-01). The correction case is the test below.
        */
+      const legs = await db.execute<{ account: string; direction: string }>(sql`
+        SELECT account::text AS account, direction::text AS direction
+        FROM ledger_entries
+        WHERE customer_profile_id = ${profileId}
+        ORDER BY account`);
+
+      expect(legs.rows).toStrictEqual([
+        { account: 'wallet_compensation', direction: 'debit' },
+        { account: 'wallet_credit', direction: 'credit' },
+      ]);
+    });
+
+    /**
+     * The other answer, and it has to reach both places.
+     *
+     * A correction is the customer's own money going back where it belongs — withdrawable, and an
+     * expense account it was never an expense of. Asserted as a PAIR with the test above because
+     * the failure worth catching is the two drifting apart: a wallet that says «this is theirs»
+     * over books that say «we gave this away» is one movement described two ways, and whichever
+     * report somebody opens first becomes the version they act on.
+     */
+    it('leaves a correction withdrawable, and books it as a correction', async () => {
+      const result = await adjustments.adjust(
+        profileId,
+        {
+          amount: '25.000',
+          direction: 'credit',
+          fund: 'customer',
+          currency: 'USD',
+          note: 'إعادة مبلغ حُصّل مرتين عن طريق الخطأ.',
+        },
+        { userId: ACTOR_ID, role: 'finance_officer' },
+      );
+
+      expect(result.restrictedApplied).toBe('0.000');
+      expect(result.restrictedBalance).toBe('0.000');
+      expect(withdrawableOf(result)).toBe('25.000');
+
       const legs = await db.execute<{ account: string; direction: string }>(sql`
         SELECT account::text AS account, direction::text AS direction
         FROM ledger_entries
@@ -510,6 +558,7 @@ describeIfDb('customer wallet', () => {
         {
           amount: '25.000',
           direction: 'credit',
+          fund: 'compensation',
           currency: 'USD',
           note: 'أول دفعة ودّية.',
         },
@@ -521,6 +570,7 @@ describeIfDb('customer wallet', () => {
         {
           amount: '5.00',
           direction: 'debit',
+          fund: 'compensation',
           currency: 'USD',
           note: 'تصحيح إضافة زائدة.',
         },
@@ -550,6 +600,7 @@ describeIfDb('customer wallet', () => {
         {
           amount: '10.000',
           direction: 'credit',
+          fund: 'compensation',
           currency: 'USD',
           note: 'رصيد ابتدائي لحالة التراجع.',
         },
@@ -562,6 +613,7 @@ describeIfDb('customer wallet', () => {
           {
             amount: '99.00',
             direction: 'debit',
+            fund: 'compensation',
             currency: 'USD',
             note: 'This one must not go through.',
           },
@@ -586,6 +638,7 @@ describeIfDb('customer wallet', () => {
           {
             amount: '10.000',
             direction: 'credit',
+            fund: 'compensation',
             currency: 'ZZZ',
             note: 'Should never be applied.',
           },

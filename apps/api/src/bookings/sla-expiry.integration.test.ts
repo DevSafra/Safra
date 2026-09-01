@@ -116,12 +116,32 @@ describeIfDb('the confirmation window lapsing', () => {
       'no_response',
     );
 
-    const credited = await db.execute<{ reason: string }>(sql`
-      SELECT reason::text AS reason FROM wallet_transactions
+    const credited = await db.execute<{
+      reason: string;
+      amount: string;
+      restricted: string;
+    }>(sql`
+      SELECT reason::text AS reason, amount::text AS amount,
+             restricted_amount::text AS restricted
+      FROM wallet_transactions
       WHERE booking_id = ${bookingId} AND direction = 'credit'
     `);
 
     expect(credited.rows.map((r) => r.reason)).toContain('sla_compensation');
+
+    /*
+      And every unit of it is restricted (Bashar, 2026-09-01).
+
+      Asserted HERE rather than only in the wallet's own suite because this is the path that credits
+      most of the compensation the platform ever pays. The rule lives in `WalletService`, but a
+      caller reaching past it — a second implementation, a repair script, a future sweep — would be
+      invisible to a test that only ever asks the service.
+    */
+    const compensation = credited.rows.find((r) => r.reason === 'sla_compensation');
+
+    expect(compensation?.restricted, 'an SLA compensation is not withdrawable').toBe(
+      compensation?.amount,
+    );
   });
 
   /**

@@ -28,11 +28,11 @@ import { DATABASE } from '../database/database.module.js';
 import { LedgerService, type LedgerLeg } from '../ledger/ledger.service.js';
 import { FxRateService } from '../fx/fx-rate.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { quantise } from '../common/money.js';
+import { MONEY_SCALE, quantise, toMinor } from '../common/money.js';
 import { DEFAULT_LOCALE } from '@safra/i18n';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { AuditService } from '../common/audit/audit.service.js';
-import { WalletService } from '../wallet/wallet.service.js';
+import { WalletService, withdrawableOf } from '../wallet/wallet.service.js';
 import { badRequest, notFound, unauthorized } from '../common/errors/app-error.js';
 import { ENV, type Env } from '../config/env.js';
 import { MailService } from '../mail/mail.service.js';
@@ -411,23 +411,33 @@ export class GiftCardService {
       if (!wallet) throw badRequest(ERROR.WALLET_INSUFFICIENT_BALANCE);
 
       /*
-        A card may only be bought with الرصيد الحالي — the part of the balance that did NOT come from a
-        gift card (Bashar, 2026-08-11).
+        A card may only be bought with money the customer could otherwise have BACK — the
+        withdrawable part of the balance (Bashar, 2026-08-11, widened 2026-09-01).
 
-        Without this, gift money could be poured into a fresh card indefinitely: each new card resets
-        whatever expiry the old one carried, and it turns a non-transferable balance into a bearer
-        instrument somebody else can spend. The wallet is where a gift ENDS.
+        The original rule was «not gift money»: gift money poured into a fresh card resets whatever
+        expiry the old one carried, and turns a non-transferable balance into a bearer instrument
+        somebody else can spend. The wallet is where a gift ENDS.
+
+        Compensation is now on the same side of that line, and for the stronger version of the same
+        reason. A gift card is transferable and, unlike a booking, it leaves the platform in
+        somebody else's hands — so «compensation stays inside the SAFRA ecosystem» would be a rule
+        anybody could walk around by buying a card with it. `restrictedBalance` is gift money and
+        compensation together, which is exactly the set that may not become a bearer instrument.
+
+        Exact arithmetic, not `Number()`. This compares money and decides whether to refuse; it was
+        comparing two doubles, in a file that computes every other amount in minor units.
       */
-      const cash = Number(wallet.balance) - Number(wallet.giftBalance);
+      const withdrawable = toMinor(withdrawableOf(wallet), MONEY_SCALE);
+      const wanted = toMinor(input.amount, MONEY_SCALE);
 
-      if (cash < Number(input.amount)) {
+      if (withdrawable < wanted) {
         /*
           Two different refusals, because they need two different sentences. Somebody holding $35 who is
           told their balance is insufficient for a $25 card has been told something untrue; the reason is
           the SOURCE of the money, not the amount of it.
         */
         throw badRequest(
-          Number(wallet.balance) >= Number(input.amount)
+          toMinor(wallet.balance, MONEY_SCALE) >= wanted
             ? ERROR.GIFT_CARD_CASH_ONLY
             : ERROR.WALLET_INSUFFICIENT_BALANCE,
         );
@@ -438,6 +448,12 @@ export class GiftCardService {
         amount: input.amount,
         currencyId: wallet.currencyId,
         reason: 'gift_card_transfer',
+        /*
+          And the same rule inside the lock, where it is the one that counts. The check above is
+          read outside it and is there to give the better refusal; this is what actually stops a
+          card being bought with restricted money when two requests arrive together.
+        */
+        from: 'withdrawable',
         createdByUserId: claims?.sub,
       });
 

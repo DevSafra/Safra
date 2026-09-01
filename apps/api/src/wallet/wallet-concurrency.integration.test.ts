@@ -163,7 +163,7 @@ describeIfDb('concurrent wallet movements', () => {
             customerProfileId: profileId,
             amount: '3.33',
             currencyId: usd,
-            reason: 'refund',
+            reason: 'sla_compensation',
           }),
         ),
       );
@@ -185,7 +185,7 @@ describeIfDb('concurrent wallet movements', () => {
               customerProfileId: profileId,
               amount: '7.00',
               currencyId: usd,
-              reason: 'refund',
+              reason: 'sla_compensation',
             }),
           ),
         ),

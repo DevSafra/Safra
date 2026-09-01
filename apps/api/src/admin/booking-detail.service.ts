@@ -442,6 +442,13 @@ export class BookingDetailService {
         direction: 'credit',
         currency: input.currency,
         /*
+          Compensation, and the route says so in its name — SAFRA paying for a stay that went
+          wrong. It stays inside the platform: spendable on a future booking, never payable out
+          as cash (Bashar, 2026-09-01). The operator is not asked here, because this endpoint
+          exists for one kind of movement and asking would invite the wrong answer.
+        */
+        fund: 'compensation',
+        /*
           The booking reference is PREPENDED to the operator's note rather than replacing it.
 
           `wallet_transactions.note` is what a customer support agent reads when somebody asks

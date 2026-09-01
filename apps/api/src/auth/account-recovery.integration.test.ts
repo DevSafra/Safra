@@ -404,6 +404,26 @@ describeIfDb('account recovery', () => {
       expect(await balanceOfUser(db, user.id)).toBe('30.000');
     });
 
+    /**
+     * And it carries the RESTRICTION, not only the money (Bashar, 2026-09-01).
+     *
+     * The balance being moved here is compensation — §6.4 credits it to whichever profile made the
+     * booking, guest or not — and compensation may never be paid out. Claiming a profile is the one
+     * place in the system where the same money is deliberately debited and re-credited, so it is
+     * the one place where «what kind of money is this» could be dropped in transit. Dropped, it
+     * would be a laundering path built out of an account-recovery flow.
+     */
+    it('carries the restriction across with it', async () => {
+      const guest = await createGuestBooking(db, user.email);
+      await fundWallet(db, guest.profileId, '30.000');
+
+      await recovery.requestEmailVerification(user.id, {});
+      await recovery.confirmEmailVerification(tokenFrom(outbox.at(-1)));
+
+      expect(await balanceOfUser(db, user.id)).toBe('30.000');
+      expect(await restrictedOfUser(db, user.id)).toBe('30.000');
+    });
+
     it('adds the carried balance to one the account already had', async () => {
       const guest = await createGuestBooking(db, user.email);
       await fundWallet(db, guest.profileId, '30.000');
@@ -539,7 +559,14 @@ async function createUser(
   return { id, email };
 }
 
-/** Gives a profile a wallet with a balance, as the SLA sweep would. */
+/**
+ * Gives a profile a wallet with a balance, as the SLA sweep would.
+ *
+ * Compensation, and therefore RESTRICTED — both the movement and the cache, exactly as the service
+ * writes them. A fixture that credited a compensation and left the restricted part at zero would
+ * describe a wallet the platform cannot produce, and the assertion that a claim carries the
+ * restriction across would then pass over nothing.
+ */
 async function fundWallet(
   db: Database,
   profileId: string,
@@ -547,17 +574,28 @@ async function fundWallet(
 ): Promise<void> {
   await db.execute(sql`
     WITH w AS (
-      INSERT INTO wallets (customer_profile_id, balance, currency_id)
-      SELECT ${profileId}::uuid, ${amount}::numeric, cu.id
+      INSERT INTO wallets (customer_profile_id, balance, restricted_balance, currency_id)
+      SELECT ${profileId}::uuid, ${amount}::numeric, ${amount}::numeric, cu.id
       FROM currencies cu WHERE cu.code = 'USD'
       ON CONFLICT DO NOTHING
       RETURNING id, currency_id
     )
     INSERT INTO wallet_transactions
-      (wallet_id, direction, reason, amount, currency_id, balance_after)
-    SELECT w.id, 'credit', 'sla_compensation', ${amount}::numeric, w.currency_id,
-           ${amount}::numeric
+      (wallet_id, direction, reason, amount, restricted_amount, currency_id, balance_after)
+    SELECT w.id, 'credit', 'sla_compensation', ${amount}::numeric, ${amount}::numeric,
+           w.currency_id, ${amount}::numeric
     FROM w`);
+}
+
+/** What the account may never be paid out, wherever the money ended up. */
+async function restrictedOfUser(db: Database, userId: string): Promise<string> {
+  const rows = await db.execute<{ restricted: string }>(sql`
+    SELECT w.restricted_balance::text AS restricted
+    FROM wallets w
+    JOIN customer_profiles p ON p.id = w.customer_profile_id
+    WHERE p.user_id = ${userId} AND p.deleted_at IS NULL AND w.deleted_at IS NULL`);
+
+  return rows.rows[0]?.restricted ?? 'no wallet';
 }
 
 async function fundWalletOfUser(

@@ -61,6 +61,10 @@ const COMMISSION_RATE = 0.07;
  * at 25 — the drift this constant exists to make impossible.
  */
 const WALLET_OPENING_BALANCE = '35.00';
+/** Of the opening 35: money the customer brought with them, which they could be paid back. */
+const WALLET_OPENING_OWN = '20.00';
+/** And the rest, credited by SAFRA — spendable on a stay, never withdrawable, never a gift card. */
+const WALLET_OPENING_COMPENSATION = '15.00';
 
 /** The default SYP rate the handoff names. Snapshotted onto every booking, as production does. */
 const FX_RATE_TO_SYP = 12500;
@@ -1201,7 +1205,8 @@ async function build(db: Seeder): Promise<void> {
   if (!profile) throw new Error('Could not create the customer profile.');
 
   /*
-    The opening balance is seeded WITH the transaction that explains it.
+    The opening balance is seeded WITH the transactions that explain it — and with BOTH kinds of
+    money in it (Bashar, 2026-09-01).
 
     Every movement the app makes writes a `wallet_transactions` row, so `balance` always equals the sum
     of its history — and محفظتي now relies on that: it derives how much of the balance came from a gift
@@ -1209,7 +1214,14 @@ async function build(db: Seeder): Promise<void> {
     cannot attribute, so it read «الرصيد الحالي ٠$» beside «رصيد بطاقات الهدايا ٣٥$» on a wallet that had
     never seen a gift card.
 
-    `sla_compensation` because that is what an opening testbed balance represents: goodwill credit.
+    Two movements rather than one, because there are now two kinds of balance and a fixture holding
+    only one of them cannot exercise the rule that separates them. A wallet of pure compensation
+    would refuse every gift-card purchase — correctly — and a tester would meet a rule the fixture
+    made unreachable; a wallet of pure customer money would never show the refusal at all.
+
+    `restricted_balance` and `restricted_amount` are set here for the same reason the balance is:
+    a compensation credit that left them at zero would describe a wallet the platform cannot
+    produce, and the first screen to read it would be telling the truth about a lie.
   */
   const [seededWallet] = await db
     .insert(schema.wallets)
@@ -1217,19 +1229,32 @@ async function build(db: Seeder): Promise<void> {
       customerProfileId: profile.id,
       currencyId: usd.id,
       balance: WALLET_OPENING_BALANCE,
+      restrictedBalance: WALLET_OPENING_COMPENSATION,
     })
     .returning();
 
   if (!seededWallet) throw new Error('Could not create the wallet.');
 
-  await db.insert(schema.walletTransactions).values({
-    walletId: seededWallet.id,
-    direction: 'credit',
-    reason: 'sla_compensation',
-    amount: WALLET_OPENING_BALANCE,
-    currencyId: usd.id,
-    balanceAfter: WALLET_OPENING_BALANCE,
-  });
+  await db.insert(schema.walletTransactions).values([
+    {
+      walletId: seededWallet.id,
+      direction: 'credit',
+      reason: 'profile_claim',
+      amount: WALLET_OPENING_OWN,
+      restrictedAmount: '0',
+      currencyId: usd.id,
+      balanceAfter: WALLET_OPENING_OWN,
+    },
+    {
+      walletId: seededWallet.id,
+      direction: 'credit',
+      reason: 'sla_compensation',
+      amount: WALLET_OPENING_COMPENSATION,
+      restrictedAmount: WALLET_OPENING_COMPENSATION,
+      currencyId: usd.id,
+      balanceAfter: WALLET_OPENING_BALANCE,
+    },
+  ]);
 
   // ── The bookings ──────────────────────────────────────────────────────────
   for (const spec of BOOKINGS) {

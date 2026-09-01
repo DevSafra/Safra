@@ -25,7 +25,7 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { WalletAdjustmentService } from './wallet-adjustment.service.js';
-import { WalletService } from './wallet.service.js';
+import { WalletService, withdrawableOf } from './wallet.service.js';
 import { notFound } from '../common/errors/app-error.js';
 
 /**
@@ -59,6 +59,14 @@ export class WalletAdminController {
     return {
       walletId: wallet.walletId,
       balance: wallet.balance,
+      /*
+        The three figures a finance screen needs, and they are three because two of them can
+        disagree. `restrictedBalance` is what SAFRA credited and may not pay out, `withdrawable` is
+        the remainder — the number a payout would be measured against — and the reconciled pair
+        below recomputes both from the append-only trail.
+      */
+      restrictedBalance: wallet.restrictedBalance,
+      withdrawable: withdrawableOf(wallet),
       currencyCode: wallet.currencyCode,
       /**
        * The recomputed total alongside the cached one, so a support or finance
@@ -67,6 +75,7 @@ export class WalletAdminController {
        * the person looking at a disputed balance is exactly who should find out.
        */
       reconciledBalance: await this.wallet.sumTransactions(wallet.walletId),
+      reconciledRestricted: await this.wallet.sumRestricted(wallet.walletId),
     };
   }
 

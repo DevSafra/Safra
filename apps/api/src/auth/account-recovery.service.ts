@@ -381,11 +381,21 @@ export class AccountRecoveryService {
       note: WALLET_NOTE.CLAIMED_FROM_GUEST,
     });
 
+    /*
+      The claim carries the RESTRICTION across, not only the money (Bashar, 2026-09-01).
+
+      The debit emptied the guest wallet, so it consumed whatever restricted part that wallet held,
+      and `restrictedApplied` is exactly that figure. Crediting the destination without it would
+      turn compensation into withdrawable money by the act of claiming a profile — a laundering
+      path built out of an account-recovery flow, and the one place in the system where the same
+      money is deliberately debited and re-credited.
+    */
     await this.wallet.credit(tx, {
       customerProfileId: destination,
       amount: wallet.balance,
       currencyId: wallet.currency_id,
       reason: 'profile_claim',
+      restricted: taken.restrictedApplied,
       note: WALLET_NOTE.CARRIED_TO_ACCOUNT,
     });
 
