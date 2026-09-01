@@ -528,6 +528,8 @@ export const ERROR = {
   COUPON_CURRENCY_MISMATCH: 'coupon.currency_mismatch',
   COUPON_CODE_TAKEN: 'coupon.code_taken',
   COUPON_NOT_FOUND: 'coupon.not_found',
+  /* A partner answering a coupon they have already answered — acceptance is final. */
+  COUPON_ALREADY_DECIDED: 'coupon.already_decided',
   COUPON_WINDOW_ORDER: 'coupon.window_order',
   COUPON_PERCENT_RANGE: 'coupon.percent_range',
   COUPON_FIXED_NEEDS_CURRENCY: 'coupon.fixed_needs_currency',

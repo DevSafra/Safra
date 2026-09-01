@@ -126,6 +126,7 @@ export const PARTNER_SECTION_PERMISSIONS = {
   violations: P.VIOLATION_READ,
   payouts: P.PAYOUT_READ_OWN,
   contracts: P.PARTNER_CONTRACT_SIGN_OWN,
+  coupons: P.PARTNER_COUPON_DECIDE,
   employees: P.PARTNER_EMPLOYEE_MANAGE,
   employeeRoles: P.PARTNER_EMPLOYEE_MANAGE,
 } as const satisfies Record<string, Permission>;

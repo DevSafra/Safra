@@ -407,6 +407,13 @@
       "when": 1788195458941,
       "tag": "0057_polite_nomad",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1788256174668,
+      "tag": "0058_premium_snowbird",
+      "breakpoints": true
     }
   ]
 }

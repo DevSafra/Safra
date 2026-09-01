@@ -4,6 +4,7 @@ import {
   index,
   integer,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -19,6 +20,7 @@ import {
   timestamps,
 } from './_shared.js';
 import {
+  couponPartnerStatus,
   couponType,
   couponValueKind,
   giftCardStatus,
@@ -170,6 +172,7 @@ export const coupons = pgTable(
       .notNull()
       .default(1),
     redemptionsCount: integer('redemptions_count').notNull().default(0),
+
     /** Scoping for city / partner coupon types. */
     cityId: foreignId('city_id').references(() => cities.id),
     partnerId: foreignId('partner_id').references(() => partners.id),
@@ -180,6 +183,48 @@ export const coupons = pgTable(
   (t) => [
     uniqueIndex('coupons_code_unique').on(t.code).where(notDeleted),
     index('coupons_window_idx').on(t.startsAt, t.endsAt),
+  ],
+);
+
+/**
+ * Which partners have taken up a coupon, and which have refused it.
+ *
+ * ## Why a coupon needs opting into at all
+ *
+ * A discount comes off what the CUSTOMER pays and the partner is still owed what the stay is
+ * worth — but a coupon changes the price a listing is advertised at, and that is the partner's
+ * business decision rather than SAFRA's. So a new coupon is OFFERED: every eligible partner gets a
+ * pending row, and only the ones who accept are eligible for bookings against it
+ * (Bashar, 2026-09-01).
+ *
+ * ## Accepting is final
+ *
+ * There is no path from `accepted` back to anything, and the portal says so before the partner
+ * confirms. The reason is not policy for its own sake: once a coupon is live on a listing a
+ * customer may have booked against it, and letting a partner withdraw would either break that
+ * booking's price or leave a discount nobody agreed to still honoured. Rejecting IS reversible in
+ * the sense that nothing was ever offered to a customer — but it is not made reversible here
+ * either, because a partner who changes their mind can be re-offered by staff.
+ */
+export const couponPartners = pgTable(
+  'coupon_partners',
+  {
+    couponId: foreignId('coupon_id')
+      .notNull()
+      .references(() => coupons.id),
+    partnerId: foreignId('partner_id')
+      .notNull()
+      .references(() => partners.id),
+    status: couponPartnerStatus('status').notNull().default('pending'),
+    /** Null while pending — set once, when the partner decides. */
+    decidedAt: timestamp('decided_at', { withTimezone: true }),
+    decidedByUserId: foreignId('decided_by_user_id').references(() => users.id),
+    ...timestamps,
+  },
+  (t) => [
+    primaryKey({ columns: [t.couponId, t.partnerId] }),
+    /* The partner portal's own list: their coupons, by what they still have to decide. */
+    index('coupon_partners_partner_idx').on(t.partnerId, t.status),
   ],
 );
 

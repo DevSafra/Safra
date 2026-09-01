@@ -89,3 +89,16 @@ export const WALLET_NOTE = {
 } as const;
 
 export type WalletNote = (typeof WALLET_NOTE)[keyof typeof WALLET_NOTE];
+
+/**
+ * A partner's answer to a coupon they were offered (Bashar, 2026-09-01).
+ *
+ * Two values and nothing else — `pending` is not one of them, because it is where an offer starts
+ * rather than somewhere a partner can put it back. Acceptance is final; the service refuses a
+ * second answer whichever way the first went.
+ */
+export const partnerCouponDecisionSchema = z
+  .object({ decision: z.enum(['accepted', 'rejected']) })
+  .strict();
+
+export type PartnerCouponDecisionInput = z.infer<typeof partnerCouponDecisionSchema>;

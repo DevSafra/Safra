@@ -377,6 +377,19 @@ export const giftCardStatus = pgEnum('gift_card_status', [
 ]);
 
 /** SRS §11.3. */
+/**
+ * Where a partner stands on a coupon SAFRA offered them (Bashar, 2026-09-01).
+ *
+ * `pending` until they decide. `accepted` is FINAL — the partner is told so before they confirm,
+ * and there is no route back to `pending` or `rejected` from it, because a customer may already
+ * have booked against the discount by then.
+ */
+export const couponPartnerStatus = pgEnum('coupon_partner_status', [
+  'pending',
+  'accepted',
+  'rejected',
+]);
+
 export const couponType = pgEnum('coupon_type', [
   'first_booking',
   'seasonal',

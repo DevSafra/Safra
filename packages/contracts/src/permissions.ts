@@ -139,6 +139,14 @@ export const PERMISSIONS = {
    */
   PARTNER_CONTRACT_SIGN_OWN: 'partner_contract.sign_own',
   /**
+   * Taking up, or refusing, a coupon SAFRA has offered (Bashar, 2026-09-01).
+   *
+   * OWNER-only, like signing the contract beside it and for the same reason: accepting is a
+   * commercial commitment that cannot be withdrawn, and a receptionist must not be able to put
+   * every listing on discount until the campaign ends.
+   */
+  PARTNER_COUPON_DECIDE: 'partner_coupon.decide',
+  /**
    * A partner filing and reading THEIR OWN verification documents.
    *
    * Same failure, worse data. `PROPERTY_MANAGE_OWN` guarded these too, so an employee could file
@@ -269,6 +277,7 @@ const PARTNER: Permission[] = [
     the feature rather than staying as a grant over routes that no longer exist.
   */
   P.PARTNER_CONTRACT_SIGN_OWN,
+  P.PARTNER_COUPON_DECIDE,
   /*
     Managing its own employees — and deliberately NOT in `PARTNER_EMPLOYEE_PERMISSIONS`.
 

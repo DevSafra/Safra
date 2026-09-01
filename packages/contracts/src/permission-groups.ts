@@ -75,6 +75,7 @@ const GROUP_OF_PREFIX: Readonly<Record<string, PermissionGroup>> = {
   partner: 'partners',
   partner_application: 'partners',
   partner_contract: 'partners',
+  partner_coupon: 'partners',
   partner_document: 'partners',
   partner_employee: 'partners',
   partner_employee_role: 'partners',

@@ -121,6 +121,9 @@ export const AUDIT_ACTIONS = [
   'partner.invitation_accepted',
   /* What SAFRA takes from this partner, agreed by hand — money terms, so both sides are logged. */
   'partner.commission_set',
+  /* A partner taking up a coupon SAFRA offered, or refusing it. Acceptance is final. */
+  'coupon.partner_accepted',
+  'coupon.partner_rejected',
   'partner_document.uploaded',
   'partner_document.viewed',
   'partner_document.reviewed',
