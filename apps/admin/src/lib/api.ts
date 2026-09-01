@@ -1244,6 +1244,8 @@ const walletItemSchema = z.object({
   direction: z.string(),
   reason: z.string(),
   amount: z.string(),
+  /* How much of it was money that cannot be paid out. Required, for the reason above. */
+  restrictedAmount: z.string(),
   currency: z.string(),
   balanceAfter: z.string(),
   note: z.string().nullable(),

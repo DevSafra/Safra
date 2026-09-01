@@ -341,6 +341,7 @@ export class FinanceService {
         direction: string;
         reason: string;
         amount: string;
+        restricted: string;
         currency: string;
         balance_after: string;
         note: string | null;
@@ -355,6 +356,7 @@ export class FinanceService {
              wt.direction::text          AS direction,
              wt.reason::text             AS reason,
              wt.amount::text             AS amount,
+             wt.restricted_amount::text  AS restricted,
              cur.code                    AS currency,
              wt.balance_after::text      AS balance_after,
              wt.note                     AS note,
@@ -383,6 +385,15 @@ export class FinanceService {
         direction: row.direction,
         reason: row.reason,
         amount: row.amount,
+        /*
+          How much of this movement was money that cannot be paid out.
+
+          On the ROW rather than only on the customer's record: المحفظة is where a disputed
+          movement is read, and «40.00 credited» does not say whether SAFRA handed out goodwill or
+          returned somebody their own money — which is the difference between what may leave and
+          what may not.
+        */
+        restrictedAmount: row.restricted,
         currency: row.currency,
         balanceAfter: row.balance_after,
         note: row.note,
@@ -401,6 +412,8 @@ export interface WalletRow {
   readonly direction: string;
   readonly reason: string;
   readonly amount: string;
+  /** How much of `amount` was money that may never be paid out. */
+  readonly restrictedAmount: string;
   readonly currency: string;
   readonly balanceAfter: string;
   readonly note: string | null;

@@ -1064,6 +1064,8 @@ export const ar = {
       colCustomer: 'العميل',
       colReason: 'السبب',
       colBalanceAfter: 'الرصيد بعدها',
+      /* Under the amount, when a movement credited or spent money that cannot be withdrawn. */
+      restrictedPart: 'منه غير قابل للسحب:',
       note: 'المحفظة تخزن تعويضات العملاء (P-007) — مثل 10$ عند فشل الشريك بالرد أول مرة — وتُستخدم مع بطاقة هدية ووسيلة دفع أخرى في عملية واحدة. كل حركة لها سبب مسجَّل.',
     },
 

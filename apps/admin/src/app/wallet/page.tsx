@@ -200,14 +200,33 @@ const COLUMNS: readonly AdminColumn<WalletItem>[] = [
     header: t.admin.colAmount,
     /* Signed, so direction is legible without reading the type column. */
     render: (row) => (
-      <Ltr
-        className={`font-extrabold whitespace-nowrap ${
-          row.direction === 'credit' ? 'text-ok' : 'text-bad'
-        }`}
-      >
-        {row.direction === 'credit' ? '+' : '−'}
-        {money(row.amount)} {row.currency}
-      </Ltr>
+      <div className="grid gap-0.5">
+        <Ltr
+          className={`font-extrabold whitespace-nowrap ${
+            row.direction === 'credit' ? 'text-ok' : 'text-bad'
+          }`}
+        >
+          {row.direction === 'credit' ? '+' : '−'}
+          {money(row.amount)} {row.currency}
+        </Ltr>
+        {/*
+          What this movement did with money that cannot be paid out — shown only when it did
+          something with it (Bashar, 2026-09-01).
+
+          «40.00 credited» does not say whether SAFRA handed out goodwill or gave somebody their own
+          money back, and المحفظة is where a disputed movement is read. Silent when the figure is
+          zero: a line on every ordinary row is noise, and noise is what trains people to skip the
+          line that matters.
+        */}
+        {Number(row.restrictedAmount) > 0 ? (
+          <span className="text-[10.5px] whitespace-nowrap text-faint2">
+            {t.sections.wallet.restrictedPart}{' '}
+            <Ltr>
+              {money(row.restrictedAmount)} {row.currency}
+            </Ltr>
+          </span>
+        ) : null}
+      </div>
     ),
   },
   {
