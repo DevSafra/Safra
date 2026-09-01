@@ -313,8 +313,17 @@ const INVOICE_COLUMNS: readonly AdminColumn<AdInvoiceItem>[] = [
     header: t.sections.adInvoices.colPeriod,
     render: (row) => (
       <span className="text-[11px] text-muted">
+        {/*
+          «→», not «←».
+
+          The whole run is inside `Ltr`, so it is laid out LEFT to right: the start date is on the
+          left and the end on the right, and an arrow pointing left there reads «the end leads back
+          to the start». The rest of the console writes a range in the page's own RTL flow, where
+          «←» is correct — the direction of the glyph has to follow the direction of the run it
+          sits in (Bashar, 2026-09-01).
+        */}
         <Ltr>
-          {shortDate(row.periodStart)} ← {shortDate(row.periodEnd)}
+          {shortDate(row.periodStart)} → {shortDate(row.periodEnd)}
         </Ltr>
       </span>
     ),
@@ -519,7 +528,7 @@ function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[
       Four things a reader needs, in the order they need them (Bashar, 2026-08-27).
 
       It was five stacked items of five different widths — pill, countdown, then the two dates on
-      separate lines with a dangling «←», then two buttons one above the other — and the column drove
+      separate lines with a dangling arrow, then two buttons one above the other — and the column drove
       the height of every row on the screen.
 
       ## What changed, and why each one
@@ -533,7 +542,7 @@ function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[
       sentence is what pushed the digits around.
 
       **The dates are one line that does not break**, isolated as a PAIR — a range is a single value
-      and `whitespace-nowrap` keeps «←» between its two ends instead of stranded at the end of a row.
+      and `whitespace-nowrap` keeps the arrow between its two ends instead of stranded at the end of a row.
 
       **The controls sit side by side.** Two buttons of the same size on one line read as a pair of
       actions; stacked, they read as a list of two more facts about the campaign.
@@ -551,8 +560,9 @@ function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[
             </span>
           </div>
 
+          {/* «→» inside an `Ltr` run — see the note on the invoice period column above. */}
           <Ltr className="text-[10px] whitespace-nowrap text-faint2">
-            {shortDate(row.startsAt)} ← {shortDate(row.endsAt)}
+            {shortDate(row.startsAt)} → {shortDate(row.endsAt)}
           </Ltr>
 
           {row.status === 'expired' ? null : (
