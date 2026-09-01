@@ -526,11 +526,18 @@ export class RegistriesController {
   /**
    * Who has taken one coupon up, who refused, and who has not answered.
    *
-   * `COUPON_READ`, the same permission as the registry it is opened from: this is a view OF a
-   * coupon, and a reader who may see the campaign may see how it is going.
+   * `COUPON_READ` **and** `PARTNER_READ`, both — `RequirePermissions` is an AND.
+   *
+   * The first is obvious: this is a view of a coupon, opened from the registry that needs it. The
+   * second is the answer to «what does this let somebody reach that they could not reach before».
+   * The rows are PARTNERS — a name, a reference, a city — and the permission catalogue is the input
+   * to custom staff roles, so a role built with `coupon.read` alone would have read a partner
+   * directory through a coupon. Every built-in role holding `coupon.read` already holds
+   * `partner.read`, so nothing in use loses access; the pairing closes a door rather than shutting
+   * one somebody was using.
    */
   @Get('coupons/:code/partners')
-  @RequirePermissions(P.COUPON_READ)
+  @RequirePermissions(P.COUPON_READ, P.PARTNER_READ)
   async couponParticipation(
     @Param('code') code: string,
     @Query(new ZodValidationPipe(couponPartnersQuerySchema))
