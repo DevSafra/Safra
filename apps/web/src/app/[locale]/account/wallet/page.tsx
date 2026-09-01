@@ -13,8 +13,9 @@ import { ltrIsolate } from '@/lib/bidi';
  * محفظتي — handoff §6.1, which is the most tightly specified panel in the whole document.
  *
  * One panel on a `bandA → heroA` gradient, gold hairline, 18px radius, 26px padding, a gold eyebrow
- * «محفظة سفرة», then a `minmax(220px, 1fr)` grid of TWO SEPARATE balance cards — the handoff calls
- * that separation "a hard requirement" — and a footer row with the summed total.
+ * «محفظة سفرة», then a `minmax(220px, 1fr)` grid of SEPARATE balance cards — the handoff calls that
+ * separation "a hard requirement" — and a footer row with the summed total. Two when it was written,
+ * three since compensation became a balance of its own (Bashar, 2026-09-01).
  *
  * ## Why the second card reads «—»
  *
@@ -60,15 +61,32 @@ export default async function AccountWalletPage({
   const balance = failed || expired ? null : wallet.wallet;
 
   /*
-    الرصيد الحالي is the balance MINUS the gift part, computed here rather than sent as a third figure:
-    two of the three are independent and the third is their difference, so sending all three would be one
-    more chance for them to disagree.
+    Three parts of one balance, and only two of them are sent (Bashar, 2026-09-01).
 
-    `toFixed(2)` because `formatMoney` takes a decimal STRING — the subtraction is the only arithmetic on
-    this page, and it is between two figures that are already exact to the cent.
+    The API sends the total, the gift part and the RESTRICTED part — gift money and compensation
+    together, which is the set that may never be paid out. The two figures drawn here are the
+    differences: what the customer funded is the balance minus the restricted part, and the
+    compensation is the restricted part minus the gift.
+
+    Derived rather than sent because the four figures are not independent — they are one number and
+    two cuts through it — and four numbers that must agree are three chances to disagree. The total
+    printed beneath them is the stored balance, so a reader can check the arithmetic themselves.
+
+    `Math.max` on the compensation for one wallet in the database: a load test wrote movements whose
+    recorded order does not match the order they applied, and its restricted part was clamped down to
+    its balance. A negative card would be arithmetic leaking onto a screen.
+
+    `toFixed(2)` because `formatMoney` takes a decimal STRING — the only arithmetic on this page, and
+    between figures already exact to the cent.
   */
-  const cash = balance
-    ? (Number(balance.balance) - Number(balance.giftBalance)).toFixed(2)
+  const own = balance
+    ? (Number(balance.balance) - Number(balance.restrictedBalance)).toFixed(2)
+    : '0.00';
+  const compensation = balance
+    ? Math.max(
+        Number(balance.restrictedBalance) - Number(balance.giftBalance),
+        0,
+      ).toFixed(2)
     : '0.00';
   const entries = failed || expired ? null : transactions;
 
@@ -108,19 +126,27 @@ export default async function AccountWalletPage({
             {/* The handoff's own grid: `repeat(auto-fit, minmax(220px, 1fr))`, gap 18px. */}
             <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[18px]">
               {/*
-                Two REAL figures now (Bashar, 2026-08-11).
+                Three REAL figures now (Bashar, 2026-09-01), and the third is not decoration.
 
-                The gift card told the wallet how much of it came from a gift, and the two parts always
-                sum to the balance printed beneath them — see `WalletService.composition` for the
-                gift-first rule that decides the split, and for why buying a card cannot touch it.
+                A compensation buys a stay and can never be taken out in cash or turned into a gift
+                card. Printed inside «الرصيد الحالي» it would be money the screen says is available
+                and the platform then refuses — the shape this codebase keeps paying for. So it is
+                its own card, with its own sentence, beside the money that really is the customer's.
 
-                `walletCurrentTitle` therefore means the part that did NOT come from a gift card, which
-                is exactly what its caption already said: «تعويضات ومبالغ مستردة».
+                They still sum to the balance printed beneath them.
               */}
               <BalanceCard
                 title={t('walletCurrentTitle')}
-                amount={formatMoney(cash, balance.currencyCode, locale, { exact: true })}
+                amount={formatMoney(own, balance.currencyCode, locale, { exact: true })}
                 caption={t('walletCurrentCaption')}
+                tone="text-text"
+              />
+              <BalanceCard
+                title={t('walletCompensationTitle')}
+                amount={formatMoney(compensation, balance.currencyCode, locale, {
+                  exact: true,
+                })}
+                caption={t('walletCompensationCaption')}
                 tone="text-text"
               />
               <BalanceCard
@@ -232,7 +258,7 @@ export default async function AccountWalletPage({
   );
 }
 
-/** One of §6.1's two balance cards. Same box, different figure — the separation is the point. */
+/** One of §6.1's balance cards. Same box, different figure — the separation is the point. */
 function BalanceCard({
   title,
   amount,

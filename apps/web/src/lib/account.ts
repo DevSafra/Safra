@@ -194,6 +194,14 @@ const walletSchema = z.object({
        * quietly reporting every balance as entirely non-gift.
        */
       giftBalance: z.string(),
+      /**
+       * How much of the balance may never be paid out — gift money and compensation together.
+       *
+       * Required, and never `.default('0')`: a default would invent «none of this is restricted»
+       * for a payload that stopped carrying it, which is the one wrong answer that looks right on
+       * every screen it reaches.
+       */
+      restrictedBalance: z.string(),
       currencyCode: z.string(),
     })
     .nullable(),

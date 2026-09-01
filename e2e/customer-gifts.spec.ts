@@ -89,9 +89,14 @@ test.describe('بطاقات الهدايا', () => {
     /*
       ── محفظتي splits the balance, and the parts agree with the total ──
 
-      The two cards and the total are three figures a reader can check against each other, so that is
-      what is asserted rather than any particular amount — the fixture's balance is not this spec's
-      business, and pinning a number here would make it fail the first time somebody made a booking.
+      The cards and the total are figures a reader can check against each other, so that is what is
+      asserted rather than any particular amount — the fixture's balance is not this spec's business,
+      and pinning a number here would make it fail the first time somebody made a booking.
+
+      THREE cards since 2026-09-01: the customer's own money, compensation SAFRA credited, and gift
+      money. Compensation had been printed inside «current balance», which said a figure was
+      available and was then refused at the gift-card purchase — so the count matters here, not only
+      the sum: a fourth part folded silently back into a third would still add up.
     */
     await page.goto('/en/account/wallet', { waitUntil: 'domcontentloaded' });
 
@@ -100,12 +105,22 @@ test.describe('بطاقات الهدايا', () => {
       Number(m[1]?.replace(/,/g, '')),
     );
 
-    /* Current balance, gift card balance, then the total beneath them. */
-    expect(amounts, 'the panel must print three amounts').toHaveLength(3);
+    /* Own money, compensation, gift money, then the total beneath them. */
+    expect(amounts, 'the panel must print four amounts').toHaveLength(4);
     expect(
-      (amounts[0] ?? 0) + (amounts[1] ?? 0),
-      'the two parts must sum to the total available to spend',
-    ).toBeCloseTo(amounts[2] ?? -1, 2);
+      (amounts[0] ?? 0) + (amounts[1] ?? 0) + (amounts[2] ?? 0),
+      'the three parts must sum to the total available to spend',
+    ).toBeCloseTo(amounts[3] ?? -1, 2);
+
+    /*
+      And the compensation part is a REAL figure, not a zero that would make the card decorative.
+
+      The testbed wallet opens with both kinds of money for exactly this: a spec that only ever saw
+      zero there would pass against a page that had stopped rendering the card at all.
+    */
+    expect(amounts[1] ?? 0, 'the compensation card must show the credit').toBeGreaterThan(
+      0,
+    );
 
     /*
       ── The sidebar behaves like the other two dashboards ──
