@@ -71,10 +71,21 @@ export default async function AccountGiftsPage({
 
   const walletCurrency = wallet?.currencyCode ?? summary?.counters.walletCurrency ?? '';
 
-  /* Balance minus the gift part. Both figures come from one read, so they cannot disagree. */
+  /*
+    Balance minus the part that may not become a gift card — the RESTRICTED part, which is gift money
+    and compensation together (Bashar, 2026-09-01).
+
+    It was balance minus the gift part, and after compensation joined that rule this line printed a
+    figure the purchase would then refuse: «$405.00 available to spend» over a wallet where all 405
+    was compensation. That is the exact failure this hint was added for on 2026-08-12 — pick an
+    amount the total covers, submit, and get told the rule — reopened by widening the rule and not
+    the sentence.
+
+    Both figures come from one read, so they cannot disagree.
+  */
   const spendable = wallet
     ? formatMoney(
-        (Number(wallet.balance) - Number(wallet.giftBalance)).toFixed(2),
+        Math.max(Number(wallet.balance) - Number(wallet.restrictedBalance), 0).toFixed(2),
         wallet.currencyCode,
         locale,
         { exact: true },

@@ -123,6 +123,30 @@ test.describe('بطاقات الهدايا', () => {
     );
 
     /*
+      ── And بطاقات الهدايا states what can ACTUALLY buy a card ──
+
+      The hint under the amount ladder must be the withdrawable part, not the balance. It was the
+      balance minus gift money, and when compensation joined the same rule the line started offering
+      a figure the purchase would refuse — «$405.00 available to spend» over a wallet holding 405 of
+      compensation. That is precisely the failure the hint was added for on 2026-08-12, reopened by
+      widening the rule and not the sentence, so it is asserted rather than trusted.
+
+      Read as a NUMBER against the wallet's own first card, not pinned: the fixture's balance is not
+      this spec's business, and the relationship is what must hold.
+    */
+    await page.goto('/en/account/gifts', { waitUntil: 'domcontentloaded' });
+
+    const hint = await page.locator('main').innerText();
+    const spendable = Number(
+      hint.match(/available to spend: \$([\d,]+\.\d{2})/)?.[1]?.replace(/,/g, '') ?? -1,
+    );
+
+    expect(
+      spendable,
+      'the gift page offers the customer’s own money, not the whole balance',
+    ).toBeCloseTo(amounts[0] ?? -1, 2);
+
+    /*
       ── The sidebar behaves like the other two dashboards ──
 
       Asserted from THIS test's session rather than its own spec, because a second `test` under this
