@@ -2654,6 +2654,8 @@ export const ar = {
       noWallet: 'لا محفظة',
       bookings: 'الحجوزات',
       walletMoves: 'حركات المحفظة',
+      /* Under the balance, only when part of it is SAFRA's own credit. */
+      walletRestricted: 'منه غير قابل للسحب:',
       reviews: 'التقييمات',
       disputes: 'النزاعات',
       notifications: 'ما أُرسل إليه',
@@ -3790,6 +3792,8 @@ export const ar = {
       rate: 'سعر الصرف',
       currencyCode: 'رمز العملة',
       quoteCurrency: 'عملة التسعير',
+      /* On a manual wallet movement: goodwill from سفرة, or the customer's own money back. */
+      fund: 'مصدر المبلغ',
       requestedAmount: 'المبلغ المطلوب',
       requestedCurrency: 'عملة الطلب',
       appliedAmount: 'المبلغ المطبَّق',

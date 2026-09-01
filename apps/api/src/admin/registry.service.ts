@@ -286,6 +286,7 @@ export class RegistryService {
       account_status: string | null;
       locale: string | null;
       wallet_balance: string | null;
+      wallet_restricted: string | null;
       wallet_currency: string | null;
     }>(sql`
       SELECT c.id, c.reference, c.full_name, c.email, c.phone, c.is_guest,
@@ -294,6 +295,7 @@ export class RegistryService {
              u.status::text AS account_status,
              u.preferred_locale AS locale,
              w.balance::text AS wallet_balance,
+             w.restricted_balance::text AS wallet_restricted,
              cur.code AS wallet_currency
       FROM customer_profiles c
       LEFT JOIN users u       ON u.id = c.user_id
@@ -419,7 +421,15 @@ export class RegistryService {
       wallet:
         customer.wallet_balance === null
           ? null
-          : { balance: customer.wallet_balance, currency: customer.wallet_currency },
+          : {
+              balance: customer.wallet_balance,
+              /*
+                What SAFRA credited and may not pay out. An operator asked «why was this refused»
+                needs the two figures side by side; one balance answers neither question.
+              */
+              restricted: customer.wallet_restricted ?? '0',
+              currency: customer.wallet_currency,
+            },
       bookings: {
         total: totalOf(bookings.rows),
         items: bookings.rows.map((row) => ({

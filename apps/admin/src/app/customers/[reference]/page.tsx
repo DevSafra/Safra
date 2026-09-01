@@ -127,12 +127,33 @@ export default async function CustomerPage({
                 /* No wallet row at all — a different fact from a zero balance. */
                 <span className="text-faint">{c.noWallet}</span>
               ) : (
-                <Ltr className="font-bold text-gold">
-                  {amount(
-                    customer.wallet.balance,
-                    customer.wallet.currency ?? DEFAULT_MONEY_CURRENCY,
-                  )}
-                </Ltr>
+                <span className="grid justify-items-end gap-0.5">
+                  <Ltr className="font-bold text-gold">
+                    {amount(
+                      customer.wallet.balance,
+                      customer.wallet.currency ?? DEFAULT_MONEY_CURRENCY,
+                    )}
+                  </Ltr>
+                  {/*
+                    The part that cannot be paid out, shown only when there IS one.
+
+                    An operator answering «why was their gift card purchase refused» or «can we pay
+                    this person out» needs both figures; a single balance answers neither. Silent at
+                    zero, because a line reading «none of it is restricted» on every ordinary wallet
+                    is noise that trains people not to read the line.
+                  */}
+                  {Number(customer.wallet.restricted) > 0 ? (
+                    <span className="text-[11px] text-faint2">
+                      {c.walletRestricted}{' '}
+                      <Ltr>
+                        {amount(
+                          customer.wallet.restricted,
+                          customer.wallet.currency ?? DEFAULT_MONEY_CURRENCY,
+                        )}
+                      </Ltr>
+                    </span>
+                  ) : null}
+                </span>
               )
             }
           />

@@ -475,7 +475,14 @@ const customerDetailSchema = z.object({
   accountStatus: z.string().nullable(),
   locale: z.string().nullable(),
   /* `null` when there is no wallet at all — a different fact from a zero balance. */
-  wallet: z.object({ balance: z.string(), currency: z.string().nullable() }).nullable(),
+  wallet: z
+    .object({
+      balance: z.string(),
+      /* What may never be paid out — SAFRA's own credit, and gift money. */
+      restricted: z.string(),
+      currency: z.string().nullable(),
+    })
+    .nullable(),
   bookings: recent(
     z.object({
       reference: z.string(),
