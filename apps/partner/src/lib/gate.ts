@@ -191,6 +191,7 @@ export const SECTION_PATH: Record<PartnerSection, string> = {
   violations: '/violations',
   payouts: '/payouts',
   contracts: '/contracts',
+  coupons: '/coupons',
   employees: '/employees',
   employeeRoles: '/employee-roles',
 };

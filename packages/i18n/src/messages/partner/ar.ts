@@ -255,6 +255,50 @@ export const ar = {
     home: 'العودة إلى لوحة التحكم',
   },
 
+  /**
+   * الكوبونات — what SAFRA has offered this partner, and what they did about it.
+   *
+   * The warning is the load-bearing string on the whole screen: acceptance cannot be undone, and
+   * a partner who has not understood that before pressing «قبول» has made a commitment they did
+   * not mean to. It is stated on the card AND inside the confirmation, because a person who skims
+   * the first will read the second.
+   */
+  coupons: {
+    title: 'الكوبونات',
+    intro:
+      'الكوبونات التي تعرضها سفرة على عقاراتك. لا يُطبَّق أي كوبون قبل قبولك له، ولا يظهر خصمه للزوار قبل ذلك.',
+    pendingTitle: 'بانتظار قرارك',
+    pendingEmpty: 'لا كوبونات بانتظار قرارك.',
+    acceptedTitle: 'الكوبونات المقبولة',
+    acceptedEmpty: 'لم تقبل أي كوبون بعد.',
+    rejectedTitle: 'الكوبونات المرفوضة',
+    rejectedEmpty: 'لم ترفض أي كوبون.',
+
+    accept: 'قبول',
+    reject: 'رفض',
+    accepting: 'جارٍ الحفظ…',
+
+    /* Bashar's own words, 2026-09-01 — the sentence a partner must read before confirming. */
+    warning:
+      'القبول نهائي. بعد قبولك يبقى الكوبون فعّالاً على عقاراتك حتى انتهاء صلاحيته، ولا يمكن التراجع عن القرار.',
+    confirmTitle: 'قبول الكوبون',
+    confirmBody:
+      'القبول نهائي. بعد قبولك يبقى الكوبون فعّالاً على عقاراتك حتى انتهاء صلاحيته، ولا يمكن التراجع عن القرار. هل تريد المتابعة؟',
+    rejectTitle: 'رفض الكوبون',
+    rejectBody:
+      'لن يُطبَّق هذا الكوبون على عقاراتك. يمكن لسفرة عرضه عليك من جديد لاحقاً.',
+
+    colValue: 'الخصم',
+    colWindow: 'الصلاحية',
+    colUsage: 'مرات الاستخدام',
+    colDecided: 'تاريخ القرار',
+    expired: 'منتهي',
+    minBooking: 'الحد الأدنى للحجز',
+    maxDiscount: 'أقصى خصم',
+    failed: 'تعذّر حفظ قرارك. حاول مرة أخرى.',
+    alreadyDecided: 'سبق أن اتُّخذ القرار في هذا الكوبون. القبول نهائي.',
+  },
+
   nav: {
     heading: 'لوحة الشريك',
     dashboard: 'لوحة التحكم',
@@ -263,6 +307,7 @@ export const ar = {
     reviews: 'التقييمات',
     payouts: 'مستحقاتي',
     contracts: 'العقود',
+    coupons: 'الكوبونات',
     arrivals: 'الوصول اليوم',
     violations: 'المخالفات',
     employees: 'الموظفون',

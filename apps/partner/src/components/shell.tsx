@@ -58,6 +58,7 @@ export async function Shell({
     | 'payouts'
     | 'reviews'
     | 'contracts'
+    | 'coupons'
     | 'employees'
     | 'employeeRoles'
     | 'support';
@@ -275,6 +276,17 @@ export async function Shell({
           ) : null}
           {locked ? null : (
             <>
+              {/*
+                الكوبونات — offers waiting on a decision. Hidden while locked, like every other
+                working section: a partner who is not yet verified has no listings to discount.
+              */}
+              {opens('coupons') ? (
+                <Item
+                  href="/coupons"
+                  label={t.nav.coupons}
+                  current={active === 'coupons'}
+                />
+              ) : null}
               {opens('reviews') ? (
                 <Item
                   href="/reviews"

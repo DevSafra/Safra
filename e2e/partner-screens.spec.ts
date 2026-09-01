@@ -432,3 +432,70 @@ test.describe('الوحدات', () => {
     await unit.getByRole('checkbox').check();
   });
 });
+
+/**
+ * الكوبونات — offered, decided once, and the warning shown before it can be (Bashar, 2026-09-01).
+ *
+ * The load-bearing assertion is the PERMANENCE. «Acceptance is permanent … the decision cannot be
+ * reversed» is a promise the portal makes, and a promise the server keeps: after accepting, the
+ * row leaves the pending section and no «رفض» is offered for it anywhere. A browser is the only
+ * place that can check the sentence is actually put in front of the partner before they confirm.
+ */
+test.describe('الكوبونات', () => {
+  test('offers a coupon, warns before accepting, and will not take it back', async ({
+    page,
+    request,
+  }) => {
+    await page.goto(`${BASE}/coupons`);
+
+    const pending = page
+      .locator('[data-coupon]')
+      .filter({ has: page.locator('[data-coupon-accept]') });
+
+    test.skip(
+      (await pending.count()) === 0,
+      'No coupon is waiting on this partner’s decision.',
+    );
+
+    const card = pending.first();
+    const code = (await card.getAttribute('data-coupon')) ?? '';
+
+    /* The warning is on the CARD, before anything is pressed. */
+    await expect(card, 'the permanence is stated before the button').toContainText(
+      'القبول نهائي',
+    );
+
+    await card.locator(`[data-coupon-accept="${code}"]`).click();
+
+    /*
+      And again inside the confirmation, which is the system's own popup — never the browser's —
+      and `tone: 'danger'`, so the focus starts on «إلغاء».
+    */
+    const confirm = page.getByRole('alertdialog');
+
+    await expect(confirm).toContainText('لا يمكن التراجع');
+    await expect(page.locator(':focus')).toHaveText('إلغاء');
+
+    await confirm.getByRole('button', { name: 'قبول' }).click();
+
+    /* It leaves the pending section and cannot be answered again. */
+    await expect
+      .poll(async () => page.locator(`[data-coupon-accept="${code}"]`).count(), {
+        timeout: 20_000,
+      })
+      .toBe(0);
+
+    await page.reload();
+    await expect(page.locator(`[data-coupon-reject="${code}"]`)).toHaveCount(0);
+
+    /*
+      The endpoint refuses too, not just the screen. A partner posting directly must meet the same
+      rule — a warning the server does not enforce is one somebody can walk around.
+    */
+    const again = await request.post(`${BASE}/api/coupons/${code}/decision`, {
+      data: { decision: 'rejected' },
+    });
+
+    expect(again.ok(), 'a decided coupon cannot be decided again').toBe(false);
+  });
+});

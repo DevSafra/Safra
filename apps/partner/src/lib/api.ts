@@ -1021,3 +1021,34 @@ export async function getMyViolation(id: string) {
     z.object({ violation: violationSchema, moneyHidden: z.boolean() }),
   );
 }
+
+/**
+ * A coupon as its offered partner sees it.
+ *
+ * `status` is the partner's own answer, not the coupon's state: a coupon can be `accepted` and
+ * expired at the same time, which is why `expired` travels separately rather than being folded
+ * into one word.
+ */
+const partnerCouponSchema = z.object({
+  code: z.string(),
+  status: z.enum(['pending', 'accepted', 'rejected']),
+  valueKind: z.string(),
+  value: z.string(),
+  currencyCode: z.string().nullable(),
+  maxDiscountAmount: z.string().nullable(),
+  minBookingAmount: z.string().nullable(),
+  startsAt: z.string(),
+  endsAt: z.string(),
+  expired: z.boolean(),
+  redemptions: z.number(),
+  decidedAt: z.string().nullable(),
+});
+
+export type PartnerCoupon = z.infer<typeof partnerCouponSchema>;
+
+export async function getMyCoupons() {
+  return partnerFetch(
+    '/partner/coupons',
+    z.object({ coupons: z.array(partnerCouponSchema) }),
+  );
+}
