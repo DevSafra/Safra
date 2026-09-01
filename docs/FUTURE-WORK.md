@@ -3176,6 +3176,43 @@ for anyone deploying: the fix is in `dist`/`.next` only after a rebuild AND a re
 standalone apps need `.next/static` and `public` copied into `.next/standalone/apps/<app>/` or the
 console serves HTML with no CSS or JS.
 
+### O-wallet-1 — the wallet split leaves three decisions open
+
+**Status:** open · **Severity:** Low · **Owner:** Bashar · **Recorded:** 2026-09-01
+
+Compensation credited by SAFRA is now held inside the platform: `wallets.restricted_balance` and
+`wallet_transactions.restricted_amount` record it, two CHECK constraints bound it, and
+`wallet_txn_reason` carries a `withdrawal` value whose only purpose today is the constraint that
+refuses a payout of restricted money. **There is no payout endpoint** — this is the rule waiting for
+the code, not a feature.
+
+Three judgement calls were made to ship it, each reversible in about one line, each worth a decision
+rather than a silence:
+
+1. **Gift-card money is restricted too.** A card is a bearer instrument, and the platform already
+   refused to let gift money buy another card — «the wallet is where a gift ENDS». Cashing one out
+   would be the same door. If gift money should be withdrawable, it is one entry in
+   `restrictedCredit`.
+2. **A compensation can no longer buy a gift card.** The rule was «not gift money» and is now «only
+   the withdrawable part», because a transferable card is how compensation would leave the platform
+   without a payout ever existing. It is a real change to what a customer can do today.
+3. **The 1,695 historical manual credits were classified as compensation.** They cannot say whether
+   they were goodwill or the correction of an overcharge — the `fund` field that captures it did not
+   exist when they were written — and restricting them cannot hurt anybody while no payout exists. A
+   row that was genuinely the customer's can be freed by a debit and a credit that say so.
+
+**Deferred, not done:** the LIABILITY accounts are still one pair. `wallet_credit` holds both kinds
+of money; what SAFRA credited is told apart in the books by the EXPENSE side
+(`wallet_compensation`, `gift_card_issued`, `wallet_adjustment`), which answers «what did we hand
+out» but not «how much of what we owe is settleable in cash». Splitting the liability is the
+accounting-correct next step and touches every posting, so it waits for a decision.
+
+**Known imprecision, measured:** `created_at` is a transaction's START time, so it does not order two
+movements that ran at once, and the historical replay had nothing else to sort by. One wallet of
+13,819 — a load-test fixture hammered concurrently — replayed to a restricted part 50.00 larger than
+its balance and was clamped to it, leaving its withdrawable part at zero. `wallet_restriction_backfill`
+records the count.
+
 ### O-e2e-5 — `partner-calendars.spec.ts` names a date, and the calendar moved past it
 
 **Status:** open · **Severity:** Medium · **Owner:** engineering · **Recorded:** 2026-09-01
@@ -3190,6 +3227,18 @@ skipped** on 2026-09-01. Both failures predate today's work and neither touches 
 
 **The work:** derive the day under test from the run's own clock — a booking the spec creates, or
 the first day the month actually renders — rather than a literal. **To unblock:** nothing external.
+
+### O-test-4 — `support.integration.test.ts` fails once in a while under the parallel runner
+
+**Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-09-01
+
+«shows a staff reply that is not internal» read `customer` where it expected `staff`, once, in a full
+`pnpm verify`; the same file passed alone and the next full run was 235/235, 3,599 tests green. It
+touches nothing the wallet work of that day changed.
+
+The shape is the one O-e2e-4 records for the browser suite — suites sharing one database, running in
+parallel, one of them committing. **The work:** make the support fixture address rows it created
+rather than the newest matching row. **To unblock:** nothing external.
 
 ### O-e2e-4 — a spec cannot address "the last page" once a table passes COUNT_CAP
 
