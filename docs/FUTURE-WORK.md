@@ -3176,6 +3176,21 @@ for anyone deploying: the fix is in `dist`/`.next` only after a rebuild AND a re
 standalone apps need `.next/static` and `public` copied into `.next/standalone/apps/<app>/` or the
 console serves HTML with no CSS or JS.
 
+### O-e2e-5 — `partner-calendars.spec.ts` names a date, and the calendar moved past it
+
+**Status:** open · **Severity:** Medium · **Owner:** engineering · **Recorded:** 2026-09-01
+
+`e2e/partner-calendars.spec.ts:45` looks for `[data-day="2026-08-22"]`, a date written into the
+spec. The dashboard shows the CURRENT month, so the assertion held while it was August and started
+failing on 1 September for every run, on every machine, with no code change — the shape O-e2e-3
+describes, arriving from the calendar rather than from accumulated rows.
+
+It is the only red in the suite besides `customer-gifts` (O-e2e-3): **382 passed, 2 failed, 4
+skipped** on 2026-09-01. Both failures predate today's work and neither touches it.
+
+**The work:** derive the day under test from the run's own clock — a booking the spec creates, or
+the first day the month actually renders — rather than a literal. **To unblock:** nothing external.
+
 ### O-e2e-4 — a spec cannot address "the last page" once a table passes COUNT_CAP
 
 **Status:** open · **Severity:** Low · **Owner:** engineering · **Recorded:** 2026-08-23
