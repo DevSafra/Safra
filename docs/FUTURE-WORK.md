@@ -1283,6 +1283,37 @@ engineering, alongside `S-1`.
 
 **Owner:** engineering.
 
+### O-media-3 — Every city photograph in the database is the same placeholder fixture
+
+**Identified 2026-09-02, while redesigning the home page.** The pipeline is not broken — O-media
+and the 2026-08-30 geography work built it end to end, the console uploads, the bucket policy
+grants anonymous read on `cities/*`, and the catalogue read carries the row. What is missing is
+the CONTENT.
+
+Six of the nine cities carry a cover and all six are the **same 1,072-byte solid-colour WebP**:
+
+```
+damascus  aleppo  latakia  tartus  aqaba  petra   → all 1072 bytes, byte-identical
+kasab     palmyra tripoli                          → no cover row at all
+```
+
+They are test fixtures uploaded to prove the pipeline, and they render as flat orange rectangles.
+That was survivable while the home page showed cities as small bordered boxes. It is not now: the
+destinations rail is the largest photographic surface on the customer site's first screen, and
+`/city/[slug]` draws the same image across its hero band.
+
+**Why this is not a code item.** Nothing in the repository can fix it. It needs somebody to
+photograph or license nine cities and upload them on الجغرافيا, with `alt` written in all three
+languages — the alt fields have been writable since 2026-08-31 and are empty for every row.
+
+**Mitigated, not hidden.** A city with no cover renders the night ornament field rather than a
+grey box, so the three cities with nothing look deliberate rather than broken. That mitigation
+does NOT extend to the six that have a placeholder: a row that says it has a photograph is
+rendered as one, because the alternative is second-guessing the database from the view layer.
+
+**Owner:** Bashar — content, not engineering. Blocks nothing technically; visible on the first
+screen of the public site, so it belongs before launch rather than after.
+
 ### O-partner-5 — Closed: the two disabled partner screens are built
 
 **Closed 2026-08-08.** عقاراتي offered تعديل and التقويم as greyed-out `<span aria-disabled>` labels
