@@ -46,6 +46,28 @@ const cityCategorySchema = z.object({
 
 export type CityCategory = z.infer<typeof cityCategorySchema>;
 
+/**
+ * The one photograph a destination card shows, or `null` where staff have uploaded none.
+ *
+ * `.nullable()`, never `.default()`. A default here would invent a plausible value for something
+ * the API did not send, and the failure it hides is exactly the one that matters: a card drawing
+ * an image element around a `fileKey` that does not exist renders a broken frame, where a real
+ * `null` renders the deliberate typographic tile instead.
+ */
+const cityCoverSchema = z.object({
+  fileKey: z.string(),
+  variantWidths: z.array(z.number()),
+  width: z.number().nullable(),
+  height: z.number().nullable(),
+  alt: z.object({
+    ar: z.string().nullable(),
+    en: z.string().nullable(),
+    de: z.string().nullable(),
+  }),
+});
+
+export type CityCover = z.infer<typeof cityCoverSchema>;
+
 const citySchema = z.object({
   slug: z.string(),
   nameAr: z.string(),
@@ -53,6 +75,7 @@ const citySchema = z.object({
   nameDe: z.string(),
   countryCode: z.string(),
   categories: z.array(cityCategorySchema),
+  cover: cityCoverSchema.nullable(),
   propertyCount: z.number(),
 });
 

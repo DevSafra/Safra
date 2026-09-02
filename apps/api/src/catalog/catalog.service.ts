@@ -34,6 +34,45 @@ const CITY_CATEGORIES_JSON = sql`
 `;
 
 /**
+ * One city's COVER photograph, or SQL `null` where it has none.
+ *
+ * The home page shows destinations as photographs rather than as named boxes, and the only
+ * picture of a city the platform holds is the one staff uploaded on الجغرافيا. Selected here
+ * rather than fetched per card: nine cities would otherwise be nine round trips on a page with a
+ * 200 ms budget.
+ *
+ * `is_hero DESC, sort_order` is the SAME ordering the detail page uses, deliberately — a visitor
+ * who clicks a destination must land on the photograph they clicked, and two orderings written
+ * separately drift the first time somebody reorders a gallery.
+ *
+ * `variant_widths` needs NO `to_jsonb` here, unlike the categories aggregate above. That wrapper
+ * was written in out of caution and then proved unnecessary: the integer array is being passed to
+ * `jsonb_build_object`, which converts it to a JSON array itself, so it arrives as `[400, 800,
+ * 900]` either way. It was removed after the assertion meant to guard it was mutated and stayed
+ * green — the trap `categories` fell into is real at the TOP level of a select, not inside a jsonb
+ * constructor.
+ *
+ * `credit` is NOT selected. The column exists for attribution where a licence demands it and no
+ * surface renders it today, including the city page; carrying it into a payload nothing prints
+ * would be a field that reads as handled. See the report accompanying this change.
+ */
+const CITY_COVER_JSON = sql`
+  (
+    SELECT jsonb_build_object(
+             'fileKey', i.file_key,
+             'variantWidths', i.variant_widths,
+             'width', i.width,
+             'height', i.height,
+             'alt', jsonb_build_object('ar', i.alt_ar, 'en', i.alt_en, 'de', i.alt_de)
+           )
+    FROM city_images i
+    WHERE i.city_id = c.id AND i.deleted_at IS NULL
+    ORDER BY i.is_hero DESC, i.sort_order
+    LIMIT 1
+  )
+`;
+
+/**
  * Public reference data for the storefront (SRS §5.1, §5.4).
  *
  * Read-only and cacheable: cities, property types and amenities change through the
@@ -82,12 +121,20 @@ export class CatalogService {
       name_de: string;
       country_code: string;
       categories: { code: string; nameAr: string; nameEn: string; nameDe: string }[];
+      cover: {
+        fileKey: string;
+        variantWidths: number[];
+        width: number | null;
+        height: number | null;
+        alt: { ar: string | null; en: string | null; de: string | null };
+      } | null;
       published_count: string;
     }>(sql`
       SELECT
         c.slug, c.name_ar, c.name_en, c.name_de,
         co.code AS country_code,
         ${CITY_CATEGORIES_JSON} AS categories,
+        ${CITY_COVER_JSON} AS cover,
         -- The count shown on a destination card must reflect what a visitor can
         -- actually book, so unpublished inventory is excluded.
         (
@@ -118,6 +165,8 @@ export class CatalogService {
       nameDe: r.name_de,
       countryCode: r.country_code,
       categories: r.categories,
+      /* `null` where a city has no photograph — the grid draws that case deliberately. */
+      cover: r.cover,
       propertyCount: Number(r.published_count),
     }));
   }

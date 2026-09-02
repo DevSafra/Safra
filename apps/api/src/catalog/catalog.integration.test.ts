@@ -205,4 +205,102 @@ describeIfDb('CatalogService', () => {
       expect(Number.isInteger(city.propertyCount), `${city.slug} count`).toBe(true);
     }
   });
+
+  /**
+   * The home page draws destinations as photographs, so the LIST has to carry one.
+   *
+   * This pins the RUNTIME shape a type generic on `db.execute` only asserts. `imageUrl()` reads
+   * `variantWidths` to pick the largest variant that actually exists, and `localisedText` reads
+   * all three `alt` keys; either arriving wrong fills the grid with frames pointing at widths the
+   * pipeline never rendered.
+   *
+   * Honest note on its strength: the `variantWidths` half was NOT falsifiable by removing the
+   * `to_jsonb` this query first carried, because `jsonb_build_object` converts an integer array on
+   * its own — that mutation was run and stayed green, which is why the wrapper is gone. The
+   * assertion that has been watched to fail is the `alt` one below, against a query that omits a
+   * language.
+   */
+  it('hands each city a cover image whose variant widths are NUMBERS', async () => {
+    const cities = await catalog.cities();
+
+    const withCover = cities.filter((city) => city.cover !== null);
+    expect(
+      withCover.length,
+      'at least one seeded city must have an image',
+    ).toBeGreaterThan(0);
+
+    for (const city of withCover) {
+      const cover = city.cover!;
+
+      expect(typeof cover.fileKey, `${city.slug} fileKey`).toBe('string');
+      expect(Array.isArray(cover.variantWidths), `${city.slug} variantWidths`).toBe(true);
+
+      for (const width of cover.variantWidths) {
+        expect(typeof width, `${city.slug} variant width`).toBe('number');
+      }
+
+      /* Three keys, always present, so `localisedText` never reads `undefined`. */
+      expect(Object.keys(cover.alt).sort(), `${city.slug} alt`).toEqual([
+        'ar',
+        'de',
+        'en',
+      ]);
+    }
+  });
+
+  /**
+   * A city with NO photograph answers `null`, and the grid draws its typographic tile.
+   *
+   * The opposite control to the test above, and the one that stops «every city has a cover» being
+   * satisfied by a query that invents an empty object. A `{}` here type-checks, passes the shape
+   * assertions above, and renders an `<img>` with no `src`.
+   */
+  it('answers null for a city that has no image, never an empty object', async () => {
+    const [target] = await db
+      .execute<{ slug: string }>(
+        sql`
+      SELECT c.slug
+      FROM cities c
+      JOIN countries co ON co.id = c.country_id
+      WHERE c.is_active AND co.is_active AND c.deleted_at IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM city_images i WHERE i.city_id = c.id AND i.deleted_at IS NULL
+        )
+      LIMIT 1
+    `,
+      )
+      .then((r) => r.rows);
+
+    if (!target) {
+      /*
+        Every seeded city has a photograph today. Rather than skip in silence, MAKE the case: the
+        harness rolls back, so soft-deleting one city's images cannot escape this test.
+      */
+      const [any] = await db
+        .execute<{ slug: string }>(
+          sql`SELECT c.slug FROM cities c JOIN city_images i ON i.city_id = c.id LIMIT 1`,
+        )
+        .then((r) => r.rows);
+
+      expect(any, 'the fixture must hold at least one city image').toBeDefined();
+
+      await db.execute(sql`
+        UPDATE city_images SET deleted_at = now()
+        WHERE city_id = (SELECT id FROM cities WHERE slug = ${any!.slug})
+      `);
+
+      const cities = await catalog.cities();
+      const city = cities.find((c) => c.slug === any!.slug);
+
+      expect(city, `${any!.slug} must still be listed`).toBeDefined();
+      expect(city!.cover, `${any!.slug} cover`).toBeNull();
+      return;
+    }
+
+    const cities = await catalog.cities();
+    const city = cities.find((c) => c.slug === target.slug);
+
+    expect(city, `${target.slug} must be listed`).toBeDefined();
+    expect(city!.cover, `${target.slug} cover`).toBeNull();
+  });
 });
