@@ -111,6 +111,27 @@ export const searchResultItemSchema = z.object({
   stayTotal: z.string(),
   currencyCode: z.string(),
   nights: z.number(),
+  /**
+   * The photograph the card leads with, or `null` where the listing has none.
+   *
+   * `.nullable()`, never `.default()`. A default here would invent a plausible value for something
+   * the API did not send, and the failure it hides is exactly the one that matters: a card drawing
+   * an image element around a `fileKey` that does not exist renders a broken frame, where a real
+   * `null` renders the card's own fallback.
+   */
+  cover: z
+    .object({
+      fileKey: z.string(),
+      variantWidths: z.array(z.number()),
+      width: z.number().nullable(),
+      height: z.number().nullable(),
+      alt: z.object({
+        ar: z.string().nullable(),
+        en: z.string().nullable(),
+        de: z.string().nullable(),
+      }),
+    })
+    .nullable(),
 });
 
 export type SearchResultItem = z.infer<typeof searchResultItemSchema>;

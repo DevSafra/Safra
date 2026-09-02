@@ -3,7 +3,9 @@ import { getTranslations } from 'next-intl/server';
 
 import type { Locale } from '@/i18n/routing';
 import type { SearchResultItem } from '@/lib/api';
-import { localisedName } from '@/lib/localise';
+import { OrnamentField } from '@/components/ornament';
+import { localisedName, localisedText } from '@/lib/localise';
+import { imageUrl } from '@/lib/property';
 import { getCurrencyCatalogue } from '@/lib/catalog';
 import { convertForDisplay, displayCurrency } from '@/lib/currency';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -11,10 +13,23 @@ import { dynamicMessage } from '@/lib/dynamic-message';
 /**
  * A search result card (§5.5, §5.6).
  *
- * Shows the nightly rate AND the stay total, because the total is what the
- * customer actually pays and per-night pricing hides multi-night arithmetic. The
- * service fee is called out separately rather than folded in, so the price is not
- * misleading at the point of comparison.
+ * ## It leads with the photograph (Bashar, 2026-09-02: «the items here look very bad»)
+ *
+ * It was type only — a name, a type, a city, a rating and two prices — which is survivable in a
+ * grid of results and is not in a SLIDER beside a row of photographs. Three faults compounded: no
+ * visual anchor at all, a `mt-auto` that stretched a hole through the middle of every card once
+ * they were 336px wide, and the SAME price printed twice on a one-night search («$US 100 /
+ * الليلة» over «$US 100 لليلة واحدة»), which reads as a rendering fault rather than as a total.
+ *
+ * The projection now carries a cover — see the note on the outer select in `search.service.ts` for
+ * why that costs one index probe per RETURNED row rather than one per matching property. A listing
+ * with no photograph gets the ornament, the same surface a city with none gets, rather than a grey
+ * box that reads as a page that failed to load.
+ *
+ * Shows the nightly rate, and the stay total WHEN THAT SAYS SOMETHING ELSE — the total is what the
+ * customer actually pays and per-night pricing hides multi-night arithmetic, but on a one-night
+ * search the two lines are the same figure. The service fee is called out separately rather than
+ * folded in, so the price is not misleading at the point of comparison.
  *
  * ## Prices convert here, and say when they have
  *
@@ -90,71 +105,116 @@ export async function PropertyCard({
   );
 
   return (
-    <article className="flex h-full flex-col rounded-card border border-line bg-card p-5 transition-colors hover:border-gold/60">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="font-display text-lg text-text">
-          {/* The whole card is not a link: the heading is, so screen readers get one
-              clear target instead of a wall of duplicated link text.
-
-              `min-h-10` below `lg` because this is the primary target on a result card and a
-              finger has to hit it. It rendered 21px tall — an anchor is inline, so the global
-              40px floor in `globals.css` (which covers `button`, `select`, `summary`) cannot
-              reach it, exactly as the responsive rule warns. It is not exempt as an "inline"
-              link either: it is a card's main action, not a word inside a sentence. */}
-          <Link
-            href={`/${locale}/property/${item.slug}${stay ?? ''}`}
-            className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
-          >
-            {name}
-          </Link>
-        </h3>
-        {item.rating ? (
-          <span className="shrink-0 rounded-lg border border-line bg-field px-2 py-1 text-sm text-gold">
-            ★ {item.rating}
-          </span>
-        ) : null}
+    <article className="group relative flex h-full w-full flex-col overflow-hidden rounded-card border border-line bg-card transition-colors hover:border-gold/60">
+      <div className="relative aspect-[3/2] shrink-0 overflow-hidden bg-band">
+        {item.cover ? (
+          <picture>
+            <source srcSet={imageUrl(item.cover, 600, 'avif')} type="image/avif" />
+            <source srcSet={imageUrl(item.cover, 600, 'webp')} type="image/webp" />
+            <img
+              src={imageUrl(item.cover, 600, 'webp')}
+              /*
+                Empty where the partner wrote none: the property's NAME is the next element in the
+                reading order, so a screen reader that also announced the picture would hear the
+                listing twice. Where alt text exists it is used, because then it says something the
+                name does not.
+              */
+              alt={localisedText(item.cover.alt, locale)}
+              className="size-full object-cover transition-transform duration-500 ease-out-strong group-hover:scale-[1.04]"
+              loading="lazy"
+            />
+          </picture>
+        ) : (
+          <OrnamentField
+            id={`ornament-property-${item.propertyReference}`}
+            className="text-gold opacity-30"
+          />
+        )}
       </div>
 
-      <p className="mt-1 text-sm text-faint">
-        {dynamicMessage(tt, item.propertyTypeCode, item.propertyTypeCode)} · {city}
-      </p>
+      <div className="flex flex-1 flex-col p-4">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-[0.9375rem] font-semibold text-text">
+            {/*
+              The WHOLE CARD is the target, and there is still only one link (Bashar, 2026-09-02).
 
-      {/* Trust badges (§5.6). Awarded by SAFRA, never set by the partner. */}
-      {item.badges.length > 0 ? (
-        <ul className="mt-3 flex flex-wrap gap-1.5">
-          {item.badges.map((badge) => (
-            <li
-              key={badge}
-              className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-xs text-gold"
+              Those two things are usually in tension: wrapping the card in an anchor makes the
+              rating, the badges and the price part of the link's accessible name, so a screen
+              reader announces «اختبار 4.8 موثّق من سفرة 5 تقييمات 65 دولار…» as the name of one
+              control. Putting an anchor on each of them instead gives four links to the same
+              place.
+
+              `after:absolute after:inset-0` is the third answer: the anchor keeps its own short
+              name in the accessibility tree, and its pseudo-element is stretched over the card so
+              a press anywhere inside lands on it. The card is `relative` so that box is the
+              card's, and `after:content-['']` because a pseudo-element with no content is not
+              rendered at all.
+
+              `min-h-10` below `lg` stays even though the hit area is now the whole card: the
+              anchor is what a keyboard focuses and what its focus ring is drawn around, and a
+              21px ring on a 300px card reads as focus landing on nothing.
+            */}
+            <Link
+              href={`/${locale}/property/${item.slug}${stay ?? ''}`}
+              className="inline-flex min-h-10 items-center after:absolute after:inset-0 after:content-[''] lg:min-h-0"
             >
-              {badge === 'safra_verified' ? t('badgeVerified') : t('badgeRecommends')}
-            </li>
-          ))}
-        </ul>
-      ) : null}
+              {name}
+            </Link>
+          </h3>
+          {item.rating ? (
+            <span className="shrink-0 rounded-lg border border-line bg-field px-2 py-1 text-sm text-gold">
+              ★ {item.rating}
+            </span>
+          ) : null}
+        </div>
 
-      {item.reviewsCount > 0 ? (
-        <p className="mt-2 text-xs text-faint">
-          {t('reviews', { count: item.reviewsCount })}
+        <p className="mt-1 text-xs text-faint">
+          {dynamicMessage(tt, item.propertyTypeCode, item.propertyTypeCode)} · {city}
         </p>
-      ) : null}
 
-      <div className="mt-auto pt-5">
-        <div className="gold-rule mb-4" />
-        <p className="text-lg text-text">
-          <span className="font-semibold text-gold">{nightly.text}</span>{' '}
-          <span className="text-sm text-faint">{t('perNight')}</span>
-        </p>
-        <p className="mt-1 text-sm text-muted">
-          {total.text} {t('totalFor', { nights: item.nights })}
-        </p>
-        {/* Said once per card, under the total — the figure a booking is actually made against. */}
-        {total.converted ? (
-          <p className="mt-1 text-xs text-faint">
-            {common('convertedFrom', { amount: total.original })}
+        {/* Trust badges (§5.6). Awarded by SAFRA, never set by the partner. */}
+        {item.badges.length > 0 ? (
+          <ul className="mt-2.5 flex flex-wrap gap-1.5">
+            {item.badges.map((badge) => (
+              <li
+                key={badge}
+                className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-xs text-gold"
+              >
+                {badge === 'safra_verified' ? t('badgeVerified') : t('badgeRecommends')}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+
+        {item.reviewsCount > 0 ? (
+          <p className="mt-2 text-[0.6875rem] text-faint">
+            {t('reviews', { count: item.reviewsCount })}
           </p>
         ) : null}
-        <p className="mt-1 text-xs text-faint">{t('serviceFee')}</p>
+
+        <div className="mt-auto pt-4">
+          <p className="text-base text-text">
+            <span className="font-bold text-gold">{nightly.text}</span>{' '}
+            <span className="text-xs text-faint">{t('perNight')}</span>
+          </p>
+          {/*
+          The total, only when it says something the line above does not. On a one-night search the
+          two are the same figure, and «$US 100 / الليلة» over «$US 100 لليلة واحدة» reads as the
+          card having printed the price twice by mistake.
+        */}
+          {item.nights > 1 ? (
+            <p className="mt-0.5 text-xs text-muted">
+              {total.text} {t('totalFor', { nights: item.nights })}
+            </p>
+          ) : null}
+          {/* Said once per card, under the total — the figure a booking is actually made against. */}
+          {total.converted ? (
+            <p className="mt-0.5 text-[0.6875rem] text-faint">
+              {common('convertedFrom', { amount: total.original })}
+            </p>
+          ) : null}
+          <p className="mt-0.5 text-[0.6875rem] text-faint">{t('serviceFee')}</p>
+        </div>
       </div>
     </article>
   );

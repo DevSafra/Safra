@@ -38,6 +38,19 @@ export interface SearchResultItem {
   stayTotal: string;
   currencyCode: string;
   nights: number;
+  /**
+   * The photograph a result card leads with, or `null` where the listing has none.
+   *
+   * `null`, never a default: a card that draws an image element around a `fileKey` that does not
+   * exist renders a broken frame, where a real `null` renders the card's own fallback.
+   */
+  cover: {
+    fileKey: string;
+    variantWidths: number[];
+    width: number | null;
+    height: number | null;
+    alt: { ar: string | null; en: string | null; de: string | null };
+  } | null;
 }
 
 export interface SearchResult {
@@ -369,9 +382,11 @@ export class SearchService {
           ROUND(b.stay_total / ${nights}, 2) AS "nightlyFrom",
           ${nights}::int       AS nights,
           -- Duplicated in snake_case purely to drive ORDER BY; stripped before
-          -- the rows are returned.
+          -- the rows are returned. property_id_sort drives the cover subquery in the OUTER
+          -- select instead, and is stripped with them.
           p.recommendation_score,
-          b.stay_total         AS stay_total_sort
+          b.stay_total         AS stay_total_sort,
+          p.id                 AS property_id_sort
         FROM bookable b
         JOIN properties p            ON p.id = b.property_id
         JOIN cities ci               ON ci.id = p.city_id
@@ -407,7 +422,37 @@ export class SearchService {
       -- computed over the WHOLE partition before LIMIT can apply, so the cost of ranking every
       -- matching property was paid on every search and then discarded. Removing it lets the sort
       -- feed the limit directly.
-      SELECT c.*
+      --
+      -- The cover is read HERE, in the outer target list, and that placement is the whole cost
+      -- argument. A scalar subquery in the target list of a limited query is evaluated per
+      -- RETURNED row, so this runs at most limit + 1 times — eight probes on a home page, not
+      -- one per matching property. Inside the candidates CTE it would have run for every bookable
+      -- listing before the limit could apply, which on a city with two thousand of them is the
+      -- shape that took search from 0.6s to 144s once before.
+      --
+      -- property_images_property_idx is (property_id, sort_order), so each probe is an index
+      -- scan. is_cover DESC first, matching the gallery's own order: the cover if one is
+      -- flagged, else the first by position.
+      --
+      -- status = 'ready' because a row mid-pipeline has no rendered variants yet, and a card
+      -- asking for one would draw a broken frame. No backticks in this comment: it sits inside a
+      -- sql template literal.
+      SELECT c.*,
+             (
+               SELECT jsonb_build_object(
+                        'fileKey', i.file_key,
+                        'variantWidths', i.variant_widths,
+                        'width', i.width,
+                        'height', i.height,
+                        'alt', jsonb_build_object('ar', i.alt_ar, 'en', i.alt_en, 'de', i.alt_de)
+                      )
+               FROM property_images i
+               WHERE i.property_id = c.property_id_sort
+                 AND i.deleted_at IS NULL
+                 AND i.status = 'ready'
+               ORDER BY i.is_cover DESC, i.sort_order
+               LIMIT 1
+             ) AS cover
       FROM candidates c
       ORDER BY ${orderBy}
       LIMIT ${query.limit + 1}
@@ -482,7 +527,12 @@ function encodeOffset(offset: number): string {
 
 /** Drops the duplicate columns that exist only to drive ORDER BY. */
 function stripSortColumns(row: Record<string, unknown>): SearchResultItem {
-  const { recommendation_score: _rs, stay_total_sort: _st, ...rest } = row;
+  const {
+    recommendation_score: _rs,
+    stay_total_sort: _st,
+    property_id_sort: _pid,
+    ...rest
+  } = row;
 
   return rest as unknown as SearchResultItem;
 }
