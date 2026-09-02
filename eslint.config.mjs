@@ -34,6 +34,16 @@ export default tseslint.config(
       // tsconfig project, and adding one would mean type-checking against @types/node for a
       // runtime that is not Node. Prettier still formats them, so style stays consistent.
       'load/**',
+      // Third-party agent tooling installed into the working tree (2026-09-01).
+      //
+      // `npx skills add` and the impeccable installer write their skills under `.agents/skills/`
+      // and symlink them into `.claude/skills/`, and impeccable ships ~107 `.mjs` scripts. They
+      // are not in any tsconfig project, so type-aware linting reported a parsing error for every
+      // one of them — 214 errors, which took `pnpm lint` and therefore `pnpm verify` from green
+      // to failing for every session in this checkout, with nothing in `apps/` or `packages/`
+      // wrong. Both paths are git-ignored; none of it is ours to lint or to ship.
+      '.agents/**',
+      '.claude/**',
     ],
   },
 

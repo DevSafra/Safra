@@ -4,3 +4,14 @@ dist
 .turbo
 pnpm-lock.yaml
 packages/db/migrations
+
+# Third-party agent tooling installed into this working tree (2026-09-02).
+#
+# `.gitignore` already excludes all of it — `df67d31` did that for the skills, and the
+# impeccable hook writes its own cache under `.impeccable/`. Prettier does not read
+# `.gitignore`, so without these lines `pnpm verify` fails on a JSON file no human wrote
+# and no build consumes, in every checkout where a skill has been run.
+.claude
+.agents
+.impeccable
+skills-lock.json

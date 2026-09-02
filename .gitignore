@@ -61,3 +61,9 @@ CLAUDE.md
 
 # Local object storage (development only)
 .storage/
+
+# Local state written by third-party agent tooling (2026-09-02) — the impeccable design
+# skill's hook cache and Codex's hook config. Neither is authored here and neither is a
+# dependency of the build, the same reason `.agents/` and `.claude/` are excluded above.
+.impeccable/
+.codex/
