@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
-import { Amiri, Cairo } from 'next/font/google';
+import { Amiri, IBM_Plex_Sans_Arabic } from 'next/font/google';
 import { NextIntlClientProvider } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
@@ -16,23 +16,32 @@ import { ThemeKeeper } from '@/components/theme-keeper';
 import '../globals.css';
 
 /**
- * Amiri for display — the Arabic serif the approved prototype embedded, which
- * carries the "oriental character" §1.1 calls for. Cairo for UI text, because a
- * serif at 14px in Arabic is hard to read on screen.
+ * The design handoff's own pair (§4.1), which the console and the partner portal already use.
  *
- * Both are self-hosted by next/font at build time: no runtime request to Google,
- * no layout shift, and nothing for a visitor's network to block.
+ * IBM Plex Sans Arabic for UI, Amiri for display headings. This is not a fresh choice — it is the
+ * documented one, and the customer site was the only app of the three not following it. Every
+ * spacing value in the handoff was measured against Plex Arabic, which has tighter counters and a
+ * shorter x-height than the Cairo that was here as a pre-handoff guess.
+ *
+ * ## Both variables go on `<html>`
+ *
+ * `@theme` emits `--font-sans` at `:root`, so a `--font-plex` defined on `<body>` is one level
+ * BELOW where it is read: `var(--font-plex)` is then undefined, the whole declaration is
+ * guaranteed-invalid, and `font-family` silently falls through to the OS stack. That is how this
+ * app shipped from the day fonts were added until 2026-09-02, and it is why neither face had ever
+ * actually rendered here. The console and the portal put them on `<html>` and were never affected.
  */
+const plex = IBM_Plex_Sans_Arabic({
+  subsets: ['arabic', 'latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-plex',
+  display: 'swap',
+});
+
 const amiri = Amiri({
   subsets: ['arabic', 'latin'],
   weight: ['400', '700'],
   variable: '--font-amiri',
-  display: 'swap',
-});
-
-const cairo = Cairo({
-  subsets: ['arabic', 'latin'],
-  variable: '--font-cairo',
   display: 'swap',
 });
 
@@ -108,18 +117,18 @@ export default async function LocaleLayout({
   const theme = (await cookies()).get(themeCookie('web'))?.value;
 
   return (
+    /* Both font variables on `<html>` — see the note on the declarations above. */
     <html
       lang={locale}
       dir={direction}
+      className={`${plex.variable} ${amiri.variable}`}
       {...(theme === 'dark' ? { 'data-theme': 'dark' } : {})}
       suppressHydrationWarning
     >
       <head>
         <ThemeScript />
       </head>
-      <body
-        className={`${amiri.variable} ${cairo.variable} flex min-h-dvh flex-col bg-bg text-text`}
-      >
+      <body className="flex min-h-dvh flex-col bg-bg text-text">
         <ThemeKeeper />
         <NextIntlClientProvider>
           {/* Keyboard users must be able to bypass the header on every page. */}

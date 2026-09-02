@@ -23,8 +23,14 @@
  * and the admin screens use it.
  */
 @theme {
+  /*
+    The handoff's pair (§4.1), the same two the console and the partner portal load. Both fall back
+    to a generic ARABIC-capable family rather than to `system-ui` alone, which on most machines is a
+    Latin default — an Arabic string shaped by it before the webfont arrives is what `display: swap`
+    exists to make brief, not to make ugly.
+  */
   --font-display: var(--font-amiri), 'Amiri', serif;
-  --font-sans: var(--font-cairo), system-ui, sans-serif;
+  --font-sans: var(--font-plex), 'IBM Plex Sans Arabic', system-ui, sans-serif;
 
   --color-bg: #0c0a1c;
   --color-card: #17142f;
@@ -66,6 +72,19 @@
   --color-stone: #a8968a;
 
   --radius-card: 0.875rem;
+
+  /**
+   * One authored curve, used for everything the visitor triggers.
+   *
+   * CSS's built-in `ease-out` is too gentle to read as a response: at 200 ms it looks like the
+   * browser is catching up rather than like the interface answering. This is the strong variant
+   * — nearly all of the distance is covered in the first third — which is what makes a press or
+   * a hover feel instant at a duration short enough not to be waited on.
+   *
+   * `ease-in` is deliberately absent. It withholds movement at exactly the moment the eye is on
+   * the element, so it reads as lag on every control it touches.
+   */
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 /**
@@ -116,6 +135,37 @@
   --color-crimson: #a8285c;
   --color-slate: #5a6480;
   --color-stone: #7a6a5e;
+  --shadow-lift: 0 1px 2px rgba(29, 35, 51, 0.1), 0 6px 16px -4px rgba(29, 35, 51, 0.14);
+  --shadow-lift-hover:
+    0 2px 5px rgba(29, 35, 51, 0.13), 0 12px 26px -6px rgba(29, 35, 51, 0.18);
+}
+
+/**
+ * The lift under a control that floats ON something — the slider arrows, over the cards they scroll.
+ *
+ * Two layers, both with a real OFFSET and a soft blur: a 1px contact shadow so the circle does not
+ * look pasted on, and a wider diffuse one that lifts it off the card underneath. A zero-offset halo
+ * is decoration rather than depth.
+ *
+ * ## Why these are NOT in `@theme`
+ *
+ * They were, and both themes then got the dark values. Tailwind v4 INLINES a `--shadow-*` theme
+ * value into the generated utility — `.shadow-lift{--tw-shadow:0 1px 2px #0000008c,…}` — rather
+ * than emitting `var(--shadow-lift)` the way it does for colours. So a per-theme override of the
+ * variable cannot reach it, and `@theme` would additionally publish a `shadow-lift` utility that
+ * silently paints the night shadow on a white page: a trap for whoever reaches for it next.
+ *
+ * Declared as plain custom properties and consumed as `shadow-[var(--shadow-lift)]`, the `var()`
+ * indirection survives into the stylesheet and the light block below overrides it as normal.
+ *
+ * A shadow has to be redefined per theme rather than tinted from a token: it must always be DARKER
+ * than the surface it falls on, and `--color-text` inverts between the two, so one expression would
+ * paint a cream glow on night. The light pair is tinted from the page's own ink (#1d2333) rather
+ * than pure black, because a black shadow on a blue-grey surface reads as a smudge.
+ */
+:root {
+  --shadow-lift: 0 1px 2px rgba(0, 0, 0, 0.55), 0 6px 16px -4px rgba(0, 0, 0, 0.5);
+  --shadow-lift-hover: 0 2px 5px rgba(0, 0, 0, 0.6), 0 12px 26px -6px rgba(0, 0, 0, 0.55);
 }
 
 /**
@@ -197,6 +247,67 @@ body {
   /* Arabic needs a little more line height than Latin at the same size. */
   line-height: 1.7;
   -webkit-font-smoothing: antialiased;
+}
+
+/**
+ * The primary action — the prototype's gold, and the one control that does NOT follow the theme.
+ *
+ * Taken verbatim from `SAFRA - موقع سفرة 20.08.html` (Bashar, 2026-09-02, with a screenshot of
+ * «احجز الآن»): `linear-gradient(135deg, #f0cb7c, #c4923e)` under `#241a05`.
+ *
+ * ## Why these are literals when everything else on the page is a token
+ *
+ * `--color-gold` is not one colour, it is two: #e8bc66 against night and #a87a1f against white,
+ * because a gold that reads on one is invisible on the other. That works for TEXT and for borders,
+ * where the theme also moves the surface behind them. It does not work for a filled button, whose
+ * surface IS the gold: routed through the token, the light theme paints a dark ochre block with
+ * near-white text at 3.56:1 — under the floor, and nothing like the screenshot.
+ *
+ * So the pair is fixed. The button carries its own foreground and background, the contrast between
+ * them is a property of the pair rather than of the page, and it is therefore identical in both
+ * themes — which is what the screenshot shows and what makes a primary action recognisable.
+ *
+ * ## Contrast, measured across the gradient
+ *
+ * `#241a05` on the LIGHTEST stop is 11.0:1 and on the DARKEST stop is 6.1:1. A gradient has to be
+ * checked at the dark end, because that is where a light-on-dark reading fails and it is the end
+ * nobody looks at.
+ *
+ * `background-image` rather than `background`, so a `bg-*` utility cannot half-override it.
+ */
+.btn-gold {
+  background-image: linear-gradient(135deg, #f0cb7c, #c4923e);
+  color: #241a05;
+}
+
+/*
+  Paper prints the label, not the fill: a gradient block behind dark text costs ink and gains
+  nothing, and the customer's receipt is the one page that reaches a printer.
+*/
+@media print {
+  .btn-gold {
+    background-image: none;
+    color: #000000;
+  }
+}
+
+/**
+ * The parts of the page the browser paints for us.
+ *
+ * Selection and the caret ship with a system blue that belongs to macOS rather than to SAFRA. Both
+ * are derived from `--color-gold`, so they follow the theme without a second declaration.
+ *
+ * The selection FILL is a tint rather than solid gold: at full strength, `--color-text` on
+ * `--color-gold` does not clear 4.5:1 in either theme, and text you cannot read while it is
+ * selected is worse than the default it replaced.
+ */
+::selection {
+  background-color: color-mix(in oklab, var(--color-gold) 28%, transparent);
+  color: var(--color-text);
+}
+
+:where(input, textarea) {
+  caret-color: var(--color-gold);
 }
 
 /**
@@ -450,4 +561,24 @@ body {
   a {
     text-decoration: none;
   }
+}
+
+/**
+ * The destination slider's row.
+ *
+ * `overscroll-behavior-inline: contain` stops a horizontal flick that reaches the end of the row
+ * from continuing into the browser's back gesture, which on a trackpad silently navigates away
+ * from the page.
+ *
+ * The scrollbar is hidden here, unlike a bare rail: the row has ARROWS, so the bar is a second
+ * affordance for the same thing and booking.com's carousels show none. Hiding it also stops the
+ * cards jumping by a scrollbar's height when the overlay bar appears on a trackpad.
+ */
+.slider-rail {
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+
+.slider-rail::-webkit-scrollbar {
+  display: none;
 }
