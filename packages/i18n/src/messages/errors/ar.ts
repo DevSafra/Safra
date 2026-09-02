@@ -305,6 +305,8 @@ export const ar = {
   'property.image_limit': 'يمكن أن يحتوي العقار على {max} صورة كحد أقصى.',
   'property.cancellation_policy_unknown': 'سياسة الإلغاء غير معروفة.',
   'geo.city_image_limit': 'يمكن أن تحتوي المدينة على {max} صورة كحد أقصى.',
+  'geo.city_image_last_one':
+    'لا يمكن حذف الصورة الأخيرة للمدينة. ارفع صورة بديلة أولاً، ثم احذف هذه.',
   'unit.unavailable_on': 'الوحدة غير متاحة في {date}.',
   'unit.guest_limit': 'تتسع هذه الوحدة لـ {max} ضيوف، وقد طُلب {requested}.',
   'unit.max_nights': 'تسمح هذه الوحدة بـ {max} ليلة كحد أقصى.',

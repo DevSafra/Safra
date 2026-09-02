@@ -228,6 +228,55 @@ describeIfDb('managing a city photograph', () => {
     ).rejects.toMatchObject({ response: { code: ERROR.IMAGE_NOT_FOUND } });
   });
 
+  /**
+   * Archiving the main hands the badge to the next one (Bashar, 2026-09-02).
+   *
+   * The third photograph is inserted with a LOWER sort order than the second, so «the first on the
+   * list» and «the oldest remaining» are different rows. A promotion written as `ORDER BY
+   * created_at` picks the second and passes a weaker test; this one names the row the console
+   * actually shows first.
+   */
+  it('promotes the first remaining photograph when the main is archived', async () => {
+    const third = await db.execute<{ id: string }>(sql`
+      INSERT INTO city_images (city_id, file_key, width, height, variant_widths,
+                               is_hero, sort_order)
+      VALUES ((SELECT city_id FROM city_images WHERE id = ${ids[0]}::uuid),
+              ${`cities/${slug}/c`}, 1600, 900, '{480,960}', false, 0)
+      RETURNING id::text
+    `);
+
+    await controller.remove(slug, ids[0] ?? '');
+
+    expect((await image(third.rows[0]?.id ?? ''))?.is_hero).toBe(true);
+    /* Exactly one, because two heroes is not a state the public read can resolve. */
+    expect((await image(ids[1] ?? ''))?.is_hero).toBe(false);
+  });
+
+  /** Archiving anything else must not move the badge. */
+  it('leaves the main alone when another photograph is archived', async () => {
+    await controller.remove(slug, ids[1] ?? '');
+
+    expect((await image(ids[0] ?? ''))?.is_hero).toBe(true);
+  });
+
+  /**
+   * A city may never be left without a photograph (Bashar, 2026-09-02).
+   *
+   * The public destination card draws one, and the ornament it falls back to is a designed state
+   * for a city nobody has photographed YET — not something an operator should be able to produce
+   * by pressing delete twice.
+   */
+  it('refuses to archive the last photograph a city has', async () => {
+    await controller.remove(slug, ids[1] ?? '');
+
+    await expect(controller.remove(slug, ids[0] ?? '')).rejects.toMatchObject({
+      response: { code: ERROR.GEO_CITY_IMAGE_LAST_ONE },
+    });
+
+    /* And it is still there, rather than archived and then complained about. */
+    expect((await image(ids[0] ?? ''))?.is_hero).toBe(true);
+  });
+
   /** And a retired one is gone, not merely hidden — the archive path this screen finally calls. */
   it('refuses a photograph that has been removed', async () => {
     const id = ids[0] ?? '';

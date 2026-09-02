@@ -380,6 +380,8 @@ export const de = {
   'property.image_limit': 'Ein Objekt darf höchstens {max} Bilder haben.',
   'property.cancellation_policy_unknown': 'Unbekannte Stornierungsbedingung.',
   'geo.city_image_limit': 'Eine Stadt darf höchstens {max} Bilder haben.',
+  'geo.city_image_last_one':
+    'Eine Stadt darf nicht ohne Foto bleiben. Laden Sie zuerst ein Ersatzbild hoch und löschen Sie dann dieses.',
   'unit.unavailable_on': 'Die Einheit ist am {date} nicht verfügbar.',
   'unit.guest_limit':
     'Diese Einheit bietet Platz für {max} Gäste; angefragt wurden {requested}.',

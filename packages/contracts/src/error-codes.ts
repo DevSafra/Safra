@@ -468,6 +468,8 @@ export const ERROR = {
   PROPERTY_IMAGE_LIMIT: 'property.image_limit',
   PROPERTY_CANCELLATION_POLICY_UNKNOWN: 'property.cancellation_policy_unknown',
   GEO_CITY_IMAGE_LIMIT: 'geo.city_image_limit',
+  /* A city must always have a photograph: the public destination card draws one (Bashar, 2026-09-02). */
+  GEO_CITY_IMAGE_LAST_ONE: 'geo.city_image_last_one',
   UNIT_UNAVAILABLE_ON: 'unit.unavailable_on',
   UNIT_GUEST_LIMIT: 'unit.guest_limit',
   UNIT_MAX_NIGHTS: 'unit.max_nights',

@@ -28,7 +28,7 @@ import { DATABASE } from '../database/database.module.js';
 import { ImageService } from '../storage/image.service.js';
 import { CurrentUser, RequirePermissions } from '../rbac/decorators.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
-import { badRequest, notFound } from '../common/errors/app-error.js';
+import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
 const MAX_IMAGES_PER_CITY = 12;
 
@@ -200,7 +200,33 @@ export class CityImagesController {
     return { id: image.id };
   }
 
-  /** Soft delete only (P-003). */
+  /**
+   * Soft delete only (P-003), and it may never leave the city without a photograph.
+   *
+   * Two rules, both from Bashar on 2026-09-02, and they are the same rule seen from two sides:
+   * **every city has at least one image**, and **deleting the main promotes the next one**.
+   *
+   * ## Why the last image cannot go
+   *
+   * The public destination card and §5.4's hero band both draw a city's photograph. Archiving the
+   * only one leaves the card falling back to the ornament — which is a designed state for a city
+   * nobody has photographed YET, not an outcome an operator should be able to produce by pressing
+   * delete. So it is refused with a message that says what to do instead: upload the replacement
+   * first. This is the shape `property-images.service.ts` already uses for a published listing.
+   *
+   * ## Why the promotion is a subquery rather than a read and a write
+   *
+   * `UPDATE … WHERE id = (SELECT … LIMIT 1)` inside the transaction, so two operators archiving
+   * two images at once cannot both read «the next one» as the same row and both promote it. The
+   * order is `sort_order, created_at` — EXACTLY the order the console lists them in, so «the first
+   * image on the list» means the same thing to the operator and to this statement. The public read
+   * orders by `is_hero DESC, sort_order`, which is a different question and deliberately so.
+   *
+   * Without the promotion the city keeps zero heroes. Nothing 500s — the public cover query falls
+   * through to `sort_order` and still finds a picture — but the console then shows no «الرئيسية»
+   * badge at all, so the operator and the site disagree about which photograph is the main one,
+   * and the next upload silently becomes the cover.
+   */
   @Delete(':imageId')
   @RequirePermissions(P.GEO_MANAGE)
   @Audited({
@@ -209,8 +235,12 @@ export class CityImagesController {
     subjectParam: 'imageId',
   })
   async remove(@Param('slug') slug: string, @Param('imageId') imageId: string) {
-    const rows = await this.db
-      .select({ id: schema.cityImages.id })
+    const found = await this.db
+      .select({
+        id: schema.cityImages.id,
+        cityId: schema.cityImages.cityId,
+        isHero: schema.cityImages.isHero,
+      })
       .from(schema.cityImages)
       .innerJoin(schema.cities, eq(schema.cities.id, schema.cityImages.cityId))
       .where(
@@ -222,12 +252,37 @@ export class CityImagesController {
       )
       .limit(1);
 
-    if (rows.length === 0) throw notFound(ERROR.IMAGE_NOT_FOUND);
+    const image = found[0];
 
-    await this.db
-      .update(schema.cityImages)
-      .set({ deletedAt: new Date() })
-      .where(eq(schema.cityImages.id, imageId));
+    if (!image) throw notFound(ERROR.IMAGE_NOT_FOUND);
+
+    const live = await this.db.execute<{ n: number }>(sql`
+      SELECT count(*)::int AS n FROM city_images
+      WHERE city_id = ${image.cityId}::uuid AND deleted_at IS NULL
+    `);
+
+    if (Number(live.rows[0]?.n ?? 0) <= 1) {
+      throw conflict(ERROR.GEO_CITY_IMAGE_LAST_ONE);
+    }
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(schema.cityImages)
+        .set({ deletedAt: new Date() })
+        .where(eq(schema.cityImages.id, imageId));
+
+      if (image.isHero) {
+        await tx.execute(sql`
+          UPDATE city_images SET is_hero = true, updated_at = now()
+          WHERE id = (
+            SELECT id FROM city_images
+            WHERE city_id = ${image.cityId}::uuid AND deleted_at IS NULL
+            ORDER BY sort_order, created_at
+            LIMIT 1
+          )
+        `);
+      }
+    });
 
     return { id: imageId, archived: true };
   }

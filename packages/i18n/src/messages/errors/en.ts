@@ -336,6 +336,8 @@ export const en = {
   'property.image_limit': 'A property may have at most {max} images.',
   'property.cancellation_policy_unknown': 'Unknown cancellation policy.',
   'geo.city_image_limit': 'A city may have at most {max} images.',
+  'geo.city_image_last_one':
+    'A city cannot be left without a photograph. Upload a replacement first, then delete this one.',
   'unit.unavailable_on': 'The unit is not available on {date}.',
   'unit.guest_limit': 'This unit accommodates {max} guests; {requested} were requested.',
   'unit.max_nights': 'This unit allows at most {max} nights.',
