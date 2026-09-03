@@ -103,7 +103,7 @@ export default async function ReviewPage({
 
           {eligibility.review.partnerReply ? (
             <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2">
-              <p className="text-xs font-bold text-gold-ink">{t('partnerReply')}</p>
+              <p className="text-xs font-bold text-gold">{t('partnerReply')}</p>
               <p className="mt-1 text-sm leading-relaxed text-muted">
                 {eligibility.review.partnerReply}
               </p>

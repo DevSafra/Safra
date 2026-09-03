@@ -119,7 +119,7 @@ export default async function AccountWalletPage({
               borderColor: 'rgba(var(--goldA), 0.35)',
             }}
           >
-            <p className="text-[12px] font-extrabold tracking-[0.08em] text-gold-ink">
+            <p className="text-[12px] font-extrabold tracking-[0.08em] text-gold">
               {t('walletEyebrow')}
             </p>
 
@@ -155,7 +155,7 @@ export default async function AccountWalletPage({
                   exact: true,
                 })}
                 caption={t('walletGiftCaption')}
-                tone="text-gold-ink"
+                tone="text-gold"
               />
             </div>
 
@@ -171,7 +171,7 @@ export default async function AccountWalletPage({
                 — and printing the stored number rather than a sum is what makes that checkable. A total
                 computed on the page could disagree with the balance the API holds; this one cannot.
               */}
-              <span className="text-[16px] font-extrabold text-gold-ink" dir="ltr">
+              <span className="text-[16px] font-extrabold text-gold" dir="ltr">
                 {formatMoney(balance.balance, balance.currencyCode, locale, {
                   exact: true,
                 })}

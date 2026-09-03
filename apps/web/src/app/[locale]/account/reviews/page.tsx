@@ -91,7 +91,7 @@ export default async function AccountReviewsPage({
                           />
                         </span>
                       </span>
-                      <span className="text-sm font-semibold text-gold-ink">
+                      <span className="text-sm font-semibold text-gold">
                         {reviews('writeReview')}
                       </span>
                     </Link>
@@ -126,7 +126,7 @@ export default async function AccountReviewsPage({
                           {localisedName(review.property, locale)}
                         </p>
                         {/* A score is a Latin numeral pair on a line that may be Arabic. */}
-                        <p className="text-sm font-bold text-gold-ink" dir="ltr">
+                        <p className="text-sm font-bold text-gold" dir="ltr">
                           {review.rating} / 5
                         </p>
                       </div>

@@ -117,7 +117,7 @@ export function SaveButton({
         aria-pressed={saved}
         className={`inline-flex min-h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border px-4 text-sm transition-colors sm:min-h-11 ${
           saved
-            ? 'border-gold bg-gold/12 text-gold-ink'
+            ? 'border-gold bg-gold/12 text-gold'
             : 'border-line text-muted hover:border-gold hover:text-gold'
         }`}
       >

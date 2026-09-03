@@ -95,7 +95,7 @@ export function ReviewForm({
               key={value}
               className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-sm transition-colors ${
                 rating === value
-                  ? 'border-gold bg-gold/15 font-bold text-gold-ink'
+                  ? 'border-gold bg-gold/15 font-bold text-gold'
                   : 'border-line text-muted hover:border-gold/40'
               }`}
             >

@@ -182,7 +182,7 @@ export default async function CityPage({
             className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_-20%,color-mix(in_oklab,var(--color-sky)_28%,transparent),transparent_65%)]"
           />
         )}
-        <div className="relative mx-auto max-w-6xl px-4 py-14 sm:py-20">
+        <div className="relative mx-auto max-w-7xl px-4 py-14 sm:py-20">
           <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
             {/*
               A breadcrumb link is a CONTROL, so it carries the 40px floor below `lg`.
@@ -233,7 +233,7 @@ export default async function CityPage({
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 py-10">
+      <section className="mx-auto max-w-7xl px-4 py-10">
         <SearchForm
           locale={locale}
           cities={cities}
@@ -242,7 +242,7 @@ export default async function CityPage({
         />
       </section>
 
-      <section className="mx-auto max-w-6xl px-4 pb-16">
+      <section className="mx-auto max-w-7xl px-4 pb-16">
         <h2 className="font-display text-2xl text-text">
           {t('availableStays', { city: name })}
         </h2>

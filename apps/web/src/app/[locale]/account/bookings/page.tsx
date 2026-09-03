@@ -96,7 +96,7 @@ export default async function AccountBookingsPage({
                         status={shown}
                         label={dynamicMessage(t, `status.${shown}`, shown)}
                       />
-                      <span className="text-sm text-gold-ink" dir="ltr">
+                      <span className="text-sm text-gold" dir="ltr">
                         {booking.totalAmount}
                       </span>
                     </span>

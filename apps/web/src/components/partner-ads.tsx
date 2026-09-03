@@ -76,7 +76,7 @@ export async function PartnerAds({
               Below it, a reader who stops after the first line has read an advertisement without
               being told it was one — and that first line is the half designed to be read.
             */}
-            <span className="w-fit rounded-full border border-gold/40 px-2 py-0.5 text-[11px] font-semibold text-gold-ink">
+            <span className="w-fit rounded-full border border-gold/40 px-2 py-0.5 text-[11px] font-semibold text-gold">
               {t('label')}
             </span>
 
@@ -111,7 +111,7 @@ export async function PartnerAds({
               href={`/${locale}/api/ads/${encodeURIComponent(ad.reference)}/click`}
               rel="nofollow sponsored noopener noreferrer"
               target="_blank"
-              className="mt-auto inline-flex min-h-10 w-fit items-center text-xs font-semibold text-gold-ink hover:underline lg:min-h-0"
+              className="mt-auto inline-flex min-h-10 w-fit items-center text-xs font-semibold text-gold hover:underline lg:min-h-0"
             >
               {t('visit')}
             </a>

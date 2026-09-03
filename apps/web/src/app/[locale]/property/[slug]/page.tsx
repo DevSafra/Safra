@@ -150,7 +150,7 @@ export default async function PropertyPage({
   );
 
   return (
-    <article className="mx-auto max-w-6xl px-4 py-8">
+    <article className="mx-auto max-w-7xl px-4 py-8">
       <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
         {/* Both breadcrumb links are controls — see the note on the city page. */}
         <Link
@@ -177,7 +177,7 @@ export default async function PropertyPage({
       <header className="mt-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="font-display text-3xl font-bold text-gold-ink sm:text-4xl">
+            <h1 className="font-display text-3xl font-bold text-gold sm:text-4xl">
               {name}
             </h1>
             <p className="mt-2 text-sm text-muted">
@@ -208,7 +208,7 @@ export default async function PropertyPage({
               </span>
               <a
                 href="#location"
-                className="inline-flex min-h-10 items-center font-semibold text-gold-ink underline decoration-gold/40 underline-offset-2 lg:min-h-0 hover:decoration-gold"
+                className="inline-flex min-h-10 items-center font-semibold text-gold underline decoration-gold/40 underline-offset-2 lg:min-h-0 hover:decoration-gold"
               >
                 {t('location')}
               </a>
@@ -228,7 +228,7 @@ export default async function PropertyPage({
           <div className="flex flex-wrap items-center gap-2">
             <a
               href="#booking"
-              className="btn-gold inline-flex min-h-10 items-center rounded-lg px-5 text-sm font-bold transition-[opacity,scale] duration-200 ease-out-strong hover:opacity-90 active:scale-[.98] sm:min-h-11"
+              className="btn-gold inline-flex min-h-10 items-center rounded-lg px-5 text-sm font-bold transition-[opacity] duration-200 ease-out-strong hover:opacity-90 sm:min-h-11"
             >
               {t('bookNow')}
             </a>
@@ -263,7 +263,7 @@ export default async function PropertyPage({
             {property.badges.map((badge) => (
               <li
                 key={badge}
-                className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs text-gold-ink"
+                className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs text-gold"
               >
                 {badge === 'safra_verified' ? t('badgeVerified') : t('badgeRecommends')}
               </li>
@@ -408,7 +408,7 @@ export default async function PropertyPage({
                           `dir="ltr"`: a ★ followed by a digit is a Latin run, and the star is
                           bidi-neutral — without this it lands on the wrong side of the number.
                         */}
-                        <span dir="ltr" className="text-sm font-bold text-gold-ink">
+                        <span dir="ltr" className="text-sm font-bold text-gold">
                           <span aria-hidden>★</span> {review.rating}
                         </span>
                         <span className="text-xs text-faint">{t('reviewsVerified')}</span>
@@ -423,7 +423,7 @@ export default async function PropertyPage({
 
                       {review.partnerReply ? (
                         <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3">
-                          <p className="text-xs font-semibold text-gold-ink">
+                          <p className="text-xs font-semibold text-gold">
                             {t('reviewsPartnerReply')}
                           </p>
                           <p className="mt-1 text-sm leading-relaxed text-muted">
@@ -494,7 +494,7 @@ export default async function PropertyPage({
           <div className="rounded-card border border-gold/30 bg-card p-5">
             {cheapest ? (
               <>
-                <p className="text-2xl font-semibold text-gold-ink">
+                <p className="text-2xl font-semibold text-gold">
                   {nightly.text}
                   <span className="ms-1 text-sm font-normal text-faint">
                     {t('perNight')}
@@ -599,7 +599,7 @@ function PinIcon() {
       strokeWidth={1.75}
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="shrink-0 text-gold-ink"
+      className="shrink-0 text-gold"
     >
       <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
       <circle cx="12" cy="10" r="2.5" />

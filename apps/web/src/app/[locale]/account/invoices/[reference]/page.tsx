@@ -126,7 +126,7 @@ export default async function AccountInvoicePage({
           <a
             href={`/${locale}/account/invoices/${encodeURIComponent(invoice.reference)}/pdf`}
             download={`${invoice.reference}.pdf`}
-            className="inline-flex min-h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border border-gold px-4 text-sm text-gold-ink transition-colors hover:btn-gold hover: print:hidden lg:min-h-0 lg:py-2"
+            className="inline-flex min-h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border border-gold px-4 text-sm text-gold transition-colors hover:btn-gold hover: print:hidden lg:min-h-0 lg:py-2"
           >
             <span aria-hidden="true">⤓</span>
             {t('invoiceDownload')}
@@ -185,7 +185,7 @@ export default async function AccountInvoicePage({
 
           <Link
             href={`/${locale}/account/bookings/${encodeURIComponent(invoice.reference)}?${returnParam('invoice', invoice.reference)}`}
-            className="mt-4 inline-flex min-h-10 w-fit items-center text-sm text-gold-ink hover:underline print:hidden lg:min-h-0"
+            className="mt-4 inline-flex min-h-10 w-fit items-center text-sm text-gold hover:underline print:hidden lg:min-h-0"
           >
             {t('invoiceBookingLink')}
           </Link>
@@ -211,7 +211,7 @@ export default async function AccountInvoicePage({
 
           <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-line pt-3">
             <span className="font-semibold text-text">{t('invoiceTotalLabel')}</span>
-            <span className="font-display text-xl text-gold-ink" dir="ltr">
+            <span className="font-display text-xl text-gold" dir="ltr">
               {formatMoney(invoice.totalAmount, invoice.currencyCode, locale, {
                 exact: true,
               })}

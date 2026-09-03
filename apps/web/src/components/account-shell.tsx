@@ -147,7 +147,7 @@ export async function AccountShell({
   };
 
   return (
-    <div className="account-layout mx-auto max-w-6xl px-4 py-10">
+    <div className="account-layout mx-auto max-w-7xl px-4 py-10">
       {/* Print geometry lives with the layout in `globals.css`, not as `print:` utilities here. */}
       {/*
         Content BEFORE navigation in the DOM, with the sidebar placed back into column one by
@@ -214,7 +214,7 @@ export async function AccountShell({
                 aria-current={current ? 'page' : undefined}
                 className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm transition-colors lg:min-h-0 lg:py-2 ${
                   current
-                    ? 'bg-gold/12 font-bold text-gold-ink'
+                    ? 'bg-gold/12 font-bold text-gold'
                     : 'text-muted hover:bg-line/40 hover:text-text'
                 }`}
               >

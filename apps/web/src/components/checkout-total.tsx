@@ -33,14 +33,14 @@ export function CheckoutTotal({
       {applied ? (
         <div className="flex justify-between">
           <dt className="text-muted">{discountLabel.replace('{code}', applied.code)}</dt>
-          <dd className="text-gold-ink">
+          <dd className="text-gold">
             −{formatMoney(applied.discountAmount, currencyCode, locale)}
           </dd>
         </div>
       ) : null}
       <div className="flex justify-between border-t border-line pt-2 text-base">
         <dt className="font-semibold text-text">{label}</dt>
-        <dd className="font-semibold text-gold-ink">
+        <dd className="font-semibold text-gold">
           {formatMoney(applied ? applied.totalAfter : total, currencyCode, locale)}
         </dd>
       </div>

@@ -287,7 +287,7 @@ export function BuyForm({
           role="alert"
           className="grid gap-2 rounded-lg border border-gold/50 bg-gold/10 p-4"
         >
-          <p className="text-sm font-semibold text-gold-ink">{t('giftCodeOnce')}</p>
+          <p className="text-sm font-semibold text-gold">{t('giftCodeOnce')}</p>
           <p
             data-gift-code
             dir="ltr"
@@ -305,7 +305,7 @@ export function BuyForm({
                   .then(() => setCopied(true))
                   .catch(() => undefined);
               }}
-              className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 text-sm text-gold-ink lg:min-h-0 lg:py-1.5"
+              className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 text-sm text-gold lg:min-h-0 lg:py-1.5"
             >
               {copied ? t('giftCopied') : t('giftCopy')}
             </button>

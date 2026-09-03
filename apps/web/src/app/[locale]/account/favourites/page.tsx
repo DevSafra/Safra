@@ -105,7 +105,7 @@ export default async function AccountFavouritesPage({
                   {item.rating ? (
                     <span
                       dir="ltr"
-                      className="shrink-0 rounded-lg border border-line bg-field px-2 py-1 text-sm text-gold-ink"
+                      className="shrink-0 rounded-lg border border-line bg-field px-2 py-1 text-sm text-gold"
                     >
                       ★ {item.rating}
                     </span>
@@ -120,7 +120,7 @@ export default async function AccountFavouritesPage({
                     {t('favouriteUnavailable')}
                   </p>
                 ) : item.fromPrice && item.currencyCode ? (
-                  <p className="text-sm text-gold-ink">
+                  <p className="text-sm text-gold">
                     {t('favouriteFrom')}{' '}
                     <span dir="ltr">
                       {

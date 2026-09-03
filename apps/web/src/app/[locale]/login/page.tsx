@@ -75,7 +75,7 @@ export default async function LoginPage({
         {t('noAccount')}{' '}
         <Link
           href={`/${locale}/register?next=${encodeURIComponent(next)}`}
-          className="inline-flex min-h-10 items-center lg:min-h-0 text-gold-ink hover:underline"
+          className="inline-flex min-h-10 items-center lg:min-h-0 text-gold hover:underline"
         >
           {t('createAccount')}
         </Link>

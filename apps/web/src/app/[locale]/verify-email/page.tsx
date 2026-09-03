@@ -69,7 +69,7 @@ export default async function VerifyEmailPage({
         at worst.
       */}
       {outcome.claimedBookings > 0 ? (
-        <p className="mt-3 rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm text-gold-ink">
+        <p className="mt-3 rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm text-gold">
           {t('claimedBookings', { count: outcome.claimedBookings })}
         </p>
       ) : null}
