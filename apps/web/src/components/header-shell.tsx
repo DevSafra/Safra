@@ -27,7 +27,14 @@ import { useEffect, useRef, useState } from 'react';
  * ## The transition
  *
  * Background, border and shadow, 200ms on the project's one ease-out. Not transform: the bar must
- * not move, only its surface arrives. Nothing animates on load — `stuck` starts false, which is
+ * not move, only its surface arrives.
+ *
+ * **The surface is translucent, not solid** (Bashar, 2026-09-03: the bar «should be a little bit
+ * blur not solid white»). It is also what the design says: `--headerBg` in the handoff is
+ * `rgba(250,251,254,.86)` light and `rgba(13,10,30,.82)` dark, and the prototype's own header
+ * computes `backdrop-filter: blur(18px)` over an `rgba(168,122,31,.14)` hairline — sampled from
+ * the file, not guessed. A solid bar cuts the page in two at the scroll line; a blurred one keeps
+ * what is behind it present without letting it compete. Nothing animates on load — `stuck` starts false, which is
  * also what the server renders, so the first paint is the transparent state and there is no flash
  * of a background that then fades out.
  *
@@ -69,7 +76,7 @@ export function HeaderShell({ children }: { children: React.ReactNode }) {
         data-stuck={stuck ? '' : undefined}
         className={`sticky top-0 z-40 border-b transition-[background-color,border-color,box-shadow] duration-200 ease-out-strong print:hidden ${
           stuck
-            ? 'border-line bg-card shadow-[var(--shadow-lift)]'
+            ? 'border-[rgba(168,122,31,0.14)] bg-[var(--header-bg)] shadow-[var(--shadow-lift)] backdrop-blur-[18px]'
             : 'border-transparent bg-transparent'
         }`}
       >

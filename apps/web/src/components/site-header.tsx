@@ -6,6 +6,7 @@ import { getSession } from '@/lib/session-server';
 import { getCurrencyCatalogue } from '@/lib/catalog';
 import { DISPLAY_CURRENCIES, displayCurrency } from '@/lib/currency';
 import { HeaderMenus } from '@/components/header-menus';
+import { HeaderNav } from '@/components/header-nav';
 import { HeaderShell } from '@/components/header-shell';
 import { ORNAMENT_BRAND } from '@safra/ui';
 
@@ -84,10 +85,9 @@ import { ORNAMENT_BRAND } from '@safra/ui';
  * two links is height spent on nothing, and it would push the search bar off a phone's first
  * screen.
  *
- * **No active-page state on the pills.** A Server Component cannot read the pathname, and marking
- * the current tab the way booking.com does would mean either a client component in the header of
- * every route or a pathname header set in middleware. Neither is worth it for two links; recorded
- * rather than silently dropped.
+ * **The current page IS marked** (Bashar, 2026-09-03), by `HeaderNav` — the one client component
+ * this bar needs for it. The note here used to say two links were not worth that; the design marks
+ * the current item in gold, so they are.
  */
 export async function SiteHeader({ locale }: { locale: Locale }) {
   const t = await getTranslations('nav');
@@ -138,7 +138,13 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
 
   return (
     <HeaderShell>
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 sm:py-4 lg:h-[var(--header-h)] lg:py-0">
+      {/*
+        `gap-x-5` from `lg`, which is the prototype's own header (`gap:20px`), and 12px below it.
+        Not taste: at 768 the five visible items come to 654px inside a 736px bar, so 20px gaps
+        plus the nav's start margin put it 10px over and dropped «تسجيل الدخول» onto a second row.
+        The desktop bar is where the design's figure was measured and where there is room for it.
+      */}
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:py-4 lg:h-[var(--header-h)] lg:gap-x-5 lg:py-0">
         {/*
           The wordmark alone. The tagline «إقامات في الوطن العربي · من ليلة واحدة» sat under it and
           is gone (Bashar, 2026-09-02) — booking.com's header carries none, it cost a second line
@@ -179,17 +185,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           and everything after it is pushed to the far end. `me-*` rather than `mr-*`, so the
           English and German pages get the mirror of this rather than a copy of it.
         */}
-        <nav aria-label={t('home')} className="me-auto flex items-center gap-1">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-sm text-text/85 transition-colors hover:bg-gold/10 hover:text-text sm:min-h-11"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
+        <HeaderNav links={links} label={t('home')} />
 
         {/*
           booking.com's «List your property», in the place booking.com puts it. Reuses the home
@@ -203,10 +199,16 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           Measured, not guessed: at 768px the six items came to ~735px inside a 736px bar, so the
           row wrapped and «تسجيل الدخول» fell to a second line 44px below the rest. Dropping this
           one link is 98px back and the bar closes to a single row at 768 and 1024 alike.
+
+          **Typed as a nav item, because it is one** (Bashar, 2026-09-03: it «should have the same
+          font weight as the menu items»). 13.5px/600 in `--muted` — the same three values
+          `HeaderNav` uses, and the same ones the prototype gives every button in its own nav,
+          «لوحة الشريك» included. It was 14px/400 in `--text/85`, which is a different size, a
+          different weight AND a different colour from the two links it sits beside.
         */}
         <Link
           href={`/${locale}/partners/join`}
-          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-sm text-text/85 transition-colors hover:bg-gold/10 hover:text-text sm:min-h-11 lg:inline-flex"
+          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-[13.5px] font-semibold text-muted transition-colors hover:bg-gold/10 hover:text-text sm:min-h-11 lg:inline-flex"
         >
           {home('partnersCta')}
         </Link>

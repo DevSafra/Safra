@@ -96,6 +96,13 @@ function LanguageTrigger({
     <button
       type="button"
       onClick={onClick}
+      /*
+        A stable seam for the browser tests, in the pattern the console's status pills already use
+        (`data-status-pill`). The alternative is selecting on the `aria-label`, which is COPY — it
+        differs per locale and changes whenever the catalogue does, so a test written against it
+        breaks for reasons that have nothing to do with the control.
+      */
+      data-menu="language"
       aria-label={`${label}: ${LOCALE_LABELS[locale]}`}
       className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-text/85 transition-colors duration-200 ease-out-strong hover:bg-gold/10 hover:text-text sm:min-h-11"
     >
@@ -218,6 +225,7 @@ function CurrencyMenu({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        data-menu="currency"
         aria-label={`${labels.currency}: ${currency}`}
         className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-text/85 transition-colors duration-200 ease-out-strong hover:bg-gold/10 hover:text-text sm:min-h-11"
       >
@@ -271,9 +279,16 @@ function CurrencyMenu({
                       : 'text-muted hover:bg-field hover:text-text'
                   }`}
                 >
+                  {/*
+                    No box around the symbol (Bashar, 2026-09-03). It was a bordered chip, which
+                    read as a control inside a row that is already a button — two nested things to
+                    press, and the row's own selected state had to fight it. The fixed width stays:
+                    it is what keeps «$», «€» and «ل.س» on one column so the codes beside them line
+                    up.
+                  */}
                   <span
                     aria-hidden
-                    className="grid size-7 shrink-0 place-items-center rounded-lg border border-line text-[0.8125rem]"
+                    className="grid size-7 shrink-0 place-items-center text-[0.85rem]"
                   >
                     {symbol}
                   </span>
@@ -308,7 +323,7 @@ function CloseButton({ label, onClick }: { label: string; onClick: () => void })
       <button
         type="button"
         onClick={onClick}
-        className="min-h-10 cursor-pointer rounded-lg border border-line px-4 text-sm font-semibold text-text transition-[border-color,background-color,scale] duration-200 ease-out-strong hover:border-gold/60 hover:bg-gold/10 active:scale-95 sm:min-h-11"
+        className="min-h-10 cursor-pointer rounded-lg border border-line px-4 text-sm font-semibold text-text transition-[border-color,background-color] duration-200 ease-out-strong hover:border-gold/60 hover:bg-gold/10 sm:min-h-11"
       >
         {label}
       </button>
