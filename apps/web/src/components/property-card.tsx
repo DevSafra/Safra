@@ -28,8 +28,12 @@ import { dynamicMessage } from '@/lib/dynamic-message';
  *
  * Shows the nightly rate, and the stay total WHEN THAT SAYS SOMETHING ELSE — the total is what the
  * customer actually pays and per-night pricing hides multi-night arithmetic, but on a one-night
- * search the two lines are the same figure. The service fee is called out separately rather than
- * folded in, so the price is not misleading at the point of comparison.
+ * search the two lines are the same figure.
+ *
+ * **No service fee line** (Bashar, 2026-09-03). It said «+ رسوم خدمة سفرة» under every price, on a
+ * surface whose whole job is comparison, where it is a constant that changes no comparison — and
+ * every card carried it, so twenty cards said it twenty times. It is still stated at checkout,
+ * where it is part of a figure somebody is about to be charged.
  *
  * ## Prices convert here, and say when they have
  *
@@ -234,7 +238,6 @@ export async function PropertyCard({
                 {common('convertedFrom', { amount: total.original })}
               </p>
             ) : null}
-            <p className="mt-0.5 text-[12px] text-muted">{t('serviceFee')}</p>
           </div>
         </div>
       </div>

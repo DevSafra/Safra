@@ -519,27 +519,6 @@ export default async function PropertyPage({
                 <div className="gold-rule my-4" />
 
                 {/*
-                  SAFRA's fee, read from settings rather than hardcoded — the super
-                  admin sets it on the Rules Engine page (P-005).
-                */}
-                <dl className="space-y-1.5 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-muted">{t('serviceFeeLabel')}</dt>
-                    <dd className="text-text">
-                      {property.fees.customerFeeMode === 'flat'
-                        ? convertForDisplay(
-                            property.fees.customerFeeValue.toFixed(2),
-                            cheapest.currencyCode,
-                            locale,
-                            target,
-                            rates,
-                          ).text
-                        : `${(property.fees.customerFeeValue * 100).toFixed(0)}%`}
-                    </dd>
-                  </div>
-                </dl>
-
-                {/*
                   Carries the unit and a concrete date range, because checkout needs
                   both to quote a price. The first bookable window from the calendar is
                   used as the default so the link always lands on something valid.

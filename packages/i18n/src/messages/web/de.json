@@ -46,7 +46,7 @@
     "step1Title": "Suchen und wählen",
     "step1Body": "Daten und Gästezahl sind erforderlich, die Stadt ist optional. Die Ergebnisse folgen SAFRAs Empfehlung, nicht dem niedrigsten Preis.",
     "step2Title": "An SAFRA zahlen",
-    "step2Body": "Der volle Betrag plus eine feste Servicegebühr von {fee}, mit Ihrer bevorzugten Zahlungsart. Ihr Geld liegt bei SAFRA, nicht beim Partner.",
+    "step2Body": "Der volle Betrag, mit Ihrer bevorzugten Zahlungsart. Ihr Geld liegt bei SAFRA, nicht beim Partner.",
     "step3Title": "Wir bestätigen binnen zwei Stunden",
     "step3Body": "Wir kontaktieren den Partner. Er stimmt zu? Gutschein und QR-Code erreichen Sie per WhatsApp und E-Mail.",
     "step4Title": "Code zeigen und wohnen",
@@ -160,7 +160,6 @@
   "property": {
     "perNight": "/ Nacht",
     "totalFor": "{nights, plural, one {für 1 Nacht} other {für # Nächte}}",
-    "serviceFee": "+ SAFRA-Servicegebühr",
     "rating": "Bewertung",
     "reviews": "{count, plural, =0 {Keine Bewertungen} one {1 Bewertung} other {# Bewertungen}}",
     "guestsUpTo": "Bis zu {count, plural, one {1 Gast} other {# Gäste}}",

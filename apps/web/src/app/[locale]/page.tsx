@@ -113,8 +113,6 @@ export default async function HomePage({
     recommendedStays(today, tomorrow),
   ]);
 
-  const serviceFee = formatCustomerFee(settings, 'customerFee', locale);
-
   const trust = [
     { icon: VerifiedIcon, label: t('trustVerified') },
     { icon: WalletIcon, label: t('trustPayment') },
@@ -124,7 +122,7 @@ export default async function HomePage({
   const steps = [
     { title: t('step1Title'), body: t('step1Body') },
     /* The fee is a setting the super admin edits (P-005), never a literal in the copy. */
-    { title: t('step2Title'), body: t('step2Body', { fee: serviceFee }) },
+    { title: t('step2Title'), body: t('step2Body') },
     { title: t('step3Title'), body: t('step3Body') },
     { title: t('step4Title'), body: t('step4Body') },
   ];
@@ -354,7 +352,7 @@ export default async function HomePage({
               `PropertyCard` unchanged — the same card the search results use. A second card for
               the same object is how two surfaces come to disagree about a price, and this one
               already converts to the reader's currency, prints the original underneath when it
-              did, names the service fee, and renders the two SAFRA badges the prototype shows.
+              did, and renders the two SAFRA badges the prototype shows.
             */}
             {/*
               The same `CardSlider` the destinations use (Bashar, 2026-09-02), so the two rows on

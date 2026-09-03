@@ -46,7 +46,7 @@
     "step1Title": "Search and choose",
     "step1Body": "Dates and guests are required, the city is optional. Results are ordered by SAFRA's recommendation, not by the cheapest.",
     "step2Title": "Pay SAFRA",
-    "step2Body": "The full amount plus a flat {fee} service fee, by your preferred method. Your money is with SAFRA, not the partner.",
+    "step2Body": "The full amount, by your preferred method. Your money is with SAFRA, not the partner.",
     "step3Title": "We confirm within two hours",
     "step3Body": "We contact the partner. They agree? Your voucher and QR code arrive by WhatsApp and email.",
     "step4Title": "Show the code and stay",
@@ -160,7 +160,6 @@
   "property": {
     "perNight": "/ night",
     "totalFor": "{nights, plural, one {for 1 night} other {for # nights}}",
-    "serviceFee": "+ SAFRA service fee",
     "rating": "rating",
     "reviews": "{count, plural, =0 {No reviews} one {1 review} other {# reviews}}",
     "guestsUpTo": "Up to {count, plural, one {1 guest} other {# guests}}",

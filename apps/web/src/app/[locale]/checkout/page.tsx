@@ -229,12 +229,29 @@ export default async function CheckoutPage({
                     {formatMoney(priced.baseAmount, priced.currencyCode, locale)}
                   </dd>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-muted">{tp('serviceFeeLabel')}</dt>
-                  <dd className="text-text">
-                    {formatMoney(priced.customerFeeAmount, priced.currencyCode, locale)}
-                  </dd>
-                </div>
+                {/*
+                  Shown only when it is CHARGED.
+
+                  Bashar asked for «رسوم خدمة سفرة» off the client UI (2026-09-03) and it is now
+                  gone from the card, the property page and the home page — every surface where it
+                  is a fact about the platform rather than about a payment. It stays here on the
+                  condition below, because here it is money: `pricing.service.ts` computes
+                  `grossMinor = baseMinor + customerFeeMinor`, so it is inside «المبلغ المستحق» and
+                  a breakdown that omits it would show a subtotal and a total that do not
+                  reconcile, with the difference unexplained.
+
+                  Zero hides it. That is what makes the instruction reachable without lying about a
+                  charge: setting `commission.customer_fee_value` to 0 removes the fee from the
+                  customer's world everywhere at once, because there is then nothing to disclose.
+                */}
+                {Number(priced.customerFeeAmount) > 0 ? (
+                  <div className="flex justify-between">
+                    <dt className="text-muted">{tp('serviceFeeLabel')}</dt>
+                    <dd className="text-text">
+                      {formatMoney(priced.customerFeeAmount, priced.currencyCode, locale)}
+                    </dd>
+                  </div>
+                ) : null}
                 {/* Falls when a coupon applies — see `CheckoutTotal`. */}
                 <CheckoutTotal
                   total={priced.totalAmount}
