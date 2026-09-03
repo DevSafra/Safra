@@ -11,7 +11,7 @@ import { couponMessages } from '@/lib/coupon-messages';
 import { DateRange } from '@/components/date-range';
 import { isLocale } from '@/i18n/routing';
 import { getMyWallet } from '@/lib/account';
-import { formatMoney, localisedName, localisedText } from '@/lib/localise';
+import { localisedName, localisedText } from '@/lib/localise';
 import { availablePaymentMethods, getProperty, quote } from '@/lib/property';
 import { getSession } from '@/lib/session-server';
 
@@ -208,50 +208,50 @@ export default async function CheckoutPage({
                 {infants > 0 ? <> · {ts('infantsCount', { count: infants })}</> : null}
               </p>
 
+              {/*
+                The DATES are listed, the per-night AMOUNTS are not.
+
+                Bashar, 2026-09-03: «the total/final price should only be displayed to the
+                customer/guest.» The amounts were the last place the service fee remained visible —
+                not by name, by SUBTRACTION: four nights adding to 100 above a total of 101.99
+                states the fee as plainly as a row labelled with it, and more confusingly, because
+                nothing accounts for the difference.
+
+                The dates stay because they are not a price. «An override is visible rather than
+                buried» was this list's original reason, and a partner's date-by-date override is
+                still visible — in the nightly rate on the property page, before anybody reaches a
+                checkout.
+              */}
               <div className="gold-rule my-4" />
 
-              {/* Every night listed, so an override is visible rather than buried. */}
               <ul className="space-y-1 text-sm">
                 {priced.nightly.map((night) => (
-                  <li key={night.date} className="flex justify-between text-muted">
-                    <span>{night.date}</span>
-                    <span>{formatMoney(night.amount, priced.currencyCode, locale)}</span>
+                  <li key={night.date} className="text-muted">
+                    {night.date}
                   </li>
                 ))}
               </ul>
 
               <div className="gold-rule my-4" />
 
+              {/*
+                The nights, then what is due. No itemisation between them.
+
+                «رسوم خدمة سفرة» was a row here and Bashar asked for it off the customer's screens
+                (2026-09-03), twice, and then «just remove it from UI not from the backend» — so the
+                fee is still charged and still recorded; it is no longer named to the person paying.
+
+                **The SUBTOTAL row went with it, and that is not tidying.** It showed `baseAmount`,
+                which is the total minus the fee. Left in place with the fee row gone it would have
+                read «المجموع الفرعي 100» directly above «المبلغ المستحق 101.99» — two figures that
+                do not reconcile and nothing on the page accounting for the difference. Removing the
+                claim is honest; leaving a broken one is not. The nightly lines above are the rate
+                detail, and the total is the fact.
+
+                The fee is unchanged in `pricing.service.ts`, on the booking row, in the ledger and
+                on the invoice. This is a display decision and nothing else.
+              */}
               <dl className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-muted">{t('subtotal')}</dt>
-                  <dd className="text-text">
-                    {formatMoney(priced.baseAmount, priced.currencyCode, locale)}
-                  </dd>
-                </div>
-                {/*
-                  Shown only when it is CHARGED.
-
-                  Bashar asked for «رسوم خدمة سفرة» off the client UI (2026-09-03) and it is now
-                  gone from the card, the property page and the home page — every surface where it
-                  is a fact about the platform rather than about a payment. It stays here on the
-                  condition below, because here it is money: `pricing.service.ts` computes
-                  `grossMinor = baseMinor + customerFeeMinor`, so it is inside «المبلغ المستحق» and
-                  a breakdown that omits it would show a subtotal and a total that do not
-                  reconcile, with the difference unexplained.
-
-                  Zero hides it. That is what makes the instruction reachable without lying about a
-                  charge: setting `commission.customer_fee_value` to 0 removes the fee from the
-                  customer's world everywhere at once, because there is then nothing to disclose.
-                */}
-                {Number(priced.customerFeeAmount) > 0 ? (
-                  <div className="flex justify-between">
-                    <dt className="text-muted">{tp('serviceFeeLabel')}</dt>
-                    <dd className="text-text">
-                      {formatMoney(priced.customerFeeAmount, priced.currencyCode, locale)}
-                    </dd>
-                  </div>
-                ) : null}
                 {/* Falls when a coupon applies — see `CheckoutTotal`. */}
                 <CheckoutTotal
                   total={priced.totalAmount}
