@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  addMoney,
   formatMoney,
   localisedDescription,
   localisedName,
@@ -265,5 +266,38 @@ describe('formatMoney — a blank is not zero', () => {
     expect(formatMoney('10.1', 'USD', 'en')).toContain('10.10');
     /* A round price reads better without the zeros — unchanged, and asserted so it stays. */
     expect(formatMoney('65', 'USD', 'en')).not.toContain('.00');
+  });
+});
+
+/**
+ * `addMoney` — the sum of two displayed lines, done in minor units.
+ *
+ * Watched to fail against the obvious implementation: `(Number(a) + Number(b)).toFixed(2)` returns
+ * `'0.30'` for the third case here only because `toFixed` rounds away the error, and returns
+ * `'10.13'` for the JOD case, silently dropping a digit a three-decimal currency actually has.
+ */
+describe('addMoney', () => {
+  it('adds without a float in the middle', () => {
+    expect(addMoney('100.00', '1.99', 'USD')).toBe('101.99');
+    expect(addMoney('0.10', '0.20', 'USD')).toBe('0.30');
+    expect(addMoney('0.07', '0.01', 'USD')).toBe('0.08');
+  });
+
+  it('keeps the currency s own scale', () => {
+    /* Three decimals, and the third one survives. */
+    expect(addMoney('10.125', '0.005', 'JOD')).toBe('10.130');
+    /* A zero-decimal currency has no point at all. */
+    expect(addMoney('1200', '300', 'IQD')).toBe('1500.000');
+  });
+
+  it('carries across the decimal point and handles a negative', () => {
+    expect(addMoney('9.99', '0.01', 'USD')).toBe('10.00');
+    expect(addMoney('100.00', '-1.99', 'USD')).toBe('98.01');
+  });
+
+  /* A figure it cannot parse is not turned into one it invented. */
+  it('returns the first amount when either side is unparseable', () => {
+    expect(addMoney('100.00', '', 'USD')).toBe('100.00');
+    expect(addMoney('100.00', 'abc', 'USD')).toBe('100.00');
   });
 });

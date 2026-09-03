@@ -128,3 +128,47 @@ export function formatMoney(
 
   return symbolTrails(symbol) ? `${number} ${symbol}` : `${symbol}${number}`;
 }
+
+/**
+ * Exact addition of two money strings.
+ *
+ * Minor units as `bigint`, never `Number`. The rule is already stated in `formatMoney` — «nothing
+ * upstream does arithmetic on a float; a rounding error in a price is not recoverable once it has
+ * been shown to a customer» — and it does not stop applying because the sum happens at the point of
+ * display. `0.1 + 0.2` is the canonical demonstration, and money is exactly where it matters.
+ *
+ * The SCALE comes from the currency, so a three-decimal dinar keeps its third digit instead of
+ * being rounded to two by a helper that assumed cents.
+ *
+ * Either side unparseable returns the first ARGUMENT untouched rather than a wrong number: the
+ * callers here are folding one displayed line into another, and showing one of the two figures
+ * beats showing `NaN` in a financial document.
+ */
+export function addMoney(a: string, b: string, currency: string): string {
+  const scale = currencyDecimals(currency);
+
+  const toMinor = (value: string): bigint | null => {
+    const match = /^\s*(-?)(\d+)(?:\.(\d+))?\s*$/.exec(value);
+
+    if (!match) return null;
+
+    const [, sign = '', whole = '0', fraction = ''] = match;
+    const padded = `${fraction}${'0'.repeat(scale)}`.slice(0, scale);
+    const total = BigInt(whole) * 10n ** BigInt(scale) + BigInt(padded || '0');
+
+    return sign === '-' ? -total : total;
+  };
+
+  const left = toMinor(a);
+  const right = toMinor(b);
+
+  if (left === null || right === null) return a;
+
+  const sum = left + right;
+  const negative = sum < 0n;
+  const digits = (negative ? -sum : sum).toString().padStart(scale + 1, '0');
+  const whole = scale === 0 ? digits : digits.slice(0, -scale);
+  const fraction = scale === 0 ? '' : `.${digits.slice(-scale)}`;
+
+  return `${negative ? '-' : ''}${whole}${fraction}`;
+}
