@@ -129,20 +129,30 @@ export default async function HomePage({
     { title: t('step4Title'), body: t('step4Body') },
   ];
 
+  /*
+    An icon per pledge (Bashar, 2026-09-03), drawn in the product's own 1.75 stroke rather than the
+    three brand ornaments that were here. The ornaments are beautiful and interchangeable — a
+    crescent, a star and the brand mark say «SAFRA» three times and say nothing about the promise
+    underneath. A shield, a badge and a returning arrow say which promise this is before the heading
+    is read, which is the only reason to put a mark above a heading at all.
+  */
   const pledges = [
     {
+      icon: VerifiedIcon,
       ornament: ORNAMENT_CRESCENT,
       ordinal: t('pledgeOrdinal1'),
       title: t('pledge1Title'),
       body: t('pledge1Body'),
     },
     {
+      icon: CompensationIcon,
       ornament: ORNAMENT_STAR,
       ordinal: t('pledgeOrdinal2'),
       title: t('pledge2Title'),
       body: t('pledge2Body'),
     },
     {
+      icon: WalletIcon,
       ornament: ORNAMENT_BRAND,
       ordinal: t('pledgeOrdinal3'),
       title: t('pledge3Title'),
@@ -177,52 +187,60 @@ export default async function HomePage({
         hero simply follows it. A pull-up shorter than a wrapped bar would put the brand on top of
         the headline.
       */}
-      <section className="border-b border-line bg-[radial-gradient(1200px_600px_at_50%_-80px,var(--color-hero),var(--color-band)_45%,var(--color-bg))] lg:-mt-[var(--header-h)]">
+      <section className="bg-[radial-gradient(1200px_600px_at_50%_-80px,var(--color-hero),var(--color-band)_45%,var(--color-bg))] lg:-mt-[var(--header-h)]">
         <div className="mx-auto max-w-5xl px-4 pt-8 pb-10 text-center sm:pt-14 sm:pb-12 lg:pt-[calc(var(--header-h)+3.5rem)]">
-          <p className="inline-flex items-center rounded-full border border-gold/40 px-3 py-1 text-[0.6875rem] font-semibold tracking-wide text-gold-ink">
-            {t('heroCountries')}
-          </p>
-
           {/*
             58px is the prototype's size; `clamp` gets there continuously rather than stepping at
             two breakpoints, and holds the Arabic headline on one line from about 900px up.
+
+            **And the padding is not decoration.** `background-clip: text` paints the gradient only
+            inside the element's own box, and Amiri's ascent and descent together come to more than
+            1.6em: measured at 58px, the ink ran 5px above the box and 4.2px below it, so the top of
+            «سفرة» and the tail of «تبدأ» were simply not painted. `py-1.5` grows the painting area
+            past the ink; `mt-2.5` and `-mb-1.5` give the six pixels back, so nothing moves.
+
+            **`leading-[1.6]` is the prototype's too — 92.8px on 58px — and it is load-bearing, not
+            taste.** At 1.18 the line box was shorter than the face's own ascent and descent, so
+            Amiri's Arabic clipped top and bottom (Bashar screenshotted it). `bg-clip-text` makes
+            that worse rather than better: the gradient is clipped to the glyphs, so anything the
+            line box cuts is simply not painted.
           */}
-          <h1 className="mt-4 font-display text-[clamp(1.5rem,3.1vw,2.5rem)] leading-[1.22] font-bold text-balance text-gold">
+          <h1 className="mt-2.5 -mb-1.5 bg-[image:var(--hero-title-grad)] bg-clip-text py-1.5 font-display text-[clamp(2rem,4.6vw,3.625rem)] leading-[1.6] font-bold text-balance text-transparent">
             {t('heroTitle')}
           </h1>
 
-          <p className="mx-auto mt-3 max-w-[62ch] text-sm leading-relaxed text-muted sm:text-base">
+          {/*
+            `#5C6377` and line-height 1.8 are sampled from the prototype, not inferred, and the
+            colour is a literal on purpose (Bashar, 2026-09-03: «should be exactly same as the html
+            file»).
+
+            **17px is the prototype's; the WEIGHT is not.** The file sets 400 and this is 500, asked
+            for on 2026-09-03 («should be weighter and bigger»). The size went to 19px in the same
+            breath and came back to 17 an hour later, which settles it: the line needed more
+            presence, not more room. Weight was the half that was doing the work.
+
+            One size at every width, deliberately — 17px is already comfortable on a 390px screen,
+            and a line that only reaches its intended size on a desktop is a line nobody on a phone
+            ever reads as intended.
+
+            It is the handoff's own `--muted`. This product's `--muted` is DARKER (#454B5A), because
+            he asked twice for the greys to be readable at caption sizes — see the note in
+            `globals.css`. At 17px the design's lighter grey measures 4.81:1 and clears the floor
+            comfortably, so honouring the file here costs nothing, and the deviation stays where it
+            was earned: the small text.
+          */}
+          <p className="mx-auto mt-4 max-w-[62ch] text-[17px] leading-[1.8] font-medium text-[#5c6377]">
             {t('heroSubtitle')} {t('heroPromise')}
           </p>
 
           <div className="mt-6 text-start">
-            <SearchForm locale={locale} cities={cities} minDate={recommended.checkIn} />
-          </div>
-
-          {/*
-            The trip features, exactly the ten the prototype puts under the bar.
-
-            They are LINKS into `/search`, not decoration and not a client-side filter: this page
-            ships no JavaScript, and a chip that looked interactive and did nothing would be worse
-            than none. `?attributes=sea` is the shape the search page already parses — `many()`
-            turns a single value into an array — so each one lands on a real filtered result set.
-
-            `min-h-10` below `lg`, `lg:min-h-8` above. An anchor is INLINE, so the 40px touch floor
-            in `globals.css` — which covers `button`, `select` and `summary` — cannot reach these;
-            at 32px all ten failed `responsive.spec.ts` in all three languages. Above `lg` the input
-            is a pointer and the compact chip is the right size.
-          */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
-            <span className="text-[0.6875rem] text-faint">{t('attributesLabel')}</span>
-            {TRIP_FEATURES.map((code) => (
-              <Link
-                key={code}
-                href={`/${locale}/search${stay}&attributes=${code}`}
-                className="inline-flex min-h-10 items-center rounded-full border border-line bg-card px-2.5 py-1 text-[0.6875rem] text-muted lg:min-h-8 transition-[color,border-color,scale] duration-200 ease-out-strong hover:border-gold/60 hover:text-gold active:scale-[.97]"
-              >
-                {ta(code)}
-              </Link>
-            ))}
+            <SearchForm
+              locale={locale}
+              cities={cities}
+              minDate={recommended.checkIn}
+              attributes={TRIP_FEATURES.map((code) => ({ code, label: ta(code) }))}
+              attributesLabel={t('attributesLabel')}
+            />
           </div>
 
           {/*
@@ -234,7 +252,7 @@ export default async function HomePage({
             {trust.map(({ icon: Icon, label }) => (
               <li
                 key={label}
-                className="flex items-center gap-2 text-[0.8125rem] text-muted"
+                className="flex items-center gap-2 text-[0.85rem] text-muted"
               >
                 <span aria-hidden className="shrink-0 text-gold">
                   <Icon />
@@ -248,7 +266,7 @@ export default async function HomePage({
 
       {/* ── Destinations (§5.4) ──────────────────────────────────────────── */}
       <section aria-label={t('destinationsTitle')} className="bg-bg">
-        <div className="mx-auto max-w-6xl px-4 py-10 sm:py-12">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
           <SectionHeading eyebrow={t('destinationsTitle')}>
             {t('destinationsSubtitle')}
           </SectionHeading>
@@ -266,7 +284,7 @@ export default async function HomePage({
             JavaScript the row is still a scrollable rail, which is exactly what it was before.
 
             THREE across at `lg`, not four (Bashar, 2026-09-02). The width is chosen against the
-            container rather than picked by eye: the rail is 1152px inside `max-w-6xl` less its
+            container rather than picked by eye: the rail is 1152px inside `max-w-7xl` less its
             own 16px of padding either side, so 3 × 21rem + 2 × 1rem gap = 1040 of 1120 — three
             whole cards and 80px of the fourth. That peek is deliberate and is the only thing on a
             horizontal row that says there is more; a width that divided exactly would end the row
@@ -287,9 +305,19 @@ export default async function HomePage({
         </div>
       </section>
 
+      {/*
+        Nothing on this page shrinks when it is pressed (Bashar, 2026-09-03, the third time he has
+        said it — the slider arrows in August, the trip tags this morning, these tiles now). The
+        press is answered in colour: the border warms and a faint gold wash arrives. A tile that
+        changes SIZE under a finger moves the two tiles beside it, which is the part that reads as
+        cheap rather than responsive.
+      */}
       {/* ── Types of stay (§8.2) ─────────────────────────────────────────── */}
-      <section aria-label={t('typesTitle')} className="border-y border-line bg-card">
-        <div className="mx-auto max-w-6xl px-4 py-10 sm:py-12">
+      <section
+        aria-label={t('typesTitle')}
+        className="bg-[linear-gradient(var(--color-bg),var(--color-bg2))]"
+      >
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
           <SectionHeading eyebrow={t('typesTitle')}>{t('typesSubtitle')}</SectionHeading>
 
           <ul className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -317,7 +345,7 @@ export default async function HomePage({
       */}
       {recommended.outcome.items.length > 0 ? (
         <section aria-label={t('recommendedTitle')} className="bg-bg">
-          <div className="mx-auto max-w-6xl px-4 py-10 sm:py-12">
+          <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
             <SectionHeading eyebrow={t('recommendedTitle')}>
               {t('recommendedSubtitle')}
             </SectionHeading>
@@ -365,8 +393,8 @@ export default async function HomePage({
       ) : null}
 
       {/* ── How booking works (§6.1) ─────────────────────────────────────── */}
-      <section aria-label={t('howTitle')} className="border-y border-line bg-card">
-        <div className="mx-auto max-w-6xl px-4 py-10 sm:py-12">
+      <section aria-label={t('howTitle')} className="bg-bg">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
           <SectionHeading eyebrow={t('howTitle')}>{t('howSubtitle')}</SectionHeading>
           <p className="mt-3 max-w-[70ch] text-sm leading-relaxed text-muted">
             {t('howBody')}
@@ -386,7 +414,7 @@ export default async function HomePage({
             {steps.map((step, index) => (
               <li
                 key={step.title}
-                className="rounded-card border border-line bg-bg p-4 transition-colors duration-200 ease-out-strong hover:border-gold/45"
+                className="rounded-card border border-line bg-card p-4 transition-colors duration-200 ease-out-strong hover:border-gold/45"
               >
                 {/*
                   The numeral on the gold GRADIENT rather than in gold text. `--color-gold` on the
@@ -396,14 +424,14 @@ export default async function HomePage({
                 */}
                 <span
                   aria-hidden
-                  className="btn-gold inline-flex size-7 items-center justify-center rounded-full text-[0.8125rem] font-bold"
+                  className="btn-gold inline-flex size-7 items-center justify-center rounded-full text-[0.85rem] font-bold"
                 >
                   {index + 1}
                 </span>
                 <h3 className="mt-2.5 text-[0.9375rem] font-semibold text-text">
                   {step.title}
                 </h3>
-                <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted">
+                <p className="mt-1.5 text-[0.85rem] leading-relaxed text-muted">
                   {step.body}
                 </p>
               </li>
@@ -413,8 +441,11 @@ export default async function HomePage({
       </section>
 
       {/* ── The three pledges (P-001, P-002, P-007) ──────────────────────── */}
-      <section aria-label={t('pledgesTitle')} className="bg-band">
-        <div className="mx-auto max-w-6xl px-4 py-12 sm:py-14">
+      <section
+        aria-label={t('pledgesTitle')}
+        className="bg-[linear-gradient(var(--color-bg),var(--color-band))]"
+      >
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:py-14">
           <SectionHeading eyebrow={t('pledgesTitle')} centred>
             {t('pledgesSubtitle')}
           </SectionHeading>
@@ -432,9 +463,9 @@ export default async function HomePage({
                 */}
                 <span
                   aria-hidden
-                  className="inline-flex size-10 items-center justify-center rounded-full border border-gold/40 text-lg text-gold-ink"
+                  className="inline-flex size-11 items-center justify-center rounded-full border border-gold/40 bg-gold/10 text-gold [&_svg]:size-5"
                 >
-                  {pledge.ornament}
+                  <pledge.icon />
                 </span>
                 <p className="mt-3 text-[0.6875rem] tracking-wide text-faint">
                   {pledge.ordinal}
@@ -443,7 +474,7 @@ export default async function HomePage({
                   {pledge.title}
                 </h3>
                 <div className="gold-rule mx-auto mt-3 w-12" />
-                <p className="mt-3 text-[0.8125rem] leading-relaxed text-muted">
+                <p className="mt-3 text-[0.85rem] leading-relaxed text-muted">
                   {pledge.body}
                 </p>
               </li>
@@ -454,16 +485,23 @@ export default async function HomePage({
 
       {/* ── Partner recruitment (§8.3) ───────────────────────────────────── */}
       <section aria-label={t('partnersTitle')} className="bg-bg">
-        <div className="mx-auto max-w-6xl px-4 py-10 sm:py-12">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
           <div className="grid gap-6 rounded-card border border-line bg-card p-6 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center lg:gap-12">
             <div>
-              <p className="text-[0.6875rem] font-semibold tracking-[0.08em] text-muted">
+              {/* Gold, 12px/700 — the same label treatment every other section on this page has. */}
+              <p className="text-[12px] font-bold tracking-[0.08em] text-gold">
                 {t('partnersTitle')}
               </p>
-              <h2 className="mt-1 font-display text-lg font-bold text-balance text-text sm:text-xl">
+              {/*
+                Bigger (Bashar, 2026-09-03: «too small — make the font and the button bigger»). This
+                is the one place on the page addressed to somebody with a building to list rather
+                than a night to book, and it was set two steps below every other section heading, so
+                it read as a footnote to the page instead of an offer on it.
+              */}
+              <h2 className="mt-1 font-display text-2xl font-bold text-balance text-text sm:text-[28px]">
                 {t('partnersSubtitle')}
               </h2>
-              <p className="mt-2.5 max-w-[62ch] text-sm leading-relaxed text-muted">
+              <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-muted">
                 {/*
                   The commission comes from settings, never a hardcoded string. The super admin
                   edits it from the Rules Engine page (P-005), and this text has to follow
@@ -488,7 +526,7 @@ export default async function HomePage({
             */}
             <Link
               href={`/${locale}/partners/join`}
-              className="btn-gold inline-flex min-h-10 items-center justify-center justify-self-start rounded-lg px-6 text-sm font-bold transition-[opacity,scale] duration-200 ease-out-strong hover:opacity-90 active:scale-[.97]"
+              className="btn-gold inline-flex min-h-12 items-center justify-center justify-self-start rounded-lg px-8 text-[15px] font-bold transition-opacity duration-200 ease-out-strong hover:opacity-90 sm:min-h-[52px]"
             >
               {t('partnersCta')}
             </Link>
@@ -555,16 +593,13 @@ function SectionHeading({
   return (
     <div className={centred ? 'text-center' : undefined}>
       {/*
-        The label is MUTED, not gold. The prototype sets it gold against night, where it is 7.9:1;
-        the light theme's `--color-gold` is #a87a1f and the same label on the page measures 3.55:1,
-        under the 4.5:1 floor for an 11px control. Muted is 5.6:1, and it is what booking.com's own
-        section labels are. Gold stays where it still clears: the wordmark, the ornaments, the
-        hairlines, and the button gradient that carries its own foreground.
+        GOLD, 12px, 700 — sampled from the prototype in the light theme, not inferred. An earlier
+        pass made this muted on contrast grounds (3.56:1 against the 4.5 floor) and the note here
+        argued for it; Bashar has since asked twice for the design's own colours, and the gold inks
+        are recorded as his decision in `e2e/contrast.spec.ts`. The design wins.
       */}
-      <p className="text-[0.6875rem] font-semibold tracking-[0.08em] text-muted">
-        {eyebrow}
-      </p>
-      <h2 className="mt-1 font-display text-xl leading-snug font-bold text-balance text-text sm:text-2xl">
+      <p className="text-[12px] font-bold tracking-[0.08em] text-gold">{eyebrow}</p>
+      <h2 className="mt-1.5 font-display text-[26px] leading-snug font-bold text-balance text-text sm:text-[32px]">
         {children}
       </h2>
     </div>
@@ -606,7 +641,7 @@ function CityCard({
   return (
     <Link
       href={`/${locale}/city/${encodeURIComponent(city.slug)}`}
-      className="group flex h-full flex-col overflow-hidden rounded-card border border-line bg-card transition-[border-color,scale] duration-200 ease-out-strong hover:border-gold/60 active:scale-[.985]"
+      className="group flex h-full flex-col overflow-hidden rounded-card border border-line bg-card transition-[border-color] duration-200 ease-out-strong hover:border-gold/60"
     >
       {/*
         3:2, which is the ratio booking.com's carousel cards use — a destination photograph is a
@@ -633,7 +668,7 @@ function CityCard({
         ) : (
           <OrnamentField
             id={`ornament-city-${city.slug}`}
-            className="text-gold-ink opacity-30"
+            className="text-gold opacity-30"
           />
         )}
       </div>
@@ -647,22 +682,26 @@ function CityCard({
         the full width and the row reads as one line of facts about the place.
       */}
       <div className="flex flex-1 flex-col p-4">
-        <h3 className="text-sm font-semibold text-text sm:text-base">
+        <h3 className="text-[17px] font-bold text-text sm:text-[20px]">
           {localisedName(city, locale)}
         </h3>
 
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           {categories ? (
-            <span className="rounded-full border border-line bg-bg px-2 py-0.5 text-xs text-muted">
+            <span className="rounded-full border border-gold/35 bg-gold/10 px-2 py-0.5 text-[10.5px] text-gold">
               {categories}
             </span>
           ) : null}
-          <span className="text-xs text-faint">
-            {city.countryCode}
-            {city.propertyCount > 0
-              ? ` · ${stays('cityStays', { count: city.propertyCount })}`
-              : ''}
-          </span>
+          {/*
+            The country code is gone (Bashar, 2026-09-03). «SY» beside «دمشق» told an Arabic reader
+            nothing they did not already know, in Latin letters, on a card whose whole job is the
+            place — and it read as a form field rather than as a fact about a city.
+          */}
+          {city.propertyCount > 0 ? (
+            <span className="text-[12.5px] text-muted">
+              {stays('cityStays', { count: city.propertyCount })}
+            </span>
+          ) : null}
         </div>
       </div>
     </Link>
@@ -694,16 +733,16 @@ function StayTypeCard({
   return (
     <Link
       href={`/${locale}/search${stay}&propertyTypeCode=${encodeURIComponent(type.code)}`}
-      className="flex h-full flex-col items-center justify-center gap-2 rounded-card border border-line bg-bg px-3 py-4 text-center transition-[border-color,scale] duration-200 ease-out-strong hover:border-gold/60 active:scale-[.98]"
+      className="flex h-full flex-col items-center justify-center gap-2 rounded-card border border-line bg-card px-3 py-4 text-center transition-[border-color,background-color] duration-200 ease-out-strong hover:border-gold/60 hover:bg-gold/5"
     >
       <span
         aria-hidden
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-gold/35 text-base text-gold-ink"
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-gold/35 text-base text-gold"
       >
         {Drawn ? <Drawn /> : (type.glyph ?? <StayIcon />)}
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[0.8125rem] font-semibold text-text">
+        <span className="block truncate text-[0.85rem] font-semibold text-text">
           {label}
         </span>
         <span className="mt-0.5 block text-[0.6875rem] text-faint">

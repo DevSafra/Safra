@@ -127,14 +127,14 @@ export async function PropertyCard({
         ) : (
           <OrnamentField
             id={`ornament-property-${item.propertyReference}`}
-            className="text-gold-ink opacity-30"
+            className="text-gold opacity-30"
           />
         )}
       </div>
 
       <div className="flex flex-1 flex-col p-4">
         <div className="flex items-start justify-between gap-3">
-          <h3 className="text-[0.9375rem] font-semibold text-text">
+          <h3 className="text-[14.5px] font-bold text-text">
             {/*
               The WHOLE CARD is the target, and there is still only one link (Bashar, 2026-09-02).
 
@@ -162,13 +162,19 @@ export async function PropertyCard({
             </Link>
           </h3>
           {item.rating ? (
-            <span className="shrink-0 rounded-lg border border-line bg-field px-2 py-1 text-sm text-gold-ink">
+            <span className="shrink-0 text-[13px] font-bold text-gold">
               ★ {item.rating}
             </span>
           ) : null}
         </div>
 
-        <p className="mt-1 text-xs text-faint">
+        {/*
+          12.5px and MUTED, not 11px faint (Bashar, 2026-09-03: «too light or small»). These lines
+          are the card's only facts — what kind of place it is, where it is, how many people have
+          stayed — and they were set at the size the design reserves for a footnote. `--faint` is
+          the quietest step in the ladder and was doing the second-quietest one's work.
+        */}
+        <p className="mt-1 text-[12.5px] text-muted">
           {dynamicMessage(tt, item.propertyTypeCode, item.propertyTypeCode)} · {city}
         </p>
 
@@ -178,7 +184,7 @@ export async function PropertyCard({
             {item.badges.map((badge) => (
               <li
                 key={badge}
-                className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-xs text-gold-ink"
+                className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-xs text-gold"
               >
                 {badge === 'safra_verified' ? t('badgeVerified') : t('badgeRecommends')}
               </li>
@@ -187,33 +193,49 @@ export async function PropertyCard({
         ) : null}
 
         {item.reviewsCount > 0 ? (
-          <p className="mt-2 text-[0.6875rem] text-faint">
+          <p className="mt-2 text-[12.5px] text-muted">
             {t('reviews', { count: item.reviewsCount })}
           </p>
         ) : null}
 
-        <div className="mt-auto pt-4">
-          <p className="text-base text-text">
-            <span className="text-xl font-bold text-gold-ink">{nightly.text}</span>{' '}
-            <span className="text-xs text-faint">{t('perNight')}</span>
-          </p>
-          {/*
+        {/*
+          A dotted rule between the facts and the money (Bashar, 2026-09-03, with the reference).
+          The price is the one line on the card a person compares against every other card, and it
+          was sharing an edgeless column with the type, the city and the review count. A dotted rule
+          separates without adding a second box: the card already has one border and does not need
+          an interior one.
+
+          **Two elements, and the outer one is why.** The dots are `border-t-2`, not `border-t`: at
+          1px they were a hairline nobody could see was dotted (Bashar: «the points should be
+          bigger»). And the gap above them is `pt-5` on an OUTER box rather than a margin on this
+          one, because `mt-auto` is what pushes the money to the foot of a stretched card and a
+          second margin-top would fight it — where a card is not stretched, `auto` resolves to zero
+          and the rule sat against «تقييم واحد». Padding on a wrapper is a floor `auto` cannot eat.
+        */}
+        <div className="mt-auto pt-5">
+          <div className="border-t-2 border-dotted border-line pt-4">
+            <p className="text-base text-text">
+              <span className="text-[18px] font-bold text-gold">{nightly.text}</span>{' '}
+              <span className="text-[12.5px] text-muted">{t('perNight')}</span>
+            </p>
+            {/*
           The total, only when it says something the line above does not. On a one-night search the
           two are the same figure, and «$US 100 / الليلة» over «$US 100 لليلة واحدة» reads as the
           card having printed the price twice by mistake.
         */}
-          {item.nights > 1 ? (
-            <p className="mt-0.5 text-xs text-muted">
-              {total.text} {t('totalFor', { nights: item.nights })}
-            </p>
-          ) : null}
-          {/* Said once per card, under the total — the figure a booking is actually made against. */}
-          {total.converted ? (
-            <p className="mt-0.5 text-[0.6875rem] text-faint">
-              {common('convertedFrom', { amount: total.original })}
-            </p>
-          ) : null}
-          <p className="mt-0.5 text-[0.6875rem] text-faint">{t('serviceFee')}</p>
+            {item.nights > 1 ? (
+              <p className="mt-0.5 text-xs text-muted">
+                {total.text} {t('totalFor', { nights: item.nights })}
+              </p>
+            ) : null}
+            {/* Said once per card, under the total — the figure a booking is actually made against. */}
+            {total.converted ? (
+              <p className="mt-0.5 text-[12px] text-muted">
+                {common('convertedFrom', { amount: total.original })}
+              </p>
+            ) : null}
+            <p className="mt-0.5 text-[12px] text-muted">{t('serviceFee')}</p>
+          </div>
         </div>
       </div>
     </article>

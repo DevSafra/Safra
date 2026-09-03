@@ -221,7 +221,7 @@ function Arrow({
       aria-label={label}
       tabIndex={hidden ? -1 : 0}
       aria-hidden={hidden}
-      className={`absolute top-[38%] z-10 hidden size-10 -translate-y-1/2 cursor-pointer place-items-center rounded-full border border-line bg-card text-text shadow-[var(--shadow-lift)] transition-[opacity,scale,box-shadow,background-color] ease-out-strong hover:bg-field hover:shadow-[var(--shadow-lift-hover)] active:scale-95 sm:grid ${
+      className={`absolute top-[38%] z-10 hidden size-10 -translate-y-1/2 cursor-pointer place-items-center rounded-full border border-line bg-card text-text shadow-[var(--shadow-lift)] transition-[opacity,box-shadow,background-color] ease-out-strong hover:bg-field hover:shadow-[var(--shadow-lift-hover)] sm:grid ${
         hidden
           ? 'pointer-events-none opacity-0 duration-140 lg:scale-90'
           : 'opacity-100 duration-200 lg:scale-100'
