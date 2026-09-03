@@ -12,6 +12,10 @@
     "account": "My account",
     "language": "Language",
     "currency": "Currency",
+    "chooseLanguage": "Choose a language",
+    "chooseCurrency": "Choose a display currency",
+    "closeDialog": "Close",
+    "currencyHelp": "Prices are converted for display only; you are charged in the listing's own currency.",
     "breadcrumb": "Breadcrumb",
     "themeToLight": "Switch to light mode",
     "themeToDark": "Switch to dark mode"
@@ -95,7 +99,23 @@
     "infants": "Infants",
     "childrenCount": "{count, plural, =0 {no children} one {1 child} other {# children}}",
     "infantsCount": "{count, plural, =0 {no infants} one {1 infant} other {# infants}}",
-    "infantsHint": "Infants do not count toward the unit’s capacity"
+    "infantsHint": "Infants do not count toward the unit’s capacity",
+    "filters": "Filters",
+    "filtersApply": "Apply filters",
+    "filtersClear": "Clear all",
+    "filtersActive": "{count, plural, =0 {No filters} one {1 filter} other {# filters}}",
+    "priceRange": "Price per night",
+    "priceFrom": "From",
+    "priceTo": "To",
+    "priceCurrencyNote": "In the listing's own currency, not the display currency",
+    "propertyType": "Property type",
+    "anyPropertyType": "Any type",
+    "amenitiesTitle": "Amenities",
+    "freeCancellation": "Free cancellation only",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "pageNumber": "Page {number}",
+    "resultsOnPage": "{count, plural, =0 {No results} one {1 result on this page} other {# results on this page}}"
   },
   "attributes": {
     "sea": "Sea",
@@ -165,7 +185,9 @@
       "previous": "Previous photo",
       "next": "Next photo",
       "close": "Close preview",
-      "viewAll": "View all photos ({n})"
+      "viewAll": "View all photos ({n})",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out"
     }
   },
   "city": {

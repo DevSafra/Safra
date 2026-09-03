@@ -874,6 +874,8 @@ export const ar = {
     previous: 'الصورة السابقة',
     next: 'الصورة التالية',
     close: 'إغلاق المعاينة',
+    zoomIn: 'تكبير الصورة',
+    zoomOut: 'تصغير الصورة',
   },
 
   images: {

@@ -12,6 +12,10 @@
     "account": "حسابي",
     "language": "اللغة",
     "currency": "العملة",
+    "chooseLanguage": "اختر اللغة",
+    "chooseCurrency": "اختر عملة العرض",
+    "closeDialog": "إغلاق",
+    "currencyHelp": "تُحوَّل الأسعار للعرض فقط؛ الدفع يجري بعملة الإقامة.",
     "breadcrumb": "مسار التنقل",
     "themeToLight": "التبديل إلى المظهر الفاتح",
     "themeToDark": "التبديل إلى المظهر الداكن"
@@ -95,7 +99,23 @@
     "infants": "الرضّع",
     "childrenCount": "{count, plural, zero {لا أطفال} one {طفل واحد} two {طفلان} few {# أطفال} many {# طفلًا} other {# طفل}}",
     "infantsCount": "{count, plural, zero {لا رضّع} one {رضيع واحد} two {رضيعان} few {# رضّع} many {# رضيعًا} other {# رضيع}}",
-    "infantsHint": "الرضّع لا يُحتسبون ضمن سعة الوحدة"
+    "infantsHint": "الرضّع لا يُحتسبون ضمن سعة الوحدة",
+    "filters": "التصفية",
+    "filtersApply": "طبّق التصفية",
+    "filtersClear": "مسح الكل",
+    "filtersActive": "{count, plural, zero {لا تصفية} one {تصفية واحدة} two {تصفيتان} few {# عوامل تصفية} many {# عامل تصفية} other {# عامل تصفية}}",
+    "priceRange": "السعر لليلة",
+    "priceFrom": "من",
+    "priceTo": "إلى",
+    "priceCurrencyNote": "بعملة الإقامة نفسها، لا بعملة العرض",
+    "propertyType": "نوع الإقامة",
+    "anyPropertyType": "كل الأنواع",
+    "amenitiesTitle": "المرافق",
+    "freeCancellation": "إلغاء مجاني فقط",
+    "previousPage": "الصفحة السابقة",
+    "nextPage": "الصفحة التالية",
+    "pageNumber": "صفحة {number}",
+    "resultsOnPage": "{count, plural, zero {لا نتائج} one {نتيجة واحدة على هذه الصفحة} two {نتيجتان على هذه الصفحة} few {# نتائج على هذه الصفحة} many {# نتيجة على هذه الصفحة} other {# نتيجة على هذه الصفحة}}"
   },
   "attributes": {
     "sea": "بحر",
@@ -165,7 +185,9 @@
       "previous": "الصورة السابقة",
       "next": "الصورة التالية",
       "close": "إغلاق المعاينة",
-      "viewAll": "عرض كل الصور ({n})"
+      "viewAll": "عرض كل الصور ({n})",
+      "zoomIn": "تكبير الصورة",
+      "zoomOut": "تصغير الصورة"
     }
   },
   "city": {

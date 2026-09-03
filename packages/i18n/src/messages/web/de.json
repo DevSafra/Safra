@@ -12,6 +12,10 @@
     "account": "Mein Konto",
     "language": "Sprache",
     "currency": "Währung",
+    "chooseLanguage": "Sprache wählen",
+    "chooseCurrency": "Anzeigewährung wählen",
+    "closeDialog": "Schließen",
+    "currencyHelp": "Preise werden nur zur Anzeige umgerechnet; abgerechnet wird in der Währung der Unterkunft.",
     "breadcrumb": "Brotkrümelnavigation",
     "themeToLight": "Zum hellen Design wechseln",
     "themeToDark": "Zum dunklen Design wechseln"
@@ -95,7 +99,23 @@
     "infants": "Kleinkinder",
     "childrenCount": "{count, plural, =0 {keine Kinder} one {1 Kind} other {# Kinder}}",
     "infantsCount": "{count, plural, =0 {keine Kleinkinder} one {1 Kleinkind} other {# Kleinkinder}}",
-    "infantsHint": "Kleinkinder zählen nicht zur Belegung der Einheit"
+    "infantsHint": "Kleinkinder zählen nicht zur Belegung der Einheit",
+    "filters": "Filter",
+    "filtersApply": "Filter anwenden",
+    "filtersClear": "Alle löschen",
+    "filtersActive": "{count, plural, =0 {Keine Filter} one {1 Filter} other {# Filter}}",
+    "priceRange": "Preis pro Nacht",
+    "priceFrom": "Von",
+    "priceTo": "Bis",
+    "priceCurrencyNote": "In der Währung der Unterkunft, nicht in der Anzeigewährung",
+    "propertyType": "Unterkunftsart",
+    "anyPropertyType": "Alle Arten",
+    "amenitiesTitle": "Ausstattung",
+    "freeCancellation": "Nur kostenlose Stornierung",
+    "previousPage": "Vorherige Seite",
+    "nextPage": "Nächste Seite",
+    "pageNumber": "Seite {number}",
+    "resultsOnPage": "{count, plural, =0 {Keine Ergebnisse} one {1 Ergebnis auf dieser Seite} other {# Ergebnisse auf dieser Seite}}"
   },
   "attributes": {
     "sea": "Meer",
@@ -165,7 +185,9 @@
       "previous": "Vorheriges Foto",
       "next": "Nächstes Foto",
       "close": "Vorschau schließen",
-      "viewAll": "Alle Fotos ansehen ({n})"
+      "viewAll": "Alle Fotos ansehen ({n})",
+      "zoomIn": "Vergrößern",
+      "zoomOut": "Verkleinern"
     }
   },
   "city": {
