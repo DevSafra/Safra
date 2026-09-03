@@ -1314,6 +1314,434 @@ rendered as one, because the alternative is second-guessing the database from th
 **Owner:** Bashar — content, not engineering. Blocks nothing technically; visible on the first
 screen of the public site, so it belongs before launch rather than after.
 
+### O-web-7 — Closed: an unlayered touch floor beat every height a component asked for
+
+**Found and fixed 2026-09-02**, from a one-line report: «the menu items on the navbar is a little
+bit under the logo with height.»
+
+The header's controls carried `sm:min-h-11` and rendered 40px anyway. Not specificity — a class
+beats `:where()`, which is exactly zero. **An unlayered rule beats every layered one whatever the
+specificity says**, and `@import 'tailwindcss'` puts every utility inside `@layer utilities`. The
+40px touch floor was written outside any layer in all three apps, so from the day it was added no
+`min-h-*` utility could raise a control below `lg`.
+
+It was never one bar. Measured before the fix:
+
+| Surface                            | Asked for | Rendered                                                   |
+| ---------------------------------- | --------- | ---------------------------------------------------------- |
+| Header controls, 768–1023px        | 44px      | 40px — the brand mark is 44px, so its box began 2px higher |
+| Search form «بحث», 390/768         | 48px      | 40px                                                       |
+| Search form date + guests triggers | 48px      | 40px, beside الوجهة which is a `div` and got its 48px      |
+| Partner application submit         | 44px      | 40px                                                       |
+
+The fix is `@layer base { … }` around the floor in each app's `globals.css`. Inside `base` the rule
+still does what it was written to do — a control with no height of its own is 40px where the input
+is a finger — and a component that states a larger one gets it. A component stating a SMALLER one
+now also gets it, which is why the one button that did (`field-popover`'s «تم») carries the floor
+explicitly and drops to 36px only from `lg`.
+
+**Held by three probes**, one per app, in `e2e/responsive.spec.ts`. They declare a height from
+inside `@layer utilities` and ask what the element ended up with: 44px layered, 40px unlayered.
+Deliberately not phrased against a utility CLASS — `min-h-11` is emitted only into the stylesheet of
+an app that uses it, so a class-based probe would have reported the defect in any app that had not
+yet reached for that height. Plus a fourth test that the header row has one top edge and one bottom
+edge at 768/1024/1440. All four were watched to fail: the probes against an unlayered floor
+re-inserted into the built stylesheet, the edge test against `sm:min-h-11` rewritten to 10, which
+reproduced Bashar's exact reading — brand `20/64`, everything else `22/62`.
+
+### O-web-8 — The customer header is two rows on a phone
+
+**Identified 2026-09-02.** At 390px the bar wraps: brand, the two nav pills and the language and
+currency chips on the first line, «إنشاء حساب» and «تسجيل الدخول» on the second. 109px of header.
+
+Not a defect — nothing overflows, every control meets the 40px floor and all of them are reachable —
+but it is not what booking.com does, and it is 109px of a 664px first screen. Measured, the five
+items come to **551px against 358px** of usable width, so no amount of tightening closes it: one row
+on a phone needs a drawer behind a hamburger, which is a component and a decision, not a tweak.
+
+The 768px case WAS closed the same day by dropping «سجّل كشريك» to `lg`, which is where booking.com
+drops its own «List your property». That took the bar from 125px and two rows to 77px and one.
+
+**Owner:** engineering, in the mobile pass over the customer site. Blocks nothing.
+
+### O-web-9 — Closed: the landing page's primary action led to «لا نتائج» every evening
+
+**Found and fixed 2026-09-02, by pressing the button.** «موصى به من سفرة» had been fixed that
+morning for the §5.3 cutoff — after 17:00 in the city's timezone the API refuses a same-day search
+with a 400 naming `firstBookableDate`, and the rail now asks again from the date the API named.
+
+The SEARCH FORM was not fixed, and it is the page's primary action. It was pre-filled with
+`todayInDamascus()` unconditionally, so between 17:00 and midnight pressing «ابحث عن إقامة» with
+the form untouched produced **zero results** and the API's own «حجوزات اليوم أُغلقت» notice.
+Measured at 21:06: 0 cards. After the fix, the same press returns 24, in all three locales.
+
+Two more paths carried the same fault and were found by sweeping for the SHAPE rather than the
+symptom: the stay-type chips and the attribute shortcuts both linked into `/search` with today's
+date hard-built into the query.
+
+**The decision now exists once**, in `apps/web/src/lib/bookable-night.ts`, because it existed four
+times and three of them were wrong. It reads the date the API named and never re-implements the
+cutoff — the API owns the timezone, the hour and what "first bookable" means across nine cities,
+and a UI that computed it would drift from the endpoint that enforces it, invisibly.
+
+`minDate` is the only prop the form needs: `SearchForm` derives both date values from it when no
+explicit defaults are given, so the calendar's floor and the pre-filled night cannot disagree.
+
+**Held by `bookable-night.test.ts`** — ten cases, including the two that keep the fix honest: an
+empty night with no notice is an ANSWER and must not be silently redirected to tomorrow, and rows
+that arrive alongside a notice are kept. Both directions of the guard were watched to fail, and a
+`day + 2` mutation kills five of the calendar assertions.
+
+### O-web-10 — Closed: the results page could not be paged and could not be filtered
+
+**Found and fixed 2026-09-02**, starting the customer-site pass down the booking funnel.
+
+**Result 25 was unreachable.** Not hard to reach — unreachable. `/search` asked for 24, rendered
+them, and sent no cursor; `limit` caps at 60 in the contract, so no URL a person could type would
+show the twenty-fifth stay. There are 2,016 published properties in the testbed. §2 makes
+pagination mandatory on every list a customer reads and cursor the only permitted mechanism for
+one.
+
+The API now returns `previousCursor` beside `nextCursor`, computed in `search.service.ts` because
+that service owns the cursor format — `encodeOffset` is `base64url(String(offset))` today, and a
+page that rebuilt that expression would be a second definition of a wire format, free to drift the
+moment a cursor carries anything more than an offset. The drift would surface as a 400 on a
+«السابق» link.
+
+**Nothing could be filtered.** `searchQuerySchema` has accepted `minPrice`, `maxPrice`,
+`propertyTypeCode`, `attributes`, `amenityCodes` and `freeCancellationOnly` since it was written;
+the screen offered a sort order. Every one of them was live in the API and reachable only by
+hand-writing a query string. `SearchFilters` is a GET form pointed at the same route — the view
+stays in the URL, it works before hydration, and applying a filter drops the cursor so a change of
+criteria returns to the first page rather than to page three of a set that now has one.
+
+**Its own links reflected the request.** They were built by iterating `Object.entries` over
+whatever the URL carried, which put arbitrary caller-chosen parameters into four links on our own
+page. Not an injection — `URLSearchParams` encodes and the base path is a literal — but it is the
+shape `returnQuery` exists to forbid. Every link is now built from values the page parsed and
+clamped, and an unknown trip attribute is dropped rather than echoed into a checkbox.
+
+_(The footer's language picker still carries the whole query string, deliberately and unchanged: it
+exists so that changing language keeps the reader on their search.)_
+
+**Held by `e2e/customer-search.spec.ts`** — six tests, all watched to fail against their own
+mutation. The paging one compares result LINKS, not headings: `db:testbed` gives twenty-four
+published stays that share one name, so the obvious assertion reported two identical pages for two
+completely disjoint result sets.
+
+### O-web-11 — Closed: a `<details>` that a desktop could not open, and the measurement that hid it
+
+**Fixed 2026-09-02, and worth its own entry because the wrong test passed first.**
+
+The filter panel collapses on a phone and must never be closed from `lg`. The server cannot know
+the viewport, so it renders CLOSED and CSS reveals it. Setting `display` on the child is not
+enough: **Chrome hides a closed disclosure's subtree with `content-visibility: hidden` on the
+`::details-content` pseudo-element, which no property on a descendant overrides.** The form computed
+`display: flex` with a 1911px box and was not rendered at all.
+
+A first test appeared to prove the opposite, because it measured `getBoundingClientRect()` — which
+reports a box for content that is never painted. `isVisible()` is the question; a height is not.
+This is the same lesson as «a control that changes nothing proves nothing», one layer down: the
+check ran, returned a number, and the number meant nothing.
+
+`.disclosure-open-lg::details-content { content-visibility: visible }` in each app's `globals.css`,
+as a rule separate from the `display` override so a browser that does not know the pseudo drops
+only that one — which is the whole mechanism on Firefox. Verified with a real visibility check in
+Chromium and Firefox at 390 and 1440.
+
+### O-media-4 — No stay is tagged with a single amenity
+
+**Identified 2026-09-02, while building the results filters.** `unit_amenities` holds **zero rows**
+while the catalogue lists twelve filterable amenities — wifi, pool, parking, breakfast, sea view,
+accessible, and six more, all defined, all filterable, none attached to anything.
+
+Nothing is broken. The console can tag, the partner portal can tag, the search filters on it
+correctly, and the counting query was proved to count (tagging one unit takes wifi to 1; untagging
+returns it to 0). What is missing is the CONTENT — the same shape as `O-media-3`.
+
+**Mitigated so it does not read as a broken search.** `/amenities` now returns a `propertyCount`
+per amenity, counted over PUBLISHED, non-deleted properties and DISTINCT on the property, and the
+filter panel offers only amenities above zero — so today the section is simply absent rather than
+twelve checkboxes whose every outcome is «لا نتائج». An amenity joins the filter the moment a
+published stay has it; nothing has to be remembered or switched on.
+
+**Owner:** Bashar — content, via الشركاء or the console. Blocks nothing; costs the results page its
+most useful filter until it is done.
+
+### O-ui-5 — Closed: the shared touch floor was suppressed in a second property too
+
+**Found and fixed 2026-09-02**, while redesigning the image previewer, and it is the same defect as
+`O-web-7` one property across. `globals.css` carries
+`:where(.grid, .flex, .inline-flex) > * { min-width: 0 }` so no panel has to remember `min-w-0`, and
+it sat OUTSIDE any cascade layer — which beats every Tailwind utility whatever the specificity says.
+
+The note beside it read «`:where()` gives the selector ZERO specificity, so any explicit `min-w-*`
+utility still wins», and that sentence had been false since Tailwind v4 landed. So had the copy of it
+in `.claude/CLAUDE.md` §"Responsive on every device". Both are corrected.
+
+**It had already been met once and not reported.** A previous session hit it on الإعلانات, measured
+it correctly — `min-w-[5.5rem]` computing to `0px` — wrote an accurate account of the cause in a
+comment, and worked around it with a two-column grid rather than fixing the rule. Everything
+downstream of it stayed broken, including the previewer's controls in all three apps.
+
+Fixed by layering the rule. Held by `raisableWidthFloor` in `e2e/responsive.spec.ts`, one probe per
+app, alongside the height probe it is twinned with; watched to fail against an unlayered copy
+re-inserted into the built stylesheet.
+
+### O-ui-6 — Closed: «معاينة», the one image previewer, redesigned
+
+**2026-09-02, at Bashar's request** («use the 3 skills to design the image preview component»). It
+is used by six surfaces across three apps — the customer property gallery, the console's property
+review, city photographs, dispute evidence, a campaign creative and the partner's image manager — so
+everything below landed on all six at once. **The label contract did not change**, deliberately: the
+rail names its buttons with the existing `open` key plus a position, so no caller and none of the
+five catalogues needed a migration.
+
+**Four of the five things it needed were defects, and each was measured on the running site first.**
+
+|                              | Was                                                                                                                      | Is                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| Controls                     | 30×23px, under WCAG 2.5.8's 24×24 floor                                                                                  | 44×44, stated as a box rather than a floor |
+| Caption on the customer site | `text-text2`, a token the customer app does not define, so the declaration was invalid and it inherited full text colour | `text-muted`, which all three apps define  |
+| Tab                          | walked out of the dialog; `aria-modal` traps nothing                                                                     | trapped, per `Modal`'s pattern             |
+| The picture                  | 640px inside a 1440px viewport, 44% of the width                                                                         | fills the area the frame reserves          |
+| Controls' glyphs             | `‹` `›` `×`, text standing in for an icon system                                                                         | drawn, one 1.75 stroke, one size           |
+
+`confirm-dialog.tsx` carried the same `text-text2` line, so every confirmation message on the
+customer site had lost its muted colour too. Fixed in the same pass — the shared package may only
+spend tokens all three apps define, and now does.
+
+**What is new rather than fixed:** a thumbnail rail (a counter says how far through you are; fourteen
+photographs stepped one at a time is a search), swipe-to-step and drag-down-to-dismiss with velocity,
+neighbour preloading, `focus-visible` rings, and `prefers-reduced-motion`.
+
+**The motion decision is the asymmetry.** Opening animates — 200ms, one ease-out — because a
+full-screen dark surface appearing out of nothing is jarring and a person sees it occasionally.
+**Stepping does not**, because a reviewer walks a set with the arrow keys dozens of times a day and
+animating a key-repeated action is how an interface starts to feel slow; the work went into
+preloading the neighbours so instantaneous was actually possible. Closing is instant for the same
+reason — it is usually Escape, and an exit animation delays the page underneath for nothing.
+
+**The viewer is physical; only its words follow the page.** The standing rule says arrows are not
+mirrored on an RTL screen, so the chevrons are placed with `left`/`right` rather than `start`/`end`,
+a leftward drag goes onward, and the rail is `dir="ltr"`. That is the one place in this codebase
+where the logical property is the wrong tool, and it is what keeps the four ways of moving through a
+set — key, chevron, drag, rail — from disagreeing. **Consequence, accepted and stated:** the rail
+runs left to right on an Arabic page.
+
+**Measured, not asserted:** the counter is 9.66:1 on the surround and the close glyph 19.56:1. The
+worst case is a control glyph on its pill over a pure-white photograph, which was 3.06:1 — over
+WCAG's 3:1 floor for a control by four hundredths — so the pill went from 45% to 55% black and it
+is 4.74:1.
+
+**Held by `e2e/image-preview.spec.ts`**, eight tests, every one watched to fail against its own
+mutation. Two of them had to be rewritten first, and both failures are worth keeping:
+
+- The 44px assertion failed against a correct build, because it measured during the entrance and
+  `getBoundingClientRect` reports the PAINTED box — a 44px control is 43.3px while the frame is at
+  `scale(0.985)`. It waits for the entrance now.
+- The fill assertion compared the picture to its own element, which is the same thing by
+  construction whenever `max-*` sizing is in play, so it stayed green against the exact defect it
+  was written for. It compares against the area the frame reserves now.
+
+**Not done, and deliberately:** no zoom. booking.com's own lightbox has none, the sources are 1600px
+renders, and adding it would have meant new label keys in five catalogues for a control the reference
+does not carry.
+
+**Unverified:** the swipe thresholds and the velocity cut-off were driven with emulated pointer
+events, which proves the logic and not the feel. They want a real handset.
+
+### O-ui-7 — Closed: the arrows in the image preview did nothing
+
+**Found by Bashar and fixed 2026-09-02**: «the arrows buttons of the image preview are not
+working». They were not. The swipe gesture added earlier the same day lived on a wrapper that called
+`setPointerCapture` on every press, and **capturing retargets every later pointer event to the
+capturing element** — so `pointerup` never reached the chevron a person pressed, and a `click` only
+fires when down and up share a target. The buttons received nothing at all; instrumenting them
+recorded zero click events.
+
+The guard is one line — a press that starts on a control is not a drag — written as
+`closest('button, a[href]')` rather than against the two chevrons, so the next caller to put a
+control over a picture does not have to rediscover it.
+
+**The spec had six tests and none of them pressed one.** It checked the chevrons were 44px, that
+they sat on the right sides, and that the arrow KEYS stepped — all of which passed against a build
+where the controls were inert. A control is tested by using it. Two tests were added: one that
+presses each chevron, and one that they vanish at the ends.
+
+### O-ui-8 — Closed: the preview became a real slider
+
+**2026-09-02, at Bashar's request** — «add an animation to it … similar to the booking.com image
+preview slider.» The picture area is now a TRACK: the pictures sit at multiples of the frame's width
+and the track translates by `-at × 100%`, so stepping is one transform and a drag is the same
+transform following the pointer. A viewer that swaps one `<img>`'s source can fade; it can never
+show the next picture arriving under a finger, which is the thing that makes a strip feel like
+photographs rather than a slideshow.
+
+Only three slides are mounted — the current one and its neighbours, which is exactly the pair the
+frame already preloads. Fourteen 1600px photographs decoded at once is a lot of bitmap for a set
+somebody will look at three of.
+
+**Stepping now animates, and that reverses a deliberate decision.** It did not, because a reviewer
+walks a set with the arrow keys dozens of times a day and animating a key-repeated action is how an
+interface starts to feel slow. Bashar asked for it explicitly, so the brief wins: 260ms on one
+ease-out, fast enough that a held arrow key still reads as stepping, and off entirely under
+`prefers-reduced-motion`.
+
+**Wrapping had to go with it.** Sliding from the last picture back past every other one to reach the
+first reads as the viewer losing its place. Stepping clamps, and a control with nowhere to go is
+ABSENT rather than greyed out — the behaviour Bashar asked for on the home page's sliders.
+
+Two tests had to be rewritten before they meant anything, and both failures are worth keeping: the
+44px assertion measured during the entrance, where `getBoundingClientRect` reports the painted box
+and a 44px control is 43.3px at `scale(0.985)`; and the physical-placement test assumed both
+chevrons exist, which is never true in a two-picture fixture now that they hide at the ends. The
+rail also grew a `data-thumb` seam, because a locator written against «معاينة الصورة» only works in
+the language it was written in.
+
+### O-ui-9 — Closed: the text on the whole site was below the contrast floor
+
+**Found by Bashar and fixed 2026-09-02:** «the text colour on the entire website is too light and
+hard to read. Please keep in mind to make the website comfortable and easy to use for really every
+person on the earth.»
+
+He was right, and it was measurable. Walking every visible run of text on eight customer pages and
+computing each against the background actually behind it found **eighteen distinct failing pairs**,
+concentrated in two tokens:
+
+| Token                                            | Was       | Is        | Worst ratio           |
+| ------------------------------------------------ | --------- | --------- | --------------------- |
+| `--color-faint`                                  | `#7c8296` | `#5e6372` | 3.07 → 4.82           |
+| `--color-gold` (light)                           | `#a87a1f` | `#846018` | 3.09 → 4.60           |
+| `--color-muted`                                  | `#5c6377` | `#454b5a` | 4.81 → **7.01 (AAA)** |
+| `warn` `ok` `bad` `teal` `lime` `orange` `stone` | 3.59–4.16 |           | all ≥ 4.61            |
+| `--color-faint` (dark)                           | `#736f92` | `#908da8` | 3.26 → 4.85           |
+
+`--color-muted` went past AA to **AAA** deliberately: it carries most of the secondary reading on
+every screen, and that is where "comfortable" is actually decided. `faint` is the quietest step and
+stays at a solid AA so the three-level hierarchy survives. `--color-text` was already 12.6:1.
+
+**The gold was darkened here and that was WRONG — see `O-ui-11`.** `--color-gold` is the brand, and
+moving it to fix eight small labels took the primary button and the price with it. Reverted the next
+morning; the split into `gold` and `gold-ink` is what should have been done first.
+
+All three apps share one palette, so one set of values fixed the console and the portal as well.
+The 3,616-test suite passed unchanged, including `status-tone.test.ts`, which would have caught two
+statuses collapsing onto one colour.
+
+**Held by `e2e/contrast.spec.ts`**, which walks the DOM rather than reading the tokens — a palette
+audit proves what the palette says, and this proves what a person sees, after every utility, every
+`/60` opacity and every inherited value. Those two answers came apart twice in one day. It runs both
+themes, setting `data-theme` rather than trusting `prefers-color-scheme`: the first version used
+Playwright's `colorScheme: 'dark'`, which renders the LIGHT palette here, and so reported the light
+theme's failures twice while calling the dark one checked. Watched to fail against the old `faint`.
+
+### O-ui-10 — Closed: the preview zooms
+
+**2026-09-03, at Bashar's request** — «add zoom in and zoom out buttons». It had been left out
+deliberately, on the grounds that booking.com's own lightbox has none; the brief wins.
+
+Four stops (1×, 1.5×, 2×, 3×), because these are buttons and a button that moves by an
+unpredictable amount is one people press twice to find out what it did. 3× is the ceiling: past it a
+1600px render is mush. Both ends disable rather than hide — the opposite of the chevrons, and right
+for the opposite reason: a zoom pair that changed width as it was used would move the control you
+were about to press.
+
+**Panning came with it, because zoom without panning is a control that appears to work and does
+not.** The clamp is measured from the PICTURE, not the element: `object-contain` letterboxes a
+landscape shot in a tall frame, and panning to the bar is panning into nothing. Verified — 600px of
+travel clamps to the computed 361px limit. A new picture always arrives at 1×.
+
+`+`/`=`, `-` and `0` on the keyboard; double-press to toggle. Two new label keys in five catalogues,
+which is what `SliderLabels` being required-rather-than-defaulted is for.
+
+**And it exposed the arrow bug's real shape.** Double-press did nothing at first, for the same
+reason the chevrons had done nothing: the pointer was captured on PRESS, and capturing retargets
+every later event, so neither `click` nor `dblclick` could complete. The guard that exempted buttons
+was treating the symptom. **Capture now waits for 5px of movement** — a press that goes nowhere stays
+a press, a real drag still keeps its pointer when the finger leaves the frame, and any control
+placed over a picture in future works without knowing about this.
+
+Held by three more tests in `e2e/image-preview.spec.ts`, thirteen now, all watched to fail against a
+flattened zoom ladder and a disabled pan branch.
+
+### O-web-12 — The property page, moving toward booking.com's composition
+
+**Started 2026-09-03** against the screenshot Bashar supplied of booking.com's Arabic property page.
+
+**Done:** the gallery is a MOSAIC — one tall photograph at the reading start, two stacked beside it,
+a row of five underneath whose last tile carries «+N صورة». Every tile opens the previewer at its
+own picture, where before eleven photographs of fourteen were reachable only through one small
+button in a corner. The header moved ABOVE the photographs and split the way the reference does:
+name, type, city and rating at the reading start, «احجز الآن» at the end as an anchor to the booking
+panel rather than a second booking form.
+
+Two notes worth keeping. The gallery block is `7/3`, not `16/9`: 16/9 is 630px tall in this column
+and pushes the price and every word about the place below the fold on a laptop. And the stacked
+column takes one row when there is one photograph — `grid-rows-2` with a single image leaves half a
+column empty beside a full-height cover, which reads as an image that failed to load.
+
+**Not done, and each is a real piece:**
+
+- **The map card.** Bashar chose MapLibre + MapTiler on 2026-09-02; it needs `MAPTILER_KEY` in the
+  environment, which only he can obtain. The component will render an honest fallback until it is
+  there. Note the constraint already recorded: coordinates are fuzzed to ~100m and the address is
+  truncated until a booking exists, so the map must show an AREA, not a door.
+- **The score-and-review card** in the sidebar — «9.0 ممتاز», the review count, one guest quote.
+- **The amenity chips as bordered icon boxes**, which is how the reference draws them; they are a
+  plain grid today.
+- **The address line** under the name, with its «اعرض الخريطة» link.
+
+### O-ui-11 — Closed: the brand gold came back, and gold text got its own token
+
+**Bashar, 2026-09-03:** «why you changed the button colour and price colour? please undo that — I
+meant the grey texts on the website is hard to read.» He screenshotted the booking panel: a muddy
+brown «احجز الآن» and a muddy brown price.
+
+He was right and the mistake is worth naming. `O-ui-9` fixed a real problem — eighteen failing text
+colours — but it fixed the gold one by moving `--color-gold`, and that token is not a text colour,
+it is the BRAND. Eight small labels were unreadable; the answer taken made the primary button and
+the price unreadable as a brand instead. **A contrast fix that changes what the product looks like
+is a rebrand wearing an accessibility argument.**
+
+**Two tokens now, split exactly where WCAG splits:**
+
+|                    | Light                | Used for                                  | Floor | Worst measured |
+| ------------------ | -------------------- | ----------------------------------------- | ----- | -------------- |
+| `--color-gold`     | `#a87a1f` (restored) | surfaces, borders, ornament, display text | 3:1   | 3.09           |
+| `--color-gold-ink` | `#846018`            | gold text below 18.66px bold              | 4.5:1 | 4.60           |
+
+In the dark theme both are `#e8bc66`, which already measures 8.73 — there was never anything to fix
+there.
+
+**Three things fell out of doing it properly:**
+
+- **Ten flat-gold buttons became `.btn-gold`.** They were `bg-gold` with near-white text, which is
+  3.56:1 — they had been failing all along and the earlier darkening had masked it. `.btn-gold` is
+  the gradient the approved design specifies and it carries its own foreground at 6.1:1. One filled
+  gold action across the whole site now, which is what the design always said.
+- **The card price and the footer wordmark grew rather than dulled.** Both were 16px bold gold, just
+  under the 18.66px that makes gold legal at 3:1. They are `text-xl` now — the price is the number a
+  booking decision turns on and deserved the size anyway, and the footer wordmark finally matches
+  the header's.
+- **A mechanical sweep, not eighty judgements.** Gold text that states a small size took the ink:
+  29 files in the customer app, 52 in the console, 22 in the portal. The remaining handful inherited
+  their size from a parent, so the sweep could not see them and the audit named them one by one.
+
+**The grey text stays dark** — `muted` at 7.01:1 (AAA) and `faint` at 4.82:1, which was the actual
+request. `e2e/contrast.spec.ts` reports zero failing pairs in both themes with the brand gold in
+place, which is the whole point: the two goals were never in conflict, only the single token was.
+
+### O-dep-2 — Closed: `qs` pinned above two moderate advisories
+
+**Closed 2026-09-02.** `pnpm audit` began failing on GHSA-x5fp-wj9c-mxmx and GHSA-4mjr-xmp4-gh2g,
+both in `qs` — the query parser `express` uses, so on the API's every request path. Newly published
+rather than newly introduced: the lockfile had not changed.
+
+Pinned with `pnpm.overrides` `qs: >=6.16.0`, which is how this repository already holds seven other
+transitive dependencies. `express@^5.1.0` declares `qs@^6.14.0`, so the override stays inside the
+range express itself asks for; the 3,605-test suite passes on it.
+
 ### O-partner-5 — Closed: the two disabled partner screens are built
 
 **Closed 2026-08-08.** عقاراتي offered تعديل and التقويم as greyed-out `<span aria-disabled>` labels
