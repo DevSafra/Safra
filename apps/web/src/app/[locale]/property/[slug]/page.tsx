@@ -109,6 +109,25 @@ export default async function PropertyPage({
   const name = localisedText(property.name, locale);
   const description = localisedText(property.description, locale);
   const cityName = localisedName(property.city, locale);
+  /*
+    The word beside the number. A bare «4.8» asks the reader to know what the scale is; the word is
+    what makes it a judgement. Thresholds on a FIVE-point scale — this platform's reviews are out of
+    five, not out of ten, so booking.com's own 9.0/8.0 boundaries do not transfer.
+  */
+  const score = Number(property.rating ?? 0);
+  const scoreWord = t(
+    score >= 4.5
+      ? 'scoreExcellent'
+      : score >= 4
+        ? 'scoreVeryGood'
+        : score >= 3.5
+          ? 'scoreGood'
+          : 'scoreFair',
+  );
+
+  /* The most recent review with something to read; a one-word review is not a highlight. */
+  const highlight = property.reviews?.find((one) => (one.body ?? '').trim().length > 40);
+
   const cheapest = property.units[0];
   const defaultStay = firstAvailableWindow(property.calendar, cheapest?.minNights ?? 1);
 
@@ -170,6 +189,29 @@ export default async function PropertyPage({
                 : ''}
               {' · '}
               <span className="text-faint">{property.reference}</span>
+            </p>
+
+            {/*
+              The address, on its own line under the name — booking.com's arrangement, and it earns
+              the line: «where is it» is the second question anybody asks and it was buried in a
+              section two screens down.
+
+              It jumps to that section rather than opening a map, because there is no map yet:
+              `MAPTILER_KEY` is not in the environment. The link is honest about where it goes, and
+              the section it lands on is the one that also says the exact address arrives after
+              booking (§5.6, P-001) — which is the part a pin would otherwise imply away.
+            */}
+            <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+              <PinIcon />
+              <span>
+                {property.addressApproximate}, {cityName}
+              </span>
+              <a
+                href="#location"
+                className="inline-flex min-h-10 items-center font-semibold text-gold-ink underline decoration-gold/40 underline-offset-2 lg:min-h-0 hover:decoration-gold"
+              >
+                {t('location')}
+              </a>
             </p>
           </div>
 
@@ -245,12 +287,26 @@ export default async function PropertyPage({
           {cheapest && cheapest.amenityCodes.length > 0 ? (
             <section>
               <h2 className="font-display text-xl text-text">{t('amenities')}</h2>
+              {/*
+                Bordered boxes, as booking.com draws them — a grid of bordered cells is scannable in
+                a way a bulleted list is not, and this is a list people scan for one word.
+
+                **No icon, deliberately.** The reference gives each amenity its own glyph; the
+                `amenities` catalogue carries an `icon` column and it is populated for **0 of 12**
+                rows, so the honest alternatives were twelve identical marks or none. Twelve
+                identical ticks is decoration pretending to be information. The `✓` that used to sit
+                here was worse still: a unicode glyph standing in for an icon system, which is the
+                one substitution the craft floor names outright.
+
+                Distinct icons need either that column filled or an icon library adopted; both are
+                recorded rather than faked.
+              */}
               <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {cheapest.amenityCodes.map((code) => (
-                  <li key={code} className="flex items-center gap-2 text-sm text-muted">
-                    <span aria-hidden className="text-ok">
-                      ✓
-                    </span>
+                  <li
+                    key={code}
+                    className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-text"
+                  >
                     {dynamicMessage(ta, code, code)}
                   </li>
                 ))}
@@ -308,7 +364,7 @@ export default async function PropertyPage({
           </section>
 
           {/* ── Location, deliberately approximate (§5.6, P-001) ──────────── */}
-          <section>
+          <section id="location" className="scroll-mt-28">
             <h2 className="font-display text-xl text-text">{t('location')}</h2>
             <div className="mt-3 rounded-card border border-line bg-card p-5">
               <p className="text-sm text-muted">
@@ -389,6 +445,52 @@ export default async function PropertyPage({
           to — the same reason every row on the console carries one.
         */}
         <aside id="booking" className="scroll-mt-28 lg:sticky lg:top-24 lg:self-start">
+          {/*
+            The score, the count, and one thing a guest actually said — booking.com's card, and the
+            reason it sits ABOVE the price is that it answers the question the price provokes. A
+            rating with no sentence under it is a number; a sentence with a name under it is a
+            reason.
+            
+            One review, not a carousel: the full set is a section further down, and a panel that
+            paged through them would compete with the thing beside it for the same attention.
+          */}
+          {property.rating ? (
+            <div className="mb-3 rounded-card border border-line bg-card p-5">
+              <div className="flex items-center gap-3">
+                <span className="btn-gold grid min-w-11 place-items-center rounded-lg px-2.5 py-1.5 text-lg font-bold">
+                  {property.rating}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-bold text-text">{scoreWord}</span>
+                  {property.reviewsCount > 0 ? (
+                    <span className="block text-xs text-muted">
+                      {t('reviews', { count: property.reviewsCount })}
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+
+              {highlight ? (
+                <figure className="mt-4 border-t border-line pt-4">
+                  <figcaption className="text-xs font-semibold text-muted">
+                    {t('guestsLoved')}
+                  </figcaption>
+                  {/*
+                    A real quotation mark pair, not the ASCII kind, and the body is clamped to three
+                    lines: a panel quote is a snippet somebody reads at a glance, and the whole
+                    review is one section down for anybody who wants it.
+                  */}
+                  <blockquote className="mt-2 line-clamp-3 text-sm leading-relaxed text-text">
+                    “{highlight.body}”
+                  </blockquote>
+                  {highlight.author ? (
+                    <p className="mt-2 text-xs text-faint">{highlight.author}</p>
+                  ) : null}
+                </figure>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="rounded-card border border-gold/30 bg-card p-5">
             {cheapest ? (
               <>
@@ -481,6 +583,27 @@ export default async function PropertyPage({
         </aside>
       </div>
     </article>
+  );
+}
+
+/** A location mark, in the stroke weight the rest of the product's icons are drawn at. */
+function PinIcon() {
+  return (
+    <svg
+      aria-hidden
+      width="1em"
+      height="1em"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="shrink-0 text-gold-ink"
+    >
+      <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </svg>
   );
 }
 
