@@ -123,7 +123,7 @@ export function ScreeningPanel({
           advisory ? 'border-gold/40 bg-gold/5' : 'border-bad/40 bg-bad/10'
         }`}
       >
-        <p className={`text-sm ${advisory ? 'text-gold-ink' : 'text-bad'}`}>
+        <p className={`text-sm ${advisory ? 'text-gold' : 'text-bad'}`}>
           {listStatus.imported
             ? fill(t.sections.screening.listStale, { days: listStatus.ageDays ?? 0 })
             : listStatus.fixtureLoaded
@@ -197,7 +197,7 @@ export function ScreeningPanel({
           ) : null}
         </div>
       ) : (
-        <p className="text-sm text-gold-ink">{t.sections.screening.notScreened}</p>
+        <p className="text-sm text-gold">{t.sections.screening.notScreened}</p>
       )}
 
       {error ? (
@@ -242,7 +242,7 @@ export function ScreeningPanel({
 
       {override !== null ? (
         <div className="mt-3 rounded border border-gold/30 bg-gold/5 p-3">
-          <p className="text-xs text-gold-ink">
+          <p className="text-xs text-gold">
             {override
               ? t.sections.panels.screeningMatchWarning
               : t.sections.panels.screeningClearWarning}

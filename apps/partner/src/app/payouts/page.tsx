@@ -143,7 +143,7 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
           {payoutStatus(payout.status)}
         </span>
 
-        <span className="ms-auto text-[17px] font-extrabold text-gold-ink">
+        <span className="ms-auto text-[17px] font-extrabold text-gold">
           <Ltr>{amount(payout.netAmount, payout.currencyCode)}</Ltr>
         </span>
       </div>

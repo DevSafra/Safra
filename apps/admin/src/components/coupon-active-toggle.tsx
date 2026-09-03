@@ -64,7 +64,7 @@ export function CouponActiveToggle({
         className={`min-h-10 cursor-pointer rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors disabled:opacity-50 lg:min-h-0 ${
           isActive
             ? 'border-line text-muted hover:border-bad hover:text-bad'
-            : 'border-[rgba(var(--goldA),0.4)] text-gold-ink hover:bg-[rgba(var(--goldA),0.08)]'
+            : 'border-[rgba(var(--goldA),0.4)] text-gold hover:bg-[rgba(var(--goldA),0.08)]'
         }`}
       >
         {busy ? t.table.working : isActive ? c.deactivate : c.activate}

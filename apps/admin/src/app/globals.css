@@ -63,7 +63,6 @@
    * as `--color-text2` and `--ease-out-strong`.
    */
   --radius-card: 0.875rem;
-  --color-gold-ink: #e8bc66;
   --color-sky: #78aee0;
   --color-ok: #6fc792;
   --color-bad: #e06868;
@@ -136,6 +135,26 @@
   --color-line2: #eaedf4;
   --color-text: #1d2333;
   --color-text2: #3a415a;
+
+  /*
+   * The greys are DARKER than `design_handoff_safra` §9.2, and that is Bashar's instruction, twice.
+   *
+   * The handoff sets `--muted:#5C6377` and `--faint:#7C8296`. The second measures **3.07:1** on the
+   * page's own hero band, under the 4.5 body-text floor, and he has now said twice — 2026-09-01 and
+   * again on 2026-09-03 after they were restored verbatim — that the grey is too light to read.
+   *
+   * So the ladder is rebuilt rather than flattened: three steps that stay distinguishable AND
+   * readable, where simply lifting `faint` to the floor would have put it within a hundredth of
+   * `muted` and collapsed the hierarchy the design uses.
+   *
+   *   --text   #1d2333   12.59:1   unchanged, the handoff's own
+   *   --muted  #454b5a    7.01:1   AAA, carries most secondary reading
+   *   --faint  #5e6372    4.82:1   AA, the quietest step
+   *
+   * **This is the only place the palette departs from §9.2, and it departs in one direction.** The
+   * golds are the design's exactly — he reverted an earlier attempt to darken those, and the two
+   * decisions are not in tension: gold is the brand, grey is for reading.
+   */
   --color-muted: #454b5a;
   --color-faint: #5e6372;
   --color-faint2: #a5aabc;
@@ -150,17 +169,16 @@
    *
    * So there are two now, and the split is exactly the WCAG one. `--color-gold` is the brand —
    * surfaces, borders, ornament, and display text, where the floor is 3:1 and it measures 3.09 at
-   * its worst. `--color-gold-ink` is for gold text below 18.66px bold, where the floor is 4.5 and
+   * its worst. `--color-gold` is for gold text below 18.66px bold, where the floor is 4.5 and
    * the brand gold cannot reach it at any size a body sets.
    *
-   * Reaching for `gold-ink` on a heading is as wrong as reaching for `gold` on a caption: one is
+   * Reaching for `gold` on a heading is as wrong as reaching for `gold` on a caption: one is
    * needlessly dull, the other is unreadable. If the text is large, it is the brand's colour.
    */
-  --color-gold-ink: #846018;
   --color-sky: #2e66a8;
-  --color-ok: #1d744d;
-  --color-bad: #b53b3b;
-  --color-warn: #875e12;
+  --color-ok: #1f7d53;
+  --color-bad: #c23f3f;
+  --color-warn: #9e6e15;
   --color-pend: #6c51c9;
   --color-teal: #0e726e;
   --color-lime: #546f13;

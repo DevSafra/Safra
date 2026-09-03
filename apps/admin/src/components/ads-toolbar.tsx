@@ -196,7 +196,7 @@ export function AdsToolbar({
 
         {error ? <p className="text-[11.5px] font-semibold text-bad">{error}</p> : null}
         {created ? (
-          <p className="text-[11.5px] font-semibold text-gold-ink">
+          <p className="text-[11.5px] font-semibold text-gold">
             {c.advCreated.replace('{reference}', created)}
           </p>
         ) : null}
@@ -239,7 +239,7 @@ export function AdsToolbar({
                 }
               })();
             }}
-            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-ink disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
           >
             {busy ? t.table.working : c.advSubmit}
           </button>
@@ -418,7 +418,7 @@ export function AdsToolbar({
         </div>
 
         {created ? (
-          <p className="text-[11.5px] font-semibold text-gold-ink">
+          <p className="text-[11.5px] font-semibold text-gold">
             {c.advCreated.replace('{reference}', created)}
           </p>
         ) : null}
@@ -490,7 +490,7 @@ export function AdsToolbar({
                 }
               })();
             }}
-            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-ink disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
           >
             {busy ? t.table.working : c.submit}
           </button>
@@ -529,7 +529,7 @@ export function AdsToolbar({
             <button
               type="button"
               onClick={() => setOpen('campaign')}
-              className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+              className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
             >
               {c.create}
             </button>

@@ -98,7 +98,7 @@ export default async function PaymentsPage({
             <Kpi
               label={t.sections.payments.kpiCaptured}
               value={amount(result.counters.captured_today, result.counters.currency)}
-              valueClass="text-gold-ink"
+              valueClass="text-gold"
             />
             <Kpi
               label={t.sections.payments.kpiRefunded}

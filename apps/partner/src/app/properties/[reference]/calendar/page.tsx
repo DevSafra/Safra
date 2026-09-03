@@ -145,7 +145,7 @@ export default async function UnitCalendarPage({
               aria-current={candidate.id === unit.id ? 'true' : undefined}
               className={`inline-flex min-h-10 items-center rounded-lg border px-3 text-[11.5px] lg:min-h-0 lg:py-1.5 ${
                 candidate.id === unit.id
-                  ? 'border-gold bg-gold/15 text-gold-ink'
+                  ? 'border-gold bg-gold/15 text-gold'
                   : 'border-line text-muted'
               }`}
             >

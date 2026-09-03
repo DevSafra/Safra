@@ -279,7 +279,7 @@ export function CouponsToolbar({
           type="button"
           disabled={!ready}
           onClick={() => void submit()}
-          className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {busy ? t.table.working : c.submit}
         </button>
@@ -308,7 +308,7 @@ export function CouponsToolbar({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {c.create}
           </button>

@@ -151,7 +151,7 @@ export function OnboardPartnerForm({
         void submit(new FormData(event.currentTarget));
       }}
     >
-      <p className="rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-[12.5px] leading-relaxed text-gold-ink">
+      <p className="rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 text-[12.5px] leading-relaxed text-gold">
         {t.sections.partnerOnboarding.passwordNote}
       </p>
 

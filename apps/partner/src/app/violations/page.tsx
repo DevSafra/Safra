@@ -184,7 +184,7 @@ function Row({ violation }: { violation: PartnerViolation }) {
         </div>
         <Ltr className="text-[12px] text-faint">{violation.createdAt}</Ltr>
         {/* The affordance, so a card that opens looks like one. */}
-        <span className="text-[11.5px] text-gold-ink">{t.violations.open} ←</span>
+        <span className="text-[11.5px] text-gold">{t.violations.open} ←</span>
       </div>
 
       <p className="text-[12.5px] text-muted">

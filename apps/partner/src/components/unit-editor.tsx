@@ -293,7 +293,7 @@ function UnitRow({
         <button
           type="submit"
           disabled={busy}
-          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[12px] font-bold text-gold-ink disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[12px] font-bold text-gold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {busy ? t.editProperty.unitSaving : t.editProperty.unitSave}
         </button>

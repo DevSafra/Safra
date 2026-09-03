@@ -170,7 +170,7 @@ export default async function ContractsPage({
       <StagePanel stage={stage} />
 
       <section>
-        <h2 className="mb-2 text-[14.5px] font-extrabold text-gold-ink">
+        <h2 className="mb-2 text-[14.5px] font-extrabold text-gold">
           {t.contracts.contractsTitle}
         </h2>
 
@@ -327,7 +327,7 @@ function ContractCard({ contract }: { readonly contract: PartnerContract }) {
       */}
       <a
         href={`/api/contracts/${encodeURIComponent(contract.id)}/file`}
-        className="inline-flex min-h-10 w-fit items-center rounded-lg border border-gold px-4 text-[12.5px] text-gold-ink transition-colors hover:bg-gold hover:text-bg lg:min-h-0 lg:py-2"
+        className="inline-flex min-h-10 w-fit items-center rounded-lg border border-gold px-4 text-[12.5px] text-gold transition-colors hover:bg-gold hover:text-bg lg:min-h-0 lg:py-2"
       >
         {/* Names which copy: after SAFRA signs, this link serves the document carrying that
             signature rather than the blank original the partner was previously given. */}
@@ -401,7 +401,7 @@ function ContractHistory({ contract }: { readonly contract: PartnerContract }) {
       <p className="text-[11.5px] font-bold text-text2">{t.contracts.historyTitle}</p>
 
       {theirSignatureWasUndone ? (
-        <p className="text-[11.5px] leading-relaxed text-gold-ink">
+        <p className="text-[11.5px] leading-relaxed text-gold">
           {t.contracts.historyReplaced}
         </p>
       ) : null}

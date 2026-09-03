@@ -200,7 +200,7 @@ const TONES: Record<Tone, string> = {
   indigo: 'text-indigo border-indigo',
   /** Pending confirmation. Purple, never gold — handoff §1 and §14. */
   pend: 'text-pend border-pend',
-  gold: 'text-gold-ink border-gold',
+  gold: 'text-gold border-gold',
   warn: 'text-warn border-warn',
   orange: 'text-orange border-orange',
   bad: 'text-bad border-bad',

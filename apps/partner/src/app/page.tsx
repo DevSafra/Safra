@@ -302,7 +302,7 @@ function Requests({
                 </div>
 
                 <div className="ms-auto text-end">
-                  <p className="text-[15px] font-extrabold text-gold-ink">
+                  <p className="text-[15px] font-extrabold text-gold">
                     <Ltr>{amount(request.amount, request.currencyCode)}</Ltr>
                   </p>
                   <p className="text-[11px] font-bold text-warn">
@@ -366,7 +366,7 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
   return (
     <section className="rounded-card border border-gold/15 bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[15px] font-extrabold text-gold-ink">
+        <h2 className="text-[15px] font-extrabold text-gold">
           {fill(t.dashboard.calendarTitle, { month: monthName })}
         </h2>
         <span className="text-[11px] text-faint">
@@ -504,7 +504,7 @@ function Legend({ tone, label }: { readonly tone: string; readonly label: string
 function Notices({ notices }: { readonly notices: PartnerDashboard['notices'] }) {
   return (
     <section data-notices className="rounded-card border border-gold/15 bg-card p-5">
-      <h2 className="mb-3 text-[15px] font-extrabold text-gold-ink">
+      <h2 className="mb-3 text-[15px] font-extrabold text-gold">
         {t.dashboard.noticesTitle}
       </h2>
 
@@ -535,7 +535,7 @@ function Notices({ notices }: { readonly notices: PartnerDashboard['notices'] })
                     ? '/'
                     : '/violations'
                 }
-                className="ms-auto text-[11.5px] text-gold-ink underline"
+                className="ms-auto text-[11.5px] text-gold underline"
               >
                 {t.dashboard.noticeDetail}
               </Link>
@@ -556,7 +556,7 @@ function Alerts({
 }) {
   return (
     <section className="rounded-card border border-gold/15 bg-card p-5">
-      <h2 className="mb-3 text-[15px] font-extrabold text-gold-ink">
+      <h2 className="mb-3 text-[15px] font-extrabold text-gold">
         {t.dashboard.alertsTitle}
       </h2>
 

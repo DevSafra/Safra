@@ -384,14 +384,14 @@ function AddForm({
   return (
     <>
       <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
-        <h2 className="text-[14px] font-extrabold text-gold-ink">{title}</h2>
+        <h2 className="text-[14px] font-extrabold text-gold">{title}</h2>
         <span className="ms-auto">
           <button
             type="button"
             data-geo-add={marker}
             aria-expanded={open}
             onClick={() => setOpen(!open)}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11.5px] font-bold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {label}
           </button>

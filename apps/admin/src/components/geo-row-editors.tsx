@@ -307,7 +307,7 @@ export function CurrencyRows({ rows }: { readonly rows: readonly Currency[] }) {
             </span>
 
             {row.isAccounting ? (
-              <span className="rounded-full bg-[rgba(var(--goldA),0.14)] px-2.5 py-0.5 text-[10px] font-extrabold text-gold-ink">
+              <span className="rounded-full bg-[rgba(var(--goldA),0.14)] px-2.5 py-0.5 text-[10px] font-extrabold text-gold">
                 {c.accounting}
               </span>
             ) : null}

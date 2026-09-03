@@ -297,7 +297,7 @@ function PhotographCard({
         <div className="grid min-w-0 flex-1 gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
             {photograph.isHero ? (
-              <span className="rounded-full bg-[rgba(var(--goldA),0.14)] px-2.5 py-0.5 text-[10px] font-extrabold text-gold-ink">
+              <span className="rounded-full bg-[rgba(var(--goldA),0.14)] px-2.5 py-0.5 text-[10px] font-extrabold text-gold">
                 {c.imageHero}
               </span>
             ) : (
@@ -393,7 +393,7 @@ function PhotographCard({
               disabled={busy}
               data-city-image-save={photograph.id}
               onClick={() => void save()}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11px] font-bold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
             >
               {busy ? c.saving : c.save}
             </button>

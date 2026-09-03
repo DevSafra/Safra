@@ -212,7 +212,7 @@ export function RangeEditor({
             onClick={() => setPrice(price === 'clear' ? '' : 'clear')}
             aria-pressed={price === 'clear'}
             className={`min-h-10 w-fit cursor-pointer rounded-lg border px-2.5 py-1 text-[11px] lg:min-h-0 ${
-              price === 'clear' ? 'border-gold text-gold-ink' : 'border-line text-faint2'
+              price === 'clear' ? 'border-gold text-gold' : 'border-line text-faint2'
             }`}
           >
             {t.unitCalendar.priceClear}

@@ -526,7 +526,7 @@ export function CampaignCreativeForm({
                       served. It is not: what gets served is the SERVER's re-encode, and this tile
                       shows only that.
                     */
-                    <span className="grid h-20 w-32 content-center gap-1 rounded-lg border border-dashed border-[rgba(var(--goldA),0.55)] px-2 text-center text-[10.5px] text-gold-ink">
+                    <span className="grid h-20 w-32 content-center gap-1 rounded-lg border border-dashed border-[rgba(var(--goldA),0.55)] px-2 text-center text-[10.5px] text-gold">
                       <span className="w-full truncate" title={staged.file.name}>
                         {staged.file.name}
                       </span>
@@ -669,7 +669,7 @@ export function CampaignCreativeForm({
                   type="button"
                   disabled={!ready || !changed}
                   onClick={() => void submit()}
-                  className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-ink transition-colors disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+                  className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
                 >
                   {busy ? c.pausing : c.saveCreative}
                 </button>

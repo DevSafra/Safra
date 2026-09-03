@@ -119,7 +119,7 @@ export default async function PayoutPage({
         </section>
 
         <section>
-          <h2 className="mb-2 text-[14px] font-extrabold text-gold-ink">
+          <h2 className="mb-2 text-[14px] font-extrabold text-gold">
             {t.payouts.coveredBookings} ({count(covered.length)})
           </h2>
 
@@ -146,7 +146,7 @@ export default async function PayoutPage({
                   <Ltr className="text-[11.5px] text-faint">
                     {booking.checkIn} ← {booking.checkOut}
                   </Ltr>
-                  <span className="ms-auto text-[13px] font-bold text-gold-ink">
+                  <span className="ms-auto text-[13px] font-bold text-gold">
                     <Ltr>{amount(booking.amount, payout.currencyCode)}</Ltr>
                   </span>
                 </li>

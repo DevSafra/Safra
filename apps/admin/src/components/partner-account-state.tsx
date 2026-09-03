@@ -93,7 +93,7 @@ export function PartnerAccountState({
 
   return (
     <div className="mt-2 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2.5">
-      <p className="text-[12px] leading-relaxed text-gold-ink">
+      <p className="text-[12px] leading-relaxed text-gold">
         {fill(
           invitationPending
             ? t.sections.partnerOnboarding.accountPending
@@ -118,7 +118,7 @@ export function PartnerAccountState({
         type="button"
         disabled={busy}
         onClick={() => void resend()}
-        className="mt-2 inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold/40 px-3 py-1.5 text-[12px] font-semibold text-gold-ink hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+        className="mt-2 inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold/40 px-3 py-1.5 text-[12px] font-semibold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
       >
         {busy
           ? t.sections.partnerOnboarding.resending

@@ -66,7 +66,7 @@ export function StaffInvite({ roles }: { roles: readonly StaffRole[] }) {
 
   return (
     <section className="rounded-lg border border-line bg-card p-4">
-      <h2 className="text-[14.5px] font-extrabold text-gold-ink">
+      <h2 className="text-[14.5px] font-extrabold text-gold">
         {t.sections.staff.invite}
       </h2>
       <p className="mt-1 text-[11.5px] leading-relaxed text-faint">

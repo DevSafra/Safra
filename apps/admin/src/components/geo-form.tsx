@@ -271,7 +271,7 @@ export function Panel({
         bare ? '' : 'mb-3 rounded-card border border-line bg-field p-4'
       }`}
     >
-      <p className="text-[11.5px] font-bold text-gold-ink">{heading}</p>
+      <p className="text-[11.5px] font-bold text-gold">{heading}</p>
       {children}
     </div>
   );

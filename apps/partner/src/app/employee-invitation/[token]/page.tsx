@@ -57,7 +57,7 @@ export default async function EmployeeInvitationPage({
     <main className="mx-auto grid min-h-screen max-w-sm content-center px-4">
       <div className="w-full">
         {/* `aria-hidden`: an ornament is a glyph, and a screen reader announcing it says nothing. */}
-        <p className="text-3xl text-gold-ink text-center" aria-hidden>
+        <p className="text-3xl text-gold text-center" aria-hidden>
           {ORNAMENT_BRAND}
         </p>
 

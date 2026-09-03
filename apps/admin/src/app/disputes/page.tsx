@@ -132,7 +132,7 @@ export default async function DisputesPage({
             <FootNote>
               <Link
                 href="/reviews"
-                className="inline-flex min-h-10 items-center font-semibold text-gold-ink underline-offset-2 hover:underline lg:min-h-0"
+                className="inline-flex min-h-10 items-center font-semibold text-gold underline-offset-2 hover:underline lg:min-h-0"
               >
                 {t.sections.reviewModeration.title}
               </Link>
@@ -296,7 +296,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
             <p className="mt-2 rounded-card border border-line bg-field px-3 py-2 text-[11.5px] leading-relaxed text-text2">
               {dispute.resolution}
               {dispute.compensationAmount && dispute.compensationCurrency ? (
-                <span className="ms-1.5 font-bold text-gold-ink">
+                <span className="ms-1.5 font-bold text-gold">
                   <Ltr>
                     {amount(dispute.compensationAmount, dispute.compensationCurrency)}
                   </Ltr>

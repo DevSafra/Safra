@@ -50,7 +50,7 @@ export default function NotFound() {
         */}
         <Link
           href="/"
-          className="border-line bg-card text-gold-ink hover:border-gold mt-8 inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-4 text-sm lg:min-h-0"
+          className="border-line bg-card text-gold hover:border-gold mt-8 inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-4 text-sm lg:min-h-0"
         >
           {t.notFound.home}
         </Link>

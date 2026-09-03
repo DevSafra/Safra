@@ -101,13 +101,13 @@ export function VerifyPartner({
       */}
       {/* Said before the screening note: a contract is the step that comes last. */}
       {!contractActive ? (
-        <p className="mb-3 rounded border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-gold-ink">
+        <p className="mb-3 rounded border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-gold">
           {t.sections.partnerContract.notSignedYet}
         </p>
       ) : null}
 
       {!screened && policy !== 'off' ? (
-        <p className="mb-3 rounded border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-gold-ink">
+        <p className="mb-3 rounded border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-gold">
           {policy === 'required'
             ? t.sections.verifyPartner.screeningRequired
             : t.sections.verifyPartner.screeningAdvisory}

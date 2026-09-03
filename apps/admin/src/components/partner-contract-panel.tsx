@@ -283,7 +283,7 @@ export function PartnerContractPanel({
             type="button"
             disabled={busy}
             onClick={() => void post(`/api/contracts/${current.id}/reopen`, {})}
-            className="cursor-pointer rounded-lg border border-gold/50 px-3 py-1.5 text-xs text-gold-ink hover:bg-gold hover:text-bg disabled:cursor-not-allowed disabled:opacity-60"
+            className="cursor-pointer rounded-lg border border-gold/50 px-3 py-1.5 text-xs text-gold hover:bg-gold hover:text-bg disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy
               ? t.sections.partnerContract.reopening
@@ -386,13 +386,13 @@ export function PartnerContractPanel({
             button the operator pressed.
           */}
           {current.status === 'active' ? (
-            <p className="text-[11px] leading-relaxed text-gold-ink">
+            <p className="text-[11px] leading-relaxed text-gold">
               {t.sections.partnerContract.replaceWarning}
             </p>
           ) : null}
 
           {joint && current.status !== 'draft' ? (
-            <p className="text-[11px] leading-relaxed text-gold-ink">
+            <p className="text-[11px] leading-relaxed text-gold">
               {t.sections.partnerContract.uploadJointReplaceWarning}
             </p>
           ) : null}

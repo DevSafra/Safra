@@ -77,7 +77,7 @@ export default async function ReviewsPage({
       ) : (
         <div className="grid gap-3.5">
           <header className="grid gap-1">
-            <p className="text-[13px] font-bold text-gold-ink">
+            <p className="text-[13px] font-bold text-gold">
               {result.summary.average
                 ? fill(t.reviews.summary, {
                     average: result.summary.average,
@@ -156,11 +156,11 @@ function Row({ review }: { readonly review: PartnerReview }) {
     >
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
         <span className="text-[13px] font-bold text-text">{review.guestName}</span>
-        <span className="text-[11.5px] font-semibold text-gold-ink">
+        <span className="text-[11.5px] font-semibold text-gold">
           {review.propertyName}
         </span>
         <span className="text-[11.5px] text-faint">{review.unitName}</span>
-        <span className="text-[12.5px] font-extrabold text-gold-ink">
+        <span className="text-[12.5px] font-extrabold text-gold">
           <Ltr>★ {review.rating}</Ltr>
         </span>
 
@@ -186,7 +186,7 @@ function Row({ review }: { readonly review: PartnerReview }) {
 
       {review.partnerReply ? (
         <div className="mt-2.5 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2">
-          <p className="text-[11px] font-bold text-gold-ink">{t.reviews.replied}</p>
+          <p className="text-[11px] font-bold text-gold">{t.reviews.replied}</p>
           <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
             {review.partnerReply}
           </p>

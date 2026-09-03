@@ -173,7 +173,7 @@ function Message({ message }: { message: ThreadMessage }) {
       }`}
     >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11.5px] font-bold text-gold-ink">
+        <span className="text-[11.5px] font-bold text-gold">
           {senderLabel(message.senderKind)}
         </span>
         {message.senderEmail ? (
