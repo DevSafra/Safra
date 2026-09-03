@@ -3,6 +3,10 @@ import { getTranslations } from 'next-intl/server';
 
 import type { Locale } from '@/i18n/routing';
 import { getSession } from '@/lib/session-server';
+import { getCurrencyCatalogue } from '@/lib/catalog';
+import { DISPLAY_CURRENCIES, displayCurrency } from '@/lib/currency';
+import { HeaderMenus } from '@/components/header-menus';
+import { HeaderShell } from '@/components/header-shell';
 import { ORNAMENT_BRAND } from '@safra/ui';
 
 /**
@@ -11,6 +15,19 @@ import { ORNAMENT_BRAND } from '@safra/ui';
  * Positioning uses logical properties throughout (`start`/`end`, `ms`/`me`), so the
  * whole bar mirrors correctly under RTL without a second stylesheet or any
  * direction-specific overrides.
+ *
+ * ## No background until the page moves (Bashar, 2026-09-02)
+ *
+ * «On the top it should have no background same as booking.com and on scrolling, it should.» The
+ * surface lives in `HeaderShell`, which is the only client code here — see the note there on why
+ * that is an IntersectionObserver and not a scroll listener. The bar is also taller than it was,
+ * 80px against 66px, which is what gives the wordmark and the two new controls room to sit on one
+ * line without the bar feeling packed.
+ *
+ * **Consequence, accepted:** with no background at the top, the header's contents sit on whatever
+ * is behind them — the hero's pale wash on the home page, the page ground everywhere else. Both
+ * were measured rather than assumed; the gold wordmark against the hero is the tightest pair on
+ * the bar and it is why the wordmark is `text-xl` and not smaller.
  *
  * ## The band follows the THEME (Bashar, 2026-09-02: «the navbar colour should be also light»)
  *
@@ -34,6 +51,13 @@ import { ORNAMENT_BRAND } from '@safra/ui';
  * text and not for small: at 18px bold it is 13.5pt, just under the 14pt bold threshold, and at
  * 20px bold it is over it. One step of type size is what makes the brand legal to draw in its
  * own colour.
+ *
+ * **One control height across the bar** (Bashar, 2026-09-02: «the menu items on the navbar is a
+ * little bit under the logo»). Every item was `min-h-10` while the brand mark is 44px, so with the
+ * row centred the brand's box began 2px above everything else's — measured, brand at y=20 and the
+ * menu at y=22. The TEXT baselines were already identical to a tenth of a pixel; it was the BOXES
+ * that differed, which is the half nobody thinks to check. From `sm` every control is 44px, so the
+ * row has one top edge and one bottom edge.
  *
  * **Hover is a gold WASH, never gold text** (Bashar, 2026-09-02: «I see a blue background»). Every
  * hover in here was `bg-field` under `text-sky` — a cool grey pill under #2e66a8 type, which was
@@ -77,7 +101,35 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
    * pages that §5.4 needs indexed render their own content statically, and this
    * header is the sole dynamic part of them.
    */
-  const session = await getSession();
+  /*
+    Three reads in parallel, and two of them are free: `getCurrencyCatalogue` is the same
+    five-minute cached read the footer already makes and Next deduplicates it within a request, and
+    `displayCurrency` reads a cookie — which this header is already dynamic for, because of the
+    session below.
+  */
+  const [session, { currencies }, currency] = await Promise.all([
+    getSession(),
+    getCurrencyCatalogue(),
+    displayCurrency(),
+  ]);
+
+  /*
+    The list is `DISPLAY_CURRENCIES`; the catalogue supplies only the SYMBOL. This is the footer's
+    own arrangement and the reason is a defect this popup had for one build: offering the catalogue
+    directly listed TRY, which is a currency listings are PRICED in and not one prices can be shown
+    in. `isDisplayCurrency` rejects it on the way back, so choosing it set nothing and silently
+    left the reader on the default — a control that looks like it works and does not.
+
+    Mapping over the constant fixes the order as well: USD, EUR, SYP, rather than whatever
+    alphabetical order the reference table happens to return.
+  */
+  const symbolOf = (code: string) =>
+    currencies.find((one) => one.code === code)?.symbol ?? code;
+
+  const displayCurrencies = DISPLAY_CURRENCIES.map((code) => ({
+    code,
+    symbol: symbolOf(code),
+  }));
 
   const links = [
     { href: `/${locale}`, label: t('home') },
@@ -85,8 +137,8 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-card print:hidden">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-2.5">
+    <HeaderShell>
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 sm:py-4 lg:h-[var(--header-h)] lg:py-0">
         {/*
           The wordmark alone. The tagline «إقامات في الوطن العربي · من ليلة واحدة» sat under it and
           is gone (Bashar, 2026-09-02) — booking.com's header carries none, it cost a second line
@@ -96,12 +148,21 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         <Link href={`/${locale}`} className="flex items-center gap-3">
           <span
             aria-hidden
-            className="grid size-10 place-items-center rounded-xl border border-gold/40 text-lg text-gold"
+            className="grid size-10 shrink-0 place-items-center rounded-xl border border-gold/40 text-lg text-gold sm:size-11 sm:text-xl"
           >
             {ORNAMENT_BRAND}
           </span>
+          {/*
+            The Latin half goes below `sm`. «سفرة | SAFRA» is three words wide on a bar that had
+            already wrapped to three rows once the language and currency controls arrived — 161px
+            of a 390px phone, measured. «سفرة» alone is still the brand.
+          */}
           <span className="font-display text-xl font-bold text-gold">
-            {brand('name')} <span className="text-text/50">|</span> {brand('latin')}
+            {brand('name')}
+            <span className="hidden sm:inline">
+              {' '}
+              <span className="text-text/50">|</span> {brand('latin')}
+            </span>
           </span>
         </Link>
 
@@ -123,7 +184,7 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
             <Link
               key={link.href}
               href={link.href}
-              className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-sm text-text/85 transition-colors hover:bg-gold/10 hover:text-text"
+              className="inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-sm text-text/85 transition-colors hover:bg-gold/10 hover:text-text sm:min-h-11"
             >
               {link.label}
             </Link>
@@ -135,13 +196,17 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           page's approved wording rather than inventing a header-specific string: «سجّل كشريك» is
           the same offer, and a second phrase for it would be a third thing to translate.
 
-          Hidden below `sm` — on a phone the band has room for the brand, the two destinations and
-          the account action, and this is the one of the four a visitor is least likely to want
-          from a handset.
+          Hidden below `lg`, which is where booking.com drops its own «List your property» — it is
+          the first thing they give up and the last thing they add back, because a partner signing
+          a property up is not doing it from a handset between trains.
+
+          Measured, not guessed: at 768px the six items came to ~735px inside a 736px bar, so the
+          row wrapped and «تسجيل الدخول» fell to a second line 44px below the rest. Dropping this
+          one link is 98px back and the bar closes to a single row at 768 and 1024 alike.
         */}
         <Link
           href={`/${locale}/partners/join`}
-          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-sm text-text/85 transition-colors hover:bg-gold/10 hover:text-text sm:inline-flex"
+          className="hidden min-h-10 items-center rounded-lg px-3 py-2 text-sm text-text/85 transition-colors hover:bg-gold/10 hover:text-text sm:min-h-11 lg:inline-flex"
         >
           {home('partnersCta')}
         </Link>
@@ -152,10 +217,30 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           The email is not shown: it is what the API's auth payload carries, and inventing a display
           name from it would be guessing at what comes before the @. It stays in `title`.
         */}
+        {/*
+          Language and currency, as booking.com puts them: in the bar, the language as its flag,
+          each opening a popup. They are ALSO still in the footer, which is where Bashar moved them
+          on 2026-08-13 and where people look for them on a long page — the header is the reach
+          from anywhere, the footer is the reach at the end. Removing one was not asked for.
+        */}
+        <HeaderMenus
+          locale={locale}
+          currency={currency}
+          currencies={displayCurrencies}
+          labels={{
+            language: t('language'),
+            currency: t('currency'),
+            chooseLanguage: t('chooseLanguage'),
+            chooseCurrency: t('chooseCurrency'),
+            currencyHelp: t('currencyHelp'),
+            close: t('closeDialog'),
+          }}
+        />
+
         {session ? (
           <Link
             href={`/${locale}/account`}
-            className="inline-flex min-h-10 max-w-[10rem] btn-gold items-center truncate rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90"
+            className="inline-flex min-h-10 max-w-[10rem] btn-gold items-center truncate rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:min-h-11"
             title={session.user.email}
           >
             {auth('account')}
@@ -164,19 +249,19 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           <>
             <Link
               href={`/${locale}/register`}
-              className="inline-flex min-h-10 items-center rounded-lg border border-gold/60 px-4 py-2 text-sm font-semibold text-text transition-colors hover:border-gold hover:bg-gold/10"
+              className="inline-flex min-h-10 items-center rounded-lg border border-gold/60 px-4 py-2 text-sm font-semibold text-text transition-colors hover:border-gold hover:bg-gold/10 sm:min-h-11"
             >
               {auth('createAccount')}
             </Link>
             <Link
               href={`/${locale}/login`}
-              className="inline-flex min-h-10 btn-gold items-center rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90"
+              className="inline-flex min-h-10 btn-gold items-center rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:min-h-11"
             >
               {auth('signIn')}
             </Link>
           </>
         )}
       </div>
-    </header>
+    </HeaderShell>
   );
 }
