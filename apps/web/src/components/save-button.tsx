@@ -104,14 +104,20 @@ export function SaveButton({
   }
 
   return (
+    /*
+      `sm:min-h-11`, and no `lg:min-h-0`. This sits beside «احجز الآن» in the property header
+      (Bashar, 2026-09-03) and the pair has to share a top and a bottom edge — released at `lg` it
+      collapsed to 38px next to a 44px action, which reads as one of the two having gone wrong. Same
+      question the site header answered on 2026-09-02, same answer.
+    */
     <div className="grid gap-1">
       <button
         type="button"
         onClick={() => void toggle()}
         aria-pressed={saved}
-        className={`inline-flex min-h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border px-4 text-sm transition-colors lg:min-h-0 lg:py-2 ${
+        className={`inline-flex min-h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border px-4 text-sm transition-colors sm:min-h-11 ${
           saved
-            ? 'border-gold bg-gold/12 text-gold'
+            ? 'border-gold bg-gold/12 text-gold-ink'
             : 'border-line text-muted hover:border-gold hover:text-gold'
         }`}
       >

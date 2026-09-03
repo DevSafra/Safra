@@ -155,13 +155,10 @@ export default async function PropertyPage({
         <span className="text-muted">{name}</span>
       </nav>
 
-      {/* ── Gallery ────────────────────────────────────────────────────────── */}
-      <Gallery property={property} locale={locale} name={name} t={t} />
-
       <header className="mt-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="font-display text-3xl font-bold text-gold sm:text-4xl">
+            <h1 className="font-display text-3xl font-bold text-gold-ink sm:text-4xl">
               {name}
             </h1>
             <p className="mt-2 text-sm text-muted">
@@ -174,40 +171,67 @@ export default async function PropertyPage({
               {' · '}
               <span className="text-faint">{property.reference}</span>
             </p>
+          </div>
+
+          {/*
+            The actions at the reading END, opposite the name — booking.com's own arrangement, and
+            it is not arbitrary: the name answers «what is this» and belongs where the eye starts,
+            the action answers «and now what» and belongs where it finishes.
+
+            «احجز الآن» is an ANCHOR to the panel further down, not a second booking form. Two
+            places to book one stay is two places to keep in step, and the panel is where the dates
+            and the price live. On a phone the panel is below the fold and this is the only prompt
+            above it.
+          */}
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="#booking"
+              className="btn-gold inline-flex min-h-10 items-center rounded-lg px-5 text-sm font-bold transition-[opacity,scale] duration-200 ease-out-strong hover:opacity-90 active:scale-[.98] sm:min-h-11"
+            >
+              {t('bookNow')}
+            </a>
 
             {/*
-              Save to المفضلة.
+              «حفظ في المفضلة» beside «احجز الآن» (Bashar, 2026-09-03), which is where booking.com
+              keeps its own pair. It sat under the name before, in the column that answers «what is
+              this» — and saving is not a fact about the listing, it is something the reader does to
+              it. Both of the things a person can do here are now in one place.
+
+              AFTER the action in the DOM, so on an Arabic page «احجز الآن» takes the start of the
+              cluster and this sits beside it. The booking is the primary and reads first in both
+              directions.
 
               No `initiallySaved`: this page is cached (`revalidate = 60`), so its HTML is shared
               between readers and must carry nobody's shortlist. The button asks for its own state
               after mounting, which keeps the page cacheable.
             */}
-            <div className="mt-3">
-              <SaveButton
-                slug={property.slug}
-                labels={{
-                  save: t('save'),
-                  saved: t('saved'),
-                  failed: t('saveFailed'),
-                }}
-              />
-            </div>
+            <SaveButton
+              slug={property.slug}
+              labels={{
+                save: t('save'),
+                saved: t('saved'),
+                failed: t('saveFailed'),
+              }}
+            />
           </div>
-
-          {property.badges.length > 0 ? (
-            <ul className="flex flex-wrap gap-2">
-              {property.badges.map((badge) => (
-                <li
-                  key={badge}
-                  className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs text-gold"
-                >
-                  {badge === 'safra_verified' ? t('badgeVerified') : t('badgeRecommends')}
-                </li>
-              ))}
-            </ul>
-          ) : null}
         </div>
+
+        {property.badges.length > 0 ? (
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {property.badges.map((badge) => (
+              <li
+                key={badge}
+                className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs text-gold-ink"
+              >
+                {badge === 'safra_verified' ? t('badgeVerified') : t('badgeRecommends')}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </header>
+
+      {/* ── Gallery ────────────────────────────────────────────────────────── */}
+      <Gallery property={property} locale={locale} name={name} t={t} />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_20rem]">
         <div className="space-y-8">
@@ -328,7 +352,7 @@ export default async function PropertyPage({
                           `dir="ltr"`: a ★ followed by a digit is a Latin run, and the star is
                           bidi-neutral — without this it lands on the wrong side of the number.
                         */}
-                        <span dir="ltr" className="text-sm font-bold text-gold">
+                        <span dir="ltr" className="text-sm font-bold text-gold-ink">
                           <span aria-hidden>★</span> {review.rating}
                         </span>
                         <span className="text-xs text-faint">{t('reviewsVerified')}</span>
@@ -343,7 +367,7 @@ export default async function PropertyPage({
 
                       {review.partnerReply ? (
                         <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3">
-                          <p className="text-xs font-semibold text-gold">
+                          <p className="text-xs font-semibold text-gold-ink">
                             {t('reviewsPartnerReply')}
                           </p>
                           <p className="mt-1 text-sm leading-relaxed text-muted">
@@ -360,11 +384,15 @@ export default async function PropertyPage({
         </div>
 
         {/* ── Booking panel ─────────────────────────────────────────────────── */}
-        <aside className="lg:sticky lg:top-24 lg:self-start">
+        {/*
+          `scroll-mt` so the sticky header does not land on top of the panel the anchor just jumped
+          to — the same reason every row on the console carries one.
+        */}
+        <aside id="booking" className="scroll-mt-28 lg:sticky lg:top-24 lg:self-start">
           <div className="rounded-card border border-gold/30 bg-card p-5">
             {cheapest ? (
               <>
-                <p className="text-2xl font-semibold text-gold">
+                <p className="text-2xl font-semibold text-gold-ink">
                   {nightly.text}
                   <span className="ms-1 text-sm font-normal text-faint">
                     {t('perNight')}
@@ -416,7 +444,7 @@ export default async function PropertyPage({
                 */}
                 <Link
                   href={`/${locale}/checkout?property=${property.slug}&unitId=${cheapest.id}&checkIn=${defaultStay.checkIn}&checkOut=${defaultStay.checkOut}&adults=${Math.min(adults, cheapest.maxGuests)}&children=${children}&infants=${infants}`}
-                  className="mt-5 block rounded-lg bg-gold px-5 py-3 text-center font-semibold text-bg transition-opacity hover:opacity-90"
+                  className="mt-5 block rounded-lg btn-gold px-5 py-3 text-center font-semibold transition-opacity hover:opacity-90"
                 >
                   {t('bookNow')}
                 </Link>
@@ -477,8 +505,6 @@ function Gallery({
     );
   }
 
-  const [cover, ...rest] = property.images;
-
   /*
     EVERY photograph, not the three the grid has room for.
 
@@ -495,57 +521,39 @@ function Gallery({
       : {}),
   }));
 
+  /*
+    The mosaic's own sources. `SliderImage` carries what the PREVIEWER needs — one thumb and one
+    full render — and a tile needs the `<picture>` pair the pipeline produced, so the two travel
+    side by side rather than one pretending to be the other.
+
+    The cover asks for 1600px because it is the page's largest paint; the rest ask for 800, which is
+    more than any tile is ever drawn at.
+  */
+  const tiles = property.images.map((image, index) => ({
+    id: image.fileKey,
+    avif: imageUrl(image, index === 0 ? 1600 : 800, 'avif'),
+    webp: imageUrl(image, index === 0 ? 1600 : 800, 'webp'),
+    alt: localisedText(image.alt, locale) ?? '',
+    width: image.width ?? (index === 0 ? 1600 : 800),
+    height: image.height ?? (index === 0 ? 1000 : 600),
+  }));
+
   return (
     <PropertyGallery
       images={slides}
+      tiles={tiles}
+      alt={name}
       labels={{
         title: t('slider.title'),
         open: t('slider.open'),
         previous: t('slider.previous'),
         next: t('slider.next'),
         close: t('slider.close'),
+        zoomIn: t('slider.zoomIn'),
+        zoomOut: t('slider.zoomOut'),
       }}
       viewAllLabel={t('slider.viewAll', { n: property.images.length })}
-    >
-      <div className="mt-6 grid gap-2 sm:grid-cols-[2fr_1fr]">
-        {cover ? (
-          <picture>
-            {/* AVIF first, WebP as the fallback — both produced by the upload pipeline. */}
-            <source srcSet={imageUrl(cover, 1600, 'avif')} type="image/avif" />
-            <source srcSet={imageUrl(cover, 1600, 'webp')} type="image/webp" />
-            <img
-              src={imageUrl(cover, 1600, 'webp')}
-              alt={localisedText(cover.alt, locale) ?? name}
-              width={cover.width ?? 1600}
-              height={cover.height ?? 1000}
-              className="h-64 w-full rounded-card border border-line object-cover sm:h-80"
-              loading="eager"
-            />
-          </picture>
-        ) : null}
-
-        {rest.length > 0 ? (
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-1">
-            {rest.slice(0, 2).map((image) => (
-              <li key={image.fileKey}>
-                <picture>
-                  <source srcSet={imageUrl(image, 800, 'avif')} type="image/avif" />
-                  <source srcSet={imageUrl(image, 800, 'webp')} type="image/webp" />
-                  <img
-                    src={imageUrl(image, 800, 'webp')}
-                    alt={localisedText(image.alt, locale) ?? name}
-                    width={image.width ?? 800}
-                    height={image.height ?? 600}
-                    className="h-32 w-full rounded-card border border-line object-cover sm:h-[9.5rem]"
-                    loading="lazy"
-                  />
-                </picture>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
-    </PropertyGallery>
+    />
   );
 }
 
