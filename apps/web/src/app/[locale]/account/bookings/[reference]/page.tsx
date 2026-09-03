@@ -156,7 +156,7 @@ export default async function BookingDetailPage({
               >
                 <span
                   aria-hidden
-                  className="grid size-7 shrink-0 place-items-center rounded-full border border-gold/40 text-sm text-gold"
+                  className="grid size-7 shrink-0 place-items-center rounded-full border border-gold/40 text-sm text-gold-ink"
                 >
                   {index + 1}
                 </span>
@@ -203,7 +203,7 @@ export default async function BookingDetailPage({
             href={`/${locale}/api/bookings/${encodeURIComponent(booking.reference)}/voucher`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-10 items-center text-sm font-bold text-gold hover:underline lg:min-h-0"
+            className="inline-flex min-h-10 items-center text-sm font-bold text-gold-ink hover:underline lg:min-h-0"
           >
             {t('voucherOpen')}
           </a>

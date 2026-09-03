@@ -104,7 +104,7 @@ function Section({
 }) {
   return (
     <section>
-      <h2 className="mb-2 text-[14.5px] font-extrabold text-gold">{title}</h2>
+      <h2 className="mb-2 text-[14.5px] font-extrabold text-gold-ink">{title}</h2>
 
       {rows.length === 0 ? (
         <p className="text-[12.5px] text-faint2">{empty}</p>
@@ -120,7 +120,7 @@ function Section({
                 <span className="font-mono text-[13px] font-bold text-text">
                   {coupon.code}
                 </span>
-                <span className="text-[12.5px] font-semibold text-gold">
+                <span className="text-[12.5px] font-semibold text-gold-ink">
                   {discountOf(coupon)}
                 </span>
                 {coupon.expired ? (

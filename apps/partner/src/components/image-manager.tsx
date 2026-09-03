@@ -346,7 +346,7 @@ export function ImageManager({
                 )}
 
                 {image.isCover ? (
-                  <span className="absolute top-2 start-2 rounded-full border border-gold bg-gold/20 px-2.5 py-0.5 text-[10.5px] font-bold text-gold">
+                  <span className="absolute top-2 start-2 rounded-full border border-gold bg-gold/20 px-2.5 py-0.5 text-[10.5px] font-bold text-gold-ink">
                     {t.images.cover}
                   </span>
                 ) : null}

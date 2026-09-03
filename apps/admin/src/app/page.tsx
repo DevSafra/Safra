@@ -358,7 +358,7 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
               <span className="text-[12.5px] text-text2">{row.text}</span>
               <Link
                 href={row.href}
-                className="ms-auto inline-flex min-h-10 cursor-pointer items-center rounded-[7px] border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+                className="ms-auto inline-flex min-h-10 cursor-pointer items-center rounded-[7px] border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-[11.5px] font-bold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
               >
                 {t.admin.handle}
               </Link>
@@ -374,7 +374,7 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
   return (
     <section className="min-w-0 rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="text-[14.5px] font-extrabold text-gold">
+        <h2 className="text-[14.5px] font-extrabold text-gold-ink">
           {t.admin.latestBookings}
         </h2>
 
@@ -441,7 +441,10 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
                   <td className="max-w-[140px] truncate p-2.5 text-text2">
                     {row.customer}
                   </td>
-                  <td dir="ltr" className="whitespace-nowrap p-2.5 font-bold text-gold">
+                  <td
+                    dir="ltr"
+                    className="whitespace-nowrap p-2.5 font-bold text-gold-ink"
+                  >
                     {amount(row.amount, row.currency)}
                   </td>
                   <td className="p-2.5">
@@ -466,7 +469,7 @@ function PartnerQueue({
 }) {
   return (
     <section className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
-      <h2 className="mb-3 text-[14.5px] font-extrabold text-gold">
+      <h2 className="mb-3 text-[14.5px] font-extrabold text-gold-ink">
         {t.admin.pendingPartners}
       </h2>
 
@@ -495,7 +498,7 @@ function PartnerQueue({
               >
                 <span
                   aria-hidden
-                  className="grid size-[34px] shrink-0 place-items-center rounded-[9px] border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] font-[family-name:var(--font-amiri)] text-base text-gold"
+                  className="grid size-[34px] shrink-0 place-items-center rounded-[9px] border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] font-[family-name:var(--font-amiri)] text-base text-gold-ink"
                 >
                   {ORNAMENT_BRAND}
                 </span>
@@ -538,7 +541,7 @@ function PartnerQueue({
 function RecentActivity({ rows }: { rows: DashboardOverview['recentAudit'] }) {
   return (
     <section className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
-      <h2 className="mb-2.5 text-[14.5px] font-extrabold text-gold">
+      <h2 className="mb-2.5 text-[14.5px] font-extrabold text-gold-ink">
         {t.admin.recentActivity}
       </h2>
 

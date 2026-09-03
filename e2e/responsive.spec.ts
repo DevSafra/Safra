@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
+import { PARTNER_BASE } from './partner-session.js';
 
 /**
  * Every screen must work on every device — the project rule, asserted.
@@ -130,6 +131,99 @@ async function smallTargets(page: Page) {
 }
 
 /**
+ * Can a component ask for a control TALLER than the floor and get it?
+ *
+ * Bashar, 2026-09-02: «the menu items on the navbar is a little bit under the logo with height.»
+ * The header's controls carried `sm:min-h-11` and rendered 40px anyway, so the 44px brand mark sat
+ * two pixels above a row of 40px items. Not specificity — a class beats `:where()`, which is zero.
+ * **An UNLAYERED rule beats every layered one whatever the specificity**, and `@import 'tailwindcss'`
+ * puts utilities in `@layer utilities`, so the floor — written outside any layer — won against every
+ * height a component asked for below `lg`.
+ *
+ * It reached four more screens than the one that was reported: on a phone the search form's «بحث»
+ * button and both of its popover triggers ask for 48px and rendered 40, beside الوجهة, which is a
+ * `div` and got the 48px it asked for.
+ *
+ * ## Why a probe rather than a screen
+ *
+ * The defect is a property of the CASCADE, not of any one component, and asserting it through a
+ * component would make this test fail the day that component changes its height for a good reason.
+ * The probe declares a height from inside `@layer utilities` — exactly where every Tailwind utility
+ * lives — and asks what the element ended up with. Layered, the floor loses and the answer is 44px;
+ * unlayered, it wins and the answer is 40px, which is the bug.
+ *
+ * It does not name a utility CLASS on purpose: `min-h-11` is emitted only into the stylesheets of
+ * apps that use it, so a class-based probe would report the defect in any app that happens not to
+ * have reached for that height yet.
+ */
+async function raisableFloor(page: Page) {
+  return page.evaluate(() => {
+    const style = document.createElement('style');
+
+    style.textContent = '@layer utilities { #floor-probe { min-height: 2.75rem } }';
+
+    const probe = document.createElement('button');
+
+    probe.id = 'floor-probe';
+
+    document.head.append(style);
+    document.body.append(probe);
+
+    const resolved = getComputedStyle(probe).minHeight;
+
+    probe.remove();
+    style.remove();
+
+    return resolved;
+  });
+}
+
+/**
+ * Can a grid or flex child ask for a WIDTH floor and get it?
+ *
+ * The twin of `raisableFloor`, and the same defect in a second property. `globals.css` carries
+ * `:where(.grid, .flex, .inline-flex) > * { min-width: 0 }` so no panel has to remember `min-w-0`,
+ * and it was written outside any cascade layer — which beats every Tailwind utility whatever the
+ * specificity says. The note beside it claimed «any explicit `min-w-*` still wins» and had been
+ * false since Tailwind v4 landed.
+ *
+ * It was not theoretical. The shared image previewer's controls asked for `min-w-10`/`min-h-10` and
+ * rendered **30×23px** — under WCAG 2.5.8's 24×24 floor, on a modal dialog, in all three apps. A
+ * previous session met the same defect on الإعلانات, measured it correctly, and worked around it
+ * with a two-column grid instead of fixing the rule.
+ *
+ * The probe declares a width from inside `@layer utilities`, on a flex child, which is exactly where
+ * the real rule bites. Not phrased against a utility CLASS, for the reason `raisableFloor` gives.
+ */
+async function raisableWidthFloor(page: Page) {
+  return page.evaluate(() => {
+    const style = document.createElement('style');
+
+    style.textContent = '@layer utilities { #width-probe { min-width: 2.75rem } }';
+
+    const row = document.createElement('div');
+
+    row.className = 'flex';
+    row.style.width = '0px';
+
+    const probe = document.createElement('button');
+
+    probe.id = 'width-probe';
+    row.append(probe);
+
+    document.head.append(style);
+    document.body.append(row);
+
+    const resolved = getComputedStyle(probe).minWidth;
+
+    row.remove();
+    style.remove();
+
+    return resolved;
+  });
+}
+
+/**
  * Reports the widest offender rather than just a boolean.
  *
  * A failure that says "the page is 138px too wide" sends you looking; one that names
@@ -236,6 +330,20 @@ test.describe('the staff console', () => {
     });
   }
 
+  test('a control may declare a height above the floor', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto('/bookings');
+
+    expect(await raisableFloor(page)).toBe('44px');
+  });
+
+  test('a flex child may declare a width floor', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto('/bookings');
+
+    expect(await raisableWidthFloor(page)).toBe('44px');
+  });
+
   /**
    * A wide table SCROLLS; it is not crushed.
    *
@@ -315,6 +423,68 @@ test.describe('the customer site', () => {
       }
 
       expect(broken).toStrictEqual([]);
+    });
+  }
+
+  test('a control may declare a height above the floor', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto('/ar');
+
+    expect(await raisableFloor(page)).toBe('44px');
+  });
+
+  test('a flex child may declare a width floor', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto('/ar');
+
+    expect(await raisableWidthFloor(page)).toBe('44px');
+  });
+
+  /**
+   * And the لوحة الشريك, whose `globals.css` carried the same rule.
+   *
+   * Its sign-in screen, which needs no session — this spec runs in the project that has none. The
+   * portal is a third copy of the floor and a fix applied to two of three files is the shape that
+   * leaves a defect live on the screen nobody was looking at.
+   */
+  test('a control may declare a height above the floor in the partner portal', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto(`${PARTNER_BASE}/login`);
+
+    expect(await raisableFloor(page)).toBe('44px');
+    expect(await raisableWidthFloor(page)).toBe('44px');
+  });
+
+  /**
+   * The header row has ONE top edge and ONE bottom edge.
+   *
+   * What Bashar actually saw. The brand mark is 44px and every control beside it was 40px, so on a
+   * row centred about a common axis the brand's box began two pixels higher than the menu's — brand
+   * at y=20, menu at y=22, measured. The text baselines were identical to a tenth of a pixel; it
+   * was the BOXES that differed, which is the half nobody thinks to check.
+   *
+   * From `sm` up, where the bar is one row. Below it the header wraps deliberately — five items
+   * come to 551px against 358px of a 390px phone — and a row-sharing assertion there would be
+   * asserting that it does not wrap.
+   */
+  for (const width of [768, 1024, 1440]) {
+    test(`the header is one row with one top edge at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 850 });
+      await page.goto('/ar');
+
+      const edges = await page.evaluate(() => {
+        const bar = document.querySelector('header')?.firstElementChild;
+
+        return Array.from(bar?.children ?? [])
+          .map((element) => element.getBoundingClientRect())
+          .filter((box) => box.height > 0)
+          .map((box) => `${Math.round(box.top)}/${Math.round(box.bottom)}`);
+      });
+
+      expect(edges.length).toBeGreaterThan(3);
+      expect(new Set(edges).size, `distinct edges: ${edges.join(' ')}`).toBe(1);
     });
   }
 

@@ -26,7 +26,7 @@ export default async function LoginPage({
   return (
     <main className="mx-auto grid min-h-screen max-w-sm content-center px-4">
       <div className="w-full">
-        <p className="text-3xl text-gold text-center" aria-hidden>
+        <p className="text-3xl text-gold-ink text-center" aria-hidden>
           {ORNAMENT_BRAND}
         </p>
         <h1 className="mt-3 text-2xl font-semibold text-text text-center">

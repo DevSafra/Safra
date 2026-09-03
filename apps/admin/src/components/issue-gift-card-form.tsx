@@ -143,7 +143,7 @@ export function GiftCardsToolbar({
 
   const panel = issued ? (
     <div className="grid w-full gap-2 rounded-[10px] border border-[rgba(var(--goldA),0.4)] bg-field p-3.5">
-      <h3 className="text-[13px] font-bold text-gold">{c.issuedTitle}</h3>
+      <h3 className="text-[13px] font-bold text-gold-ink">{c.issuedTitle}</h3>
       {/*
           `dir="ltr"` on a DISPLAYED Latin value, never on a field: the code is one Latin run and
           this is the display half of the rule, not the typing half.
@@ -260,7 +260,7 @@ export function GiftCardsToolbar({
           type="button"
           disabled={!ready}
           onClick={() => void submit()}
-          className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {busy ? t.table.working : c.issueSubmit}
         </button>
@@ -294,7 +294,7 @@ export function GiftCardsToolbar({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="min-h-10 cursor-pointer rounded-[9px] border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-[9px] border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {c.create}
           </button>

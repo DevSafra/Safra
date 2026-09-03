@@ -88,7 +88,7 @@ export function AdInvoicePaidButton({ reference }: { readonly reference: string 
           type="button"
           disabled={note.trim().length < 3 || busy}
           onClick={() => void submit()}
-          className="cursor-pointer rounded-md border border-[rgba(var(--goldA),0.4)] px-2.5 py-0.5 text-[10.5px] font-bold text-gold transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          className="cursor-pointer rounded-md border border-[rgba(var(--goldA),0.4)] px-2.5 py-0.5 text-[10.5px] font-bold text-gold-ink transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         >
           {busy ? t.sections.ads.pausing : c.confirm}
         </button>

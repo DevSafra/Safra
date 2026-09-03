@@ -192,7 +192,7 @@ export function AuthForm({
         <p className="mt-2 text-sm leading-relaxed text-muted">{t('checkEmailBody')}</p>
         <Link
           href={`/${locale}/login`}
-          className="mt-4 inline-flex min-h-10 items-center text-sm text-gold underline-offset-4 hover:underline"
+          className="mt-4 inline-flex min-h-10 items-center text-sm text-gold-ink underline-offset-4 hover:underline"
         >
           {t('backToSignIn')}
         </Link>
@@ -247,7 +247,7 @@ export function AuthForm({
       {mode === 'register' ? (
         <div className="flex flex-col gap-1.5">
           <label htmlFor="field-gender" className="text-sm text-muted">
-            {t('gender')} <span className="text-gold">*</span>
+            {t('gender')} <span className="text-gold-ink">*</span>
           </label>
           <select
             id="field-gender"
@@ -337,7 +337,7 @@ export function AuthForm({
       <button
         type="submit"
         disabled={submitting}
-        className="mt-2 w-full rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-2 w-full rounded-lg btn-gold px-5 py-3 font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? t('submitting') : t(mode === 'login' ? 'signIn' : 'createAccount')}
       </button>
@@ -387,7 +387,7 @@ function Field({
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-sm text-muted">
-        {label} <span className="text-gold">*</span>
+        {label} <span className="text-gold-ink">*</span>
       </label>
       <input
         id={id}

@@ -51,7 +51,7 @@ export default async function ResetPasswordPage({
         <p className="mt-2 text-sm text-muted">{t('resetLinkInvalid')}</p>
         <Link
           href={`/${locale}/forgot-password`}
-          className="mt-6 inline-block rounded-lg bg-gold px-5 py-2.5 font-semibold text-bg"
+          className="mt-6 inline-block rounded-lg btn-gold px-5 py-2.5 font-semibold"
         >
           {t('requestNewLink')}
         </Link>

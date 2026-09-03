@@ -148,7 +148,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)]"
+          className="cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4.5 py-2 text-xs font-bold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)]"
         >
           {t.sections.disputes.open}
         </button>

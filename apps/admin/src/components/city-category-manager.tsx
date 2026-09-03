@@ -190,7 +190,7 @@ export function CityCategoryManager({
   return (
     <>
       <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
-        <h2 className="text-[14.5px] font-extrabold text-gold">{c.title}</h2>
+        <h2 className="text-[14.5px] font-extrabold text-gold-ink">{c.title}</h2>
         <span className="ms-auto">
           <button
             type="button"
@@ -200,7 +200,7 @@ export function CityCategoryManager({
               setEditing(null);
               setAdding(!adding);
             }}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11.5px] font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1.5 text-[11.5px] font-bold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {c.add}
           </button>

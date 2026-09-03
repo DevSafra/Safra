@@ -84,7 +84,7 @@ export function LegalPage({
 
       <Link
         href={`/${locale}`}
-        className="mt-10 inline-flex min-h-10 items-center text-sm text-gold hover:underline lg:min-h-0"
+        className="mt-10 inline-flex min-h-10 items-center text-sm text-gold-ink hover:underline lg:min-h-0"
       >
         {backLabel}
       </Link>

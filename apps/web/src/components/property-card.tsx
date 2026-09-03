@@ -127,7 +127,7 @@ export async function PropertyCard({
         ) : (
           <OrnamentField
             id={`ornament-property-${item.propertyReference}`}
-            className="text-gold opacity-30"
+            className="text-gold-ink opacity-30"
           />
         )}
       </div>
@@ -162,7 +162,7 @@ export async function PropertyCard({
             </Link>
           </h3>
           {item.rating ? (
-            <span className="shrink-0 rounded-lg border border-line bg-field px-2 py-1 text-sm text-gold">
+            <span className="shrink-0 rounded-lg border border-line bg-field px-2 py-1 text-sm text-gold-ink">
               ★ {item.rating}
             </span>
           ) : null}
@@ -178,7 +178,7 @@ export async function PropertyCard({
             {item.badges.map((badge) => (
               <li
                 key={badge}
-                className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-xs text-gold"
+                className="rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-xs text-gold-ink"
               >
                 {badge === 'safra_verified' ? t('badgeVerified') : t('badgeRecommends')}
               </li>
@@ -194,7 +194,7 @@ export async function PropertyCard({
 
         <div className="mt-auto pt-4">
           <p className="text-base text-text">
-            <span className="font-bold text-gold">{nightly.text}</span>{' '}
+            <span className="text-xl font-bold text-gold-ink">{nightly.text}</span>{' '}
             <span className="text-xs text-faint">{t('perNight')}</span>
           </p>
           {/*

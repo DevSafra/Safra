@@ -141,7 +141,7 @@ export function OutlineAction({
     <a
       href={href}
       {...(download ? { download: '' } : {})}
-      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.35)] px-4 py-1.5 text-xs font-bold text-gold transition-colors hover:bg-[rgba(var(--goldA),0.08)]"
+      className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.35)] px-4 py-1.5 text-xs font-bold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)]"
     >
       {children}
     </a>

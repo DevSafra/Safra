@@ -79,7 +79,7 @@ export default async function AccountFavouritesPage({
           <p className="text-sm text-muted">{t('favouritesNone')}</p>
           <Link
             href={`/${locale}/search`}
-            className="mt-3 inline-block rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-bg"
+            className="mt-3 inline-block rounded-lg btn-gold px-5 py-2.5 text-sm font-semibold"
           >
             {t('findStay')}
           </Link>
@@ -105,7 +105,7 @@ export default async function AccountFavouritesPage({
                   {item.rating ? (
                     <span
                       dir="ltr"
-                      className="shrink-0 rounded-lg border border-line bg-field px-2 py-1 text-sm text-gold"
+                      className="shrink-0 rounded-lg border border-line bg-field px-2 py-1 text-sm text-gold-ink"
                     >
                       ★ {item.rating}
                     </span>
@@ -120,7 +120,7 @@ export default async function AccountFavouritesPage({
                     {t('favouriteUnavailable')}
                   </p>
                 ) : item.fromPrice && item.currencyCode ? (
-                  <p className="text-sm text-gold">
+                  <p className="text-sm text-gold-ink">
                     {t('favouriteFrom')}{' '}
                     <span dir="ltr">
                       {

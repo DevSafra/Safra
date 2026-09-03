@@ -95,7 +95,7 @@ export function ReviewForm({
               key={value}
               className={`inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-sm transition-colors ${
                 rating === value
-                  ? 'border-gold bg-gold/15 font-bold text-gold'
+                  ? 'border-gold bg-gold/15 font-bold text-gold-ink'
                   : 'border-line text-muted hover:border-gold/40'
               }`}
             >
@@ -135,7 +135,7 @@ export function ReviewForm({
       <button
         type="submit"
         disabled={busy}
-        className="inline-flex min-h-10 w-fit items-center rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex min-h-10 w-fit items-center rounded-lg btn-gold px-5 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
       >
         {busy ? t('submitting') : t('submit')}
       </button>

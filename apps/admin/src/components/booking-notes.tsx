@@ -167,7 +167,7 @@ export function BookingNotes({
         <button
           type="submit"
           disabled={busy}
-          className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12.5px] font-bold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+          className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12.5px] font-bold text-gold-ink hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
         >
           {busy ? t.sections.bookingDetail.addingNote : t.sections.bookingDetail.addNote}
         </button>

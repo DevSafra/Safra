@@ -622,7 +622,7 @@ function ValueInput({
         above the hint, in the gold the rest of the console uses for a live figure, rather than
         being read as the first two words of a sentence about fractions.
       */}
-      {echo ? <span className="text-[11px] font-bold text-gold">{echo}</span> : null}
+      {echo ? <span className="text-[11px] font-bold text-gold-ink">{echo}</span> : null}
 
       <span className="text-[10.5px] text-faint2">{schemaHint(setting.valueSchema)}</span>
     </label>

@@ -321,7 +321,7 @@ export function StaffRolesManager({
                   this screen sometimes do nothing.
                 */}
                   {role.employeeCount > 0 ? (
-                    <span className="text-[11.5px] leading-relaxed text-gold">
+                    <span className="text-[11.5px] leading-relaxed text-gold-ink">
                       {copy.inUse}
                     </span>
                   ) : confirming === role.id ? (

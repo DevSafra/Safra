@@ -186,7 +186,7 @@ export function DisputeForm({
       <button
         type="submit"
         disabled={busy}
-        className="mt-2 inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg bg-gold px-5 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2.5"
+        className="mt-2 inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg btn-gold px-5 font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2.5"
       >
         {busy ? labels.submitting : labels.submit}
       </button>

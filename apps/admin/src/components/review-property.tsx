@@ -67,7 +67,7 @@ export function ReviewProperty({
   return (
     <div className="rounded-lg border border-line bg-card p-4">
       {!canApprove ? (
-        <p className="mb-3 rounded border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-gold">
+        <p className="mb-3 rounded border border-gold/30 bg-gold/5 px-3 py-2 text-xs text-gold-ink">
           {!partnerVerified
             ? t.sections.reviewProperty.partnerNotVerified
             : t.sections.reviewProperty.noUnits}

@@ -67,7 +67,7 @@ export function SettingsBoard({
   return (
     <div className="grid gap-4">
       <ConsolePanel>
-        <h2 className="text-[14.5px] font-extrabold text-gold">
+        <h2 className="text-[14.5px] font-extrabold text-gold-ink">
           {t.sections.settings.title}
         </h2>
         <p className="mt-1.5 max-w-[80ch] text-[11.5px] leading-relaxed text-text2">

@@ -146,7 +146,9 @@ export function AddProperty({
   return (
     <div className="rounded-2xl border border-gold/40 bg-card p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[14px] font-extrabold text-gold">{t.properties.addOpen}</h2>
+        <h2 className="text-[14px] font-extrabold text-gold-ink">
+          {t.properties.addOpen}
+        </h2>
         <button
           type="button"
           onClick={() => setOpen(false)}
@@ -275,7 +277,7 @@ export function AddProperty({
                   onClick={() => toggle(attribute)}
                   className={`min-h-10 cursor-pointer rounded-full border px-3 text-[11px] font-semibold lg:min-h-0 lg:py-1 ${
                     on
-                      ? 'border-gold bg-gold/15 text-gold'
+                      ? 'border-gold bg-gold/15 text-gold-ink'
                       : 'border-line text-muted hover:border-gold/40'
                   }`}
                 >

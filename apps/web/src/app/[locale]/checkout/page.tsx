@@ -80,7 +80,7 @@ export default async function CheckoutPage({
         <p className="font-display text-xl text-text">{t('missingDetails')}</p>
         <Link
           href={`/${locale}/search`}
-          className="mt-4 inline-block rounded-lg bg-gold px-5 py-2.5 font-semibold text-bg"
+          className="mt-4 inline-block rounded-lg btn-gold px-5 py-2.5 font-semibold"
         >
           {t('backToSearch')}
         </Link>

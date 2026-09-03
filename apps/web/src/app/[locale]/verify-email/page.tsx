@@ -69,14 +69,14 @@ export default async function VerifyEmailPage({
         at worst.
       */}
       {outcome.claimedBookings > 0 ? (
-        <p className="mt-3 rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm text-gold">
+        <p className="mt-3 rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm text-gold-ink">
           {t('claimedBookings', { count: outcome.claimedBookings })}
         </p>
       ) : null}
 
       <Link
         href={`/${locale}/account`}
-        className="mt-6 inline-block rounded-lg bg-gold px-5 py-2.5 font-semibold text-bg"
+        className="mt-6 inline-block rounded-lg btn-gold px-5 py-2.5 font-semibold"
       >
         {t('account')}
       </Link>

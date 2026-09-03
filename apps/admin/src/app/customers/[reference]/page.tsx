@@ -128,7 +128,7 @@ export default async function CustomerPage({
                 <span className="text-faint">{c.noWallet}</span>
               ) : (
                 <span className="grid justify-items-end gap-0.5">
-                  <Ltr className="font-bold text-gold">
+                  <Ltr className="font-bold text-gold-ink">
                     {amount(
                       customer.wallet.balance,
                       customer.wallet.currency ?? DEFAULT_MONEY_CURRENCY,

@@ -151,7 +151,7 @@ export function ProfileForm({
       <button
         type="submit"
         disabled={busy}
-        className="min-h-10 w-fit cursor-pointer rounded-lg bg-gold px-5 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2.5"
+        className="min-h-10 w-fit cursor-pointer rounded-lg btn-gold px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2.5"
       >
         {busy ? labels.saving : labels.save}
       </button>
@@ -329,7 +329,7 @@ export function PasswordForm({
       <button
         type="submit"
         disabled={busy || mismatch}
-        className="min-h-10 w-fit cursor-pointer rounded-lg bg-gold px-5 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2.5"
+        className="min-h-10 w-fit cursor-pointer rounded-lg btn-gold px-5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 lg:py-2.5"
       >
         {busy ? labels.submitting : labels.submit}
       </button>

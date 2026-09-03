@@ -298,7 +298,7 @@ export function PropertyEditor({
                   setMessage(null);
                 }}
                 className={`min-h-10 cursor-pointer rounded-full border px-3 py-1 text-[11.5px] lg:min-h-0 ${
-                  on ? 'border-gold bg-gold/15 text-gold' : 'border-line text-muted'
+                  on ? 'border-gold bg-gold/15 text-gold-ink' : 'border-line text-muted'
                 }`}
               >
                 {tripAttribute(attribute)}

@@ -55,7 +55,7 @@ function ContractRow({ contract }: { contract: ContractItem }) {
       {/* The design's 32×32 gold PDF tile. */}
       <span
         aria-hidden
-        className="grid size-8 shrink-0 place-items-center rounded-lg border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] text-[10px] font-extrabold text-gold"
+        className="grid size-8 shrink-0 place-items-center rounded-lg border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] text-[10px] font-extrabold text-gold-ink"
       >
         PDF
       </span>

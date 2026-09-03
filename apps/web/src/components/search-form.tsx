@@ -355,7 +355,7 @@ function Field({
           beside it, so it is held to the 3:1 non-text floor rather than the 4.5:1 text one.
         */}
         {required ? (
-          <span aria-hidden className="text-gold">
+          <span aria-hidden className="text-gold-ink">
             {' '}
             *
           </span>

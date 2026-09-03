@@ -132,7 +132,7 @@ export async function Shell({
             hideLabel={t.nav.hideSidebar}
           />
 
-          <h1 className="font-[family-name:var(--font-amiri)] text-[28px] leading-tight font-bold text-gold">
+          <h1 className="font-[family-name:var(--font-amiri)] text-[28px] leading-tight font-bold text-gold-ink">
             {title}
           </h1>
 
@@ -415,7 +415,7 @@ function Item({
       {...(current ? { 'aria-current': 'page' as const } : {})}
       className={`flex min-h-10 items-center gap-2 rounded-lg px-2.5 py-2 text-[13px] transition-colors lg:min-h-0 ${
         current
-          ? 'bg-[rgba(var(--goldA),0.12)] font-extrabold text-gold'
+          ? 'bg-[rgba(var(--goldA),0.12)] font-extrabold text-gold-ink'
           : 'text-muted hover:bg-line2'
       }`}
     >

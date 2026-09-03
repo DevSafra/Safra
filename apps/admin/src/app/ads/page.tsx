@@ -493,7 +493,7 @@ function columnsFor(created: string | null): readonly AdminColumn<CampaignItem>[
           <span className="text-text2">{periodLabel(row.billingPeriod)}</span>
           {row.priceAmount && row.priceCurrency ? (
             /* Never a bare figure — SYP and USD differ by four orders of magnitude. */
-            <Ltr className="text-[11px] font-bold text-gold">
+            <Ltr className="text-[11px] font-bold text-gold-ink">
               {amount(row.priceAmount, row.priceCurrency)}
             </Ltr>
           ) : (

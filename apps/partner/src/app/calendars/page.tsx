@@ -251,7 +251,9 @@ export default async function CalendarsPage({
         /* The عقار's own line — name, reference, how many rooms. The same open or shut. */
         const title = (
           <>
-            <h2 className="text-[14.5px] font-extrabold text-gold">{property.nameAr}</h2>
+            <h2 className="text-[14.5px] font-extrabold text-gold-ink">
+              {property.nameAr}
+            </h2>
             <span className="text-[11px] text-faint" dir="ltr">
               {property.reference}
             </span>
@@ -336,7 +338,7 @@ export default async function CalendarsPage({
 
                 <button
                   type="submit"
-                  className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 text-[12.5px] text-gold transition-colors hover:bg-gold hover:text-bg lg:min-h-0 lg:py-2"
+                  className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 text-[12.5px] text-gold-ink transition-colors hover:bg-gold hover:text-bg lg:min-h-0 lg:py-2"
                 >
                   {t.calendars.searchAction}
                 </button>

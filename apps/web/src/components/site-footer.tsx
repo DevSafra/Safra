@@ -166,12 +166,12 @@ export async function SiteFooter({ locale }: { locale: Locale }) {
             <Link href={`/${locale}`} className="flex items-center gap-3">
               <span
                 aria-hidden
-                className="grid size-10 place-items-center rounded-xl border border-gold/40 bg-card text-lg text-gold"
+                className="grid size-10 place-items-center rounded-xl border border-gold/40 bg-card text-lg text-gold-ink"
               >
                 {ORNAMENT_BRAND}
               </span>
               <span className="leading-tight">
-                <span className="block font-display text-base font-bold text-gold">
+                <span className="block font-display text-xl font-bold text-gold-ink">
                   {brand('name')} <span className="text-text/70">|</span> {brand('latin')}
                 </span>
                 <span className="block text-xs text-faint">{brand('tagline')}</span>
@@ -285,7 +285,7 @@ function CurrencyPicker({
             aria-current={code === chosen ? 'true' : undefined}
             className={`flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-start text-sm transition-colors lg:min-h-9 ${
               code === chosen
-                ? 'bg-field font-semibold text-gold'
+                ? 'bg-field font-semibold text-gold-ink'
                 : 'text-muted hover:bg-field hover:text-gold'
             }`}
           >

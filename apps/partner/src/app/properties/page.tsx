@@ -180,7 +180,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
             ) : null}
           </h2>
           {property.rating ? (
-            <span className="shrink-0 text-[12.5px] font-extrabold text-gold">
+            <span className="shrink-0 text-[12.5px] font-extrabold text-gold-ink">
               ★ {property.rating}
             </span>
           ) : null}
@@ -193,7 +193,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
             {property.attributes.map((attribute) => (
               <li
                 key={attribute}
-                className="rounded-full border border-gold/40 px-2 py-0.5 text-[11px] font-semibold text-gold"
+                className="rounded-full border border-gold/40 px-2 py-0.5 text-[11px] font-semibold text-gold-ink"
               >
                 {tripAttribute(attribute)}
               </li>
@@ -230,7 +230,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
 
         <div className="mt-auto pt-3.5">
           {property.fromPrice ? (
-            <p className="text-[17px] font-extrabold text-gold">
+            <p className="text-[17px] font-extrabold text-gold-ink">
               <Ltr>{amount(property.fromPrice, property.currencyCode ?? 'USD')}</Ltr>
               <span className="text-[12px] font-normal text-faint">
                 {' '}
@@ -243,7 +243,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
             {/* الصور is built; تعديل and التقويم are not, and say so rather than navigating nowhere. */}
             <Link
               href={`/properties/${encodeURIComponent(property.reference)}/images`}
-              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-gold/50 px-3 text-[11.5px] font-semibold text-gold lg:min-h-0 lg:py-1.5"
+              className="inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-gold/50 px-3 text-[11.5px] font-semibold text-gold-ink lg:min-h-0 lg:py-1.5"
             >
               {t.properties.manageImages}
             </Link>

@@ -127,7 +127,7 @@ export function ContractSigning({
       onSubmit={(event) => void submit(event)}
       className="mt-3 grid gap-2.5 rounded-lg border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.05)] p-3.5"
     >
-      <p className="text-[12.5px] font-bold text-gold">{t.contracts.signTitle}</p>
+      <p className="text-[12.5px] font-bold text-gold-ink">{t.contracts.signTitle}</p>
       <p className="text-[11.5px] leading-relaxed text-text2">{t.contracts.signSteps}</p>
 
       <label className="grid gap-1">

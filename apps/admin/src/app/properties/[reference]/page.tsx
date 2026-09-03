@@ -134,7 +134,7 @@ export default async function PropertyPage({
             {t.sections.propertyDetail.partnerVerified}
           </p>
         ) : (
-          <p className="mt-2 text-xs text-gold">
+          <p className="mt-2 text-xs text-gold-ink">
             {fill(t.sections.propertyDetail.partnerNotVerified, {
               status: label(t.enums.verification, property.partner.verification),
             })}{' '}
@@ -219,7 +219,7 @@ export default async function PropertyPage({
       */}
       <Section title={t.sections.propertyDetail.photos}>
         {property.images.length === 0 ? (
-          <p className="rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm text-gold">
+          <p className="rounded-lg border border-gold/30 bg-gold/5 p-3 text-sm text-gold-ink">
             {t.sections.propertyDetail.noPhotos}
           </p>
         ) : (

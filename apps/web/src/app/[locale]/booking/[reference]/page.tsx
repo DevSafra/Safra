@@ -81,7 +81,7 @@ export default async function BookingPendingPage({
           >
             <span
               aria-hidden
-              className="grid size-7 shrink-0 place-items-center rounded-full border border-gold/40 text-sm text-gold"
+              className="grid size-7 shrink-0 place-items-center rounded-full border border-gold/40 text-sm text-gold-ink"
             >
               {index + 1}
             </span>

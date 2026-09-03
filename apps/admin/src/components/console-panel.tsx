@@ -22,7 +22,7 @@ export function ConsolePanel({
   return (
     <section className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       {title ? (
-        <h2 className="mb-3 text-[14.5px] font-extrabold text-gold">{title}</h2>
+        <h2 className="mb-3 text-[14.5px] font-extrabold text-gold-ink">{title}</h2>
       ) : null}
       {children}
     </section>

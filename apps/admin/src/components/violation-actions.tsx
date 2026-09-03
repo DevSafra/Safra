@@ -437,7 +437,7 @@ function Step({
       type="button"
       onClick={onClick}
       className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-3 py-1.5 text-[11.5px] lg:min-h-0 ${
-        active ? (danger ? 'border-bad text-bad' : 'border-gold/60 text-gold') : tone
+        active ? (danger ? 'border-bad text-bad' : 'border-gold/60 text-gold-ink') : tone
       }`}
     >
       {label}
@@ -479,7 +479,7 @@ function Submit({
     <button
       type="submit"
       disabled={busy}
-      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-[9px] border border-gold/50 px-4 py-2 text-[12px] font-bold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-[9px] border border-gold/50 px-4 py-2 text-[12px] font-bold text-gold-ink hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
     >
       {busy ? working : idle}
     </button>

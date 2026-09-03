@@ -95,7 +95,7 @@ export default async function PayoutPage({
           <Row
             label={t.sections.payouts.net}
             value={
-              <Ltr className="font-extrabold text-gold">
+              <Ltr className="font-extrabold text-gold-ink">
                 {amount(payout.netAmount, payout.currencyCode)}
               </Ltr>
             }
@@ -265,7 +265,7 @@ function Shell({ back, children }: { back: BackTarget; children: ReactNode }) {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h2 className="mb-2 text-sm font-semibold text-gold">{title}</h2>
+      <h2 className="mb-2 text-sm font-semibold text-gold-ink">{title}</h2>
       {children}
     </section>
   );

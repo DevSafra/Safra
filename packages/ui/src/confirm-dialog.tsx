@@ -96,7 +96,7 @@ export function ConfirmDialog({
         {request.title}
       </h2>
 
-      <p id="safra-confirm-message" className="text-[12.5px] leading-relaxed text-text2">
+      <p id="safra-confirm-message" className="text-[12.5px] leading-relaxed text-muted">
         {request.message}
       </p>
 

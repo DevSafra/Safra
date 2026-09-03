@@ -108,7 +108,7 @@ export function FieldPopover({
                 setOpen(false);
                 trigger.current?.focus();
               }}
-              className="btn-gold min-h-9 cursor-pointer rounded-lg px-5 text-[0.8125rem] font-bold transition-[opacity,scale] duration-200 ease-out-strong hover:opacity-90 active:scale-[.97]"
+              className="btn-gold min-h-10 cursor-pointer lg:min-h-9 rounded-lg px-5 text-[0.8125rem] font-bold transition-[opacity,scale] duration-200 ease-out-strong hover:opacity-90 active:scale-[.97]"
             >
               {doneLabel}
             </button>

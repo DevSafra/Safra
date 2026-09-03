@@ -105,7 +105,7 @@ export function SettingDetails({
         </div>
       </dl>
 
-      <h4 className="mt-3.5 text-[11.5px] font-bold text-gold">
+      <h4 className="mt-3.5 text-[11.5px] font-bold text-gold-ink">
         {t.sections.settings.historyTitle}
       </h4>
 

@@ -114,7 +114,7 @@ export function CouponField({
         <span className="min-w-0 truncate text-text">
           {copy.applied.replace('{code}', applied.code)}
         </span>
-        <span className="whitespace-nowrap text-gold">
+        <span className="whitespace-nowrap text-gold-ink">
           −{formatMoney(applied.discountAmount, currencyCode, locale)}
         </span>
         <button

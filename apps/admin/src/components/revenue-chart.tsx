@@ -58,7 +58,9 @@ export function RevenueChart({
   return (
     <div className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       {/* `h2` like every other panel title, so the console has one heading outline. */}
-      <h2 className="text-[14.5px] font-extrabold text-gold">{t.admin.weekRevenue}</h2>
+      <h2 className="text-[14.5px] font-extrabold text-gold-ink">
+        {t.admin.weekRevenue}
+      </h2>
       <p className="mt-1 mb-3.5 text-[11px] text-faint">{t.admin.weekRevenueSub}</p>
 
       <svg

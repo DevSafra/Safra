@@ -49,10 +49,11 @@
   /** Secondary body text: dimmer than `text`, brighter than `muted`. */
   --color-text2: #c9c3e0;
   --color-muted: #a9a3c4;
-  --color-faint: #736f92;
+  --color-faint: #908da8;
   /** Dimmest legible tier — a denied cell in the permission matrix, an unbuilt nav item. */
   --color-faint2: #4e4a6e;
   --color-gold: #e8bc66;
+  --color-gold-ink: #e8bc66;
   --color-sky: #78aee0;
   --color-ok: #6fc792;
   --color-bad: #e06868;
@@ -125,22 +126,39 @@
   --color-line2: #eaedf4;
   --color-text: #1d2333;
   --color-text2: #3a415a;
-  --color-muted: #5c6377;
-  --color-faint: #7c8296;
+  --color-muted: #454b5a;
+  --color-faint: #5e6372;
   --color-faint2: #a5aabc;
   --color-gold: #a87a1f;
+  /*
+   * Gold that can be READ at body size, as opposed to gold the brand is made of.
+   *
+   * Bashar, 2026-09-03: «why you changed the button colour and price colour? please undo that — I
+   * meant the grey texts.» He was right. Darkening `--color-gold` to fix eight small labels took
+   * the brand down with it: the primary button and the price went from gold to a muddy brown, which
+   * is not a contrast fix, it is a rebrand nobody asked for.
+   *
+   * So there are two now, and the split is exactly the WCAG one. `--color-gold` is the brand —
+   * surfaces, borders, ornament, and display text, where the floor is 3:1 and it measures 3.09 at
+   * its worst. `--color-gold-ink` is for gold text below 18.66px bold, where the floor is 4.5 and
+   * the brand gold cannot reach it at any size a body sets.
+   *
+   * Reaching for `gold-ink` on a heading is as wrong as reaching for `gold` on a caption: one is
+   * needlessly dull, the other is unreadable. If the text is large, it is the brand's colour.
+   */
+  --color-gold-ink: #846018;
   --color-sky: #2e66a8;
-  --color-ok: #1f7d53;
-  --color-bad: #c23f3f;
-  --color-warn: #9e6e15;
+  --color-ok: #1d744d;
+  --color-bad: #b53b3b;
+  --color-warn: #875e12;
   --color-pend: #6c51c9;
-  --color-teal: #0f7d78;
-  --color-lime: #5f7d16;
+  --color-teal: #0e726e;
+  --color-lime: #546f13;
   --color-indigo: #4356b8;
-  --color-orange: #b35418;
+  --color-orange: #a44d16;
   --color-crimson: #a8285c;
   --color-slate: #5a6480;
-  --color-stone: #7a6a5e;
+  --color-stone: #726358;
   --color-barDim: #d5dae8;
 
   --goldA: 168, 122, 31;
@@ -418,9 +436,31 @@
  *
  * `:where()` for zero specificity — anything that genuinely needs to be smaller can say so.
  */
-@media (max-width: 63.999rem) {
-  :where(button, select, summary, [role='button']) {
-    min-height: 2.5rem;
+/*
+ * The floor lives in `@layer base` so a utility can still raise it.
+ *
+ * Bashar, 2026-09-02: «the menu items on the navbar is a little bit under the logo with height.»
+ * The header's controls carried `sm:min-h-11` and rendered 40px anyway. Not a specificity problem —
+ * a class beats `:where()`, which is exactly zero. **An UNLAYERED rule beats every layered one no
+ * matter what the specificity says**, and `@import 'tailwindcss'` puts every utility inside
+ * `@layer utilities`. So this block, written outside any layer, silently won against `min-h-11`,
+ * `min-h-12`, and anything else a component asked for below `lg`.
+ *
+ * It was not one bar. On a phone the search form's «بحث» button and both of its popover triggers
+ * ask for 48px and rendered 40 — beside الوجهة, which is a `div` and therefore got the 48px it
+ * asked for, so the three fields of one form were two different heights. The partner application's
+ * submit asked for 44 and rendered 40.
+ *
+ * Inside `base` the rule does what it was written to do — a control with no height of its own is
+ * 40px where the input is a finger — and a component that states a LARGER height gets it. A
+ * component asking for a SMALLER one now also gets it, which is why the one button that did
+ * (`field-popover`'s «تم») carries the floor explicitly and drops to 36px only from `lg`.
+ */
+@layer base {
+  @media (max-width: 63.999rem) {
+    :where(button, select, summary, [role='button']) {
+      min-height: 2.5rem;
+    }
   }
 }
 
@@ -436,16 +476,29 @@
  * desktop stays exactly as drawn: this trades vertical space for reachability precisely where the
  * input is a finger.
  */
-@media (max-width: 63.999rem) {
-  :where(td, th) a {
-    display: inline-flex;
-    min-height: 2.5rem;
-    align-items: center;
+@layer base {
+  @media (max-width: 63.999rem) {
+    :where(td, th) a {
+      display: inline-flex;
+      min-height: 2.5rem;
+      align-items: center;
+    }
   }
 }
 
-:where(.grid, .flex, .inline-flex) > * {
-  min-width: 0;
+/*
+ * Inside `@layer base` so an element that states a floor gets it.
+ *
+ * Zero specificity is the right instinct and only half the mechanism: an UNLAYERED rule beats every
+ * layered one whatever the specificity says, and `@import 'tailwindcss'` puts every utility inside
+ * `@layer utilities`. Written outside a layer this silently outranked every `min-w-*` — the shared
+ * image previewer's `min-w-10` controls rendered 30×23px, under WCAG 2.5.8's 24×24 floor, on a
+ * modal dialog. See the customer app's copy of this rule for the full account.
+ */
+@layer base {
+  :where(.grid, .flex, .inline-flex) > * {
+    min-width: 0;
+  }
 }
 
 html {

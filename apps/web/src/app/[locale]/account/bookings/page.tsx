@@ -60,7 +60,7 @@ export default async function AccountBookingsPage({
           <p className="text-sm text-muted">{t('noBookings')}</p>
           <Link
             href={`/${locale}/search`}
-            className="mt-3 inline-block rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-bg"
+            className="mt-3 inline-block rounded-lg btn-gold px-5 py-2.5 text-sm font-semibold"
           >
             {t('findStay')}
           </Link>
@@ -96,7 +96,7 @@ export default async function AccountBookingsPage({
                         status={shown}
                         label={dynamicMessage(t, `status.${shown}`, shown)}
                       />
-                      <span className="text-sm text-gold" dir="ltr">
+                      <span className="text-sm text-gold-ink" dir="ltr">
                         {booking.totalAmount}
                       </span>
                     </span>

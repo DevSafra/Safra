@@ -113,7 +113,7 @@ export function ReviewActions({
           <button
             type="submit"
             disabled={busy}
-            className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[12px] font-bold text-gold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[12px] font-bold text-gold-ink disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
           >
             {busy
               ? t.reviews.working
@@ -140,7 +140,7 @@ export function ReviewActions({
         <button
           type="button"
           onClick={() => setMode('reply')}
-          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[12px] font-bold text-gold lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-gold px-4 py-1.5 text-[12px] font-bold text-gold-ink lg:min-h-0"
         >
           {t.reviews.reply}
         </button>

@@ -115,7 +115,9 @@ export default async function CouponParticipationPage({
       <ConsolePanel>
         <BackLink target={back} section={t.nav.coupons} />
 
-        <h2 className="mt-3 font-mono text-[15px] font-extrabold text-gold">{code}</h2>
+        <h2 className="mt-3 font-mono text-[15px] font-extrabold text-gold-ink">
+          {code}
+        </h2>
         <h3 className="mt-1 text-[13px] font-bold text-text">{c.participationTitle}</h3>
         <p className="mt-1 text-[12px] leading-relaxed text-faint2">
           {c.participationNote}
@@ -142,7 +144,7 @@ export default async function CouponParticipationPage({
                 {...(group.key ? { 'data-participation-count': group.key } : {})}
                 className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3.5 py-2 text-[12px] font-bold transition-colors lg:min-h-0 ${
                   active
-                    ? 'border-[rgba(var(--goldA),0.5)] bg-[rgba(var(--goldA),0.1)] text-gold'
+                    ? 'border-[rgba(var(--goldA),0.5)] bg-[rgba(var(--goldA),0.1)] text-gold-ink'
                     : 'border-line text-muted hover:text-text'
                 }`}
               >

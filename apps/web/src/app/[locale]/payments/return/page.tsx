@@ -101,7 +101,7 @@ export default async function PaymentReturnPage({
         <p className="mt-3 text-muted">{t('failedBody')}</p>
         <Link
           href={`/${locale}/search`}
-          className="mt-6 inline-block rounded-lg bg-gold px-5 py-2.5 font-semibold text-bg"
+          className="mt-6 inline-block rounded-lg btn-gold px-5 py-2.5 font-semibold"
         >
           {t('retry')}
         </Link>

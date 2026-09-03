@@ -365,7 +365,7 @@ function Toggle({
       type="button"
       onClick={onClick}
       className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-3 py-1.5 text-[11.5px] lg:min-h-0 ${
-        active ? (danger ? 'border-bad text-bad' : 'border-gold/60 text-gold') : tone
+        active ? (danger ? 'border-bad text-bad' : 'border-gold/60 text-gold-ink') : tone
       }`}
     >
       {label}
@@ -413,7 +413,7 @@ function Reasoned({
         onSubmit(text(new FormData(event.currentTarget), 'reason').trim());
       }}
     >
-      <p className={`text-[11.5px] ${tone === 'bad' ? 'text-bad' : 'text-gold'}`}>
+      <p className={`text-[11.5px] ${tone === 'bad' ? 'text-bad' : 'text-gold-ink'}`}>
         {hint}
       </p>
 
@@ -442,7 +442,7 @@ function Reasoned({
         className={`inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border px-4 py-2 text-[12.5px] font-bold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 ${
           tone === 'bad'
             ? 'border-bad/50 text-bad hover:bg-bad/10'
-            : 'border-gold/50 text-gold hover:bg-gold/10'
+            : 'border-gold/50 text-gold-ink hover:bg-gold/10'
         }`}
       >
         {submitLabel}
@@ -483,7 +483,7 @@ function DisputeForm({
       }}
     >
       {/* Both consequences before the first field: frozen money, and a changed booking status. */}
-      <p className="text-[11.5px] text-gold">{copy.disputeHint}</p>
+      <p className="text-[11.5px] text-gold-ink">{copy.disputeHint}</p>
 
       <label className="grid gap-1">
         <span className="text-[11px] text-faint">{copy.disputeKindLabel}</span>
@@ -617,7 +617,7 @@ function RefundForm({
         onSubmit(text(new FormData(event.currentTarget), 'reason').trim());
       }}
     >
-      <p className="text-[11.5px] text-gold">{copy.refundHint}</p>
+      <p className="text-[11.5px] text-gold-ink">{copy.refundHint}</p>
 
       {/* The figure, as soon as it is known. `failed` is silent: the form still works. */}
       {quote && !nothing ? (
@@ -695,7 +695,7 @@ function CompensationForm({
         });
       }}
     >
-      <p className="text-[11.5px] text-gold">{copy.compensateHint}</p>
+      <p className="text-[11.5px] text-gold-ink">{copy.compensateHint}</p>
 
       <div className="flex flex-wrap gap-2">
         <label className="grid gap-1">
@@ -757,7 +757,7 @@ function Submit({ busy, label: text }: { busy: boolean; label: string }) {
     <button
       type="submit"
       disabled={busy}
-      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12.5px] font-bold text-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12.5px] font-bold text-gold-ink hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
     >
       {text}
     </button>

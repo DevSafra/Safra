@@ -190,7 +190,7 @@ export function PartnerApplicationForm({
   return (
     <form onSubmit={(event) => void submit(event)} noValidate className="grid gap-5">
       <fieldset className="grid gap-4">
-        <legend className="mb-2 text-[15px] font-bold text-gold">
+        <legend className="mb-2 text-[15px] font-bold text-gold-ink">
           {t('sectionContact')}
         </legend>
 
@@ -240,7 +240,7 @@ export function PartnerApplicationForm({
       </fieldset>
 
       <fieldset className="grid gap-4">
-        <legend className="mb-2 text-[15px] font-bold text-gold">
+        <legend className="mb-2 text-[15px] font-bold text-gold-ink">
           {t('sectionBusiness')}
         </legend>
 

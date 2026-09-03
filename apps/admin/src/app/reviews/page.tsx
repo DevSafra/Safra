@@ -79,11 +79,11 @@ export default async function ReviewModerationPage({
                       <span className="text-sm font-bold text-text">
                         {review.guestName}
                       </span>
-                      <span className="text-[11.5px] font-semibold text-gold">
+                      <span className="text-[11.5px] font-semibold text-gold-ink">
                         {review.propertyName}
                       </span>
                       <span className="text-[11.5px] text-faint">{review.unitName}</span>
-                      <span className="text-[12.5px] font-extrabold text-gold">
+                      <span className="text-[12.5px] font-extrabold text-gold-ink">
                         <Ltr>★ {review.rating}</Ltr>
                       </span>
                       <span className="ms-auto text-[11.5px] text-faint">

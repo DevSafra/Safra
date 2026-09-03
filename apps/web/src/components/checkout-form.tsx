@@ -299,7 +299,7 @@ export function CheckoutForm({
       <button
         type="submit"
         disabled={submitting}
-        className="mt-6 w-full rounded-lg bg-gold px-5 py-3 font-semibold text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="mt-6 w-full rounded-lg btn-gold px-5 py-3 font-semibold transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? t('submitting') : t('submit')}
       </button>
@@ -488,7 +488,7 @@ function Field({
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor={id} className="text-sm text-muted">
-        {label} <span className="text-gold">*</span>
+        {label} <span className="text-gold-ink">*</span>
       </label>
       <input
         id={id}

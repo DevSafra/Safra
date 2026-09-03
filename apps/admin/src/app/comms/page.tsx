@@ -138,7 +138,7 @@ function Templates({ templates }: { templates: Notifications['templates'] }) {
   return (
     <ConsolePanel>
       <div className="mb-2.5 flex flex-wrap items-center gap-2.5">
-        <h2 className="text-[14px] font-extrabold text-gold">
+        <h2 className="text-[14px] font-extrabold text-gold-ink">
           {t.sections.comms.templates}
         </h2>
         <span className="ms-auto text-[11px] text-faint">

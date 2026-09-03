@@ -191,7 +191,7 @@ export default async function StaffMemberPage({
           */}
           {isScopable(member.role as Role) ? (
             <div className="mt-4 border-t border-line2 pt-4">
-              <h3 className="mb-2.5 text-[12.5px] font-bold text-gold">
+              <h3 className="mb-2.5 text-[12.5px] font-bold text-gold-ink">
                 {t.sections.staff.scopeEdit}
               </h3>
               <StaffScopeEditor

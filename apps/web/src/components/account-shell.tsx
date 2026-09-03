@@ -214,7 +214,7 @@ export async function AccountShell({
                 aria-current={current ? 'page' : undefined}
                 className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm transition-colors lg:min-h-0 lg:py-2 ${
                   current
-                    ? 'bg-gold/12 font-bold text-gold'
+                    ? 'bg-gold/12 font-bold text-gold-ink'
                     : 'text-muted hover:bg-line/40 hover:text-text'
                 }`}
               >
