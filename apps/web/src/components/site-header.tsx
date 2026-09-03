@@ -7,6 +7,8 @@ import { getCurrencyCatalogue } from '@/lib/catalog';
 import { DISPLAY_CURRENCIES, displayCurrency } from '@/lib/currency';
 import { HeaderMenus } from '@/components/header-menus';
 import { HeaderNav } from '@/components/header-nav';
+import { MenuContents } from '@/components/menu-contents';
+import { MobileMenu } from '@/components/mobile-menu';
 import { HeaderShell } from '@/components/header-shell';
 import { ORNAMENT_BRAND } from '@safra/ui';
 
@@ -144,7 +146,36 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         plus the nav's start margin put it 10px over and dropped «تسجيل الدخول» onto a second row.
         The desktop bar is where the design's figure was measured and where there is room for it.
       */}
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:py-4 lg:h-[var(--header-h)] lg:gap-x-5 lg:py-0">
+      <div className="mx-auto flex max-w-7xl items-center gap-x-3 px-4 py-3 sm:py-4 lg:h-[var(--header-h)] lg:gap-x-5 lg:py-0">
+        {/*
+          The hamburger, and the reason the row no longer wraps.
+
+          `flex-wrap` used to be what saved this bar on a phone, and it saved it by growing: three
+          rows and 152px at 320px, two and 108px at 390px, on every page. Everything after the
+          wordmark is now hidden below `md` and rendered inside the menu instead, so the row has
+          four items at most and never needs a second line — which is why the wrapping is gone
+          rather than merely discouraged.
+        */}
+        <MobileMenu
+          labels={{
+            open: t('openMenu'),
+            close: t('closeMenu'),
+            title: t('menu'),
+          }}
+        >
+          <MenuContents
+            locale={locale}
+            links={links}
+            partnerLabel={home('partnersCta')}
+            navLabel={t('home')}
+            session={session}
+            accountLabel={auth('account')}
+            registerLabel={auth('createAccount')}
+            signInLabel={auth('signIn')}
+            accountTitle={session?.user.email}
+          />
+        </MobileMenu>
+
         {/*
           The wordmark alone. The tagline «إقامات في الوطن العربي · من ليلة واحدة» sat under it and
           is gone (Bashar, 2026-09-02) — booking.com's header carries none, it cost a second line
@@ -185,7 +216,11 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
           and everything after it is pushed to the far end. `me-*` rather than `mr-*`, so the
           English and German pages get the mirror of this rather than a copy of it.
         */}
-        <HeaderNav links={links} label={t('home')} />
+        <HeaderNav
+          links={links}
+          label={t('home')}
+          className="me-auto ms-3 hidden items-center gap-1 md:flex"
+        />
 
         {/*
           booking.com's «List your property», in the place booking.com puts it. Reuses the home
@@ -214,55 +249,63 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
         </Link>
 
         {/*
+          Everything from here is the desktop bar's own. Below `md` these same controls are inside
+          the menu — rendered there rather than moved, because the pickers and the account link are
+          server components that read a cookie and a session, and a single instance cannot be in
+          two places in the layout.
+        */}
+        <div className="hidden items-center gap-x-3 md:flex lg:gap-x-5">
+          {/*
           Account, or the Register/Sign in pair.
 
           The email is not shown: it is what the API's auth payload carries, and inventing a display
           name from it would be guessing at what comes before the @. It stays in `title`.
         */}
-        {/*
+          {/*
           Language and currency, as booking.com puts them: in the bar, the language as its flag,
           each opening a popup. They are ALSO still in the footer, which is where Bashar moved them
           on 2026-08-13 and where people look for them on a long page — the header is the reach
           from anywhere, the footer is the reach at the end. Removing one was not asked for.
         */}
-        <HeaderMenus
-          locale={locale}
-          currency={currency}
-          currencies={displayCurrencies}
-          labels={{
-            language: t('language'),
-            currency: t('currency'),
-            chooseLanguage: t('chooseLanguage'),
-            chooseCurrency: t('chooseCurrency'),
-            currencyHelp: t('currencyHelp'),
-            close: t('closeDialog'),
-          }}
-        />
+          <HeaderMenus
+            locale={locale}
+            currency={currency}
+            currencies={displayCurrencies}
+            labels={{
+              language: t('language'),
+              currency: t('currency'),
+              chooseLanguage: t('chooseLanguage'),
+              chooseCurrency: t('chooseCurrency'),
+              currencyHelp: t('currencyHelp'),
+              close: t('closeDialog'),
+            }}
+          />
 
-        {session ? (
-          <Link
-            href={`/${locale}/account`}
-            className="inline-flex min-h-10 max-w-[10rem] btn-gold items-center truncate rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:min-h-11"
-            title={session.user.email}
-          >
-            {auth('account')}
-          </Link>
-        ) : (
-          <>
+          {session ? (
             <Link
-              href={`/${locale}/register`}
-              className="inline-flex min-h-10 items-center rounded-lg border border-gold/60 px-4 py-2 text-sm font-semibold text-text transition-colors hover:border-gold hover:bg-gold/10 sm:min-h-11"
+              href={`/${locale}/account`}
+              className="inline-flex min-h-10 max-w-[10rem] btn-gold items-center truncate rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:min-h-11"
+              title={session.user.email}
             >
-              {auth('createAccount')}
+              {auth('account')}
             </Link>
-            <Link
-              href={`/${locale}/login`}
-              className="inline-flex min-h-10 btn-gold items-center rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:min-h-11"
-            >
-              {auth('signIn')}
-            </Link>
-          </>
-        )}
+          ) : (
+            <>
+              <Link
+                href={`/${locale}/register`}
+                className="inline-flex min-h-10 items-center rounded-lg border border-gold/60 px-4 py-2 text-sm font-semibold text-text transition-colors hover:border-gold hover:bg-gold/10 sm:min-h-11"
+              >
+                {auth('createAccount')}
+              </Link>
+              <Link
+                href={`/${locale}/login`}
+                className="inline-flex min-h-10 btn-gold items-center rounded-lg px-4 py-2 text-sm font-bold transition-opacity hover:opacity-90 sm:min-h-11"
+              >
+                {auth('signIn')}
+              </Link>
+            </>
+          )}
+        </div>
       </div>
     </HeaderShell>
   );

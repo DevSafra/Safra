@@ -737,3 +737,18 @@ body {
 .slider-rail::-webkit-scrollbar {
   display: none;
 }
+
+/**
+ * The bar stays above the menu it opened.
+ *
+ * `MobileMenu` sets this attribute while its sheet is open. The header is `z-40` and the modal
+ * shell is `z-[60]`, so without this the panel covers the bar — including the hamburger, which by
+ * then has become an X and is the only visible way to close what the reader just opened.
+ *
+ * Scoped to the attribute rather than raised permanently: the language and currency popups are
+ * CENTRED modals opened FROM this bar, and a header sitting above their backdrop would look like a
+ * strip of the page that failed to dim.
+ */
+:root[data-menu-open] header {
+  z-index: 70;
+}

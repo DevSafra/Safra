@@ -36,14 +36,29 @@ import { usePathname } from 'next/navigation';
 export function HeaderNav({
   links,
   label,
+  className = 'flex me-auto ms-3 items-center gap-1',
+  linkClassName = 'min-h-10 px-3 sm:min-h-11',
 }: {
   readonly links: readonly { href: string; label: string }[];
   readonly label: string;
+  /**
+   * The list's own layout, so the bar and the phone menu can be one component.
+   *
+   * A row on the bar, a stack in the menu. Passed in rather than switched on a breakpoint inside,
+   * because the menu is not «the bar, narrower» — it is a different arrangement of the same
+   * destinations, and the marking of the current one is the part that must not be written twice.
+   *
+   * The DISPLAY is the caller's too, which is why there is no `flex` baked in here: the bar wants
+   * `hidden md:flex`, and a `hidden` alongside a hardcoded `flex` is a coin toss decided by
+   * stylesheet order rather than by the class list.
+   */
+  readonly className?: string;
+  readonly linkClassName?: string;
 }) {
   const pathname = usePathname();
 
   return (
-    <nav aria-label={label} className="me-auto ms-3 flex items-center gap-1">
+    <nav aria-label={label} className={className}>
       {links.map((link, index) => {
         /* The first link is the locale root; the rest own their subtree. */
         const here =
@@ -56,7 +71,7 @@ export function HeaderNav({
             key={link.href}
             href={link.href}
             aria-current={here ? 'page' : undefined}
-            className={`inline-flex min-h-10 items-center rounded-lg px-3 py-2 text-[13.5px] font-semibold transition-colors sm:min-h-11 ${
+            className={`inline-flex items-center rounded-lg py-2 text-[13.5px] font-semibold transition-colors duration-200 ease-out-strong ${linkClassName} ${
               here ? 'text-gold' : 'text-muted hover:bg-gold/10 hover:text-text'
             }`}
           >
