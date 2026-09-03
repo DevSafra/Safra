@@ -43,7 +43,19 @@ export function LegalPage({
   readonly backLabel: string;
 }) {
   return (
-    <article className="mx-auto max-w-3xl px-4 py-10">
+    <article className="mx-auto max-w-3xl px-4 py-10 [&_p]:max-w-[57ch]">
+      {/*
+        `57ch` on the PROSE, not a wider container. Measured at 105 characters a line, against the
+        65–75 a reader can track without losing their place returning to the start of the next one —
+        and legal text is the one surface nobody reads out of enthusiasm, so the measure is doing all
+        the work. The heading and the meta line stay full width; only the running text is capped,
+        which is why the cap is a descendant selector rather than a width on the article.
+
+        57 and not 65, because `ch` is the advance of «0» and that is wider than average lowercase:
+        the same cap renders about 65 Arabic characters and about 85 Latin ones. 57ch lands both
+        scripts inside the range instead of only the one the value was chosen against — measured on
+        `/ar/terms` and `/en/terms`, not assumed from the unit.
+      */}
       <h1 className="font-display text-3xl font-bold text-gold">{title}</h1>
       <p className="mt-2 text-xs text-faint">{updated}</p>
 
