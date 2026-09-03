@@ -85,6 +85,8 @@ const ADULT_CHOICES = [1, 2, 3, 4, 5, 6, 8] as const;
 const ADULTS = Array.from({ length: 9 }, (_, index) => index);
 const CHILDREN = Array.from({ length: 7 }, (_, index) => index);
 const INFANTS = Array.from({ length: 4 }, (_, index) => index);
+/* One through six, matching the stepper's floor and ceiling. */
+const BEDROOMS = Array.from({ length: 6 }, (_, index) => index + 1);
 
 /**
  * The placeholder `increase`/`decrease` carry, filled with the field's own name in the client.
@@ -106,18 +108,26 @@ function nextDay(date: string): string {
 export async function SearchForm({
   locale,
   cities,
+  attributes = [],
+  attributesLabel = '',
   defaults,
   minDate,
 }: {
   locale: Locale;
   cities: City[];
+  /** The trip attributes offered as tags, already translated by the caller. */
+  attributes?: readonly { code: string; label: string }[];
+  /** «صفات الرحلة:» — the row's own label. */
+  attributesLabel?: string;
   defaults?: {
+    attributes?: readonly string[] | undefined;
     children?: number | undefined;
     infants?: number | undefined;
     citySlug?: string | undefined;
     checkIn?: string | undefined;
     checkOut?: string | undefined;
     adults?: number | undefined;
+    bedrooms?: number | undefined;
   };
   minDate: string;
 }) {
@@ -233,6 +243,7 @@ export async function SearchForm({
               childrenLabel: t('children'),
               infants: t('infants'),
               infantsHint: t('infantsHint'),
+              bedrooms: t('bedrooms'),
               done: t('done'),
               increase: t('increase', { field: FIELD_TOKEN }),
               decrease: t('decrease', { field: FIELD_TOKEN }),
@@ -244,6 +255,7 @@ export async function SearchForm({
               adults: defaults?.adults ?? 2,
               children: defaults?.children ?? 0,
               infants: defaults?.infants ?? 0,
+              bedrooms: defaults?.bedrooms ?? 1,
             }}
           >
             <Field label={t('adults')} required htmlFor="q-adults">
@@ -291,16 +303,86 @@ export async function SearchForm({
                 ))}
               </select>
             </Field>
+            <Divider />
+            {/*
+              Bedrooms, as a select, for the same reason the three above it are selects: this block
+              renders until `GuestsField` mounts, so the form still submits every field it owns from
+              a browser that never ran a script. A control that only exists after hydration is a
+              control some readers do not have.
+            */}
+            <Field label={t('bedrooms')} htmlFor="q-bedrooms">
+              <select
+                id="q-bedrooms"
+                name="bedrooms"
+                defaultValue={String(defaults?.bedrooms ?? 1)}
+                className="w-full cursor-pointer truncate bg-transparent text-text focus:outline-none"
+              >
+                {BEDROOMS.map((count) => (
+                  <option key={count} value={count}>
+                    {t('bedroomsCount', { count })}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </GuestsField>
         </Segment>
 
         <button
           type="submit"
-          className="btn-gold min-h-12 cursor-pointer rounded-lg px-6 text-base font-bold transition-[opacity,scale] duration-200 ease-out-strong hover:opacity-90 active:scale-[.99] sm:col-span-2 lg:col-span-1"
+          className="btn-gold min-h-12 cursor-pointer rounded-lg px-6 text-base font-bold transition-[opacity] duration-200 ease-out-strong hover:opacity-90 sm:col-span-2 lg:col-span-1"
         >
           {t('submit')}
         </button>
       </div>
+
+      {attributes.length > 0 ? (
+        <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+          <span className="text-[12.5px] font-semibold text-muted">
+            {attributesLabel}
+          </span>
+          {attributes.map(({ code, label }) => (
+            /*
+              A checkbox styled as a chip, INSIDE the form (Bashar, 2026-09-03: «should be
+              selectable as a search tag same as it is on the prototype»).
+
+              They were links, each carrying exactly one attribute to `/search` — so picking «بحر»
+              and then «مسبح» gave you the second one and silently dropped the first, and neither
+              survived a change of dates. As checkboxes they are part of the search: any number can
+              be on at once, they submit with the dates and the party, and the results page already
+              parses a repeated `attributes` parameter.
+
+              No JavaScript. `has-[:checked]` does the whole selected state, so this works before
+              hydration and with a keyboard, and `sr-only` keeps the real control focusable rather
+              than hidden from it.
+
+              **Nothing moves on press** (Bashar, 2026-09-03: «I do not like the click animation»).
+              The prototype's own chip computes `transform: none`, and he said the same thing about
+              the slider arrows in August — a control that changes SIZE when pressed is the thing he
+              keeps rejecting, so the press is answered in colour alone.
+
+              The weight is 600 at REST, which is the design's own (`12px/600` sampled from the
+              prototype's chip) and what Bashar asked for. It is deliberately not a weight that
+              CHANGES on selection: `font-semibold` applied only when checked made the chip wider
+              than it was a frame earlier, so choosing «بحر» nudged every chip after it along the
+              row — a jitter nobody can name but everybody feels. Border, fill and text colour carry
+              the state at a constant width, in 150ms.
+            */
+            <label
+              key={code}
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-full border border-line bg-card px-3 py-1.5 text-[12.5px] font-semibold text-muted transition-[color,border-color,background-color] duration-150 ease-out-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-gold has-[:checked]:border-gold has-[:checked]:bg-gold/15 has-[:checked]:text-gold lg:min-h-8 hover:border-gold/60 hover:bg-gold/5 hover:text-gold"
+            >
+              <input
+                type="checkbox"
+                name="attributes"
+                value={code}
+                defaultChecked={defaults?.attributes?.includes(code)}
+                className="sr-only"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      ) : null}
     </form>
   );
 }
@@ -355,7 +437,7 @@ function Field({
           beside it, so it is held to the 3:1 non-text floor rather than the 4.5:1 text one.
         */}
         {required ? (
-          <span aria-hidden className="text-gold-ink">
+          <span aria-hidden className="text-gold">
             {' '}
             *
           </span>

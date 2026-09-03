@@ -73,6 +73,8 @@ export async function SearchFilters({
     adults: number;
     children: number;
     infants: number;
+    /** Part of the SEARCH, like the dates and the party — see `cleared` below. */
+    bedrooms: number;
     sort: string;
   };
   active: {
@@ -118,6 +120,12 @@ export async function SearchFilters({
   });
 
   if (carried.citySlug) cleared.set('citySlug', carried.citySlug);
+  /*
+    Bedrooms SURVIVES a clear, because it is not a filter — it is asked in the search form beside
+    the dates and the party, and «امسح الفلاتر» must not silently widen what somebody searched for.
+    Set only when non-zero, so a cleared URL stays as short as it was.
+  */
+  if (carried.bedrooms > 1) cleared.set('bedrooms', String(carried.bedrooms));
 
   return (
     <details className="disclosure-open-lg group rounded-card border border-line bg-card lg:sticky lg:top-24">
@@ -131,7 +139,7 @@ export async function SearchFilters({
         <span>{t('filters')}</span>
         <span className="flex items-center gap-2">
           {count > 0 ? (
-            <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[0.6875rem] font-semibold text-gold-ink">
+            <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[0.6875rem] font-semibold text-gold">
               {t('filtersActive', { count })}
             </span>
           ) : null}
@@ -154,6 +162,9 @@ export async function SearchFilters({
         <input type="hidden" name="adults" value={carried.adults} />
         <input type="hidden" name="children" value={carried.children} />
         <input type="hidden" name="infants" value={carried.infants} />
+        {carried.bedrooms > 1 ? (
+          <input type="hidden" name="bedrooms" value={carried.bedrooms} />
+        ) : null}
         <input type="hidden" name="sort" value={carried.sort} />
         {carried.citySlug ? (
           <input type="hidden" name="citySlug" value={carried.citySlug} />
@@ -161,7 +172,7 @@ export async function SearchFilters({
 
         {/* ── Price ──────────────────────────────────────────────────────── */}
         <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 text-[0.8125rem] font-bold text-text">
+          <legend className="mb-1 text-[0.85rem] font-bold text-text">
             {t('priceRange')}
           </legend>
 
@@ -225,7 +236,7 @@ export async function SearchFilters({
         {/* ── Property type ──────────────────────────────────────────────── */}
         {propertyTypes.length > 0 ? (
           <fieldset className="flex flex-col gap-1">
-            <legend className="mb-1 text-[0.8125rem] font-bold text-text">
+            <legend className="mb-1 text-[0.85rem] font-bold text-text">
               {t('propertyType')}
             </legend>
 
@@ -268,7 +279,7 @@ export async function SearchFilters({
 
         {/* ── Trip attributes ────────────────────────────────────────────── */}
         <fieldset className="flex flex-col gap-1">
-          <legend className="mb-1 text-[0.8125rem] font-bold text-text">
+          <legend className="mb-1 text-[0.85rem] font-bold text-text">
             {t('attributes')}
           </legend>
 
@@ -292,7 +303,7 @@ export async function SearchFilters({
         {/* ── Amenities ──────────────────────────────────────────────────── */}
         {offered.length > 0 ? (
           <fieldset className="flex flex-col gap-1">
-            <legend className="mb-1 text-[0.8125rem] font-bold text-text">
+            <legend className="mb-1 text-[0.85rem] font-bold text-text">
               {t('amenitiesTitle')}
             </legend>
 
@@ -327,7 +338,7 @@ export async function SearchFilters({
         <div className="flex flex-col gap-2 border-t border-line pt-4">
           <button
             type="submit"
-            className="btn-gold min-h-11 cursor-pointer rounded-lg px-4 text-sm font-bold transition-[opacity,scale] duration-200 ease-out-strong hover:opacity-90 active:scale-[.98]"
+            className="btn-gold min-h-11 cursor-pointer rounded-lg px-4 text-sm font-bold transition-[opacity] duration-200 ease-out-strong hover:opacity-90"
           >
             {t('filtersApply')}
           </button>

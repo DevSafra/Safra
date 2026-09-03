@@ -75,7 +75,7 @@ export function FieldPopover({
         onClick={() => setOpen((was) => !was)}
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 rounded-lg bg-field px-3 py-2 text-start transition-[background-color,scale] duration-200 ease-out-strong active:scale-[.99]"
+        className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 rounded-lg bg-field px-3 py-2 text-start transition-[background-color] duration-200 ease-out-strong"
       >
         {icon ? (
           <span aria-hidden className="shrink-0 text-muted">
@@ -84,7 +84,7 @@ export function FieldPopover({
         ) : null}
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[0.6875rem] text-muted">{label}</span>
-          <span className="block truncate text-[0.8125rem] text-text">{value}</span>
+          <span className="block truncate text-[0.85rem] text-text">{value}</span>
         </span>
       </button>
 
@@ -108,7 +108,7 @@ export function FieldPopover({
                 setOpen(false);
                 trigger.current?.focus();
               }}
-              className="btn-gold min-h-10 cursor-pointer lg:min-h-9 rounded-lg px-5 text-[0.8125rem] font-bold transition-[opacity,scale] duration-200 ease-out-strong hover:opacity-90 active:scale-[.97]"
+              className="btn-gold min-h-10 cursor-pointer lg:min-h-9 rounded-lg px-5 text-[0.85rem] font-bold transition-[opacity] duration-200 ease-out-strong hover:opacity-90"
             >
               {doneLabel}
             </button>
@@ -147,7 +147,7 @@ export function Stepper({
 }) {
   return (
     <div className="flex items-center justify-between gap-6">
-      <span className="text-[0.8125rem] text-text">{label}</span>
+      <span className="text-[0.85rem] text-text">{label}</span>
       <span className="flex items-center gap-1">
         <Step
           label={decrease.replace('{field}', label)}
@@ -159,7 +159,15 @@ export function Stepper({
           `tabular-nums` so the row does not shift by a pixel between «1» and «8», and a fixed
           width so it does not shift between one digit and two.
         */}
-        <span className="w-7 text-center text-[0.8125rem] font-semibold tabular-nums text-text">
+        {/*
+          `tabular-nums` so the row does not shift by a pixel between «1» and «8», and a fixed
+          width so it does not shift between one digit and two.
+
+          A DIGIT, in every stepper (Bashar, 2026-09-03). The bedrooms row briefly rendered the
+          counted word — «غرفة», «غرفتان» — and it broke the column: four rows that should read as
+          one control had three numbers and one phrase, at three different widths.
+        */}
+        <span className="w-7 text-center text-[0.85rem] font-semibold tabular-nums text-text">
           {value}
         </span>
         <Step
@@ -190,7 +198,7 @@ function Step({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="grid size-8 cursor-pointer place-items-center rounded-lg border border-line text-base text-sky transition-[border-color,color,scale] duration-200 ease-out-strong not-disabled:hover:border-sky active:scale-[.94] disabled:cursor-not-allowed disabled:border-line/60 disabled:text-faint"
+      className="grid size-8 cursor-pointer place-items-center rounded-lg border border-line text-base text-sky transition-[border-color,color] duration-200 ease-out-strong not-disabled:hover:border-sky disabled:cursor-not-allowed disabled:border-line/60 disabled:text-faint"
     >
       {/* A mathematical sign, not a word: no letters, so `no-hardcoded-text` does not apply. */}
       <span aria-hidden>{glyph}</span>

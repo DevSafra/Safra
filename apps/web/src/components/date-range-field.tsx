@@ -210,7 +210,7 @@ function Month({
 
   return (
     <div className="min-w-0">
-      <p className="pb-2 text-center text-[0.8125rem] font-semibold text-text">
+      <p className="pb-2 text-center text-[0.85rem] font-semibold text-text">
         {monthName.format(first)}
       </p>
 
@@ -277,7 +277,7 @@ function Nav({
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="grid size-8 cursor-pointer place-items-center rounded-lg border border-line text-text transition-[border-color,scale] duration-200 ease-out-strong not-disabled:hover:border-gold/70 active:scale-[.94] disabled:cursor-not-allowed disabled:text-faint"
+      className="grid size-8 cursor-pointer place-items-center rounded-lg border border-line text-text transition-[border-color] duration-200 ease-out-strong not-disabled:hover:border-gold/70 disabled:cursor-not-allowed disabled:text-faint"
     >
       <svg
         aria-hidden

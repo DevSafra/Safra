@@ -107,6 +107,7 @@ export default async function SearchPage({
 
   const query = await searchParams;
   const t = await getTranslations('search');
+  const ta = await getTranslations('attributes');
 
   const [cities, propertyTypes, amenities] = await Promise.all([
     getCities(),
@@ -125,6 +126,16 @@ export default async function SearchPage({
   */
   const children = whole(first(query['children']), 0, 20);
   const infants = whole(first(query['infants']), 0, 10);
+  /*
+    A REQUIREMENT, not a party size, and it floors at ONE (Bashar, 2026-09-03).
+
+    One filters nothing today — every unit in the database has at least one bedroom — so a plain
+    search is unchanged, and the form can show «غرفة» instead of a zero the reader has to decode.
+    Clamped rather than trusted: the API bounds it again, but an unclamped `?bedrooms=abc` would
+    reach `searchSafely` as NaN and lose the whole result set on a page somebody reached by editing
+    a URL.
+  */
+  const bedrooms = whole(first(query['bedrooms']), 1, 10);
   const citySlug = first(query['citySlug']) || undefined;
   const sortParam = first(query['sort']);
   const sort: Sort = isSort(sortParam) ? sortParam : 'recommended';
@@ -164,6 +175,7 @@ export default async function SearchPage({
     adults,
     children,
     infants,
+    bedrooms,
     citySlug,
     propertyTypeCode,
     attributes,
@@ -192,6 +204,13 @@ export default async function SearchPage({
       infants: String(infants),
       sort: overrides.sort ?? sort,
     });
+
+    /*
+      Only when it narrows something. `bedrooms=1` in every URL would be noise in a shared link and
+      is the default anyway — but it MUST be carried above one, or paging past the first page of a
+      «three bedrooms» search quietly returns one-bedroom flats.
+    */
+    if (bedrooms > 1) next.set('bedrooms', String(bedrooms));
 
     if (citySlug) next.set('citySlug', citySlug);
     if (propertyTypeCode) next.set('propertyTypeCode', propertyTypeCode);
@@ -242,12 +261,23 @@ export default async function SearchPage({
     : t('resultsTitle', { count: results.items.length });
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
+    <div className="mx-auto max-w-7xl px-4 py-10">
       <SearchForm
         locale={locale}
         cities={cities}
         minDate={results.firstBookableDate ?? todayInDamascus()}
-        defaults={{ citySlug, checkIn, checkOut, adults, children, infants }}
+        attributes={TRIP_ATTRIBUTES.map((code) => ({ code, label: ta(code) }))}
+        attributesLabel={t('attributes')}
+        defaults={{
+          citySlug,
+          checkIn,
+          checkOut,
+          adults,
+          children,
+          infants,
+          bedrooms,
+          attributes,
+        }}
       />
 
       {/*
@@ -285,7 +315,16 @@ export default async function SearchPage({
             locale={locale}
             propertyTypes={propertyTypes}
             amenities={amenities}
-            carried={{ citySlug, checkIn, checkOut, adults, children, infants, sort }}
+            carried={{
+              citySlug,
+              checkIn,
+              checkOut,
+              adults,
+              children,
+              infants,
+              bedrooms,
+              sort,
+            }}
             active={{
               propertyTypeCode,
               attributes,
@@ -310,7 +349,7 @@ export default async function SearchPage({
                   aria-current={sort === option.value ? 'true' : undefined}
                   className={
                     sort === option.value
-                      ? 'inline-flex min-h-10 items-center rounded-lg border border-gold/50 bg-card px-3 py-1.5 text-gold-ink sm:min-h-11'
+                      ? 'inline-flex min-h-10 items-center rounded-lg border border-gold/50 bg-card px-3 py-1.5 text-gold sm:min-h-11'
                       : 'inline-flex min-h-10 items-center rounded-lg border border-line px-3 py-1.5 text-muted transition-colors duration-200 ease-out-strong hover:border-gold/50 hover:bg-gold/10 hover:text-text sm:min-h-11'
                   }
                 >

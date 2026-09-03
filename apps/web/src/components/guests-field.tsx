@@ -43,6 +43,7 @@ export function GuestsField({
     childrenLabel: string;
     infants: string;
     infantsHint: string;
+    bedrooms: string;
     done: string;
     increase: string;
     decrease: string;
@@ -51,7 +52,7 @@ export function GuestsField({
     childrenCounts: readonly string[];
     infantsCounts: readonly string[];
   };
-  defaults: { adults: number; children: number; infants: number };
+  defaults: { adults: number; children: number; infants: number; bedrooms: number };
   icon: React.ReactNode;
   /** The native selects, rendered by the server and shown until this mounts. */
   children: React.ReactNode;
@@ -60,6 +61,7 @@ export function GuestsField({
   const [adults, setAdults] = useState(defaults.adults);
   const [kids, setKids] = useState(defaults.children);
   const [infants, setInfants] = useState(defaults.infants);
+  const [bedrooms, setBedrooms] = useState(defaults.bedrooms);
 
   useEffect(() => setMounted(true), []);
 
@@ -77,6 +79,7 @@ export function GuestsField({
       <input type="hidden" name="adults" value={adults} />
       <input type="hidden" name="children" value={kids} />
       <input type="hidden" name="infants" value={infants} />
+      <input type="hidden" name="bedrooms" value={bedrooms} />
 
       <FieldPopover
         label={labels.occupancy}
@@ -115,6 +118,34 @@ export function GuestsField({
         <p className="pt-1 text-[0.6875rem] leading-relaxed text-faint">
           {labels.infantsHint}
         </p>
+
+        {/*
+          Bedrooms (Bashar, 2026-09-03), and it is a REQUIREMENT rather than a quantity — «find me a
+          place with at least this many bedrooms», not «book me this many rooms». One booking is one
+          unit in this model (`bookings.unit_id`), so the other reading is not expressible; he chose
+          this one knowing that.
+
+          Separated by a rule, because it answers a different question from the three above it: they
+          describe the PARTY, this describes the PLACE. Sitting flush under «الرضّع» it read as a
+          fourth kind of guest.
+        */}
+        <div className="mt-1 border-t border-line pt-3">
+          <Stepper
+            label={labels.bedrooms}
+            value={bedrooms}
+            /*
+              One, never zero (Bashar, 2026-09-03: «as default set it to 1, never write أي عدد»).
+              Every stay has at least one bedroom in practice — 41,559 of 41,559 units — so a floor
+              of one filters nothing today and reads as a real answer where «أي عدد» read as a
+              missing one.
+            */
+            min={1}
+            max={6}
+            onChange={setBedrooms}
+            increase={labels.increase}
+            decrease={labels.decrease}
+          />
+        </div>
       </FieldPopover>
     </>
   );
