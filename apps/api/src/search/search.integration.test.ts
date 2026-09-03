@@ -63,6 +63,7 @@ describeIfDb('SearchService', () => {
     adults: 2,
     children: 0,
     infants: 0,
+    bedrooms: 0,
     attributes: [],
     amenityCodes: [],
     freeCancellationOnly: false,
@@ -486,6 +487,36 @@ describeIfDb('SearchService', () => {
     expect(item?.cityNameDe).toBeTruthy();
   });
 
+  /**
+   * «غرف النوم» is a MINIMUM on the unit, not a number of rooms to book (Bashar, 2026-09-03).
+   *
+   * The first and third are the load-bearing ones: both go red when the predicate is deleted, which
+   * is the way this fails silently — a filter that filters nothing looks exactly like a filter.
+   *
+   * The second is a REGRESSION guard, and it is worth saying that it is weaker than it looks. It
+   * cannot distinguish «predicate omitted» from «predicate applied as >= 0», because those return
+   * the same rows; mutating the condition to `>= 0` leaves all three green. Results are grouped per
+   * PROPERTY, so it also cannot see a unit-level change that leaves the property in the set. What
+   * it does hold is the thing worth holding: a default search must return what it returned before
+   * bedrooms existed, and it goes red the moment zero starts excluding anything.
+   */
+  describe('the bedrooms requirement', () => {
+    it('keeps only units with at least that many bedrooms', async () => {
+      expect(await slugs({ bedrooms: 3 })).toEqual([dearPropertySlug]);
+    });
+
+    it('is not applied at all when it is zero', async () => {
+      /* Both properties, which is exactly what this search returned before the filter existed. */
+      expect((await slugs({ bedrooms: 0 })).sort()).toEqual(
+        [cheapPropertySlug, dearPropertySlug].sort(),
+      );
+    });
+
+    it('returns nothing when no unit is large enough', async () => {
+      expect(await slugs({ bedrooms: 9 })).toEqual([]);
+    });
+  });
+
   it('does not leak the columns that exist only to drive ORDER BY', async () => {
     const item = (await search.search(query())).items[0] as unknown as Record<
       string,
@@ -587,9 +618,12 @@ describeIfDb('SearchService', () => {
         SELECT cheap.id, 'وحدة٢', 'Unit 2', 'Einheit 2', 2, '250.00', ref.currency_id, 1, true
         FROM cheap, ref RETURNING id
       ), u3 AS (
-        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
+        -- Three bedrooms, where the other two units take the default of one. That asymmetry is
+        -- what makes the bedrooms filter testable: a villa is the only thing a family of six
+        -- wanting three bedrooms can be shown.
+        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, bedrooms, base_price,
                            currency_id, min_nights, is_active)
-        SELECT dear.id, 'فيلا', 'Villa', 'Villa', 10, '400.00', ref.currency_id, 1, true
+        SELECT dear.id, 'فيلا', 'Villa', 'Villa', 10, 3, '400.00', ref.currency_id, 1, true
         FROM dear, ref RETURNING id
       )
       SELECT ci.slug AS city_slug, pa.id AS partner_id,

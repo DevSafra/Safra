@@ -70,6 +70,21 @@ export const searchQuerySchema = z
     children: z.coerce.number().int().min(0).max(20).default(0),
     infants: z.coerce.number().int().min(0).max(10).default(0),
 
+    /**
+     * A REQUIREMENT, not a quantity (Bashar, 2026-09-03).
+     *
+     * «غرف النوم: ٢» asks for a place with at least two bedrooms; it does not ask to book two
+     * rooms. That distinction is forced by the model rather than chosen: `bookings.unit_id` is a
+     * single unit, so one booking is one unit, and `units.room_type_code` says in its own comment
+     * that it is «NOT a quantity». A room-count selector in booking.com's sense would need
+     * multi-unit bookings through availability, pricing, checkout and the partner calendar.
+     *
+     * Zero means «no requirement» and is the default, so a search that does not mention bedrooms
+     * behaves exactly as it did. Ten is the ceiling because `units.bedrooms` is a `smallint` that
+     * a partner fills in for one unit — a villa, not an estate.
+     */
+    bedrooms: z.coerce.number().int().min(0).max(10).default(0),
+
     /** Optional: §5.2 allows searching with no city selected. */
     citySlug: z.string().trim().min(1).max(80).optional(),
     propertyTypeCode: z.string().trim().min(1).max(40).optional(),

@@ -189,7 +189,8 @@ export class SearchService {
         )`
       : sql``;
 
-    const rows = await this.db.execute<Record<string, unknown>>(sql`
+    const rows = await this.db.execute<Record<string, unknown>>(
+      sql`
       -- available: which units could be slept in, with no price computed yet.
       --
       -- Pricing is a probe per unit, and an unfiltered search has 150,000 candidates. Splitting
@@ -227,6 +228,10 @@ export class SearchService {
             WHERE sp.id = p.partner_id AND sp.suspended_at IS NOT NULL
           )
           AND u.max_guests >= ${guests}
+          -- Zero is «no requirement», so the predicate is omitted rather than written as a
+          -- constant-true comparison: the planner would still carry it through every candidate row.
+          -- (No backticks in this comment. See the note above — that is now the fifth time.)
+          ${query.bedrooms > 0 ? sql`AND u.bedrooms >= ${query.bedrooms}` : sql``}
           AND ${nights} >= u.min_nights
           AND (u.max_nights IS NULL OR ${nights} <= u.max_nights)
 
@@ -472,7 +477,8 @@ export class SearchService {
       ORDER BY ${orderBy}
       LIMIT ${query.limit + 1}
       OFFSET ${offset}
-    `);
+    `,
+    );
 
     const all = rows.rows;
     const hasMore = all.length > query.limit;
