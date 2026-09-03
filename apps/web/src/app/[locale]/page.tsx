@@ -23,6 +23,7 @@ import {
 } from '@/lib/catalog';
 import { searchSafely } from '@/lib/api';
 import { formatCustomerFee, todayInDamascus } from '@/lib/settings';
+import { dayAfter, night, retryFrom } from '@/lib/bookable-night';
 import { localisedName, localisedText } from '@/lib/localise';
 import { imageUrl } from '@/lib/property';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -149,7 +150,11 @@ export default async function HomePage({
     },
   ];
 
-  const stay = `?checkIn=${today}&checkOut=${tomorrow}&adults=2`;
+  /*
+    The night every link into search carries — the one the API said was bookable, not the one the
+    clock says. See `nights` for what pre-filling today cost between 17:00 and midnight.
+  */
+  const stay = recommended.stay;
 
   return (
     <>
@@ -162,9 +167,19 @@ export default async function HomePage({
         dark theme and turns it into a pale blue wash in the light one. A hard-coded `#241b52` would
         have been a dark band in light mode, which is the thing this page must not have.
       */}
-      <section className="border-b border-line bg-[radial-gradient(1200px_600px_at_50%_-80px,var(--color-hero),var(--color-band)_45%,var(--color-bg))]">
-        <div className="mx-auto max-w-5xl px-4 pt-8 pb-10 text-center sm:pt-14 sm:pb-12">
-          <p className="inline-flex items-center rounded-full border border-gold/40 px-3 py-1 text-[0.6875rem] font-semibold tracking-wide text-gold">
+      {/*
+        From `lg` the hero starts UNDER the bar rather than below it: `-mt` pulls it up by the
+        header's own height and the inner padding puts the content back, so the transparent bar
+        floats on this gradient instead of on a flat band above it. `--header-h` is the single
+        number both sides read — see the note in `globals.css`.
+
+        Below `lg` the bar wraps to two rows and has no fixed height, so nothing is pulled and the
+        hero simply follows it. A pull-up shorter than a wrapped bar would put the brand on top of
+        the headline.
+      */}
+      <section className="border-b border-line bg-[radial-gradient(1200px_600px_at_50%_-80px,var(--color-hero),var(--color-band)_45%,var(--color-bg))] lg:-mt-[var(--header-h)]">
+        <div className="mx-auto max-w-5xl px-4 pt-8 pb-10 text-center sm:pt-14 sm:pb-12 lg:pt-[calc(var(--header-h)+3.5rem)]">
+          <p className="inline-flex items-center rounded-full border border-gold/40 px-3 py-1 text-[0.6875rem] font-semibold tracking-wide text-gold-ink">
             {t('heroCountries')}
           </p>
 
@@ -181,7 +196,7 @@ export default async function HomePage({
           </p>
 
           <div className="mt-6 text-start">
-            <SearchForm locale={locale} cities={cities} minDate={today} />
+            <SearchForm locale={locale} cities={cities} minDate={recommended.checkIn} />
           </div>
 
           {/*
@@ -417,7 +432,7 @@ export default async function HomePage({
                 */}
                 <span
                   aria-hidden
-                  className="inline-flex size-10 items-center justify-center rounded-full border border-gold/40 text-lg text-gold"
+                  className="inline-flex size-10 items-center justify-center rounded-full border border-gold/40 text-lg text-gold-ink"
                 >
                   {pledge.ornament}
                 </span>
@@ -512,20 +527,11 @@ async function recommendedStays(today: string, tomorrow: string) {
     searchSafely({ checkIn, checkOut, adults: 2, limit: 8 }, { cached: true });
 
   const first = await ask(today, tomorrow);
+  const again = retryFrom(first);
 
-  if (first.items.length > 0 || !first.notice) {
-    return { outcome: first, stay: stayQuery(today, tomorrow) };
-  }
+  if (!again) return { outcome: first, ...night(today, tomorrow) };
 
-  const opens = first.notice.firstBookableDate;
-  const leaves = dayAfter(opens);
-
-  return { outcome: await ask(opens, leaves), stay: stayQuery(opens, leaves) };
-}
-
-/** The party and the nights, as the `?…` a card appends to its property link. */
-function stayQuery(checkIn: string, checkOut: string): string {
-  return `?checkIn=${checkIn}&checkOut=${checkOut}&adults=2`;
+  return { outcome: await ask(again.checkIn, again.checkOut), ...again };
 }
 
 /**
@@ -627,7 +633,7 @@ function CityCard({
         ) : (
           <OrnamentField
             id={`ornament-city-${city.slug}`}
-            className="text-gold opacity-30"
+            className="text-gold-ink opacity-30"
           />
         )}
       </div>
@@ -692,7 +698,7 @@ function StayTypeCard({
     >
       <span
         aria-hidden
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-gold/35 text-base text-gold"
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-gold/35 text-base text-gold-ink"
       >
         {Drawn ? <Drawn /> : (type.glyph ?? <StayIcon />)}
       </span>
@@ -710,11 +716,4 @@ function StayTypeCard({
 
 function tomorrowInDamascus(): string {
   return dayAfter(todayInDamascus());
-}
-
-/** The next calendar day, over the month and year boundaries `Date.UTC` already handles. */
-function dayAfter(date: string): string {
-  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
-  const next = new Date(Date.UTC(y, m - 1, d + 1));
-  return next.toISOString().slice(0, 10);
 }
