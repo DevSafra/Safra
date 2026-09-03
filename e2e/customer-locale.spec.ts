@@ -271,51 +271,77 @@ test.describe('a Latin-valued field on an Arabic page', () => {
   /**
    * The footer is on every page of the customer site, so its own RTL is worth one assertion.
    *
-   * `ms-auto` rather than `ml-auto` on the copyright: a logical margin puts it at the trailing
-   * edge in both directions, where a physical one pins it to the left of an Arabic page — which is
-   * the START, beside the language links it is supposed to be opposite.
+   * This asserted that the copyright sat opposite the language links, which was true of the row
+   * the footer used to end with — a brand at the start and an `ms-auto` copyright at the trailing
+   * edge, where `ml-auto` would have pinned it to the START of an Arabic page. That row is gone:
+   * the footer was rebuilt to the reference Bashar gave on 2026-09-03, which stacks the controls
+   * under the brand and centres the copyright.
+   *
+   * The QUESTION survives the layout, so the assertion follows it rather than being deleted: does
+   * this footer lay itself out by the reading direction, or by a physical edge somebody typed? In
+   * a multi-column grid the answer is the COLUMN ORDER — the brand opens the row at the start,
+   * which on an Arabic page is the right, and the last column closes it on the left.
    */
-  test('puts the footer copyright opposite the language links', async ({ page }) => {
+  test('lays the footer columns out by the reading direction', async ({ page }) => {
     await page.goto('/ar');
 
     const footer = page.locator('footer');
     const brand = footer.getByRole('link', { name: /SAFRA/ }).first();
-    const pickers = footer.locator('details').first();
+    /* The last column, by its landmark rather than its position — position is what is on trial. */
+    const lastColumn = footer.getByRole('navigation', { name: 'حسابي' });
 
-    const [identity, controls] = await Promise.all([
+    const [identity, tail] = await Promise.all([
       brand.boundingBox(),
-      pickers.boundingBox(),
+      lastColumn.boundingBox(),
     ]);
 
-    /* Right-to-left: the brand starts the row on the right, the controls end it on the left. */
-    expect(identity && controls && identity.x).toBeGreaterThan(controls?.x ?? 0);
+    /* Right-to-left: the brand opens on the right, the account column closes on the left. */
+    expect(identity && tail && identity.x).toBeGreaterThan(tail?.x ?? 0);
+
+    /*
+      And the copyright is CENTRED, not pushed to an edge — the reference's own answer, and the
+      thing that would silently regress into `ml-auto` if anybody reached for a margin again.
+    */
+    const rights = footer.getByText(/جميع الحقوق محفوظة/);
+
+    expect(await rights.evaluate((el) => getComputedStyle(el).textAlign)).toBe('center');
   });
 
   /**
-   * The language control moved OUT of the navbar (Bashar, 2026-08-13) and must not come back.
+   * The languages are reachable from BOTH bars, and the crawler depends on neither.
    *
-   * Its justification in the header was that real anchors get the alternate-language pages indexed
-   * (§5.4). That property had to survive the move, so this asserts both halves: gone from the
-   * header, and still real anchors in the footer.
+   * This used to assert the opposite of half of that — «in the footer and NOT in the navbar», from
+   * when the control moved out of the header (2026-08-13). It came back on 2026-09-02 at Bashar's
+   * request, as booking.com has it, and on 2026-09-03 the footer's bespoke `<details>` was replaced
+   * by the same component so the two behave identically. The old assertion only still passed
+   * because a CLOSED popup renders no links — an accidental pass, which is the kind of test that
+   * reports coverage it does not have.
+   *
+   * So it now asserts what is true and worth holding: each bar's control opens, each offers a real
+   * anchor carrying `hreflang`, and the AUTHORITATIVE signal — `<link rel="alternate">` in the head
+   * — is there whether or not anybody opens anything.
    */
-  test('offers the languages in the footer and not in the navbar', async ({ page }) => {
+  test('offers the languages from both bars, with hreflang on the anchors', async ({
+    page,
+  }) => {
     await page.goto('/ar');
 
-    await expect(
-      page.locator('header').getByRole('link', { name: 'Deutsch' }),
-    ).toHaveCount(0);
+    /* The head's alternates, which are what a crawler actually reads. */
+    for (const code of ['ar', 'en', 'de']) {
+      await expect(
+        page.locator(`head link[rel="alternate"][hreflang="${code}"]`),
+      ).toHaveCount(1);
+    }
 
-    /*
-      Opened first: a closed `<details>` hides its contents from the ACCESSIBILITY TREE, so a role
-      selector finds nothing there. The anchors are still in the DOM, which is what a crawler reads
-      — and `generateMetadata` emits the `hreflang` alternates regardless, which is the
-      authoritative signal either way.
-    */
-    await page.locator('footer details').first().click();
+    for (const bar of ['header', 'footer']) {
+      await page.locator(`${bar} [data-menu="language"]`).click();
 
-    const german = page.locator('footer').getByRole('link', { name: 'Deutsch' });
+      const german = page.locator(bar).getByRole('link', { name: 'Deutsch' });
 
-    await expect(german).toHaveAttribute('hreflang', 'de');
+      await expect(german, bar).toHaveAttribute('hreflang', 'de');
+
+      await page.keyboard.press('Escape');
+    }
   });
 
   /**
@@ -327,7 +353,7 @@ test.describe('a Latin-valued field on an Arabic page', () => {
   test('keeps the page when the language changes', async ({ page }) => {
     await page.goto('/ar/city/damascus');
 
-    await page.locator('footer details').first().click();
+    await page.locator('footer [data-menu="language"]').click();
     await page.locator('footer').getByRole('link', { name: 'English' }).click();
 
     await expect.poll(() => new URL(page.url()).pathname).toBe('/en/city/damascus');
@@ -370,7 +396,7 @@ test.describe('a Latin-valued field on an Arabic page', () => {
 
       expect(light, 'the default is white').toBe('rgb(245, 246, 250)');
 
-      await page.locator('footer details').first().click();
+      await page.locator('footer [data-menu="language"]').click();
       await page.locator('footer').getByRole('link', { name: 'English' }).click();
       await page.waitForURL('**/en');
 
@@ -399,7 +425,7 @@ test.describe('a Latin-valued field on an Arabic page', () => {
 
       expect(dark).not.toBe('rgb(245, 246, 250)');
 
-      await page.locator('footer details').first().click();
+      await page.locator('footer [data-menu="language"]').click();
       await page.locator('footer').getByRole('link', { name: 'English' }).click();
       await page.waitForURL('**/en');
 
@@ -436,7 +462,7 @@ test.describe('a Latin-valued field on an Arabic page', () => {
 
       /* Every hop, because the bug was reported as specific to some of them. */
       for (const language of ['English', 'Deutsch', 'العربية']) {
-        await page.locator('footer details').first().click();
+        await page.locator('footer [data-menu="language"]').click();
         await page.locator('footer').getByRole('link', { name: language }).click();
         await page.waitForTimeout(900);
 
@@ -463,7 +489,7 @@ test.describe('a Latin-valued field on an Arabic page', () => {
       ] as const) {
         await page.goto(from);
 
-        await page.locator('footer details').first().click();
+        await page.locator('footer [data-menu="language"]').click();
         await page.locator('footer').getByRole('link', { name: 'English' }).click();
         await page.waitForURL(`**${to}`);
 
@@ -504,7 +530,7 @@ test.describe('a Latin-valued field on an Arabic page', () => {
       expect(await background(), 'another app cannot repaint this one').toBe(light);
 
       /* And the language change, which is where it was noticed. */
-      await page.locator('footer details').first().click();
+      await page.locator('footer [data-menu="language"]').click();
       await page.locator('footer').getByRole('link', { name: 'English' }).click();
       await page.waitForURL('**/en');
 
@@ -519,31 +545,35 @@ test.describe('a Latin-valued field on an Arabic page', () => {
    * A converted price is an ESTIMATE from one rate a staff member typed. The listing's own amount
    * is printed beneath it, and checkout is never converted, because that is the figure somebody is
    * actually charged. Both halves are asserted here; either alone would pass on a broken build.
+   *
+   * The dollar is «$», which is what `CURRENCY_CATALOGUE` says it is. This pinned `Intl`'s ar-SY
+   * spelling until 2026-09-03 — asserted because that is what the screen happened to render, never
+   * because the platform had decided it. See the note in `formatMoney`.
    */
   test('converts browse prices and never the checkout total', async ({ page }) => {
     await page.goto('/ar/city/damascus');
 
     const card = page.locator('article').first();
 
-    await expect(card).toContainText('US$');
+    await expect(card).toContainText('$');
 
     /*
       Driven through the real control — a `<details>` and a form POST. A cookie set directly would
       skip the one thing worth testing, which is that choosing a currency writes it and comes back
       to the same page.
     */
-    await page.locator('footer details').last().click();
+    await page.locator('footer [data-menu="currency"]').click();
     await page.locator('footer button[name="currency"][value="SYP"]').click();
 
     await expect.poll(() => new URL(page.url()).pathname).toBe('/ar/city/damascus');
     await expect(card).toContainText('ل.س');
     /* The original, so an estimate is never mistaken for a quote. */
-    await expect(card).toContainText('US$');
+    await expect(card).toContainText('$');
 
     /* Contractual: the amount a card is charged, in the listing's own currency, always. */
     await page.goto(CHECKOUT);
 
-    await expect(page.locator('main')).toContainText('US$');
+    await expect(page.locator('main')).toContainText('$');
     await expect(page.locator('main')).not.toContainText('ل.س');
   });
 });

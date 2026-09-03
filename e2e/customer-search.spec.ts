@@ -198,3 +198,64 @@ test('every amenity offered as a filter has at least one stay behind it', async 
 
   expect(counts.filter((count) => count <= 0)).toStrictEqual([]);
 });
+
+/**
+ * «غرف النوم» — a requirement on the place, not a number of rooms to book.
+ *
+ * Driven through the popover rather than by typing a URL, because the stepper only exists after
+ * hydration and the hidden input it writes is the whole mechanism. Three things have to hold and
+ * each fails independently: the control writes the value, the search carries it, and the results
+ * links keep it — a filter dropped on page two is a filter that silently widens itself.
+ */
+test('the bedrooms requirement reaches the search and survives its links', async ({
+  page,
+}) => {
+  await page.goto('/ar');
+  await page
+    .getByRole('button', { name: /تحديد الإشغال/ })
+    .first()
+    .click();
+
+  /* It starts at one and reads «غرفة» — never a zero, never «any» (Bashar, 2026-09-03). */
+  await expect(page.locator('input[name="bedrooms"]').first()).toHaveValue('1');
+
+  await page.getByRole('button', { name: 'زيادة غرف' }).click();
+
+  /* The control writes what it shows. */
+  await expect(page.locator('input[name="bedrooms"]').first()).toHaveValue('2');
+
+  await page.getByRole('button', { name: 'تم' }).click();
+  await page.getByRole('button', { name: /ابحث عن إقامة/ }).click();
+  await page.waitForURL('**/search**');
+
+  /* The search carries it… */
+  expect(new URL(page.url()).searchParams.get('bedrooms')).toBe('2');
+
+  /* …and so does every link the results page builds from its allow-list. */
+  const sortLinks = await page
+    .locator('a[href*="sort="]')
+    .evaluateAll((links) => links.map((link) => link.getAttribute('href') ?? ''));
+
+  expect(sortLinks.length).toBeGreaterThan(0);
+  expect(sortLinks.filter((href) => !href.includes('bedrooms=2'))).toStrictEqual([]);
+});
+
+/**
+ * And zero means «any», so an ordinary search is untouched by the field existing.
+ *
+ * The regression half: a default of anything but zero, or a predicate applied when it is zero,
+ * would narrow every search on the site — the kind of change that shows up as «fewer results than
+ * yesterday» rather than as a failure.
+ */
+test('a search that does not ask for bedrooms is not narrowed by the field', async ({
+  page,
+}) => {
+  await page.goto(SEARCH);
+
+  const withoutTheField = await page.locator('article').count();
+
+  await page.goto(`${SEARCH}&bedrooms=0`);
+
+  expect(await page.locator('article').count()).toBe(withoutTheField);
+  expect(withoutTheField).toBeGreaterThan(0);
+});
