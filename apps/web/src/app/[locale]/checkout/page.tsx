@@ -11,6 +11,7 @@ import { couponMessages } from '@/lib/coupon-messages';
 import { DateRange } from '@/components/date-range';
 import { isLocale } from '@/i18n/routing';
 import { getMyWallet } from '@/lib/account';
+import { ltrIsolate } from '@/lib/bidi';
 import { localisedName, localisedText } from '@/lib/localise';
 import { availablePaymentMethods, getProperty, quote } from '@/lib/property';
 import { getSession } from '@/lib/session-server';
@@ -226,8 +227,21 @@ export default async function CheckoutPage({
 
               <ul className="space-y-1 text-sm">
                 {priced.nightly.map((night) => (
-                  <li key={night.date} className="text-muted">
-                    {night.date}
+                  <li key={night.date} className="flex justify-between gap-4">
+                    {/*
+                      A date on its own line, between two rules, naming nothing — which is what it
+                      became when the amounts went (Bashar, 2026-09-03, with the screenshot). Every
+                      other line in this panel is a caption at the start and its value at the end;
+                      this one now reads the same way.
+                    */}
+                    <span className="text-muted">{t('nightLabel')}</span>
+                    {/*
+                      Isolated, and the DATE only. «2026-09-03» is a left-to-right run of digits and
+                      hyphens; unisolated next to Arabic the bidi algorithm can reorder it, and the
+                      year ends up on the wrong end. Never isolate the label with it — that would
+                      put the caption inside the same run and reverse the pair.
+                    */}
+                    <span className="text-text2">{ltrIsolate(night.date)}</span>
                   </li>
                 ))}
               </ul>

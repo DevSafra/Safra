@@ -235,6 +235,7 @@
     "submitting": "Wird verarbeitet…",
     "terms": "Mit dem Fortfahren akzeptieren Sie die Stornierungsbedingungen und die AGB von SAFRA.",
     "summary": "Zahlungsübersicht",
+    "nightLabel": "Nacht",
     "dueNow": "Jetzt fällig",
     "notInstant": "Die Buchung erfolgt nicht sofort: Nach der Zahlung kontaktiert SAFRA den Partner, um die Verfügbarkeit innerhalb von zwei Stunden zu bestätigen. Ohne Bestätigung erhalten Sie den vollen Betrag zurück plus Entschädigung in Ihrer Wallet.",
     "missingDetails": "Die Buchungsdaten sind unvollständig.",

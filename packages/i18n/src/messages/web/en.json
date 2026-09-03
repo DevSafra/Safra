@@ -235,6 +235,7 @@
     "submitting": "Processing…",
     "terms": "By continuing you accept the cancellation policy and SAFRA's terms.",
     "summary": "Payment summary",
+    "nightLabel": "Night",
     "dueNow": "Due now",
     "notInstant": "Booking is not instant: after payment SAFRA contacts the partner to confirm availability within two hours. If they do not confirm, you are refunded in full and compensated in your wallet.",
     "missingDetails": "Booking details are incomplete.",
