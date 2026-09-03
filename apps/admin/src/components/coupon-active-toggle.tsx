@@ -61,7 +61,7 @@ export function CouponActiveToggle({
         type="button"
         disabled={busy}
         onClick={() => void submit()}
-        className={`min-h-10 cursor-pointer rounded-[8px] border px-2.5 py-1 text-[11px] font-bold transition-colors disabled:opacity-50 lg:min-h-0 ${
+        className={`min-h-10 cursor-pointer rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-colors disabled:opacity-50 lg:min-h-0 ${
           isActive
             ? 'border-line text-muted hover:border-bad hover:text-bad'
             : 'border-[rgba(var(--goldA),0.4)] text-gold-ink hover:bg-[rgba(var(--goldA),0.08)]'

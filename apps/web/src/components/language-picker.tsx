@@ -108,7 +108,7 @@ function Picker({
               href={href(code)}
               hrefLang={code}
               aria-current={code === locale ? 'true' : undefined}
-              className={`flex min-h-10 items-center rounded-md px-2 text-sm transition-colors lg:min-h-9 ${
+              className={`flex min-h-10 items-center rounded-lg px-2 text-sm transition-colors lg:min-h-9 ${
                 code === locale
                   ? 'bg-field font-semibold text-gold-ink'
                   : 'text-muted hover:bg-field hover:text-gold'

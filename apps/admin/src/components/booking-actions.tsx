@@ -431,7 +431,7 @@ function Reasoned({
           maxLength={1000}
           rows={2}
           disabled={busy}
-          className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+          className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
         />
         <span className="text-[10.5px] text-faint">{fieldHint}</span>
       </label>
@@ -492,7 +492,7 @@ function DisputeForm({
           required
           defaultValue=""
           disabled={busy}
-          className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+          className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
         >
           <option value="" disabled>
             {copy.pickDisputeKind}
@@ -521,7 +521,7 @@ function DisputeForm({
             `lg` — a text INPUT is not in that list, so it comes out at 38px on a phone and misses
             the rule by two pixels. Measured, not guessed.
           */
-          className="min-h-10 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed lg:min-h-0"
+          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed lg:min-h-0"
         />
         <span className="text-[10.5px] text-faint">{copy.disputeTitleHint}</span>
       </label>
@@ -535,7 +535,7 @@ function DisputeForm({
           maxLength={4000}
           rows={3}
           disabled={busy}
-          className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+          className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
         />
         <span className="text-[10.5px] text-faint">{copy.disputeDescriptionHint}</span>
       </label>
@@ -653,7 +653,7 @@ function RefundForm({
           maxLength={500}
           rows={2}
           disabled={busy || nothing}
-          className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+          className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
         />
         <span className="text-[10.5px] text-faint">{copy.refundReasonHint}</span>
       </label>
@@ -711,7 +711,7 @@ function CompensationForm({
             inputMode="decimal"
             pattern="\d{1,10}(\.\d{1,2})?"
             disabled={busy}
-            className="w-32 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed min-h-10 lg:min-h-0"
+            className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed min-h-10 lg:min-h-0"
           />
         </label>
 
@@ -721,7 +721,7 @@ function CompensationForm({
             name="currency"
             required
             disabled={busy}
-            className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
           >
             {currencies.map((code) => (
               <option key={code} value={code}>
@@ -741,7 +741,7 @@ function CompensationForm({
           maxLength={500}
           rows={2}
           disabled={busy}
-          className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+          className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
         />
         <span className="text-[10.5px] text-faint">{copy.compensateNoteHint}</span>
       </label>

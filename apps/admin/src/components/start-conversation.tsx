@@ -140,14 +140,14 @@ export function StartConversation({
   );
 
   const form = (
-    <div className="grid gap-3 rounded-[10px] border border-line bg-field p-3.5">
+    <div className="grid gap-3 rounded-card border border-line bg-field p-3.5">
       <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
         {c.composeTo}
         <select
           name="to"
           value={to}
           onChange={(event) => setTo(event.target.value as Recipient)}
-          className="cursor-pointer rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+          className="cursor-pointer rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
         >
           <option value="customer">{c.composeToCustomer}</option>
           <option value="partner">{c.composeToPartner}</option>
@@ -170,7 +170,7 @@ export function StartConversation({
           onChange={(event) => setReference(event.target.value)}
           /* The prefix is the whole hint: it changes with the recipient above it. */
           placeholder={referencePlaceholder(to)}
-          className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text placeholder:text-faint"
+          className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text placeholder:text-faint"
         />
         <span className="text-[10.5px] font-normal text-faint2">
           {c.composeReferenceHint}
@@ -185,7 +185,7 @@ export function StartConversation({
           onChange={(event) => setBody(event.target.value)}
           rows={4}
           placeholder={c.composeBodyPlaceholder}
-          className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text placeholder:text-faint"
+          className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text placeholder:text-faint"
         />
       </label>
 

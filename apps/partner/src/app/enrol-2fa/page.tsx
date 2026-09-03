@@ -31,7 +31,7 @@ export default async function EnrolPage() {
           {session?.user.email}
         </p>
 
-        <div className="mt-6 rounded-[14px] border border-line bg-card p-5">
+        <div className="mt-6 rounded-card border border-line bg-card p-5">
           <TwoFactorEnrolment />
         </div>
       </div>

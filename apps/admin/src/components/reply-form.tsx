@@ -73,7 +73,7 @@ export function ReplyForm({ reference }: { reference: string }) {
           rows={3}
           maxLength={4000}
           placeholder={t.sections.messages.replyPlaceholder}
-          className="rounded-[9px] border border-line bg-field px-3 py-2.5 text-[12.5px] leading-relaxed text-text placeholder:text-faint"
+          className="rounded-lg border border-line bg-field px-3 py-2.5 text-[12.5px] leading-relaxed text-text placeholder:text-faint"
         />
       </label>
 
@@ -102,7 +102,7 @@ export function ReplyForm({ reference }: { reference: string }) {
           type="button"
           disabled={body.trim().length === 0 || busy}
           onClick={() => void send()}
-          className="cursor-pointer rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[12.5px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-40"
+          className="cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[12.5px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? t.sections.messages.replying : t.sections.messages.reply}
         </button>

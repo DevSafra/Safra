@@ -269,7 +269,7 @@ function StagePanel({ stage }: { readonly stage: Stage }) {
   return (
     <section
       data-stage={stage}
-      className={`rounded-xl border px-4 py-3.5 ${
+      className={`rounded-card border px-4 py-3.5 ${
         copy.tone === 'ok'
           ? 'border-ok/40 bg-ok/5'
           : copy.tone === 'bad'
@@ -294,7 +294,7 @@ function StagePanel({ stage }: { readonly stage: Stage }) {
 
 function ContractCard({ contract }: { readonly contract: PartnerContract }) {
   return (
-    <li className="grid gap-2 rounded-xl border border-line bg-card px-3.5 py-3">
+    <li className="grid gap-2 rounded-card border border-line bg-card px-3.5 py-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <span className="text-[13px] font-bold text-text">
           {contractKind(contract.kind)}

@@ -101,7 +101,7 @@ export function PasswordStrengthMeter({
           <li key={rule.id}>
             <span
               data-met={rule.met ? 'true' : 'false'}
-              className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11.5px] transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11.5px] transition-colors ${
                 rule.met
                   ? 'border-ok/50 bg-ok/10 text-ok'
                   : 'border-line bg-field text-faint'

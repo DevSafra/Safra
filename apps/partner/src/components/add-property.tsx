@@ -144,7 +144,7 @@ export function AddProperty({
   }
 
   return (
-    <div className="rounded-2xl border border-gold/40 bg-card p-5">
+    <div className="rounded-card border border-gold/40 bg-card p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[14px] font-extrabold text-gold-ink">
           {t.properties.addOpen}

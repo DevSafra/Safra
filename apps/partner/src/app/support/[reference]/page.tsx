@@ -82,7 +82,7 @@ export default async function SupportThreadPage({
         {t.support.back}
       </Link>
 
-      <section className="mt-4 rounded-[14px] border border-line bg-card p-4">
+      <section className="mt-4 rounded-card border border-line bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Ltr className="text-[12.5px] text-text">{thread.reference}</Ltr>
           <span
@@ -138,11 +138,11 @@ export default async function SupportThreadPage({
       </section>
 
       {thread.closed ? (
-        <p className="mt-4 rounded-[14px] border border-line bg-card p-4 text-[12.5px] text-muted">
+        <p className="mt-4 rounded-card border border-line bg-card p-4 text-[12.5px] text-muted">
           {t.support.closedNote}
         </p>
       ) : (
-        <section className="mt-4 rounded-[14px] border border-line bg-card p-4">
+        <section className="mt-4 rounded-card border border-line bg-card p-4">
           <SupportForm reference={thread.reference} />
 
           {/* Ending the thread sits under the reply, not beside it: the common action leads. */}

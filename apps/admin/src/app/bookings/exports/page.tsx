@@ -101,7 +101,7 @@ const COLUMNS: AdminColumn<ExportItem>[] = [
         <a
           href={`/bookings/exports/download/${row.reference}`}
           download
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-gold px-3 text-[12px] font-bold text-gold-ink lg:min-h-0 lg:py-1.5"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold px-3 text-[12px] font-bold text-gold-ink lg:min-h-0 lg:py-1.5"
         >
           {t.sections.exports.download}
         </a>

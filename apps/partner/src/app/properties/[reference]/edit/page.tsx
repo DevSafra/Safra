@@ -60,7 +60,7 @@ export default async function EditPropertyPage({
         <h2 className="text-[15px] font-bold text-text">{property.name.ar}</h2>
 
         {property.reviewNotes ? (
-          <section className="rounded-[14px] border border-bad/40 bg-bad/10 p-4">
+          <section className="rounded-card border border-bad/40 bg-bad/10 p-4">
             <h3 className="pb-1 text-[12.5px] font-bold text-bad">
               {t.editProperty.rejectedTitle}
             </h3>
@@ -110,7 +110,7 @@ function Back() {
  */
 function Locked({ reference }: { readonly reference: string }) {
   return (
-    <section className="grid gap-3 rounded-[14px] border border-line bg-card p-4">
+    <section className="grid gap-3 rounded-card border border-line bg-card p-4">
       <h3 className="text-[13px] font-bold text-text">{t.editProperty.lockedTitle}</h3>
       <p className="text-[12.5px] leading-relaxed text-muted">
         {t.editProperty.lockedWhy}

@@ -288,7 +288,7 @@ export function ImageManager({
           {images.map((image, index) => (
             <li
               key={image.id}
-              className={`overflow-hidden rounded-[14px] border bg-card ${
+              className={`overflow-hidden rounded-card border bg-card ${
                 image.isCover ? 'border-gold' : 'border-line'
               }`}
             >

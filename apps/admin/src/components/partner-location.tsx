@@ -95,7 +95,7 @@ export function PartnerLocation({
             defaultValue={latitude ?? ''}
             placeholder="33.5138"
             disabled={busy}
-            className="min-h-10 w-32 rounded-[9px] border border-line bg-field px-3 py-2 text-[13px] text-text disabled:cursor-not-allowed lg:min-h-0"
+            className="min-h-10 w-32 rounded-lg border border-line bg-field px-3 py-2 text-[13px] text-text disabled:cursor-not-allowed lg:min-h-0"
           />
         </label>
 
@@ -108,14 +108,14 @@ export function PartnerLocation({
             defaultValue={longitude ?? ''}
             placeholder="36.2765"
             disabled={busy}
-            className="min-h-10 w-32 rounded-[9px] border border-line bg-field px-3 py-2 text-[13px] text-text disabled:cursor-not-allowed lg:min-h-0"
+            className="min-h-10 w-32 rounded-lg border border-line bg-field px-3 py-2 text-[13px] text-text disabled:cursor-not-allowed lg:min-h-0"
           />
         </label>
 
         <button
           type="submit"
           disabled={busy}
-          className="min-h-10 cursor-pointer rounded-[9px] border border-line px-4 text-[12.5px] text-text disabled:cursor-not-allowed lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-line px-4 text-[12.5px] text-text disabled:cursor-not-allowed lg:min-h-0"
         >
           {busy ? copy.saving : copy.save}
         </button>

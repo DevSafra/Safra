@@ -124,12 +124,11 @@ export function CouponsToolbar({
     }
   }
 
-  const field =
-    'rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text';
+  const field = 'rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text';
   const labelled = 'grid gap-1.5 text-[11.5px] font-semibold text-muted';
 
   const panel = !open ? null : (
-    <div className="grid w-full gap-3 rounded-[10px] border border-line bg-field p-3.5">
+    <div className="grid w-full gap-3 rounded-card border border-line bg-field p-3.5">
       <h3 className="text-[13px] font-bold text-text">{c.newTitle}</h3>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -309,7 +308,7 @@ export function CouponsToolbar({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="min-h-10 cursor-pointer rounded-[9px] border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {c.create}
           </button>

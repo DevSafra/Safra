@@ -195,7 +195,7 @@ export default async function BookingsPage({
                   {status ? <input type="hidden" name="status" value={status} /> : null}
                   <button
                     type="submit"
-                    className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-line bg-field px-3.5 text-[12.5px] text-text2 hover:border-gold hover:text-gold lg:min-h-0 lg:py-2"
+                    className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line bg-field px-3.5 text-[12.5px] text-text2 hover:border-gold hover:text-gold lg:min-h-0 lg:py-2"
                   >
                     {t.table.exportCsv}
                   </button>
@@ -246,7 +246,7 @@ export default async function BookingsPage({
             name="status"
             defaultValue={status ?? ''}
             aria-label={t.table.colStatus}
-            className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
           >
             <option value="">{t.sections.bookings.allStatuses}</option>
             {STATUSES.map((value) => (

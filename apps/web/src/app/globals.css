@@ -311,6 +311,31 @@
  * may shrink, without anyone remembering `min-w-0` — and an element that states a floor gets it.
  * Same reasoning as the touch-floor rule above; they were the same bug in two properties.
  */
+/*
+ * ## The radius scale, locked
+ *
+ * Three members, and every rounded thing in all three apps is one of them:
+ *
+ * | `rounded-full`  | pills and icon buttons                                  |
+ * | `rounded-lg`    | controls, fields, inputs, tiles, chips, thumbnails       |
+ * | `rounded-card`  | panels, cards, surfaces, dialogs                        |
+ *
+ * There were ELEVEN values before: `md`, `xl`, `2xl` and eight pixel one-offs from two different
+ * handoffs — `[7px]`, `[8px]`, `[9px]`, `[11px]`, `[13px]`, `[14px]`, `[15px]`, `[10px]`. Nothing
+ * was wrong with any single one; the problem is that a reader learns a product's corner in the
+ * first ten seconds and then meets four more, and the fourth reads as a different component
+ * library rather than as a decision.
+ *
+ * **Two documented exceptions, both earned:**
+ *
+ * - **18px on the search panel** and on the wallet card that mirrors it. Read from
+ *   `SAFRA - موقع سفرة 20.08.html`, which is the brief. The approved design outranks the scale.
+ * - **3px on a flag chip.** A 30×20 flag at the surface radius is a lozenge, not a flag.
+ *
+ * `--radius-card` now exists in all three apps rather than only the customer one, which is what
+ * lets `packages/ui` name the surface radius instead of hard-coding `[14px]` and `[10px]`.
+ */
+
 @layer base {
   :where(.grid, .flex, .inline-flex) > * {
     min-width: 0;

@@ -110,7 +110,7 @@ export default async function DashboardPage() {
             */
             <Link
               href="/emergency"
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-[rgba(var(--badA),0.5)] bg-[rgba(var(--badA),0.1)] px-4 py-2 text-xs font-extrabold text-bad transition-colors hover:bg-[rgba(var(--badA),0.18)]"
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--badA),0.5)] bg-[rgba(var(--badA),0.1)] px-4 py-2 text-xs font-extrabold text-bad transition-colors hover:bg-[rgba(var(--badA),0.18)]"
             >
               {t.admin.emergencyMode}
             </Link>
@@ -337,7 +337,7 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
   ].filter((row): row is { code: string; text: string; href: string } => row !== null);
 
   return (
-    <section className="rounded-[15px] border border-[rgba(var(--badA),0.45)] bg-card p-4.5">
+    <section className="rounded-card border border-[rgba(var(--badA),0.45)] bg-card p-4.5">
       <h2 className="mb-3 text-[14.5px] font-extrabold text-bad">{t.admin.attention}</h2>
 
       {rows.length === 0 ? (
@@ -347,7 +347,7 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
           {rows.map((row) => (
             <li
               key={row.text}
-              className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-line bg-field px-3.5 py-2.5"
+              className="flex flex-wrap items-center gap-2.5 rounded-card border border-line bg-field px-3.5 py-2.5"
             >
               <span
                 dir="ltr"
@@ -358,7 +358,7 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
               <span className="text-[12.5px] text-text2">{row.text}</span>
               <Link
                 href={row.href}
-                className="ms-auto inline-flex min-h-10 cursor-pointer items-center rounded-[7px] border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-[11.5px] font-bold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+                className="ms-auto inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] px-3.5 py-1 text-[11.5px] font-bold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
               >
                 {t.admin.handle}
               </Link>
@@ -372,7 +372,7 @@ function Attention({ counters }: { counters: DashboardOverview['counters'] }) {
 
 function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] }) {
   return (
-    <section className="min-w-0 rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
+    <section className="min-w-0 rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <h2 className="text-[14.5px] font-extrabold text-gold-ink">
           {t.admin.latestBookings}
@@ -392,11 +392,11 @@ function LatestBookings({ rows }: { rows: DashboardOverview['recentBookings'] })
             placeholder={t.dashboard.bookingReferencePlaceholder}
             aria-label={t.dashboard.findBookingLabel}
             /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
-            className="min-w-[260px] rounded-[9px] border border-line bg-field px-3.5 py-2 text-[12.5px] text-text placeholder:text-faint"
+            className="min-w-[260px] rounded-lg border border-line bg-field px-3.5 py-2 text-[12.5px] text-text placeholder:text-faint"
           />
           <button
             type="submit"
-            className="cursor-pointer rounded-[9px] border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
+            className="cursor-pointer rounded-lg border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold"
           >
             {t.dashboard.findBooking}
           </button>
@@ -468,7 +468,7 @@ function PartnerQueue({
   partners: PendingPartnerPage | 'unauthenticated' | 'failed';
 }) {
   return (
-    <section className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
+    <section className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       <h2 className="mb-3 text-[14.5px] font-extrabold text-gold-ink">
         {t.admin.pendingPartners}
       </h2>
@@ -494,11 +494,11 @@ function PartnerQueue({
             <li key={partner.reference}>
               <Link
                 href={`/partners/${partner.reference}?from=dashboard`}
-                className="flex items-center gap-2.5 rounded-[10px] border border-line bg-field px-3 py-2.5 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
+                className="flex items-center gap-2.5 rounded-card border border-line bg-field px-3 py-2.5 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
               >
                 <span
                   aria-hidden
-                  className="grid size-[34px] shrink-0 place-items-center rounded-[9px] border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] font-[family-name:var(--font-amiri)] text-base text-gold-ink"
+                  className="grid size-[34px] shrink-0 place-items-center rounded-lg border border-[rgba(var(--goldA),0.3)] bg-[rgba(var(--goldA),0.12)] font-[family-name:var(--font-amiri)] text-base text-gold-ink"
                 >
                   {ORNAMENT_BRAND}
                 </span>
@@ -540,7 +540,7 @@ function PartnerQueue({
 
 function RecentActivity({ rows }: { rows: DashboardOverview['recentAudit'] }) {
   return (
-    <section className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
+    <section className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       <h2 className="mb-2.5 text-[14.5px] font-extrabold text-gold-ink">
         {t.admin.recentActivity}
       </h2>
@@ -578,7 +578,7 @@ function Kpi({
   valueClass?: string;
 }) {
   return (
-    <div className="rounded-[13px] border border-[rgba(var(--goldA),0.14)] bg-card p-4">
+    <div className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4">
       <p className="text-[11.5px] text-faint">{label}</p>
       <p className={`mt-1.5 text-2xl font-extrabold ${valueClass}`}>{value}</p>
       <p className="mt-1 text-[10.5px] text-muted">{sub}</p>
@@ -607,7 +607,7 @@ function Th({ children }: { children: React.ReactNode }) {
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-[15px] border border-line bg-card p-6">{children}</div>;
+  return <div className="rounded-card border border-line bg-card p-6">{children}</div>;
 }
 
 /** How many queue rows the dashboard previews before deferring to the full section. */

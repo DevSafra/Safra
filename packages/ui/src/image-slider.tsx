@@ -490,7 +490,7 @@ export function ImageSliderFrame({
           offset={offset}
           onPan={setOffset}
           onToggleZoom={toggleZoom}
-          radius="rounded-[10px]"
+          radius="rounded-card"
         >
           {images.length > 1 ? (
             <>
@@ -576,7 +576,7 @@ export function ImageSliderFrame({
                   aria-label={`${labels.open} ${index + 1}`}
                   aria-current={index === at ? 'true' : undefined}
                   style={{ transitionTimingFunction: EASE_OUT }}
-                  className="group relative h-12 w-16 shrink-0 cursor-pointer overflow-hidden rounded-[6px] outline-none ring-1 ring-white/15 transition-[opacity,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-gold data-[active=false]:opacity-55 data-[active=true]:ring-2 data-[active=true]:ring-gold data-[active=false]:hover:opacity-100 motion-reduce:transition-none"
+                  className="group relative h-12 w-16 shrink-0 cursor-pointer overflow-hidden rounded-lg outline-none ring-1 ring-white/15 transition-[opacity,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-gold data-[active=false]:opacity-55 data-[active=true]:ring-2 data-[active=true]:ring-gold data-[active=false]:hover:opacity-100 motion-reduce:transition-none"
                 >
                   <img
                     src={image.thumb}

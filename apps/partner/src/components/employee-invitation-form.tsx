@@ -91,7 +91,7 @@ export function EmployeeInvitationForm({ token }: { token: string }) {
 
   if (done) {
     return (
-      <div className="grid gap-4 rounded-xl border border-ok/40 bg-ok/5 p-4">
+      <div className="grid gap-4 rounded-card border border-ok/40 bg-ok/5 p-4">
         <p className="text-sm text-ok">{t.employeeInvitation.done}</p>
         {/*
           A button to sign in, not an automatic redirect. The API issues no session on activation,

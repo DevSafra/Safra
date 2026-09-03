@@ -97,7 +97,7 @@ export function BackLink({
     <BackNavigation
       href={target.href}
       ariaLabel={fill(t.table.backToLabel, { section: destination })}
-      className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-[9px] border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold lg:min-h-0"
+      className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-line px-3.5 py-2 text-[12.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold lg:min-h-0"
     >
       <span aria-hidden="true">{t.table.backArrow}</span>
       <span>{t.table.back}</span>

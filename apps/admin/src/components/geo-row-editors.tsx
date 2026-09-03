@@ -59,7 +59,7 @@ export function CountryRows({
         {rows.map((row) => (
           <li
             key={row.code}
-            className="flex flex-wrap items-center gap-2.5 rounded-[9px] border border-line bg-field px-3 py-2.5"
+            className="flex flex-wrap items-center gap-2.5 rounded-lg border border-line bg-field px-3 py-2.5"
           >
             <span className="font-bold text-text">{row.nameAr}</span>
             <span className="text-[11px] text-faint">
@@ -300,7 +300,7 @@ export function CurrencyRows({ rows }: { readonly rows: readonly Currency[] }) {
         {rows.map((row) => (
           <li
             key={row.code}
-            className="flex flex-wrap items-center gap-2.5 rounded-[9px] border border-line bg-field px-3 py-2.5"
+            className="flex flex-wrap items-center gap-2.5 rounded-lg border border-line bg-field px-3 py-2.5"
           >
             <span className="font-bold text-text">
               {row.nameAr} {row.symbol}

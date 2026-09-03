@@ -224,7 +224,7 @@ export function OnboardPartnerForm({
             name="partnerTypeCode"
             required
             defaultValue={partnerTypes[0]?.code ?? ''}
-            className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2.5 text-[13px] font-normal text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] font-normal text-text"
           >
             {partnerTypes.map((type) => (
               <option key={type.code} value={type.code}>
@@ -246,7 +246,7 @@ export function OnboardPartnerForm({
             name="citySlug"
             required
             defaultValue={cities[0]?.slug ?? ''}
-            className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2.5 text-[13px] font-normal text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] font-normal text-text"
           >
             {cities.map((city) => (
               <option key={city.slug} value={city.slug}>
@@ -285,7 +285,7 @@ export function OnboardPartnerForm({
             name="preferredLocale"
             defaultValue="ar"
             aria-describedby={`${formId}-preferredLocale-hint`}
-            className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2.5 text-[13px] font-normal text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] font-normal text-text"
           >
             {LOCALES.map((locale) => (
               <option key={locale} value={locale}>
@@ -317,7 +317,7 @@ export function OnboardPartnerForm({
           maxLength={2000}
           aria-invalid={field === 'notes' ? true : undefined}
           aria-describedby={`${formId}-notes-hint`}
-          className={`rounded-[9px] border bg-field px-3 py-2.5 text-[13px] font-normal text-text ${
+          className={`rounded-lg border bg-field px-3 py-2.5 text-[13px] font-normal text-text ${
             field === 'notes' ? 'border-bad' : 'border-line'
           }`}
         />
@@ -406,7 +406,7 @@ function Field({
         maxLength={maxLength}
         aria-invalid={invalid ? true : undefined}
         aria-describedby={hint ? hintId : undefined}
-        className={`min-h-10 rounded-[9px] border bg-field px-3 py-2.5 text-[13px] font-normal text-text lg:min-h-0 ${
+        className={`min-h-10 rounded-lg border bg-field px-3 py-2.5 text-[13px] font-normal text-text lg:min-h-0 ${
           invalid ? 'border-bad' : 'border-line'
         }`}
       />

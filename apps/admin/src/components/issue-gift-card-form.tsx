@@ -142,7 +142,7 @@ export function GiftCardsToolbar({
   }
 
   const panel = issued ? (
-    <div className="grid w-full gap-2 rounded-[10px] border border-[rgba(var(--goldA),0.4)] bg-field p-3.5">
+    <div className="grid w-full gap-2 rounded-card border border-[rgba(var(--goldA),0.4)] bg-field p-3.5">
       <h3 className="text-[13px] font-bold text-gold-ink">{c.issuedTitle}</h3>
       {/*
           `dir="ltr"` on a DISPLAYED Latin value, never on a field: the code is one Latin run and
@@ -162,7 +162,7 @@ export function GiftCardsToolbar({
         */}
       <p
         dir="ltr"
-        className="select-all rounded-[9px] border border-line bg-card px-3 py-3 text-center font-mono text-[13px] leading-relaxed font-bold tracking-[0.1em] break-all text-text sm:text-[15px] sm:tracking-[0.16em]"
+        className="select-all rounded-lg border border-line bg-card px-3 py-3 text-center font-mono text-[13px] leading-relaxed font-bold tracking-[0.1em] break-all text-text sm:text-[15px] sm:tracking-[0.16em]"
       >
         {issued.code}
       </p>
@@ -180,7 +180,7 @@ export function GiftCardsToolbar({
       </div>
     </div>
   ) : !open ? null : (
-    <div className="grid w-full gap-3 rounded-[10px] border border-line bg-field p-3.5">
+    <div className="grid w-full gap-3 rounded-card border border-line bg-field p-3.5">
       <h3 className="text-[13px] font-bold text-text">{c.issueTitle}</h3>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -192,7 +192,7 @@ export function GiftCardsToolbar({
             onChange={(event) => setAmount(event.target.value)}
             placeholder={c.issueAmountPlaceholder}
             inputMode="decimal"
-            className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+            className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
           />
         </label>
 
@@ -201,7 +201,7 @@ export function GiftCardsToolbar({
           <select
             value={currency}
             onChange={(event) => setCurrency(event.target.value as GiftCardCurrency)}
-            className="cursor-pointer rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
           >
             {currencies.map((code) => (
               <option key={code} value={code}>
@@ -217,7 +217,7 @@ export function GiftCardsToolbar({
             type="date"
             value={expiresOn}
             onChange={(event) => setExpiresOn(event.target.value)}
-            className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+            className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
           />
         </label>
 
@@ -226,7 +226,7 @@ export function GiftCardsToolbar({
           <input
             value={recipientName}
             onChange={(event) => setRecipientName(event.target.value)}
-            className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+            className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
           />
         </label>
 
@@ -237,7 +237,7 @@ export function GiftCardsToolbar({
             value={recipientEmail}
             onChange={(event) => setRecipientEmail(event.target.value)}
             placeholder={c.issueRecipientEmailPlaceholder}
-            className="field-ltr rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+            className="field-ltr rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
           />
         </label>
       </div>
@@ -248,7 +248,7 @@ export function GiftCardsToolbar({
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           rows={2}
-          className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+          className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
         />
         <span className="font-normal text-faint">{c.issueReasonHint}</span>
       </label>
@@ -294,7 +294,7 @@ export function GiftCardsToolbar({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="min-h-10 cursor-pointer rounded-[9px] border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+            className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
           >
             {c.create}
           </button>

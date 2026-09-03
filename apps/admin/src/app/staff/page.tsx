@@ -350,18 +350,18 @@ function Activity({
           placeholder={t.sections.staff.activitySearch}
           aria-label={t.sections.staff.activitySearchLabel}
           /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
-          className="min-w-0 flex-1 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
         />
         <button
           type="submit"
-          className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-line px-4 py-2 text-[12.5px] text-muted hover:border-gold/50 hover:text-gold lg:min-h-0"
+          className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[12.5px] text-muted hover:border-gold/50 hover:text-gold lg:min-h-0"
         >
           {t.sections.staff.activitySearchGo}
         </button>
         {term ? (
           <a
             href={`/staff?${new URLSearchParams({ ...carry, activitySize: String(size) }).toString()}`}
-            className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-line px-4 py-2 text-[12.5px] text-muted hover:border-gold/50 hover:text-gold lg:min-h-0"
+            className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[12.5px] text-muted hover:border-gold/50 hover:text-gold lg:min-h-0"
           >
             {t.sections.staff.activityClear}
           </a>
@@ -393,7 +393,7 @@ function Activity({
                 <a
                   href={`/staff/activity/${row.id}${returnQuery({ page: result.page, size })}`}
                   aria-label={t.sections.staff.activityOpen}
-                  className="flex flex-wrap items-center gap-2.5 rounded-[10px] border border-line bg-field px-3.25 py-2.5 hover:border-gold/50"
+                  className="flex flex-wrap items-center gap-2.5 rounded-card border border-line bg-field px-3.25 py-2.5 hover:border-gold/50"
                 >
                   <span className="font-bold text-text">
                     {row.actorEmail ?? t.admin.systemActor}

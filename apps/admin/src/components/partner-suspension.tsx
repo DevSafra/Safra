@@ -199,7 +199,7 @@ export function PartnerSuspension({
             minLength={ENFORCEMENT_REASON_MIN}
             maxLength={2000}
             rows={2}
-            className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+            className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
           />
           <span className="text-[10.5px] text-faint">
             {t.sections.enforcement.reasonHint}
@@ -216,7 +216,7 @@ export function PartnerSuspension({
               name="notes"
               maxLength={2000}
               rows={2}
-              className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+              className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
             />
           </label>
         )}
@@ -224,7 +224,7 @@ export function PartnerSuspension({
         <button
           type="submit"
           disabled={busy}
-          className={`inline-flex min-h-10 w-fit cursor-pointer items-center rounded-[9px] border px-4 py-2 text-[12.5px] font-bold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 ${
+          className={`inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border px-4 py-2 text-[12.5px] font-bold disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0 ${
             suspension
               ? 'border-ok/50 text-ok hover:bg-ok/10'
               : 'border-bad/50 text-bad hover:bg-bad/10'

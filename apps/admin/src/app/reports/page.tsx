@@ -72,7 +72,7 @@ function Card({ card }: { card: ReportCard }) {
   const peak = Math.max(...values, 1);
 
   return (
-    <section className="rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
+    <section className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4.5">
       <h2 className="text-[14px] font-extrabold text-gold-ink">{meta.title}</h2>
 
       <p className="mt-3 text-2xl font-extrabold text-text">{format(card)}</p>

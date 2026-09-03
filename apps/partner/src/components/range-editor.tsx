@@ -130,7 +130,7 @@ export function RangeEditor({
 
   return (
     <form
-      className="grid gap-3 rounded-[14px] border border-line bg-card p-4"
+      className="grid gap-3 rounded-card border border-line bg-card p-4"
       onSubmit={(event) => void apply(event)}
     >
       <p className="text-[13px] font-bold text-text">{t.unitCalendar.editorTitle}</p>

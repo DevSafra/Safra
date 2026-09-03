@@ -132,7 +132,7 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
   return (
     <Link
       href={`/payouts/${encodeURIComponent(payout.reference)}`}
-      className="block rounded-[14px] border border-line bg-card p-4 hover:border-gold/40"
+      className="block rounded-card border border-line bg-card p-4 hover:border-gold/40"
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <Ltr className="text-[13px] font-bold text-sky">{payout.reference}</Ltr>

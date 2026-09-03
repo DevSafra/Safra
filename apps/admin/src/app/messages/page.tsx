@@ -97,7 +97,7 @@ export default async function MessagesPage({
                   <li
                     key={thread.reference}
                     id={rowAnchor(thread.reference)}
-                    className="scroll-mt-24 target:rounded-[11px] target:bg-[rgba(var(--goldA),0.14)]"
+                    className="scroll-mt-24 target:rounded-lg target:bg-[rgba(var(--goldA),0.14)]"
                   >
                     <Thread thread={thread} back={back} />
                   </li>
@@ -143,7 +143,7 @@ function Thread({ thread, back }: { thread: ConversationItem; back: string }) {
   return (
     <Link
       href={`/messages/${thread.reference}${back}`}
-      className="flex flex-wrap items-center gap-3 rounded-[11px] border border-line bg-field px-4 py-3 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
+      className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-field px-4 py-3 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
     >
       <span
         aria-hidden

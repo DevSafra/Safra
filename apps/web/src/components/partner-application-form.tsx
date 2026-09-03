@@ -170,7 +170,7 @@ export function PartnerApplicationForm({
     return (
       <section
         data-application-sent
-        className="rounded-2xl border border-[rgba(var(--goldA),0.25)] bg-card p-6"
+        className="rounded-card border border-[rgba(var(--goldA),0.25)] bg-card p-6"
       >
         <h2 className="text-xl font-bold text-gold">{t('successTitle')}</h2>
         <p className="mt-2 text-[14px] leading-relaxed text-text">
@@ -207,7 +207,7 @@ export function PartnerApplicationForm({
         */}
         <div className="grid gap-1.5">
           <span className="text-[13px] font-semibold text-text">{t('email')}</span>
-          <p className="min-h-11 rounded-xl border border-line bg-card px-3.5 py-3 text-[14px] text-muted">
+          <p className="min-h-11 rounded-card border border-line bg-card px-3.5 py-3 text-[14px] text-muted">
             {email}
           </p>
           <span className="text-[12px] text-faint">{t('emailHint')}</span>
@@ -288,7 +288,7 @@ export function PartnerApplicationForm({
             name="message"
             rows={4}
             maxLength={2000}
-            className="rounded-xl border border-line bg-field px-3.5 py-2.5 text-[14px] text-text"
+            className="rounded-card border border-line bg-field px-3.5 py-2.5 text-[14px] text-text"
           />
         </label>
       </fieldset>
@@ -304,7 +304,7 @@ export function PartnerApplicationForm({
       <button
         type="submit"
         disabled={busy}
-        className="min-h-11 w-fit cursor-pointer rounded-xl bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-6 text-[14px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50"
+        className="min-h-11 w-fit cursor-pointer rounded-card bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-6 text-[14px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-50"
       >
         {busy ? t('submitting') : t('submit')}
       </button>
@@ -350,7 +350,7 @@ function Field({
         {...(autoComplete ? { autoComplete } : {})}
         {...(describedBy ? { 'aria-describedby': describedBy } : {})}
         aria-invalid={error ? true : undefined}
-        className="min-h-11 rounded-xl border border-line bg-field px-3.5 text-[14px] text-text"
+        className="min-h-11 rounded-card border border-line bg-field px-3.5 text-[14px] text-text"
       />
       {error ? (
         <span role="alert" className="text-[12px] text-bad">
@@ -383,7 +383,7 @@ function Select({
         name={name}
         defaultValue={defaultValue ?? ''}
         aria-invalid={error ? true : undefined}
-        className="min-h-11 cursor-pointer rounded-xl border border-line bg-field px-3.5 text-[14px] text-text"
+        className="min-h-11 cursor-pointer rounded-card border border-line bg-field px-3.5 text-[14px] text-text"
       >
         {placeholder ? <option value="">{placeholder}</option> : null}
         {options.map((option) => (

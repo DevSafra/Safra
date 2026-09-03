@@ -70,7 +70,7 @@ export function Kpi({
   valueClass?: string;
 }) {
   return (
-    <div className="rounded-[13px] border border-[rgba(var(--goldA),0.14)] bg-card p-4">
+    <div className="rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4">
       <p className="text-[11.5px] text-faint">{label}</p>
       <p className={`mt-1.5 text-2xl font-extrabold ${valueClass}`}>{value}</p>
       {sub ? <p className="mt-1 text-[10.5px] text-muted">{sub}</p> : null}
@@ -105,7 +105,7 @@ export function KpiRow({
  */
 export function NotBuilt({ reason }: { reason: string }) {
   return (
-    <section className="rounded-[15px] border border-dashed border-[rgba(var(--goldA),0.35)] bg-card p-6">
+    <section className="rounded-card border border-dashed border-[rgba(var(--goldA),0.35)] bg-card p-6">
       <h2 className="text-[14.5px] font-extrabold text-warn">{t.unbuilt.heading}</h2>
       <p className="mt-2.5 max-w-[70ch] text-[12.5px] leading-relaxed text-text2">
         {reason}

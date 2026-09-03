@@ -149,7 +149,7 @@ export default async function PartnerPage({
           <p className="mt-3">
             <a
               href={`/partners/${partner.reference}/onboarding`}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-gold/40 bg-gold/10 px-4 py-2 text-[12.5px] text-gold-ink transition-colors hover:border-gold hover:bg-gold/15 lg:min-h-0"
+              className="inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-[12.5px] text-gold-ink transition-colors hover:border-gold hover:bg-gold/15 lg:min-h-0"
             >
               {t.sections.partnerDetail.continueOnboarding}
             </a>
@@ -354,7 +354,7 @@ export default async function PartnerPage({
         */}
         <a
           href={`/partners/${partner.reference}/violations`}
-          className="mt-3 inline-flex min-h-10 cursor-pointer items-center rounded-[9px] border border-line px-4 py-2 text-[12.5px] text-muted hover:border-gold/50 hover:text-gold lg:min-h-0"
+          className="mt-3 inline-flex min-h-10 cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[12.5px] text-muted hover:border-gold/50 hover:text-gold lg:min-h-0"
         >
           {t.sections.enforcement.openViolations}
         </a>

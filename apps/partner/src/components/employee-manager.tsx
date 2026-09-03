@@ -85,7 +85,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
       reader somewhere that cannot help.
     */
     return (
-      <div className="grid gap-2 rounded-xl border border-line bg-card p-4">
+      <div className="grid gap-2 rounded-card border border-line bg-card p-4">
         <p className="text-sm text-muted">{t.employees.noRoles}</p>
         <Link
           href="/employee-roles"
@@ -137,7 +137,7 @@ export function EmployeeInvite({ roles }: { roles: PartnerEmployeeRole[] }) {
         void submit(event);
       }}
       noValidate
-      className="grid gap-3 rounded-xl border border-line bg-card p-4"
+      className="grid gap-3 rounded-card border border-line bg-card p-4"
     >
       <h2 className="text-sm font-semibold text-text">{t.employees.inviteTitle}</h2>
 

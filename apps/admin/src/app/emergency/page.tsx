@@ -60,7 +60,7 @@ export default async function EmergencyPage() {
                 {result.history.map((mode) => (
                   <li
                     key={mode.id}
-                    className="rounded-[10px] border border-line bg-field px-3.5 py-3"
+                    className="rounded-card border border-line bg-field px-3.5 py-3"
                   >
                     <div className="flex flex-wrap items-center gap-2.5">
                       <span className="text-[12.5px] font-bold text-text">
@@ -104,7 +104,7 @@ export default async function EmergencyPage() {
 
 function ActiveBanner({ mode }: { mode: EmergencyMode }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-bad bg-[rgba(var(--badA),0.12)] px-4 py-3">
+    <div className="flex flex-wrap items-center gap-3 rounded-card border border-bad bg-[rgba(var(--badA),0.12)] px-4 py-3">
       <span className="text-[13px] font-extrabold text-bad">
         {fill(t.sections.emergency.activeBanner, { scope: mode.scopeName })}
       </span>

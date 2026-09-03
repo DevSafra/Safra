@@ -27,8 +27,7 @@ import { TIMEZONE_CATALOGUE, utcOffset } from '@safra/contracts';
  */
 
 /** The one input height on these screens — 40px, the project's control floor. */
-const CONTROL =
-  'h-10 rounded-[9px] border border-line bg-card px-3 text-[12.5px] text-text';
+const CONTROL = 'h-10 rounded-lg border border-line bg-card px-3 text-[12.5px] text-text';
 
 /**
  * A row of fields that share the width.
@@ -137,7 +136,7 @@ export function Prose({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         rows={4}
-        className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text placeholder:text-faint"
+        className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text placeholder:text-faint"
       />
       {hint ? (
         <span className="text-[10.5px] font-normal text-faint2">{hint}</span>
@@ -269,7 +268,7 @@ export function Panel({
     <div
       {...{ [attribute]: marker }}
       className={`grid w-full gap-3 text-start ${
-        bare ? '' : 'mb-3 rounded-[10px] border border-line bg-field p-4'
+        bare ? '' : 'mb-3 rounded-card border border-line bg-field p-4'
       }`}
     >
       <p className="text-[11.5px] font-bold text-gold-ink">{heading}</p>

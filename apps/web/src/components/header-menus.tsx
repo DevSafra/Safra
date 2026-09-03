@@ -273,7 +273,7 @@ function CurrencyMenu({
                 >
                   <span
                     aria-hidden
-                    className="grid size-7 shrink-0 place-items-center rounded-md border border-line text-[0.8125rem]"
+                    className="grid size-7 shrink-0 place-items-center rounded-lg border border-line text-[0.8125rem]"
                   >
                     {symbol}
                   </span>

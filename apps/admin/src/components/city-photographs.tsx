@@ -265,12 +265,12 @@ function PhotographCard({
   }
 
   const control =
-    'cursor-pointer rounded-md border border-line px-2 py-0.5 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35';
+    'cursor-pointer rounded-lg border border-line px-2 py-0.5 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35';
 
   return (
     <div
       data-city-photograph={photograph.id}
-      className="grid gap-2.5 rounded-[10px] border border-line bg-field p-3"
+      className="grid gap-2.5 rounded-card border border-line bg-field p-3"
     >
       <div className="flex flex-wrap items-start gap-3">
         <button
@@ -350,7 +350,7 @@ function PhotographCard({
                 aria-label={c.imageRemove}
                 data-city-image-remove={photograph.id}
                 onClick={() => void remove()}
-                className="cursor-pointer rounded-md border border-bad/45 px-2 py-0.5 text-[10.5px] font-bold text-bad transition-colors hover:bg-bad/10 disabled:cursor-not-allowed disabled:opacity-35"
+                className="cursor-pointer rounded-lg border border-bad/45 px-2 py-0.5 text-[10.5px] font-bold text-bad transition-colors hover:bg-bad/10 disabled:cursor-not-allowed disabled:opacity-35"
               >
                 {c.remove}
               </button>

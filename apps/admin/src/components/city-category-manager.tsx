@@ -150,7 +150,7 @@ export function CityCategoryManager({
               data-category-up={row.code}
               aria-label={`${c.moveUp} — ${row.nameAr}`}
               onClick={() => void move(row.code, -1)}
-              className="cursor-pointer rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
+              className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
             >
               ↑
             </button>
@@ -160,7 +160,7 @@ export function CityCategoryManager({
               data-category-down={row.code}
               aria-label={`${c.moveDown} — ${row.nameAr}`}
               onClick={() => void move(row.code, 1)}
-              className="cursor-pointer rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
+              className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
             >
               ↓
             </button>

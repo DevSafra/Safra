@@ -137,7 +137,7 @@ export default async function PayoutPage({
               {covered.map((booking) => (
                 <li
                   key={booking.bookingReference}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-line bg-card px-3.5 py-3"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-card border border-line bg-card px-3.5 py-3"
                 >
                   <Ltr className="text-[12.5px] font-semibold text-sky">
                     {booking.bookingReference}
@@ -175,7 +175,7 @@ function Row({
   readonly ltr?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-3.5 py-2.5">
+    <div className="flex items-center justify-between gap-3 rounded-card border border-line bg-card px-3.5 py-2.5">
       <span className="text-[11.5px] text-faint">{label}</span>
       <span
         className={`text-[13px] ${strong ? 'font-extrabold text-gold' : 'text-text'}`}

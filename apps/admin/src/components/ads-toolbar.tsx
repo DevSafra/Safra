@@ -85,8 +85,7 @@ export function AdsToolbar({
   const [startsOn, setStartsOn] = useState('');
   const [endsOn, setEndsOn] = useState('');
 
-  const field =
-    'rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text';
+  const field = 'rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text';
   const labelled = 'grid gap-1.5 text-[11.5px] font-semibold text-muted';
 
   async function send(
@@ -143,7 +142,7 @@ export function AdsToolbar({
 
   const panel =
     open === 'advertiser' ? (
-      <div className="grid w-full gap-3 rounded-[10px] border border-line bg-field p-3.5">
+      <div className="grid w-full gap-3 rounded-card border border-line bg-field p-3.5">
         <h3 className="text-[13px] font-bold text-text">{c.advTitle}</h3>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -258,7 +257,7 @@ export function AdsToolbar({
         </div>
       </div>
     ) : open === 'campaign' ? (
-      <div className="grid w-full gap-3 rounded-[10px] border border-line bg-field p-3.5">
+      <div className="grid w-full gap-3 rounded-card border border-line bg-field p-3.5">
         <h3 className="text-[13px] font-bold text-text">{c.newTitle}</h3>
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -523,14 +522,14 @@ export function AdsToolbar({
             <button
               type="button"
               onClick={() => setOpen('advertiser')}
-              className="min-h-10 cursor-pointer rounded-[9px] border border-line px-4 py-1.5 text-[12.5px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold lg:min-h-0"
+              className="min-h-10 cursor-pointer rounded-lg border border-line px-4 py-1.5 text-[12.5px] font-bold text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold lg:min-h-0"
             >
               {c.newAdvertiser}
             </button>
             <button
               type="button"
               onClick={() => setOpen('campaign')}
-              className="min-h-10 cursor-pointer rounded-[9px] border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
+              className="min-h-10 cursor-pointer rounded-lg border border-[rgba(var(--goldA),0.4)] px-4 py-1.5 text-[12.5px] font-extrabold text-gold-ink transition-colors hover:bg-[rgba(var(--goldA),0.08)] lg:min-h-0"
             >
               {c.create}
             </button>

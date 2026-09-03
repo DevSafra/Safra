@@ -83,7 +83,7 @@ export function SettingDetails({
   }, [setting.key]);
 
   return (
-    <div className="mt-3 rounded-[11px] border border-line bg-field p-3.5">
+    <div className="mt-3 rounded-lg border border-line bg-field p-3.5">
       <dl className="grid gap-2 sm:grid-cols-2">
         <div className="min-w-0">
           <dt className="text-[10.5px] text-faint2">

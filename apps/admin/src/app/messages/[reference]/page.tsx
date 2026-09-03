@@ -166,7 +166,7 @@ function Message({ message }: { message: ThreadMessage }) {
         An internal note is visually distinct — dashed border — because the one mistake worth
         preventing on this screen is reading a staff note as something the customer was told.
       */
-      className={`rounded-[10px] border px-3.5 py-2.5 ${
+      className={`rounded-card border px-3.5 py-2.5 ${
         message.internal
           ? 'border-dashed border-[rgba(var(--warnA),0.45)] bg-[rgba(var(--warnA),0.06)]'
           : 'border-line bg-field'

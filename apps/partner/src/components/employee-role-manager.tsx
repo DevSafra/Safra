@@ -141,7 +141,7 @@ function RoleForm({
         void submit(event);
       }}
       noValidate
-      className="grid gap-3 rounded-xl border border-line bg-card p-4"
+      className="grid gap-3 rounded-card border border-line bg-card p-4"
     >
       <h2 className="text-sm font-semibold text-text">
         {editing ? t.employeeRoles.editTitle : t.employeeRoles.createTitle}
@@ -331,7 +331,7 @@ export function EmployeeRoleManager({
               </li>
             ) : (
               <li key={role.id}>
-                <div className="grid gap-2 rounded-xl border border-line bg-card p-4">
+                <div className="grid gap-2 rounded-card border border-line bg-card p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm font-semibold text-text">{role.name}</p>
 

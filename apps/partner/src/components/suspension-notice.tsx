@@ -38,7 +38,7 @@ export function SuspensionNotice({
       */
       role="status"
       data-suspension-notice
-      className="grid gap-3 rounded-xl border border-bad/40 bg-bad/5 p-4"
+      className="grid gap-3 rounded-card border border-bad/40 bg-bad/5 p-4"
     >
       <div className="grid gap-1">
         <h2 className="text-sm font-semibold text-bad">{t.suspension.title}</h2>

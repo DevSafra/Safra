@@ -70,7 +70,7 @@ export default async function ReviewModerationPage({
                   <li
                     key={review.reference}
                     id={rowAnchor(review.reference)}
-                    className="scroll-mt-24 rounded-xl border border-line bg-card p-4"
+                    className="scroll-mt-24 rounded-card border border-line bg-card p-4"
                   >
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                       <Ltr className="text-[12px] font-semibold text-sky">

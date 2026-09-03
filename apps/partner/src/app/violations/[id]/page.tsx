@@ -102,12 +102,12 @@ export default async function ViolationDetailPage({
 
   return shell(
     <>
-      <section className="grid gap-3 rounded-xl border border-line bg-card p-4">
+      <section className="grid gap-3 rounded-card border border-line bg-card p-4">
         <div className="flex flex-wrap items-center gap-2.5">
           <h2 className="text-[15px] font-bold text-text">
             {t.violations.kind[violation.kind] ?? violation.kind}
           </h2>
-          <span className="rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted">
+          <span className="rounded-lg border border-line px-1.5 py-0.5 text-[11px] text-muted">
             {t.violations.stage[violation.stage] ?? violation.stage}
           </span>
         </div>
@@ -146,7 +146,7 @@ export default async function ViolationDetailPage({
 
       {/* The warning, and only once somebody actually issued one. */}
       {violation.warnedAt ? (
-        <section className="grid gap-1.5 rounded-xl border border-line bg-card p-4">
+        <section className="grid gap-1.5 rounded-card border border-line bg-card p-4">
           <h3 className="text-[12px] font-semibold text-muted">
             {t.violations.theWarning}
           </h3>
@@ -172,7 +172,7 @@ export default async function ViolationDetailPage({
           {t.violations.moneyHidden}
         </p>
       ) : fine ? (
-        <section className="grid gap-2 rounded-xl border border-line bg-card p-4">
+        <section className="grid gap-2 rounded-card border border-line bg-card p-4">
           <h3 className="text-[12px] font-semibold text-muted">{t.violations.theFine}</h3>
 
           <p
@@ -211,7 +211,7 @@ export default async function ViolationDetailPage({
         decision happened and refuses to say what it was is worse for the partner than no record.
       */}
       {violation.waived ? (
-        <section className="grid gap-1.5 rounded-xl border border-ok/40 bg-ok/5 p-4">
+        <section className="grid gap-1.5 rounded-card border border-ok/40 bg-ok/5 p-4">
           <h3 className="text-[12px] font-semibold text-ok">{t.violations.theWaiver}</h3>
           {violation.waivedReason ? (
             <p className="text-[13px] leading-relaxed text-text">

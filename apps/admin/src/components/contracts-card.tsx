@@ -51,7 +51,7 @@ export async function ContractsCard({ partnerReference }: { partnerReference?: s
 
 function ContractRow({ contract }: { contract: ContractItem }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line bg-field px-3.5 py-2.75">
+    <div className="flex flex-wrap items-center gap-3 rounded-card border border-line bg-field px-3.5 py-2.75">
       {/* The design's 32×32 gold PDF tile. */}
       <span
         aria-hidden

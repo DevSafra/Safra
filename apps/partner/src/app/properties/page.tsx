@@ -132,7 +132,7 @@ function Card({ property }: { readonly property: PartnerProperty }) {
     .join(' · ');
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-[14px] border border-line bg-card">
+    <article className="flex h-full flex-col overflow-hidden rounded-card border border-line bg-card">
       {/*
         The image, or an honest placeholder. `property_images` is empty for every seeded listing
         because nothing has uploaded one yet — a stock photo here would be a picture of somewhere

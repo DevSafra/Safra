@@ -81,7 +81,7 @@ export function SettingsBoard({
           how carefully somebody presses a button: every change here is recorded against their
           name. It is also repeated inside the editor, where the decision is actually taken.
         */}
-        <p className="mt-3 rounded-[9px] border border-[rgba(var(--warnA),0.3)] bg-[rgba(var(--warnA),0.07)] px-3 py-2 text-[11px] leading-relaxed text-warn">
+        <p className="mt-3 rounded-lg border border-[rgba(var(--warnA),0.3)] bg-[rgba(var(--warnA),0.07)] px-3 py-2 text-[11px] leading-relaxed text-warn">
           {t.sections.settings.auditNote}
         </p>
 
@@ -104,13 +104,13 @@ export function SettingsBoard({
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder={t.sections.settings.filterPlaceholder}
                 /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
-                className="min-w-0 flex-1 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+                className="min-w-0 flex-1 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
               />
               {query ? (
                 <button
                   type="button"
                   onClick={() => setQuery('')}
-                  className="shrink-0 cursor-pointer rounded-[9px] border border-line px-3 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
+                  className="shrink-0 cursor-pointer rounded-lg border border-line px-3 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
                 >
                   {t.sections.settings.filterClear}
                 </button>

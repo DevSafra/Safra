@@ -79,7 +79,7 @@ export default async function InvitationPage({
           {t.invitation.intro}
         </p>
 
-        <div className="mt-8 rounded-xl border border-line bg-card p-6">
+        <div className="mt-8 rounded-card border border-line bg-card p-6">
           <InvitationForm token={token} />
         </div>
 

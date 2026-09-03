@@ -88,7 +88,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
   }
 
   return (
-    <section className="max-w-[640px] rounded-[15px] border border-[rgba(var(--badA),0.5)] bg-card p-5.5">
+    <section className="max-w-[640px] rounded-card border border-[rgba(var(--badA),0.5)] bg-card p-5.5">
       <h2 className="text-[15px] font-extrabold text-bad">
         {t.sections.emergency.title}
       </h2>
@@ -108,7 +108,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
               setScopeRef('');
               setConfirming(false);
             }}
-            className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2.5 text-[13px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] text-text"
           >
             <option value="city">{t.sections.emergency.scopeCity}</option>
             <option value="country">{t.sections.emergency.scopeCountry}</option>
@@ -123,7 +123,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
               setScopeRef(event.target.value);
               setConfirming(false);
             }}
-            className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2.5 text-[13px] text-text"
+            className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] text-text"
           >
             <option value="">—</option>
             {targets.map((target) => (
@@ -179,7 +179,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
           }}
           rows={2}
           maxLength={500}
-          className="rounded-[9px] border border-line bg-field px-3 py-2.5 text-[13px] text-text"
+          className="rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] text-text"
         />
         <span className="text-[10.5px] font-normal text-faint2">
           {t.sections.emergency.reasonHint}
@@ -193,7 +193,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
       ) : null}
 
       {confirming && selected ? (
-        <div className="mt-4 rounded-xl border border-bad bg-[rgba(var(--badA),0.12)] p-3.5">
+        <div className="mt-4 rounded-card border border-bad bg-[rgba(var(--badA),0.12)] p-3.5">
           {/*
             The confirmation restates the operator's own selections rather than saying "are you
             sure?". A generic prompt trains people to click through it; this one is only
@@ -220,7 +220,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
               setConfirming(true);
             }
           }}
-          className="cursor-pointer rounded-[9px] bg-bad px-6 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className="cursor-pointer rounded-lg bg-bad px-6 py-3 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
           {confirming ? t.sections.emergency.activate : t.admin.handle}
         </button>
@@ -229,7 +229,7 @@ export function EmergencyForm({ scopes }: { scopes: EmergencyState['scopes'] }) 
           <button
             type="button"
             onClick={() => setConfirming(false)}
-            className="cursor-pointer rounded-[9px] border border-line px-6 py-3 text-[13px] text-muted"
+            className="cursor-pointer rounded-lg border border-line px-6 py-3 text-[13px] text-muted"
           >
             {t.login.useDifferentAccount}
           </button>

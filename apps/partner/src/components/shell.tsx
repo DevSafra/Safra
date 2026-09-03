@@ -179,7 +179,7 @@ export async function Shell({
         id={SIDEBAR_ID}
         tabIndex={-1}
         aria-label={t.nav.heading}
-        className="portal-sidebar flex flex-col rounded-[14px] border border-[rgba(var(--goldA),0.14)] bg-card p-3.5"
+        className="portal-sidebar flex flex-col rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-3.5"
       >
         <p className="mb-2 px-2 text-[11px] tracking-wide text-faint">{partnerName}</p>
 

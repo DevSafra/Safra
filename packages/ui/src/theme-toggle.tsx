@@ -150,7 +150,7 @@ export function ThemeToggle({
       onClick={toggle}
       aria-label={label}
       title={label}
-      className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-[9px] border border-line bg-field text-sm text-muted transition-colors hover:border-gold hover:text-gold"
+      className="grid size-10 shrink-0 cursor-pointer place-items-center rounded-lg border border-line bg-field text-sm text-muted transition-colors hover:border-gold hover:text-gold"
     >
       {/* The destination: a moon offers dark, a sun offers light — matching the label above. */}
       {theme === 'dark' ? <SunIcon /> : <MoonIcon />}

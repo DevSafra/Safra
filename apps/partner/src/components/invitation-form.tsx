@@ -92,7 +92,7 @@ export function InvitationForm({ token }: { token: string }) {
 
   if (done) {
     return (
-      <div className="grid gap-4 rounded-xl border border-ok/40 bg-ok/5 p-4">
+      <div className="grid gap-4 rounded-card border border-ok/40 bg-ok/5 p-4">
         <p className="text-sm text-ok">{t.invitation.done}</p>
         <button
           type="button"

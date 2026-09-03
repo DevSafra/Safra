@@ -178,7 +178,7 @@ function Lookup({ reference }: { reference: string }) {
     <form
       action="/arrivals"
       method="get"
-      className="flex flex-wrap items-end gap-2 rounded-xl border border-line bg-card p-3"
+      className="flex flex-wrap items-end gap-2 rounded-card border border-line bg-card p-3"
     >
       <label className="grid min-w-0 flex-1 gap-1 text-[12px] text-muted">
         {t.arrivals.lookup.label}
@@ -223,7 +223,7 @@ function Row({ arrival }: { arrival: PartnerArrival }) {
     arrival.checkIn < new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="grid gap-3 rounded-xl border border-line bg-card p-4">
+    <div className="grid gap-3 rounded-card border border-line bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="grid gap-0.5">
           <p className="text-sm font-semibold text-text">{arrival.guestName}</p>

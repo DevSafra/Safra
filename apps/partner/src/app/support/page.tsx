@@ -36,7 +36,7 @@ export default async function SupportPage() {
     >
       <p className="text-[12.5px] text-muted">{t.support.intro}</p>
 
-      <section className="mt-4 rounded-[14px] border border-line bg-card p-4">
+      <section className="mt-4 rounded-card border border-line bg-card p-4">
         <h2 className="font-[family-name:var(--font-amiri)] text-[18px] text-text">
           {t.support.openTitle}
         </h2>
@@ -53,7 +53,7 @@ export default async function SupportPage() {
         {tickets === 'failed' || tickets === 'unauthenticated' ? (
           <p className="mt-3 text-[12.5px] text-bad">{t.dashboard.loadFailed}</p>
         ) : tickets.items.length === 0 ? (
-          <p className="mt-3 rounded-[14px] border border-line bg-card p-5 text-center text-[12.5px] text-muted">
+          <p className="mt-3 rounded-card border border-line bg-card p-5 text-center text-[12.5px] text-muted">
             {t.support.none}
           </p>
         ) : (
@@ -62,7 +62,7 @@ export default async function SupportPage() {
               <li key={ticket.reference}>
                 <Link
                   href={`/support/${encodeURIComponent(ticket.reference)}`}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-line bg-card p-4 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-card p-4 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
                 >
                   <span className="min-w-0">
                     <Ltr className="block text-[12.5px] text-text">

@@ -157,7 +157,7 @@ export function BookingNotes({
             maxLength={2000}
             rows={3}
             disabled={busy}
-            className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+            className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
           />
           <span className="text-[10.5px] text-faint">
             {t.sections.bookingDetail.noteHint}

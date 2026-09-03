@@ -272,7 +272,7 @@ function BalanceCard({
 }) {
   return (
     <div
-      className="rounded-[14px] border px-5 py-[18px]"
+      className="rounded-card border px-5 py-[18px]"
       style={{
         background: 'rgba(var(--goldA), 0.06)',
         borderColor: 'rgba(var(--goldA), 0.22)',

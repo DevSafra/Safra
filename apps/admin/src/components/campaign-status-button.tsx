@@ -57,7 +57,7 @@ export function CampaignStatusButton({
       type="button"
       disabled={busy}
       onClick={() => void toggle()}
-      className="inline-flex w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold disabled:opacity-50"
+      className="inline-flex w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-lg border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold disabled:opacity-50"
     >
       {busy
         ? t.sections.ads.pausing

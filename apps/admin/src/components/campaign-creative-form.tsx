@@ -390,7 +390,7 @@ export function CampaignCreativeForm({
   }
 
   const field =
-    'w-full min-w-0 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text';
+    'w-full min-w-0 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text';
   const labelled = 'grid gap-1.5 text-[11.5px] font-semibold text-muted';
 
   return (
@@ -399,7 +399,7 @@ export function CampaignCreativeForm({
         ref={trigger}
         type="button"
         onClick={() => reopen()}
-        className="inline-flex w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-md border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
+        className="inline-flex w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-lg border border-line px-2.5 py-1 text-[10.5px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
       >
         {c.editCreative}
       </button>
@@ -416,7 +416,7 @@ export function CampaignCreativeForm({
           <div
             /* Clicks inside the dialog must not reach the backdrop's handler. */
             onClick={(event) => event.stopPropagation()}
-            className="w-full max-w-xl rounded-[14px] border border-line bg-card p-5 shadow-2xl"
+            className="w-full max-w-xl rounded-card border border-line bg-card p-5 shadow-2xl"
           >
             <div className="mb-4 flex items-start justify-between gap-4">
               <h2 className="text-[15px] font-bold text-text">{c.editTitle}</h2>
@@ -572,7 +572,7 @@ export function CampaignCreativeForm({
                       type="button"
                       disabled={busy}
                       onClick={() => file.current?.click()}
-                      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-[9px] border border-line px-4 py-2 text-[12px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold disabled:opacity-50 lg:min-h-0"
+                      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-line px-4 py-2 text-[12px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.4)] hover:text-gold disabled:opacity-50 lg:min-h-0"
                     >
                       {imageUrl || staged.kind === 'replace'
                         ? c.imageReplace

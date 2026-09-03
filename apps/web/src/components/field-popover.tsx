@@ -75,7 +75,7 @@ export function FieldPopover({
         onClick={() => setOpen((was) => !was)}
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 rounded-[0.6rem] bg-field px-3 py-2 text-start transition-[background-color,scale] duration-200 ease-out-strong active:scale-[.99]"
+        className="flex min-h-12 w-full cursor-pointer items-center gap-2.5 rounded-lg bg-field px-3 py-2 text-start transition-[background-color,scale] duration-200 ease-out-strong active:scale-[.99]"
       >
         {icon ? (
           <span aria-hidden className="shrink-0 text-muted">

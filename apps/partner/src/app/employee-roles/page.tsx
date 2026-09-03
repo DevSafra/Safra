@@ -92,7 +92,7 @@ export default async function EmployeeRolesPage() {
         the reader has met the concept and the paragraph is in their way.
       */}
       {roles.length === 0 ? (
-        <div className="grid gap-1.5 rounded-xl border border-line bg-card p-4">
+        <div className="grid gap-1.5 rounded-card border border-line bg-card p-4">
           <p className="text-sm font-semibold text-text">{t.employeeRoles.emptyTitle}</p>
           <p className="text-[12.5px] leading-relaxed text-muted">
             {t.employeeRoles.emptyBody}

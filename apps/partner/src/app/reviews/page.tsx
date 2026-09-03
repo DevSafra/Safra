@@ -152,7 +152,7 @@ function Row({ review }: { readonly review: PartnerReview }) {
 
   return (
     <article
-      className={`rounded-xl border bg-card p-3.5 ${hidden ? 'border-bad/40 opacity-80' : 'border-line'}`}
+      className={`rounded-card border bg-card p-3.5 ${hidden ? 'border-bad/40 opacity-80' : 'border-line'}`}
     >
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
         <span className="text-[13px] font-bold text-text">{review.guestName}</span>

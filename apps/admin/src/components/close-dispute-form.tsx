@@ -157,7 +157,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
   }
 
   return (
-    <div className="mt-3 grid gap-3 rounded-[10px] border border-line bg-field p-3.5">
+    <div className="mt-3 grid gap-3 rounded-card border border-line bg-field p-3.5">
       <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
         {t.sections.disputes.outcome}
         <select
@@ -165,7 +165,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
           onChange={(event) =>
             setOutcome(event.target.value === 'rejected' ? 'rejected' : 'resolved')
           }
-          className="cursor-pointer rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+          className="cursor-pointer rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
         >
           <option value="resolved">{t.sections.disputes.outcomeResolved}</option>
           <option value="rejected">{t.sections.disputes.outcomeRejected}</option>
@@ -179,7 +179,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
           onChange={(event) => setResolution(event.target.value)}
           rows={3}
           maxLength={2000}
-          className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text"
+          className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] leading-relaxed text-text"
         />
         <span className="text-[10.5px] font-normal text-faint2">
           {t.sections.disputes.resolutionHint}
@@ -206,7 +206,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
             placeholder="10.00"
             /* No `dir`: a field a person types into follows the page (docs/i18n.md §9). */
             aria-invalid={!amountValid}
-            className={`w-40 rounded-[9px] border bg-card px-3 py-2 text-[13px] text-text ${
+            className={`w-40 rounded-lg border bg-card px-3 py-2 text-[13px] text-text ${
               amountValid ? 'border-line' : 'border-bad'
             }`}
           />
@@ -230,14 +230,14 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
           type="button"
           disabled={!ready}
           onClick={() => void submit()}
-          className="cursor-pointer rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[12.5px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-40"
+          className="cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-5 py-2 text-[12.5px] font-extrabold text-[#241A05] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? t.sections.disputes.closing : t.sections.disputes.confirmClose}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="cursor-pointer rounded-[9px] border border-line px-5 py-2 text-[12.5px] text-muted"
+          className="cursor-pointer rounded-lg border border-line px-5 py-2 text-[12.5px] text-muted"
         >
           {t.sections.settings.cancel}
         </button>

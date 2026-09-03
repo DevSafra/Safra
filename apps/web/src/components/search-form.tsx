@@ -296,7 +296,7 @@ export async function SearchForm({
 
         <button
           type="submit"
-          className="btn-gold min-h-12 cursor-pointer rounded-[0.6rem] px-6 text-base font-bold transition-[opacity,scale] duration-200 ease-out-strong hover:opacity-90 active:scale-[.99] sm:col-span-2 lg:col-span-1"
+          className="btn-gold min-h-12 cursor-pointer rounded-lg px-6 text-base font-bold transition-[opacity,scale] duration-200 ease-out-strong hover:opacity-90 active:scale-[.99] sm:col-span-2 lg:col-span-1"
         >
           {t('submit')}
         </button>
@@ -322,7 +322,7 @@ function Segment({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-12 items-center gap-2.5 rounded-[0.6rem] bg-field px-3 py-2">
+    <div className="flex min-h-12 items-center gap-2.5 rounded-lg bg-field px-3 py-2">
       {icon ? (
         <span aria-hidden className="shrink-0 text-muted">
           {icon}

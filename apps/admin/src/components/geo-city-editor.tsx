@@ -572,7 +572,7 @@ export function GeoCities({
                     data-city-up={row.slug}
                     aria-label={`${c.cityMoveUp} — ${row.nameAr}`}
                     onClick={() => void move(row.slug, -1)}
-                    className="cursor-pointer rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
+                    className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     ↑
                   </button>
@@ -582,7 +582,7 @@ export function GeoCities({
                     data-city-down={row.slug}
                     aria-label={`${c.cityMoveDown} — ${row.nameAr}`}
                     onClick={() => void move(row.slug, 1)}
-                    className="cursor-pointer rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
+                    className="cursor-pointer rounded-lg border border-line px-1.5 py-0.5 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.45)] hover:text-gold disabled:cursor-not-allowed disabled:opacity-35"
                   >
                     ↓
                   </button>

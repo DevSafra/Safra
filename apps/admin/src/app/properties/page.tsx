@@ -125,7 +125,7 @@ export default async function PropertiesPage({
                 <li key={property.reference}>
                   <Link
                     href={`/properties/${property.reference}${back}`}
-                    className="block rounded-[10px] border border-line bg-field px-3.5 py-3 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
+                    className="block rounded-card border border-line bg-field px-3.5 py-3 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
                   >
                     <span className="block truncate text-[13px] font-bold text-text">
                       {property.nameAr}

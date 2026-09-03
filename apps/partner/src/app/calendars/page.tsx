@@ -269,7 +269,7 @@ export default async function CalendarsPage({
               key={property.reference}
               data-property={property.reference}
               href={openHref(property.reference)}
-              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4"
+              className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4"
             >
               <span aria-hidden className="text-[11px] text-faint">
                 ‹
@@ -287,7 +287,7 @@ export default async function CalendarsPage({
             key={property.reference}
             data-property={property.reference}
             open
-            className="group rounded-[15px] border border-[rgba(var(--goldA),0.14)] bg-card p-4"
+            className="group rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-4"
           >
             <summary className="flex list-none cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1">
               <span

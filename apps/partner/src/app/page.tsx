@@ -196,7 +196,7 @@ function Kpis({
       <Link
         href="/violations"
         data-violations-card
-        className="block rounded-[14px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+        className="block rounded-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
       >
         <Kpi
           label={t.dashboard.kpiViolations}
@@ -254,7 +254,7 @@ function Kpi({
   readonly tone: string;
 }) {
   return (
-    <div className="rounded-[14px] border border-gold/15 bg-card p-4.5">
+    <div className="rounded-card border border-gold/15 bg-card p-4.5">
       <p className="text-[12px] text-faint">{label}</p>
       <p className={`mt-1.5 text-[26px] font-extrabold ${tone}`}>{value}</p>
       <p className="mt-1 text-[11px] text-ok">{sub}</p>
@@ -269,7 +269,7 @@ function Requests({
   readonly requests: PartnerDashboard['pendingRequests'];
 }) {
   return (
-    <section className="rounded-2xl border border-warn/40 bg-card p-5">
+    <section className="rounded-card border border-warn/40 bg-card p-5">
       <div className="flex flex-wrap items-center gap-2.5">
         <h2 className="text-[15px] font-extrabold text-warn">
           {t.dashboard.requestsTitle}
@@ -286,7 +286,7 @@ function Requests({
           {requests.map((request) => (
             <li
               key={request.reference}
-              className="rounded-xl border border-line bg-field p-3.5"
+              className="rounded-card border border-line bg-field p-3.5"
             >
               <div className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
@@ -354,7 +354,7 @@ function Deadline({ at }: { readonly at: string | null }) {
 function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'] }) {
   if (!calendar) {
     return (
-      <section className="rounded-2xl border border-gold/15 bg-card p-5">
+      <section className="rounded-card border border-gold/15 bg-card p-5">
         <p className="text-[12.5px] text-faint">{t.dashboard.calendarNoUnits}</p>
       </section>
     );
@@ -364,7 +364,7 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
   const monthName = first ? (t.months[new Date(first.date).getUTCMonth()] ?? '') : '';
 
   return (
-    <section className="rounded-2xl border border-gold/15 bg-card p-5">
+    <section className="rounded-card border border-gold/15 bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[15px] font-extrabold text-gold-ink">
           {fill(t.dashboard.calendarTitle, { month: monthName })}
@@ -421,7 +421,7 @@ function Calendar({ calendar }: { readonly calendar: PartnerDashboard['calendar'
                 prefetch={false}
                 title={detail}
                 aria-label={detail}
-                className={`grid aspect-square min-h-10 cursor-pointer place-items-center rounded-[7px] border text-[11px] font-semibold transition-colors hover:border-gold ${portfolioTone(
+                className={`grid aspect-square min-h-10 cursor-pointer place-items-center rounded-lg border text-[11px] font-semibold transition-colors hover:border-gold ${portfolioTone(
                   day.available,
                   calendar.unitCount,
                 )}`}
@@ -503,7 +503,7 @@ function Legend({ tone, label }: { readonly tone: string; readonly label: string
  */
 function Notices({ notices }: { readonly notices: PartnerDashboard['notices'] }) {
   return (
-    <section data-notices className="rounded-2xl border border-gold/15 bg-card p-5">
+    <section data-notices className="rounded-card border border-gold/15 bg-card p-5">
       <h2 className="mb-3 text-[15px] font-extrabold text-gold-ink">
         {t.dashboard.noticesTitle}
       </h2>
@@ -555,7 +555,7 @@ function Alerts({
   readonly payout: PartnerDashboard['payout'];
 }) {
   return (
-    <section className="rounded-2xl border border-gold/15 bg-card p-5">
+    <section className="rounded-card border border-gold/15 bg-card p-5">
       <h2 className="mb-3 text-[15px] font-extrabold text-gold-ink">
         {t.dashboard.alertsTitle}
       </h2>
@@ -644,7 +644,7 @@ function Alerts({
 function NoSections() {
   return (
     <Shell title={t.employees.noSectionsTitle} partnerName="" active="dashboard">
-      <div className="grid gap-1.5 rounded-xl border border-line bg-card p-4">
+      <div className="grid gap-1.5 rounded-card border border-line bg-card p-4">
         <p className="text-sm font-semibold text-text">{t.employees.noSectionsTitle}</p>
         <p className="text-[12.5px] leading-relaxed text-muted">
           {t.employees.noSectionsBody}

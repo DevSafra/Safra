@@ -92,7 +92,7 @@ export function RaiseViolation({ reference }: { reference: string }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-[9px] border border-gold/50 px-4 py-2 text-[12.5px] font-bold text-gold-ink hover:bg-gold/10 lg:min-h-0"
+        className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12.5px] font-bold text-gold-ink hover:bg-gold/10 lg:min-h-0"
       >
         {t.sections.enforcement.raise}
       </button>
@@ -124,7 +124,7 @@ export function RaiseViolation({ reference }: { reference: string }) {
               name="kind"
               required
               defaultValue=""
-              className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+              className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
             >
               <option value="" disabled>
                 {t.sections.enforcement.pickViolationKind}
@@ -148,7 +148,7 @@ export function RaiseViolation({ reference }: { reference: string }) {
               minLength={ENFORCEMENT_REASON_MIN}
               maxLength={2000}
               rows={2}
-              className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+              className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
             />
             <span className="text-[10.5px] text-faint">
               {t.sections.enforcement.reasonHint}
@@ -162,14 +162,14 @@ export function RaiseViolation({ reference }: { reference: string }) {
             <input
               name="bookingReference"
               maxLength={64}
-              className="w-56 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+              className="w-56 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
             />
           </label>
 
           <button
             type="submit"
             disabled={busy}
-            className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-[9px] border border-gold/50 px-4 py-2 text-[12px] font-bold text-gold-ink hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+            className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12px] font-bold text-gold-ink hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
           >
             {busy ? t.sections.enforcement.raising : t.sections.enforcement.raise}
           </button>

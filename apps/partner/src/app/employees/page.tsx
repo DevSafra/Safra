@@ -162,7 +162,7 @@ function Row({
       : { label: t.employees.invitationExpired, tone: 'text-warn' };
 
   return (
-    <div className="grid gap-3 rounded-xl border border-line bg-card p-4">
+    <div className="grid gap-3 rounded-card border border-line bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="grid gap-0.5">
           <p className="text-sm font-semibold text-text">{employee.fullName}</p>

@@ -65,7 +65,7 @@ export function CancelGiftCardForm({ reference }: { reference: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="min-h-10 cursor-pointer rounded-[8px] border border-line px-2.5 py-1 text-[11px] font-bold text-muted transition-colors hover:border-bad hover:text-bad lg:min-h-0"
+        className="min-h-10 cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[11px] font-bold text-muted transition-colors hover:border-bad hover:text-bad lg:min-h-0"
       >
         {c.cancel}
       </button>
@@ -79,7 +79,7 @@ export function CancelGiftCardForm({ reference }: { reference: string }) {
         onChange={(event) => setReason(event.target.value)}
         rows={2}
         placeholder={c.cancelReason}
-        className="rounded-[8px] border border-line bg-card px-2.5 py-1.5 text-[11.5px] text-text"
+        className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-[11.5px] text-text"
       />
       <span className="text-[10.5px] text-faint">{c.cancelReasonHint}</span>
 
@@ -90,7 +90,7 @@ export function CancelGiftCardForm({ reference }: { reference: string }) {
           type="button"
           disabled={reason.trim().length < 3 || busy}
           onClick={() => void submit()}
-          className="min-h-10 cursor-pointer rounded-[8px] border border-bad px-2.5 py-1 text-[11px] font-bold text-bad disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-bad px-2.5 py-1 text-[11px] font-bold text-bad disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
           {busy ? t.table.working : c.cancelConfirm}
         </button>
@@ -100,7 +100,7 @@ export function CancelGiftCardForm({ reference }: { reference: string }) {
             setOpen(false);
             setError(null);
           }}
-          className="min-h-10 cursor-pointer rounded-[8px] border border-line px-2.5 py-1 text-[11px] font-bold text-muted lg:min-h-0"
+          className="min-h-10 cursor-pointer rounded-lg border border-line px-2.5 py-1 text-[11px] font-bold text-muted lg:min-h-0"
         >
           {c.cancelBack}
         </button>

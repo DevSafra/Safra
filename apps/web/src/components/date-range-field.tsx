@@ -243,7 +243,7 @@ function Month({
               disabled={disabled}
               onClick={() => onChoose(day)}
               aria-pressed={isStart || isEnd}
-              className={`grid h-8 w-full cursor-pointer place-items-center rounded-md text-[0.75rem] tabular-nums transition-[background-color,color] duration-150 ease-out-strong disabled:cursor-not-allowed disabled:text-faint/50 ${
+              className={`grid h-8 w-full cursor-pointer place-items-center rounded-lg text-[0.75rem] tabular-nums transition-[background-color,color] duration-150 ease-out-strong disabled:cursor-not-allowed disabled:text-faint/50 ${
                 isStart || isEnd
                   ? 'btn-gold font-bold'
                   : inRange

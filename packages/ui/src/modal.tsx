@@ -135,7 +135,7 @@ export function Modal({
         tabIndex={-1}
         /* Clicks inside must not reach the backdrop's handler. */
         onClick={(event) => event.stopPropagation()}
-        className={`my-auto grid w-full ${width} gap-3 rounded-[14px] border border-line bg-card p-5 text-start shadow-2xl outline-none`}
+        className={`my-auto grid w-full ${width} gap-3 rounded-card border border-line bg-card p-5 text-start shadow-2xl outline-none`}
       >
         {children}
       </div>

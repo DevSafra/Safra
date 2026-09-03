@@ -94,7 +94,7 @@ export default async function DisputesPage({
                 name="status"
                 defaultValue={status ?? ''}
                 aria-label={t.table.colStatus}
-                className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+                className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
               >
                 <option value="">{t.sections.bookings.allStatuses}</option>
                 {DISPUTE_STATUSES.map((value) => (
@@ -193,7 +193,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
   return (
     <article
       /* The design's card: bad-tinted border, 14px radius. */
-      className={`rounded-[14px] border bg-card p-4 ${
+      className={`rounded-card border bg-card p-4 ${
         closed ? 'border-line' : 'border-[rgba(var(--badA),0.35)]'
       }`}
     >
@@ -293,7 +293,7 @@ function DisputeCard({ dispute }: { dispute: DisputeItem }) {
 
           {/* The resolution, once closed. It is the whole point of requiring one. */}
           {dispute.resolution ? (
-            <p className="mt-2 rounded-[10px] border border-line bg-field px-3 py-2 text-[11.5px] leading-relaxed text-text2">
+            <p className="mt-2 rounded-card border border-line bg-field px-3 py-2 text-[11.5px] leading-relaxed text-text2">
               {dispute.resolution}
               {dispute.compensationAmount && dispute.compensationCurrency ? (
                 <span className="ms-1.5 font-bold text-gold-ink">

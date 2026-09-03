@@ -249,7 +249,7 @@ export function ViolationActions({
                 inputMode="decimal"
                 pattern="\d{1,10}(\.\d{1,2})?"
                 placeholder={t.sections.enforcement.fineAmountPlaceholder}
-                className="w-32 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+                className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
               />
             </label>
             <label className="grid gap-1">
@@ -277,7 +277,7 @@ export function ViolationActions({
                 name="currencyCode"
                 required
                 defaultValue={FINE_CURRENCIES[0]}
-                className="w-28 cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+                className="w-28 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
               >
                 {FINE_CURRENCIES.map((code) => (
                   <option key={code} value={code}>
@@ -298,7 +298,7 @@ export function ViolationActions({
                 name="customerCompensation"
                 inputMode="decimal"
                 pattern="\d{1,10}(\.\d{1,2})?"
-                className="w-32 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+                className="w-32 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
               />
             </label>
           </div>
@@ -457,7 +457,7 @@ function Reason({ name, label, busy }: { name: string; label: string; busy: bool
         maxLength={2000}
         rows={2}
         disabled={busy}
-        className="rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
+        className="rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed"
       />
       <span className="text-[10.5px] text-faint">
         {t.sections.enforcement.reasonHint}
@@ -479,7 +479,7 @@ function Submit({
     <button
       type="submit"
       disabled={busy}
-      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-[9px] border border-gold/50 px-4 py-2 text-[12px] font-bold text-gold-ink hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
+      className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-gold/50 px-4 py-2 text-[12px] font-bold text-gold-ink hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60 lg:min-h-0"
     >
       {busy ? working : idle}
     </button>

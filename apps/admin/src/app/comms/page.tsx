@@ -95,7 +95,7 @@ export default async function CommsPage({
                 name="status"
                 defaultValue={status ?? ''}
                 aria-label={t.table.colStatus}
-                className="cursor-pointer rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text"
+                className="cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
               >
                 <option value="">{t.sections.bookings.allStatuses}</option>
                 {(['queued', 'sent', 'delivered', 'failed'] as const).map((value) => (

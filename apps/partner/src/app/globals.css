@@ -53,6 +53,16 @@
   /** Dimmest legible tier — a denied cell in the permission matrix, an unbuilt nav item. */
   --color-faint2: #4e4a6e;
   --color-gold: #e8bc66;
+
+  /*
+   * The surface radius, so `packages/ui` can name it.
+   *
+   * It existed only in the customer app, which is why `Modal` and the image previewer carried
+   * `rounded-card` and `rounded-card`: a shared component may only spend what all three apps
+   * have, and the alternative to a token is a number nobody can change in one place. Same lesson
+   * as `--color-text2` and `--ease-out-strong`.
+   */
+  --radius-card: 0.875rem;
   --color-gold-ink: #e8bc66;
   --color-sky: #78aee0;
   --color-ok: #6fc792;

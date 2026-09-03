@@ -237,7 +237,7 @@ export function SettingRow({
             type="button"
             onClick={() => setShowingDetails(!showingDetails)}
             aria-expanded={showingDetails}
-            className="cursor-pointer rounded-md px-2 py-1 text-[11px] text-faint transition-colors hover:text-gold"
+            className="cursor-pointer rounded-lg px-2 py-1 text-[11px] text-faint transition-colors hover:text-gold"
           >
             {showingDetails
               ? t.sections.settings.detailsHide
@@ -257,7 +257,7 @@ export function SettingRow({
             <button
               type="button"
               onClick={open}
-              className="cursor-pointer rounded-md border border-line px-3 py-1 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
+              className="cursor-pointer rounded-lg border border-line px-3 py-1 text-[11px] text-muted transition-colors hover:border-[rgba(var(--goldA),0.5)] hover:text-gold"
             >
               {t.sections.settings.change}
             </button>
@@ -274,7 +274,7 @@ export function SettingRow({
         Arabic screen (Bashar, 2026-08-31).
       */}
       {display.kind === 'routing' ? (
-        <div className="mt-2 overflow-x-auto rounded-[9px] border border-line bg-field">
+        <div className="mt-2 overflow-x-auto rounded-lg border border-line bg-field">
           <table className="w-full text-[11.5px]">
             <thead>
               <tr className="border-b border-line2 text-[10px] text-faint2">
@@ -318,7 +318,7 @@ export function SettingRow({
       {display.kind === 'json' ? (
         <pre
           dir="ltr"
-          className="mt-2 overflow-x-auto rounded-[9px] border border-line bg-field p-2.5 font-mono text-[10.5px] leading-relaxed text-text2"
+          className="mt-2 overflow-x-auto rounded-lg border border-line bg-field p-2.5 font-mono text-[10.5px] leading-relaxed text-text2"
         >
           {display.text}
         </pre>
@@ -334,7 +334,7 @@ export function SettingRow({
 
       {editing ? (
         <form
-          className="mt-3 rounded-[11px] border border-[rgba(var(--goldA),0.22)] bg-field p-3.5"
+          className="mt-3 rounded-lg border border-[rgba(var(--goldA),0.22)] bg-field p-3.5"
           onSubmit={(event) => {
             event.preventDefault();
 
@@ -362,7 +362,7 @@ export function SettingRow({
               <input
                 name="reason"
                 maxLength={500}
-                className="rounded-[9px] border border-line bg-card px-2.5 py-2 text-[12.5px] text-text"
+                className="rounded-lg border border-line bg-card px-2.5 py-2 text-[12.5px] text-text"
               />
             </label>
           </div>
@@ -371,14 +371,14 @@ export function SettingRow({
             <button
               type="submit"
               disabled={busy}
-              className="cursor-pointer rounded-[9px] bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-1.5 text-[11.5px] font-extrabold text-[#241A05] disabled:cursor-default disabled:opacity-60"
+              className="cursor-pointer rounded-lg bg-[linear-gradient(135deg,#F0CB7C,#C4923E)] px-4 py-1.5 text-[11.5px] font-extrabold text-[#241A05] disabled:cursor-default disabled:opacity-60"
             >
               {busy ? t.sections.settings.saving : t.sections.settings.save}
             </button>
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="cursor-pointer rounded-[9px] border border-line px-4 py-1.5 text-[11.5px] text-muted"
+              className="cursor-pointer rounded-lg border border-line px-4 py-1.5 text-[11.5px] text-muted"
             >
               {t.sections.settings.cancel}
             </button>
@@ -536,7 +536,7 @@ function ValueInput({
   fieldRef: RefObject<HTMLInputElement | HTMLSelectElement | null>;
 }) {
   const common =
-    'w-full rounded-[9px] border border-line bg-card px-3 py-2.5 text-[13.5px] text-text';
+    'w-full rounded-lg border border-line bg-card px-3 py-2.5 text-[13.5px] text-text';
 
   if (setting.valueSchema === 'feeMode') {
     return (

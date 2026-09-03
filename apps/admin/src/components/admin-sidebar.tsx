@@ -236,7 +236,7 @@ export function AdminSidebar({
       id={SIDEBAR_ID}
       tabIndex={-1}
       aria-label={t.nav.heading}
-      className="console-sidebar flex flex-col rounded-[14px] border border-[rgba(var(--goldA),0.14)] bg-card p-3.5"
+      className="console-sidebar flex flex-col rounded-card border border-[rgba(var(--goldA),0.14)] bg-card p-3.5"
     >
       <p className="px-2.5 py-1 text-[11px] font-bold tracking-[0.1em] text-faint">
         {t.nav.heading}

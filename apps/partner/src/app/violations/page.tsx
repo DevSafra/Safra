@@ -107,7 +107,7 @@ export default async function ViolationsPage({
               */}
               <Link
                 href={`/violations/${encodeURIComponent(violation.id)}`}
-                className="block rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+                className="block rounded-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
               >
                 <Row violation={violation} />
               </Link>
@@ -173,12 +173,12 @@ function Row({ violation }: { violation: PartnerViolation }) {
   const waivedReason = violation.waiver?.reason ?? violation.waivedReason;
 
   return (
-    <div className="grid gap-1.5 rounded-xl border border-line bg-card p-4">
+    <div className="grid gap-1.5 rounded-card border border-line bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-sm font-semibold text-text">{kind}</p>
           {/* The raw value if the ladder grows a stage nobody labelled — never prettified. */}
-          <span className="rounded-md border border-line px-1.5 py-0.5 text-[11px] text-muted">
+          <span className="rounded-lg border border-line px-1.5 py-0.5 text-[11px] text-muted">
             {t.violations.stage[violation.stage] ?? violation.stage}
           </span>
         </div>

@@ -119,7 +119,7 @@ export function ApplicationActions({
       </div>
 
       {open ? (
-        <div className="grid gap-2 rounded-[10px] border border-line bg-field p-3">
+        <div className="grid gap-2 rounded-card border border-line bg-field p-3">
           <p className="text-[11.5px] leading-relaxed text-muted">
             {open === 'contact'
               ? t.sections.partnerApplications.contactHint
@@ -144,7 +144,7 @@ export function ApplicationActions({
                 onChange={(event) => setNotes(event.target.value)}
                 rows={3}
                 maxLength={2000}
-                className="rounded-[9px] border border-line bg-card px-3 py-2 text-[12.5px] text-text"
+                className="rounded-lg border border-line bg-card px-3 py-2 text-[12.5px] text-text"
               />
             </label>
           )}

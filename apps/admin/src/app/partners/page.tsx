@@ -177,7 +177,7 @@ export default async function PartnersPage({
                 <li key={partner.reference}>
                   <Link
                     href={`/partners/${partner.reference}${back}`}
-                    className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line bg-field px-3.5 py-3 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
+                    className="flex flex-wrap items-center gap-3 rounded-card border border-line bg-field px-3.5 py-3 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-[13px] font-bold text-text">

@@ -211,7 +211,7 @@ function Field({
         maxLength={80}
         placeholder={placeholder}
         disabled={disabled}
-        className="min-h-10 rounded-[9px] border border-line bg-field px-3 py-2 text-[13px] text-text disabled:cursor-not-allowed lg:min-h-0"
+        className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[13px] text-text disabled:cursor-not-allowed lg:min-h-0"
       />
     </label>
   );

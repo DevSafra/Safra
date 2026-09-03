@@ -119,7 +119,7 @@ export function BookingVerification() {
             value={reference}
             onChange={(event) => setReference(event.target.value)}
             disabled={busy}
-            className="min-h-10 w-64 rounded-[9px] border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed lg:min-h-0"
+            className="min-h-10 w-64 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text disabled:cursor-not-allowed lg:min-h-0"
           />
           <span className="text-[10.5px] text-faint">{copy.referenceHint}</span>
         </label>
@@ -177,7 +177,7 @@ export function BookingVerification() {
               pattern="\d{6}"
               maxLength={6}
               disabled={busy}
-              className="min-h-10 w-32 rounded-[9px] border border-line bg-field px-3 py-2 text-center text-[14px] tracking-[0.3em] text-text disabled:cursor-not-allowed lg:min-h-0"
+              className="min-h-10 w-32 rounded-lg border border-line bg-field px-3 py-2 text-center text-[14px] tracking-[0.3em] text-text disabled:cursor-not-allowed lg:min-h-0"
             />
           </label>
 

@@ -183,7 +183,7 @@ export function StaffRolesManager({
               minLength={2}
               maxLength={60}
               aria-describedby={`${formId}-name-hint`}
-              className="min-h-10 rounded-[9px] border border-line bg-field px-3 py-2.5 text-[13px] text-text lg:min-h-0"
+              className="min-h-10 rounded-lg border border-line bg-field px-3 py-2.5 text-[13px] text-text lg:min-h-0"
             />
             <span
               id={`${formId}-name-hint`}
