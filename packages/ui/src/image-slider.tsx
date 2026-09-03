@@ -973,9 +973,9 @@ export function ImageSlider({
         {images.map((image, index) => (
           <li key={image.id} className="relative">
             {/*
-              The press answers. A tile that a person taps and that does nothing until the frame
-              appears reads as a slow screen rather than a busy one; `active:scale` is the cheapest
-              honest acknowledgement there is. Hover is gated on a real pointer, because a touch
+              The press answers in COLOUR, never in size. Bashar has rejected press-scale three
+              times across this product, and he is right about it here: a tile that shrinks under a
+              finger nudges the tiles beside it. Hover is gated on a real pointer, because a touch
               device fires hover on tap and would leave the tile stuck in its hovered state.
             */}
             <button
@@ -983,7 +983,7 @@ export function ImageSlider({
               onClick={() => setAt(index)}
               aria-label={`${labels.open} ${index + 1}`}
               style={{ transitionTimingFunction: EASE_OUT }}
-              className="block cursor-pointer overflow-hidden rounded-lg outline-none ring-1 ring-line transition-[box-shadow,scale] duration-200 focus-visible:ring-2 focus-visible:ring-gold active:scale-[0.98] motion-reduce:transition-none hover:[@media(hover:hover)and(pointer:fine)]:ring-gold/60"
+              className="block cursor-pointer overflow-hidden rounded-lg outline-none ring-1 ring-line transition-[box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-gold motion-reduce:transition-none hover:[@media(hover:hover)and(pointer:fine)]:ring-gold/60"
             >
               <img
                 src={image.thumb}
@@ -1056,7 +1056,7 @@ function Control({
         A control at its limit is dimmed and unpressable rather than gone. `disabled:opacity-40` is
         the visible half; `disabled:cursor-not-allowed` is the half that answers before the press.
       */
-      className={`grid size-11 shrink-0 cursor-pointer place-items-center rounded-full bg-black/55 text-white outline-none ring-1 ring-white/25 backdrop-blur-[2px] transition-[background-color,color,scale,box-shadow,opacity] duration-200 focus-visible:ring-2 focus-visible:ring-gold active:scale-[0.94] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100 motion-reduce:transition-none hover:not-disabled:[@media(hover:hover)and(pointer:fine)]:bg-black/70 ${className}`}
+      className={`grid size-11 shrink-0 cursor-pointer place-items-center rounded-full bg-black/55 text-white outline-none ring-1 ring-white/25 backdrop-blur-[2px] transition-[background-color,color,box-shadow,opacity] duration-200 focus-visible:ring-2 focus-visible:ring-gold disabled:cursor-not-allowed disabled:opacity-40 motion-reduce:transition-none hover:not-disabled:[@media(hover:hover)and(pointer:fine)]:bg-black/70 ${className}`}
     >
       <Icon name={icon} />
     </button>
