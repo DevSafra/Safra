@@ -33,6 +33,10 @@
   --font-sans: var(--font-plex), 'IBM Plex Sans Arabic', system-ui, sans-serif;
 
   --color-bg: #0c0a1c;
+  --color-bg2: #12102b;
+  --color-footer: #0a0817;
+  --hero-title-grad: linear-gradient(120deg, #f6e3b0, #e8bc66 45%, #c4923e);
+  --header-bg: rgba(13, 10, 30, 0.82);
   --color-card: #17142f;
   --color-field: #0f0d24;
   --color-line: #2a2450;
@@ -40,7 +44,8 @@
   --color-muted: #a9a3c4;
   --color-faint: #908da8;
   --color-gold: #e8bc66;
-  --color-gold-ink: #e8bc66;
+  --color-faint2: #4e4a6e;
+  --color-text2: #c9c3e0;
   --color-sky: #78aee0;
   --color-ok: #6fc792;
   --color-warn: #e8a54b;
@@ -114,13 +119,39 @@
  */
 :root:not([data-theme='dark']) {
   --color-bg: #f5f6fa;
+  --color-bg2: #eceef5;
+  --color-footer: #edeff6;
+  --hero-title-grad: linear-gradient(120deg, #8a6414, #a87a1f 45%, #6e4f0f);
+  --header-bg: rgba(250, 251, 254, 0.86);
   --color-card: #ffffff;
   --color-field: #f1f3f8;
   --color-line: #dfe3ed;
   --color-text: #1d2333;
+
+  /*
+   * The greys are DARKER than `design_handoff_safra` §9.2, and that is Bashar's instruction, twice.
+   *
+   * The handoff sets `--muted:#5C6377` and `--faint:#7C8296`. The second measures **3.07:1** on the
+   * page's own hero band, under the 4.5 body-text floor, and he has now said twice — 2026-09-01 and
+   * again on 2026-09-03 after they were restored verbatim — that the grey is too light to read.
+   *
+   * So the ladder is rebuilt rather than flattened: three steps that stay distinguishable AND
+   * readable, where simply lifting `faint` to the floor would have put it within a hundredth of
+   * `muted` and collapsed the hierarchy the design uses.
+   *
+   *   --text   #1d2333   12.59:1   unchanged, the handoff's own
+   *   --muted  #454b5a    7.01:1   AAA, carries most secondary reading
+   *   --faint  #5e6372    4.82:1   AA, the quietest step
+   *
+   * **This is the only place the palette departs from §9.2, and it departs in one direction.** The
+   * golds are the design's exactly — he reverted an earlier attempt to darken those, and the two
+   * decisions are not in tension: gold is the brand, grey is for reading.
+   */
   --color-muted: #454b5a;
   --color-faint: #5e6372;
   --color-gold: #a87a1f;
+  --color-faint2: #a5aabc;
+  --color-text2: #3a415a;
   /*
    * Gold that can be READ at body size, as opposed to gold the brand is made of.
    *
@@ -131,17 +162,16 @@
    *
    * So there are two now, and the split is exactly the WCAG one. `--color-gold` is the brand —
    * surfaces, borders, ornament, and display text, where the floor is 3:1 and it measures 3.09 at
-   * its worst. `--color-gold-ink` is for gold text below 18.66px bold, where the floor is 4.5 and
+   * its worst. `--color-gold` is for gold text below 18.66px bold, where the floor is 4.5 and
    * the brand gold cannot reach it at any size a body sets.
    *
-   * Reaching for `gold-ink` on a heading is as wrong as reaching for `gold` on a caption: one is
+   * Reaching for `gold` on a heading is as wrong as reaching for `gold` on a caption: one is
    * needlessly dull, the other is unreadable. If the text is large, it is the brand's colour.
    */
-  --color-gold-ink: #846018;
   --color-sky: #2e66a8;
-  --color-ok: #1d744d;
-  --color-warn: #875e12;
-  --color-bad: #b53b3b;
+  --color-ok: #1f7d53;
+  --color-warn: #9e6e15;
+  --color-bad: #c23f3f;
   --color-pend: #6c51c9;
   --color-band: #e8ebf7;
   --color-hero: #e2e6f5;
