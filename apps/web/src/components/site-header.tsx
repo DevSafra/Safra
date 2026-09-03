@@ -148,35 +148,6 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
       */}
       <div className="mx-auto flex max-w-7xl items-center gap-x-3 px-4 py-3 sm:py-4 lg:h-[var(--header-h)] lg:gap-x-5 lg:py-0">
         {/*
-          The hamburger, and the reason the row no longer wraps.
-
-          `flex-wrap` used to be what saved this bar on a phone, and it saved it by growing: three
-          rows and 152px at 320px, two and 108px at 390px, on every page. Everything after the
-          wordmark is now hidden below `md` and rendered inside the menu instead, so the row has
-          four items at most and never needs a second line — which is why the wrapping is gone
-          rather than merely discouraged.
-        */}
-        <MobileMenu
-          labels={{
-            open: t('openMenu'),
-            close: t('closeMenu'),
-            title: t('menu'),
-          }}
-        >
-          <MenuContents
-            locale={locale}
-            links={links}
-            partnerLabel={home('partnersCta')}
-            navLabel={t('home')}
-            session={session}
-            accountLabel={auth('account')}
-            registerLabel={auth('createAccount')}
-            signInLabel={auth('signIn')}
-            accountTitle={session?.user.email}
-          />
-        </MobileMenu>
-
-        {/*
           The wordmark alone. The tagline «إقامات في الوطن العربي · من ليلة واحدة» sat under it and
           is gone (Bashar, 2026-09-02) — booking.com's header carries none, it cost a second line
           exactly where the bar is tightest, and it still reads in the footer, which is the one
@@ -306,6 +277,44 @@ export async function SiteHeader({ locale }: { locale: Locale }) {
             </>
           )}
         </div>
+
+        {/*
+          The hamburger, and the reason the row no longer wraps.
+
+          `flex-wrap` used to be what saved this bar on a phone, and it saved it by growing: three
+          rows and 152px at 320px, two and 108px at 390px, on every page. Everything after the
+          wordmark is now hidden below `md` and rendered inside the menu instead, so the row has
+          four items at most and never needs a second line — which is why the wrapping is gone
+          rather than merely discouraged.
+
+          **LAST in the row, not first** (Bashar, 2026-09-03: «set the hamburger menu on the other
+          side of the logo»). `ms-auto` is what puts it at the trailing edge, and it is a LOGICAL
+          margin so the English and German bars get the mirror rather than a copy: the wordmark
+          opens the bar at the reading start and the menu closes it at the far end, both ways.
+        */}
+        <MobileMenu
+          className="ms-auto"
+          labels={{
+            open: t('openMenu'),
+            close: t('closeMenu'),
+            title: t('menu'),
+          }}
+        >
+          <MenuContents
+            locale={locale}
+            links={links}
+            partnerLabel={home('partnersCta')}
+            navLabel={t('home')}
+            session={session}
+            accountLabel={auth('account')}
+            registerLabel={auth('createAccount')}
+            signInLabel={auth('signIn')}
+            accountTitle={session?.user.email}
+            currency={currency}
+            currencies={displayCurrencies}
+            localeLabels={{ language: t('language'), currency: t('currency') }}
+          />
+        </MobileMenu>
       </div>
     </HeaderShell>
   );

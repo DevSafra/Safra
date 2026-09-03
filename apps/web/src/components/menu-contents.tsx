@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import type { Locale } from '@/i18n/routing';
 import { HeaderNav } from '@/components/header-nav';
+import { MenuLocale } from '@/components/menu-locale';
 
 /**
  * What the phone menu holds: everything the bar gives up below `md`.
@@ -21,11 +22,10 @@ import { HeaderNav } from '@/components/header-nav';
  * take the SAME components and the same catalogue keys: `HeaderNav` renders the destinations here
  * exactly as it does up there, current-page marking included.
  *
- * The language and currency pickers are the one exception and they are deliberately absent: they
- * open a popup, and a popup opened from inside a popup is a stack a phone has no room for. They
- * are in the footer of every page, which is where this site has put them since 2026-08-13 and
- * where a reader on a phone can reach them by scrolling to the end of what they were already
- * reading.
+ * The language and currency controls are the one thing NOT taken from the bar as-is: the bar's are
+ * popup triggers, and a popup opened from inside a popup is two focus traps and an ambiguous
+ * Escape. `MenuLocale` renders the same choices as open lists instead, which also answers the
+ * question a trigger hides — which language and which currency am I on right now.
  */
 export function MenuContents({
   locale,
@@ -37,6 +37,9 @@ export function MenuContents({
   registerLabel,
   signInLabel,
   accountTitle,
+  currency,
+  currencies,
+  localeLabels,
 }: {
   readonly locale: Locale;
   readonly links: readonly { href: string; label: string }[];
@@ -48,6 +51,9 @@ export function MenuContents({
   readonly registerLabel: string;
   readonly signInLabel: string;
   readonly accountTitle?: string | undefined;
+  readonly currency: string;
+  readonly currencies: readonly { code: string; symbol: string }[];
+  readonly localeLabels: { language: string; currency: string };
 }) {
   return (
     <>
@@ -69,6 +75,18 @@ export function MenuContents({
       >
         {partnerLabel}
       </Link>
+
+      {/*
+        Language and currency, shown OPEN with the current one filled in (Bashar, 2026-09-03: «I do
+        not see the current language and currency inside it»). See `MenuLocale` for why they are
+        lists here and a popup on the bar.
+      */}
+      <MenuLocale
+        locale={locale}
+        currency={currency}
+        currencies={currencies}
+        labels={localeLabels}
+      />
 
       {/* A rule, because what follows is about the READER rather than about the site. */}
       <div className="mt-2 grid gap-2 border-t border-line pt-4">

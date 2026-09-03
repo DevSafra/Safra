@@ -45,8 +45,11 @@ import { Modal } from '@safra/ui';
 export function MobileMenu({
   labels,
   children,
+  className = '',
 }: {
   readonly labels: { open: string; close: string; title: string };
+  /** Where the button sits in the bar — the caller's placement, not this component's. */
+  readonly className?: string;
   /**
    * What goes IN the menu, rendered by the server.
    *
@@ -114,7 +117,7 @@ export function MobileMenu({
           `lg`. `md:hidden` rather than a `sm:` breakpoint: the full bar fits on one row from 768px
           up — measured, not guessed — and that is exactly Tailwind's `md`.
         */
-        className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-lg text-text transition-colors duration-200 ease-out-strong hover:bg-gold/10 md:hidden"
+        className={`grid size-11 shrink-0 cursor-pointer place-items-center rounded-lg text-text transition-colors duration-200 ease-out-strong hover:bg-gold/10 md:hidden ${className}`}
       >
         <MenuIcon open={open} />
       </button>
@@ -127,15 +130,24 @@ export function MobileMenu({
           closeHandleRef={closeHandleRef}
         >
           {/*
-            One press closes it, wherever it lands: every link in here navigates, and a menu still
-            standing over the page you just asked for is the commonest fault in this pattern.
-            Delegated rather than wired per child — the children are the header's own server-
-            rendered controls and must not have to know they are inside a menu.
+            A press on a LINK closes it, and only on a link.
 
-            `onClick` on a wrapper catches the anchors; the language links are anchors too, and the
-            currency form is a POST that reloads the page, which closes it either way.
+            Every anchor in here navigates, and a menu still standing over the page you just asked
+            for is the commonest fault in this pattern — so it is delegated rather than wired per
+            child, and the children stay unaware they are inside a menu.
+
+            **Not on every click**, which is what this was and it broke the currency control
+            silently. The currency chips are submit buttons in a POST form; closing on their click
+            unmounted the form in the same tick, and the browser had nothing left to submit. No
+            request was made, no error appeared, and the menu closed looking exactly as if it had
+            worked. A submit reloads the page anyway, which takes the menu with it.
           */}
-          <div onClick={() => setOpen(false)} className="grid gap-1">
+          <div
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest('a')) setOpen(false);
+            }}
+            className="grid gap-1"
+          >
             {children}
           </div>
         </Modal>
