@@ -38,7 +38,7 @@
     "typesSubtitle": "From a Damascene hotel to a camp under the stars",
     "typeOptions": "{count, plural, =0 {No options} one {1 option} other {# options}}",
     "howTitle": "How booking works",
-    "howSubtitle": "Booking with SAFRA is not instant — and that is deliberate",
+    "howSubtitle": "Booking with SAFRA is not instant, and that is deliberate",
     "howBody": "You pay in full to SAFRA, and we contact the partner to confirm availability within two hours. If they do not confirm: a full refund plus compensation in your wallet.",
     "step1Title": "Search and choose",
     "step1Body": "Dates and guests are required, the city is optional. Results are ordered by SAFRA's recommendation, not by the cheapest.",
@@ -169,7 +169,7 @@
     "serviceFeeLabel": "SAFRA service fee",
     "bookNow": "Book now",
     "askSafra": "Ask SAFRA about this property",
-    "notInstantNotice": "You will not contact the partner directly — SAFRA confirms your booking within two hours of payment.",
+    "notInstantNotice": "You will not contact the partner directly; SAFRA confirms your booking within two hours of payment.",
     "noUnits": "No units are currently available.",
     "reviewsTitle": "Guest reviews",
     "reviewsEmpty": "No reviews for this property yet.",
@@ -188,7 +188,12 @@
       "viewAll": "View all photos ({n})",
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out"
-    }
+    },
+    "scoreExcellent": "Excellent",
+    "scoreVeryGood": "Very good",
+    "scoreGood": "Good",
+    "scoreFair": "Fair",
+    "guestsLoved": "What guests who stayed here liked"
   },
   "city": {
     "availableStays": "Available stays in {city}",
@@ -208,7 +213,7 @@
     "home": "Back to the home page"
   },
   "calendar": {
-    "title": "Availability — coming days",
+    "title": "Availability: coming days",
     "available": "Available",
     "booked": "Booked",
     "closed": "Closed",
@@ -238,7 +243,7 @@
     "datesTaken": "Those dates were taken a moment ago. Please choose different dates.",
     "cutoffClosed": "Today's bookings have closed. The first available date is {date}.",
     "fixFields": "Please correct the highlighted fields.",
-    "networkError": "Could not connect. Try again — this will not create a duplicate booking.",
+    "networkError": "Could not connect. Try again; this will not create a duplicate booking.",
     "genericError": "Something unexpected happened. Please try again.",
     "walletApply": "Use {amount} from my balance",
     "walletRemaining": "Remaining to pay",
@@ -254,7 +259,7 @@
     "couponInvalid": "That code could not be applied."
   },
   "bookingPending": {
-    "title": "Paid — your booking is pending confirmation",
+    "title": "Paid. Your booking is pending confirmation",
     "body": "SAFRA received your payment. We are contacting the partner to confirm availability.",
     "referenceLabel": "Booking reference",
     "step1": "SAFRA contacts the partner to confirm availability within two hours.",
@@ -266,14 +271,14 @@
     "title": "Complete your payment by bank transfer",
     "intro": "Your booking is held. To confirm it, transfer the amount below and quote the reference in the payment description.",
     "remittanceLabel": "Transfer reference",
-    "remittanceHint": "Quote this on the transfer — without it the payment cannot be matched to your booking.",
+    "remittanceHint": "Quote this on the transfer; without it the payment cannot be matched to your booking.",
     "nextSteps": "Once the transfer arrives your booking is confirmed within one business day, and we email you.",
     "referenceLabel": "Booking reference",
     "viewBooking": "View booking",
     "genericTitle": "Checking your payment",
     "genericBody": "This may take a moment. Please do not close this page.",
     "failedTitle": "The payment did not complete",
-    "failedBody": "Nothing was charged. Your dates are held for a short while — you can try again.",
+    "failedBody": "Nothing was charged. Your dates are held for a short while; you can try again.",
     "retry": "Try again"
   },
   "paymentMethods": {
@@ -334,7 +339,7 @@
     "backToSignIn": "Go to sign in",
     "resetDone": "Your password has been changed. Sign in with it below.",
     "verifiedTitle": "Email confirmed",
-    "verified": "Thank you — your address is confirmed.",
+    "verified": "Thank you. Your address is confirmed.",
     "verifyFailedTitle": "This link no longer works",
     "verifyFailed": "Confirmation links expire after 24 hours and can be used once. You can request another from your account.",
     "claimedBookings": "We also linked {count, plural, one {1 earlier booking} other {# earlier bookings}} made with this address to your account.",
@@ -362,7 +367,7 @@
     "findSubmit": "Send my booking numbers",
     "findSending": "Sending…",
     "findSent": "If any bookings are attached to that address, we have just sent their numbers to it. Please check your inbox.",
-    "findPrivacy": "This page never reveals whether an address has a booking — the answer is the same either way."
+    "findPrivacy": "This page never reveals whether an address has a booking; the answer is the same either way."
   },
   "account": {
     "title": "My account",
@@ -449,7 +454,7 @@
     "passwordHide": "Hide password",
     "passwordSubmit": "Change password",
     "passwordSubmitting": "Changing…",
-    "passwordChanged": "Password changed. Every session — including this one — was signed out, so please sign in again.",
+    "passwordChanged": "Password changed. Every session (including this one) was signed out, so please sign in again.",
     "passwordWrong": "Your current password is not correct.",
     "passwordFailed": "Could not change your password. Try again.",
     "passwordRule": "At least twelve characters, and different from your current one.",
@@ -498,16 +503,16 @@
     "giftRedeemed": "{amount} was added to your wallet. Your balance is now {balance}.",
     "giftRedeemFailed": "That could not be redeemed right now. Please try again.",
     "giftBuyTitle": "Buy a gift card",
-    "giftBuyIntro": "The value comes out of your current balance — not your gift card balance — and the card is issued in the same currency.",
+    "giftBuyIntro": "The value comes out of your current balance (not your gift card balance) and the card is issued in the same currency.",
     "giftAmountLabel": "Value",
     "giftRecipientName": "Recipient name (optional)",
     "giftRecipientEmail": "Recipient email (optional)",
-    "giftRecipientNote": "A label to tell your cards apart — we do not send the code to this address.",
+    "giftRecipientNote": "A label to tell your cards apart; we do not send the code to this address.",
     "giftBuySubmit": "Buy",
     "giftBuying": "Buying…",
     "giftBuyFailed": "The purchase could not be completed. Please try again.",
     "giftCodeOnce": "This code is shown once",
-    "giftCodeOnceBody": "Copy it now and keep it somewhere safe. We cannot show it again — the code itself is what gets redeemed, and we do not keep it in readable form.",
+    "giftCodeOnceBody": "Copy it now and keep it somewhere safe. We cannot show it again; the code itself is what gets redeemed, and we do not keep it in readable form.",
     "giftCopy": "Copy",
     "giftCopied": "Copied",
     "giftBalanceAfter": "Wallet balance after this purchase: {balance}",
@@ -529,7 +534,7 @@
     "supportIntro": "Describe your problem and the SAFRA team will follow it up with you here.",
     "supportOpenTitle": "New support request",
     "supportBodyLabel": "Describe the problem",
-    "supportBodyHint": "At least ten characters. Do not include a phone number or email — they are masked automatically and will not reach us.",
+    "supportBodyHint": "At least ten characters. Do not include a phone number or email; they are masked automatically and will not reach us.",
     "supportSubmit": "Send request",
     "supportSubmitting": "Sending…",
     "supportFailed": "That could not be sent right now. Please try again.",
@@ -559,7 +564,7 @@
     "disputesReason": "What went wrong",
     "disputesSubject": "In one line",
     "disputesBody": "What happened",
-    "disputesBodyHint": "At least twenty characters. Do not write a phone number or an email — they are masked automatically and will not reach anyone.",
+    "disputesBodyHint": "At least twenty characters. Do not write a phone number or an email; they are masked automatically and will not reach anyone.",
     "disputesSubmit": "Raise the dispute",
     "disputesSubmitting": "Sending…",
     "disputesFailed": "The dispute could not be raised. Please try again.",
@@ -573,7 +578,7 @@
   "ads": {
     "title": "Nearby, from our partners",
     "label": "Partner ad",
-    "note": "Paid placements from partners in the same city — they never affect search ranking.",
+    "note": "Paid placements from partners in the same city; they never affect search ranking.",
     "visit": "Visit site"
   },
   "reviews": {
@@ -609,7 +614,7 @@
     "rejected": "Declined"
   },
   "footer": {
-    "about": "SAFRA books stays across the Levant — from a single night to a long stay, with clear prices and cancellation terms written down before you pay.",
+    "about": "SAFRA books stays across the Levant, from a single night to a long stay, with clear prices and cancellation terms written down before you pay.",
     "explore": "Explore",
     "account": "Your account",
     "language": "Language",
@@ -688,7 +693,7 @@
     "steps": {
       "one": "You fill in this form. The request reaches our team with a number you keep.",
       "two": "We telephone you to confirm the details of your business and answer your questions.",
-      "three": "The request is reviewed and decided — accepted or declined, with the reason either way.",
+      "three": "The request is reviewed and decided: accepted or declined, with the reason either way.",
       "four": "On acceptance we send the partnership contract and a link to set your account password. We never send a password in a message.",
       "five": "The account stays under review until we have checked your documents. Meanwhile you can prepare your property details.",
       "six": "Once the checks pass, the account is verified.",
@@ -726,7 +731,7 @@
     "choose": "Choose",
     "successTitle": "We have your request",
     "successBody": "Your request number is {reference}. We have emailed you a copy, and our team will be in touch shortly.",
-    "successKeep": "Keep the request number — it is how we find your request if you contact us.",
+    "successKeep": "Keep the request number; it is how we find your request if you contact us.",
     "backHome": "Back to the home page",
     "failed": "The request could not be sent. Please try again.",
     "privacy": "We use these details only to assess your request and to contact you about it.",

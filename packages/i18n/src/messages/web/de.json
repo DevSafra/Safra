@@ -38,7 +38,7 @@
     "typesSubtitle": "Vom Damaszener Hotel bis zum Camp unter den Sternen",
     "typeOptions": "{count, plural, =0 {Keine Optionen} one {1 Option} other {# Optionen}}",
     "howTitle": "So funktioniert die Buchung",
-    "howSubtitle": "Buchen bei SAFRA ist nicht sofort — und das ist Absicht",
+    "howSubtitle": "Buchen bei SAFRA ist nicht sofort, und das ist Absicht",
     "howBody": "Sie zahlen den vollen Betrag an SAFRA, und wir kontaktieren den Partner, um die Verfügbarkeit innerhalb von zwei Stunden zu bestätigen. Ohne Bestätigung: vollständige Rückerstattung plus Entschädigung in Ihrer Wallet.",
     "step1Title": "Suchen und wählen",
     "step1Body": "Daten und Gästezahl sind erforderlich, die Stadt ist optional. Die Ergebnisse folgen SAFRAs Empfehlung, nicht dem niedrigsten Preis.",
@@ -169,7 +169,7 @@
     "serviceFeeLabel": "SAFRA-Servicegebühr",
     "bookNow": "Jetzt buchen",
     "askSafra": "SAFRA zu dieser Unterkunft fragen",
-    "notInstantNotice": "Sie kontaktieren den Partner nicht direkt — SAFRA bestätigt Ihre Buchung innerhalb von zwei Stunden nach Zahlung.",
+    "notInstantNotice": "Sie kontaktieren den Partner nicht direkt; SAFRA bestätigt Ihre Buchung innerhalb von zwei Stunden nach Zahlung.",
     "noUnits": "Derzeit sind keine Einheiten verfügbar.",
     "reviewsTitle": "Gästebewertungen",
     "reviewsEmpty": "Für diese Unterkunft gibt es noch keine Bewertungen.",
@@ -188,7 +188,12 @@
       "viewAll": "Alle Fotos ansehen ({n})",
       "zoomIn": "Vergrößern",
       "zoomOut": "Verkleinern"
-    }
+    },
+    "scoreExcellent": "Hervorragend",
+    "scoreVeryGood": "Sehr gut",
+    "scoreGood": "Gut",
+    "scoreFair": "Akzeptabel",
+    "guestsLoved": "Was Gäste hier geschätzt haben"
   },
   "city": {
     "availableStays": "Verfügbare Unterkünfte in {city}",
@@ -208,7 +213,7 @@
     "home": "Zurück zur Startseite"
   },
   "calendar": {
-    "title": "Verfügbarkeit — kommende Tage",
+    "title": "Verfügbarkeit: kommende Tage",
     "available": "Verfügbar",
     "booked": "Gebucht",
     "closed": "Geschlossen",
@@ -238,7 +243,7 @@
     "datesTaken": "Diese Daten wurden gerade vergeben. Bitte wählen Sie andere Daten.",
     "cutoffClosed": "Buchungen für heute sind geschlossen. Das erste verfügbare Datum ist {date}.",
     "fixFields": "Bitte korrigieren Sie die markierten Felder.",
-    "networkError": "Verbindung fehlgeschlagen. Versuchen Sie es erneut — es entsteht keine Doppelbuchung.",
+    "networkError": "Verbindung fehlgeschlagen. Versuchen Sie es erneut; es entsteht keine Doppelbuchung.",
     "genericError": "Ein unerwarteter Fehler ist aufgetreten. Bitte erneut versuchen.",
     "walletApply": "{amount} vom Guthaben verwenden",
     "walletRemaining": "Restbetrag",
@@ -254,7 +259,7 @@
     "couponInvalid": "Dieser Code konnte nicht angewendet werden."
   },
   "bookingPending": {
-    "title": "Bezahlt — Ihre Buchung wird bestätigt",
+    "title": "Bezahlt. Ihre Buchung wird bestätigt",
     "body": "SAFRA hat Ihre Zahlung erhalten. Wir kontaktieren den Partner zur Bestätigung der Verfügbarkeit.",
     "referenceLabel": "Buchungsnummer",
     "step1": "SAFRA kontaktiert den Partner zur Bestätigung innerhalb von zwei Stunden.",
@@ -266,14 +271,14 @@
     "title": "Zahlung per Banküberweisung abschließen",
     "intro": "Ihre Buchung ist reserviert. Überweisen Sie zur Bestätigung den unten genannten Betrag und geben Sie die Referenz im Verwendungszweck an.",
     "remittanceLabel": "Überweisungsreferenz",
-    "remittanceHint": "Bitte im Verwendungszweck angeben — ohne sie kann die Zahlung Ihrer Buchung nicht zugeordnet werden.",
+    "remittanceHint": "Bitte im Verwendungszweck angeben; ohne sie kann die Zahlung Ihrer Buchung nicht zugeordnet werden.",
     "nextSteps": "Nach Eingang der Überweisung wird Ihre Buchung innerhalb eines Werktags bestätigt; Sie erhalten eine E-Mail.",
     "referenceLabel": "Buchungsnummer",
     "viewBooking": "Buchung ansehen",
     "genericTitle": "Wir prüfen Ihre Zahlung",
     "genericBody": "Das kann einen Moment dauern. Bitte schließen Sie diese Seite nicht.",
     "failedTitle": "Die Zahlung wurde nicht abgeschlossen",
-    "failedBody": "Es wurde nichts abgebucht. Ihre Daten sind kurzzeitig reserviert — Sie können es erneut versuchen.",
+    "failedBody": "Es wurde nichts abgebucht. Ihre Daten sind kurzzeitig reserviert; Sie können es erneut versuchen.",
     "retry": "Erneut versuchen"
   },
   "paymentMethods": {
@@ -334,7 +339,7 @@
     "backToSignIn": "Zur Anmeldung",
     "resetDone": "Ihr Passwort wurde geändert. Melden Sie sich damit an.",
     "verifiedTitle": "E-Mail bestätigt",
-    "verified": "Vielen Dank — Ihre Adresse ist bestätigt.",
+    "verified": "Vielen Dank. Ihre Adresse ist bestätigt.",
     "verifyFailedTitle": "Dieser Link ist nicht mehr gültig",
     "verifyFailed": "Bestätigungslinks laufen nach 24 Stunden ab und sind einmal verwendbar. Sie können in Ihrem Konto einen neuen anfordern.",
     "claimedBookings": "Wir haben außerdem {count, plural, one {1 frühere Buchung} other {# frühere Buchungen}} mit dieser Adresse Ihrem Konto zugeordnet.",
@@ -357,12 +362,12 @@
     "genderUndisclosed": "Keine Angabe",
     "genderChoose": "Bitte wählen…",
     "findTitle": "Buchungsnummer vergessen?",
-    "findSubtitle": "Geben Sie Ihre E-Mail-Adresse ein — wir senden Ihre Buchungsnummern dorthin.",
+    "findSubtitle": "Geben Sie Ihre E-Mail-Adresse ein; wir senden Ihre Buchungsnummern dorthin.",
     "findEmail": "E-Mail-Adresse",
     "findSubmit": "Buchungsnummern senden",
     "findSending": "Wird gesendet…",
     "findSent": "Falls zu dieser Adresse Buchungen bestehen, haben wir deren Nummern soeben dorthin gesendet. Bitte prüfen Sie Ihr Postfach.",
-    "findPrivacy": "Diese Seite verrät nie, ob zu einer Adresse eine Buchung besteht — die Antwort ist immer dieselbe."
+    "findPrivacy": "Diese Seite verrät nie, ob zu einer Adresse eine Buchung besteht; die Antwort ist immer dieselbe."
   },
   "account": {
     "title": "Mein Konto",
@@ -449,7 +454,7 @@
     "passwordHide": "Passwort verbergen",
     "passwordSubmit": "Passwort ändern",
     "passwordSubmitting": "Wird geändert…",
-    "passwordChanged": "Passwort geändert. Alle Sitzungen — auch diese — wurden beendet, bitte melden Sie sich erneut an.",
+    "passwordChanged": "Passwort geändert. Alle Sitzungen (auch diese) wurden beendet, bitte melden Sie sich erneut an.",
     "passwordWrong": "Ihr aktuelles Passwort ist nicht korrekt.",
     "passwordFailed": "Passwort konnte nicht geändert werden. Bitte erneut versuchen.",
     "passwordRule": "Mindestens zwölf Zeichen und anders als das aktuelle.",
@@ -498,16 +503,16 @@
     "giftRedeemed": "{amount} wurde Ihrem Guthaben hinzugefügt. Ihr Guthaben beträgt jetzt {balance}.",
     "giftRedeemFailed": "Das konnte gerade nicht eingelöst werden. Bitte erneut versuchen.",
     "giftBuyTitle": "Geschenkkarte kaufen",
-    "giftBuyIntro": "Der Betrag wird von Ihrem aktuellen Guthaben abgebucht — nicht vom Geschenkkarten-Guthaben — und die Karte wird in derselben Währung ausgegeben.",
+    "giftBuyIntro": "Der Betrag wird von Ihrem aktuellen Guthaben abgebucht (nicht vom Geschenkkarten-Guthaben) und die Karte wird in derselben Währung ausgegeben.",
     "giftAmountLabel": "Wert",
     "giftRecipientName": "Name des Empfängers (optional)",
     "giftRecipientEmail": "E-Mail des Empfängers (optional)",
-    "giftRecipientNote": "Nur zur Unterscheidung Ihrer Karten — wir senden den Code nicht an diese Adresse.",
+    "giftRecipientNote": "Nur zur Unterscheidung Ihrer Karten; wir senden den Code nicht an diese Adresse.",
     "giftBuySubmit": "Kaufen",
     "giftBuying": "Wird gekauft…",
     "giftBuyFailed": "Der Kauf konnte nicht abgeschlossen werden. Bitte erneut versuchen.",
     "giftCodeOnce": "Dieser Code wird nur einmal angezeigt",
-    "giftCodeOnceBody": "Kopieren Sie ihn jetzt und bewahren Sie ihn sicher auf. Wir können ihn nicht erneut anzeigen — der Code selbst wird eingelöst, und wir speichern ihn nicht in lesbarer Form.",
+    "giftCodeOnceBody": "Kopieren Sie ihn jetzt und bewahren Sie ihn sicher auf. Wir können ihn nicht erneut anzeigen; der Code selbst wird eingelöst, und wir speichern ihn nicht in lesbarer Form.",
     "giftCopy": "Kopieren",
     "giftCopied": "Kopiert",
     "giftBalanceAfter": "Guthaben nach diesem Kauf: {balance}",
@@ -526,10 +531,10 @@
     "navHideSidebar": "Menü ausblenden",
     "giftSpendable": "Aktuell verfügbares Guthaben: {amount}",
     "navSupport": "Support",
-    "supportIntro": "Beschreiben Sie Ihr Problem — das SAFRA-Team verfolgt es hier mit Ihnen.",
+    "supportIntro": "Beschreiben Sie Ihr Problem; das SAFRA-Team verfolgt es hier mit Ihnen.",
     "supportOpenTitle": "Neue Support-Anfrage",
     "supportBodyLabel": "Problem beschreiben",
-    "supportBodyHint": "Mindestens zehn Zeichen. Keine Telefonnummer oder E-Mail-Adresse — diese werden automatisch maskiert und erreichen uns nicht.",
+    "supportBodyHint": "Mindestens zehn Zeichen. Keine Telefonnummer oder E-Mail-Adresse; diese werden automatisch maskiert und erreichen uns nicht.",
     "supportSubmit": "Anfrage senden",
     "supportSubmitting": "Wird gesendet…",
     "supportFailed": "Das konnte gerade nicht gesendet werden. Bitte erneut versuchen.",
@@ -559,7 +564,7 @@
     "disputesReason": "Was ist passiert",
     "disputesSubject": "In einer Zeile",
     "disputesBody": "Was geschehen ist",
-    "disputesBodyHint": "Mindestens zwanzig Zeichen. Schreiben Sie keine Telefonnummer und keine E-Mail-Adresse — sie werden automatisch maskiert und erreichen niemanden.",
+    "disputesBodyHint": "Mindestens zwanzig Zeichen. Schreiben Sie keine Telefonnummer und keine E-Mail-Adresse; sie werden automatisch maskiert und erreichen niemanden.",
     "disputesSubmit": "Streitfall eröffnen",
     "disputesSubmitting": "Wird gesendet…",
     "disputesFailed": "Der Streitfall konnte nicht eröffnet werden. Bitte versuchen Sie es erneut.",
@@ -573,7 +578,7 @@
   "ads": {
     "title": "In der Nähe, von unseren Partnern",
     "label": "Partneranzeige",
-    "note": "Bezahlte Platzierungen von Partnern in derselben Stadt — sie beeinflussen das Suchranking nicht.",
+    "note": "Bezahlte Platzierungen von Partnern in derselben Stadt; sie beeinflussen das Suchranking nicht.",
     "visit": "Website besuchen"
   },
   "reviews": {
@@ -609,7 +614,7 @@
     "rejected": "Abgelehnt"
   },
   "footer": {
-    "about": "SAFRA vermittelt Unterkünfte in der Levante — von einer Nacht bis zum Langzeitaufenthalt, mit klaren Preisen und Stornobedingungen, die vor der Zahlung feststehen.",
+    "about": "SAFRA vermittelt Unterkünfte in der Levante, von einer Nacht bis zum Langzeitaufenthalt, mit klaren Preisen und Stornobedingungen, die vor der Zahlung feststehen.",
     "explore": "Entdecken",
     "account": "Ihr Konto",
     "language": "Sprache",
@@ -676,10 +681,10 @@
   "partner": {
     "title": "Partner werden",
     "subtitle": "Bieten Sie Ihre Unterkunft auf SAFRA an und erreichen Sie Reisende, die auf Arabisch suchen.",
-    "intro": "SAFRA verbindet Gastgeber mit Reisenden in Syrien und der Region. Jeder Partner wird geprüft, bevor etwas veröffentlicht wird — Vertrauen ist das, was eine Buchung aus der Ferne überhaupt möglich macht.",
+    "intro": "SAFRA verbindet Gastgeber mit Reisenden in Syrien und der Region. Jeder Partner wird geprüft, bevor etwas veröffentlicht wird; Vertrauen ist das, was eine Buchung aus der Ferne überhaupt möglich macht.",
     "whyTitle": "Warum SAFRA",
     "why": {
-      "audience": "Ein Publikum, das auf Arabisch sucht — mit Preisen und Stornobedingungen, die vor der Zahlung feststehen.",
+      "audience": "Ein Publikum, das auf Arabisch sucht, mit Preisen und Stornobedingungen, die vor der Zahlung feststehen.",
       "payouts": "Nachvollziehbare Erlöse: eine Abrechnung je Buchung und eine geplante Überweisung, die Sie in Ihrem Dashboard sehen.",
       "control": "Sie legen Preis und Termine je Einheit fest und sperren jede Nacht, wann Sie möchten.",
       "support": "Support auf Arabisch und eine schriftliche Aufzeichnung zu jedem Streitfall und jeder Erstattung."
@@ -688,11 +693,11 @@
     "steps": {
       "one": "Sie füllen dieses Formular aus. Die Anfrage erreicht unser Team mit einer Nummer, die Sie behalten.",
       "two": "Wir rufen Sie an, um die Angaben zu Ihrem Betrieb zu bestätigen und Ihre Fragen zu beantworten.",
-      "three": "Die Anfrage wird geprüft und entschieden — Zusage oder Absage, in beiden Fällen mit Begründung.",
+      "three": "Die Anfrage wird geprüft und entschieden: Zusage oder Absage, in beiden Fällen mit Begründung.",
       "four": "Bei einer Zusage senden wir den Partnervertrag und einen Link, um das Passwort für Ihr Konto zu setzen. Ein Passwort versenden wir niemals in einer Nachricht.",
       "five": "Das Konto bleibt in Prüfung, bis wir Ihre Unterlagen geprüft haben. In dieser Zeit können Sie die Angaben zu Ihren Objekten vorbereiten.",
       "six": "Sind die Prüfungen bestanden, wird das Konto verifiziert.",
-      "seven": "Danach können Sie Preise, Termine und Bilder hinzufügen — Ihre Unterkunft ist bereit zur Veröffentlichung."
+      "seven": "Danach können Sie Preise, Termine und Bilder hinzufügen; Ihre Unterkunft ist bereit zur Veröffentlichung."
     },
     "documentsTitle": "Was wir für die Prüfung benötigen",
     "documentsNote": "Senden Sie jetzt keine Unterlagen. Wir fragen sie nach der Zusage direkt im Partner-Dashboard ab.",
@@ -726,7 +731,7 @@
     "choose": "Bitte wählen",
     "successTitle": "Ihre Anfrage ist eingegangen",
     "successBody": "Ihre Anfragenummer lautet {reference}. Eine Kopie haben wir Ihnen per E-Mail geschickt; unser Team meldet sich in Kürze.",
-    "successKeep": "Bewahren Sie die Anfragenummer auf — damit finden wir Ihre Anfrage, wenn Sie sich bei uns melden.",
+    "successKeep": "Bewahren Sie die Anfragenummer auf; damit finden wir Ihre Anfrage, wenn Sie sich bei uns melden.",
     "backHome": "Zurück zur Startseite",
     "failed": "Die Anfrage konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
     "privacy": "Wir verwenden diese Angaben ausschließlich, um Ihre Anfrage zu prüfen und Sie dazu zu kontaktieren.",
