@@ -157,6 +157,15 @@ export interface SearchParams {
   children?: number | undefined;
   /* §5.2. Sent, and deliberately NOT counted toward occupancy — see `search.service.ts`. */
   infants?: number | undefined;
+  /**
+   * A minimum, not a count (Bashar, 2026-09-03).
+   *
+   * «غرف النوم» asks for a place with at least this many bedrooms and matches `units.bedrooms`. It
+   * is NOT a request to book several rooms: `bookings.unit_id` is one unit, so one booking is one
+   * unit, and `units.room_type_code` says in its own comment that it is not a quantity. Zero, and
+   * absent, both mean «no requirement».
+   */
+  bedrooms?: number | undefined;
   citySlug?: string | undefined;
   propertyTypeCode?: string | undefined;
   attributes?: string[] | undefined;

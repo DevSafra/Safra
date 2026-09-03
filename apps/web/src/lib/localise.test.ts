@@ -162,6 +162,39 @@ describe('formatMoney', () => {
     expect(formatMoney('380.00', 'USD', 'en')).toBe('$380');
   });
 
+  /**
+   * The symbol is the CATALOGUE's, in every locale.
+   *
+   * `Intl`'s `style: 'currency'` spells a currency for the reader's locale, so an Arabic page
+   * rendered every dollar price «US$ 100» while the header's own currency menu offered «$»
+   * (Bashar, 2026-09-03: «remove the "US"»). These are the assertions that were watched to fail
+   * against that: the first two are red on `style: 'currency'` under `ar`, and the SYP pair is red
+   * on `currencyDisplay: 'narrowSymbol'`, which is the fix that looks right and renders the
+   * Syrian pound as «£».
+   */
+  it('writes a dollar price with the catalogue symbol, in every locale', () => {
+    for (const locale of ['ar', 'en', 'de'] as const) {
+      expect(formatMoney('100.00', 'USD', locale), locale).not.toMatch(/US/);
+      expect(formatMoney('100.00', 'USD', locale), locale).toContain('$');
+    }
+  });
+
+  it('writes the Syrian pound as ل.س, after the number', () => {
+    expect(formatMoney('100.00', 'SYP', 'ar')).toBe('100 ل.س');
+    expect(formatMoney('100.00', 'SYP', 'en')).toBe('100 ل.س');
+  });
+
+  /* An Arabic-script symbol trails the number; a Latin one leads it. */
+  it('places the symbol by its script, not by the reader s locale', () => {
+    expect(formatMoney('100.00', 'AED', 'ar')).toBe('100 د.إ');
+    expect(formatMoney('100.00', 'EUR', 'ar')).toBe('\u20ac100');
+  });
+
+  /* A code the catalogue does not know keeps its code — never a guessed symbol. */
+  it('falls back to the code for an unknown currency', () => {
+    expect(formatMoney('100.00', 'XYZ', 'en')).toBe('100 XYZ');
+  });
+
   it('keeps two decimals on a whole amount when exact', () => {
     expect(formatMoney('380.00', 'USD', 'en', { exact: true })).toBe('$380.00');
   });

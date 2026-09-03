@@ -1,4 +1,4 @@
-import { currencyDecimals } from '@safra/contracts';
+import { currencyDecimals, currencyOption, symbolTrails } from '@safra/contracts';
 
 import type { Locale } from '@/i18n/routing';
 
@@ -95,13 +95,36 @@ export function formatMoney(
   */
   const scale = currencyDecimals(currency);
 
-  return new Intl.NumberFormat(locale === 'ar' ? 'ar-SY' : locale, {
-    style: 'currency',
-    currency,
+  const number = new Intl.NumberFormat(locale === 'ar' ? 'ar-SY' : locale, {
     // Whole prices read better without trailing zeros; fractions still show them.
     minimumFractionDigits: options.exact || !Number.isInteger(value) ? scale : 0,
     maximumFractionDigits: scale,
     // Western digits across all locales, matching the prototype.
     numberingSystem: 'latn',
   }).format(value);
+
+  /*
+    The SYMBOL comes from the catalogue, and the number is formatted on its own.
+
+    `style: 'currency'` used to do both, and it wrote the currency in `Intl`'s spelling for the
+    READER's locale rather than in this platform's. On an Arabic page that made every dollar price
+    «US$ 100» — Bashar asked for the «US» gone (2026-09-03), and it was never ours to print: the
+    header's own currency menu offers «$», because `CURRENCY_CATALOGUE` says the symbol for USD is
+    «$». One product cannot spell a currency two ways on one screen.
+
+    `currencyDisplay: 'narrowSymbol'` was the obvious fix and is the wrong one, measured rather
+    than assumed: under `ar-SY` it leaves USD as «US$» anyway, and it renders SYP as «£» — the
+    pound sign, for a currency this platform writes «ل.س». It trades a cosmetic complaint for a
+    wrong symbol on the launch market's own money.
+
+    `symbolTrails` decides the side, so an Arabic-script symbol follows the number and a Latin one
+    leads it. That rule already exists for the console and the partner portal; this is the third
+    app finally asking it the same question.
+  */
+  const symbol = currencyOption(currency)?.symbol;
+
+  /* Never a guessed symbol: a code the catalogue does not know keeps its code. */
+  if (!symbol) return `${number} ${currency}`;
+
+  return symbolTrails(symbol) ? `${number} ${symbol}` : `${symbol}${number}`;
 }

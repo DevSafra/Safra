@@ -1,4 +1,5 @@
 import type { Locale } from '@/i18n/routing';
+import { formatMoney } from '@/lib/localise';
 
 /**
  * Reads operational values that the storefront must DISPLAY.
@@ -70,11 +71,14 @@ export function formatCustomerFee(
     }).format(fee.value);
   }
 
-  return new Intl.NumberFormat(intlLocale, {
-    style: 'currency',
-    currency: 'USD',
-    numberingSystem: 'latn',
-  }).format(fee.value);
+  /*
+    Through `formatMoney`, not `Intl` directly — the SECOND place this spelling was decided.
+
+    It rendered «رسوم خدمة ثابتة 1.99 US$» on the home page while the card beside it said «$100»,
+    because both asked `Intl` for a currency STYLE and `Intl` answers in the reader's locale. One
+    formatter now owns the question (see the note there), and this is a caller of it.
+  */
+  return formatMoney(String(fee.value), 'USD', locale);
 }
 
 /**
