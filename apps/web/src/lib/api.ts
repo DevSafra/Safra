@@ -139,6 +139,12 @@ export type SearchResultItem = z.infer<typeof searchResultItemSchema>;
 const searchResponseSchema = z.object({
   items: z.array(searchResultItemSchema),
   nextCursor: z.string().nullable(),
+  /*
+    `.nullable()`, never `.optional()` and never `.default(null)`. A default would invent a value
+    for something the API did not send, and the failure it would hide is a «السابق» link that
+    silently stops appearing after a deploy where the field was dropped.
+  */
+  previousCursor: z.string().nullable(),
   firstBookableDate: z.string(),
 });
 
@@ -155,8 +161,26 @@ export interface SearchParams {
   propertyTypeCode?: string | undefined;
   attributes?: string[] | undefined;
   amenityCodes?: string[] | undefined;
+  /**
+   * The nightly range, the free-cancellation switch and the cursor.
+   *
+   * `searchQuerySchema` has accepted all four since it was written and this interface carried none
+   * of them, so `/search` could not offer a price filter and — the part that broke a rule rather
+   * than merely omitting a feature — **could not reach result 25**. `limit` caps at 60 and the page
+   * asked for 24, which made the twenty-fifth stay unreachable by any means: not by scrolling, not
+   * by paging, not by editing the URL. §2 requires every customer-facing list to be paginated, and
+   * cursor is the only permitted mechanism for one.
+   *
+   * `minPrice`/`maxPrice` are in the LISTING's currency, which is what the API filters on. The card
+   * converts for display; the filter cannot, because a range converted at the reader's rate would
+   * silently exclude listings priced in a currency whose rate is stale.
+   */
+  minPrice?: number | undefined;
+  maxPrice?: number | undefined;
+  freeCancellationOnly?: boolean | undefined;
   sort?: string | undefined;
   limit?: number | undefined;
+  cursor?: string | undefined;
 }
 
 export async function search(params: SearchParams) {
@@ -198,6 +222,7 @@ export async function searchForDisplay(params: SearchParams, revalidateSeconds =
 export interface SearchOutcome {
   items: SearchResultItem[];
   nextCursor: string | null;
+  previousCursor: string | null;
   firstBookableDate: string | null;
   notice: { reason: string; firstBookableDate: string } | null;
   failed: boolean;
@@ -223,6 +248,7 @@ export async function searchSafely(
         return {
           items: [],
           nextCursor: null,
+          previousCursor: null,
           firstBookableDate: String(
             (body as { firstBookableDate: unknown }).firstBookableDate,
           ),
@@ -240,6 +266,7 @@ export async function searchSafely(
     return {
       items: [],
       nextCursor: null,
+      previousCursor: null,
       firstBookableDate: null,
       notice: null,
       failed: true,

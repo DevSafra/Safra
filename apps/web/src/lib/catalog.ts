@@ -181,6 +181,15 @@ const amenitySchema = z.object({
   nameDe: z.string(),
   category: z.string(),
   icon: z.string().nullable(),
+  /**
+   * How many published stays actually have it.
+   *
+   * The filter panel lists only amenities above zero. `unit_amenities` held zero rows on
+   * 2026-09-02 while the catalogue listed twelve, so an unfiltered list would have given the
+   * results page twelve checkboxes whose every outcome is «لا نتائج» — a control that reads as a
+   * broken search rather than as an untagged catalogue.
+   */
+  propertyCount: z.number(),
 });
 
 export type Amenity = z.infer<typeof amenitySchema>;

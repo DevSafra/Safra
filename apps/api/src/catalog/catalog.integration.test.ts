@@ -48,6 +48,98 @@ describeIfDb('CatalogService', () => {
     await harness.close();
   });
 
+  /**
+   * Amenities carry how many BOOKABLE stays have them.
+   *
+   * ## Why the number is load-bearing
+   *
+   * `unit_amenities` held zero rows on 2026-09-02 while this endpoint listed twelve filterable
+   * amenities, and the results page had just grown a filter panel. Rendered from the catalogue,
+   * every checkbox on it would empty the page — a control whose only possible outcome is «لا نتائج»
+   * reads as a broken search rather than as an untagged catalogue, and the visitor blames the site.
+   * The panel therefore offers only amenities above zero, so the count is not decoration: it
+   * decides whether the control exists.
+   *
+   * ## What is easy to get wrong, and is therefore asserted
+   *
+   * Counting the LINK TABLE would count links to units of draft, rejected and deleted properties,
+   * so «مسبح · 40» could return nothing — the same defect one step quieter. And counting UNITS
+   * would print «مسبح · 2» over a single result for one hotel with two poolside rooms.
+   *
+   * Every case is built inside the rolled-back transaction rather than read off the seed, because
+   * a seed that happens to have no drafts would let the wrong query pass.
+   */
+  it('counts amenity usage over published properties, once per property', async () => {
+    const [amenity] = (
+      await db.execute<{ id: string; code: string }>(
+        sql`SELECT id, code FROM amenities WHERE is_filterable AND deleted_at IS NULL ORDER BY sort_order LIMIT 1`,
+      )
+    ).rows;
+
+    expect(amenity, 'a filterable amenity to test with').toBeDefined();
+
+    const countFor = async (code: string) =>
+      (await catalog.amenities()).find((one) => one.code === code)?.propertyCount;
+
+    const before = await countFor(amenity!.code);
+
+    expect(before, 'every amenity reports a number, never undefined').toBeTypeOf(
+      'number',
+    );
+
+    /* Two units of ONE published property. The property is the unit of counting, so this is 1. */
+    const twoUnits = (
+      await db.execute<{ id: string }>(sql`
+        SELECT u.id FROM units u
+        JOIN properties p ON p.id = u.property_id
+        WHERE p.status = 'published' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+          AND u.property_id = (
+            SELECT u2.property_id FROM units u2
+            JOIN properties p2 ON p2.id = u2.property_id
+            WHERE p2.status = 'published' AND p2.deleted_at IS NULL AND u2.deleted_at IS NULL
+            GROUP BY u2.property_id HAVING COUNT(*) >= 2 LIMIT 1
+          )
+        LIMIT 2
+      `)
+    ).rows;
+
+    if (twoUnits.length === 2) {
+      for (const unit of twoUnits) {
+        await db.execute(
+          sql`INSERT INTO unit_amenities (unit_id, amenity_id) VALUES (${unit.id}, ${amenity!.id}) ON CONFLICT DO NOTHING`,
+        );
+      }
+
+      expect(
+        await countFor(amenity!.code),
+        'two units of one property is one stay a visitor can find',
+      ).toBe((before ?? 0) + 1);
+    }
+
+    /* A DRAFT property's unit must not raise the number a published-only filter promises. */
+    const [draftUnit] = (
+      await db.execute<{ id: string }>(sql`
+        SELECT u.id FROM units u
+        JOIN properties p ON p.id = u.property_id
+        WHERE p.status = 'draft' AND p.deleted_at IS NULL AND u.deleted_at IS NULL
+        LIMIT 1
+      `)
+    ).rows;
+
+    expect(draftUnit, 'the testbed seeds draft properties').toBeDefined();
+
+    const beforeDraft = await countFor(amenity!.code);
+
+    await db.execute(
+      sql`INSERT INTO unit_amenities (unit_id, amenity_id) VALUES (${draftUnit!.id}, ${amenity!.id}) ON CONFLICT DO NOTHING`,
+    );
+
+    expect(
+      await countFor(amenity!.code),
+      'a draft stay cannot be booked, so it cannot be filtered to',
+    ).toBe(beforeDraft);
+  });
+
   it('hands every city its categories as an ARRAY, not as a Postgres literal', async () => {
     const cities = await catalog.cities();
 

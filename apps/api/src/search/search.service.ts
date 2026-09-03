@@ -56,6 +56,21 @@ export interface SearchResultItem {
 export interface SearchResult {
   items: SearchResultItem[];
   nextCursor: string | null;
+  /**
+   * The cursor for the page BEFORE this one, or null on the first page.
+   *
+   * Added 2026-09-02, because `/search` had no paging at all: it asked for 24 and the
+   * twenty-fifth stay was unreachable by any means, including editing the URL. §2 makes
+   * pagination mandatory on every customer-facing list and cursor the only permitted mechanism
+   * for one, so the page needed links in both directions.
+   *
+   * It is computed HERE rather than in the customer app because this service owns the cursor
+   * format. `encodeOffset` is `base64url(String(offset))` today and a page that rebuilt that
+   * expression would be a second definition of a wire format, free to drift the moment the cursor
+   * carries anything more than an offset — and the drift would surface as a 400 on a «السابق»
+   * link, which is exactly the sort of failure nobody tests for.
+   */
+  previousCursor: string | null;
   /** Echoed so the UI can explain a shifted date (§5.3). */
   firstBookableDate: string;
 }
@@ -466,6 +481,13 @@ export class SearchService {
     return {
       items,
       nextCursor: hasMore ? encodeOffset(offset + query.limit) : null,
+      /*
+        `Math.max(0, …)` rather than a subtraction, because a caller can arrive at any offset the
+        decoder accepts — `?cursor=` for offset 10 with a limit of 24 is a legitimate request that
+        would otherwise produce a cursor for -14, which `decodeOffset` refuses with a 400. Going
+        back from a partial page lands on the first one, which is where those results are.
+      */
+      previousCursor: offset > 0 ? encodeOffset(Math.max(0, offset - query.limit)) : null,
       firstBookableDate: verdict.firstBookableDate,
     };
   }

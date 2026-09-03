@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
@@ -356,23 +356,67 @@ export class CatalogService {
     }));
   }
 
-  /** Filterable amenities for the results sidebar (§5.5). */
+  /**
+   * Filterable amenities for the results sidebar (§5.5), each with how many stays actually have it.
+   *
+   * ## Why the count is not decoration
+   *
+   * It is the difference between a filter and a trap. `unit_amenities` held **zero rows** on
+   * 2026-09-02 while this endpoint listed twelve amenities, so the moment the results page grew a
+   * filter panel, every checkbox on it emptied the page. A control whose only possible outcome is
+   * «لا نتائج» does not read as an untagged catalogue — it reads as a broken site, and the visitor
+   * blames the search rather than the data.
+   *
+   * The panel therefore lists only amenities with a count above zero, exactly as it prints the
+   * count beside each property type. Nothing has to be remembered when staff start tagging: an
+   * amenity appears in the filter the moment a published stay has it, and disappears if the last
+   * one loses it.
+   *
+   * ## Counted over BOOKABLE units, not over the link table
+   *
+   * `COUNT(*) FROM unit_amenities` would count links to units of draft, rejected and deleted
+   * properties — so a filter could offer «مسبح · 40» and return nothing, which is the same defect
+   * one step quieter. The subquery walks to the property and applies the same `published` and
+   * `deleted_at IS NULL` predicate the search itself uses, so the number and the result set are
+   * answers to the same question.
+   *
+   * DISTINCT on the property, not the unit: two rooms with a pool in one hotel is one stay a
+   * visitor can find, and «مسبح · 2» over a single result is a number that undermines the rest.
+   */
   async amenities() {
-    return this.db.query.amenities.findMany({
-      where: and(
-        eq(schema.amenities.isFilterable, true),
-        isNull(schema.amenities.deletedAt),
-      ),
-      columns: {
-        code: true,
-        nameAr: true,
-        nameEn: true,
-        nameDe: true,
-        category: true,
-        icon: true,
-      },
-      orderBy: [asc(schema.amenities.sortOrder)],
-    });
+    const rows = await this.db.execute<{
+      code: string;
+      name_ar: string;
+      name_en: string;
+      name_de: string;
+      category: string;
+      icon: string | null;
+      property_count: string;
+    }>(sql`
+      SELECT a.code, a.name_ar, a.name_en, a.name_de, a.category, a.icon,
+        (
+          SELECT COUNT(DISTINCT u.property_id)::text
+          FROM unit_amenities ua
+          JOIN units u ON u.id = ua.unit_id AND u.deleted_at IS NULL
+          JOIN properties p ON p.id = u.property_id
+          WHERE ua.amenity_id = a.id
+            AND p.status = 'published'
+            AND p.deleted_at IS NULL
+        ) AS property_count
+      FROM amenities a
+      WHERE a.is_filterable AND a.deleted_at IS NULL
+      ORDER BY a.sort_order
+    `);
+
+    return rows.rows.map((r) => ({
+      code: r.code,
+      nameAr: r.name_ar,
+      nameEn: r.name_en,
+      nameDe: r.name_de,
+      category: r.category,
+      icon: r.icon,
+      propertyCount: Number(r.property_count),
+    }));
   }
 
   /**
