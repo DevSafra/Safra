@@ -608,6 +608,57 @@ test.describe('the phone menu', () => {
     await expect(button).toHaveAttribute('aria-expanded', 'false');
   });
 
+  test('opens at the far end of the bar, opposite the wordmark', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 860 });
+    await page.goto('/ar');
+
+    const brand = await page.locator('header a').first().boundingBox();
+    const button = await page.locator('header [data-menu="mobile"]').boundingBox();
+
+    /* Right-to-left: the wordmark opens the bar on the right, the menu closes it on the left. */
+    expect(brand && button && brand.x).toBeGreaterThan(button?.x ?? 0);
+  });
+
+  /**
+   * The two controls the bar gives up, and the question a trigger cannot answer.
+   *
+   * Bashar asked for these after the first build left them out (2026-09-03: «I do not see the
+   * current language and currency inside it»), so what is asserted is not merely that they are
+   * present — it is that the CURRENT one is marked, which is the whole reason they are open lists
+   * rather than two more buttons.
+   */
+  test('shows the current language and currency, and can change them', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 860 });
+    await page.goto('/ar/city/damascus');
+    await page.locator('header [data-menu="mobile"]').click();
+
+    const menu = page.getByRole('dialog');
+
+    await expect(menu.getByRole('link', { name: 'العربية' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    await expect(menu.getByRole('button', { name: /USD/ })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+
+    /*
+      And it APPLIES. This is a regression test for a silent one: the menu closed itself on every
+      click inside it, including the currency chips, which unmounted their own POST form in the
+      same tick. No request was made, no error appeared, and the menu closed looking exactly as if
+      it had worked — the failure mode a «does the control exist» assertion cannot see.
+    */
+    await menu.getByRole('button', { name: /EUR/ }).click();
+    await expect.poll(() => new URL(page.url()).pathname).toBe('/ar/city/damascus');
+
+    await page.locator('header [data-menu="mobile"]').click();
+    await expect(page.getByRole('dialog').getByRole('button', { name: /EUR/ })) //
+      .toHaveAttribute('aria-current', 'true');
+  });
+
   test('leaves nothing on the document when it closes', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 860 });
     await page.goto('/ar');
