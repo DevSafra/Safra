@@ -474,10 +474,19 @@ test.describe('the customer site', () => {
       await page.setViewportSize({ width, height: 850 });
       await page.goto('/ar');
 
+      /*
+        The bar's CONTROLS at any depth, not its immediate children.
+
+        This read `bar.children` until 2026-09-03, when the desktop controls were grouped into one
+        element so the phone bar could collapse. Counting top-level children then found three boxes
+        where it wanted five and failed — while the alignment it exists to protect was still exact.
+        Walking the controls asserts the same thing about the things a person actually sees, and it
+        cannot be broken by a wrapper.
+      */
       const edges = await page.evaluate(() => {
         const bar = document.querySelector('header')?.firstElementChild;
 
-        return Array.from(bar?.children ?? [])
+        return Array.from(bar?.querySelectorAll('a, button') ?? [])
           .map((element) => element.getBoundingClientRect())
           .filter((box) => box.height > 0)
           .map((box) => `${Math.round(box.top)}/${Math.round(box.bottom)}`);
@@ -493,13 +502,129 @@ test.describe('the customer site', () => {
    *
    * It was `hidden … sm:flex`, so below 640px the site's two main destinations vanished with
    * nothing in their place — a visitor could reach الإقامات only by editing the URL.
+   *
+   * The requirement did not change on 2026-09-03; the ANSWER did. The links used to be on the bar
+   * at every width, which cost three rows and 152px at 320px, and they are now one press away
+   * inside the menu. So this asserts reachability rather than a particular element being on
+   * screen — «visible in the bar» was never the requirement, it was one way of meeting it.
    */
-  test('the primary navigation is visible on a phone', async ({ page }) => {
+  test('the primary navigation is reachable on a phone', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 850 });
     await page.goto('/ar');
 
-    await expect(page.locator('header nav').first()).toBeVisible();
-    await expect(page.locator('header nav').first().getByRole('link').first()) //
-      .toBeVisible();
+    await page.locator('header [data-menu="mobile"]').click();
+
+    const menu = page.getByRole('dialog');
+
+    await expect(menu.getByRole('navigation')).toBeVisible();
+    await expect(menu.getByRole('link', { name: 'الإقامات' })).toBeVisible();
+  });
+});
+
+/**
+ * The phone menu (Bashar, 2026-09-03).
+ *
+ * The bar carried eight controls and wrapped below `md` — three rows and 152px at 320px, two and
+ * 108px at 390px, on every page of the site. These are the four things that have to hold for the
+ * hamburger to be an improvement rather than a relocation of the problem, and each fails on its
+ * own: the bar collapses, the menu reaches everything the bar gave up, the control that opened it
+ * can close it, and nothing is left behind on the document when it goes.
+ */
+test.describe('the phone menu', () => {
+  test.use({ baseURL: 'http://localhost:3000' });
+
+  for (const width of [320, 360, 390, 430]) {
+    test(`the bar is one row at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 860 });
+      await page.goto('/ar');
+
+      const bar = page.locator('header > div');
+
+      /*
+        The HEIGHT, not a count of rows: children of different heights sit at different tops under
+        `items-center`, so comparing tops reports a wrap that is not there. One row of a 44px
+        control inside `py-3` is 68px, and anything that wraps is at least 44px more than that.
+      */
+      expect(
+        (await bar.boundingBox())?.height,
+        'the bar wrapped to a second row',
+      ).toBeLessThan(90);
+
+      await expect(page.locator('header [data-menu="mobile"]')).toBeVisible();
+    });
+  }
+
+  test('the menu reaches every destination the bar gives up', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 860 });
+    await page.goto('/ar');
+    await page.locator('header [data-menu="mobile"]').click();
+
+    const menu = page.getByRole('dialog');
+
+    await expect(menu).toBeVisible();
+
+    /* The two destinations, the partner invitation, and a way in. Nothing is only on a desktop. */
+    for (const name of [
+      'الرئيسية',
+      'الإقامات',
+      'سجّل كشريك',
+      'تسجيل الدخول',
+      'إنشاء حساب',
+    ]) {
+      await expect(menu.getByRole('link', { name }), name).toBeVisible();
+    }
+
+    /* Every row is a finger target, which the 42px the bar's own links use is not. */
+    const short = await menu
+      .locator('a')
+      .evaluateAll(
+        (links) =>
+          links.filter((link) => link.getBoundingClientRect().height < 44).length,
+      );
+
+    expect(short, 'a menu row is under the 44px target size').toBe(0);
+  });
+
+  test('the button that opens it closes it, and the bar stays reachable', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 860 });
+    await page.goto('/ar');
+
+    const button = page.locator('header [data-menu="mobile"]');
+
+    await button.click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(button).toHaveAttribute('aria-expanded', 'true');
+
+    /*
+      The press that closes it. This is the assertion that would have caught the first build, where
+      the sheet was rendered INSIDE the sticky header and its own backdrop covered the button —
+      `toBeVisible` passed and the control was unclickable.
+    */
+    await button.click();
+
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(button).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('leaves nothing on the document when it closes', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 860 });
+    await page.goto('/ar');
+    await page.locator('header [data-menu="mobile"]').click();
+    await page.getByRole('dialog').getByRole('link', { name: 'الإقامات' }).click();
+    await page.waitForURL('**/search**');
+
+    /*
+      The page behind a modal is scroll-locked and the bar is lifted over the overlay. A navigation
+      out of an open menu unmounts it without a close, so both have to be undone on unmount rather
+      than on the way out — otherwise the next page cannot be scrolled.
+    */
+    expect(await page.evaluate(() => getComputedStyle(document.body).overflow)).not.toBe(
+      'hidden',
+    );
+    expect(
+      await page.evaluate(() => document.documentElement.hasAttribute('data-menu-open')),
+    ).toBe(false);
   });
 });

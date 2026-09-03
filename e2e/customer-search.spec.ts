@@ -9,8 +9,24 @@ import { expect, test } from '@playwright/test';
  */
 test.use({ baseURL: 'http://localhost:3000' });
 
-/** A night the §5.3 cutoff cannot close, so the suite does not change behaviour at 17:00. */
-const STAY = 'checkIn=2026-09-03&checkOut=2026-09-04&adults=2';
+/**
+ * A night the §5.3 cutoff cannot close.
+ *
+ * It said that already and named TODAY, which is the one date the cutoff does close: past 17:00 in
+ * the city's own timezone the API refuses same-day arrivals, so every test here returned zero
+ * results and failed — reliably, every evening, for a reason with no relationship to the code
+ * under test. Found at 20:48 Damascus on 2026-09-03. A fortnight out is far enough that no cutoff,
+ * timezone or clock skew reaches it, and near enough to stay inside the seeded availability.
+ */
+const STAY = 'checkIn=2026-09-17&checkOut=2026-09-19&adults=2';
+/**
+ * The arrival, derived rather than retyped.
+ *
+ * Two assertions below carried their own copy of the date and drifted from `STAY` the moment it
+ * moved — they were checking that the dates survive a filter, and they were checking it against a
+ * date the page had never been asked for.
+ */
+const CHECK_IN = new URLSearchParams(STAY).get('checkIn') ?? '';
 const SEARCH = `/ar/search?${STAY}`;
 
 const apply = 'button[type="submit"]:has-text("طبّق")';
@@ -88,7 +104,7 @@ test('a filter applies, survives in the URL, and keeps the search', async ({ pag
   await page.waitForURL(/minPrice=60/);
 
   /* The dates and the party are not filters and must not be lost by filtering. */
-  expect(page.url()).toContain('checkIn=2026-09-03');
+  expect(page.url()).toContain(`checkIn=${CHECK_IN}`);
   expect(page.url()).toContain('adults=2');
   expect(page.url()).toContain('freeCancellationOnly=true');
 
@@ -99,7 +115,7 @@ test('a filter applies, survives in the URL, and keeps the search', async ({ pag
   /* Clearing drops the filters and keeps the search. */
   await page.getByRole('link', { name: 'مسح الكل' }).click();
   await page.waitForURL((url) => !url.searchParams.has('minPrice'));
-  expect(page.url()).toContain('checkIn=2026-09-03');
+  expect(page.url()).toContain(`checkIn=${CHECK_IN}`);
   expect(page.url()).not.toContain('freeCancellationOnly');
 });
 
