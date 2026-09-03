@@ -90,7 +90,7 @@ export default async function JoinAsPartnerPage({
           {reasons.map((key) => (
             <li
               key={key}
-              className="rounded-xl border border-line bg-card px-4 py-3 text-[13.5px] leading-relaxed text-text2"
+              className="rounded-card border border-line bg-card px-4 py-3 text-[13.5px] leading-relaxed text-text2"
             >
               {t(`why.${key}`)}
             </li>
@@ -111,7 +111,7 @@ export default async function JoinAsPartnerPage({
           {steps.map((key) => (
             <li
               key={key}
-              className="rounded-xl border border-line bg-card px-4 py-3 text-[13.5px] leading-relaxed text-text2"
+              className="rounded-card border border-line bg-card px-4 py-3 text-[13.5px] leading-relaxed text-text2"
             >
               {t(`steps.${key}`)}
             </li>
@@ -121,10 +121,15 @@ export default async function JoinAsPartnerPage({
 
       <section>
         <h2 className="mb-3 text-xl font-bold text-text">{t('documentsTitle')}</h2>
-        <ul className="grid gap-2">
+        {/*
+          The list's own marker, not a typed dash. An em-dash standing in for a bullet is a §9.G
+          tell and it is also worse markup: a screen reader announces a list of five items either
+          way, and only one of them draws correctly at every text size.
+        */}
+        <ul className="grid list-inside list-disc gap-2 marker:text-gold">
           {documents.map((key) => (
             <li key={key} className="text-[13.5px] leading-relaxed text-text2">
-              — {t(`documents.${key}`)}
+              {t(`documents.${key}`)}
             </li>
           ))}
         </ul>
@@ -133,7 +138,7 @@ export default async function JoinAsPartnerPage({
           uploaded from this page, and an applicant who attaches a passport to a public form has
           been let down by the page rather than by themselves.
         */}
-        <p className="mt-3 rounded-xl border border-dashed border-line px-4 py-3 text-[12.5px] leading-relaxed text-faint">
+        <p className="mt-3 rounded-card border border-dashed border-line px-4 py-3 text-[12.5px] leading-relaxed text-faint">
           {t('documentsNote')}
         </p>
       </section>

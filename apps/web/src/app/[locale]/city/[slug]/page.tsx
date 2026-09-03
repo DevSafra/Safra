@@ -256,9 +256,15 @@ export default async function CityPage({
             ))}
           </ul>
         ) : (
-          <p className="mt-6 rounded-card border border-line bg-card p-6 text-muted">
-            {ts('noResults')} — {ts('noResultsHint')}
-          </p>
+          <div className="mt-6 rounded-card border border-line bg-card p-6">
+            {/*
+              Two sentences, two elements. They were joined by a literal em-dash in the markup,
+              which is both a §9.G tell and a punctuation mark living in code rather than in the
+              catalogue — the one place `docs/i18n.md` says no word may live.
+            */}
+            <p className="text-text">{ts('noResults')}</p>
+            <p className="mt-1 text-sm text-muted">{ts('noResultsHint')}</p>
+          </div>
         )}
       </section>
     </>

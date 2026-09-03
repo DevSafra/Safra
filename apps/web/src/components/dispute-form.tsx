@@ -138,7 +138,7 @@ export function DisputeForm({
             <option key={booking.reference} value={booking.reference}>
               {/* The reference is the thing they can match against their voucher, so it leads. */}
               {booking.reference}
-              {booking.property ? ` — ${booking.property}` : ''} ({booking.checkIn})
+              {booking.property ? ` · ${booking.property}` : ''} ({booking.checkIn})
             </option>
           ))}
         </select>
