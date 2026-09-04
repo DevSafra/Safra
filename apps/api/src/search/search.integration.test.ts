@@ -84,6 +84,7 @@ describeIfDb('SearchService', () => {
     infants: 0,
     bedrooms: 0,
     attributes: [],
+    starRatings: [],
     amenityCodes: [],
     freeCancellationOnly: false,
     sort: 'recommended',

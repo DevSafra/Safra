@@ -301,6 +301,8 @@ describeIfDb('PropertiesService.readOwn', () => {
       ...codes,
       name: { ar: `عقار ${Math.random().toString(36).slice(2, 8)}` },
       address: 'شارع الاختبار ٧',
+      /* Required since 2026-09-04 — every new listing declares its classification. */
+      starRating: 4,
       attributes: [],
       ...(initialUnits ? { initialUnits } : {}),
     });
@@ -418,6 +420,7 @@ describeIfDb('PropertiesService.readOwn', () => {
       ...codes,
       name: { ar: `عقار ${Math.random().toString(36).slice(2, 8)}` },
       address: 'شارع الاختبار ٣',
+      starRating: 3,
       attributes: [],
       ...(roomNumber === undefined ? {} : { roomNumber }),
     });
@@ -426,6 +429,55 @@ describeIfDb('PropertiesService.readOwn', () => {
       const { reference } = await service.create(partner(), draftInput('A-12'));
 
       expect((await service.readOwn(partner(), reference)).roomNumber).toBe('A-12');
+    });
+
+    /**
+     * The star CLASSIFICATION round-trips (Bashar, 2026-09-04).
+     *
+     * Proved HERE rather than in a browser, and that placement was a correction: the browser spec
+     * created a listing to prove it and thereby leaked three drafts into a shared fixture partner,
+     * breaking `partner.spec.ts`'s check that every listing that partner owns is named «قصر
+     * الشرق». This suite rolls back, so a listing created here exists for one test.
+     */
+    it('stores the star classification a partner declared, and reads it back', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draftInput(),
+        starRating: 5,
+      });
+
+      expect((await service.readOwn(partner(), reference)).starRating).toBe(5);
+    });
+
+    /** And an edit changes it — the «editable later» half of the requirement. */
+    it('changes the classification on update', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draftInput(),
+        starRating: 2,
+      });
+
+      await service.update(partner(), reference, { starRating: 4 });
+
+      expect((await service.readOwn(partner(), reference)).starRating).toBe(4);
+    });
+
+    /**
+     * The DATABASE refuses what the schema would refuse, which is the check a script meets.
+     *
+     * `propertyCreateSchema` bounds it 1-5 at the boundary and that is what a person meets. This
+     * asserts the CHECK constraint behind it, so a repair script or a future endpoint cannot write
+     * a nine-star hotel — the reason the constraint exists rather than only the schema.
+     */
+    it('refuses a classification outside 1-5 at the database', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draftInput(),
+        starRating: 3,
+      });
+
+      await expect(
+        db.execute(
+          sql`UPDATE properties SET star_rating = 9 WHERE reference = ${reference}`,
+        ),
+      ).rejects.toThrow();
     });
 
     it('stores nothing when the field was left out', async () => {
