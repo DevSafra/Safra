@@ -746,5 +746,11 @@
     "failed": "The request could not be sent. Please try again.",
     "privacy": "We use these details only to assess your request and to contact you about it.",
     "signedInNote": "Applying requires an account, because the request is filed in your account’s name."
+  },
+  "starRating": {
+    "label": "Star rating",
+    "stars": "{count, plural, one {# star} other {# stars}}",
+    "unrated": "Not rated",
+    "filterAny": "Any rating"
   }
 }

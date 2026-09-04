@@ -222,6 +222,7 @@ export const de = {
   'validation.too_long': 'Dieser Wert ist zu lang.',
   'validation.account_number':
     'Eine Kontonummer besteht aus 4 bis 34 Buchstaben oder Ziffern.',
+  'validation.star_rating': 'Wählen Sie eine Sterne-Klassifizierung von 1 bis 5.',
   'validation.payout_method': 'Unbekannte Überweisungsart.',
   'validation.swift': 'Ein SWIFT-Code hat 8 oder 11 Zeichen.',
   'validation.out_of_range': 'Der Wert liegt außerhalb des zulässigen Bereichs.',

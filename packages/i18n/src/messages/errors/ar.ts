@@ -182,6 +182,7 @@ export const ar = {
   'support.ticket_closed': 'طلب الدعم هذا مغلق. يرجى فتح طلب جديد.',
   'validation.too_long': 'هذه القيمة طويلة جداً.',
   'validation.account_number': 'رقم الحساب يجب أن يتكوّن من 4 إلى 34 حرفاً أو رقماً.',
+  'validation.star_rating': 'اختر تصنيف النجوم من 1 إلى 5.',
   'validation.payout_method': 'طريقة التحويل غير معروفة.',
   'validation.swift': 'رمز السويفت يجب أن يتكوّن من 8 أو 11 خانة.',
   'validation.out_of_range': 'القيمة خارج النطاق المسموح.',

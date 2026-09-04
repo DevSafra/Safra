@@ -746,5 +746,11 @@
     "failed": "Die Anfrage konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
     "privacy": "Wir verwenden diese Angaben ausschließlich, um Ihre Anfrage zu prüfen und Sie dazu zu kontaktieren.",
     "signedInNote": "Eine Anfrage kann nur mit Konto gestellt werden, denn sie wird im Namen Ihres Kontos erfasst."
+  },
+  "starRating": {
+    "label": "Sterne-Klassifizierung",
+    "stars": "{count, plural, one {# Stern} other {# Sterne}}",
+    "unrated": "Nicht klassifiziert",
+    "filterAny": "Alle Klassifizierungen"
   }
 }

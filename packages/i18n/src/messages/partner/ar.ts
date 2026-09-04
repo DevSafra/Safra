@@ -798,6 +798,25 @@ export const ar = {
     addClose: '× إغلاق النموذج',
     fName: 'اسم العقار',
     fType: 'النوع',
+    /*
+      تصنيف النجوم — the official classification, declared on creation (Bashar, 2026-09-04).
+
+      Written out per value rather than built from a number: «نجمة واحدة» and «نجمتان» and «٣ نجوم»
+      are three Arabic forms, and a partner-facing select is a fixed list of five, so five written
+      labels are simpler and more correct than a plural rule in a component.
+    */
+    fStarRating: 'تصنيف النجوم',
+    starOption: {
+      1: 'نجمة واحدة',
+      2: 'نجمتان',
+      3: '3 نجوم',
+      4: '4 نجوم',
+      5: '5 نجوم',
+    } as Record<number, string>,
+    /** Shown on a listing that predates the field, so «none» does not read as «one star». */
+    starUnset: 'بلا تصنيف',
+    /* Why it cannot be changed once the listing is live — the §8.1 freeze, said rather than implied. */
+    starLocked: 'يُحدَّد تصنيف النجوم قبل النشر. لتعديله بعد النشر راسل فريق سفرة.',
     fCity: 'المدينة',
     fPrice: 'السعر لليلة ($)',
     fUnits: 'عدد الوحدات',

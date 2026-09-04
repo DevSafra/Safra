@@ -936,6 +936,13 @@ export const ar = {
       searchPlaceholder: 'بحث عن عقار…',
       colProperty: 'العقار',
       colPartner: 'الشريك',
+      /* تصنيف النجوم — the official classification, visible at every status (Bashar, 2026-09-04). */
+      colStars: 'النجوم',
+      starUnset: 'بلا تصنيف',
+      starRatingLabel: 'تصنيف النجوم',
+      starRatingHint:
+        'التصنيف الرسمي للعقار من 1 إلى 5 نجوم. يظهر للعملاء على كل شاشة يُعرض فيها العقار، ويمكن تصحيحه في أي حالة — بما فيها العقارات المنشورة، التي لا يستطيع الشريك تعديلها.',
+      starRatingSaved: 'حُفظ تصنيف النجوم.',
       note: 'أنواع الإقامة قابلة للإضافة من هنا دون تعديل الكود. كل وحدة لها تقويم مستقل بحالات: متاح، محجوز، مغلق، تحت الصيانة.',
     },
 
@@ -3399,6 +3406,7 @@ export const ar = {
     'payout_account.verified': 'التحقق من حساب تحويل',
     'payout_account.rejected': 'رفض حساب تحويل',
     'payout_account.removed': 'حذف حساب تحويل',
+    'property.star_rating_set': 'تعيين تصنيف نجوم عقار',
     'partner_payout.released': 'الإفراج عن مستحقات شريك',
     'partner_payout.held': 'تعليق مستحقات شريك',
     'partner_payout.hold_lifted': 'رفع تعليق مستحقات شريك',
@@ -3588,6 +3596,21 @@ export const ar = {
       «معتمد» for the same reason `in_review` is «قيد التحقق» rather than «قيد المراجعة»: the two
       pills sit on one screen, and a shared word would make two different facts read as one.
     */
+    /*
+      Star classification, one written label per value.
+
+      Five written forms rather than an ICU plural: «نجمة واحدة» and «نجمتان» and «٣ نجوم» are
+      three Arabic categories, the scale is a fixed list of five, and a lookup that cannot be
+      wrong beats a rule that can.
+    */
+    starRating: {
+      1: 'نجمة واحدة',
+      2: 'نجمتان',
+      3: '3 نجوم',
+      4: '4 نجوم',
+      5: '5 نجوم',
+    } as Record<string, string>,
+
     payoutAccountStatus: {
       pending: 'قيد المراجعة',
       verified: 'موثَّق',
@@ -3675,6 +3698,8 @@ export const ar = {
       reason: 'السبب',
       /* The payout-account lifecycle — masked in the trail exactly as it is on screen. */
       partnerId: 'الشريك',
+      /* The star classification, in a before/after payload on the audit screen. */
+      starRating: 'تصنيف النجوم',
       method: 'طريقة التحويل',
       accountHolder: 'اسم صاحب الحساب',
       last4: 'آخر أربعة أرقام',
