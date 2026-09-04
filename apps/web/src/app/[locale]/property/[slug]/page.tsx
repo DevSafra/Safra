@@ -568,12 +568,29 @@ export default async function PropertyPage({
                 <div className="gold-rule my-4" />
 
                 {/*
-                  Carries the unit and a concrete date range, because checkout needs
-                  both to quote a price. The first bookable window from the calendar is
-                  used as the default so the link always lands on something valid.
+                  Carries the unit and a concrete date range, because checkout needs both to quote
+                  a price.
+
+                  **The reader's OWN dates when they have them**, and the calendar's first bookable
+                  window only when they do not. It used `defaultStay` unconditionally, so somebody
+                  who searched 23–25 March, read a two-night price on the card and pressed «احجز
+                  الآن» arrived at a checkout for TONIGHT — one night, a different total, and
+                  nothing on the way through saying the stay had been changed. Driven and measured
+                  on 2026-09-04: searched 2027-03-23→25, booked 2026-09-04→05, $203.98 became
+                  $96.99.
+
+                  It is the same defect the SRS audit found in this link in August, in the same
+                  place, for the PARTY rather than the dates — «a family of four reached checkout as
+                  a party of two». The party was fixed then and the dates were left.
+
+                  The fallback still matters and is kept: a reader arriving from a bookmark or a
+                  city tile has no dates, and a checkout with none refuses. Availability stays the
+                  API's to judge — it re-quotes and answers «هذه الوحدة غير متاحة لهذه التواريخ» if
+                  the chosen range is not bookable, which is a truthful screen rather than a
+                  silently substituted stay.
                 */}
                 <Link
-                  href={`/${locale}/checkout?property=${property.slug}&unitId=${cheapest.id}&checkIn=${defaultStay.checkIn}&checkOut=${defaultStay.checkOut}&adults=${Math.min(adults, cheapest.maxGuests)}&children=${children}&infants=${infants}`}
+                  href={`/${locale}/checkout?property=${property.slug}&unitId=${cheapest.id}&checkIn=${stay.get('checkIn') ?? defaultStay.checkIn}&checkOut=${stay.get('checkOut') ?? defaultStay.checkOut}&adults=${Math.min(adults, cheapest.maxGuests)}&children=${children}&infants=${infants}`}
                   className="mt-5 block rounded-lg btn-gold px-5 py-3 text-center font-semibold transition-opacity hover:opacity-90"
                 >
                   {t('bookNow')}
