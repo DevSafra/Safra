@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 import { PARTNER_BASE as PORTAL, PARTNER_STATE } from './partner-session.js';
 import { STAFF_STATE } from './staff.js';
-import { ar as t } from '../packages/i18n/src/messages/partner/ar.js';
+import tw from '../packages/i18n/src/messages/web/ar.json' with { type: 'json' };
 
 /**
  * The star classification, on every surface a property appears (Bashar, 2026-09-04).
@@ -78,32 +78,31 @@ test.describe('the star classification, across all three applications', () => {
       ).toBeVisible();
 
       /*
-        The FILTER, driven as a person does it: tick the chip, submit the form, read the results.
+        The FILTER, driven as a person does it — and it lives in «التصفية» now, not on the search
+        bar (Bashar, 2026-09-04: «they should be inside التصفية on the الإقامات page»).
 
-        Not by typing `?starRatings=5` — that would prove the API filters and say nothing about
-        whether the control on the page is wired to it, which is the half that breaks. The chip is
-        a `sr-only` checkbox inside a styled label, so the label is what a person clicks.
+        Not by typing `?starRatings=5`, which would prove the API filters and say nothing about
+        whether the control on the page is wired to it — the half that breaks. Below `lg` the panel
+        is a `<details>`, so it is opened first; at the desktop width this runs at it is already
+        open and opening it again is harmless.
       */
-      const chip = page
-        .locator('label')
-        .filter({ has: page.locator('input[value="5"][name="starRatings"]') });
+      const panel = page.locator('details').filter({ hasText: 'التصفية' }).first();
 
-      await chip.click();
-      await page
-        .locator('form')
-        .first()
-        .press('Enter')
-        .catch(() => undefined);
-      await page.getByRole('button', { name: /ابحث/ }).first().click();
+      if ((await panel.count()) > 0)
+        await panel.evaluate((node: HTMLDetailsElement) => {
+          node.open = true;
+        });
+
+      await page.locator('input[name="starRatings"][value="5"]').check();
+      /* The panel's own «تطبيق التصفية», named from the catalogue rather than guessed. */
+      await page.getByRole('button', { name: tw.search.filtersApply }).click();
       await page.waitForLoadState('domcontentloaded');
 
       await expect(page).toHaveURL(/starRatings=5/);
 
       /*
-        Every result is five stars. The filter chips themselves also carry `data-star-rating`, so
-        the assertion is scoped to what comes AFTER the form — otherwise the chips' own 1..5 would
-        make this pass no matter what the results were, which is how the first draft of this test
-        proved nothing.
+        Every result is five stars. Scoped past the form, because the filter's own rows draw the
+        same component — otherwise their 1..5 would make this pass whatever the results were.
       */
       const results = await resultStarsOn(page);
 
@@ -177,88 +176,70 @@ test.describe('the star classification, across all three applications', () => {
     test.use({ storageState: PARTNER_STATE });
 
     /**
-     * The partner path: the creation form asks for it, and an existing listing can change it.
+     * The creation form asks a HOTEL for a classification, and asks nobody else.
      *
-     * ## Why this does NOT create a listing
+     * ## Why this and not an edit
      *
-     * It did, and it broke two other specs. `partner.spec.ts` asserts that EVERY listing this
-     * partner owns is named «قصر الشرق» — a real scope-isolation check that a leaked fixture must
-     * not be allowed to weaken — and three «فندق النجوم …» drafts made it fail. That is the
-     * «any spec that submits the bar must put the size back» rule, one level up: a spec that adds
-     * a ROW to a shared fixture leaks into every later spec and every later run.
+     * The fixture partner's only hotels are PUBLISHED, and §8.1 freezes a published listing's form
+     * — so there is no partner-editable hotel to drive, and a test that hunted for one would skip
+     * and prove nothing. Persistence through create and update is proved at the service layer in
+     * `apps/api/src/partner/properties.integration.test.ts`, where it rolls back and where two
+     * mutations have been watched to fail against it.
      *
-     * So the creation half is asserted on the FORM — the field is present and required — and the
-     * write is proved where it can be rolled back, in
-     * `apps/api/src/partner/properties.integration.test.ts`. The edit half is driven here on a
-     * listing that already exists, because changing one property's classification changes nothing
-     * any other spec reads.
+     * What only a browser can prove is the REACTIVE half: the field appears when the type is a
+     * hotel and vanishes when it is not, without a page load. That is Bashar's rule of 2026-09-04
+     * made visible, and it is what this drives.
+     *
+     * ## And it creates nothing
+     *
+     * An earlier version submitted the form, which left three drafts on a shared fixture partner
+     * and broke `partner.spec.ts`'s check that every listing that partner owns is named «قصر
+     * الشرق». A spec that adds a row to a shared fixture leaks into every later run.
      */
-    test('asks for it when creating, and an existing listing can change it', async ({
+    test('asks a hotel for a classification, and asks no other type', async ({
       page,
     }) => {
       await page.goto(`${PORTAL}/properties`, { waitUntil: 'domcontentloaded' });
-
-      /* ── Creating: the field is there, and there is no way to skip it ────── */
       await page
         .getByRole('button', { name: /إضافة عقار|عقار جديد/ })
         .first()
         .click();
 
-      const field = page.locator('select[name="starRating"]');
+      const type = page.locator('select[name="propertyTypeCode"]');
+      const stars = page.locator('select[name="starRating"]');
 
-      await expect(field, 'the creation form asks for a classification').toBeVisible();
+      await expect(type, 'the creation form asks for a type').toBeVisible();
+
+      await type.selectOption('hotel');
+      await expect(stars, 'a hotel is asked for its classification').toBeVisible();
       await expect(
-        field.locator('option'),
-        'five values and no blank — it is required on creation',
+        stars.locator('option'),
+        'five values and no blank — it is required of a hotel',
       ).toHaveCount(5);
 
-      await page.getByRole('button', { name: /إغلاق النموذج/ }).click();
-
-      /* ── Editing: an existing listing, changed and read back ─────────────── */
-      const card = page.locator('article').first();
-      const name = (await card.locator('h2').innerText()).trim();
-
-      await card.getByRole('link', { name: /تعديل/ }).first().click();
-      await page.waitForLoadState('domcontentloaded');
-
       /*
-        By its LABEL, not by `name`. The editor's selects are the portal's own `Select`, which
-        takes no `name` prop — the city, type and policy fields have none either — so a name-based
-        locator finds nothing and reports «the field is missing» about a field that is right there.
+        Every other type, one at a time. Not just one of them: «apartments, villas, chalets, homes,
+        camps and similar» is a list, and a rule asserted against a single example is a rule that
+        holds for a single example.
       */
-      const editor = page.getByLabel(t.properties.fStarRating);
+      for (const code of [
+        'apartment',
+        'villa',
+        'chalet',
+        'farm',
+        'camp',
+        'rural_house',
+      ]) {
+        await type.selectOption(code);
+        await expect(
+          stars,
+          `a ${code} is not asked for a star classification`,
+        ).toHaveCount(0);
+      }
 
-      await expect(editor, 'the edit form carries the field too').toBeVisible();
-
-      const before = await editor.inputValue();
-      const next = before === '5' ? '3' : '5';
-
-      await editor.selectOption(next);
-
-      /*
-        WAIT for the PATCH, do not race it. The first version clicked save and navigated straight
-        to the list, which read the OLD value while the request was still in flight — the API
-        logged a 200 a moment later. It reported the feature broken when the feature was fine.
-      */
-      const [saved] = await Promise.all([
-        page.waitForResponse(
-          (r) => r.url().includes('/api/properties/') && r.request().method() === 'PATCH',
-        ),
-        page.getByRole('button', { name: /حفظ/ }).first().click(),
-      ]);
-
-      expect(saved.status(), 'the edit was accepted').toBeLessThan(400);
-
-      await page.goto(`${PORTAL}/properties`, { waitUntil: 'domcontentloaded' });
-
-      await expect(
-        page
-          .locator('article')
-          .filter({ hasText: name })
-          .first()
-          .locator('[data-star-rating]'),
-        'the change is saved and shown on the listing screen',
-      ).toHaveAttribute('data-star-rating', next);
+      /* And back, so the disappearance is a reaction rather than a one-way collapse. */
+      await type.selectOption('hotel');
+      await expect(stars).toBeVisible();
     });
   });
 
@@ -288,7 +269,15 @@ test.describe('the star classification, across all three applications', () => {
       page,
     }) => {
       await page.goto('/properties?size=25', { waitUntil: 'domcontentloaded' });
-      await page.locator('tbody tr a').first().click();
+
+      /*
+        A HOTEL row. The classification is a hotel classification, so a villa's detail screen has
+        no editor at all — «the first row» found one and called the editor missing.
+      */
+      const hotelRow = page.locator('tbody tr').filter({ hasText: 'فندق' }).first();
+
+      await expect(hotelRow, 'the registry must show at least one hotel').toBeVisible();
+      await hotelRow.locator('a').first().click();
       await page.waitForLoadState('domcontentloaded');
       await expect(page).toHaveURL(/\/properties\/PRO-/);
 
@@ -316,6 +305,41 @@ test.describe('the star classification, across all three applications', () => {
       await expect(
         page.locator('[data-star-editor] select[name="starRating"]'),
       ).toHaveValue(next);
+    });
+
+    /**
+     * A non-hotel has no classification, and no control that offers one.
+     *
+     * Bashar, 2026-09-04: «Other accommodation types such as apartments, villas, chalets, homes,
+     * camps and similar property types should not use the hotel star-classification system. For
+     * non-hotel accommodation types, the classification should simply be absent.»
+     *
+     * «لا ينطبق» rather than «بلا تصنيف»: one says the scheme does not reach this kind of place,
+     * the other says it does and nobody has answered yet. Printing the second against a villa
+     * sends an operator looking for a control that should not exist.
+     */
+    test('offers no classification for a non-hotel, and says why', async ({ page }) => {
+      await page.goto('/properties?size=100', { waitUntil: 'domcontentloaded' });
+
+      const other = page
+        .locator('tbody tr')
+        .filter({ hasNotText: 'فندق' })
+        .filter({ hasText: 'لا ينطبق' })
+        .first();
+
+      test.skip(
+        (await other.count()) === 0,
+        'every listing in this registry page is a hotel — nothing to assert about the rest',
+      );
+
+      await other.locator('a').first().click();
+      await page.waitForLoadState('domcontentloaded');
+
+      await expect(
+        page.locator('[data-star-editor]'),
+        'a villa has no classification editor at all',
+      ).toHaveCount(0);
+      await expect(page.getByText('لا ينطبق').first()).toBeVisible();
     });
   });
 
