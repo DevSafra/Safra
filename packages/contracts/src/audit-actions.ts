@@ -260,6 +260,20 @@ export const AUDIT_ACTIONS = [
   'city.deleted',
   'country.deleted',
   'currency.deleted',
+  /*
+    كتالوج المنصّة (Bashar, 2026-09-04): amenities, cancellation policies and partner types became
+    managed rather than SQL-only. Nine actions, following the geography rows exactly — created,
+    updated, deleted — and every payload names the CODE so سجل التدقيق reads without a lookup.
+  */
+  'amenity.created',
+  'amenity.updated',
+  'amenity.deleted',
+  'cancellation_policy.created',
+  'cancellation_policy.updated',
+  'cancellation_policy.deleted',
+  'partner_type.created',
+  'partner_type.updated',
+  'partner_type.deleted',
   'conversation.started',
   'conversation.closed',
   'dispute.resolved',

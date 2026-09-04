@@ -323,6 +323,19 @@ export const ERROR = {
   GEO_SLUG_FORMAT: 'geo.slug_format',
   GEO_COUNTRY_CODE_FORMAT: 'geo.country_code_format',
   GEO_CURRENCY_UNKNOWN: 'geo.currency_unknown',
+  /*
+    ── كتالوج المنصّة: amenities, cancellation policies and partner types ─────────────────
+    The three reference sets a business manages (Bashar, 2026-09-04). The same three refusals the
+    geography rows carry, for the same reasons: a code is taken, a row is missing, or something
+    still points at it. Their own codes rather than reusing `geo.*` — a reader meeting «لا يمكن
+    حذف الدولة» while deleting an amenity is told about a screen they are not on.
+  */
+  CATALOGUE_NOT_FOUND: 'catalogue.not_found',
+  CATALOGUE_CODE_TAKEN: 'catalogue.code_taken',
+  /* Refused, with the count, so retiring is understood as the alternative rather than guessed at. */
+  CATALOGUE_IN_USE: 'catalogue.in_use',
+  /* Lowercase Latin, digits and hyphens: a code is keyed on by seeds, contracts and links. */
+  CATALOGUE_CODE_FORMAT: 'catalogue.code_format',
   SETTING_VALUE_FLAT_OR_PERCENT: 'setting.value_flat_or_percent',
   SETTING_VALUE_SANCTIONS_POLICY: 'setting.value_sanctions_policy',
   SETTING_VALUE_PERCENT_RANGE: 'setting.value_percent_range',

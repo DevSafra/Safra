@@ -241,6 +241,15 @@ export const PERMISSIONS = {
   SETTINGS_READ: 'settings.read',
   SETTINGS_UPDATE: 'settings.update',
   GEO_MANAGE: 'geo.manage',
+  /**
+   * كتالوج المنصّة: amenities, cancellation policies, partner types (Bashar, 2026-09-04).
+   *
+   * Its own permission rather than `GEO_MANAGE`, which is geography — a role that may correct a
+   * city has no business rewriting the refund ladder every booking snapshots. Reads go through
+   * `SETTINGS_READ`, as the city categories' do, so operations can see the catalogue they work
+   * against without being able to change it.
+   */
+  CATALOGUE_MANAGE: 'catalogue.manage',
   FX_RATE_MANAGE: 'fx_rate.manage',
   AD_READ: 'ad.read',
   AD_MANAGE: 'ad.manage',

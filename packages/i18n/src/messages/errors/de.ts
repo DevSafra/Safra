@@ -243,6 +243,12 @@ export const de = {
   'geo.city_not_found': 'Stadt nicht gefunden.',
   'geo.country_not_found': 'Land nicht gefunden.',
   'geo.category_not_found': 'Kategorie nicht gefunden.',
+  'catalogue.not_found': 'Kein Katalogeintrag mit diesem Code.',
+  'catalogue.code_taken': 'Dieser Code ist bereits vergeben. Bitte einen anderen wählen.',
+  'catalogue.in_use':
+    '{count} Datensätze verweisen darauf, daher ist Löschen nicht möglich — stattdessen deaktivieren: der Eintrag verschwindet aus den Auswahllisten und alles Bestehende bleibt gültig.',
+  'catalogue.code_format':
+    'Ein Code besteht aus lateinischen Kleinbuchstaben, Ziffern und Bindestrichen, z. B. ev-charger.',
   'geo.category_in_use':
     'Diese Kategorie ist {n} Städten zugeordnet — deaktivieren statt entfernen.',
   'geo.city_in_use':

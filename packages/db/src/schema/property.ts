@@ -44,6 +44,19 @@ export const amenities = pgTable('amenities', {
   nameDe: text('name_de').notNull(),
   /** Grouped in the filter sidebar: "facilities" | "rules" | "accessibility". */
   category: text('category').notNull().default('facilities'),
+  /**
+   * Offered to partners at all — the same meaning `partner_types.is_active` and
+   * `cancellation_policies.is_active` already carry (added 2026-09-04 with كتالوج المنصّة).
+   *
+   * Distinct from `isFilterable`, which decides whether it appears in the SEARCH SIDEBAR. An
+   * amenity can be real and offerable without being worth filtering on, and one being retired must
+   * not silently mean "hidden from the filter": conflating the two would let a super admin who
+   * meant to tidy the sidebar stop partners from declaring a facility they have.
+   *
+   * A retired amenity keeps every `unit_amenities` link it already has — a listing does not lose
+   * a facility because SAFRA stopped offering it to new ones.
+   */
+  isActive: boolean('is_active').notNull().default(true),
   isFilterable: boolean('is_filterable').notNull().default(true),
   icon: text('icon'),
   sortOrder: integer('sort_order').notNull().default(0),

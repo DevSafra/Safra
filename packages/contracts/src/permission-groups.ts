@@ -90,6 +90,8 @@ const GROUP_OF_PREFIX: Readonly<Record<string, PermissionGroup>> = {
 
   settings: 'platform',
   geo: 'platform',
+  /* كتالوج المنصّة — amenities, cancellation policies, partner types. */
+  catalogue: 'platform',
   ad: 'platform',
   report: 'platform',
   audit_log: 'platform',

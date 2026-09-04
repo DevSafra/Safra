@@ -3313,6 +3313,17 @@ export const ar = {
     'city_category.created': 'إضافة فئة مدن',
     'city_category.updated': 'تعديل فئة مدن',
     'city_category.deleted': 'حذف فئة مدن',
+
+    /* كتالوج المنصّة — الخدمات وسياسات الإلغاء وأنواع الشركاء (2026-09-04). */
+    'amenity.created': 'إضافة خدمة',
+    'amenity.updated': 'تعديل خدمة',
+    'amenity.deleted': 'حذف خدمة',
+    'cancellation_policy.created': 'إضافة سياسة إلغاء',
+    'cancellation_policy.updated': 'تعديل سياسة إلغاء',
+    'cancellation_policy.deleted': 'حذف سياسة إلغاء',
+    'partner_type.created': 'إضافة نوع شريك',
+    'partner_type.updated': 'تعديل نوع شريك',
+    'partner_type.deleted': 'حذف نوع شريك',
     'city.created': 'إضافة مدينة',
     'city.updated': 'تعديل مدينة',
     'city.deleted': 'حذف مدينة',

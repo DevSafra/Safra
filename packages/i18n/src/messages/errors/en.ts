@@ -213,6 +213,12 @@ export const en = {
   'geo.city_not_found': 'City not found.',
   'geo.country_not_found': 'Country not found.',
   'geo.category_not_found': 'Category not found.',
+  'catalogue.not_found': 'No catalogue entry with that code.',
+  'catalogue.code_taken': 'That code is already in use. Choose another.',
+  'catalogue.in_use':
+    '{count} records point at it, so it cannot be deleted — deactivate it instead: it leaves the pickers and everything already using it keeps working.',
+  'catalogue.code_format':
+    'A code is lowercase Latin letters, digits and hyphens, e.g. ev-charger.',
   'geo.category_in_use':
     'That category is filed against {n} cities — deactivate it instead of removing it.',
   'geo.city_in_use':

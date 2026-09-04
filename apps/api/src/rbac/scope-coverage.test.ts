@@ -59,6 +59,10 @@ const NO_CITY: readonly { readonly route: RegExp; readonly why: string }[] = [
   { route: /admin\/settings/, why: 'settings — platform-level' },
   { route: /admin\/grants/, why: 'settings — the standing-grant register' },
   { route: /admin\/property-types/, why: 'reference data, like geo' },
+  {
+    route: /admin\/catalogue/,
+    why: 'كتالوج المنصّة — amenities, cancellation policies and partner types are platform-wide reference data with no geography: an amenity is not a Damascus amenity',
+  },
   { route: /admin\/cities/, why: 'geo — the cities themselves' },
   { route: /admin\/geo/, why: 'geo' },
   { route: /admin\/fx-rates/, why: 'currencies — platform-level' },

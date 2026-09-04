@@ -28,6 +28,8 @@ import { StaffController, StaffInvitationController } from './staff.controller.j
 import { StaffService } from './staff.service.js';
 import { AuthModule } from '../auth/auth.module.js';
 import { SettingsAdminService } from '../settings/settings-admin.service.js';
+import { CatalogueController } from './catalogue.controller.js';
+import { CatalogueService } from './catalogue.service.js';
 import { RegistriesController } from './registries.controller.js';
 import { BookingListService } from './booking-list.service.js';
 import { RegistryService } from './registry.service.js';
@@ -77,6 +79,7 @@ import { StaffScopeService } from './staff-scope.service.js';
   controllers: [
     PropertyTypesController,
     AdminController,
+    CatalogueController,
     RegistriesController,
     CommsController,
     CityImagesController,
@@ -109,6 +112,7 @@ import { StaffScopeService } from './staff-scope.service.js';
     PromotionsService,
     GeoService,
     GeoWriteService,
+    CatalogueService,
     GeoCategoryService,
     ReportsService,
     StaffOverviewService,
