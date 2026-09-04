@@ -488,14 +488,51 @@ screen a partner works in was outside it, so «no page ever scrolls sideways» w
 applications out of three. `e2e/partner-responsive.spec.ts` now covers thirteen screens plus the
 three property sub-screens at 390/768/1024/1440, and the touch floor on تعديل.
 
-#### OPEN — three reference catalogues have no management screen
+#### CLOSED — three reference catalogues now have management screens (2026-09-04)
 
-`amenities` (12 rows), `cancellation_policies` (3) and `partner_types` (4) are read in the API and
-**written nowhere**. Adding or renaming an amenity — «EV charger», «co-working desk» — requires
-direct SQL, against the stated criterion that no normal operation should. Not a launch blocker (the
-12 cover the catalogue) but it is the same shape as the payout-account gap.
-`catalog.service.ts` also claims in a comment that amenities "change through the admin panel",
-which is false. **Decision needed: build the screens, or accept SQL for these three.**
+Bashar: _"Please do not leave amenities, cancellation_policies and partner_types as migration-only
+or SQL-managed data… I do not want normal business operations to depend on direct SQL or migrations
+where an administrator should reasonably be able to manage the data through the platform."_
+
+**كتالوج المنصّة** (`/catalogue`) now manages all three — create, edit, activate/deactivate, safe
+deletion, audited, permission-checked. One `CatalogueService`, one `CatalogueController`, one screen
+with three complete managers, following the الفئات pattern exactly.
+
+- **Permission:** a new `CATALOGUE_MANAGE`, deliberately NOT `GEO_MANAGE` — a role trusted to
+  correct a city's spelling has no business rewriting the refund ladder every future booking
+  snapshots. Reads are `SETTINGS_READ`, so operations can see the catalogue they work against.
+- **Deleting is refused while anything points at the row**, naming the count, so the reader is told
+  to retire it instead of meeting a foreign-key error. Retiring keeps every existing link.
+- **A retired code is REINSTATED, not refused.** All three tables constrain `code` uniquely with no
+  `deleted_at` predicate, so without this a row deleted by mistake could never be added back.
+- **Amenities gained `is_active`** (migration `0063`). It is a different question from
+  `is_filterable`: one decides whether a partner may declare the amenity, the other whether it is a
+  box in the search sidebar. Collapsing them would let somebody tidying the filter stop partners
+  describing a facility they have.
+- **The policy screen carries a warning in gold**: every booking snapshots its policy, so editing a
+  ladder moves FUTURE bookings only. A super admin who believes otherwise is wrong in a direction
+  that costs money.
+- **`partner_types.capabilities` was deliberately NOT given an editor.** Nothing in the application
+  reads that column; an editor for it would be a control that changes nothing while reading as
+  coverage. It gets one when it gets a consumer.
+
+Held by 18 integration tests — three of the rules mutation-tested — and `e2e/catalogue.spec.ts`,
+which creates, retires and deletes an amenity through the screen and puts the fixture back.
+
+#### OPEN — a partner cannot declare an amenity, so the catalogue has no consumer
+
+Found while driving the new screen. **`unit_amenities` is empty on every database**, and the reason
+is the same shape as the submit-for-review gap: `POST /partner/properties/:ref/units` and the unit
+PATCH both accept `amenityCodes` and write the links, and **the partner portal has never sent that
+field**. No listing declares any amenity.
+
+Consequences today: the customer's amenity filter is permanently empty (correctly — `catalog.service`
+lists only amenities with a non-zero count, so it degrades to nothing rather than to a trap), and the
+amenities catalogue a super admin now manages has nothing applying it.
+
+Not built as part of the catalogue work because Bashar scoped that request to _"administrative
+management only"_. **Decision needed:** add an amenity picker to the partner's unit editor — the API
+side is complete, so this is a form and a checkbox list.
 
 #### OPEN — `wallet_restriction_backfill`
 
