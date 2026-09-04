@@ -13,11 +13,16 @@ const API_URL = process.env['API_URL'] ?? 'http://localhost:4000';
  * degraded home page that still renders its search form is far better than a 500
  * because a reference endpoint blipped.
  */
-async function read<T>(path: string, schema: z.ZodType<T>, fallback: T): Promise<T> {
+async function read<T>(
+  path: string,
+  schema: z.ZodType<T>,
+  fallback: T,
+  revalidate = 300,
+): Promise<T> {
   try {
     const response = await fetch(`${API_URL}/api/v1${path}`, {
       headers: { Accept: 'application/json' },
-      next: { revalidate: 300 },
+      next: { revalidate },
     });
 
     if (!response.ok) return fallback;
@@ -198,9 +203,26 @@ export async function getAmenities(): Promise<Amenity[]> {
   return read('/amenities', z.array(amenitySchema), []);
 }
 
-/** Operational values the storefront displays; see P-005. */
+/**
+ * Operational values the storefront displays; see P-005.
+ *
+ * **Thirty seconds, not five minutes**, and it is the only reader here that differs.
+ *
+ * The rest of this file reads REFERENCE data — cities, amenities, currencies — which staff edit
+ * rarely and which nobody watches a screen to confirm. These are RULES: the service fee's
+ * visibility and the same-day cutoff hour both change what a customer is shown, and an operator
+ * who flips a switch on الإعدادات goes and looks at the site. `SettingsService` already invalidates
+ * its own 30-second cache on an admin write for exactly that reason; a further five minutes layered
+ * on top here is a second cache that no write can invalidate, and it makes a working switch look
+ * broken for long enough that somebody flips it back.
+ *
+ * Measured, not assumed: a fee-visibility change made in the console was still absent from the
+ * customer's invoice minutes later, which is how this was found (2026-09-04). Thirty seconds
+ * matches the layer underneath rather than inventing a third number, and the cost is one extra
+ * request per half-minute against an endpoint whose own answer is already cached.
+ */
 export async function getPublicSettings(): Promise<Record<string, unknown>> {
-  return read('/settings/public', z.record(z.string(), z.unknown()), {});
+  return read('/settings/public', z.record(z.string(), z.unknown()), {}, 30);
 }
 
 const currencyCatalogueSchema = z.object({
