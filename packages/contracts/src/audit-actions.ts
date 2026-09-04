@@ -54,6 +54,15 @@ export const AUDIT_ACTIONS = [
   'booking.created',
   'booking.cancelled',
   'booking.payment_captured',
+  /*
+    Written when a partner accepts within the two-hour window (§6.4).
+
+    Absent until 2026-09-04 for a reason worth recording: the state machine did not list `partner`
+    as an actor on `pending_confirmation → confirmed`, so every partner acceptance answered 409 and
+    this row had NEVER been written. The catalogue could not be missing a label for an action the
+    platform had never managed to perform. Fixing the transition is what surfaced it.
+  */
+  'booking.confirmed',
   'booking.sla_expired',
   'booking.exported',
   'booking.export_requested',

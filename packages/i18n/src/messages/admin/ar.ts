@@ -3262,6 +3262,8 @@ export const ar = {
     'booking.created': 'إنشاء حجز',
     'booking.cancelled': 'إلغاء حجز',
     'booking.payment_captured': 'تحصيل دفعة حجز',
+    /* The partner accepting inside the two-hour window — see the note in `audit-actions.ts`. */
+    'booking.confirmed': 'تأكيد الحجز من الشريك',
     'booking.checked_in': 'تسجيل وصول الضيف',
     'booking.check_in_undone': 'التراجع عن تسجيل الوصول',
     /* The ACT, not its content: the note itself never reaches the audit log — see the action. */
@@ -3568,6 +3570,8 @@ export const ar = {
      */
     payloadKey: {
       reason: 'السبب',
+      /* How much of a booking was settled from the customer's wallet rather than charged. */
+      walletApplied: 'المدفوع من المحفظة',
       /*
         `conversation.started`: who SAFRA wrote to, by reference, and whether the message joined a
         thread that was already open rather than starting one. The recipient is a REFERENCE — never
@@ -3890,6 +3894,17 @@ export const ar = {
      */
     payloadValue: {
       'EC-001': 'أُغلقت صفحة الدفع قبل إتمامه، فانتهت مهلة الحجز وأُعيدت التواريخ',
+
+      /*
+        The two values a bank-transfer booking writes into `payment.started`.
+
+        Both were missing until 2026-09-04, and `manual_transfer` is not an edge case: with no
+        acquirer contracted it is the ONLY rail routing serves, so every real booking today writes
+        it. The log printed the raw codes. Found by the catalogue test once a booking had actually
+        been driven through the browser rather than posted straight to the API.
+      */
+      manual_transfer: 'حوالة بنكية',
+      requires_action: 'بانتظار إجراء من العميل',
 
       /*
         A violation KIND, reaching a payload because `violation.recorded` records which offence.
