@@ -275,3 +275,54 @@ test('a search that does not ask for bedrooms is not narrowed by the field', asy
   expect(await page.locator('article').count()).toBe(withoutTheField);
   expect(withoutTheField).toBeGreaterThan(0);
 });
+
+/**
+ * Saving a listing while signed out sends you to sign in — it does not lie about a failure.
+ *
+ * Bashar hit this on 2026-09-04: pressing «حفظ في المفضلة» said «تعذّر الحفظ. حاول مرة أخرى»,
+ * which is untrue in the way that matters — trying again fails identically, forever, and nothing
+ * on the screen said an account was needed. The proxy answers 401 `auth.required`, and the button
+ * reported every non-OK status as the same transient failure.
+ *
+ * No sign-in here, deliberately: this is the SIGNED-OUT path, and the suite's login budget is its
+ * binding constraint (ten per minute per account, thirteen already spent). The assertion that
+ * matters is reachable without one.
+ */
+test('saving a stay while signed out leads to sign-in, not to an error', async ({
+  page,
+}) => {
+  await page.goto(SEARCH);
+
+  const first = page.locator('article a').first();
+  const href = await first.getAttribute('href');
+
+  await page.goto(href ?? SEARCH);
+
+  const listing = new URL(page.url());
+
+  await page.getByRole('button', { name: /حفظ في المفضلة/ }).click();
+  await page.waitForURL('**/login**');
+
+  const back = new URL(
+    decodeURIComponent(new URL(page.url()).searchParams.get('next') ?? ''),
+    'http://localhost:3000',
+  );
+
+  /* Back to the same listing… */
+  expect(back.pathname, 'the sign-in link lost the listing').toBe(listing.pathname);
+
+  /*
+    …AND with the party intact. Returning somebody to a bare property URL drops the guests they
+    searched with, and a family of four comes back as a party of two — the defect the SRS audit
+    found on this exact path on 2026-08-25.
+  */
+  for (const key of ['adults', 'children', 'infants']) {
+    expect(back.searchParams.get(key), key).toBe(listing.searchParams.get(key));
+  }
+
+  /*
+    And the lie is gone. Named rather than «no alert on the page»: the sign-in screen has alerts of
+    its own, and asserting their absence would be asserting something about a different screen.
+  */
+  await expect(page.getByText(/تعذّر الحفظ/)).toHaveCount(0);
+});
