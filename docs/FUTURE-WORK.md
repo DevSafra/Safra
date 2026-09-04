@@ -337,6 +337,66 @@ The testbed has drifted as suites consumed its bookings and disputes. `pnpm db:t
 the durable fix is for each of these to PROVISION what it needs rather than guard on finding it, the
 way `payout-accounts.spec.ts` now does.
 
+### Star ratings — the classification, shipped 2026-09-04
+
+**Bashar's requirement.** Every hotel/accommodation carries an official 1-5 star classification,
+declared by the partner at creation, editable later where the business rules allow, visible to the
+Super Admin for every property including pending and published, shown to customers everywhere a
+property appears, and filterable in search.
+
+**The review found two collisions before any code was written**, and both shaped the design:
+
+1. **`properties.rating` already existed** — the guest REVIEW average, which the customer card
+   already rendered as «★ 4.6». A classification drawn as stars beside it is a customer reading an
+   opinion as a designation. So they are drawn differently on purpose: the classification is a ROW
+   of five shapes on the property-type line (on its own line on the property page, where there is
+   room), and the review score keeps its number and its count. `properties.star_rating` is a
+   separate column and the comment on it says why at length.
+2. **2,703 listings predated the field, 2,016 of them published.** The column is therefore
+   NULLABLE and the 1-5 bound lives in `propertyCreateSchema`, which is a rule about submission. A
+   `NOT NULL DEFAULT 3` would have written a specific, checkable claim about 2,700 real hotels that
+   nobody made — and would have been indistinguishable from a partner who really did declare three.
+
+**One adjacent gap had to be closed for the feature to work at all.** The console could not edit a
+property — only approve or reject — so with the partner freeze (§8.1: a published listing's form is
+read-only) there was no route by which any of the 2,016 published listings could ever acquire a
+classification. `PUT /admin/properties/:reference/star-rating` is a single-field endpoint behind
+`PROPERTY_APPROVE`, allowed at every status, audited with before AND after. It is also the only
+path for a hotel re-classified after going live.
+
+**Where it appears now.** Customer: search results, property cards (search, city pages, the home
+page's recommended strip), the property page, saved listings, and a 1★-5★ multi-select filter that
+ORs (a property has exactly one classification, so ANDing would return nothing on two ticks).
+Partner: the creation form (required, five options, no blank), the edit form, the listing cards.
+Console: the registry as its own column, the approval queue, the detail facts, and the editor.
+
+**Consistency is enforced, not asserted.** One `StarRating` in `@safra/ui` draws all of it, and
+`e2e/star-rating.spec.ts` proves the same component is on a screen in each of the three
+applications by looking for the `data-star-rating` attribute only that component emits.
+
+**The index was measured, not assumed.** At the dev database's 2,700 rows Postgres correctly
+ignores an index and seq-scans in 1.6ms. The decision was taken against `safra_load` at **50,000
+published properties**, where a country-wide «5 stars only» search went from a 17.9ms sequential
+scan to a 10.2ms bitmap index scan. The partial index is on published, non-deleted rows only.
+
+**Two defects found while driving it, both fixed:**
+
+1. **A partner's own payout-account list could hide a row they had just created** — `LIMIT 20` with
+   `created_at ASC`, so once the cap was reached a new account returned 201 and did not appear.
+   Now ordered newest-first after the primary. Found because a browser spec had accumulated
+   twenty-two accounts on one fixture partner over a day of runs.
+2. **That accumulation was itself the defect in the spec.** A spec that adds a row to a shared
+   fixture leaks into every later spec and every later run — the star spec's first version created
+   listings and broke `partner.spec.ts`'s check that every listing the fixture partner owns is
+   named «قصر الشرق». Both specs are now idempotent: they reuse a stable fixture name and put the
+   state back. The create-persists proof moved to
+   `apps/api/src/partner/properties.integration.test.ts`, which rolls back.
+
+**Open question for Bashar — which property types.** It is implemented for ALL accommodation
+types, which is the letter of the instruction and costs nothing today: 2,697 of 2,703 listings are
+hotels. A star classification is a hotel convention, so «5-star camp» is expressible. If it should
+be hotel-only, that is a one-line change to `propertyCreateSchema` plus a conditional field.
+
 ## 1b. Where the remaining work is written down
 
 **Engineering is complete. Everything below this line is operational, and every item now has a
