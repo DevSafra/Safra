@@ -115,8 +115,28 @@ export default async function SearchPage({
     getAmenities(),
   ]);
 
-  const checkIn = first(query['checkIn']) ?? todayInDamascus();
-  const checkOut = first(query['checkOut']) ?? addDays(checkIn, 2);
+  /*
+    A date, or nothing — and `??` alone could not tell the difference.
+
+    `first(query['checkIn']) ?? todayInDamascus()` fell back only on `undefined`, and an EMPTY
+    string is not nullish. So `?checkIn=` put `''` into every date path below: the page answered
+    **500** on the server, and `?checkOut=` got through to the browser and threw
+    `RangeError: Invalid time value` — a blank «Application error» on the busiest page of the site,
+    from a link that had merely lost its query string. `?checkIn=not-a-date` did the same.
+
+    Validated by SHAPE rather than parsed: `YYYY-MM-DD` or nothing. A shape test is an allow-list,
+    it cannot pass through something that is not a date, and it leaves the API as the authority on
+    whether the date is bookable — which it already is, and re-checks.
+
+    Checkout has answered this correctly since it was written (`if (!slug || !unitId || !checkIn
+    || !checkOut)`); it refuses and says so, because a checkout with no dates is a broken link. A
+    SEARCH with no dates is an ordinary first visit, so this falls back instead.
+  */
+  const asDate = (value: string | undefined): string | undefined =>
+    value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+
+  const checkIn = asDate(first(query['checkIn'])) ?? todayInDamascus();
+  const checkOut = asDate(first(query['checkOut'])) ?? addDays(checkIn, 2);
   const adultsRaw = Number(first(query['adults']) ?? 2);
   const adults = Number.isFinite(adultsRaw) && adultsRaw > 0 ? Math.trunc(adultsRaw) : 2;
   /*
