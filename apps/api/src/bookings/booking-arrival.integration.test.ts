@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
-import { ERROR } from '@safra/contracts';
+import { ERROR, SAME_DAY_CUTOFF_ENABLED_SETTING } from '@safra/contracts';
 
 import { BookingCreationService } from './booking-creation.service.js';
 import { CouponService } from '../coupons/coupon.service.js';
@@ -46,16 +46,19 @@ describeIfDb('a refused arrival date', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   let db: Database;
   let service: BookingCreationService;
+  let settings: SettingsService;
   let unitId: string;
 
   beforeEach(async () => {
     await harness.begin();
     db = harness.db;
 
+    settings = new SettingsService(db);
+
     service = new BookingCreationService(
       db,
       {} as never,
-      new SettingsService(db),
+      settings,
       {} as never,
       {} as never,
       new CouponService(db),
@@ -175,6 +178,116 @@ describeIfDb('a refused arrival date', () => {
     `);
 
     expect(codeOf(await refusal(days(0), days(2)))).toBe(ERROR.BOOKING_SAME_DAY_CLOSED);
+  });
+
+  /**
+   * The cutoff is a RULE THAT CAN BE TURNED OFF, and turning it off is the API's decision.
+   *
+   * Bashar, 2026-09-04: *"The API must enforce the setting. Hiding the message or changing the date
+   * picker in the client is not sufficient."* So the proof has to be here, at the service that
+   * creates the booking — a customer who ignores the picker and posts the date anyway meets this
+   * code and nothing else.
+   *
+   * Both directions are asserted against the SAME fixture, in the same test, because a refusal is
+   * indistinguishable from a fixture that never reached the rule. The city's cutoff hour is 0, so
+   * every same-day arrival is past it and the switch is the only thing that can change the answer.
+   */
+  describe('the same-day cutoff setting', () => {
+    /** Cutoff hour 0 — today is closed for as long as the rule applies at all. */
+    beforeEach(async () => {
+      await db.execute(sql`
+        UPDATE cities SET same_day_cutoff_hour = 0
+        WHERE id = (SELECT p.city_id FROM units u JOIN properties p ON p.id = u.property_id
+                     WHERE u.id = ${unitId})
+      `);
+    });
+
+    /* The 30-second read cache would otherwise serve the value from before the write. */
+    const set = async (enabled: boolean) => {
+      await db.execute(sql`
+        UPDATE settings SET value = ${JSON.stringify(enabled)}::jsonb
+        WHERE key = ${SAME_DAY_CUTOFF_ENABLED_SETTING}
+      `);
+
+      settings.invalidate();
+    };
+
+    it('refuses today while it is enabled', async () => {
+      await set(true);
+
+      expect(codeOf(await refusal(days(0), days(2)))).toBe(ERROR.BOOKING_SAME_DAY_CLOSED);
+    });
+
+    it('accepts today once an administrator disables it', async () => {
+      await set(false);
+
+      expect(codeOf(await refusal(days(0), days(2)))).not.toBe(
+        ERROR.BOOKING_SAME_DAY_CLOSED,
+      );
+    });
+
+    /**
+     * Disabled means TODAY, not «no arrival rule at all».
+     *
+     * The two refusals share a code path and a verdict type, so switching one off must not take the
+     * other with it — a booking for last Tuesday is not something an administrator can enable.
+     */
+    it('still refuses a past arrival while it is disabled', async () => {
+      await set(false);
+
+      expect(codeOf(await refusal(days(-3), days(-1)))).toBe(
+        ERROR.BOOKING_ARRIVAL_IN_PAST,
+      );
+    });
+
+    /**
+     * A missing or unreadable row keeps the RESTRICTION.
+     *
+     * *"Existing behaviour should remain the safe default unless the administrator explicitly
+     * changes it."* Deleting the row is how a fresh database that predates the seed arrives, and a
+     * platform that opened same-day booking on every city because a setting was absent would be
+     * the failure this default exists to prevent.
+     */
+    it('keeps the cutoff when no row for the key exists', async () => {
+      /*
+        The key is moved aside rather than the row deleted, and the reason is worth writing down:
+        `settings_history` holds a foreign key to `settings` AND is append-only, guarded by a
+        trigger that raises on DELETE. So a setting anybody has ever edited through the console
+        cannot be removed by any means at all — the first version of this test deleted the row,
+        passed, and then failed the moment a real toggle was made in a browser, for a reason with
+        nothing to do with the cutoff.
+
+        What the code under test must survive is `get()` finding no row for the key, and this
+        produces exactly that state by a route the database permits.
+      */
+      await db.execute(sql`
+        UPDATE settings SET key = key || '.moved'
+        WHERE key = ${SAME_DAY_CUTOFF_ENABLED_SETTING}
+      `);
+
+      settings.invalidate();
+
+      expect(codeOf(await refusal(days(0), days(2)))).toBe(ERROR.BOOKING_SAME_DAY_CLOSED);
+    });
+
+    /**
+     * And when it is RETIRED rather than absent, which is how a setting actually leaves.
+     *
+     * Nothing here hard-deletes a settings row — `get()` filters on `deleted_at IS NULL`, so a
+     * soft delete is what "gone" looks like to every reader. It is a second route to the same
+     * fallback, and a `deletedAt` dropped from that `where` clause would resurrect a retired
+     * value rather than fall back, which no test above would notice.
+     */
+    it('keeps the cutoff when the setting has been retired', async () => {
+      await db.execute(sql`
+        UPDATE settings SET deleted_at = now()
+        WHERE key = ${SAME_DAY_CUTOFF_ENABLED_SETTING}
+      `);
+
+      settings.invalidate();
+
+      expect(codeOf(await refusal(days(0), days(2)))).toBe(ERROR.BOOKING_SAME_DAY_CLOSED);
+    });
   });
 
   /** And a date comfortably ahead is not refused by this check at all. */

@@ -3,7 +3,12 @@ import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
 import { schema } from '@safra/db';
-import { ERROR, evaluateArrival, type CouponPreview } from '@safra/contracts';
+import {
+  ERROR,
+  SAME_DAY_CUTOFF_ENABLED_SETTING,
+  evaluateArrival,
+  type CouponPreview,
+} from '@safra/contracts';
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { DATABASE } from '../database/database.module.js';
@@ -222,7 +227,29 @@ export class BookingCreationService {
       unit.city_cutoff_hour ??
       (await this.settings.getNumber('booking.same_day_cutoff_hour', 17));
 
-    const verdict = evaluateArrival(input.checkIn, now, unit.city_timezone, cutoffHour);
+    /**
+     * The cutoff can be switched off entirely (Bashar, 2026-09-04).
+     *
+     * *"The API must enforce the setting. Hiding the message or changing the date picker in the
+     * client is not sufficient."* This line IS the enforcement: the picker is a courtesy, and a
+     * customer who posts today's date directly meets the same verdict either way.
+     *
+     * The fallback is `true`, so an absent, unreadable or not-yet-seeded row keeps the existing
+     * restriction. *"Existing behaviour should remain the safe default unless the administrator
+     * explicitly changes it."*
+     */
+    const cutoffEnabled = await this.settings.getBoolean(
+      SAME_DAY_CUTOFF_ENABLED_SETTING,
+      true,
+    );
+
+    const verdict = evaluateArrival(
+      input.checkIn,
+      now,
+      unit.city_timezone,
+      cutoffHour,
+      cutoffEnabled,
+    );
 
     if (!verdict.allowed) {
       /*

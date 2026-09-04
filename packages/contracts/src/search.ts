@@ -135,6 +135,15 @@ export type SearchQuery = z.infer<typeof searchQuerySchema>;
 
 // ─── Same-day cutoff (§5.3) ──────────────────────────────────────────────────
 
+/**
+ * The setting that switches the same-day cutoff on and off, globally (Bashar, 2026-09-04).
+ *
+ * Named here beside the rule it governs rather than typed as a string at each of the four call
+ * sites — a mistyped key reads as «setting absent» and silently falls back to the default, which
+ * for this setting means the feature quietly turns itself back on.
+ */
+export const SAME_DAY_CUTOFF_ENABLED_SETTING = 'booking.same_day_cutoff_enabled';
+
 export const DEFAULT_SAME_DAY_CUTOFF_HOUR = 17;
 
 /**
@@ -211,8 +220,24 @@ export function firstBookableDate(
   instant: Date,
   timeZone: string,
   cutoffHour: number = DEFAULT_SAME_DAY_CUTOFF_HOUR,
+  /**
+   * Whether the same-day cutoff applies at all (Bashar, 2026-09-04).
+   *
+   * `booking.same_day_cutoff_enabled`, read by every caller and defaulting to TRUE here — «existing
+   * behaviour should remain the safe default unless the administrator explicitly changes it». A
+   * default of `false` in this signature would mean a caller that forgot to pass the setting
+   * silently opened same-day booking everywhere, which is the failure direction that costs money.
+   *
+   * Switched off, the earliest bookable date is the city's local TODAY — not «no restriction».
+   * Yesterday stays unbookable, because that is a different rule with a different reason, and the
+   * cutoff being off is not a licence to sell a night that has already passed.
+   */
+  cutoffEnabled = true,
 ): string {
   const local = cityLocalNow(instant, timeZone);
+
+  if (!cutoffEnabled) return local.date;
+
   return local.hour >= cutoffHour ? addDays(local.date, 1) : local.date;
 }
 
@@ -235,8 +260,10 @@ export function evaluateArrival(
   instant: Date,
   timeZone: string,
   cutoffHour: number = DEFAULT_SAME_DAY_CUTOFF_HOUR,
+  /** See `firstBookableDate` — defaults to ON, so a forgetful caller keeps the restriction. */
+  cutoffEnabled = true,
 ): CutoffVerdict {
-  const earliest = firstBookableDate(instant, timeZone, cutoffHour);
+  const earliest = firstBookableDate(instant, timeZone, cutoffHour, cutoffEnabled);
   const today = cityLocalNow(instant, timeZone).date;
 
   if (requestedCheckIn < today) {

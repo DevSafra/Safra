@@ -84,6 +84,30 @@ export class SettingsService {
     return value;
   }
 
+  /**
+   * A setting read as a boolean, with the same «unreadable value falls back» contract as
+   * `getNumber` above.
+   *
+   * `'true'` and `'false'` are accepted as strings because a setting arrives as `jsonb` and an
+   * operator editing one through the console types text — the console POSTs `"true"`, the seed
+   * writes `true`, and both must mean the same thing. Anything else is a misconfigured setting
+   * rather than a permission to guess: it logs and uses the fallback, which for every switch on
+   * this platform is the SAFE side of the rule.
+   */
+  async getBoolean(key: string, fallback: boolean): Promise<boolean> {
+    const raw = await this.get<unknown>(key, fallback);
+
+    if (typeof raw === 'boolean') return raw;
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+
+    this.logger.error(
+      `Setting "${key}" is not a boolean (${String(raw)}); using fallback ${String(fallback)}.`,
+    );
+
+    return fallback;
+  }
+
   /** Invalidate after an admin write, so a change takes effect immediately. */
   invalidate(key?: string): void {
     if (key) {

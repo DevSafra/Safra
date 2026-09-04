@@ -629,6 +629,21 @@ export const SETTINGS: {
     descriptionAr: 'إغلاق حجز اليوم نفسه — بتوقيت المدينة',
     descriptionEn: 'Same-day booking cutoff, city-local (§5.3)',
   },
+  /*
+    The switch for the rule above (Bashar, 2026-09-04).
+
+    TRUE by default, deliberately: «existing behaviour should remain the safe default unless the
+    administrator explicitly changes it». Off, the cutoff stops applying entirely — the global hour
+    and every per-city hour with it — and the first bookable date becomes the city's local today.
+    Yesterday stays unbookable either way; that is a separate rule with a separate reason.
+  */
+  {
+    key: 'booking.same_day_cutoff_enabled',
+    value: true,
+    valueSchema: 'boolean',
+    descriptionAr: 'تفعيل إغلاق حجز اليوم نفسه',
+    descriptionEn: 'Whether the same-day booking cutoff applies at all (§5.3)',
+  },
   {
     key: 'booking.pending_payment_timeout_minutes',
     value: 30,

@@ -2182,6 +2182,12 @@ export const ar = {
         'commission.partner_rate': 'عمولة سفرة من الشريك — تُخصم من مستحقاته قبل التحويل',
         'booking.confirmation_window_minutes': 'مهلة الشريك لتأكيد الحجز',
         'booking.same_day_cutoff_hour': 'آخر ساعة يُقبل فيها حجز اليوم نفسه',
+        /*
+          The SWITCH for the rule above (Bashar, 2026-09-04). Named as a question an operator can
+          answer yes or no to, not as «تفعيل/تعطيل» — the control is a toggle and the label is what
+          it toggles.
+        */
+        'booking.same_day_cutoff_enabled': 'إغلاق حجز اليوم نفسه بعد ساعة محدّدة',
         'booking.pending_payment_timeout_minutes':
           'مهلة انتظار الدفع — يُلغى الحجز تلقائياً إن لم يكتمل',
         'partner.first_violation_fine': 'غرامة الشريك عند أول مخالفة عدم رد',

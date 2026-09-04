@@ -6,6 +6,7 @@ import {
   ERROR,
   type SearchQuery,
   currencyDecimals,
+  SAME_DAY_CUTOFF_ENABLED_SETTING,
   evaluateArrival,
 } from '@safra/contracts';
 
@@ -108,8 +109,19 @@ export class SearchService {
 
     // ── Same-day cutoff, per city local time (§5.3) ──────────────────────────
     const cutoffHour = await this.settings.getNumber('booking.same_day_cutoff_hour', 17);
+    /* Off means today is searchable; the past stays refused. See `firstBookableDate`. */
+    const cutoffEnabled = await this.settings.getBoolean(
+      SAME_DAY_CUTOFF_ENABLED_SETTING,
+      true,
+    );
     const timezone = await this.resolveTimezone(query.citySlug);
-    const verdict = evaluateArrival(query.checkIn, now, timezone, cutoffHour);
+    const verdict = evaluateArrival(
+      query.checkIn,
+      now,
+      timezone,
+      cutoffHour,
+      cutoffEnabled,
+    );
 
     if (!verdict.allowed) {
       throw new BadRequestException({
