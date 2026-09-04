@@ -408,6 +408,8 @@ const pendingPropertySchema = z.object({
   nameAr: z.string(),
   nameEn: z.string().nullable(),
   address: z.string(),
+  /* Shown in the QUEUE, so a reviewer sees the claim before opening the listing. */
+  starRating: z.number().int().min(1).max(5).nullable(),
   reviewNotes: z.string().nullable(),
   createdAt: z.union([z.string(), z.date()]).transform((v) => new Date(v).toISOString()),
   partner: z.object({
@@ -441,6 +443,8 @@ const propertyDetailSchema = z.object({
   descriptionAr: z.string().nullable(),
   descriptionEn: z.string().nullable(),
   address: z.string(),
+  /* The official classification a reviewer checks against the partner's papers before approving. */
+  starRating: z.number().int().min(1).max(5).nullable(),
   latitude: z.string().nullable(),
   longitude: z.string().nullable(),
   status: z.string(),
@@ -1198,6 +1202,8 @@ const propertyListItemSchema = z.object({
   reference: z.string(),
   nameAr: z.string(),
   nameEn: z.string().nullable(),
+  /* The official classification, 1-5. Null on the 2,703 listings that predate the field. */
+  starRating: z.number().int().min(1).max(5).nullable(),
   propertyType: z.string(),
   city: z.string(),
   partner: z.string(),

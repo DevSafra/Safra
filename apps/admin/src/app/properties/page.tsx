@@ -17,6 +17,7 @@ import {
   StatusPill,
   type AdminColumn,
 } from '@/components/admin-table';
+import { StarRating } from '@safra/ui';
 import { TableToolbar } from '@/components/table-toolbar';
 import { PropertyTypes } from '@/components/property-types';
 import { fill, label, t } from '@/lib/strings';
@@ -127,8 +128,23 @@ export default async function PropertiesPage({
                     href={`/properties/${property.reference}${back}`}
                     className="block rounded-card border border-line bg-field px-3.5 py-3 transition-colors hover:border-[rgba(var(--goldA),0.4)]"
                   >
-                    <span className="block truncate text-[13px] font-bold text-text">
-                      {property.nameAr}
+                    <span className="flex items-center gap-2 text-[13px] font-bold text-text">
+                      <span className="min-w-0 truncate">{property.nameAr}</span>
+                      {/*
+                        The claimed classification, IN THE QUEUE (Bashar, 2026-09-04: «Admins
+                        should be able to see the rating during the approval process»).
+
+                        Here rather than only on the detail screen, because a reviewer works down
+                        this queue and a five-star claim is exactly the kind of thing that decides
+                        whether a listing is worth opening carefully. `shrink-0` so five stars
+                        never lose to a long Arabic name.
+                      */}
+                      {property.starRating ? (
+                        <StarRating
+                          value={property.starRating}
+                          label={label(t.enums.starRating, String(property.starRating))}
+                        />
+                      ) : null}
                     </span>
                     <span className="block text-[11px] text-faint">
                       <Ltr>{property.reference}</Ltr> · {property.city.nameAr} ·{' '}
@@ -239,6 +255,32 @@ const columns = (back: string): readonly AdminColumn<PropertyListItem>[] => [
     render: (row) => (
       <span className="text-text2">{label(t.enums.propertyType, row.propertyType)}</span>
     ),
+  },
+  {
+    /*
+      The classification, in the registry (Bashar, 2026-09-04: the Super Admin must see it for
+      every property, «including properties pending approval and properties already published»).
+
+      A drawn row rather than a digit, because that is the consistency he asked for across all
+      three applications — and because scanning a column of shapes for «which of these is a
+      five-star» is a glance, where a column of numbers is reading.
+
+      Null renders «بلا تصنيف» in words. 2,703 listings predate the field, so this is not a rare
+      state, and an empty cell would read as a rendering fault rather than as a fact.
+    */
+    key: 'stars',
+    header: t.sections.properties.colStars,
+    render: (row) =>
+      row.starRating === null ? (
+        <span className="whitespace-nowrap text-[11.5px] text-faint">
+          {t.sections.properties.starUnset}
+        </span>
+      ) : (
+        <StarRating
+          value={row.starRating}
+          label={label(t.enums.starRating, String(row.starRating))}
+        />
+      ),
   },
   {
     key: 'city',

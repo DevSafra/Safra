@@ -10,6 +10,8 @@ import { getProperty } from '@/lib/api';
 import { ReviewProperty } from '@/components/review-property';
 import { BackLink, type BackTarget } from '@/components/back-link';
 import { StatusPill } from '@/components/admin-table';
+import { PropertyStarRating } from '@/components/property-star-rating';
+import { StarRating } from '@safra/ui';
 import { backTarget, detailHref, origin } from '@/lib/search-params';
 import { statusTone } from '@/lib/status-tone';
 import { count } from '@/lib/format';
@@ -157,6 +159,33 @@ export default async function PropertyPage({
       <Section title={t.sections.propertyDetail.listing}>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <Row label={t.sections.propertyDetail.address} value={property.address} />
+          {/*
+            The classification in the facts list, drawn — visible at EVERY status, which is what
+            Bashar asked for: pending approval and already published alike. The control that
+            changes it is its own section below; this row is what a reviewer reads in passing.
+          */}
+          {/*
+            The classification in the facts list, DRAWN — visible at every status, which is what
+            Bashar asked for: pending approval and already published alike. Written out rather than
+            passed through `Row`, whose `value` is a string: the whole point of this row is that it
+            is a picture, and widening `Row` to take a node would invite markup into thirty other
+            rows that are correctly plain text.
+          */}
+          <div className="rounded-lg border border-line bg-card px-4 py-3">
+            <dt className="text-xs text-faint">
+              {t.sections.properties.starRatingLabel}
+            </dt>
+            <dd className="mt-0.5 break-words text-text">
+              {property.starRating === null ? (
+                <span className="text-faint">{t.sections.properties.starUnset}</span>
+              ) : (
+                <StarRating
+                  value={property.starRating}
+                  label={label(t.enums.starRating, String(property.starRating))}
+                />
+              )}
+            </dd>
+          </div>
           <Row label={t.sections.propertyDetail.slug} value={property.slug} />
           <Row
             label={t.sections.propertyDetail.submitted}
@@ -294,6 +323,14 @@ export default async function PropertyPage({
             ))}
           </ul>
         )}
+      </Section>
+
+      {/* ── The classification, correctable at any status (Bashar, 2026-09-04) ─── */}
+      <Section title={t.sections.properties.starRatingLabel}>
+        <PropertyStarRating
+          reference={property.reference}
+          starRating={property.starRating}
+        />
       </Section>
 
       <Section title={t.sections.propertyDetail.decision}>

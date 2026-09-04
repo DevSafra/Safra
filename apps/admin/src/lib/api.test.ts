@@ -37,6 +37,8 @@ describe('the pending-properties response schema', () => {
     nameAr: 'دفع',
     nameEn: 'Payments Test',
     address: 'Addr',
+    /* Sent by the endpoint since 2026-09-04; null on a listing that predates the field. */
+    starRating: 4,
     latitude: null,
     longitude: null,
     descriptionAr: null,
