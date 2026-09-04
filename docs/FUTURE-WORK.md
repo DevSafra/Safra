@@ -201,6 +201,100 @@ idempotency claim that stayed held for 24 hours after a failure. See
 `docs/load-test-results-2026-08-20.md` and `S-3`. **It also produced one new item needing Bashar's
 decision: `O-sec-3`** — an attacked egress address cannot sign in at all.
 
+### Payout accounts — the lifecycle, closed 2026-09-04
+
+**What was wrong, measured rather than inferred.** `partner_payout_accounts` was READ in three
+places and WRITTEN in none. On 2026-09-04 the table held **zero rows**, no code path anywhere could
+create one, and `PayoutService.release` took `payout_account_id = account.rows[0]?.id ?? null` on a
+lookup that could not succeed — so **seventy-six payouts had been released or paid with no recorded
+destination at all**. Every suite was green throughout: the console's partner screen read the empty
+table and rendered «لا بيانات تحويل مسجّلة», which is a true sentence about an empty table, and
+nothing asked whether it could ever be non-empty.
+
+**What was built**, to Bashar's decision of 2026-09-04 that both entry paths are supported:
+
+- **Two doors, one state.** A partner maintains their own details at `/payouts/accounts` in the
+  portal; staff enter or correct them on a partner's behalf from the partner screen in the console.
+  Both validate against `payoutAccountInputSchema` and land in `pending`.
+- **Verification gates payment.** `payout_account_status` defaults to `pending` in the COLUMN, so a
+  row inserted by any route — including one nobody has written yet — is unpayable until a human
+  looks at it. `isMaterialChange` decides what re-opens verification, comparing the stored form so
+  that retyping an IBAN with different spacing costs nobody an approval round.
+- **The state is visible in both apps**, as a pill and as a sentence, in the reader's language.
+- **Release and payment both refuse.** `payout.no_verified_account` and
+  `payout.account_unverified_at_payment` — both verbs, because release and payment are days apart
+  and the account can change in between.
+- **Masked everywhere.** The read projection never selects the ciphertext, so there is no control
+  that could reveal a full number and no permission that would. Editing means retyping it.
+- **Fully audited** — five actions, named in Arabic, with the subject resolvable on the audit
+  registry.
+
+**Verified in browsers**, `e2e/payout-accounts.spec.ts`: partner enters → console sees it pending
+and masked → rejection with a reason the partner reads → correction → verification → release refused
+while pending, released once verified → payment refused after the account changed → restored. Run
+twice in succession to prove it is repeatable.
+
+**Three defects found while driving it, all fixed:**
+
+1. **The staff session cookie crossed 4,096 bytes** and browsers drop a larger one SILENTLY — nobody
+   could sign in to the console. The permission list was in the cookie twice, and the second copy
+   was read by nothing. `packages/session/src/session-size.test.ts` now fails at three quarters of
+   the limit. 4,107 → 2,425 bytes.
+2. **A rejected account edited without a material change stayed `rejected` while its reason was
+   cleared** — «مرفوض» with nothing attached and no way out. Any edit of a rejected account is now
+   a resubmission.
+3. **A `scheduled` payout offered only «تسجيل الدفع»** — no way back. `PayoutService.hold` had
+   always accepted one; the control had no form to click. It matters now, because a payout can be
+   scheduled and then have its destination change, at which point payment refuses and the operator
+   needs a move.
+
+**Operational note.** 48 pre-existing `scheduled` payouts and 129 `accruing` ones carry no account,
+because none could exist before today. The scheduled ones will refuse payment — correctly — and the
+way through is «تعليق» → «رفع التعليق» → «الإفراج للتحويل», which now attaches a verified account.
+This is fail-closed and needs no migration.
+
+**Open decision for Bashar — separation of duties.** A hard four-eyes rule was written and REMOVED:
+the same member of staff could not verify what they entered, which defeats «authorised staff can
+also enter or update payout-account details … when required» on any rota where one finance officer
+is on duty. Both actors are recorded and audited, and `PAYOUT_ACCOUNT_MANAGE` / `PAYOUT_ACCOUNT_VERIFY`
+are separate permissions so an organisation with two people gets four eyes from the role map.
+Enforcing it in code behind a setting is a decision, not a default.
+
+### The 404's CSP nonce — measured, understood, not closed
+
+An unmatched path under a locale (`/ar/no-such-page`) is served by the ROOT `app/not-found.tsx`,
+which Next renders outside every layout and therefore outside the request pipeline the middleware
+writes the CSP nonce into. Measured 2026-09-04: **16 `<script>` tags, 0 nonces**, against
+`script-src 'self' 'nonce-…' 'strict-dynamic'` — the browser refuses all of them.
+
+**Impact is console noise, not a broken page.** Nothing on that 404 needs JavaScript: it is one
+heading, three lines and a link, with inline styles. A `notFound()` from a route that DOES match
+(`/ar/property/does-not-exist`) is unaffected — 42 nonces — and now renders inside the site with its
+header, footer and a search link, via `apps/web/src/app/[locale]/not-found.tsx`.
+
+**A catch-all route was written to fix it and was reverted**, because it made things worse in a
+dimension that matters more: it turned an unmatched path from a routing-time `notFound()`, which
+Next server-renders in full, into a request-time one, which it does not. The rendered body went from
+the whole page to **12 characters with JavaScript disabled**, on a public indexable surface. Closing
+this properly means getting a nonce into a render that happens outside the request pipeline, which
+is a Next-level problem.
+
+### Four e2e specs skip on testbed data state
+
+Measured 2026-09-04 in a full run (438 passed, 0 failed, 4 skipped). Each names its reason honestly
+and each is currently proving nothing:
+
+| Spec                          | Reason it skips                           |
+| ----------------------------- | ----------------------------------------- |
+| `booking-actions.spec.ts:400` | No booking awaits confirmation            |
+| `customer-record.spec.ts:221` | No customer with bookings to read         |
+| `disputes.spec.ts:98`         | Every dispute here has already been taken |
+| `public-reviews.spec.ts:102`  | This listing has no photographs           |
+
+The testbed has drifted as suites consumed its bookings and disputes. `pnpm db:testbed` restores it;
+the durable fix is for each of these to PROVISION what it needs rather than guard on finding it, the
+way `payout-accounts.spec.ts` now does.
+
 ## 1b. Where the remaining work is written down
 
 **Engineering is complete. Everything below this line is operational, and every item now has a
