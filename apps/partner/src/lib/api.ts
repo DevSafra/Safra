@@ -324,6 +324,39 @@ export async function getMyPayouts() {
   return partnerFetch('/partner/payouts', z.array(partnerPayoutSchema));
 }
 
+/**
+ * Where SAFRA sends this partner's money, masked (§11.4).
+ *
+ * The account number is not in this payload and never has been — the API's read projection does
+ * not select the ciphertext. `last4` may be an empty string, and the schema allows it rather than
+ * requiring four: a wallet number shorter than four characters has no tail that can be shown
+ * without showing the whole thing.
+ */
+const payoutAccountSchema = z.object({
+  id: z.string(),
+  method: z.string(),
+  accountHolder: z.string(),
+  last4: z.string(),
+  bankName: z.string().nullable(),
+  swiftCode: z.string().nullable(),
+  currency: z.string(),
+  isPrimary: z.boolean(),
+  status: z.enum(['pending', 'verified', 'rejected']),
+  submittedByPartner: z.boolean(),
+  verifiedAt: z.string().nullable(),
+  verifiedBy: z.string().nullable(),
+  rejectedAt: z.string().nullable(),
+  rejectionReason: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export type PartnerPayoutAccount = z.infer<typeof payoutAccountSchema>;
+
+export async function getMyPayoutAccounts() {
+  return partnerFetch('/partner/payout-accounts', z.array(payoutAccountSchema));
+}
+
 /** What one payout covers — the answer to "what is this $1,240 for". */
 const payoutBookingSchema = z.object({
   bookingReference: z.string(),

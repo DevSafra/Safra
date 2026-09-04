@@ -112,9 +112,23 @@ export default async function PayoutsPage() {
             </ul>
           )}
 
-          <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[11.5px] leading-relaxed text-faint">
-            {t.payouts.readOnly}
-          </p>
+          {/*
+            Across to where the DESTINATION is maintained (Bashar, 2026-09-04). It sits beside the
+            read-only note deliberately: that note says what a partner cannot do here, and this is
+            the one thing about their money that they can.
+          */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="rounded-lg border border-dashed border-line px-3 py-2 text-[11.5px] leading-relaxed text-faint">
+              {t.payouts.readOnly}
+            </p>
+
+            <Link
+              href="/payouts/accounts"
+              className="inline-flex min-h-10 items-center text-[12.5px] font-semibold text-gold hover:underline lg:min-h-0"
+            >
+              {t.payouts.accountsLink}
+            </Link>
+          </div>
         </div>
       )}
     </Shell>
