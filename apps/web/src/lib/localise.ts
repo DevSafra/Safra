@@ -146,27 +146,37 @@ export function formatMoney(
  */
 export function addMoney(a: string, b: string, currency: string): string {
   const scale = currencyDecimals(currency);
-
-  const toMinor = (value: string): bigint | null => {
-    const match = /^\s*(-?)(\d+)(?:\.(\d+))?\s*$/.exec(value);
-
-    if (!match) return null;
-
-    const [, sign = '', whole = '0', fraction = ''] = match;
-    const padded = `${fraction}${'0'.repeat(scale)}`.slice(0, scale);
-    const total = BigInt(whole) * 10n ** BigInt(scale) + BigInt(padded || '0');
-
-    return sign === '-' ? -total : total;
-  };
-
-  const left = toMinor(a);
-  const right = toMinor(b);
+  const left = moneyToMinor(a, scale);
+  const right = moneyToMinor(b, scale);
 
   if (left === null || right === null) return a;
 
-  const sum = left + right;
-  const negative = sum < 0n;
-  const digits = (negative ? -sum : sum).toString().padStart(scale + 1, '0');
+  return moneyFromMinor(left + right, scale);
+}
+
+/**
+ * A decimal money string as minor units, or `null` when it is not one.
+ *
+ * Exported because `customer-fee.ts` has to do its arithmetic in exactly the same units the API
+ * does — the entire point of that file is that a browse price and a checkout total agree, and two
+ * different roundings is precisely how they would stop agreeing.
+ */
+export function moneyToMinor(value: string, scale: number): bigint | null {
+  const match = /^\s*(-?)(\d+)(?:\.(\d+))?\s*$/.exec(value);
+
+  if (!match) return null;
+
+  const [, sign = '', whole = '0', fraction = ''] = match;
+  const padded = `${fraction}${'0'.repeat(scale)}`.slice(0, scale);
+  const total = BigInt(whole) * 10n ** BigInt(scale) + BigInt(padded || '0');
+
+  return sign === '-' ? -total : total;
+}
+
+/** Minor units back to a decimal string at that scale. */
+export function moneyFromMinor(minor: bigint, scale: number): string {
+  const negative = minor < 0n;
+  const digits = (negative ? -minor : minor).toString().padStart(scale + 1, '0');
   const whole = scale === 0 ? digits : digits.slice(0, -scale);
   const fraction = scale === 0 ? '' : `.${digits.slice(-scale)}`;
 
