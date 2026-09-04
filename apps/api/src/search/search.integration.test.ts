@@ -689,13 +689,18 @@ describeIfDb('SearchService', () => {
                'search-partner-' || gen_random_uuid() || '@safra.test', 'approved'
         FROM pu, ref, ci RETURNING id
       ), cheap AS (
+        /*
+          The HOTEL, and the only fixture with a star classification — the dear one below is a VILLA and
+          deliberately carries none. That pairing is what makes «a star filter returns no
+          non-hotels» a real assertion rather than a tautology over a set that is all hotels.
+        */
         INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
                                 slug, name_ar, name_en, name_de, address, status,
-                                rating, recommendation_score, attributes)
+                                rating, star_rating, recommendation_score, attributes)
         SELECT pa.id, ci.id, ref.hotel_id, ref.policy_id,
                'search-cheap-' || substr(gen_random_uuid()::text, 1, 8),
                'رخيص', 'Cheap', 'Guenstig', 'x', 'published',
-               '3.0', '5.000', ARRAY['families']
+               '3.0', 4, '5.000', ARRAY['families']
         FROM pa, ci, ref RETURNING id, slug
       ), dear AS (
         INSERT INTO properties (partner_id, city_id, property_type_id, cancellation_policy_id,
@@ -742,4 +747,46 @@ describeIfDb('SearchService', () => {
     cheapUnitId = row.cheap_unit;
     secondUnitId = row.second_unit;
   }
+  /*
+    ── The star filter returns hotels, and only hotels (Bashar, 2026-09-04) ─────────────────────
+
+    «Verify that non-hotel properties are not incorrectly mixed into hotel-star search results.»
+
+    They cannot be, and the reason is worth stating rather than trusting: a non-hotel's
+    `star_rating` is NULL, and `star_rating IN (1,2,3,4,5)` is NULL-rejecting in SQL — a NULL is
+    not equal to anything, including a list. So the exclusion is a property of the predicate rather
+    than a filter somebody remembered to add, which is the kind that survives a rewrite.
+
+    Asserted anyway, because «it follows from SQL semantics» is exactly the sort of reasoning that
+    is right until a future `COALESCE(star_rating, 0)` makes it wrong.
+  */
+  it('never mixes a non-hotel into a star-filtered result', async () => {
+    const everyStar = await search.search(
+      query({ starRatings: [1, 2, 3, 4, 5], limit: 60 }),
+    );
+
+    expect(
+      everyStar.items.length,
+      'the fixtures must contain something classified, or this proves nothing',
+    ).toBeGreaterThan(0);
+
+    for (const item of everyStar.items) {
+      expect(item.propertyTypeCode, `${item.slug} is in a star-filtered result`).toBe(
+        'hotel',
+      );
+      expect(item.starRating, `${item.slug} carries a classification`).not.toBeNull();
+    }
+  });
+
+  /** The opposite control: unfiltered, the same search DOES return other types. */
+  it('returns other accommodation types when the star filter is off', async () => {
+    const all = await search.search(query({ limit: 60 }));
+    const types = new Set(all.items.map((item) => item.propertyTypeCode));
+
+    expect(all.items.length).toBeGreaterThan(0);
+    expect(
+      types.size > 1 || !types.has('hotel'),
+      'the unfiltered search is not hotel-only by accident, which would make the test above empty',
+    ).toBe(true);
+  });
 });

@@ -439,9 +439,10 @@ describeIfDb('PropertiesService.readOwn', () => {
      * breaking `partner.spec.ts`'s check that every listing that partner owns is named «قصر
      * الشرق». This suite rolls back, so a listing created here exists for one test.
      */
-    it('stores the star classification a partner declared, and reads it back', async () => {
+    it('stores the star classification a hotel declared, and reads it back', async () => {
       const { reference } = await service.create(partner(), {
         ...draftInput(),
+        propertyTypeCode: 'hotel',
         starRating: 5,
       });
 
@@ -452,7 +453,58 @@ describeIfDb('PropertiesService.readOwn', () => {
     it('changes the classification on update', async () => {
       const { reference } = await service.create(partner(), {
         ...draftInput(),
+        propertyTypeCode: 'hotel',
         starRating: 2,
+      });
+
+      await service.update(partner(), reference, { starRating: 4 });
+
+      expect((await service.readOwn(partner(), reference)).starRating).toBe(4);
+    });
+
+    /*
+      ── Hotels only (Bashar, 2026-09-04) ────────────────────────────────────────────────────
+
+      «Other accommodation types … should not use the hotel star-classification system. For
+      non-hotel accommodation types, the classification should simply be absent rather than forcing
+      an artificial star value.»
+
+      The SERVICE is asserted here, not the schema — `property-vocabulary.test.ts` covers the
+      contract. This is the guarantee that survives a caller the schema has not met, and the second
+      test is the one that matters most: an UPDATE naming only the rating cannot be judged by any
+      schema, because the answer depends on what the listing already is.
+    */
+    it.each(['villa', 'apartment', 'chalet', 'camp'])(
+      'stores no classification for a %s, even when one is sent',
+      async (code) => {
+        const { reference } = await service.create(partner(), {
+          ...draftInput(),
+          propertyTypeCode: code,
+        });
+
+        expect((await service.readOwn(partner(), reference)).starRating).toBeNull();
+      },
+    );
+
+    it('refuses to classify a villa on update', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draftInput(),
+        propertyTypeCode: 'villa',
+      });
+
+      await expect(
+        service.update(partner(), reference, { starRating: 4 }),
+      ).rejects.toMatchObject({
+        response: { code: 'validation.star_rating_not_a_hotel' },
+      });
+    });
+
+    /** The opposite control: the same update on a HOTEL is accepted. */
+    it('classifies a hotel on update', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draftInput(),
+        propertyTypeCode: 'hotel',
+        starRating: 3,
       });
 
       await service.update(partner(), reference, { starRating: 4 });
@@ -470,6 +522,7 @@ describeIfDb('PropertiesService.readOwn', () => {
     it('refuses a classification outside 1-5 at the database', async () => {
       const { reference } = await service.create(partner(), {
         ...draftInput(),
+        propertyTypeCode: 'hotel',
         starRating: 3,
       });
 
