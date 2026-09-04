@@ -1,6 +1,6 @@
 import { currencyDecimals } from '@safra/contracts';
 
-import { moneyFromMinor, moneyToMinor } from '@/lib/localise';
+import { addMoney, moneyFromMinor, moneyToMinor } from '@/lib/localise';
 
 /**
  * Rate precision, and it matches `applyRate` in the API exactly.
@@ -56,4 +56,47 @@ export function priceWithCustomerFee(
   const flatMinor = moneyToMinor(fees.customerFeeValue.toFixed(scale), scale) ?? 0n;
 
   return moneyFromMinor(baseMinor + flatMinor, scale);
+}
+
+/** One breakdown line as the invoice endpoint sends it. */
+export interface FeeLine {
+  readonly key: string;
+  readonly amount: string;
+  readonly deduction: boolean;
+}
+
+/**
+ * The lines as the CUSTOMER sees them: the service fee folded into the accommodation.
+ *
+ * Bashar, 2026-09-03, three times and finally «the total/final price should only be displayed to
+ * the customer/guest» — SAFRA's fee is between the platform and the partner as far as a guest is
+ * concerned, and it is not to be named on their screens.
+ *
+ * **Folded, not dropped.** An invoice is a document somebody may hand to an employer or an
+ * accountant, and its lines have to reach its total. Removing a charged line would leave a
+ * breakdown that is short by the fee with nothing accounting for the gap — which states the fee to
+ * anyone who subtracts, and states it as an error. Adding it into the accommodation line keeps the
+ * arithmetic exact and the fee unnamed, and it leaves the discount, gift-card and wallet lines
+ * alone, which a customer does need to see.
+ *
+ * Nothing about the booking, the ledger or the partner's payable changes; those keep the fee
+ * itemised, which is where it belongs. This is a rendering of an unchanged record.
+ */
+export function customerLines<T extends FeeLine>(
+  lines: readonly T[],
+  currency: string,
+  feeVisible: boolean,
+): T[] {
+  const fee = lines.find((line) => line.key === 'serviceFee');
+
+  /* Named: the invoice is the API's own breakdown, itemised, exactly as staff see it. */
+  if (feeVisible || !fee) return [...lines];
+
+  return lines
+    .filter((line) => line.key !== 'serviceFee')
+    .map((line) =>
+      line.key === 'accommodation'
+        ? { ...line, amount: addMoney(line.amount, fee.amount, currency) }
+        : line,
+    );
 }

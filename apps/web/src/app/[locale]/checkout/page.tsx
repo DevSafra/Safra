@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
+import { customerFeeVisible } from '@safra/contracts';
+
 import { dialOptions } from '@/lib/dial-options';
 import { CheckoutForm } from '@/components/checkout-form';
 import { CouponProvider } from '@/components/coupon-context';
@@ -13,7 +15,8 @@ import { DateRange } from '@/components/date-range';
 import { isLocale } from '@/i18n/routing';
 import { getMyWallet } from '@/lib/account';
 import { ltrIsolate } from '@/lib/bidi';
-import { localisedName, localisedText } from '@/lib/localise';
+import { getPublicSettings } from '@/lib/catalog';
+import { formatMoney, localisedName, localisedText } from '@/lib/localise';
 import { availablePaymentMethods, getProperty, quote } from '@/lib/property';
 import { getSession } from '@/lib/session-server';
 
@@ -103,11 +106,15 @@ export default async function CheckoutPage({
    * The offered payment methods come from the same round of requests: neither depends
    * on the other, so awaiting them in sequence would add latency for nothing (§3).
    */
-  const [priced, methods, session] = await Promise.all([
+  const [priced, methods, session, settings] = await Promise.all([
     quote({ unitId, checkIn, checkOut }),
     availablePaymentMethods(property.city.countryCode),
     getSession(),
+    getPublicSettings(),
   ]);
+
+  /* Whether the fee is NAMED here. The invoice reads the same setting the same way. */
+  const feeVisible = customerFeeVisible(settings);
 
   if (!priced) {
     return (
@@ -251,23 +258,46 @@ export default async function CheckoutPage({
               <div className="gold-rule my-4" />
 
               {/*
-                The nights, then what is due. No itemisation between them.
+                The nights, then what is due — with the fee itemised between them or not, according
+                to `commission.customer_fee_visible`.
 
-                «رسوم خدمة سفرة» was a row here and Bashar asked for it off the customer's screens
-                (2026-09-03), twice, and then «just remove it from UI not from the backend» — so the
-                fee is still charged and still recorded; it is no longer named to the person paying.
+                «رسوم خدمة سفرة» was a hard-coded row here, removed on Bashar's instruction
+                (2026-09-03) and now switchable (2026-09-04). What matters either way is that the
+                rows RECONCILE: the two lines are `baseAmount` and `customerFeeAmount`, which sum
+                exactly to `totalAmount`, and a coupon subtracts from the total through
+                `CheckoutTotal`'s own discount row. The earlier version of this screen showed a
+                subtotal with no fee beside it — «المجموع الفرعي 100» above «المبلغ المستحق 101.99»,
+                two figures that do not reconcile and nothing accounting for the gap, which states
+                the fee to anybody who subtracts and states it as an error. So the pair moves
+                together: either both lines or neither, never the base alone.
 
-                **The SUBTOTAL row went with it, and that is not tidying.** It showed `baseAmount`,
-                which is the total minus the fee. Left in place with the fee row gone it would have
-                read «المجموع الفرعي 100» directly above «المبلغ المستحق 101.99» — two figures that
-                do not reconcile and nothing on the page accounting for the difference. Removing the
-                claim is honest; leaving a broken one is not. The nightly lines above are the rate
-                detail, and the total is the fact.
-
-                The fee is unchanged in `pricing.service.ts`, on the booking row, in the ledger and
-                on the invoice. This is a display decision and nothing else.
+                The fee is charged, recorded and posted identically in both modes. This is a
+                display decision and nothing else.
               */}
               <dl className="space-y-2 text-sm">
+                {feeVisible ? (
+                  <>
+                    <div className="flex justify-between">
+                      <dt className="text-muted">{t('accommodation')}</dt>
+                      <dd className="text-text2">
+                        {formatMoney(priced.baseAmount, priced.currencyCode, locale, {
+                          exact: true,
+                        })}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-muted">{t('serviceFee')}</dt>
+                      <dd className="text-text2">
+                        {formatMoney(
+                          priced.customerFeeAmount,
+                          priced.currencyCode,
+                          locale,
+                        )}
+                      </dd>
+                    </div>
+                  </>
+                ) : null}
+
                 {/* Falls when a coupon applies — see `CheckoutTotal`. */}
                 <CheckoutTotal
                   total={priced.totalAmount}

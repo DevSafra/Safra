@@ -7,12 +7,16 @@ import { AccountShell } from '@/components/account-shell';
 import { BackLink } from '@/components/back-link';
 import { DateRange } from '@/components/date-range';
 import { StatusPill, customerBookingStatus } from '@/components/booking-status-pill';
+import { customerFeeVisible } from '@safra/contracts';
+
 import { getAccountSummary, getInvoice, type InvoiceLineRow } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { ltrIsolate } from '@/lib/bidi';
-import { addMoney, formatMoney, localisedName } from '@/lib/localise';
+import { customerLines } from '@/lib/customer-fee';
+import { formatMoney, localisedName } from '@/lib/localise';
 import { returnParam, returnTo } from '@/lib/return-to';
+import { getPublicSettings } from '@/lib/catalog';
 import type { Locale } from '@/i18n/routing';
 
 /**
@@ -85,6 +89,13 @@ export default async function AccountInvoicePage({
   /* A second catalogue: payment methods are shared with the checkout, not owned by this screen. */
   const tm = await getTranslations('paymentMethods');
   const invoice = await getInvoice(reference);
+
+  /*
+    Whether the fee is NAMED on this document. One setting, read the same way the checkout reads
+    it — a receipt that itemises a charge the checkout did not, or the reverse, is two documents
+    about one payment that disagree. See `@safra/contracts/customer-fee.ts`.
+  */
+  const feeVisible = customerFeeVisible(await getPublicSettings());
 
   if (invoice === 'unauthenticated') {
     return (
@@ -198,15 +209,17 @@ export default async function AccountInvoicePage({
           </h2>
 
           <dl className="mt-2 divide-y divide-line">
-            {customerLines(invoice.lines, invoice.currencyCode).map((line) => (
-              <Line
-                key={line.key}
-                line={line}
-                currency={invoice.currencyCode}
-                locale={locale}
-                label={t(`invoiceLines.${line.key}`)}
-              />
-            ))}
+            {customerLines(invoice.lines, invoice.currencyCode, feeVisible).map(
+              (line) => (
+                <Line
+                  key={line.key}
+                  line={line}
+                  currency={invoice.currencyCode}
+                  locale={locale}
+                  label={t(`invoiceLines.${line.key}`)}
+                />
+              ),
+            )}
           </dl>
 
           <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-line pt-3">
@@ -285,38 +298,4 @@ export default async function AccountInvoicePage({
       </div>
     </AccountShell>
   );
-}
-
-/**
- * The lines as the CUSTOMER sees them: the service fee folded into the accommodation.
- *
- * Bashar, 2026-09-03, three times and finally «the total/final price should only be displayed to
- * the customer/guest» — SAFRA's fee is between the platform and the partner as far as a guest is
- * concerned, and it is not to be named on their screens.
- *
- * **Folded, not dropped.** An invoice is a document somebody may hand to an employer or an
- * accountant, and its lines have to reach its total. Removing a charged line would leave a
- * breakdown that is short by the fee with nothing accounting for the gap — which states the fee to
- * anyone who subtracts, and states it as an error. Adding it into the accommodation line keeps the
- * arithmetic exact and the fee unnamed, and it leaves the discount, gift-card and wallet lines
- * alone, which a customer does need to see.
- *
- * Nothing about the booking, the ledger or the partner's payable changes; those keep the fee
- * itemised, which is where it belongs. This is a rendering of an unchanged record.
- */
-function customerLines(
-  lines: readonly InvoiceLineRow[],
-  currency: string,
-): InvoiceLineRow[] {
-  const fee = lines.find((line) => line.key === 'serviceFee');
-
-  if (!fee) return [...lines];
-
-  return lines
-    .filter((line) => line.key !== 'serviceFee')
-    .map((line) =>
-      line.key === 'accommodation'
-        ? { ...line, amount: addMoney(line.amount, fee.amount, currency) }
-        : line,
-    );
 }

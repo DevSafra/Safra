@@ -603,6 +603,18 @@ export const SETTINGS: {
     descriptionEn: 'Customer service fee, flat amount added to every booking',
   },
   {
+    /*
+      Whether the fee is NAMED to the customer, as opposed to charged. `false` because that is what
+      the platform does today (Bashar, 2026-09-03) — a seeded `true` would re-expose the fee on
+      every screen the next time somebody ran the seed. See `@safra/contracts/customer-fee.ts`.
+    */
+    key: 'commission.customer_fee_visible',
+    value: false,
+    valueSchema: 'boolean',
+    descriptionAr: 'إظهار رسوم الخدمة كبند منفصل للعميل',
+    descriptionEn: 'Show the SAFRA service fee as its own line to the customer',
+  },
+  {
     key: 'commission.partner_rate',
     value: 0.07,
     valueSchema: 'rate',

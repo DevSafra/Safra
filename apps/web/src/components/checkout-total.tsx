@@ -34,14 +34,26 @@ export function CheckoutTotal({
         <div className="flex justify-between">
           <dt className="text-muted">{discountLabel.replace('{code}', applied.code)}</dt>
           <dd className="text-gold">
-            −{formatMoney(applied.discountAmount, currencyCode, locale)}
+            −
+            {formatMoney(applied.discountAmount, currencyCode, locale, {
+              exact: true,
+            })}
           </dd>
         </div>
       ) : null}
       <div className="flex justify-between border-t border-line pt-2 text-base">
         <dt className="font-semibold text-text">{label}</dt>
         <dd className="font-semibold text-gold">
-          {formatMoney(applied ? applied.totalAfter : total, currencyCode, locale)}
+          {/*
+            `exact`, because this figure sits at the foot of a breakdown that may itemise the
+            accommodation and the fee above it. Those render exactly (as the invoice's lines do),
+            and a total that trimmed «202.00» to «$202» above two lines showing cents reads as a
+            breakdown that does not add up. Where no lines are shown it changes nothing a customer
+            would notice — a total is the one figure worth stating to the minor unit anyway.
+          */}
+          {formatMoney(applied ? applied.totalAfter : total, currencyCode, locale, {
+            exact: true,
+          })}
         </dd>
       </div>
     </>

@@ -2179,6 +2179,7 @@ export const ar = {
       names: {
         'commission.customer_fee_mode': 'طريقة حساب رسوم خدمة العميل',
         'commission.customer_fee_value': 'رسوم خدمة العميل — تُضاف إلى كل حجز',
+        'commission.customer_fee_visible': 'إظهار رسوم الخدمة للعميل كبند منفصل',
         'commission.partner_rate': 'عمولة سفرة من الشريك — تُخصم من مستحقاته قبل التحويل',
         'booking.confirmation_window_minutes': 'مهلة الشريك لتأكيد الحجز',
         'booking.same_day_cutoff_hour': 'آخر ساعة يُقبل فيها حجز اليوم نفسه',

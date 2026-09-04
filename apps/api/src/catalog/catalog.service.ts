@@ -430,6 +430,8 @@ export class CatalogService {
     const PUBLIC_KEYS = [
       'commission.customer_fee_mode',
       'commission.customer_fee_value',
+      /* Read by the checkout and the invoice to decide whether to NAME the fee (§9.3). */
+      'commission.customer_fee_visible',
       'commission.partner_rate',
       'booking.confirmation_window_minutes',
       'booking.same_day_cutoff_hour',

@@ -12,6 +12,7 @@ export * from './currency-catalogue.js';
 export * from './timezone-catalogue.js';
 export * from './geo.js';
 export * from './gift-card.js';
+export * from './customer-fee.js';
 export * from './invoice.js';
 export * from './pagination.js';
 export * from './payment.js';

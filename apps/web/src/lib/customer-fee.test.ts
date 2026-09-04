@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { priceWithCustomerFee } from './customer-fee';
+import { customerLines, priceWithCustomerFee } from './customer-fee';
 
 /**
  * The fee a guest is shown is the fee a guest is charged.
@@ -44,4 +44,83 @@ const flat = (customerFeeValue: number) => ({
 const percent = (customerFeeValue: number) => ({
   customerFeeMode: 'percent',
   customerFeeValue,
+});
+
+/**
+ * The invoice breakdown in both modes, and the one property that must hold in both.
+ *
+ * Bashar, 2026-09-04: *"In both modes, the final total shown before payment must exactly match the
+ * total charged."* An invoice is where that is easiest to get wrong, because hiding a charged line
+ * leaves a breakdown that is SHORT by the fee with nothing accounting for the gap — which states
+ * the fee to anybody who subtracts, and states it as an error. So the fee is folded into the
+ * accommodation line rather than dropped, and every case here checks the arithmetic, not the
+ * wording.
+ */
+describe('customerLines', () => {
+  const line = (key: string, amount: string, deduction = false) => ({
+    key,
+    amount,
+    deduction,
+  });
+
+  /** What the API sends: the fee itemised, with the optional deductions beneath it. */
+  const invoice = [
+    line('accommodation', '100.00'),
+    line('serviceFee', '1.99'),
+    line('discount', '10.00', true),
+  ];
+
+  /** Additions minus deductions, in minor units, so a rounding slip cannot hide in a float. */
+  const settles = (lines: readonly { amount: string; deduction: boolean }[]): number =>
+    lines.reduce(
+      (sum, l) => sum + Math.round(Number(l.amount) * 100) * (l.deduction ? -1 : 1),
+      0,
+    );
+
+  it('itemises the fee when it is visible', () => {
+    const shown = customerLines(invoice, 'USD', true);
+
+    expect(shown.map((l) => l.key)).toEqual(['accommodation', 'serviceFee', 'discount']);
+    expect(shown.find((l) => l.key === 'serviceFee')?.amount).toBe('1.99');
+  });
+
+  it('folds the fee into the accommodation line when it is not', () => {
+    const shown = customerLines(invoice, 'USD', false);
+
+    expect(shown.map((l) => l.key)).toEqual(['accommodation', 'discount']);
+    expect(shown[0]?.amount).toBe('101.99');
+  });
+
+  /* The requirement itself: the two renderings settle to the same figure. */
+  it('settles to the same total in both modes', () => {
+    expect(settles(customerLines(invoice, 'USD', true))).toBe(
+      settles(customerLines(invoice, 'USD', false)),
+    );
+    expect(settles(customerLines(invoice, 'USD', false))).toBe(9199);
+  });
+
+  it('leaves the deductions alone in both modes', () => {
+    for (const visible of [true, false]) {
+      const discount = customerLines(invoice, 'USD', visible).find(
+        (l) => l.key === 'discount',
+      );
+
+      expect(discount).toEqual(line('discount', '10.00', true));
+    }
+  });
+
+  /** A three-decimal currency keeps its third digit; a helper that assumed cents would not. */
+  it('folds at the currency own scale', () => {
+    const jod = [line('accommodation', '10.125'), line('serviceFee', '1.500')];
+
+    expect(customerLines(jod, 'JOD', false)[0]?.amount).toBe('11.625');
+  });
+
+  /* No fee charged renders identically either way — nothing to name, nothing to fold. */
+  it('is a no-op when there is no fee line at all', () => {
+    const noFee = [line('accommodation', '100.00')];
+
+    expect(customerLines(noFee, 'USD', false)).toEqual(noFee);
+    expect(customerLines(noFee, 'USD', true)).toEqual(noFee);
+  });
 });

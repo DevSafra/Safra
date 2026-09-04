@@ -194,6 +194,37 @@ describeIfDb('InvoicesService', () => {
   });
 
   /**
+   * The API itemises the fee whatever `commission.customer_fee_visible` says.
+   *
+   * Bashar, 2026-09-04: *"Hiding the fee must only affect customer-facing presentation. The
+   * ledger, invoices and staff-facing views must remain correct."* So the setting must not reach
+   * this service at all — the customer app folds the line when it renders, and the staff console,
+   * the ledger and this payload keep the charge itemised.
+   *
+   * Written as an opposite control rather than as an absence: asserting that `invoices.service.ts`
+   * does not mention the key would pass on a file that read it through a helper. Setting the value
+   * BOTH ways and demanding an identical payload is the assertion that cannot be satisfied by a
+   * service that consults it.
+   */
+  it.each([true, false])(
+    'itemises the fee whether or not the customer is shown it (%s)',
+    async (visible) => {
+      await db.execute(sql`
+        UPDATE settings SET value = ${JSON.stringify(visible)}::jsonb
+        WHERE key = 'commission.customer_fee_visible'
+      `);
+
+      const invoice = await service.one(customer(), PAID);
+
+      expect(invoice.lines).toStrictEqual([
+        { key: 'accommodation', amount: '200.000', deduction: false },
+        { key: 'serviceFee', amount: '1.990', deduction: false },
+      ]);
+      expect(invoice.totalAmount).toBe('201.990');
+    },
+  );
+
+  /**
    * A zero line is dropped; a non-zero deduction is flagged rather than negated.
    *
    * The amount must stay identical to the stored value — the minus belongs to the reader's locale, not
