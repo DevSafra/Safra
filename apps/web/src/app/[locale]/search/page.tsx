@@ -108,6 +108,7 @@ export default async function SearchPage({
   const query = await searchParams;
   const t = await getTranslations('search');
   const ta = await getTranslations('attributes');
+  const ts = await getTranslations('starRating');
 
   const [cities, propertyTypes, amenities] = await Promise.all([
     getCities(),
@@ -186,6 +187,22 @@ export default async function SearchPage({
   const rangeOk =
     minPrice === undefined || maxPrice === undefined || minPrice <= maxPrice;
 
+  /*
+    The star classification filter, CLAMPED to the five values that exist.
+
+    Parsed here rather than forwarded, for the reason the amenity filter records: a bookmarked
+    `?starRatings=9` would otherwise reach the API, be refused by the schema, and empty the page
+    with no explanation. Anything that is not 1-5 is simply not a filter, and `Set` drops a repeat
+    so `?starRatings=4&starRatings=4` narrows once.
+  */
+  const starRatings = [
+    ...new Set(
+      many(query['starRatings'])
+        .map((value) => Number(value))
+        .filter((value) => Number.isInteger(value) && value >= 1 && value <= 5),
+    ),
+  ].sort((a, b) => a - b);
+
   const freeCancellationOnly = first(query['freeCancellationOnly']) === 'true';
   const cursor = first(query['cursor']) || undefined;
 
@@ -200,6 +217,7 @@ export default async function SearchPage({
     propertyTypeCode,
     attributes,
     amenityCodes,
+    starRatings,
     minPrice: rangeOk ? minPrice : undefined,
     maxPrice: rangeOk ? maxPrice : undefined,
     freeCancellationOnly,
@@ -236,6 +254,8 @@ export default async function SearchPage({
     if (propertyTypeCode) next.set('propertyTypeCode', propertyTypeCode);
     for (const code of attributes) next.append('attributes', code);
     for (const code of amenityCodes) next.append('amenityCodes', code);
+    /* Carried, or paging out of a «5 stars» search quietly returns everything. */
+    for (const value of starRatings) next.append('starRatings', String(value));
     if (rangeOk && minPrice !== undefined) next.set('minPrice', String(minPrice));
     if (rangeOk && maxPrice !== undefined) next.set('maxPrice', String(maxPrice));
     if (freeCancellationOnly) next.set('freeCancellationOnly', 'true');
@@ -288,6 +308,15 @@ export default async function SearchPage({
         minDate={results.firstBookableDate ?? todayInDamascus()}
         attributes={TRIP_ATTRIBUTES.map((code) => ({ code, label: ta(code) }))}
         attributesLabel={t('attributes')}
+        starRatingLabels={{
+          heading: ts('label'),
+          /*
+            Five labels, resolved on the SERVER by ICU. «نجمة واحدة» / «نجمتان» / «٣ نجوم» /
+            «٤ نجوم» / «٥ نجوم» are four different Arabic forms, and a component that built them
+            from a number would be a second place where agreement is decided.
+          */
+          forValue: [1, 2, 3, 4, 5].map((n) => ts('stars', { count: n })),
+        }}
         defaults={{
           citySlug,
           checkIn,
@@ -297,6 +326,8 @@ export default async function SearchPage({
           infants,
           bedrooms,
           attributes,
+          /* So the chips come back CHECKED after a search — a filter that forgets itself reads as broken. */
+          starRatings,
         }}
       />
 
