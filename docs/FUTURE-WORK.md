@@ -427,6 +427,93 @@ carries a note saying that filtering by stars excludes every other accommodation
 that silently removes whole categories of inventory is the failure the price note beside it already
 guards against.
 
+### Stage 3 — controlled-launch review, findings so far (2026-09-04)
+
+Bashar asked for a completion and reconciliation pass across all three applications before an
+initial controlled launch, explicitly _"rather than introducing unrelated features"_. What follows
+is what the pass has found and what was done about each. **Fixed** items shipped as part of the
+reconciliation; **open** items are reported for a decision and are NOT closed.
+
+#### FIXED — a listing could not be submitted for review, by anyone
+
+**The most serious finding of the pass.** `POST /partner/properties/:reference/submit` had its
+permission, its ownership check, its unit guard, its audit row and its timeline event, and **no
+caller anywhere in the portal**. Neither did `POST .../units`. The database said it plainly:
+
+| state                          | count                             |
+| ------------------------------ | --------------------------------- |
+| `draft`                        | 627                               |
+| `rejected`                     | 61                                |
+| **`pending_review`**           | **0**                             |
+| properties with **zero units** | **991** (468 of them _published_) |
+
+So the core partner journey — create a listing, get it published — could not complete, the console's
+approval queue had been empty for the platform's whole life, and 468 live listings had no price and
+no bookable unit with no route by which their owner could fix it. Every suite was green throughout:
+nothing was broken, a step simply did not exist, and no test that checks whether a screen works can
+notice a screen nobody built.
+
+Both endpoints now have callers, with copy for every state (including why the control is absent on a
+published listing, and why it is disabled without a unit). Held by `e2e/property-submission.spec.ts`,
+which crosses the application boundary — partner submits, console reviews, the rejection reason
+returns to the partner's screen — and completes the loop so it is repeatable rather than
+fixture-consuming. Both write paths are scope-tested with opposite controls, and the ownership scope
+was mutation-tested.
+
+#### FIXED — a list card quoted a different nightly price for every trip length
+
+Reported by Bashar with two screenshots. The card said «$101 / الليلة» over «$201.99 لليلتين»; the
+property page said «$101.99 / الليلة» for the same unit. Measured on the running API before the fix:
+
+| nights             | 1      | 2      | 3      | 5      | 7      |
+| ------------------ | ------ | ------ | ------ | ------ | ------ |
+| advertised nightly | 101.99 | 101.00 | 100.66 | 100.40 | 100.28 |
+
+The flat per-booking fee was divided across the nights, so one $100 property advertised five
+different nightly prices depending on the search, and none of them multiplied to the total. The fee
+is now applied to the nightly rate, exactly as the property page applies it — one property, one
+nightly price, on every surface. The flat fee is still charged once per booking.
+
+#### FIXED — a checkbox was a 16px tap target, in all three applications
+
+Thirteen checkboxes across fifteen files, every one 15–16px, against a standing rule of 40px below
+`lg`. Fixed as a class, in one base-layer rule per app that gives the wrapping LABEL the floor —
+enlarging the box itself would make a 40px tick, which is not a checkbox.
+
+#### FIXED — the partner portal was outside the responsive sweep
+
+`responsive.spec.ts` walks every console section at six widths and the customer pages beside them.
+Of the partner portal it checked one thing: a control height on the LOGIN page. Every authenticated
+screen a partner works in was outside it, so «no page ever scrolls sideways» was enforced on two
+applications out of three. `e2e/partner-responsive.spec.ts` now covers thirteen screens plus the
+three property sub-screens at 390/768/1024/1440, and the touch floor on تعديل.
+
+#### OPEN — three reference catalogues have no management screen
+
+`amenities` (12 rows), `cancellation_policies` (3) and `partner_types` (4) are read in the API and
+**written nowhere**. Adding or renaming an amenity — «EV charger», «co-working desk» — requires
+direct SQL, against the stated criterion that no normal operation should. Not a launch blocker (the
+12 cover the catalogue) but it is the same shape as the payout-account gap.
+`catalog.service.ts` also claims in a comment that amenities "change through the admin panel",
+which is false. **Decision needed: build the screens, or accept SQL for these three.**
+
+#### OPEN — `wallet_restriction_backfill`
+
+One row, referenced by nothing in the application. A migration leftover. Harmless; worth dropping.
+
+#### OPEN — conditional skips make coverage vary run to run
+
+Between 6 and 11 browser tests skip depending on what the seeded data happens to hold
+(`test.skip((await rows.count()) === 0, …)` and similar, mostly in `admin-sections.spec.ts`). A skip
+reads as a pass in the summary. Bashar has asked the Stage 5 runner to **fail** when an important
+test skips on fixture drift; that is where this is addressed.
+
+#### NOTE for Stage 6 — wait for warm, not for the port
+
+One full-suite run failed a sidebar-badge comparison immediately after the console was restarted,
+and passed on every run since. The runner must wait for the applications to be _serving correctly_,
+not merely accepting connections, or it will report environment noise as product failure.
+
 ### SAFRA service fee — visibility made configurable, 2026-09-04
 
 **Bashar's requirement.** _"One shared setting and one consistent pricing rule, without per-surface
