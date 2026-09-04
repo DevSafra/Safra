@@ -17,6 +17,7 @@ import {
   StatusPill,
   type AdminColumn,
 } from '@/components/admin-table';
+import { usesStarRating } from '@safra/contracts';
 import { StarRating } from '@safra/ui';
 import { TableToolbar } from '@/components/table-toolbar';
 import { PropertyTypes } from '@/components/property-types';
@@ -139,7 +140,8 @@ export default async function PropertiesPage({
                         whether a listing is worth opening carefully. `shrink-0` so five stars
                         never lose to a long Arabic name.
                       */}
-                      {property.starRating ? (
+                      {usesStarRating(property.propertyType.code) &&
+                      property.starRating ? (
                         <StarRating
                           value={property.starRating}
                           label={label(t.enums.starRating, String(property.starRating))}
@@ -271,7 +273,12 @@ const columns = (back: string): readonly AdminColumn<PropertyListItem>[] => [
     key: 'stars',
     header: t.sections.properties.colStars,
     render: (row) =>
-      row.starRating === null ? (
+      !usesStarRating(row.propertyType) ? (
+        /* A villa is not unclassified — the scheme does not reach it. Different word. */
+        <span className="whitespace-nowrap text-[11.5px] text-faint">
+          {t.sections.properties.starNotApplicable}
+        </span>
+      ) : row.starRating === null ? (
         <span className="whitespace-nowrap text-[11.5px] text-faint">
           {t.sections.properties.starUnset}
         </span>

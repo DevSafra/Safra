@@ -11,6 +11,7 @@ import { ReviewProperty } from '@/components/review-property';
 import { BackLink, type BackTarget } from '@/components/back-link';
 import { StatusPill } from '@/components/admin-table';
 import { PropertyStarRating } from '@/components/property-star-rating';
+import { usesStarRating } from '@safra/contracts';
 import { StarRating } from '@safra/ui';
 import { backTarget, detailHref, origin } from '@/lib/search-params';
 import { statusTone } from '@/lib/status-tone';
@@ -176,7 +177,12 @@ export default async function PropertyPage({
               {t.sections.properties.starRatingLabel}
             </dt>
             <dd className="mt-0.5 break-words text-text">
-              {property.starRating === null ? (
+              {!usesStarRating(property.propertyType.code) ? (
+                /* Not a gap to fill — the scheme does not reach this kind of place. */
+                <span className="text-faint">
+                  {t.sections.properties.starNotApplicable}
+                </span>
+              ) : property.starRating === null ? (
                 <span className="text-faint">{t.sections.properties.starUnset}</span>
               ) : (
                 <StarRating
@@ -325,13 +331,21 @@ export default async function PropertyPage({
         )}
       </Section>
 
-      {/* ── The classification, correctable at any status (Bashar, 2026-09-04) ─── */}
-      <Section title={t.sections.properties.starRatingLabel}>
-        <PropertyStarRating
-          reference={property.reference}
-          starRating={property.starRating}
-        />
-      </Section>
+      {/*
+        ── The classification, correctable at any status (Bashar, 2026-09-04) ───
+
+        The whole SECTION is absent for a non-hotel, not a disabled control inside it. «Other
+        accommodation types … should not use the hotel star-classification system», and a section
+        headed «تصنيف النجوم» on a villa's screen invites the question it exists to answer.
+      */}
+      {usesStarRating(property.propertyType.code) ? (
+        <Section title={t.sections.properties.starRatingLabel}>
+          <PropertyStarRating
+            reference={property.reference}
+            starRating={property.starRating}
+          />
+        </Section>
+      ) : null}
 
       <Section title={t.sections.propertyDetail.decision}>
         {reviewable ? (

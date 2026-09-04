@@ -39,6 +39,8 @@ describe('the pending-properties response schema', () => {
     address: 'Addr',
     /* Sent by the endpoint since 2026-09-04; null on a listing that predates the field. */
     starRating: 4,
+    /* And the TYPE, because only a hotel carries a classification at all. */
+    propertyType: { code: 'hotel' },
     latitude: null,
     longitude: null,
     descriptionAr: null,

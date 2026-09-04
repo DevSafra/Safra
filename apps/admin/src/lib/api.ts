@@ -410,6 +410,8 @@ const pendingPropertySchema = z.object({
   address: z.string(),
   /* Shown in the QUEUE, so a reviewer sees the claim before opening the listing. */
   starRating: z.number().int().min(1).max(5).nullable(),
+  /* The TYPE, so the queue can tell «a hotel nobody classified» from «a villa». */
+  propertyType: z.object({ code: z.string() }),
   reviewNotes: z.string().nullable(),
   createdAt: z.union([z.string(), z.date()]).transform((v) => new Date(v).toISOString()),
   partner: z.object({
