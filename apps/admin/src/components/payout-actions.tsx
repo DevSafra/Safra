@@ -131,12 +131,32 @@ export function PayoutActions({
           ) : null}
 
           {status === 'scheduled' ? (
-            <Button
-              onClick={() => setOpen('paid')}
-              label={t.sections.payouts.markPaid}
-              hint={t.sections.payouts.markPaidHint}
-              primary
-            />
+            <>
+              <Button
+                onClick={() => setOpen('paid')}
+                label={t.sections.payouts.markPaid}
+                hint={t.sections.payouts.markPaidHint}
+                primary
+              />
+              {/*
+                A way BACK from scheduled (Bashar, 2026-09-04).
+
+                This screen offered «تسجيل الدفع» and nothing else, so a released payout had exactly
+                one exit: pay it. `PayoutService.hold` has always accepted a scheduled payout — the
+                control simply had no form to click, which is the shape this project keeps finding.
+
+                It stopped being cosmetic when release began recording a verified destination. A
+                payout can now be scheduled and then have its account edited back into review, at
+                which point marking it paid refuses — correctly — and without this button the
+                operator has no move at all. Holding it clears the date and returns it to the queue
+                through «رفع التعليق», which is where somebody can decide what to do.
+              */}
+              <Button
+                onClick={() => setOpen('hold')}
+                label={t.sections.payouts.hold}
+                hint={t.sections.payouts.holdHint}
+              />
+            </>
           ) : null}
 
           {status !== 'scheduled' ? (

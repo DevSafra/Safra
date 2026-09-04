@@ -135,6 +135,28 @@ export default async function PayoutPage({
           {payout.holdReason ? (
             <Row label={t.sections.payouts.holdReason} value={payout.holdReason} />
           ) : null}
+          {/*
+            WHERE the money went (Bashar, 2026-09-04).
+
+            A released payout has a recorded destination and, until this row existed, no screen said
+            what it was — an operator reconciling a bank statement against «مجدول» had nothing here
+            to reconcile it against. Masked, like every other surface: the holder, the bank and the
+            last four are what confirm an account without exposing one.
+          */}
+          {payout.destination ? (
+            <Row
+              label={t.sections.payouts.destination}
+              value={
+                <span>
+                  {payout.destination.accountHolder}
+                  {payout.destination.bankName
+                    ? ` · ${payout.destination.bankName}`
+                    : ''}{' '}
+                  · <Ltr>{`••••${payout.destination.last4}`}</Ltr>
+                </span>
+              }
+            />
+          ) : null}
         </dl>
       </Section>
 
