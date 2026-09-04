@@ -12,6 +12,7 @@
  * and its element ids in as props, so no user-facing text lives in this package.
  */
 export * from './ornaments.js';
+export * from './star-rating.js';
 export * from './status.js';
 export * from './theme.js';
 export * from './password-field.js';
