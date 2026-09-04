@@ -93,7 +93,6 @@ export default async function HomePage({
   const t = await getTranslations('home');
   const tt = await getTranslations('propertyTypes');
   const ta = await getTranslations('attributes');
-  const ts = await getTranslations('starRating');
 
   const today = todayInDamascus();
   const tomorrow = tomorrowInDamascus();
@@ -239,15 +238,6 @@ export default async function HomePage({
               minDate={recommended.checkIn}
               attributes={TRIP_FEATURES.map((code) => ({ code, label: ta(code) }))}
               attributesLabel={t('attributesLabel')}
-              starRatingLabels={{
-                heading: ts('label'),
-                /*
-                  Five labels, resolved on the SERVER by ICU. «نجمة واحدة» / «نجمتان» / «٣ نجوم» /
-                  «٤ نجوم» / «٥ نجوم» are four different Arabic forms, and a component that built them
-                  from a number would be a second place where agreement is decided.
-                */
-                forValue: [1, 2, 3, 4, 5].map((n) => ts('stars', { count: n })),
-              }}
             />
           </div>
 

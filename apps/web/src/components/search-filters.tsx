@@ -1,11 +1,15 @@
 import { getTranslations } from 'next-intl/server';
 
 import { TRIP_ATTRIBUTES } from '@safra/contracts';
+import { StarRating } from '@safra/ui';
 
 import type { Locale } from '@/i18n/routing';
 import type { Amenity, PropertyType } from '@/lib/catalog';
 import { localisedName } from '@/lib/localise';
 import { dynamicMessage } from '@/lib/dynamic-message';
+
+/** The five values, written once — the same list the partner and console forms offer. */
+const STAR_VALUES = [1, 2, 3, 4, 5] as const;
 
 /**
  * The filters beside the results (§5.5), as booking.com places them.
@@ -80,6 +84,7 @@ export async function SearchFilters({
   active: {
     propertyTypeCode: string | undefined;
     attributes: string[];
+    starRatings: number[];
     amenityCodes: string[];
     minPrice: number | undefined;
     maxPrice: number | undefined;
@@ -89,6 +94,7 @@ export async function SearchFilters({
   const t = await getTranslations('search');
   const tt = await getTranslations('propertyTypes');
   const ta = await getTranslations('attributes');
+  const ts = await getTranslations('starRating');
   const tm = await getTranslations('amenities');
 
   /*
@@ -104,6 +110,7 @@ export async function SearchFilters({
   const count =
     (active.propertyTypeCode ? 1 : 0) +
     active.attributes.length +
+    active.starRatings.length +
     active.amenityCodes.length +
     (active.minPrice === undefined ? 0 : 1) +
     (active.maxPrice === undefined ? 0 : 1) +
@@ -276,6 +283,61 @@ export async function SearchFilters({
             ))}
           </fieldset>
         ) : null}
+
+        {/*
+          ── Star classification ─────────────────────────────────────────────
+
+          Here, in «التصفية», rather than on the search bar (Bashar, 2026-09-04). It was a chip row
+          under «صفات الرحلة» in the bar, and the bar is the QUERY — where, when, how many — while
+          this panel is how a reader narrows what came back. A classification is a narrowing.
+
+          Immediately after «نوع الإقامة», because it classifies the type: choosing «فندق» and then
+          «٤ نجوم» is one thought, and the two controls now sit together.
+
+          Checkboxes rather than radios, so «4 or 5 stars» is expressible — a property has exactly
+          one classification, so the API ORs them. And the same drawn stars the cards use, because a
+          reader picking 4 should see the shape they will be shown.
+        */}
+        <fieldset className="flex flex-col gap-1">
+          <legend className="mb-1 text-[0.85rem] font-bold text-text">
+            {t('starRating')}
+          </legend>
+
+          {STAR_VALUES.map((value) => (
+            <label
+              key={value}
+              className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-muted"
+            >
+              <input
+                type="checkbox"
+                name="starRatings"
+                value={value}
+                defaultChecked={active.starRatings.includes(value)}
+                className="size-4 shrink-0 accent-gold"
+              />
+              {/*
+                `decorative`, because the label's own text already names the rating — letting the
+                component announce itself as well reads it twice per row.
+              */}
+              <StarRating
+                value={value}
+                label={ts('stars', { count: value })}
+                decorative
+              />
+              <span className="sr-only">{ts('stars', { count: value })}</span>
+            </label>
+          ))}
+
+          {/*
+            Said, because it is the one thing about this filter a reader cannot infer: a star
+            classification is a HOTEL classification, so narrowing by it excludes every apartment
+            and chalet in the results. A filter that silently removes whole categories of
+            inventory is the failure the price note beside it exists to prevent.
+          */}
+          <p className="mt-1 text-[0.6875rem] leading-relaxed text-faint">
+            {t('starRatingHotelsOnly')}
+          </p>
+        </fieldset>
 
         {/* ── Trip attributes ────────────────────────────────────────────── */}
         <fieldset className="flex flex-col gap-1">

@@ -108,7 +108,6 @@ export default async function SearchPage({
   const query = await searchParams;
   const t = await getTranslations('search');
   const ta = await getTranslations('attributes');
-  const ts = await getTranslations('starRating');
 
   const [cities, propertyTypes, amenities] = await Promise.all([
     getCities(),
@@ -308,15 +307,6 @@ export default async function SearchPage({
         minDate={results.firstBookableDate ?? todayInDamascus()}
         attributes={TRIP_ATTRIBUTES.map((code) => ({ code, label: ta(code) }))}
         attributesLabel={t('attributes')}
-        starRatingLabels={{
-          heading: ts('label'),
-          /*
-            Five labels, resolved on the SERVER by ICU. «نجمة واحدة» / «نجمتان» / «٣ نجوم» /
-            «٤ نجوم» / «٥ نجوم» are four different Arabic forms, and a component that built them
-            from a number would be a second place where agreement is decided.
-          */
-          forValue: [1, 2, 3, 4, 5].map((n) => ts('stars', { count: n })),
-        }}
         defaults={{
           citySlug,
           checkIn,
@@ -326,8 +316,6 @@ export default async function SearchPage({
           infants,
           bedrooms,
           attributes,
-          /* So the chips come back CHECKED after a search — a filter that forgets itself reads as broken. */
-          starRatings,
         }}
       />
 
@@ -379,6 +367,7 @@ export default async function SearchPage({
             active={{
               propertyTypeCode,
               attributes,
+              starRatings,
               amenityCodes,
               minPrice: rangeOk ? minPrice : undefined,
               maxPrice: rangeOk ? maxPrice : undefined,

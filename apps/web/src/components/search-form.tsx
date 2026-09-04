@@ -5,7 +5,6 @@ import { DateRangeField } from '@/components/date-range-field';
 import { GuestsField } from '@/components/guests-field';
 import { GuestsIcon, PinIcon } from '@/components/icons';
 import { localisedName } from '@/lib/localise';
-import { StarRating } from '@safra/ui';
 
 interface City {
   slug: string;
@@ -111,7 +110,6 @@ export async function SearchForm({
   cities,
   attributes = [],
   attributesLabel = '',
-  starRatingLabels,
   defaults,
   minDate,
 }: {
@@ -119,20 +117,10 @@ export async function SearchForm({
   cities: City[];
   /** The trip attributes offered as tags, already translated by the caller. */
   attributes?: readonly { code: string; label: string }[];
-  /**
-   * The star-classification filter's five labels plus its heading, translated by the caller.
-   *
-   * Passed in rather than built here for the reason every component in this project passes its
-   * copy: a plural like «٣ نجوم» versus «نجمة واحدة» is ICU the SERVER already resolves, and a
-   * component that formatted it would be a second place where Arabic agreement is decided.
-   */
-  starRatingLabels?:
-    { readonly heading: string; readonly forValue: readonly string[] } | undefined;
   /** «صفات الرحلة:» — the row's own label. */
   attributesLabel?: string;
   defaults?: {
     attributes?: readonly string[] | undefined;
-    starRatings?: readonly number[] | undefined;
     children?: number | undefined;
     infants?: number | undefined;
     citySlug?: string | undefined;
@@ -391,54 +379,6 @@ export async function SearchForm({
                 className="sr-only"
               />
               {label}
-            </label>
-          ))}
-        </div>
-      ) : null}
-
-      {/*
-        ── The star-classification filter (Bashar, 2026-09-04) ──────────────────
-
-        The same chip as the trip attributes above it, down to the class list: a checkbox styled as
-        a chip, `has-[:checked]` carrying the whole selected state, no JavaScript, and nothing that
-        MOVES on press — the thing Bashar has rejected twice. A second visual language for a second
-        filter row would be a choice nobody asked for.
-
-        What is inside the chip is a drawn star ROW rather than «٤ نجوم», so the filter looks like
-        the thing it filters: a reader picking 4 sees the same shape the cards will show them. The
-        words are still there for a screen reader, on the input's own label.
-
-        Checkboxes, so «4 or 5 stars» is expressible — a property has exactly one classification,
-        so the API ORs them. Radio buttons would have made the combination Bashar asked for
-        impossible, and a `<select>` would have made it two interactions instead of one.
-      */}
-      {starRatingLabels ? (
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
-          <span className="text-[12.5px] font-semibold text-muted">
-            {starRatingLabels.heading}
-          </span>
-          {[1, 2, 3, 4, 5].map((value) => (
-            <label
-              key={value}
-              aria-label={starRatingLabels.forValue[value - 1]}
-              className="inline-flex min-h-10 cursor-pointer items-center rounded-full border border-line bg-card px-3 py-1.5 transition-[border-color,background-color] duration-150 ease-out-strong has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-gold has-[:checked]:border-gold has-[:checked]:bg-gold/15 lg:min-h-8 hover:border-gold/60 hover:bg-gold/5"
-            >
-              <input
-                type="checkbox"
-                name="starRatings"
-                value={value}
-                defaultChecked={defaults?.starRatings?.includes(value)}
-                className="sr-only"
-              />
-              {/*
-                `aria-hidden` on the stars: the LABEL already carries «٤ نجوم», and letting the
-                component announce itself as well would read the rating twice per chip.
-              */}
-              <StarRating
-                value={value}
-                label={starRatingLabels.forValue[value - 1] ?? ''}
-                decorative
-              />
             </label>
           ))}
         </div>
