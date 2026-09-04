@@ -36,7 +36,37 @@ const longitudeSchema = z
   .regex(/^-?\d{1,3}(\.\d{1,8})?$/, ERROR.VALIDATION_LONGITUDE_FORMAT)
   .refine((v) => Math.abs(Number(v)) <= 180, ERROR.VALIDATION_LONGITUDE_RANGE);
 
-export const propertyCreateSchema = z
+/**
+ * Every field a listing carries, with no cross-field rule applied.
+ *
+ * Named so `propertyUpdateSchema` can still `.omit().partial()` it: `propertyCreateSchema` is a
+ * REFINED schema now — «a hotel must declare a classification, nothing else may» is a rule about
+ * two fields at once — and a refined schema has no `.partial()`. Deriving the patch shape from the
+ * effect rather than from the object is the mistake this split exists to prevent.
+ */
+/**
+ * The property types that carry an official star classification (Bashar, 2026-09-04).
+ *
+ * A WRITTEN list of type codes, not a flag on `property_types`. The flag would be the obvious
+ * design and it is the wrong one here: `property_types` is operator-editable data, so a column
+ * saying «this type is star-rated» would let somebody tick it for «مخيم» from a settings screen
+ * and give camps a hotel classification — a product decision made by accident, in a table.
+ *
+ * A list means adding «boutique hotel» to the classification is a code change somebody reviews,
+ * which is what a decision of this kind should cost.
+ *
+ * `hotel` is the code, and codes are the stable identifier — the same reasoning
+ * `CUSTOMER_FACING_METHODS` records. Renaming the Arabic label does not move a listing out of the
+ * scheme; deleting the type would, and nothing can delete a type that listings reference.
+ */
+export const STAR_RATED_PROPERTY_TYPES = ['hotel'] as const;
+
+/** Whether this property type declares a star classification at all. */
+export function usesStarRating(propertyTypeCode: string): boolean {
+  return (STAR_RATED_PROPERTY_TYPES as readonly string[]).includes(propertyTypeCode);
+}
+
+const propertyBaseSchema = z
   .object({
     citySlug: z.string().trim().min(1).max(80),
     propertyTypeCode: z.string().trim().min(1).max(40),
@@ -56,22 +86,27 @@ export const propertyCreateSchema = z
      */
     roomNumber: z.string().trim().max(20).optional(),
     /**
-     * The official star CLASSIFICATION, 1 to 5 (Bashar, 2026-09-04).
+     * The official star CLASSIFICATION, 1 to 5 — for a HOTEL (Bashar, 2026-09-04).
      *
-     * REQUIRED on creation — "every hotel/accommodation must have a star rating" — and that bound
-     * lives here rather than on the column, because it is a rule about what a partner may SUBMIT.
-     * The column stays nullable so it can keep holding the 2,703 listings that predate the field;
-     * a NOT NULL with a default would have invented a checkable claim about 2,700 real hotels.
+     * Optional HERE and required by the refinement below, because whether it is required depends
+     * on another field in the same object. `.optional()` alone would let a hotel be created without
+     * one; a bare `.min(1)` would demand one from a villa. Only a cross-field rule expresses
+     * «required for hotels, absent for everything else», and it lives in one place so the three
+     * forms that send this cannot disagree about it.
      *
-     * `z.coerce` because it arrives from a `<select>` as a string on every one of the three forms
-     * that send it. Without the coercion the schema refuses "4" and the partner reads a validation
-     * error about a field they filled in correctly.
+     * The column stays nullable regardless: 2,703 listings predate the field, and now every
+     * non-hotel listing is legitimately null forever.
+     *
+     * `z.coerce` because it arrives from a `<select>` as a string on every form that sends it.
+     * Without it the schema refuses "4" and the partner reads a validation error about a field
+     * they filled in correctly.
      */
     starRating: z.coerce
       .number({ message: ERROR.VALIDATION_STAR_RATING })
       .int(ERROR.VALIDATION_STAR_RATING)
       .min(1, ERROR.VALIDATION_STAR_RATING)
-      .max(5, ERROR.VALIDATION_STAR_RATING),
+      .max(5, ERROR.VALIDATION_STAR_RATING)
+      .optional(),
     latitude: latitudeSchema.optional(),
     longitude: longitudeSchema.optional(),
     /**
@@ -102,6 +137,43 @@ export const propertyCreateSchema = z
       .optional(),
   })
   .strict();
+
+export const propertyCreateSchema = propertyBaseSchema
+  /*
+    ── Star classification is a HOTEL classification (Bashar, 2026-09-04) ──────────────────────
+
+    «Other accommodation types such as apartments, villas, chalets, homes, camps and similar
+    property types should not use the hotel star-classification system. For non-hotel accommodation
+    types, the classification should simply be absent rather than forcing an artificial star
+    value.»
+
+    Both directions are refused, and the second matters as much as the first: a villa that ARRIVES
+    with `starRating: 5` is rejected rather than quietly stripped. Silently dropping a field a
+    caller sent is how a partner comes to believe they declared something they did not, and how a
+    future client ships a form that appears to work.
+
+    The error is attached to `starRating` in both cases, so a form highlights the field the person
+    can actually do something about rather than the type they chose on purpose.
+  */
+  .superRefine((value, context) => {
+    const hotel = usesStarRating(value.propertyTypeCode);
+
+    if (hotel && value.starRating === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['starRating'],
+        message: ERROR.VALIDATION_STAR_RATING_REQUIRED,
+      });
+    }
+
+    if (!hotel && value.starRating !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['starRating'],
+        message: ERROR.VALIDATION_STAR_RATING_NOT_A_HOTEL,
+      });
+    }
+  });
 
 /**
  * Staff setting or correcting a property's star classification (Bashar, 2026-09-04).
@@ -146,10 +218,32 @@ export type PropertyCreateInput = z.infer<typeof propertyCreateSchema>;
  * wiring it up on a route with no verification check, which is the hole this pairs with on
  * `create`. Units are added through `POST properties/:reference/units`, which is guarded.
  */
-export const propertyUpdateSchema = propertyCreateSchema
+export const propertyUpdateSchema = propertyBaseSchema
   .omit({ initialUnits: true })
   .partial()
-  .strict();
+  .strict()
+  /*
+    The half of the hotel rule a PATCH can decide on its own.
+
+    When a patch names both the type and the classification, the pair can be judged here. When it
+    names only one, the answer depends on the STORED type — which no schema can see — so
+    `PropertiesService.update` finishes the job. Both halves exist because a rule enforced only in
+    the service is a rule the contract does not state, and one enforced only here is one a partner
+    can walk around by sending a single field.
+  */
+  .superRefine((value, context) => {
+    if (
+      value.propertyTypeCode !== undefined &&
+      !usesStarRating(value.propertyTypeCode) &&
+      value.starRating !== undefined
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['starRating'],
+        message: ERROR.VALIDATION_STAR_RATING_NOT_A_HOTEL,
+      });
+    }
+  });
 export type PropertyUpdateInput = z.infer<typeof propertyUpdateSchema>;
 
 export const unitCreateSchema = z

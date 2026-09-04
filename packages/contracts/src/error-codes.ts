@@ -560,6 +560,9 @@ export const ERROR = {
   VALIDATION_TOO_LONG: 'validation.too_long',
   VALIDATION_ACCOUNT_NUMBER: 'validation.account_number',
   VALIDATION_STAR_RATING: 'validation.star_rating',
+  VALIDATION_STAR_RATING_REQUIRED: 'validation.star_rating_required',
+  /* A villa with four stars — refused rather than silently stripped. */
+  VALIDATION_STAR_RATING_NOT_A_HOTEL: 'validation.star_rating_not_a_hotel',
   VALIDATION_PAYOUT_METHOD: 'validation.payout_method',
   VALIDATION_SWIFT: 'validation.swift',
   /** A number outside the range the field allows — §8.1's coordinates, for one. */
