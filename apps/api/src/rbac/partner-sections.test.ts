@@ -10,6 +10,7 @@ import { PartnerCouponsController } from '../partner/coupons.controller.js';
 import { PartnerContractsController } from '../partner/partner-contracts.controller.js';
 import { PartnerEmployeeRolesController } from '../partner/partner-employee-roles.controller.js';
 import { PartnerEmployeesController } from '../partner/partner-employees.controller.js';
+import { PartnerPayoutAccountController } from '../payouts/payout-account.controller.js';
 import { PartnerPayoutController } from '../payouts/payout.controller.js';
 import { PartnerReviewController } from '../reviews/review.controller.js';
 
@@ -56,6 +57,7 @@ const SECTION_HANDLERS: Partial<
   calendars: [PartnerController, 'readPortfolioCalendar', 'getPortfolioCalendar'],
   reviews: [PartnerReviewController, 'list', 'getMyReviews'],
   payouts: [PartnerPayoutController, 'list', 'getMyPayouts'],
+  payoutAccounts: [PartnerPayoutAccountController, 'list', 'getMyPayoutAccounts'],
   contracts: [PartnerContractsController, 'list', 'getMyContracts'],
   coupons: [PartnerCouponsController, 'list', 'getMyCoupons'],
   employees: [PartnerEmployeesController, 'list', 'getMyEmployees'],
