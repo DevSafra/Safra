@@ -574,11 +574,36 @@ const partnerPropertySchema = z.object({
       minNights: z.number(),
       maxNights: z.number().nullable(),
       isActive: z.boolean(),
+      /* What this unit declares. `[]` is a real state — most units have declared nothing. */
+      amenityCodes: z.array(z.string()),
     }),
   ),
 });
 
 export type PartnerPropertyDetail = z.infer<typeof partnerPropertySchema>;
+
+/**
+ * The amenities this partner may declare — everything SAFRA still OFFERS.
+ *
+ * Deliberately not the public `/amenities` catalogue, which filters on `is_filterable` and answers
+ * a different question: whether an amenity is a box in the search sidebar. An amenity can be real
+ * and offerable without being worth filtering on, and using the sidebar's list here would stop
+ * partners declaring it.
+ */
+const offerableAmenitySchema = z.object({
+  code: z.string(),
+  nameAr: z.string(),
+  category: z.string(),
+});
+
+export type OfferableAmenity = z.infer<typeof offerableAmenitySchema>;
+
+export async function getOfferableAmenities() {
+  return partnerFetch(
+    '/partner/amenities',
+    z.object({ amenities: z.array(offerableAmenitySchema) }),
+  );
+}
 
 export async function getProperty(reference: string) {
   return partnerFetch(

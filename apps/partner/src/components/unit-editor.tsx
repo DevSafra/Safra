@@ -4,9 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
-import type { PartnerPropertyDetail } from '@/lib/api';
+import type { OfferableAmenity, PartnerPropertyDetail } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { AddUnit } from '@/components/add-unit';
+import { AmenityPicker } from '@/components/amenity-picker';
 import { t } from '@/lib/strings';
 
 type Unit = PartnerPropertyDetail['units'][number];
@@ -39,11 +40,14 @@ export function UnitEditor({
   reference,
   units,
   fallbackCurrency,
+  amenities,
 }: {
   readonly reference: string;
   readonly units: readonly Unit[];
   /** Used only when there are no units to take one from — the partner's own contract currency. */
   readonly fallbackCurrency: string;
+  /** Read once by the page: every unit row and the add form offer the same catalogue. */
+  readonly amenities: readonly OfferableAmenity[];
 }) {
   /*
     An empty listing is not a dead end any more (Bashar, 2026-09-04).
@@ -56,7 +60,12 @@ export function UnitEditor({
     return (
       <div className="grid gap-3">
         <p className="text-[12.5px] text-faint">{t.editProperty.unitsEmpty}</p>
-        <AddUnit reference={reference} currencyCode={fallbackCurrency} defaultOpen />
+        <AddUnit
+          reference={reference}
+          currencyCode={fallbackCurrency}
+          amenities={amenities}
+          defaultOpen
+        />
       </div>
     );
   }
@@ -68,13 +77,14 @@ export function UnitEditor({
       </p>
 
       {units.map((unit) => (
-        <UnitRow key={unit.id} reference={reference} unit={unit} />
+        <UnitRow key={unit.id} reference={reference} unit={unit} amenities={amenities} />
       ))}
 
       {/* The listing's own currency, so a second unit cannot price in a different one. */}
       <AddUnit
         reference={reference}
         currencyCode={units[0]?.currencyCode ?? fallbackCurrency}
+        amenities={amenities}
       />
     </div>
   );
@@ -83,9 +93,11 @@ export function UnitEditor({
 function UnitRow({
   reference,
   unit,
+  amenities,
 }: {
   readonly reference: string;
   readonly unit: Unit;
+  readonly amenities: readonly OfferableAmenity[];
 }) {
   const router = useRouter();
 
@@ -106,6 +118,13 @@ function UnitRow({
     maxNights: unit.maxNights === null ? '' : String(unit.maxNights),
     isActive: unit.isActive,
   });
+
+  /*
+    Its own state rather than a key on `form`, because it is an ARRAY and the patch below compares
+    scalars. Seeded from what the unit declares, which is why the projection had to start returning
+    it — an editor that opened empty would have silently cleared a unit's amenities on any save.
+  */
+  const [amenityCodes, setAmenityCodes] = useState<string[]>([...unit.amenityCodes]);
 
   const set = (key: keyof typeof form) => (value: string | boolean) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -134,6 +153,17 @@ function UnitRow({
     }
     if (form.nameAr.trim() !== unit.nameAr) {
       patch['name'] = { ar: form.nameAr.trim() };
+    }
+
+    /*
+      A SET comparison, order-insensitive. The API replaces the set wholesale, so sending it when
+      nothing changed would rewrite links the partner never touched and make the audit trail read
+      as though the amenities changed on every price edit.
+    */
+    const before = [...unit.amenityCodes].sort().join(',');
+
+    if ([...amenityCodes].sort().join(',') !== before) {
+      patch['amenityCodes'] = amenityCodes;
     }
 
     const numbers: [keyof typeof form, string, number][] = [
@@ -294,6 +324,16 @@ function UnitRow({
           min={1}
         />
       </div>
+
+      <AmenityPicker
+        amenities={amenities}
+        selected={amenityCodes}
+        onChange={(codes) => {
+          setAmenityCodes(codes);
+          setMessage(null);
+        }}
+        idPrefix={unit.id}
+      />
 
       <label className="flex items-center gap-2">
         <input

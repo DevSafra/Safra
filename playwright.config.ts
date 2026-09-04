@@ -71,7 +71,7 @@ export default defineConfig({
         file that does not exist yet.
       */
       testIgnore:
-        /(partner|partner-arrivals|partner-images|partner-screens|partner-sidebar|partner-calendars|partner-employees|partner-suspension|customer-review|customer-invoices|customer-gifts|partner-support|auth-throttle|three-apps-together|payout-accounts|star-rating|property-submission|partner-responsive|partner-settings)\.spec\.ts/,
+        /(partner|partner-arrivals|partner-images|partner-screens|partner-sidebar|partner-calendars|partner-employees|partner-suspension|customer-review|customer-invoices|customer-gifts|partner-support|auth-throttle|three-apps-together|payout-accounts|star-rating|property-submission|partner-responsive|partner-settings|amenities-end-to-end)\.spec\.ts/,
     },
     /**
      * Everything that SIGNS IN, run after everything else.
@@ -114,7 +114,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['signed-in-setup'],
       testMatch:
-        /(partner|partner-arrivals|partner-images|partner-screens|partner-sidebar|partner-calendars|partner-employees|partner-suspension|customer-review|customer-invoices|customer-gifts|partner-support|auth-throttle|three-apps-together|payout-accounts|star-rating|property-submission|partner-responsive|partner-settings)\.spec\.ts/,
+        /(partner|partner-arrivals|partner-images|partner-screens|partner-sidebar|partner-calendars|partner-employees|partner-suspension|customer-review|customer-invoices|customer-gifts|partner-support|auth-throttle|three-apps-together|payout-accounts|star-rating|property-submission|partner-responsive|partner-settings|amenities-end-to-end)\.spec\.ts/,
     },
   ],
 });

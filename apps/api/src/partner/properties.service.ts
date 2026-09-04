@@ -245,10 +245,28 @@ export class PropertiesService {
       min_nights: number;
       max_nights: number | null;
       is_active: boolean;
+      amenity_codes: string[];
     }>(sql`
       SELECT un.id, un.name_ar, un.unit_label, un.max_guests, un.bedrooms, un.beds,
              un.bathrooms, un.base_price::text, cur.code AS currency_code,
-             un.min_nights, un.max_nights, un.is_active
+             un.min_nights, un.max_nights, un.is_active,
+             /*
+               What this unit DECLARES (Bashar, 2026-09-05). The column existed, the API accepted
+               amenityCodes on create and update, and this projection never sent them back — so no
+               editor could pre-fill and unit_amenities stayed empty on every database.
+
+               A correlated subquery rather than a JOIN: un.id is already bare in this SELECT and a
+               second table would make it ambiguous. Retired amenities are EXCLUDED from the list a
+               partner edits, but a unit that already declares one keeps the link — see
+               resolveAmenityIds. (No backticks in here: one ends the sql template.)
+             */
+             COALESCE(
+               (SELECT array_agg(a.code ORDER BY a.sort_order)
+                  FROM unit_amenities ua
+                  JOIN amenities a ON a.id = ua.amenity_id AND a.deleted_at IS NULL
+                 WHERE ua.unit_id = un.id),
+               '{}'
+             ) AS amenity_codes
       FROM units un
       JOIN currencies cur ON cur.id = un.currency_id
       /*
@@ -299,8 +317,41 @@ export class PropertiesService {
         minNights: unit.min_nights,
         maxNights: unit.max_nights,
         isActive: unit.is_active,
+        amenityCodes: unit.amenity_codes ?? [],
       })),
     };
+  }
+
+  /**
+   * The amenities a partner may DECLARE — everything SAFRA still offers.
+   *
+   * Not the public `/amenities` endpoint, and the difference is the whole reason كتالوج المنصّة
+   * separated the two flags. That one filters on `is_filterable`, which decides whether an amenity
+   * is a box in the SEARCH SIDEBAR; this one filters on `is_active`, which decides whether a
+   * partner may claim it at all. An amenity can be perfectly real and not worth filtering on —
+   * «مصعد» — and offering the sidebar's list here would silently stop partners declaring it.
+   *
+   * Sorted by the order a super admin arranged, so the form reads the way the catalogue does.
+   */
+  async offerableAmenities(claims: AccessTokenClaims | undefined) {
+    requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
+
+    const rows = await this.db.execute<{
+      code: string;
+      name_ar: string;
+      category: string;
+    }>(sql`
+      SELECT a.code, a.name_ar, a.category
+      FROM amenities a
+      WHERE a.is_active AND a.deleted_at IS NULL
+      ORDER BY a.category, a.sort_order, a.code
+    `);
+
+    return rows.rows.map((row) => ({
+      code: row.code,
+      nameAr: row.name_ar,
+      category: row.category,
+    }));
   }
 
   async listOwn(claims: AccessTokenClaims | undefined) {
@@ -974,11 +1025,25 @@ export class PropertiesService {
     if (rows.length === 0) throw notFound(ERROR.UNIT_NOT_FOUND);
   }
 
+  /**
+   * Codes to ids, refusing anything SAFRA no longer offers.
+   *
+   * `is_active` and `deleted_at` are checked here because كتالوج المنصّة made both meaningful
+   * (2026-09-04): a super admin who retires «مسبح» expects it to leave the partner's form, and
+   * without this it would keep being accepted by anybody who kept the page open or posted the code
+   * directly. A retired amenity is not an error in the catalogue — it is one SAFRA stopped
+   * offering, and the refusal says so.
+   *
+   * **Existing links are untouched.** This governs what may be DECLARED, not what is already
+   * declared: a listing that named an amenity before it was retired keeps it, and the customer
+   * property page still shows it. Enforcing it on the write is what makes retiring safe.
+   */
   private async resolveAmenityIds(codes: string[]): Promise<string[]> {
     if (codes.length === 0) return [];
 
     const found = await this.db.query.amenities.findMany({
-      where: (a, { inArray }) => inArray(a.code, codes),
+      where: (a, { and: andOp, eq: eqOp, inArray, isNull: isNullOp }) =>
+        andOp(inArray(a.code, codes), eqOp(a.isActive, true), isNullOp(a.deletedAt)),
       columns: { id: true, code: true },
     });
 

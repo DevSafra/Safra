@@ -753,6 +753,157 @@ describeIfDb('PropertiesService.readOwn', () => {
     });
   });
 
+  /**
+   * Amenities: the chain that existed everywhere except the one place a partner could use it.
+   *
+   * `unit_amenities` was EMPTY on every database. The API accepted `amenityCodes` on unit create
+   * and on unit update and wrote the links correctly; the portal never sent the field, and the
+   * partner projection never returned it — so nothing could be declared and nothing could be
+   * pre-filled. The customer property page and the search filter were both ready and had nothing
+   * to show (Bashar, 2026-09-05).
+   */
+  describe('amenities on a unit', () => {
+    /** A code that is offered, read from the catalogue rather than assumed. */
+    const anOffered = async (): Promise<string> => {
+      const rows = await db.execute<{ code: string }>(sql`
+        SELECT code FROM amenities WHERE is_active AND deleted_at IS NULL ORDER BY sort_order LIMIT 1
+      `);
+
+      return rows.rows[0]?.code ?? 'wifi';
+    };
+
+    it('offers only what SAFRA still lists', async () => {
+      const offered = await service.offerableAmenities(partner());
+
+      expect(offered.length, 'the catalogue is not empty').toBeGreaterThan(0);
+      expect(offered.every((one) => one.code && one.nameAr)).toBe(true);
+    });
+
+    /**
+     * The two flags are different questions, and this is where confusing them would bite.
+     *
+     * An amenity that is offered but NOT filterable must still reach the partner's form. The public
+     * `/amenities` endpoint filters on `is_filterable` — using it here would silently stop partners
+     * declaring anything a super admin had taken out of the search sidebar.
+     */
+    it('offers an amenity that is not in the search filter', async () => {
+      const code = await anOffered();
+
+      await db.execute(
+        sql`UPDATE amenities SET is_filterable = false WHERE code = ${code}`,
+      );
+
+      expect(
+        (await service.offerableAmenities(partner())).map((one) => one.code),
+      ).toContain(code);
+    });
+
+    it('stores what a unit declares, and reads it back', async () => {
+      const code = await anOffered();
+
+      const created = await service.addUnit(partner(otherPartnerId), otherReference, {
+        name: { ar: 'وحدة بخدمات' },
+        maxGuests: 2,
+        bedrooms: 1,
+        beds: 1,
+        bathrooms: 1,
+        basePrice: 100,
+        currencyCode: 'USD',
+        minNights: 1,
+        amenityCodes: [code],
+      });
+
+      expect(created).toBeTruthy();
+
+      const property = await service.readOwn(partner(otherPartnerId), otherReference);
+      const unit = property.units.find((one) => one.nameAr === 'وحدة بخدمات');
+
+      expect(unit?.amenityCodes, 'the projection returns them').toContain(code);
+    });
+
+    /** An edit REPLACES the set — the API's own comment says so, and a diff would drift. */
+    it('replaces the set on an update rather than merging it', async () => {
+      const offered = await service.offerableAmenities(partner());
+
+      /* Two distinct codes, or the test proves nothing about replacement. */
+      const [first, second] = offered;
+
+      expect(second, 'the catalogue has at least two amenities').toBeTruthy();
+
+      const created = await service.addUnit(partner(otherPartnerId), otherReference, {
+        name: { ar: 'وحدة للاستبدال' },
+        maxGuests: 2,
+        bedrooms: 1,
+        beds: 1,
+        bathrooms: 1,
+        basePrice: 100,
+        currencyCode: 'USD',
+        minNights: 1,
+        amenityCodes: [first!.code],
+      });
+
+      await service.updateUnit(partner(otherPartnerId), created.unitId, {
+        amenityCodes: [second!.code],
+      });
+
+      const property = await service.readOwn(partner(otherPartnerId), otherReference);
+      const unit = property.units.find((one) => one.nameAr === 'وحدة للاستبدال');
+
+      expect(unit?.amenityCodes).toStrictEqual([second!.code]);
+    });
+
+    /**
+     * A RETIRED amenity cannot be declared — the rule كتالوج المنصّة's `is_active` exists for.
+     *
+     * Without it, retiring one from the console would leave it acceptable to anybody who kept the
+     * page open or posted the code directly, and a super admin's decision would apply to the form
+     * and to nothing else.
+     */
+    it('refuses an amenity SAFRA has retired', async () => {
+      const code = await anOffered();
+
+      await db.execute(sql`UPDATE amenities SET is_active = false WHERE code = ${code}`);
+
+      expect(
+        codeOf(
+          await service
+            .addUnit(partner(otherPartnerId), otherReference, {
+              name: { ar: 'وحدة مرفوضة' },
+              maxGuests: 2,
+              bedrooms: 1,
+              beds: 1,
+              bathrooms: 1,
+              basePrice: 100,
+              currencyCode: 'USD',
+              minNights: 1,
+              amenityCodes: [code],
+            })
+            .catch((error: unknown) => error),
+        ),
+      ).toBe(ERROR.PROPERTY_AMENITIES_UNKNOWN);
+    });
+
+    it('refuses a code that does not exist at all', async () => {
+      expect(
+        codeOf(
+          await service
+            .addUnit(partner(otherPartnerId), otherReference, {
+              name: { ar: 'وحدة' },
+              maxGuests: 2,
+              bedrooms: 1,
+              beds: 1,
+              bathrooms: 1,
+              basePrice: 100,
+              currencyCode: 'USD',
+              minNights: 1,
+              amenityCodes: ['no-such-amenity'],
+            })
+            .catch((error: unknown) => error),
+        ),
+      ).toBe(ERROR.PROPERTY_AMENITIES_UNKNOWN);
+    });
+  });
+
   describe('scoping', () => {
     /**
      * 404, not 403. A 403 confirms the reference EXISTS and belongs to somebody, which turns the

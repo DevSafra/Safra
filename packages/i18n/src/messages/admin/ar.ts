@@ -3851,6 +3851,8 @@ export const ar = {
       category: 'المجموعة',
       isFilterable: 'تظهر في التصفية',
       units: 'الوحدات',
+      /* Written by a unit update since a partner could declare amenities (2026-09-05). */
+      amenityCodes: 'الخدمات والمرافق',
       maxGuests: 'عدد الضيوف',
       /* The payout-account lifecycle — masked in the trail exactly as it is on screen. */
       partnerId: 'الشريك',

@@ -679,6 +679,22 @@ export const ar = {
       arrived without one said «لا وحدات بعد.» for ever — 991 of them, 468 already published. The
       empty sentence now says what to do rather than only what is missing.
     */
+    /*
+      الخدمات والمرافق on a unit (Bashar, 2026-09-05).
+
+      The API has accepted `amenityCodes` on unit create and update since the schema was written and
+      the portal never sent them, so `unit_amenities` was empty everywhere: the customer property
+      page had a section with nothing in it and the search filter had nothing to filter by.
+    */
+    amenities: 'الخدمات والمرافق',
+    amenitiesHint:
+      'اختر ما توفّره هذه الوحدة فعلاً. يظهر للضيوف على صفحة العقار، ويُستخدم في تصفية البحث.',
+    amenitiesNone: 'لا خدمات متاحة للاختيار حالياً.',
+    /* What the unit row shows when nothing is ticked — an absence, said rather than left blank. */
+    amenitiesEmpty: 'لا خدمات محدَّدة.',
+    amenityGroupFacilities: 'مرافق',
+    amenityGroupRules: 'قواعد',
+    amenityGroupAccessibility: 'إتاحة',
     unitAdd: 'إضافة وحدة',
     unitAddTitle: 'وحدة جديدة',
     unitAddHint:

@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import { AmenityPicker } from '@/components/amenity-picker';
+import type { OfferableAmenity } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { t } from '@/lib/strings';
 
@@ -37,11 +39,14 @@ import { t } from '@/lib/strings';
 export function AddUnit({
   reference,
   currencyCode,
+  amenities,
   defaultOpen = false,
 }: {
   readonly reference: string;
   /** The currency the listing's other units price in, or the partner's own where there are none. */
   readonly currencyCode: string;
+  /** What SAFRA still offers — read once by the page and passed down, not fetched per form. */
+  readonly amenities: readonly OfferableAmenity[];
   readonly defaultOpen?: boolean;
 }) {
   const router = useRouter();
@@ -52,6 +57,7 @@ export function AddUnit({
     null,
   );
   const [form, setForm] = useState({ name: '', maxGuests: '2', basePrice: '' });
+  const [amenityCodes, setAmenityCodes] = useState<string[]>([]);
 
   const set = (key: keyof typeof form) => (value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -80,6 +86,7 @@ export function AddUnit({
             maxGuests: Number(form.maxGuests),
             basePrice: Number(form.basePrice),
             currencyCode,
+            amenityCodes,
           }),
         },
       );
@@ -97,6 +104,7 @@ export function AddUnit({
 
       setMessage({ kind: 'ok', text: t.editProperty.unitAdded });
       setForm({ name: '', maxGuests: '2', basePrice: '' });
+      setAmenityCodes([]);
       setBusy(false);
       /* The new unit arrives as a row of its own, which is the confirmation that it landed. */
       router.refresh();
@@ -203,6 +211,13 @@ export function AddUnit({
           />
         </label>
       </div>
+
+      <AmenityPicker
+        amenities={amenities}
+        selected={amenityCodes}
+        onChange={setAmenityCodes}
+        idPrefix={`new-${reference}`}
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <button

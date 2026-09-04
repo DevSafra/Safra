@@ -95,6 +95,18 @@ export class PartnerController {
     return this.dashboardService.overview(user);
   }
 
+  /**
+   * The amenities this partner may declare on a unit.
+   *
+   * `PROPERTY_MANAGE_OWN` because that is the authority it serves — the picker on تعديل — and an
+   * employee with it may edit a unit, so they may read the list that populates the control.
+   */
+  @Get('amenities')
+  @RequirePermissions(P.PROPERTY_MANAGE_OWN)
+  async amenities(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return { amenities: await this.properties.offerableAmenities(user) };
+  }
+
   @Get('properties')
   @RequirePermissions(P.PROPERTY_MANAGE_OWN)
   async listProperties(@CurrentUser() user: AccessTokenClaims | undefined) {

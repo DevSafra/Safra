@@ -3,7 +3,12 @@ import { notFound } from 'next/navigation';
 
 import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
-import { getProperty, getPropertyFormReference, sidebarBadges } from '@/lib/api';
+import {
+  getOfferableAmenities,
+  getProperty,
+  getPropertyFormReference,
+  sidebarBadges,
+} from '@/lib/api';
 import { PropertyEditor } from '@/components/property-editor';
 import { SubmitForReview } from '@/components/submit-for-review';
 import { UnitEditor } from '@/components/unit-editor';
@@ -30,10 +35,16 @@ export default async function EditPropertyPage({
 }) {
   const { reference } = await params;
 
-  const [profile, property, formReference] = await Promise.all([
+  /*
+    The amenity catalogue is read ONCE here and passed down. Every unit row and the add form offer
+    the same list, so a fetch per component would be one request per unit for an answer that cannot
+    differ between them.
+  */
+  const [profile, property, formReference, amenities] = await Promise.all([
     requireVerifiedPartner(),
     getProperty(reference),
     getPropertyFormReference(),
+    getOfferableAmenities(),
   ]);
 
   const name =
@@ -89,6 +100,16 @@ export default async function EditPropertyPage({
             reference={property.reference}
             units={property.units}
             fallbackCurrency={DEFAULT_MONEY_CURRENCY}
+            /*
+              An unreachable catalogue degrades to an empty picker with its own sentence, rather
+              than taking the whole editor down: a partner correcting a price must not be blocked
+              because a reference read blipped.
+            */
+            amenities={
+              amenities === 'failed' || amenities === 'unauthenticated'
+                ? []
+                : amenities.amenities
+            }
           />
         </section>
 
