@@ -331,7 +331,16 @@ export class PayoutAccountService {
     const rows = await this.db.execute<AccountRow>(sql`
       ${SELECT_ACCOUNT}
       WHERE a.partner_id = ${partnerId} AND a.deleted_at IS NULL
-      ORDER BY a.is_primary DESC, a.created_at ASC
+      /*
+        Newest first after the primary, so a just-added account is never the one that falls off.
+
+        It was created_at ASC, and a browser run found the failure it invites: with the cap
+        reached, a partner who added an account got a 201 and a list that did not contain it —
+        no error, no explanation, the newest row sorted last and outside the LIMIT. A partner has
+        one or two accounts in practice, so the cap is generous; what it must never do is hide the
+        row somebody has just created.
+      */
+      ORDER BY a.is_primary DESC, a.created_at DESC
       LIMIT 20
     `);
 
