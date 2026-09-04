@@ -486,6 +486,87 @@ describeIfDb('PropertiesService.readOwn', () => {
       },
     );
 
+    /*
+      ── Changing the property type (Bashar, 2026-09-04) ──────────────────────────────────────
+
+      «If the API accepts a property type change request, then the change must either be fully
+      supported or explicitly refused. I do not want requests that appear to succeed while silently
+      ignoring the requested change.»
+
+      It is SUPPORTED, and these prove the two dependent rules move with it. The first is the whole
+      bug: the patch used to return 200 and change nothing.
+    */
+    it('actually changes the property type, rather than accepting and ignoring it', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draftInput(),
+        propertyTypeCode: 'villa',
+      });
+
+      await service.update(partner(), reference, {
+        propertyTypeCode: 'apartment',
+      });
+
+      expect((await service.readOwn(partner(), reference)).propertyTypeCode).toBe(
+        'apartment',
+      );
+    });
+
+    it('clears the classification when a hotel becomes a villa', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draftInput(),
+        propertyTypeCode: 'hotel',
+        starRating: 5,
+      });
+
+      await service.update(partner(), reference, { propertyTypeCode: 'villa' });
+
+      const after = await service.readOwn(partner(), reference);
+
+      expect(after.propertyTypeCode).toBe('villa');
+      expect(after.starRating, 'a villa cannot carry a classification').toBeNull();
+    });
+
+    it('accepts a villa becoming a hotel when the same patch classifies it', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draftInput(),
+        propertyTypeCode: 'villa',
+      });
+
+      await service.update(partner(), reference, {
+        propertyTypeCode: 'hotel',
+        starRating: 4,
+      });
+
+      const after = await service.readOwn(partner(), reference);
+
+      expect(after.propertyTypeCode).toBe('hotel');
+      expect(after.starRating).toBe(4);
+    });
+
+    it('refuses a villa becoming a hotel with no classification', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draftInput(),
+        propertyTypeCode: 'villa',
+      });
+
+      await expect(
+        service.update(partner(), reference, { propertyTypeCode: 'hotel' }),
+      ).rejects.toMatchObject({
+        response: { code: 'validation.star_rating_required' },
+      });
+    });
+
+    it('refuses a type that does not exist, rather than ignoring it', async () => {
+      const { reference } = await service.create(partner(), {
+        ...draftInput(),
+        propertyTypeCode: 'villa',
+      });
+
+      await expect(
+        service.update(partner(), reference, { propertyTypeCode: 'submarine' }),
+      ).rejects.toMatchObject({ response: { code: 'property.type_unknown' } });
+    });
+
     it('refuses to classify a villa on update', async () => {
       const { reference } = await service.create(partner(), {
         ...draftInput(),

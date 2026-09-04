@@ -598,6 +598,13 @@ export class PropertiesService {
     }
     if (input.address !== undefined) patch['address'] = input.address;
     /*
+      The type this patch RESULTS IN — the requested one if it names a change, otherwise the stored
+      one. The star rule below is about the listing as it will be, not as it was: a patch that turns
+      a villa into a hotel AND gives it four stars is one coherent request, and judging the stars
+      against the old type would refuse it.
+    */
+    const nextTypeCode = input.propertyTypeCode ?? property.propertyType.code;
+    /*
       An empty string CLEARS it, which is how a partner removes a room number typed by mistake —
       `|| null` rather than `?? null`, so `''` becomes null instead of a room called nothing.
     */
@@ -617,7 +624,7 @@ export class PropertiesService {
       and is simply not patched.
     */
     if (input.starRating !== undefined) {
-      if (!usesStarRating(property.propertyType.code)) {
+      if (!usesStarRating(nextTypeCode)) {
         throw badRequest(ERROR.VALIDATION_STAR_RATING_NOT_A_HOTEL);
       }
 
@@ -626,6 +633,47 @@ export class PropertiesService {
     if (input.attributes !== undefined) patch['attributes'] = input.attributes;
     if (input.latitude !== undefined) patch['latitude'] = input.latitude;
     if (input.longitude !== undefined) patch['longitude'] = input.longitude;
+
+    /*
+      ── The property TYPE, honoured rather than ignored (Bashar, 2026-09-04) ────────────────────
+
+      `propertyUpdateSchema` has always accepted `propertyTypeCode` and this method never read it,
+      so a partner who changed «فندق» to «فيلا» got a 200 and no change — «requests that appear to
+      succeed while silently ignoring the requested change», which is the shape `initialUnits` is
+      omitted from the schema to avoid and which this had anyway.
+
+      SUPPORTED rather than refused, because the platform's own rules already answer it: `citySlug`
+      and `cancellationPolicyCode` are honoured here, and the CITY is part of what §8.1 verifies —
+      so the type is not the more sensitive field. And it is only reachable at all in `draft`,
+      `pending_review` and `rejected`, where nothing has been verified yet; a published listing's
+      whole form is frozen, type included.
+
+      Two dependent rules move with it:
+
+       - Moving OFF a star-rated type CLEARS the classification. A villa carrying «4 نجوم» is the
+         exact state the hotel-only rule forbids, and leaving it would reach that state by the back
+         door.
+       - Moving ON to one REQUIRES a classification — supplied in this patch, or already on the row.
+         A hotel with none is a listing the create schema would refuse, and an update must not be a
+         way to reach a state creation cannot.
+    */
+    if (input.propertyTypeCode && input.propertyTypeCode !== property.propertyType.code) {
+      const type = await this.db.query.propertyTypes.findFirst({
+        where: eq(schema.propertyTypes.code, input.propertyTypeCode),
+        columns: { id: true },
+      });
+
+      if (!type) throw badRequest(ERROR.PROPERTY_TYPE_UNKNOWN);
+
+      patch['propertyTypeId'] = type.id;
+
+      if (!usesStarRating(input.propertyTypeCode)) {
+        /* Explicit null, not an omission: a value being REMOVED, and audited as one. */
+        patch['starRating'] = null;
+      } else if (input.starRating === undefined && property.starRating === null) {
+        throw badRequest(ERROR.VALIDATION_STAR_RATING_REQUIRED);
+      }
+    }
 
     if (input.citySlug) {
       const city = await this.db.query.cities.findFirst({
@@ -893,7 +941,7 @@ export class PropertiesService {
         eq(schema.properties.partnerId, partnerId),
         isNull(schema.properties.deletedAt),
       ),
-      columns: { id: true, status: true, slug: true },
+      columns: { id: true, status: true, slug: true, starRating: true },
       /*
         The TYPE, because the star classification is a hotel classification and `update` has to
         know what kind of place this is. Only the code — one text column through an existing
