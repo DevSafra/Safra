@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 
+import { dialOptions } from '@/lib/dial-options';
 import { PartnerApplicationForm } from '@/components/partner-application-form';
 import { isLocale } from '@/i18n/routing';
 import { requireSignedIn } from '@/lib/account-page';
@@ -150,6 +151,7 @@ export default async function JoinAsPartnerPage({
         <p className="mb-4 text-[12.5px] text-faint">{t('signedInNote')}</p>
 
         <PartnerApplicationForm
+          countries={dialOptions(locale)}
           locale={locale}
           email={session.user.email}
           cities={cities.map((city) => ({

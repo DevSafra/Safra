@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
+import { dialOptions } from '@/lib/dial-options';
 import { AuthForm } from '@/components/auth-form';
 import { isLocale } from '@/i18n/routing';
 import { getSession } from '@/lib/session-server';
@@ -59,7 +60,12 @@ export default async function LoginPage({
       ) : null}
 
       <div className="mt-8 rounded-card border border-line bg-card p-6">
-        <AuthForm locale={locale} mode="login" redirectTo={next} />
+        <AuthForm
+          countries={dialOptions(locale)}
+          locale={locale}
+          mode="login"
+          redirectTo={next}
+        />
       </div>
 
       <p className="mt-4 text-center text-sm">

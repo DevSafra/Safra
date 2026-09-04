@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import type { Locale } from '@/i18n/routing';
 import { PhoneField } from '@/components/phone-field';
+import type { DialOption } from '@/lib/dial-options';
 import { PasswordField, passwordMismatch, passwordsMatch } from '@safra/ui';
 
 import { reloadInto } from '@safra/ui';
@@ -38,10 +39,18 @@ interface Labels {
 }
 
 export function ProfileForm({
+  countries,
   locale,
   initial,
   labels,
 }: {
+  /**
+   * The phone field's country list, built on the server — see `dialOptions`.
+   *
+   * Threaded rather than computed inside `PhoneField`: sorting 245 names with `Intl` runs on both
+   * sides of hydration, and the server's ICU and the browser's do not agree.
+   */
+  readonly countries: readonly DialOption[];
   readonly locale: Locale;
   readonly initial: { readonly fullName: string; readonly phone: string };
   readonly labels: Labels;
@@ -141,7 +150,7 @@ export function ProfileForm({
         It keeps its value in state rather than in `FormData`, hence `onChange`.
       */}
       <PhoneField
-        locale={locale}
+        countries={countries}
         label={labels.phone}
         hint={labels.phoneHint}
         defaultValue={phone}

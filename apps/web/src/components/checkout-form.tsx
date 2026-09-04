@@ -13,6 +13,7 @@ import { formatMoney } from '@/lib/localise';
 import { errorMessage } from '@safra/i18n';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { PhoneField } from '@/components/phone-field';
+import type { DialOption } from '@/lib/dial-options';
 
 interface FieldErrors {
   [field: string]: string | undefined;
@@ -28,6 +29,7 @@ interface FieldErrors {
  * §4 allows booking with no account, so nothing here asks the customer to register.
  */
 export function CheckoutForm({
+  countries,
   locale,
   unitId,
   checkIn,
@@ -40,6 +42,13 @@ export function CheckoutForm({
   wallet,
   signedIn,
 }: {
+  /**
+   * The phone field's country list, built on the server — see `dialOptions`.
+   *
+   * Threaded rather than computed inside `PhoneField`: sorting 245 names with `Intl` runs on both
+   * sides of hydration, and the server's ICU and the browser's do not agree.
+   */
+  readonly countries: readonly DialOption[];
   locale: Locale;
   unitId: string;
   checkIn: string;
@@ -202,7 +211,7 @@ export function CheckoutForm({
           required
         />
         <PhoneField
-          locale={locale}
+          countries={countries}
           label={t('phone')}
           hint={t('phoneHint')}
           error={fieldErrors['guest.phone']}

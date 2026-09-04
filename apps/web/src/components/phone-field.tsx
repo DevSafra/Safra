@@ -6,8 +6,8 @@ import { parsePhoneNumberFromString } from 'libphonenumber-js/max';
 
 import { useTranslations } from 'next-intl';
 
-import type { Locale } from '@/i18n/routing';
 import { DIAL_COUNTRIES, dialCountry, flagOf, toE164 } from '@/lib/dial-codes';
+import type { DialOption } from '@/lib/dial-options';
 
 /**
  * The registration phone field: a country picker, then the national number (Bashar, 2026-08-18).
@@ -32,21 +32,21 @@ import { DIAL_COUNTRIES, dialCountry, flagOf, toE164 } from '@/lib/dial-codes';
  * option text is `flag · +dial · name` and the control is narrow, so the collapsed state shows the
  * flag and the code and truncates the name — the design's shape, with the platform's behaviour.
  *
- * ## Country names come from `Intl.DisplayNames`
+ * ## The country list arrives as data
  *
- * 245 names × 3 locales is not copy anybody would translate by hand, and the platform already has
- * them right. This is the same documented exception `docs/i18n.md` makes for weekday and month
- * names, for the same reason.
+ * Named and ordered by `dialOptions` on the server. It used to be built here, in render, with
+ * `Intl.DisplayNames` and `Intl.Collator` — which ran on the server and again in the browser, on
+ * two ICU builds that do not agree, and every form carrying a phone number reported a hydration
+ * mismatch because of it. See that file for the measurement.
  */
 export function PhoneField({
-  locale,
   label,
   hint,
   error,
   defaultValue,
   onChange,
+  countries,
 }: {
-  readonly locale: Locale;
   readonly label: string;
   readonly hint: string;
   readonly error?: string | undefined;
@@ -61,6 +61,14 @@ export function PhoneField({
   readonly defaultValue?: string | undefined;
   /** For a form that keeps its value in React state rather than reading `FormData`. */
   readonly onChange?: ((e164: string) => void) | undefined;
+  /**
+   * The countries, already named and ordered — see `dialOptions`.
+   *
+   * A prop rather than a computation here, and the reason is not tidiness: sorting them during
+   * render ran the sort on the server AND in the browser, on two different ICU builds, which
+   * disagree. Every form with a phone number reported a hydration mismatch until this moved out.
+   */
+  readonly countries: readonly DialOption[];
 }) {
   const t = useTranslations('auth');
 
@@ -79,33 +87,6 @@ export function PhoneField({
   const [national, setNational] = useState(initial.national);
 
   const country = dialCountry(code) ?? DIAL_COUNTRIES[0]!;
-
-  /*
-    Names resolved once per locale, and SORTED by the reader's own collation — an Arabic reader
-    scrolling a list ordered by English names has no way to find their country.
-
-    The launch markets are lifted to the top because they are where most customers are, and a
-    separator row would need `<optgroup>` copy in three locales to say so; being first says it.
-  */
-  const countries = useMemo(() => {
-    const names = new Intl.DisplayNames([locale], { type: 'region' });
-    const collator = new Intl.Collator(locale);
-    const PINNED = ['SY', 'JO', 'LB'];
-
-    return [...DIAL_COUNTRIES]
-      .map((entry) => ({ ...entry, name: names.of(entry.code) ?? entry.code }))
-      .sort((a, b) => {
-        const pinned = PINNED.indexOf(a.code) - PINNED.indexOf(b.code);
-        if (PINNED.includes(a.code) || PINNED.includes(b.code)) {
-          return PINNED.includes(a.code) && PINNED.includes(b.code)
-            ? pinned
-            : PINNED.includes(a.code)
-              ? -1
-              : 1;
-        }
-        return collator.compare(a.name, b.name);
-      });
-  }, [locale]);
 
   const typed = national.replace(/\D/g, '').replace(/^0+/, '');
 

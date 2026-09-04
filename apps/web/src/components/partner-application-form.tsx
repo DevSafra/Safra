@@ -9,6 +9,7 @@ import { isErrorCode, partnerApplicationSchema } from '@safra/contracts';
 
 import type { Locale } from '@/i18n/routing';
 import { PhoneField } from '@/components/phone-field';
+import type { DialOption } from '@/lib/dial-options';
 
 /** What the page hands down: real rows, so the form cannot offer a city that does not exist. */
 export interface JoinOption {
@@ -43,11 +44,19 @@ export interface JoinOption {
  * own because the bidi algorithm handles a run inside an RTL field.
  */
 export function PartnerApplicationForm({
+  countries,
   locale,
   email,
   cities,
   partnerTypes,
 }: {
+  /**
+   * The phone field's country list, built on the server — see `dialOptions`.
+   *
+   * Threaded rather than computed inside `PhoneField`: sorting 245 names with `Intl` runs on both
+   * sides of hydration, and the server's ICU and the browser's do not agree.
+   */
+  readonly countries: readonly DialOption[];
   readonly locale: Locale;
   /**
    * The signed-in account's address, shown so the applicant knows where we will write.
@@ -214,7 +223,7 @@ export function PartnerApplicationForm({
         </div>
 
         <PhoneField
-          locale={locale}
+          countries={countries}
           label={t('phone')}
           hint={t('phoneHint')}
           onChange={setPhone}

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 
+import { dialOptions } from '@/lib/dial-options';
 import { AccountShell } from '@/components/account-shell';
 import { PasswordForm, ProfileForm } from '@/components/profile-forms';
 import { getAccountSummary } from '@/lib/account';
@@ -71,6 +72,7 @@ export default async function AccountProfilePage({
         */}
         {summary ? (
           <ProfileForm
+            countries={dialOptions(locale)}
             locale={locale}
             initial={{ fullName: summary.fullName, phone: summary.phone }}
             labels={{

@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 
 import type { Locale } from '@/i18n/routing';
 import { PhoneField } from '@/components/phone-field';
+import type { DialOption } from '@/lib/dial-options';
 import { reloadInto } from '@safra/ui';
 import { errorMessage } from '@safra/i18n';
 import { isErrorCode, phoneSchema } from '@safra/contracts';
@@ -29,10 +30,18 @@ interface FieldErrors {
  * HttpOnly cookie server-side, so no access token ever exists in client JavaScript.
  */
 export function AuthForm({
+  countries,
   locale,
   mode,
   redirectTo,
 }: {
+  /**
+   * The phone field's country list, built on the server — see `dialOptions`.
+   *
+   * Threaded rather than computed inside `PhoneField`: sorting 245 names with `Intl` runs on both
+   * sides of hydration, and the server's ICU and the browser's do not agree.
+   */
+  readonly countries: readonly DialOption[];
   locale: Locale;
   mode: 'login' | 'register';
   /**
@@ -274,7 +283,7 @@ export function AuthForm({
 
       {mode === 'register' ? (
         <PhoneField
-          locale={locale}
+          countries={countries}
           label={t('phone')}
           hint={t('phoneHint')}
           error={fieldErrors['phone']}

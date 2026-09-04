@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
+import { dialOptions } from '@/lib/dial-options';
 import { CheckoutForm } from '@/components/checkout-form';
 import { CouponProvider } from '@/components/coupon-context';
 import { CouponField } from '@/components/coupon-field';
@@ -162,6 +163,7 @@ export default async function CheckoutPage({
       <CouponProvider>
         <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_22rem]">
           <CheckoutForm
+            countries={dialOptions(locale)}
             locale={locale}
             unitId={unitId}
             checkIn={checkIn}
