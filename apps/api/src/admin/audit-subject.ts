@@ -95,6 +95,29 @@ const SOURCES: Record<string, Source> = {
     label: sql`display_name`,
     href: (row) => `/partners/${row.reference}`,
   },
+  /*
+    A payout account resolves to its PARTNER, and shows the masked tail rather than a name of its
+    own — an account has no name, and printing the holder here would put banking details on the
+    audit registry where they are not needed. The link goes to the partner screen, which is where
+    the account and its verification state live.
+  */
+  partner_payout_account: {
+    /*
+      SUBQUERIES rather than a JOIN, like `city_images` and `property_images` above it.
+
+      The shared resolver selects a bare `id` and filters on a bare `id`, so any join makes both
+      ambiguous and the whole registry fails to name anything. The pattern here keeps one table in
+      the FROM and reaches sideways for what it needs.
+    */
+    table: 'partner_payout_accounts',
+    reference: sql`(
+      SELECT p.reference FROM partners p WHERE p.id = partner_payout_accounts.partner_id
+    )`,
+    label: sql`(
+      SELECT p.display_name FROM partners p WHERE p.id = partner_payout_accounts.partner_id
+    ) || ' · ••••' || partner_payout_accounts.account_number_last4`,
+    href: (row) => `/partners/${row.reference}`,
+  },
   partner_application: {
     table: 'partner_applications',
     reference: sql`reference`,
