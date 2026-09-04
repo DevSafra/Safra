@@ -1,8 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
+
 import { getProperty, getPropertyFormReference, sidebarBadges } from '@/lib/api';
 import { PropertyEditor } from '@/components/property-editor';
+import { SubmitForReview } from '@/components/submit-for-review';
 import { UnitEditor } from '@/components/unit-editor';
 import { requireVerifiedPartner } from '@/lib/gate';
 import { Shell } from '@/components/shell';
@@ -82,8 +85,23 @@ export default async function EditPropertyPage({
 
         <section className="grid gap-2">
           <h3 className="text-[13px] font-bold text-text">{t.editProperty.units}</h3>
-          <UnitEditor reference={property.reference} units={property.units} />
+          <UnitEditor
+            reference={property.reference}
+            units={property.units}
+            fallbackCurrency={DEFAULT_MONEY_CURRENCY}
+          />
         </section>
+
+        {/*
+          The step that was missing entirely — see `submit-for-review.tsx`. It sits BELOW الوحدات
+          deliberately: submitting is refused without a unit, so the reader meets the requirement
+          before they meet the button that depends on it.
+        */}
+        <SubmitForReview
+          reference={property.reference}
+          status={property.status}
+          unitCount={property.units.length}
+        />
       </div>
     </Shell>
   );

@@ -3712,6 +3712,14 @@ export const ar = {
      */
     payloadKey: {
       reason: 'السبب',
+      /*
+        Written by `unit.created` since a partner could add a unit to an existing listing
+        (2026-09-04). `propertyReference` rather than an id, because the audit screen's reader
+        follows it to a listing; `maxGuests` because capacity is the half of a new unit that is
+        not a price.
+      */
+      propertyReference: 'مرجع العقار',
+      maxGuests: 'عدد الضيوف',
       /* The payout-account lifecycle — masked in the trail exactly as it is on screen. */
       partnerId: 'الشريك',
       /* The star classification, in a before/after payload on the audit screen. */
@@ -4047,6 +4055,13 @@ export const ar = {
      * unchanged, exactly like a typed cancellation reason.
      */
     payloadValue: {
+      /*
+        The status a listing reaches when its partner sends it for review (2026-09-04). «قيد
+        المراجعة» deliberately, matching `enums.propertyStatus` — the audit trail and the registry
+        must call one state by one name, or a reader comparing the two screens sees two events.
+      */
+      pending_review: 'قيد المراجعة',
+
       /* The payout rails, as `PAYOUT_METHODS` spells them. */
       bank_transfer: 'حوالة مصرفية',
       sham_cash: 'شام كاش',

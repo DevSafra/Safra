@@ -669,7 +669,24 @@ export const ar = {
     failed: 'تعذّر حفظ التعديلات. راجع الحقول وحاول مرة أخرى.',
     unreachable: 'تعذّر الوصول إلى الخادم.',
     units: 'الوحدات',
-    unitsEmpty: 'لا وحدات بعد.',
+    unitsEmpty: 'لا وحدات بعد. أضف وحدة حتى يصبح العقار قابلاً للحجز.',
+
+    /*
+      Adding a unit to an EXISTING listing (Bashar, 2026-09-04).
+
+      Until now a unit could only be created inline while creating the property, so a listing that
+      arrived without one said «لا وحدات بعد.» for ever — 991 of them, 468 already published. The
+      empty sentence now says what to do rather than only what is missing.
+    */
+    unitAdd: 'إضافة وحدة',
+    unitAddTitle: 'وحدة جديدة',
+    unitAddHint:
+      'الوحدة هي ما يُحجز فعلاً: غرفة أو شقة أو منزل بسعره وسعته. العقار بلا وحدة لا يظهر في البحث ولا يمكن حجزه.',
+    unitAddSubmit: 'أضف الوحدة',
+    unitAddSaving: 'جارٍ الإضافة…',
+    unitAdded: 'أُضيفت الوحدة.',
+    unitAddFailed: 'تعذّرت إضافة الوحدة. راجع الحقول وحاول مرة أخرى.',
+    unitCurrency: 'العملة',
     unitGuests: '{n} ضيف',
     unitInactive: 'موقوفة',
     openUnitCalendar: 'تقويم هذه الوحدة',
@@ -686,6 +703,27 @@ export const ar = {
     unitActive: 'معروضة للحجز',
     unitInactiveNote:
       'الوحدة الموقوفة تختفي من البحث ولا تُحجز، وتبقى حجوزاتها القائمة كما هي. لإغلاق تواريخ محددة استخدم التقويم بدل إيقاف الوحدة.',
+    /*
+      Sending a draft for SAFRA's review (Bashar, 2026-09-04).
+
+      The API step existed with its permission, its guards, its audit row and its timeline event,
+      and nothing called it: 627 drafts, 61 rejected and NOT ONE listing in «قيد المراجعة». These
+      are the words for the control that was missing.
+    */
+    submitTitle: 'إرسال للمراجعة',
+    submitHint:
+      'يراجع فريق سفرة العقار ومطابقة عنوانه وصوره ووثائقه، ثم ينشره أو يعيده إليك مع السبب. لا يمكن تعديل العنوان بعد النشر.',
+    submitAction: 'أرسل للمراجعة',
+    submitSending: 'جارٍ الإرسال…',
+    submitDone: 'أُرسل العقار للمراجعة.',
+    submitFailed: 'تعذّر الإرسال للمراجعة.',
+    submitConfirmTitle: 'إرسال العقار للمراجعة؟',
+    submitConfirmBody:
+      'سيصبح العقار «قيد المراجعة» ولن تستطيع تعديل عنوانه حتى ينتهي الفحص. يمكنك تعديل الأسعار والوحدات في أي وقت.',
+    /* Why the control is absent, said rather than left to be inferred from a missing button. */
+    submitPending: 'العقار قيد المراجعة لدى فريق سفرة.',
+    submitPublished: 'العقار منشور.',
+    submitNeedsUnit: 'أضف وحدة واحدة على الأقل قبل الإرسال للمراجعة.',
     unitSave: 'حفظ الوحدة',
     unitSaving: 'جارٍ الحفظ…',
     unitSaved: 'حُفظت الوحدة.',

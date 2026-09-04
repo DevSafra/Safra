@@ -6,6 +6,7 @@ import { ERROR, PERMISSIONS as P, propertyCreateSchema } from '@safra/contracts'
 
 import { AuditService } from '../common/audit/audit.service.js';
 import { PropertiesService } from './properties.service.js';
+import { codeOf } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
 /**
@@ -776,6 +777,88 @@ describeIfDb('PropertiesService.readOwn', () => {
       await expect(
         service.readOwn({ ...partner(), partnerId: undefined }, draft),
       ).rejects.toThrow();
+    });
+
+    /**
+     * The two WRITES the portal gained on 2026-09-04, scoped the same way as the read.
+     *
+     * They matter more than the read does: submitting another partner's listing would put it in
+     * front of SAFRA's reviewers as though its owner had asked, and adding a unit to one would put
+     * a price on somebody else's inventory. Both go through `findOwned`, whose partner id is a
+     * `WHERE` clause rather than a check afterwards — so the refusal is a 404, identical to a
+     * reference that does not exist, and the endpoint cannot be used to enumerate listings.
+     *
+     * Each has its opposite control below. Without those, a fixture that could not reach the code
+     * at all would produce exactly these two passes.
+     */
+    it("refuses to submit another partner's listing", async () => {
+      /*
+        The CODE, not the message. `message` carries English prose for logs and must never be what
+        an assertion or a client reads — the rule `no-raw-error-messages.test.ts` holds everywhere
+        else, and a test that matched on it would freeze the wording.
+      */
+      expect(
+        codeOf(
+          await service
+            .submitForReview(partner(), otherReference)
+            .catch((error: unknown) => error),
+        ),
+      ).toBe(ERROR.PROPERTY_NOT_FOUND);
+    });
+
+    it("refuses to add a unit to another partner's listing", async () => {
+      expect(
+        codeOf(
+          await service
+            .addUnit(partner(), otherReference, {
+              name: { ar: 'وحدة' },
+              maxGuests: 2,
+              bedrooms: 1,
+              beds: 1,
+              bathrooms: 1,
+              basePrice: 100,
+              currencyCode: 'USD',
+              minNights: 1,
+              amenityCodes: [],
+            })
+            .catch((error: unknown) => error),
+        ),
+      ).toBe(ERROR.PROPERTY_NOT_FOUND);
+    });
+
+    /* The controls: the same calls, by the partner who owns the listing, must reach the rule. */
+    it('lets the owner add a unit to their own listing', async () => {
+      const created = await service.addUnit(partner(otherPartnerId), otherReference, {
+        name: { ar: 'وحدة المالك' },
+        maxGuests: 2,
+        bedrooms: 1,
+        beds: 1,
+        bathrooms: 1,
+        basePrice: 100,
+        currencyCode: 'USD',
+        minNights: 1,
+        amenityCodes: [],
+      });
+
+      expect(created).toBeTruthy();
+    });
+
+    /**
+     * And the owner's submit reaches a DIFFERENT rule from the ownership one.
+     *
+     * The listing has no unit, so the owner is stopped by `property.unit_required` — a refusal
+     * that can only be reached from INSIDE `findOwned`. That difference is the whole assertion:
+     * it proves the two refusals above are about ownership rather than about a fixture that could
+     * not reach the code at all, which is the failure a scoping test is most prone to.
+     */
+    it('lets the owner past the ownership check, to the lifecycle rules', async () => {
+      expect(
+        codeOf(
+          await service
+            .submitForReview(partner(otherPartnerId), otherReference)
+            .catch((error: unknown) => error),
+        ),
+      ).toBe(ERROR.PROPERTY_UNIT_REQUIRED);
     });
   });
 });

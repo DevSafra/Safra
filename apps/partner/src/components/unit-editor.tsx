@@ -6,6 +6,7 @@ import Link from 'next/link';
 
 import type { PartnerPropertyDetail } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
+import { AddUnit } from '@/components/add-unit';
 import { t } from '@/lib/strings';
 
 type Unit = PartnerPropertyDetail['units'][number];
@@ -37,12 +38,27 @@ type Unit = PartnerPropertyDetail['units'][number];
 export function UnitEditor({
   reference,
   units,
+  fallbackCurrency,
 }: {
   readonly reference: string;
   readonly units: readonly Unit[];
+  /** Used only when there are no units to take one from — the partner's own contract currency. */
+  readonly fallbackCurrency: string;
 }) {
+  /*
+    An empty listing is not a dead end any more (Bashar, 2026-09-04).
+
+    This returned the sentence «لا وحدات بعد.» and nothing else, on 991 listings — 468 of them
+    published, so live and unbookable, with no route by which their owner could add the thing that
+    makes a listing a listing. The form opens by default here because on this screen it IS the task.
+  */
   if (units.length === 0) {
-    return <p className="text-[12.5px] text-faint">{t.editProperty.unitsEmpty}</p>;
+    return (
+      <div className="grid gap-3">
+        <p className="text-[12.5px] text-faint">{t.editProperty.unitsEmpty}</p>
+        <AddUnit reference={reference} currencyCode={fallbackCurrency} defaultOpen />
+      </div>
+    );
   }
 
   return (
@@ -54,6 +70,12 @@ export function UnitEditor({
       {units.map((unit) => (
         <UnitRow key={unit.id} reference={reference} unit={unit} />
       ))}
+
+      {/* The listing's own currency, so a second unit cannot price in a different one. */}
+      <AddUnit
+        reference={reference}
+        currencyCode={units[0]?.currencyCode ?? fallbackCurrency}
+      />
     </div>
   );
 }
