@@ -18,6 +18,15 @@ describe('booking state machine (§6.2)', () => {
 
   it('lets a partner reject but never confirm-to-customer directly', () => {
     expect(canTransition('pending_confirmation', 'cancelled', 'partner')).toBe(true);
+    /*
+      The case the portal's «قبول» button depends on, and the one this file did not have.
+
+      Its three neighbours were all here — a customer cannot confirm, a partner can cancel, a
+      partner cannot confirm from `pending_payment` — while the transition the entire two-hour
+      window exists for was never asserted. It was `['staff', 'system']` from the first commit, so
+      every partner acceptance answered 409 and the SLA then fined the partner for not replying.
+    */
+    expect(canTransition('pending_confirmation', 'confirmed', 'partner')).toBe(true);
     expect(canTransition('pending_payment', 'confirmed', 'partner')).toBe(false);
   });
 

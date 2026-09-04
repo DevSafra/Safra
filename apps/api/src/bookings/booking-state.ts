@@ -57,9 +57,25 @@ export const TRANSITIONS: Transition[] = [
   {
     from: 'pending_confirmation',
     to: 'confirmed',
-    // SAFRA confirms to the customer once the partner approves — §6.3 step 7 puts
-    // SAFRA in the middle, so staff and system can both finalise it.
-    actors: ['staff', 'system'],
+    /*
+      The PARTNER is the actor this window exists for (§6.4, §8.3).
+
+      This listed only `staff` and `system`, on the reading that «SAFRA confirms to the customer
+      once the partner approves» — but that sentence is about who tells the CUSTOMER, not about who
+      may move the booking. `partnerDecision` has always asserted this transition with the actor
+      `'partner'`, so the two halves contradicted each other from the commit that introduced them,
+      and every partner acceptance answered **409 booking.transition_invalid**.
+
+      What that cost: the portal renders «قبول» on a two-hour clock, the press failed silently, the
+      SLA sweep then expired the booking, cancelled it, refunded and compensated the customer — and
+      raised a violation and a $10 fine against the partner, for not answering a request they had
+      answered. Rejection was unaffected, because `cancelled` always listed `partner`.
+
+      Found on 2026-09-04 by pressing the button. Nothing caught it: `booking-state.test.ts`
+      asserts the customer cannot confirm, that a partner can cancel, and that a partner cannot
+      confirm from `pending_payment` — three neighbours of the one case that matters.
+    */
+    actors: ['partner', 'staff', 'system'],
     label: 'confirmed',
   },
   {
