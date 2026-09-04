@@ -157,7 +157,33 @@ test.describe('بطاقات الهدايا', () => {
     */
     await page.goto('/en/account', { waitUntil: 'domcontentloaded' });
 
-    const hamburger = page.getByRole('button', { name: /menu/i }).first();
+    /*
+      The persisted choice is cleared FIRST, so these assertions are about this build.
+
+      The sidebar's visibility is remembered in `localStorage` and applied before paint, so a run
+      that ended with it hidden — or one killed part-way through the block below — decides the
+      starting state of the next run. Same discipline the rows-per-page rule states: a spec that
+      changes a persisted preference puts it back, and reads the default only after clearing it.
+    */
+    await page.evaluate(() => localStorage.removeItem('safra-sidebar'));
+    await page.reload({ waitUntil: 'domcontentloaded' });
+
+    /*
+      Located by `aria-controls`, NOT by an accessible name matching /menu/i.
+
+      This test was failing intermittently and the cause was not timing. Since the site header grew
+      a phone menu of its own (2026-09-03) TWO controls answer to /menu/i — «Open the menu» in the
+      banner and «Show menu» in the account main — and `.first()` took the banner's, which is only
+      RENDERED below `lg`. So it passed at 1280px, where only one exists, and at 390px it clicked
+      the site header's menu and then waited for the account sidebar to appear. The recorded failure
+      shows exactly that: `button "Close the menu" [expanded]` in the banner, and the sidebar hidden.
+
+      `.first()` on a name-based locator is the shape that allowed it: it turns "there are two of
+      these now" from a hard failure into a silent wrong choice. `aria-controls` names the panel
+      this button actually operates, so nothing else can answer to it — and if the attribute is ever
+      removed the locator matches nothing and the test fails loudly rather than quietly.
+    */
+    const hamburger = page.locator('button[aria-controls="account-sidebar"]');
     const sidebar = page.locator('#account-sidebar');
 
     await expect(hamburger).toBeVisible();
