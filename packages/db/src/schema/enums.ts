@@ -58,6 +58,24 @@ export const verificationStatus = pgEnum('verification_status', [
   'rejected',
 ]);
 
+/**
+ * Where a partner's transfer details are in their own review (§8.1, §11.4).
+ *
+ * Separate from `verificationStatus` — which is the PARTNER's onboarding review — because the two
+ * move independently and for different reasons. A partner approved in January can change their
+ * bank in June, and that change has to be re-checked without reopening their onboarding; equally
+ * a partner still `in_review` may have perfectly good transfer details on file.
+ *
+ * `pending` is the entry state for every account and every material change to one, and it is the
+ * DEFAULT so that a row which arrives by any route SAFRA has not thought of is unpayable rather
+ * than payable. Only `verified` may be attached to a payout.
+ */
+export const payoutAccountStatus = pgEnum('payout_account_status', [
+  'pending',
+  'verified',
+  'rejected',
+]);
+
 /** SRS §8.5: partner tiers, driven by the internal score. */
 export const partnerTier = pgEnum('partner_tier', [
   'new',

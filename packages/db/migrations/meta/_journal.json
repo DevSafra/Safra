@@ -421,6 +421,13 @@
       "when": 1788266495743,
       "tag": "0059_new_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1788516999301,
+      "tag": "0060_glamorous_rocket_racer",
+      "breakpoints": true
     }
   ]
 }

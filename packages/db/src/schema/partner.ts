@@ -25,6 +25,7 @@ import {
 import {
   partnerApplicationStatus,
   partnerTier,
+  payoutAccountStatus,
   payoutStatus,
   partnerEmployeeStatus,
   verificationStatus,
@@ -385,9 +386,40 @@ export const partnerPayoutAccounts = pgTable(
       .notNull()
       .references(() => currencies.id),
     isPrimary: boolean('is_primary').notNull().default(false),
+    /*
+      §11.4's control, and the reason this table has a lifecycle at all (Bashar, 2026-09-04):
+      «Every new payout account and every material change must require verification before it
+      becomes eligible for payouts.»
+
+      It DEFAULTS to `pending`, which is the whole point of putting it here rather than in the
+      service: a row inserted by a route nobody has written yet, by a repair script, or by a
+      future import is unpayable until a human looks at it. The service can only ever make that
+      guarantee for the paths it knows about; the column makes it for the ones it does not.
+    */
+    status: payoutAccountStatus('status').notNull().default('pending'),
+    /*
+      Who put these details on file — the partner themselves, or the member of staff who entered
+      them on the partner's behalf. Both routes exist by Bashar's decision on 2026-09-04, and the
+      difference matters to whoever reads the trail afterwards: an account a partner typed and an
+      account staff typed carry different questions when something goes wrong.
+    */
+    submittedByUserId: foreignId('submitted_by_user_id').references(() => users.id),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    verifiedByUserId: foreignId('verified_by_user_id').references(() => users.id),
+    rejectedAt: timestamp('rejected_at', { withTimezone: true }),
+    rejectedByUserId: foreignId('rejected_by_user_id').references(() => users.id),
+    /** Why it was refused, so the partner can correct the thing that was actually wrong. */
+    rejectionReason: text('rejection_reason'),
     ...timestamps,
   },
-  (t) => [index('partner_payout_accounts_partner_idx').on(t.partnerId)],
+  (t) => [
+    index('partner_payout_accounts_partner_idx').on(t.partnerId),
+    /*
+      The release path asks "does this partner have a verified account", on every release. Without
+      this it is a scan of the partner's accounts filtered in memory; with it, an index seek.
+    */
+    index('partner_payout_accounts_partner_status_idx').on(t.partnerId, t.status),
+  ],
 );
 
 /** SRS §8.1: ID, commercial register, ownership proof or management contract. */
