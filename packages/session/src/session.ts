@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { authUserSchema, type AuthUser } from '@safra/contracts';
+import { authUserSchema } from '@safra/contracts';
 
 /**
  * The session a SAFRA web app holds, in ONE cookie on its own origin.
@@ -26,16 +26,48 @@ import { authUserSchema, type AuthUser } from '@safra/contracts';
  * STATE ONLY: it is not signed, so someone editing their own cookie can change the
  * name in their own header and nothing follows from it — every authorization decision
  * belongs to the API, which reads the token rather than this blob.
+ *
+ * ## And what is deliberately NOT in it: the permission list
+ *
+ * A cookie has a HARD 4096-byte limit and a browser that meets a larger one drops it
+ * SILENTLY — no error, no request, the person simply cannot sign in. On 2026-09-04
+ * three permissions were added for the payout-account lifecycle and the super admin's
+ * cookie went to **4107 bytes**. Sign-in stopped working for the widest role, and the
+ * symptom named nothing: the API answered 200, the cookie was set, and the very next
+ * request had no session.
+ *
+ * The permission list was in the cookie TWICE — once inside the signed JWT, and again
+ * as `user.permissions` — and the second copy was read by nothing. `sessionPermissions`
+ * has always taken them from the token, which is the copy that is signed and therefore
+ * the only one worth trusting. So the duplicate is gone, and with it about 1,700 bytes.
+ *
+ * `sessionUserSchema` omits the field rather than allowing it, so a future edit cannot
+ * put it back by accident — and because `z.object` strips unknown keys, a cookie issued
+ * before this change still parses and nobody is signed out by the fix.
  */
+const sessionUserSchema = authUserSchema.omit({ permissions: true });
+
+/** Identity enough to render a header, and nothing that grows with the platform. */
+export type SessionUser = z.infer<typeof sessionUserSchema>;
+
 const sessionSchema = z.object({
   accessToken: z.string().min(1),
   refreshToken: z.string().min(1),
-  user: authUserSchema,
+  user: sessionUserSchema,
   /** Epoch milliseconds at which the ACCESS token stops being accepted. */
   expiresAt: z.number().int().positive(),
 });
 
 export type Session = z.infer<typeof sessionSchema>;
+
+/**
+ * The widest a session cookie may get before a browser starts dropping it.
+ *
+ * 4096 is the limit browsers actually enforce on `name=value`, and it is not a budget to
+ * spend — a JWT grows with every claim and every permission, so `session-size.test.ts`
+ * holds the encoded cookie well under it and fails while there is still room to act.
+ */
+export const COOKIE_BYTE_LIMIT = 4096;
 
 /**
  * Refresh this far before the access token actually expires.
@@ -83,14 +115,33 @@ export function needsRefresh(session: Session, now = Date.now()): boolean {
 
 /** Builds a session from what the API returns on login, register or refresh. */
 export function sessionFrom(
-  body: { accessToken: string; expiresIn: number; user: AuthUser },
+  /*
+    `SessionUser` rather than `AuthUser`, so a caller re-issuing a session from an EXISTING one can
+    pass what it already holds. `AuthUser` is a structural supertype, so a fresh login response
+    still satisfies this and its extra `permissions` field is simply not read.
+  */
+  body: { accessToken: string; expiresIn: number; user: SessionUser },
   refreshToken: string,
   now = Date.now(),
 ): Session {
   return {
     accessToken: body.accessToken,
     refreshToken,
-    user: body.user,
+    /*
+      An ALLOW-LIST, not a subtraction.
+
+      Written out field by field so that what reaches the cookie is decided here rather than by
+      whatever `AuthUser` happens to hold. `permissions` was dropped on 2026-09-04 for crossing the
+      4096-byte cookie limit (see the class note), and a `...spread` minus one key would let the
+      NEXT field added to `AuthUser` walk straight into the cookie and do it again — at which point
+      sign-in breaks silently for the widest role and nothing says why.
+    */
+    user: {
+      id: body.user.id,
+      email: body.user.email,
+      role: body.user.role,
+      preferredLocale: body.user.preferredLocale,
+    },
     // `expiresIn` is seconds, per OAuth convention.
     expiresAt: now + body.expiresIn * 1000,
   };

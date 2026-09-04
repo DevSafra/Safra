@@ -24,12 +24,17 @@ import {
  * session alive, and an expiry calculation that is off by a factor of a thousand
  * either logs everyone out constantly or never refreshes at all.
  */
+/*
+  No `permissions`. The cookie stopped carrying them on 2026-09-04, when the super admin's session
+  crossed 4096 bytes and browsers began dropping it silently — see the class note in `session.ts`
+  and `session-size.test.ts`. They live in the signed token, which is where `sessionPermissions`
+  has always read them from.
+*/
 const USER = {
   id: '11111111-1111-4111-8111-111111111111',
   email: 'customer@safra.test',
   role: 'customer' as const,
   preferredLocale: 'ar' as const,
-  permissions: ['booking.read_own', 'wallet.read'],
 };
 
 function session(overrides: Partial<Session> = {}): Session {
@@ -47,6 +52,26 @@ describe('encode / decode', () => {
     const original = session();
 
     expect(decodeSession(encodeSession(original))).toStrictEqual(original);
+  });
+
+  /**
+   * A cookie issued BEFORE the permission list was removed still parses.
+   *
+   * This is what makes the fix free of a forced sign-out: `z.object` strips keys it does not
+   * declare, so an existing session decodes and simply loses a field nothing read. Without this
+   * assertion the change looks safe and would in fact log out every signed-in member of staff at
+   * the moment it deployed.
+   */
+  it('still accepts a cookie written before permissions were dropped', () => {
+    const legacy = JSON.stringify({
+      ...session(),
+      user: { ...USER, permissions: ['booking.read_own', 'wallet.read'] },
+    });
+    const decoded = decodeSession(legacy);
+
+    expect(decoded).not.toBeNull();
+    expect(decoded?.user.email).toBe(USER.email);
+    expect(decoded?.user).not.toHaveProperty('permissions');
   });
 
   it('returns null for an absent cookie', () => {
