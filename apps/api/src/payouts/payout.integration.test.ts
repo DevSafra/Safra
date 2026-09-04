@@ -150,7 +150,70 @@ describeIfDb('PayoutService', () => {
 
     partnerId = made.rows[0]?.partner_id ?? '';
     bookingIds = made.rows.map((row) => row.booking_id);
+
+    /*
+      A VERIFIED destination, because that is the ordinary state of a partner SAFRA pays.
+
+      Every release below asserts something else — suspension, sanctions, the ledger movement — and
+      without an account on file all of them would refuse for the same new reason and prove nothing
+      about the thing they name. The tests that are ABOUT the account remove or downgrade this row
+      first, so the guard has an opposite control rather than only a refusal.
+    */
+    await giveAccount('verified');
   });
+
+  /**
+   * Puts one payout account on the fixture partner, in the state the caller names.
+   *
+   * The ciphertext is a literal. Nothing on the release or payment path decrypts it — the guard
+   * reads `status` and `deleted_at` — and encrypting a fake IBAN here would test the encryption
+   * service, which has its own suite, rather than the rule this file is about.
+   */
+  async function giveAccount(
+    status: 'pending' | 'verified' | 'rejected',
+    /*
+      Whether the row claims to be the partner's primary account, overriding what the status would
+      imply. `create` deliberately writes `is_primary = false` for every new account so an
+      unverified row can never claim it — this parameter exists to build the state that rule
+      prevents, and prove the release query does not depend on the rule holding.
+    */
+    primary?: boolean,
+  ): Promise<string> {
+    const row = await db.execute<{ id: string }>(sql`
+      INSERT INTO partner_payout_accounts
+        (partner_id, method, account_holder, account_number_encrypted, account_number_last4,
+         bank_name, currency_id, is_primary, status, verified_at)
+      SELECT ${partnerId}, 'bank_transfer', 'Payout Test', 'ciphertext', '4321',
+             'Test Bank', (SELECT id FROM currencies WHERE code = 'USD'),
+             ${primary ?? status === 'verified'}, ${status}::payout_account_status,
+             ${status === 'verified' ? sql`now()` : sql`NULL`}
+      RETURNING id
+    `);
+
+    return row.rows[0]?.id ?? '';
+  }
+
+  /**
+   * One payout for the fixture partner, closed and waiting to be released.
+   *
+   * Every destination test needs the same three steps, and repeating them is how one of them ends
+   * up asserting against a payout that is still `accruing` — which refuses for a different reason
+   * and would pass a test written about the account.
+   */
+  async function openPayout(): Promise<{ id: string }> {
+    await service.accrue();
+
+    const found = await db.execute<{ id: string }>(sql`
+      SELECT id FROM partner_payouts WHERE partner_id = ${partnerId} AND status = 'accruing'
+    `);
+    const payout = found.rows[0];
+
+    if (!payout) throw new Error('no accruing payout for the fixture partner');
+
+    await service.close(payout.id, finance);
+
+    return payout;
+  }
 
   afterEach(async () => {
     await harness.rollback();
@@ -504,6 +567,172 @@ describeIfDb('PayoutService', () => {
   });
 
   /** A partner reads their own and nothing else. There is no call that names a partner. */
+  /*
+    ── The destination guard (Bashar, 2026-09-04) ──────────────────────────────────────────────
+
+    «A payout must never be released or marked as paid unless it is linked to an active, verified
+    payout account.» Both verbs, so both are proved, and each refusal is paired with the case that
+    SUCCEEDS — a release that refuses for every partner is indistinguishable from a release that is
+    simply broken, and the pair is what tells them apart.
+
+    What made this necessary is not hypothetical. On 2026-09-04 the table held zero rows, nothing
+    in the codebase ever wrote one, and the release path took `?? null` on the lookup — so
+    seventy-six payouts had been released or paid with no recorded destination at all.
+  */
+  it('refuses to release a payout when the partner has no payout account', async () => {
+    if (bookingIds.length === 0) return;
+
+    await db.execute(
+      sql`DELETE FROM partner_payout_accounts WHERE partner_id = ${partnerId}`,
+    );
+    const payout = await openPayout();
+
+    await expect(
+      service.release(payout.id, { scheduledFor: '2026-08-20' }, finance),
+    ).rejects.toMatchObject({ response: { code: 'payout.no_verified_account' } });
+
+    const after = await db.execute<{ status: string; account: string | null }>(sql`
+      SELECT status, payout_account_id AS account FROM partner_payouts WHERE id = ${payout.id}
+    `);
+
+    expect(after.rows[0]?.status).toBe('pending_release');
+    expect(after.rows[0]?.account).toBeNull();
+  });
+
+  it('refuses to release when the only account is still pending verification', async () => {
+    if (bookingIds.length === 0) return;
+
+    await db.execute(
+      sql`DELETE FROM partner_payout_accounts WHERE partner_id = ${partnerId}`,
+    );
+    await giveAccount('pending');
+    const payout = await openPayout();
+
+    await expect(
+      service.release(payout.id, { scheduledFor: '2026-08-20' }, finance),
+    ).rejects.toMatchObject({ response: { code: 'payout.no_verified_account' } });
+  });
+
+  it('refuses to release when the only account was rejected', async () => {
+    if (bookingIds.length === 0) return;
+
+    await db.execute(
+      sql`DELETE FROM partner_payout_accounts WHERE partner_id = ${partnerId}`,
+    );
+    await giveAccount('rejected');
+    const payout = await openPayout();
+
+    await expect(
+      service.release(payout.id, { scheduledFor: '2026-08-20' }, finance),
+    ).rejects.toMatchObject({ response: { code: 'payout.no_verified_account' } });
+  });
+
+  /**
+   * The opposite control, and it also proves the payout RECORDS which account it went to.
+   *
+   * A release that succeeds but writes NULL into `payout_account_id` would satisfy a test that
+   * only asserted the status — and NULL is the exact state seventy-six live rows were in.
+   */
+  it('releases to the verified account, and records which one', async () => {
+    if (bookingIds.length === 0) return;
+
+    await db.execute(
+      sql`DELETE FROM partner_payout_accounts WHERE partner_id = ${partnerId}`,
+    );
+
+    /*
+      The pending row is marked PRIMARY and is older, so `ORDER BY is_primary DESC, … created_at`
+      would choose it. Only `status = 'verified'` in the WHERE clause does not — which is the point:
+      remove that one line and this test goes red, where an ordinary two-account fixture would stay
+      green because the ordering happened to agree with the filter.
+    */
+    const pending = await giveAccount('pending', true);
+    const verified = await giveAccount('verified', false);
+
+    const payout = await openPayout();
+
+    await service.release(payout.id, { scheduledFor: '2026-08-20' }, finance);
+
+    const after = await db.execute<{ status: string; account: string | null }>(sql`
+      SELECT status, payout_account_id AS account FROM partner_payouts WHERE id = ${payout.id}
+    `);
+
+    expect(after.rows[0]?.status).toBe('scheduled');
+    expect(after.rows[0]?.account).toBe(verified);
+    /* Never the unverified one, even though the ordering alone would have chosen it. */
+    expect(after.rows[0]?.account).not.toBe(pending);
+  });
+
+  /**
+   * The second verb, and the reason it is checked twice.
+   *
+   * Release and payment are separated by days. In that gap the partner can edit their details —
+   * which returns the account to `pending` — or staff can remove it. A payout scheduled against an
+   * account that has since changed is precisely the case somebody would engineer, so the state at
+   * release is not evidence about the state at payment.
+   */
+  it('refuses to mark paid when the account stopped being verified after release', async () => {
+    if (bookingIds.length === 0) return;
+
+    const payout = await openPayout();
+
+    await service.release(payout.id, { scheduledFor: '2026-08-20' }, finance);
+
+    /* What an edit does: the account goes back to review, and stops being payable. */
+    await db.execute(sql`
+      UPDATE partner_payout_accounts SET status = 'pending', verified_at = NULL
+      WHERE partner_id = ${partnerId}
+    `);
+
+    await expect(
+      service.markPaid(payout.id, { paidReference: 'TRX-1' }, finance),
+    ).rejects.toMatchObject({
+      response: { code: 'payout.account_unverified_at_payment' },
+    });
+
+    const after = await db.execute<{ status: string; entry: string | null }>(sql`
+      SELECT status, entry_group_id AS entry FROM partner_payouts WHERE id = ${payout.id}
+    `);
+
+    /* Still scheduled, and NO ledger movement — the refusal happens before the money is booked. */
+    expect(after.rows[0]?.status).toBe('scheduled');
+    expect(after.rows[0]?.entry).toBeNull();
+  });
+
+  it('refuses to mark paid when the account was removed after release', async () => {
+    if (bookingIds.length === 0) return;
+
+    const payout = await openPayout();
+
+    await service.release(payout.id, { scheduledFor: '2026-08-20' }, finance);
+    await db.execute(sql`
+      UPDATE partner_payout_accounts SET deleted_at = now() WHERE partner_id = ${partnerId}
+    `);
+
+    await expect(
+      service.markPaid(payout.id, { paidReference: 'TRX-1' }, finance),
+    ).rejects.toMatchObject({
+      response: { code: 'payout.account_unverified_at_payment' },
+    });
+  });
+
+  /** The opposite control for both refusals above: the account is untouched, so payment lands. */
+  it('marks paid when the account is still verified at payment', async () => {
+    if (bookingIds.length === 0) return;
+
+    const payout = await openPayout();
+
+    await service.release(payout.id, { scheduledFor: '2026-08-20' }, finance);
+    await service.markPaid(payout.id, { paidReference: 'TRX-1' }, finance);
+
+    const after = await db.execute<{ status: string; entry: string | null }>(sql`
+      SELECT status, entry_group_id AS entry FROM partner_payouts WHERE id = ${payout.id}
+    `);
+
+    expect(after.rows[0]?.status).toBe('paid');
+    expect(after.rows[0]?.entry).not.toBeNull();
+  });
+
   it('scopes a partner’s list to their own token', async () => {
     if (bookingIds.length === 0) return;
 

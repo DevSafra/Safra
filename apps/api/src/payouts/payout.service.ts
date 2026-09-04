@@ -279,12 +279,33 @@ export class PayoutService {
       }
     }
 
+    /*
+      WHERE the money is going, and a refusal when the platform cannot say (Bashar, 2026-09-04):
+      «A payout must never be released or marked as paid unless it is linked to an active,
+      verified payout account.»
+
+      This was `?? null` against a query with no status filter, over a table that had never been
+      written to — so every release recorded a transfer with no destination, and on 2026-09-04
+      seventy-six of them had one. `?? null` is the shape the rule exists to forbid: it reads as
+      handled and it releases money into a field nobody filled in.
+
+      `status = 'verified'` and `deleted_at IS NULL` together are the "active, verified" of the
+      instruction. `is_primary DESC` still decides between two verified accounts, but it is now a
+      preference among valid answers rather than the only thing standing between a release and an
+      arbitrary row.
+    */
     const account = await this.db.execute<{ id: string }>(sql`
       SELECT id FROM partner_payout_accounts
-      WHERE partner_id = ${payout.partner_id} AND deleted_at IS NULL
-      ORDER BY is_primary DESC, created_at ASC
+      WHERE partner_id = ${payout.partner_id}
+        AND deleted_at IS NULL
+        AND status = 'verified'
+      ORDER BY is_primary DESC, verified_at DESC, created_at ASC
       LIMIT 1
     `);
+
+    const accountId = account.rows[0]?.id;
+
+    if (!accountId) throw conflict(ERROR.PAYOUT_NO_VERIFIED_ACCOUNT);
 
     await this.db.execute(sql`
       UPDATE partner_payouts
@@ -292,7 +313,7 @@ export class PayoutService {
           scheduled_for = ${input.scheduledFor}::date,
           released_at = now(),
           released_by_user_id = ${claims?.sub ?? null},
-          payout_account_id = ${account.rows[0]?.id ?? null},
+          payout_account_id = ${accountId},
           notes = ${input.notes ?? null},
           updated_at = now()
       WHERE id = ${payoutId}
@@ -302,6 +323,8 @@ export class PayoutService {
       reference: payout.reference,
       net: payout.net_amount,
       scheduledFor: input.scheduledFor,
+      /* The trail says where, not only how much — an id, never the account's own details. */
+      payoutAccountId: accountId,
     });
   }
 
@@ -319,6 +342,30 @@ export class PayoutService {
 
     if (payout.status !== 'scheduled') {
       throw conflict(ERROR.PAYOUT_NOT_SCHEDULED);
+    }
+
+    /*
+      The destination is re-checked HERE, and not taken on trust from the release.
+
+      Bashar's rule names both verbs — released OR marked as paid — and the second is not implied
+      by the first. Release and payment are separated by days: in that gap the partner can edit
+      their details, which returns the account to `pending`, or staff can remove it. A payout
+      scheduled against an account that has since changed is exactly the case somebody would
+      engineer, and re-reading costs one indexed lookup on a path that already writes the ledger.
+
+      It reads the payout's OWN `payout_account_id` rather than looking the partner's accounts up
+      again. Any other row would be a different destination from the one that was released, and
+      silently paying into it is the failure, not the fix.
+    */
+    const destination = await this.db.execute<{ ok: boolean }>(sql`
+      SELECT (a.status = 'verified' AND a.deleted_at IS NULL) AS ok
+      FROM partner_payouts po
+      JOIN partner_payout_accounts a ON a.id = po.payout_account_id
+      WHERE po.id = ${payoutId}
+    `);
+
+    if (destination.rows[0]?.ok !== true) {
+      throw conflict(ERROR.PAYOUT_ACCOUNT_UNVERIFIED_AT_PAYMENT);
     }
 
     await this.db.transaction(async (tx) => {
@@ -558,8 +605,10 @@ export class PayoutService {
    * impossible to create — this is what proves the constraint is still doing its job.
    */
   async detailForStaff(reference: string, claims: AccessTokenClaims | undefined) {
-    const rows = await this.db.execute<PayoutRow & { entry_group_id: string | null }>(sql`
-      ${PAYOUT_COLUMNS}, p.entry_group_id
+    const rows = await this.db.execute<
+      PayoutRow & { entry_group_id: string | null; payout_account_id: string | null }
+    >(sql`
+      ${PAYOUT_COLUMNS}, p.entry_group_id, p.payout_account_id
       FROM partner_payouts p
       JOIN currencies cur ON cur.id = p.currency_id
       JOIN partners pa    ON pa.id = p.partner_id
@@ -570,6 +619,29 @@ export class PayoutService {
     const row = rows.rows[0];
 
     if (!row) throw notFound(ERROR.PAYOUT_NOT_FOUND);
+
+    /*
+      WHERE this payout is going, masked (Bashar, 2026-09-04).
+
+      Added when a browser run reached a scheduled payout and found that no screen said where the
+      money was headed. The whole feature exists so that a transfer HAS a recorded destination, and
+      a destination nobody can read is barely better than none — an operator reconciling a bank
+      statement against «مجدول» had nothing on this screen to reconcile it with.
+
+      Masked, like every other surface: the holder, the bank and the last four. The ciphertext is
+      not selected here for the same reason it is not selected anywhere else.
+    */
+    const destination = await this.db.execute<{
+      method: string;
+      account_holder: string;
+      account_number_last4: string;
+      bank_name: string | null;
+      status: string;
+    }>(sql`
+      SELECT a.method, a.account_holder, a.account_number_last4, a.bank_name, a.status::text
+      FROM partner_payout_accounts a
+      WHERE a.id = ${row.payout_account_id}
+    `);
 
     const items = await this.db.execute<{
       booking_reference: string;
@@ -639,6 +711,16 @@ export class PayoutService {
       */
       id: row.id,
       entryGroupId: row.entry_group_id,
+      /* Null until the payout is released — before that there is no destination to name. */
+      destination: destination.rows[0]
+        ? {
+            method: destination.rows[0].method,
+            accountHolder: destination.rows[0].account_holder,
+            last4: destination.rows[0].account_number_last4,
+            bankName: destination.rows[0].bank_name,
+            status: destination.rows[0].status,
+          }
+        : null,
       bookings: items.rows.map((item) => ({
         bookingReference: item.booking_reference,
         amount: item.amount,
