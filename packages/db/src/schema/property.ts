@@ -130,6 +130,34 @@ export const properties = pgTable(
       .notNull()
       .references(() => cancellationPolicies.id),
 
+    /**
+     * The official star CLASSIFICATION, 1 to 5 (Bashar, 2026-09-04).
+     *
+     * ## It is not `rating`, and the two must never be confused
+     *
+     * `rating` immediately below is the GUEST REVIEW score — a decimal averaged from reviews by a
+     * worker, which moves on its own as people write them. This is a fixed designation the partner
+     * declares when they create the listing and SAFRA checks at approval. One is an opinion, the
+     * other is a classification, and they are close enough in name that the comment matters more
+     * than usual: a customer card renders both, and rendering them alike would make «★ 4.6» and
+     * «★★★★☆» read as one confused fact.
+     *
+     * ## Nullable, deliberately, and it is not a soft rule
+     *
+     * 2,703 listings existed before this column — 2,016 of them PUBLISHED — and none of them has a
+     * classification anybody has verified. A `NOT NULL DEFAULT 3` would have written a specific,
+     * checkable claim about 2,700 real hotels that nobody made, and it would be indistinguishable
+     * from a partner who really did declare three. Null means «not declared», the screens say so,
+     * and the console can find them.
+     *
+     * New listings are required to carry one — that bound is in `propertyCreateSchema`, not here,
+     * because it is a rule about SUBMISSION and this column has to keep holding the history.
+     *
+     * `smallint` with a CHECK rather than an enum: it is a NUMBER — it sorts, it filters by range,
+     * and «4 or 5 stars» is the query customers actually make. An enum would make that a set
+     * comparison over labels.
+     */
+    starRating: smallint('star_rating'),
     /** Denormalised from reviews for sort/filter performance; worker-maintained. */
     rating: numeric('rating', { precision: 2, scale: 1 }),
     reviewsCount: integer('reviews_count').notNull().default(0),
@@ -158,6 +186,23 @@ export const properties = pgTable(
     index('properties_partner_idx').on(t.partnerId),
     index('properties_type_idx').on(t.propertyTypeId),
     index('properties_attributes_idx').using('gin', t.attributes),
+    /*
+      The star filter, MEASURED rather than assumed (2026-09-04).
+
+      Five values over the whole catalogue is low cardinality, and at the 2,700 rows of the dev
+      database Postgres correctly ignores an index and seq-scans in 1.6ms. The decision was taken
+      against `safra_load` at **50,000 published properties**, which is what the table actually
+      grows into: a country-wide «5 stars only» search went from a 17.9ms sequential scan to a
+      10.2ms bitmap index scan. Partial, because an unpublished or deleted listing is never a
+      search candidate and indexing one is paying to store rows the query cannot return.
+
+      The city-scoped case does NOT need it — `properties_search_idx` already serves «this city,
+      published, by recommendation» and the star predicate is a cheap filter on top. This index
+      earns its place on the unscoped search, which is the one with nothing else selective in it.
+    */
+    index('properties_star_rating_idx')
+      .on(t.starRating)
+      .where(sql`status = 'published' AND deleted_at IS NULL`),
   ],
 );
 

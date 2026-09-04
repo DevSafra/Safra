@@ -428,6 +428,20 @@
       "when": 1788516999301,
       "tag": "0060_glamorous_rocket_racer",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1788527729000,
+      "tag": "0061_green_the_liberteens",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1788528052987,
+      "tag": "0062_colossal_imperial_guard",
+      "breakpoints": true
     }
   ]
 }

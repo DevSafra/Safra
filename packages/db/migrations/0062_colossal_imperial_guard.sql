@@ -1,0 +1,1 @@
+CREATE INDEX "properties_star_rating_idx" ON "properties" USING btree ("star_rating") WHERE status = 'published' AND deleted_at IS NULL;
