@@ -392,10 +392,40 @@ scan to a 10.2ms bitmap index scan. The partial index is on published, non-delet
    state back. The create-persists proof moved to
    `apps/api/src/partner/properties.integration.test.ts`, which rolls back.
 
-**Open question for Bashar — which property types.** It is implemented for ALL accommodation
-types, which is the letter of the instruction and costs nothing today: 2,697 of 2,703 listings are
-hotels. A star classification is a hotel convention, so «5-star camp» is expressible. If it should
-be hotel-only, that is a one-line change to `propertyCreateSchema` plus a conditional field.
+**Decided 2026-09-04 — HOTELS ONLY.** Bashar: «Other accommodation types such as apartments,
+villas, chalets, homes, camps and similar property types should not use the hotel
+star-classification system. For non-hotel accommodation types, the classification should simply be
+absent rather than forcing an artificial star value.» Implemented as:
+
+- **`STAR_RATED_PROPERTY_TYPES` in `@safra/contracts`**, a written list of type codes rather than a
+  flag on `property_types`. The flag is the obvious design and the wrong one: that table is
+  operator-editable, so a column saying «this type is star-rated» would let somebody give camps a
+  hotel classification from a settings screen — a product decision made by accident, in a table.
+- **Both directions refused, at the schema and again in the service.** A hotel without a
+  classification is rejected; a villa WITH one is rejected rather than silently stripped, because
+  quietly dropping a field a caller sent lets a partner believe they declared something they did
+  not. The service half exists because a PATCH naming only the rating depends on the STORED type,
+  which no schema can see.
+- **The UI stops asking.** The partner's creation form shows the field only while the chosen type
+  is a hotel and removes it — from the DOM, so it is not submitted — the moment it is not. The
+  console's editor section is absent for a non-hotel entirely.
+- **«لا ينطبق» is not «بلا تصنيف».** A villa reads «does not apply»; a hotel nobody has classified
+  reads «not classified». Printing the second against a camp sends an operator looking for a
+  control that should not exist.
+- **Non-hotels cannot enter a star-filtered search**, and the reason is a property of the predicate
+  rather than a filter somebody remembered: a non-hotel's `star_rating` is NULL and `IN (…)` is
+  NULL-rejecting. Asserted anyway, with a mutation (`coalesce(star_rating, 4)`) watched to let a
+  villa through.
+- **Existing data stays valid.** The column was already nullable, so every non-hotel listing is
+  legitimately null. The four dev listings that had a rating from the seed were cleared, and the
+  testbed seed now classifies hotels only.
+
+**The filter moved into «التصفية» (Bashar, 2026-09-04).** It was a chip row on the search bar; the
+bar is the QUERY — where, when, how many — and the panel is how a reader narrows what came back. It
+sits directly under «نوع الإقامة», because choosing «فندق» and then «٤ نجوم» is one thought, and it
+carries a note saying that filtering by stars excludes every other accommodation type — a filter
+that silently removes whole categories of inventory is the failure the price note beside it already
+guards against.
 
 ## 1b. Where the remaining work is written down
 
