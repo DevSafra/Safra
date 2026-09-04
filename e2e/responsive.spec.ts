@@ -47,6 +47,8 @@ const CONSOLE = [
   '/messages',
   '/comms',
   '/geo',
+  '/city-categories',
+  '/catalogue',
   '/reports',
   '/settings',
   '/audit',

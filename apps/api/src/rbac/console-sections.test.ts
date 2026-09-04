@@ -11,6 +11,7 @@ import { AdminReviewController } from '../reviews/review.controller.js';
 import { AdminPartnerApplicationController } from '../partner/partner-application.controller.js';
 import { CommsController } from '../admin/comms.controller.js';
 import { PERMISSIONS_KEY } from './decorators.js';
+import { CatalogueController } from '../admin/catalogue.controller.js';
 import { RegistriesController } from '../admin/registries.controller.js';
 import { StaffController } from '../admin/staff.controller.js';
 import { StaffRolesController } from '../admin/staff-roles.controller.js';
@@ -77,6 +78,12 @@ const SECTION_HANDLERS: Record<
   whatsapp: [CommsController, 'listNotifications', 'getNotifications'],
   geo: [RegistriesController, 'geography', 'getGeography'],
   cityCategories: [RegistriesController, 'cityCategories', 'getCityCategories'],
+  /*
+    كتالوج المنصّة reads three lists. `amenities` is the PRIMARY one — it is the table at the top
+    of the page and the one a reader opens the section for; the other two degrade to their own
+    message if their read is refused, exactly as the note above this map describes.
+  */
+  catalogue: [CatalogueController, 'amenities', 'getAmenities'],
   reports: [RegistriesController, 'reportCards', 'getReports'],
   settings: [AdminOperationsController, 'listSettings', 'getSettings'],
   audit: [AdminOperationsController, 'auditLog', 'getAuditLog'],

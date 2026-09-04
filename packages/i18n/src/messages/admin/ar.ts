@@ -149,6 +149,7 @@ export const ar = {
     whatsapp: 'واتساب والبريد',
     geo: 'المدن والدول والعملات',
     cityCategories: 'الفئات',
+    catalogue: 'كتالوج المنصّة',
     reports: 'التقارير',
     settings: 'الإعدادات',
     staffRoles: 'أدوار الموظفين',
@@ -430,6 +431,118 @@ export const ar = {
       moveUp: 'نقل لأعلى',
       moveDown: 'نقل لأسفل',
       reordering: 'يُحفظ الترتيب…',
+    },
+
+    /*
+      كتالوج المنصّة — الخدمات وسياسات الإلغاء وأنواع الشركاء (Bashar, 2026-09-04).
+
+      الثلاثة كانت تُقرأ في كل المنصّة ولا تُكتب من أي شاشة: إضافة خدمة أو تعديل سياسة كانت تعني
+      SQL مباشراً على قاعدة البيانات. كل قسم هنا يقول ما الذي يتغيّر فعلاً حين يُعدَّل — لأن
+      «سياسة الإلغاء» تبدو تعديلاً بسيطاً وهي تحكم ما يُسترد لكل حجز قادم.
+    */
+    catalogue: {
+      title: 'كتالوج المنصّة',
+      note: 'ثلاث مجموعات مرجعية تُقرأ في كل المنصّة: الخدمات في البحث وصفحة العقار، سياسات الإلغاء في الاسترداد، وأنواع الشركاء في طلبات الانضمام. تُدار من هنا ولا تحتاج إصداراً جديداً.',
+
+      colCode: 'المعرّف',
+      colNameAr: 'الاسم بالعربية',
+      colNameEn: 'الاسم بالإنجليزية',
+      colNameDe: 'الاسم بالألمانية',
+      colStatus: 'الحالة',
+      colUsage: 'الاستخدام',
+      active: 'مفعَّل',
+      inactive: 'موقوف',
+      edit: 'تعديل',
+      remove: 'حذف',
+      removing: 'جارٍ الحذف…',
+      code: 'المعرّف',
+      codeHint:
+        'أحرف لاتينية صغيرة وأرقام وشرطات، ولا يُعدَّل بعد الإنشاء — مثل ev-charger',
+      /* One sentence, used by all three: the row comes back exactly as it was. */
+      reinstateHint: 'إضافة المعرّف نفسه بعد الحذف تُعيد السجل بدل رفضه.',
+
+      // ── الخدمات ────────────────────────────────────────────────────────────
+      amenitiesTitle: 'الخدمات والمرافق',
+      amenitiesNote:
+        'ما يعلنه الشريك عن وحدته — واي فاي، موقف، مسبح. «مفعَّلة» تعني أنها معروضة على الشريك ليختارها؛ «تظهر في التصفية» تعني أنها بند في مُصفّي البحث. الاثنان منفصلان: خدمة حقيقية قد لا تستحق التصفية.',
+      amenitiesAdd: '+ إضافة خدمة',
+      amenitiesAddTitle: 'خدمة جديدة',
+      amenitiesEditTitle: 'تعديل الخدمة',
+      amenitiesEmpty: 'لا خدمات بعد.',
+      colGroup: 'المجموعة',
+      colFilterable: 'التصفية',
+      filterableLabel: 'تظهر في تصفية البحث',
+      activeAmenityLabel: 'مفعَّلة — يستطيع الشريك اختيارها',
+      group: 'المجموعة في مُصفّي البحث',
+      groupFacilities: 'مرافق',
+      groupRules: 'قواعد',
+      groupAccessibility: 'إتاحة',
+      unitCount:
+        '{n, plural, zero {لا وحدات} one {وحدة واحدة} two {وحدتان} few {# وحدات} many {# وحدة} other {# وحدة}}',
+      deactivateAmenityTitle: 'إيقاف خدمة',
+      deactivateAmenityBody:
+        'تختفي من نموذج الشريك فلا تُختار لوحدات جديدة، وتبقى {n} من الوحدات التي تعلنها كما هي.',
+      deleteAmenityTitle: 'حذف خدمة',
+      deleteAmenityBody:
+        'يُحذف السجل نهائياً من القوائم. لا يمكن حذف خدمة تعلنها وحدات — عندها أوقفها بدل حذفها.',
+
+      // ── سياسات الإلغاء ─────────────────────────────────────────────────────
+      policiesTitle: 'سياسات الإلغاء',
+      /*
+        The one sentence that must be on this screen. A super admin editing a ladder believes they
+        have changed what a live booking refunds; they have not, and the difference is money.
+      */
+      policiesNote:
+        'السلّم يحدّد ما يُسترد حسب قربك من موعد الوصول. كل حجز يحفظ لقطة من السياسة لحظة إنشائه، فالتعديل هنا يسري على الحجوزات القادمة فقط ولا يغيّر استرداد حجز قائم.',
+      policiesAdd: '+ إضافة سياسة',
+      policiesAddTitle: 'سياسة جديدة',
+      policiesEditTitle: 'تعديل السياسة',
+      policiesEmpty: 'لا سياسات بعد.',
+      colTiers: 'السلّم',
+      colFloor: 'الحد الأدنى',
+      colProperties: 'العقارات',
+      descriptionAr: 'الشرح بالعربية',
+      descriptionEn: 'الشرح بالإنجليزية',
+      descriptionDe: 'الشرح بالألمانية',
+      floor: 'أقل نسبة استرداد (%)',
+      floorHint: 'حدٌّ لا ينزل تحته أي درج من السلّم.',
+      tiers: 'درجات الاسترداد',
+      tiersHint:
+        'كل درجة: «من ألغى قبل X ساعة يسترد Y٪». تُقرأ من الأعلى ساعاتٍ نزولاً، وأول درجة تنطبق هي المطبَّقة. درجة بصفر ساعة هي الحالة الأخيرة.',
+      tierHours: 'ساعات قبل الوصول',
+      tierPercent: 'نسبة الاسترداد (%)',
+      tierAdd: '+ إضافة درجة',
+      tierRemove: 'حذف الدرجة',
+      tierSummary: '{hours} ساعة ← {percent}٪',
+      propertyCount:
+        '{n, plural, zero {لا عقارات} one {عقار واحد} two {عقاران} few {# عقارات} many {# عقاراً} other {# عقار}}',
+      activePolicyLabel: 'مفعَّلة — يستطيع الشريك اختيارها لعقار',
+      deactivatePolicyTitle: 'إيقاف سياسة',
+      deactivatePolicyBody:
+        'تختفي من اختيار الشريك لعقار جديد، وتبقى {n} من العقارات عليها كما هي وحجوزاتها القائمة بلقطاتها.',
+      deletePolicyTitle: 'حذف سياسة',
+      deletePolicyBody:
+        'يُحذف السجل من القوائم. لا يمكن حذف سياسة عليها عقارات — عندها أوقفها بدل حذفها.',
+
+      // ── أنواع الشركاء ──────────────────────────────────────────────────────
+      typesTitle: 'أنواع الشركاء',
+      typesNote:
+        'ما يختاره مقدّم الطلب عند الانضمام — إقامة، نشاط، نقل، مطعم. إيقاف نوع يمنعه من طلبات الانضمام الجديدة ولا يمسّ الشركاء القائمين عليه.',
+      typesAdd: '+ إضافة نوع',
+      typesAddTitle: 'نوع جديد',
+      typesEditTitle: 'تعديل النوع',
+      typesEmpty: 'لا أنواع بعد.',
+      colPartners: 'الشركاء',
+      colApplications: 'الطلبات',
+      partnerCount:
+        '{n, plural, zero {لا شركاء} one {شريك واحد} two {شريكان} few {# شركاء} many {# شريكاً} other {# شريك}}',
+      activeTypeLabel: 'مفعَّل — يظهر في نموذج الانضمام',
+      deactivateTypeTitle: 'إيقاف نوع شريك',
+      deactivateTypeBody:
+        'يختفي من نموذج الانضمام فلا تُقدَّم طلبات جديدة عليه، ويبقى {n} من الشركاء عليه كما هم.',
+      deleteTypeTitle: 'حذف نوع شريك',
+      deleteTypeBody:
+        'يُحذف السجل من القوائم. لا يمكن حذف نوع عليه شركاء أو طلبات — عندها أوقفه بدل حذفه.',
     },
 
     slider: {
@@ -3208,6 +3321,10 @@ export const ar = {
    * evidence, so it is translated HERE and never at the source.
    */
   auditSubject: {
+    /* كتالوج المنصّة (2026-09-04) — the three entities a super admin manages there. */
+    amenity: 'خدمة',
+    cancellation_policy: 'سياسة إلغاء',
+    partner_type: 'نوع شريك',
     partner_payout_account: 'حساب تحويل شريك',
     coupon: 'كوبون',
     advertiser: 'معلن',
@@ -3730,6 +3847,10 @@ export const ar = {
         not a price.
       */
       propertyReference: 'مرجع العقار',
+      /* Written by the كتالوج المنصّة writes — the amenity's sidebar group and its two flags. */
+      category: 'المجموعة',
+      isFilterable: 'تظهر في التصفية',
+      units: 'الوحدات',
       maxGuests: 'عدد الضيوف',
       /* The payout-account lifecycle — masked in the trail exactly as it is on screen. */
       partnerId: 'الشريك',

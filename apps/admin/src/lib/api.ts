@@ -1495,6 +1495,86 @@ const cityCategorySchema = z.object({
 
 export type CityCategory = z.infer<typeof cityCategorySchema>;
 
+/**
+ * كتالوج المنصّة — the three reference sets a business manages (Bashar, 2026-09-04).
+ *
+ * Each row carries a USE COUNT alongside its fields, because that count is what turns «retire or
+ * delete» from a guess into a decision: an amenity 4,000 units declare is retired, one added by
+ * mistake this morning is deleted. The API refuses the delete either way when something points at
+ * the row, so the count on screen and the rule in the service agree.
+ */
+const amenityRowSchema = z.object({
+  code: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string(),
+  nameDe: z.string(),
+  category: z.string(),
+  /** Whether it appears in the SEARCH SIDEBAR — a different question from `isActive`. */
+  isFilterable: z.boolean(),
+  /** Whether a partner may declare it at all. */
+  isActive: z.boolean(),
+  sortOrder: z.number(),
+  units: z.number(),
+});
+
+export type AmenityRow = z.infer<typeof amenityRowSchema>;
+
+const cancellationTierRowSchema = z.object({
+  hoursBeforeCheckIn: z.number(),
+  refundPercent: z.number(),
+});
+
+const cancellationPolicyRowSchema = z.object({
+  code: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string(),
+  nameDe: z.string(),
+  descriptionAr: z.string(),
+  descriptionEn: z.string(),
+  descriptionDe: z.string(),
+  tiers: z.array(cancellationTierRowSchema),
+  minRefundPercent: z.number(),
+  isActive: z.boolean(),
+  properties: z.number(),
+});
+
+export type CancellationPolicyRow = z.infer<typeof cancellationPolicyRowSchema>;
+export type CancellationTierRow = z.infer<typeof cancellationTierRowSchema>;
+
+const partnerTypeRowSchema = z.object({
+  code: z.string(),
+  nameAr: z.string(),
+  nameEn: z.string(),
+  nameDe: z.string(),
+  isActive: z.boolean(),
+  partners: z.number(),
+  applications: z.number(),
+});
+
+export type PartnerTypeRow = z.infer<typeof partnerTypeRowSchema>;
+
+export async function getAmenities() {
+  return staffFetch(
+    '/admin/catalogue/amenities',
+    z.object({ amenities: z.array(amenityRowSchema) }),
+  );
+}
+
+export async function getCancellationPolicies() {
+  return staffFetch(
+    '/admin/catalogue/cancellation-policies',
+    z.object({ policies: z.array(cancellationPolicyRowSchema) }),
+  );
+}
+
+/* Named apart from `getPartnerTypes`, which feeds the partner-create picker with a narrower row. */
+export async function getCataloguePartnerTypes() {
+  return staffFetch(
+    '/admin/catalogue/partner-types',
+    z.object({ partnerTypes: z.array(partnerTypeRowSchema) }),
+  );
+}
+
 export async function getCityCategories() {
   return staffFetch(
     '/admin/geo/categories',
