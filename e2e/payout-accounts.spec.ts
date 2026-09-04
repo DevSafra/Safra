@@ -46,7 +46,15 @@ import { PARTNER_BASE as PORTAL, PARTNER_STATE } from './partner-session.js';
 /** A number long enough to mask and unique per run, so two runs never collide on a partner. */
 const ACCOUNT_NUMBER = `SY${Date.now()}${'0'.repeat(6)}`.slice(0, 24);
 const LAST4 = ACCOUNT_NUMBER.slice(-4);
-const HOLDER = `Qasr Al-Sharq ${String(Date.now()).slice(-5)}`;
+/*
+  A STABLE holder name, so a second run finds the account it made rather than adding another.
+
+  It was timestamped, and twenty-two accounts accumulated on the fixture partner across a day of
+  runs — at which point the newest fell outside the list's `LIMIT 20` and the spec failed on a
+  feature that was working. That was worth finding (the ordering is fixed), but a spec that grows
+  a shared fixture by one row per run is the leak, not the discovery.
+*/
+const HOLDER = 'Qasr Al-Sharq Fixture';
 
 /** The fixture partner the portal session belongs to — five listings, one payout. */
 const PARTNER_REFERENCE = 'PAR-433898';
@@ -133,7 +141,17 @@ test.describe('payout accounts, across the portal and the console', () => {
         page.getByText('لا يُحوَّل أي مبلغ إلا إلى حساب موثَّق', { exact: false }),
       ).toBeVisible();
 
-      await page.getByRole('button', { name: 'إضافة حساب تحويل' }).click();
+      /*
+        Reuse it if a previous run made it. The row is edited back to `pending` below either way,
+        so the states this spec walks through are the same on the first run and the hundredth.
+      */
+      const existing = page.locator('[data-payout-account]').filter({ hasText: HOLDER });
+
+      if ((await existing.count()) > 0) {
+        await existing.first().getByRole('button', { name: 'تعديل' }).click();
+      } else {
+        await page.getByRole('button', { name: 'إضافة حساب تحويل' }).click();
+      }
 
       /* The consequence of editing is stated BEFORE the fields, not after the save. */
       await expect(
