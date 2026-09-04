@@ -313,6 +313,7 @@ export const ar = {
     employees: 'الموظفون',
     employeeRoles: 'أدوار الموظفين',
     supportPage: 'الدعم',
+    settings: 'الإعدادات',
     showSidebar: 'إظهار قائمة التنقل',
     hideSidebar: 'إخفاء قائمة التنقل',
     signOut: 'تسجيل الخروج',
@@ -1084,6 +1085,9 @@ export const ar = {
     paidReference: 'مرجع الحوالة',
     holdReason: 'سبب التعليق',
     coveredBookings: 'الحجوزات المشمولة',
+    /* On the card, where the count is a phrase rather than a column heading. */
+    coveredCount:
+      '{n, plural, zero {لا حجوزات} one {حجز واحد} two {حجزان} few {# حجوزات} many {# حجزاً} other {# حجز}}',
     noBookings: 'لا حجوزات على هذه الفترة بعد.',
     colBooking: 'الحجز',
     colProperty: 'العقار',
@@ -1093,8 +1097,60 @@ export const ar = {
     /* Read-only, and the screen says why rather than leaving a partner hunting for a button. */
     readOnly:
       'هذه الصفحة للاطّلاع فقط. جدولة التحويلات وتنفيذها يتمّان من سفرة؛ لأي استفسار راسل partners@safra.com.',
-    /* The link across to where the destination is maintained — its own screen, its own task. */
+    /* The link across to where the destination is maintained — now inside الإعدادات. */
     accountsLink: 'حسابات التحويل',
+
+    /*
+      The summary (Bashar, 2026-09-04: «design the pages … much better»).
+
+      A partner opens this screen to answer two questions — «كم لي؟» and «متى يصلني؟» — and the
+      page answered neither: it listed rows and stopped. This is a SENTENCE rather than a row of
+      metric tiles, because the two figures only mean anything together with where the money is
+      going, and «$3,264.30» floating above a label is a number nobody can act on.
+    */
+    summaryPending:
+      '{amount} قيد التحويل عبر {n, plural, zero {لا تحويلات} one {تحويل واحد} two {تحويلين} few {# تحويلات} many {# تحويلاً} other {# تحويل}}.',
+    summaryNothingPending: 'لا مستحقات قيد التحويل حالياً.',
+    summaryPaid: 'حُوِّل إليك {amount} حتى الآن.',
+    summaryNext: 'أقرب موعد تحويل: {date}.',
+    summaryTo: 'إلى {account}.',
+    /* No verified destination — the one thing that stops a transfer, said where it is noticed. */
+    summaryNoAccount: 'لا حساب تحويل موثّق بعد، ولا يمكن تحويل أي مبلغ قبل توثيق حساب.',
+    summaryAddAccount: 'أضف حساب تحويل',
+
+    /* The two groups a partner actually distinguishes: what is coming, and what has arrived. */
+    groupOpen: 'قيد الانتظار',
+    groupSettled: 'مكتملة',
+    /* Fines are DEDUCTED from the gross — a net with an unexplained gap is a support ticket. */
+    afterFine: '{gross} ناقص {fine} غرامات',
+  },
+
+  /*
+    الإعدادات — the partner's own account (Bashar, 2026-09-04).
+
+    «add a new tab for حسابات التحويل or add it inside a new settings page, where the partner also
+    can change his password». Both live here: the destination money arrives at, and the credential
+    that protects it. They belong together because they are the two things a partner owns about
+    their ACCOUNT rather than about their listings.
+  */
+  settings: {
+    title: 'الإعدادات',
+    accountsHeading: 'حسابات التحويل',
+    passwordHeading: 'كلمة المرور',
+    passwordNote:
+      'تغيير كلمة المرور ينهي كل الجلسات الأخرى فوراً، بما فيها هذه — ستحتاج إلى تسجيل الدخول من جديد.',
+    currentPassword: 'كلمة المرور الحالية',
+    newPassword: 'كلمة المرور الجديدة',
+    confirmPassword: 'تأكيد كلمة المرور الجديدة',
+    passwordSubmit: 'تغيير كلمة المرور',
+    passwordSaving: 'جارٍ التغيير…',
+    passwordChanged: 'تم تغيير كلمة المرور. سجّل الدخول من جديد.',
+    /* Checked here so the mismatch is caught before a round trip that would refuse it anyway. */
+    passwordMismatch: 'الكلمتان غير متطابقتين.',
+    passwordFailed: 'تعذّر تغيير كلمة المرور.',
+    /* The two refusals this form can actually meet, in the reader's language. */
+    passwordIncorrect: 'كلمة المرور الحالية غير صحيحة.',
+    passwordUnchanged: 'كلمة المرور الجديدة يجب أن تختلف عن الحالية.',
   },
 
   /**

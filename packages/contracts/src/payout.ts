@@ -29,6 +29,24 @@ export const PAYOUT_STATUSES = [
 export type PayoutStatus = (typeof PAYOUT_STATUSES)[number];
 
 /**
+ * A payout that has REACHED ITS END: the money moved, or it never will.
+ *
+ * The complement — everything a partner is still waiting on — is derived from this rather than
+ * listed, and the direction is deliberate. A status added to the enum and forgotten here shows up
+ * under «قيد الانتظار», where a partner sees it and asks; listed the other way round it would be
+ * filed silently into history and vanish from the screen that matters. `payoutIsSettled` is what
+ * مستحقاتي groups on, so getting this backwards hides somebody's money.
+ *
+ * Held by `payout.test.ts` against `PAYOUT_STATUSES`, so a new state cannot be added without this
+ * file being read.
+ */
+export const SETTLED_PAYOUT_STATUSES = ['paid', 'cancelled'] as const;
+
+export function payoutIsSettled(status: string): boolean {
+  return (SETTLED_PAYOUT_STATUSES as readonly string[]).includes(status);
+}
+
+/**
  * Releasing a payout for transfer.
  *
  * `scheduledFor` is a DATE, not a timestamp — the handoff's line is "مجدول يوم الخميس", and a

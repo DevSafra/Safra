@@ -1,3 +1,5 @@
+import IntlMessageFormat from 'intl-messageformat';
+
 import { fill, partnerAr, type Locale } from '@safra/i18n';
 
 /**
@@ -11,6 +13,25 @@ import { fill, partnerAr, type Locale } from '@safra/i18n';
  * line here when a second language arrives.
  */
 export const PARTNER_LOCALE: Locale = 'ar';
+
+/**
+ * A COUNTED sentence, through ICU — the same mechanism the console and the customer app use.
+ *
+ * Arabic has six plural forms and `fill()` substitutes placeholders without knowing any of them,
+ * so «# حجز» renders «4 حجز» — correct for one, wrong for four. The portal had no plural handling
+ * at all until مستحقاتي needed one (2026-09-04); teaching `fill` the rules would turn a
+ * substituter into a small translation library, and `Intl.PluralRules` already knows them.
+ *
+ * ## Counts arrive as NUMBERS, not through `count()`
+ *
+ * `IntlMessageFormat` formats the digits itself, so the Western digits this platform uses in
+ * Arabic still appear. A pre-formatted string would give `Intl.PluralRules` nothing numeric to
+ * classify, every message would silently resolve to `other`, and the failure would leave every
+ * test green — which is why the values are typed as numbers.
+ */
+export function plural(message: string, values: Record<string, number | string>): string {
+  return String(new IntlMessageFormat(message, PARTNER_LOCALE).format(values));
+}
 
 export const t = partnerAr;
 

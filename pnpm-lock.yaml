@@ -222,6 +222,9 @@ importers:
       '@safra/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      intl-messageformat:
+        specifier: ^11.2.13
+        version: 11.2.13
       next:
         specifier: ^15.5.0
         version: 15.5.22(@playwright/test@1.62.1)(@types/node@22.20.1)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
