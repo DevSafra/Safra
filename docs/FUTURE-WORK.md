@@ -427,6 +427,57 @@ carries a note saying that filtering by stars excludes every other accommodation
 that silently removes whole categories of inventory is the failure the price note beside it already
 guards against.
 
+### SAFRA service fee — visibility made configurable, 2026-09-04
+
+**Bashar's requirement.** _"One shared setting and one consistent pricing rule, without per-surface
+hard-coding."_ Enabled, the fee is a separate line wherever there is a price breakdown; disabled,
+the customer sees the final payable price without it. _"In both modes, the final total shown before
+payment must exactly match the total charged."_ Ledger, invoices and staff views stay correct;
+hiding affects customer-facing presentation only.
+
+**Why it needed a setting at all.** The fee was taken off the customer's screens on 2026-09-03 by
+**two separate pieces of code that each decided locally**, one on the checkout and one on the
+invoice, each with its own comment explaining why. That is the shape this replaces:
+`commission.customer_fee_visible`, seeded `false` (what the platform does today), read through one
+function — `customerFeeVisible` in `@safra/contracts` — which every customer surface must call.
+
+**The two surfaces with a real breakdown**, and what each does:
+
+- **Checkout** — itemises `baseAmount` and `customerFeeAmount` above the total when enabled, and
+  shows the total alone when not. The pair moves together: never the base alone, which is what the
+  screen used to do and which reads as a breakdown that does not add up.
+- **Invoice** — **folds** the fee into the accommodation line rather than dropping it. A receipt
+  short by a charged line states the fee to anybody who subtracts, and states it as an error.
+
+Home cards, city pages, search and the property page show one fee-inclusive price rather than a
+breakdown, so they are unchanged in both modes. **Emails carry totals only** — no fee line exists in
+any template — so they too are correct either way.
+
+**Held by three things**, not by care: `customerLines` is tested to settle to the same figure in
+both modes; `invoices.integration.test.ts` sets the setting BOTH ways and demands an identical API
+payload, so the service cannot start consulting it; and `one-fee-rule.test.ts` sweeps the customer
+app for any file that names the fee line without CALLING the shared rule. That sweep's first version
+matched the bare name, which an `import` satisfies — found by mutation, and now it requires a call.
+
+**Driven in browsers, both modes, both surfaces.** Invoice: `$190.00 + $1.99 = $191.99` named,
+`$191.99 = $191.99` folded. Checkout: `$200.00 + $1.99 = $201.99` named, `$201.99` alone hidden.
+Totals identical. Itemised at 390/768/1024/1440 with zero horizontal overflow in Arabic. Each toggle
+audited with actor, IP and user agent plus a `settings_history` row.
+
+**Found and fixed alongside it:** the storefront cached `/settings/public` for **five minutes**,
+layered on top of the API's own 30-second cache which an admin write invalidates. An operator who
+flipped the switch and looked at the site saw nothing change — long enough to conclude it was
+broken and flip it back. That read is now 30 seconds, matching the layer beneath it; the other
+reference reads (cities, amenities, currencies) keep their five minutes, because nobody watches a
+screen to confirm an amenity.
+
+**A fact worth stating rather than assuming:** `commission.customer_fee_value` (1.99) and
+`commission.customer_fee_mode` have been on the public settings endpoint since before this change —
+the property page needs them to display fee-inclusive prices. So hiding the fee is presentation, not
+concealment: anyone reading the API can still compute it. That matches the requirement as written
+(_"only affect customer-facing presentation"_), but it is not a secrecy mechanism and should not be
+relied on as one.
+
 ### Same-day booking cutoff — made switchable, 2026-09-04
 
 **Bashar's requirement.** The same-day cutoff must be configurable from the settings or Rules
