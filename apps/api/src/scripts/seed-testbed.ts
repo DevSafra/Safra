@@ -423,6 +423,21 @@ function isoDate(offsetDays: number): string {
  */
 type Seeder = Database | Transaction;
 
+/**
+ * A stable star classification for a seeded listing, 1-5.
+ *
+ * A cheap string hash rather than a random number, so the same fixture seeds the same catalogue
+ * every time. A browser test that filters to «5 stars» and counts the results is meaningless if
+ * the seed decides how many there are by chance.
+ */
+function starRatingFor(slug: string): number {
+  let hash = 0;
+
+  for (const character of slug) hash = (hash * 31 + character.charCodeAt(0)) % 100_000;
+
+  return (hash % 5) + 1;
+}
+
 async function main(): Promise<void> {
   const databaseUrl = process.env['DATABASE_URL'];
 
@@ -1068,6 +1083,20 @@ async function build(db: Seeder): Promise<void> {
             : {}),
           cancellationPolicyId: policy.id,
           attributes: [...property.attributes],
+          /*
+            A star CLASSIFICATION, so a fresh testbed can demonstrate the filter.
+
+            DERIVED from the slug rather than random, so two seeds of the same fixture produce the
+            same catalogue — a filter test that asserts «5 stars only» needs the set to be stable,
+            and `Math.random()` would make it pass or fail by luck.
+
+            Spread across all five deliberately: a testbed where every hotel is four stars cannot
+            show that the filter narrows anything, which is the one thing it exists to show.
+
+            NOT the same as `rating`, which the note below is about — that is the guest review
+            average and a trigger owns it.
+          */
+          starRating: starRatingFor(property.slug),
           /* No rating or count — a trigger owns both. See the note above the partner insert. */
         })
         .returning();
