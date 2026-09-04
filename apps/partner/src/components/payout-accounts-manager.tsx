@@ -401,7 +401,9 @@ function Action({
       type="button"
       onClick={onClick}
       disabled={busy}
-      className={`inline-flex min-h-10 cursor-pointer items-center rounded-lg border px-3 text-[12.5px] font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-1.5 ${
+      /* `w-fit`: `inline-flex` is overruled by a grid parent, which stretches its items — and a
+         full-width bordered strip reads as a table row rather than as a button. */
+      className={`inline-flex w-fit min-h-10 cursor-pointer items-center rounded-lg border px-3 text-[12.5px] font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:py-1.5 ${
         danger
           ? 'border-bad/40 text-bad hover:bg-bad/10'
           : 'border-line text-text hover:bg-panel'

@@ -61,6 +61,7 @@ export async function Shell({
     | 'coupons'
     | 'employees'
     | 'employeeRoles'
+    | 'settings'
     | 'support';
   /**
    * The §7 sidebar badges — `عقاراتي 3` and `التقييمات ★ 4.7`.
@@ -343,6 +344,20 @@ export async function Shell({
             Last in the list because it is where a partner goes when something else on it did not
             work.
           */}
+          {/*
+            الإعدادات — the partner's own account: where money arrives, and the password that
+            protects it (Bashar, 2026-09-04).
+
+            NOT gated. حسابات التحويل inside it needs `PAYOUT_ACCOUNT_MANAGE_OWN`, which an
+            employee does not hold — but every signed-in person must be able to change their own
+            password, and hiding the entry would take that away from exactly the people who cannot
+            reach it any other way. The panel explains itself; the door stays open.
+
+            Beside الدعم at the foot, because both are things a partner reaches for occasionally
+            rather than as part of the day's work.
+          */}
+          <Item href="/settings" label={t.nav.settings} current={active === 'settings'} />
+
           <Item
             href="/support"
             label={t.nav.supportPage}

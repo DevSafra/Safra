@@ -46,6 +46,10 @@ const EXEMPT: Readonly<Record<string, string>> = {
     'The rejected banner tells the partner to come here, so it must stay reachable. It locks ' +
     'the sidebar instead, via isLocked().',
   'support/[reference]/page.tsx': 'One thread of the above.',
+  'payouts/accounts/page.tsx':
+    'A permanent redirect and nothing else — حسابات التحويل moved into الإعدادات on 2026-09-04. ' +
+    'It renders no partner data, so there is nothing for a gate to withhold; /settings, where it ' +
+    'lands, calls requireVerifiedPartner() itself.',
 };
 
 /** Every `page.tsx` under `app/`, as a path relative to it. */

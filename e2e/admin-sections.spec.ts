@@ -134,8 +134,11 @@ test.describe('every admin section the design specifies', () => {
       change made to it. It did exactly that when the roles screen landed, which is the assertion
       working rather than getting in the way — so the number goes up by one and the reason for the
       new entry is recorded beside it.
+
+      23 since 2026-09-04: كتالوج المنصّة, where amenities, cancellation policies and partner types
+      became manageable instead of SQL-only.
     */
-    expect(hrefs.length).toBe(22);
+    expect(hrefs.length).toBe(23);
 
     for (const href of hrefs) {
       const response = await page.goto(href);
