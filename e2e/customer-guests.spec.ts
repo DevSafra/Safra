@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 import ar from '../packages/i18n/src/messages/web/ar.json' assert { type: 'json' };
 
@@ -42,6 +42,17 @@ function stay(): { checkIn: string; checkOut: string } {
   return { checkIn: day(40), checkOut: day(43) };
 }
 
+/**
+ * The party field inside the SEARCH form, not the filter panel's copy of it.
+ *
+ * `/search` carries each party value twice: once in the search form and once as a hidden field in
+ * the filter panel, which repeats the search so filtering does not drop it. A bare `[name=adults]`
+ * matches both and fails Playwright's strict mode — so the form is named by the one control only
+ * it has, its own submit.
+ */
+const party = (page: Page, name: string) =>
+  page.locator('form:has(button:has-text("ابحث عن إقامة"))').locator(`[name="${name}"]`);
+
 test.describe('عدد الضيوف', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -50,9 +61,17 @@ test.describe('عدد الضيوف', () => {
 
     await page.goto(`/ar/search?${query}`);
 
-    // ── The form offers all three, and shows what was asked for ────────────────
+    /*
+      ── The form offers all three, and shows what was asked for ────────────────
+
+      `[name=…]` rather than `select[name=…]`. The party is a `<select>` per field until
+      `GuestsField` mounts and a hidden input per field afterwards — the popover replaced the
+      three selects on 2026-09-02. Selecting on the NAME asserts the value the form will actually
+      submit in either state, which is the requirement; selecting on the tag asserted the
+      mechanism, and went red the day the mechanism changed while the behaviour was intact.
+    */
     for (const [field, value] of Object.entries(PARTY)) {
-      await expect(page.locator(`select[name="${field}"]`), field).toHaveValue(value);
+      await expect(party(page, field), field).toHaveValue(value);
     }
 
     // ── A result link carries the party ───────────────────────────────────────
@@ -126,9 +145,9 @@ test.describe('عدد الضيوف', () => {
   test('renders for a reader who never searched', async ({ page }) => {
     await page.goto('/ar/search');
 
-    await expect(page.locator('select[name="adults"]')).toHaveValue('2');
-    await expect(page.locator('select[name="children"]')).toHaveValue('0');
-    await expect(page.locator('select[name="infants"]')).toHaveValue('0');
+    await expect(party(page, 'adults')).toHaveValue('2');
+    await expect(party(page, 'children')).toHaveValue('0');
+    await expect(party(page, 'infants')).toHaveValue('0');
   });
 
   /**
@@ -143,8 +162,45 @@ test.describe('عدد الضيوف', () => {
     );
 
     expect(response?.status(), 'a page, not a 500').toBeLessThan(400);
-    await expect(page.locator('select[name="children"]')).toHaveValue('0');
+    await expect(party(page, 'children')).toHaveValue('0');
     /* Clamped to the schema's ceiling, not echoed back. */
-    await expect(page.locator('select[name="infants"]')).not.toHaveValue('9999');
+    await expect(party(page, 'infants')).not.toHaveValue('9999');
   });
+
+  /**
+   * A crafted DATE does not take the page down — which it did until 2026-09-04.
+   *
+   * `first(query['checkIn']) ?? todayInDamascus()` fell back only on `undefined`, and an empty
+   * string is not nullish. `?checkIn=` answered **500** from the server component; `?checkOut=`
+   * reached the browser and threw `RangeError: Invalid time value`, painting «Application error»
+   * over the busiest page on the site. A link that had merely lost its query string was enough.
+   *
+   * Each variant is its own case because they failed in different LAYERS — one server, one client
+   * — and a single combined URL hid the second behind the first.
+   */
+  for (const query of [
+    'checkIn=',
+    'checkOut=',
+    'checkIn=not-a-date',
+    'checkIn=&checkOut=',
+    /* Reversed: the API refuses this pair, and the page must report that rather than break. */
+    'checkIn=2026-12-01&checkOut=2026-11-01',
+  ]) {
+    test(`survives ?${query}`, async ({ page }) => {
+      const errors: string[] = [];
+
+      page.on('pageerror', (error) => errors.push(String(error)));
+
+      const response = await page.goto(`/ar/search?${query}`);
+
+      expect(response?.status(), 'a page, not a 500').toBeLessThan(400);
+      expect(errors, 'the page threw in the browser').toStrictEqual([]);
+      /*
+        And it is the search page, not an error boundary wearing its URL. `toBeAttached` rather
+        than `toBeVisible`: once `GuestsField` mounts the party lives in HIDDEN inputs, and
+        visibility is the wrong question about a field whose whole job is to be submitted.
+      */
+      await expect(party(page, 'adults')).toBeAttached();
+    });
+  }
 });

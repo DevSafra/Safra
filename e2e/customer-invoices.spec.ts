@@ -75,7 +75,45 @@ test.describe('الفواتير', () => {
     await expect(
       breakdown.getByText(en.account.invoiceLines.accommodation),
     ).toBeVisible();
-    await expect(breakdown.getByText(en.account.invoiceLines.serviceFee)).toBeVisible();
+
+    /*
+      SAFRA's fee is NOT named to the customer (Bashar, 2026-09-03, three times, ending «the
+      total/final price should only be displayed to the customer/guest»). It is still charged, still
+      on the booking and still in the ledger; the invoice folds it into the accommodation line.
+
+      So what is asserted here is the property that the fold has to preserve and that a removal
+      would have broken: the lines still reach the total. An invoice whose breakdown is short by the
+      fee states the fee to anyone who subtracts, and states it as an error.
+    */
+    await expect(breakdown.getByText(en.account.invoiceLines.serviceFee)).toHaveCount(0);
+
+    /*
+      The LINE rows only. The section also prints the total underneath them, so summing every
+      amount inside it counted the total as a line and came to exactly twice the bill.
+    */
+    const minor = (text: string): number => {
+      const found = /(-?)\$([\d,]+\.\d{2})/.exec(text);
+
+      if (!found) return 0;
+
+      const value = Math.round(Number((found[2] ?? '0').replace(/,/g, '')) * 100);
+
+      return found[1] === '-' ? -value : value;
+    };
+
+    const lineTotal = (await breakdown.locator('dl > div').allInnerTexts())
+      .map(minor)
+      .reduce((sum, value) => sum + value, 0);
+
+    const printed = minor(
+      await page.getByText(en.account.invoiceTotalLabel).locator('..').innerText(),
+    );
+
+    expect(printed, 'the invoice printed no total').toBeGreaterThan(0);
+    expect(
+      lineTotal,
+      'the breakdown does not add up to the total the customer is asked for',
+    ).toBe(printed);
 
     /*
       Every figure in the column carries two decimals.

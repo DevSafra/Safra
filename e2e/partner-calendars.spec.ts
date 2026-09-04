@@ -42,15 +42,43 @@ const grids = (page: Page) => page.locator('[data-unit] ul[aria-label]');
 test('a day on the dashboard opens التقويمات at that date', async ({ page }) => {
   await page.goto(`${BASE}/`);
 
-  const day = page.locator('[data-day="2026-08-22"] a');
+  /*
+    A day taken from the GRID, not written into the test.
+
+    This named `2026-08-22`, and the dashboard renders THIS month — so it passed for the weeks it
+    was written in and has failed every day since August ended, reporting a broken link where the
+    only thing wrong was the calendar. A date that ages out is a fixture pretending to be an
+    assertion.
+
+    The middle of the rendered month: every month has one, and it avoids the first and last cells,
+    whose own edge cases the ring assertions below cover.
+  */
+  const cells = page.locator('[data-day] a');
+
+  await expect(cells.first()).toBeVisible();
+
+  const date = await cells
+    .nth(Math.floor((await cells.count()) / 2))
+    .getAttribute('data-day-date')
+    .catch(() => null);
+
+  const chosen =
+    date ??
+    (await cells
+      .nth(Math.floor((await cells.count()) / 2))
+      .evaluate((node) => node.closest('[data-day]')?.getAttribute('data-day') ?? ''));
+
+  expect(chosen, 'the dashboard rendered no day cells').toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+  const day = page.locator(`[data-day="${chosen}"] a`);
 
   await expect(day).toBeVisible();
-  await expect(day).toHaveAttribute('href', '/calendars?date=2026-08-22');
+  await expect(day).toHaveAttribute('href', `/calendars?date=${chosen}`);
   /* Its accessible name is the breakdown, not a bare numeral repeated thirty-one times. */
-  await expect(day).toHaveAttribute('aria-label', /2026-08-22/);
+  await expect(day).toHaveAttribute('aria-label', new RegExp(chosen));
 
   await day.click();
-  await page.waitForURL(/\/calendars\?date=2026-08-22/);
+  await page.waitForURL(new RegExp(`/calendars\\?date=${chosen}`));
 
   /* Marked in EVERY unit's grid — the reader arrived looking for that date across the portfolio. */
   const marked = page.locator('[data-day-highlight]');
@@ -59,7 +87,7 @@ test('a day on the dashboard opens التقويمات at that date', async ({ pa
   for (const value of await marked.evaluateAll((nodes) =>
     nodes.map((node) => node.getAttribute('data-day')),
   )) {
-    expect(value).toBe('2026-08-22');
+    expect(value).toBe(chosen);
   }
 
   /*
@@ -176,6 +204,19 @@ test('a day on the dashboard opens التقويمات at that date', async ({ pa
     That is what the old strip would have failed — it drew day one in column one whatever weekday it
     was. The spacers carry no `data-day`, because that attribute has to keep meaning "a real day".
   */
+  /*
+    Anchored to a KNOWN month before the arrow is pressed.
+
+    The two halves of this test want different things from the calendar. The dashboard half must
+    use whatever month is showing today, or it ages out — that is what `2026-08-22` did. This half
+    needs a SPECIFIC month, because the assertions below are about September 2026's shape: it opens
+    on a Tuesday, so a Saturday-first week needs exactly three leading spacers. Relativising that
+    would mean recomputing the offset in the test, which is re-implementing the thing under test.
+
+    So it navigates to August and presses the arrow. The arrow is still a CLICK rather than a
+    `goto` to September, which is the regression this step exists for — see the note above.
+  */
+  await page.goto(`${BASE}/calendars?month=2026-08`);
   await page.getByLabel(t.unitCalendar.nextMonth).click();
   await page.waitForURL(/month=2026-09/);
 

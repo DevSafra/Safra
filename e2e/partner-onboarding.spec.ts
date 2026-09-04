@@ -402,8 +402,20 @@ test('a partner’s commission is set by hand, in percent, and survives a reload
   await page.locator('input[name=commissionCapUsd]').fill('');
   await page.locator('[data-partner-commission] [data-geo-save]').click();
 
+  /*
+    The panel's summary line is a PREVIEW of what the boxes currently mean — it says «platform
+    rate» the moment the field is cleared, before any request is made. Waiting on it and then
+    reloading raced the save: in isolation the request won, in a full run the reload did, and the
+    test reported a persistence bug that was not there.
+
+    `commissionSaved` is the only text that means the server answered, because `setSaved(true)` runs
+    after `response.ok`. Both are asserted: the words the reader sees, and the fact that it landed.
+  */
   await expect(page.locator('[data-partner-commission]')).toContainText(
     t.sections.partnerDetail.commissionPlatform,
+  );
+  await expect(page.locator('[data-partner-commission]')).toContainText(
+    t.sections.partnerDetail.commissionSaved,
     { timeout: 20_000 },
   );
 
