@@ -13,7 +13,7 @@ import {
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
-import { divideDecimalStrings, fromMinor, toMinor } from '../common/money.js';
+import { fromMinor, toMinor } from '../common/money.js';
 import {
   customerFeeMinor,
   customerFeeRule,
@@ -542,13 +542,13 @@ export class SearchService {
       identical, and a percentage fee is monotonic in the base, so `price_asc` still means cheapest
       first either way. `stay_total_sort` is deliberately left alone for that reason.
 
-      `nightlyFrom` is recomputed from the inclusive total rather than having the fee added to it:
-      the card prints both, and «$101 / الليلة» over «$201.99 لليلتين» has to multiply.
+      `nightlyFrom` has the fee added to it, exactly as the property page adds it — see below for
+      why it is no longer divided out of the inclusive total.
     */
     const feeRule = await customerFeeRule(this.settings);
     const items = (hasMore ? all.slice(0, query.limit) : all)
       .map(stripSortColumns)
-      .map((item) => this.withCustomerFee(item, nights, feeRule));
+      .map((item) => this.withCustomerFee(item, feeRule));
 
     return {
       items,
@@ -565,29 +565,42 @@ export class SearchService {
   }
 
   /**
-   * One row's prices, with the customer fee folded in.
+   * One row's prices, with the customer fee folded into each.
+   *
+   * ## The advertised nightly price must not depend on how long the trip is
+   *
+   * It used to: `nightlyFrom` was the fee-INCLUSIVE total divided by nights, so one $100 unit
+   * advertised itself at $101.99, $101.00, $100.66, $100.40 and $100.28 a night for a one-, two-,
+   * three-, five- and seven-night search — while the property page, which adds the fee to the
+   * unit's own rate, said $101.99 every time. Bashar saw the pair on 2026-09-04: «the prices on the
+   * list are not correct but in Details page is correct.»
+   *
+   * Dividing was chosen so the card's two figures would multiply — «$101 / الليلة» over «$201.99
+   * لليلتين». It never achieved that: a flat fee spread across N nights does not divide evenly, so
+   * the rounded quotient was a minor unit off the total for four of the five lengths above, and
+   * $101 × 2 = $202 sat next to a total of $201.99 on the same card.
+   *
+   * So the fee is applied to the NIGHTLY rate here, which is what `priceWithCustomerFee` does on
+   * the property page. One property now quotes one nightly price wherever it appears, which is the
+   * property a guest comparing cards actually relies on. `customerFeeMinor` keeps the flat fee
+   * per-BOOKING in the total, which is where it is charged.
    *
    * The scale comes from the row's OWN currency, so a three-decimal dinar is not rounded to cents
-   * on the way through. Division for the per-night figure rounds half-up at that scale, which can
-   * leave `nightly × nights` a minor unit away from the total on a stay whose fee does not divide
-   * evenly — unavoidable when one flat fee is spread across N nights, and the total is the figure
-   * that is charged.
+   * on the way through.
    */
   private withCustomerFee(
     item: SearchResultItem,
-    nights: number,
     rule: CustomerFeeRule,
   ): SearchResultItem {
     const scale = currencyDecimals(item.currencyCode);
-    const baseMinor = toMinor(item.stayTotal, scale);
-    const grossMinor = baseMinor + customerFeeMinor(baseMinor, rule, scale);
+    const totalMinor = toMinor(item.stayTotal, scale);
+    const nightlyMinor = toMinor(item.nightlyFrom, scale);
 
     return {
       ...item,
-      stayTotal: fromMinor(grossMinor, scale),
-      nightlyFrom: divideDecimalStrings(
-        fromMinor(grossMinor, scale),
-        String(nights),
+      stayTotal: fromMinor(totalMinor + customerFeeMinor(totalMinor, rule, scale), scale),
+      nightlyFrom: fromMinor(
+        nightlyMinor + customerFeeMinor(nightlyMinor, rule, scale),
         scale,
       ),
     };

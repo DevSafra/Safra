@@ -558,8 +558,11 @@ describeIfDb('SearchService', () => {
    * He saw «$100» on a card and «$101.99» at checkout, on three surfaces, and the fee had just
    * stopped being itemised — so nothing on the page accounted for the difference. These assert the
    * two halves that have to hold for a browse price to be believable: the total is what will be
-   * charged, and the per-night figure is that total divided by the nights, so a card printing both
-   * multiplies.
+   * charged, and the per-night figure is the one the property page shows for the same unit.
+   *
+   * The per-night half was originally the total DIVIDED by nights, and this suite asserted that.
+   * It was wrong, and the assertion made it durable — see «does not change with the length of the
+   * trip» below for what Bashar saw on 2026-09-04 and why the rule moved.
    */
   describe('SAFRA s customer fee', () => {
     it('is inside the stay total', async () => {
@@ -572,15 +575,76 @@ describeIfDb('SearchService', () => {
       );
     });
 
-    it('is spread across the nightly figure, not added to it', async () => {
+    it('is added to the nightly figure, the way the property page adds it', async () => {
       await setCustomerFee('flat', 1.99);
 
       const cheap = (await search.search(query())).items.find(
         (item) => item.slug === cheapPropertySlug,
       );
 
-      /* 201.99 over two nights, not 100 + 1.99 per night. */
-      expect(cheap?.nightlyFrom).toBe('101.00');
+      /* 100 + 1.99, which is what `priceWithCustomerFee` prints on the property page. */
+      expect(cheap?.nightlyFrom).toBe('101.99');
+    });
+
+    /**
+     * The advertised nightly price does not change with the length of the trip.
+     *
+     * This is the defect Bashar reported on 2026-09-04 — *"the prices on the list are not correct
+     * but in Details page is correct"* — measured before the fix on the running API: one $100 unit
+     * advertised itself at **$101.99, $101.00, $100.66, $100.40 and $100.28** a night for a one-,
+     * two-, three-, five- and seven-night search, because the flat fee was divided across the
+     * nights. The property page said $101.99 every time, so the same property carried two different
+     * nightly prices on two screens, and a guest comparing cards was comparing trip lengths.
+     *
+     * Asserted across several lengths rather than one, because the old rule was CORRECT for a
+     * one-night stay: a test fixed at a single length would have passed against the defect.
+     */
+    it('does not change with the length of the trip', async () => {
+      await setCustomerFee('flat', 1.99);
+
+      const nightly: Record<number, string | undefined> = {};
+
+      for (const nights of [1, 2, 3, 7]) {
+        const { items } = await search.search(
+          query({ checkIn: isoDate(IN), checkOut: isoDate(IN + nights) }),
+        );
+
+        nightly[nights] = items.find(
+          (item) => item.slug === cheapPropertySlug,
+        )?.nightlyFrom;
+      }
+
+      expect(nightly).toStrictEqual({
+        1: '101.99',
+        2: '101.99',
+        3: '101.99',
+        7: '101.99',
+      });
+    });
+
+    /**
+     * And the TOTAL still charges the flat fee once, however long the stay.
+     *
+     * The opposite control for the test above: a fix that simply multiplied the fee into every
+     * night would give one stable nightly figure and would also charge a seven-night guest $13.93
+     * in fees. `customerFeeMinor`'s own comment says a flat fee is per BOOKING; this is what holds
+     * it to that through the search projection.
+     */
+    it('charges the flat fee once per booking, not once per night', async () => {
+      await setCustomerFee('flat', 1.99);
+
+      const totals: Record<number, string | undefined> = {};
+
+      for (const nights of [1, 2, 7]) {
+        const { items } = await search.search(
+          query({ checkIn: isoDate(IN), checkOut: isoDate(IN + nights) }),
+        );
+
+        totals[nights] = items.find((item) => item.slug === cheapPropertySlug)?.stayTotal;
+      }
+
+      /* 100/night, plus 1.99 once. */
+      expect(totals).toStrictEqual({ 1: '101.99', 2: '201.99', 7: '701.99' });
     });
 
     it('takes a percentage of the base when that is the mode', async () => {

@@ -65,6 +65,21 @@ describeIfDb('a refused arrival date', () => {
     );
 
     unitId = await publishedUnit(db);
+
+    /*
+      The cutoff is ON for every test here unless one says otherwise.
+
+      Not decoration: since 2026-09-04 it is a SETTING an operator can switch off, so a suite that
+      read whatever the database happened to hold would pass or fail on a toggle somebody made in a
+      browser hours earlier. That is exactly what happened — «distinguishes the same-day cutoff
+      from a date in the past» went red with nothing in the diff to explain it, because the live row
+      was `false`. Stating the precondition is what makes the assertion about the code again.
+    */
+    await db.execute(sql`
+      UPDATE settings SET value = 'true'::jsonb
+      WHERE key = ${SAME_DAY_CUTOFF_ENABLED_SETTING}
+    `);
+    settings.invalidate();
   });
 
   afterEach(async () => {
