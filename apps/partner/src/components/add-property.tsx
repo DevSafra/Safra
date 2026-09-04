@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-import { TRIP_ATTRIBUTES } from '@safra/contracts';
+import { TRIP_ATTRIBUTES, usesStarRating } from '@safra/contracts';
 
 import type { PropertyFormReference } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
@@ -61,6 +61,13 @@ export function AddProperty({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
+  /*
+    The chosen property type, held in state ONLY so the star classification can appear for a hotel
+    and vanish for everything else. It is initialised to the first option because that is what an
+    uncontrolled `<select>` would have selected — state that disagreed with the rendered control
+    would offer a villa's form to somebody looking at «فندق».
+  */
+  const [typeCode, setTypeCode] = useState(reference.propertyTypes[0]?.code ?? '');
 
   function toggle(attribute: string): void {
     setPicked((current) =>
@@ -180,27 +187,39 @@ export function AddProperty({
           <Select
             name="propertyTypeCode"
             label={t.properties.fType}
+            value={typeCode}
+            onChange={setTypeCode}
             options={reference.propertyTypes.map((type) => ({
               value: type.code,
               label: type.nameAr,
             }))}
           />
           {/*
-            The star CLASSIFICATION, required on creation (Bashar, 2026-09-04).
+            The star CLASSIFICATION — for a HOTEL, and only a hotel (Bashar, 2026-09-04).
 
-            Placed immediately after the property type because it classifies the type — a four-star
-            hotel is one answer, not two unrelated fields two rows apart. A select of five rather
-            than a star widget: this is a DECLARATION the partner already knows, not a rating they
-            are forming an opinion about, and five options is one tap on a phone.
+            Immediately after the property type because it classifies the type, and CONDITIONAL on
+            it: «other accommodation types … should not use the hotel star-classification system».
+            A villa's form simply has no such field, which is the honest rendering of «the
+            classification should simply be absent» — better than a disabled control, which invites
+            the question «why can I not fill this in».
+
+            It disappears from the DOM when the type changes, so the field is not submitted either:
+            the API refuses a villa that sends one, and a form that could send it would be a form
+            whose submit is refused for a reason the reader cannot see.
+
+            A select of five rather than a star widget: this is a DECLARATION the partner already
+            knows, not a rating they are forming an opinion about, and five options is one tap.
           */}
-          <Select
-            name="starRating"
-            label={t.properties.fStarRating}
-            options={STAR_VALUES.map((value) => ({
-              value: String(value),
-              label: t.properties.starOption[value] ?? String(value),
-            }))}
-          />
+          {usesStarRating(typeCode) ? (
+            <Select
+              name="starRating"
+              label={t.properties.fStarRating}
+              options={STAR_VALUES.map((value) => ({
+                value: String(value),
+                label: t.properties.starOption[value] ?? String(value),
+              }))}
+            />
+          ) : null}
           <Select
             name="citySlug"
             label={t.properties.fCity}
@@ -376,10 +395,20 @@ function Select({
   name,
   label,
   options,
+  value,
+  onChange,
 }: {
   readonly name: string;
   readonly label: string;
   readonly options: readonly { value: string; label: string }[];
+  /*
+    CONTROLLED only when a caller needs to react to the choice — the property type does, because
+    the star classification appears for a hotel and for nothing else. Every other select on this
+    form stays uncontrolled and submits through FormData, which is the simpler thing and correct
+    for a field nothing else depends on.
+  */
+  readonly value?: string | undefined;
+  readonly onChange?: ((value: string) => void) | undefined;
 }) {
   return (
     <label className="grid gap-1">
@@ -387,6 +416,9 @@ function Select({
       <select
         name={name}
         required
+        {...(value === undefined
+          ? {}
+          : { value, onChange: (event) => onChange?.(event.target.value) })}
         className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text"
       >
         {options.map((option) => (

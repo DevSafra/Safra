@@ -132,7 +132,19 @@ function Card({ property }: { readonly property: PartnerProperty }) {
     .join(' · ');
 
   return (
-    <article className="flex h-full flex-col overflow-hidden rounded-card border border-line bg-card">
+    <article
+      /*
+        The TYPE as a data attribute, because it decides what this card shows.
+
+        Since 2026-09-04 a star classification is a hotel classification, so a browser check for
+        «the classification appears on a hotel and not on an apartment» has to be able to tell them
+        apart — and it cannot do that from the visible text, where «فندق» turns up in the NAME of
+        listings that are not hotels («فندق قصر الشرق — المالكي» beside «شقق قصر الشرق»). The same
+        reasoning as `data-payout-account` and `data-star-editor`.
+      */
+      data-property-type={property.propertyType}
+      className="flex h-full flex-col overflow-hidden rounded-card border border-line bg-card"
+    >
       {/*
         The image, or an honest placeholder. `property_images` is empty for every seeded listing
         because nothing has uploaded one yet — a stock photo here would be a picture of somewhere

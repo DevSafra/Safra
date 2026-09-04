@@ -7,7 +7,7 @@ import type { PartnerPropertyDetail, PropertyFormReference } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { STAR_VALUES } from '@/lib/stars';
 import { t, tripAttribute } from '@/lib/strings';
-import { TRIP_ATTRIBUTES } from '@safra/contracts';
+import { TRIP_ATTRIBUTES, usesStarRating } from '@safra/contracts';
 
 /**
  * تعديل العقار — the form, for a listing that may still be edited.
@@ -116,7 +116,11 @@ export function PropertyEditor({
       listing that predates the field starts blank. So an untouched blank sends nothing, which
       leaves the null alone, and picking a value sends it.
     */
-    if (form.starRating !== '' && form.starRating !== String(property.starRating ?? '')) {
+    if (
+      usesStarRating(form.propertyTypeCode) &&
+      form.starRating !== '' &&
+      form.starRating !== String(property.starRating ?? '')
+    ) {
       patch['starRating'] = Number(form.starRating);
     }
     if (form.cancellationPolicyCode !== property.cancellationPolicyCode) {
@@ -259,25 +263,32 @@ export function PropertyEditor({
           The classification, beside the type it classifies — the same order the creation form
           uses, so a partner editing a listing meets the fields where they left them.
 
+          CONDITIONAL on the type, and on the type currently CHOSEN in this form rather than the
+          one the listing was loaded with: a partner switching «فندق» to «فيلا» watches the field
+          go, which is the whole rule made visible. (The service ignores a type change on update
+          today, so this is the form being honest about the rule rather than about that gap.)
+
           The blank option exists ONLY for a listing that predates the field: it is the current
           state, and removing it would make the select silently claim a rating nobody declared the
           moment the form rendered. Once a value is chosen there is no way back to blank, which is
           correct — «not classified» is a historical state, not a choice.
         */}
-        <Select
-          label={t.properties.fStarRating}
-          value={form.starRating}
-          onChange={set('starRating')}
-          options={[
-            ...(property.starRating === null
-              ? [{ value: '', label: t.properties.starUnset }]
-              : []),
-            ...STAR_VALUES.map((value) => ({
-              value: String(value),
-              label: t.properties.starOption[value] ?? String(value),
-            })),
-          ]}
-        />
+        {usesStarRating(form.propertyTypeCode) ? (
+          <Select
+            label={t.properties.fStarRating}
+            value={form.starRating}
+            onChange={set('starRating')}
+            options={[
+              ...(property.starRating === null
+                ? [{ value: '', label: t.properties.starUnset }]
+                : []),
+              ...STAR_VALUES.map((value) => ({
+                value: String(value),
+                label: t.properties.starOption[value] ?? String(value),
+              })),
+            ]}
+          />
+        ) : null}
         <Select
           label={t.editProperty.policy}
           value={form.cancellationPolicyCode}
