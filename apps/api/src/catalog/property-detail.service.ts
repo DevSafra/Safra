@@ -46,7 +46,7 @@ export class PropertyDetailService {
         p.name_ar, p.name_en, p.name_de,
         p.description_ar, p.description_en, p.description_de,
         p.address, p.latitude, p.longitude,
-        p.rating, p.reviews_count, p.badges, p.attributes,
+        p.star_rating, p.rating, p.reviews_count, p.badges, p.attributes,
         ci.slug AS city_slug, ci.name_ar AS city_name_ar, ci.name_en AS city_name_en,
         ci.name_de AS city_name_de, ci.timezone AS city_timezone,
         co.code AS country_code,
@@ -109,6 +109,11 @@ export class PropertyDetailService {
         countryCode: row['country_code'],
       },
       propertyTypeCode: row['property_type_code'],
+      /*
+        The CLASSIFICATION, beside the review score and not the same fact — see the column note.
+        Null for a listing that predates the field; the page shows nothing rather than guessing.
+      */
+      starRating: row['star_rating'] === null ? null : Number(row['star_rating']),
       rating: row['rating'],
       reviewsCount: Number(row['reviews_count'] ?? 0),
       badges: row['badges'],

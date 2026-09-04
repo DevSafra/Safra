@@ -38,6 +38,8 @@ export interface SearchResultItem {
   cityNameEn: string;
   cityNameDe: string;
   propertyTypeCode: string;
+  /** The official classification, 1-5. Null for a listing that predates the field. */
+  starRating: number | null;
   rating: string | null;
   reviewsCount: number;
   badges: string[];
@@ -272,6 +274,26 @@ export class SearchService {
               : sql``
           }
           ${
+            /*
+              Star classification, ORed within the filter (Bashar, 2026-09-04).
+
+              `IN` rather than `@>` or a chain of ANDs, because a property has exactly ONE
+              classification: requiring all of a multi-select would return nothing the moment a
+              second box was ticked. Each value bound individually — the same reason the attribute
+              filter does, and the same reason it must not become a joined string.
+
+              A listing with NO classification is excluded when the filter is on. That is the
+              honest answer to "show me 4-star hotels": a listing nobody has classified is not
+              known to be one, and including it would put unverified rows in a filtered result.
+            */
+            query.starRatings.length > 0
+              ? sql`AND p.star_rating IN (${sql.join(
+                  query.starRatings.map((one) => sql`${one}`),
+                  sql`, `,
+                )})`
+              : sql``
+          }
+          ${
             query.freeCancellationOnly
               ? sql`AND p.cancellation_policy_id IN (
                       SELECT id FROM cancellation_policies
@@ -402,6 +424,7 @@ export class SearchService {
           ci.name_en           AS "cityNameEn",
           ci.name_de           AS "cityNameDe",
           pt.code              AS "propertyTypeCode",
+          p.star_rating        AS "starRating",
           p.rating,
           p.reviews_count      AS "reviewsCount",
           p.badges,

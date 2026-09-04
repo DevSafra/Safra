@@ -205,6 +205,7 @@ export class RegistryService {
     const [result, total] = await Promise.all([
       this.db.execute<PropertyRowSql>(sql`
       SELECT pr.id, pr.reference, pr.name_ar, pr.name_en,
+             pr.star_rating             AS star_rating,
              pr.status::text            AS status,
              coalesce(ty.code, '—')     AS property_type,
              coalesce(ci.name_ar, '—')  AS city,
@@ -228,6 +229,7 @@ export class RegistryService {
         city: row.city,
         partner: row.partner,
         partnerReference: row.partner_reference,
+        starRating: row.star_rating,
         status: row.status,
       })),
       total,
@@ -589,6 +591,7 @@ interface PropertyRowSql extends Record<string, unknown> {
   reference: string;
   name_ar: string;
   name_en: string | null;
+  star_rating: number | null;
   property_type: string;
   city: string;
   partner: string;
@@ -601,6 +604,8 @@ export interface PropertyRow {
   readonly reference: string;
   readonly nameAr: string;
   readonly nameEn: string | null;
+  /** The official classification, 1-5. Null for a listing that predates the field. */
+  readonly starRating: number | null;
   readonly propertyType: string;
   readonly city: string;
   readonly partner: string;

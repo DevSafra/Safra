@@ -80,6 +80,7 @@ export class FavouritesService {
       city_name_en: string | null;
       city_name_de: string | null;
       rating: string | null;
+      star_rating: number | null;
       reviews_count: number;
       is_available: boolean;
       from_price: string | null;
@@ -91,6 +92,7 @@ export class FavouritesService {
              ci.name_ar AS city_name_ar,
              ci.name_en AS city_name_en,
              ci.name_de AS city_name_de,
+             p.star_rating,
              p.rating::text AS rating,
              p.reviews_count,
              /*
@@ -135,6 +137,7 @@ export class FavouritesService {
           nameEn: row.city_name_en,
           nameDe: row.city_name_de,
         },
+        starRating: row.star_rating,
         rating: row.rating,
         reviewsCount: row.reviews_count,
         fromPrice: row.from_price,

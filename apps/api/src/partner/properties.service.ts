@@ -197,6 +197,7 @@ export class PropertiesService {
       description_de: string | null;
       address: string;
       room_number: string | null;
+      star_rating: number | null;
       latitude: string | null;
       longitude: string | null;
       attributes: string[] | null;
@@ -209,7 +210,8 @@ export class PropertiesService {
       SELECT pr.id, pr.reference, pr.slug, pr.status::text AS status,
              pr.name_ar, pr.name_en, pr.name_de,
              pr.description_ar, pr.description_en, pr.description_de,
-             pr.address, pr.room_number, pr.latitude, pr.longitude, pr.attributes,
+             pr.address, pr.room_number, pr.star_rating, pr.latitude, pr.longitude,
+             pr.attributes,
              ci.slug AS city_slug, ci.name_ar AS city_name_ar,
              pt.code AS property_type_code,
              cp.code AS cancellation_policy_code,
@@ -270,6 +272,7 @@ export class PropertiesService {
       },
       address: row.address,
       roomNumber: row.room_number,
+      starRating: row.star_rating,
       latitude: row.latitude,
       longitude: row.longitude,
       attributes: row.attributes ?? [],
@@ -308,6 +311,7 @@ export class PropertiesService {
       name_ar: string;
       name_en: string | null;
       room_number: string | null;
+      star_rating: number | null;
       status: string;
       rating: string | null;
       reviews_count: number;
@@ -323,7 +327,7 @@ export class PropertiesService {
       currency_code: string | null;
       created_at: string;
     }>(sql`
-      SELECT pr.reference, pr.slug, pr.name_ar, pr.name_en, pr.room_number,
+      SELECT pr.reference, pr.slug, pr.name_ar, pr.name_en, pr.room_number, pr.star_rating,
              pr.status::text AS status,
              pr.rating::text AS rating, pr.reviews_count, pr.attributes, pr.badges,
              ci.name_ar AS city_name_ar,
@@ -373,6 +377,7 @@ export class PropertiesService {
       nameAr: row.name_ar,
       nameEn: row.name_en,
       roomNumber: row.room_number,
+      starRating: row.star_rating,
       status: row.status,
       rating: row.rating,
       reviewsCount: row.reviews_count,
@@ -481,6 +486,8 @@ export class PropertiesService {
           address: input.address,
           /* Empty means none: the field is optional, and `''` would be a room called nothing. */
           roomNumber: input.roomNumber?.trim() || null,
+          /* Required by the schema, so it is always here — see the note on the column. */
+          starRating: input.starRating,
           latitude: input.latitude ?? null,
           longitude: input.longitude ?? null,
           attributes: input.attributes,
@@ -586,6 +593,12 @@ export class PropertiesService {
     */
     if (input.roomNumber !== undefined)
       patch['roomNumber'] = input.roomNumber.trim() || null;
+    /*
+      No `|| null` and no clearing: unlike a room number there is no "none" to go back to. A
+      partner either declares a classification or leaves the one they declared, and the schema's
+      1-5 bound means an empty submission arrives as `undefined` and is simply not patched.
+    */
+    if (input.starRating !== undefined) patch['starRating'] = input.starRating;
     if (input.attributes !== undefined) patch['attributes'] = input.attributes;
     if (input.latitude !== undefined) patch['latitude'] = input.latitude;
     if (input.longitude !== undefined) patch['longitude'] = input.longitude;

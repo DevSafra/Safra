@@ -7,6 +7,7 @@ import type {
   PageQuery,
   PartnerVerifyInput,
   PropertyReviewInput,
+  PropertyStarRatingInput,
 } from '@safra/contracts';
 import {
   DEFAULT_SANCTIONS_POLICY,
@@ -198,6 +199,8 @@ export class ReviewService {
           nameAr: true,
           nameEn: true,
           address: true,
+          /* Visible in the QUEUE, so a reviewer sees the claim before opening the listing. */
+          starRating: true,
           latitude: true,
           longitude: true,
           descriptionAr: true,
@@ -322,6 +325,8 @@ export class ReviewService {
         descriptionAr: true,
         descriptionEn: true,
         address: true,
+        /* The classification a reviewer checks against the documents before approving. */
+        starRating: true,
         latitude: true,
         longitude: true,
         status: true,
@@ -423,6 +428,66 @@ export class ReviewService {
    * listing sitting verified-but-invisible would just be a second queue for staff
    * to forget about.
    */
+  /**
+   * Staff setting or correcting a listing's star classification (Bashar, 2026-09-04).
+   *
+   * ## Why the console needs a write here at all
+   *
+   * 2,703 listings predate the field and 2,016 of them are PUBLISHED, which a partner may no
+   * longer edit — the §8.1 freeze. Without this, «the Super Admin must be able to see the star
+   * rating for every property, including properties already published» would be an empty column
+   * for the whole existing catalogue and no route would ever fill it. It is also the only way a
+   * hotel re-classified after going live can be corrected.
+   *
+   * ## Allowed at EVERY status, unlike a review decision
+   *
+   * `reviewProperty` refuses anything that is not `pending_review`, because approving an approved
+   * listing is not a thing. A classification is a FACT about the building that can change while
+   * the listing is live, so refusing it on a published property would defeat the reason it exists.
+   *
+   * `assertCanWrite`, not `assertCanRead`: a city-scoped reviewer may look at the rest of the
+   * country and change none of it — the same distinction `reviewProperty` records below.
+   */
+  async setStarRating(
+    claims: AccessTokenClaims | undefined,
+    reference: string,
+    input: PropertyStarRatingInput,
+  ) {
+    const property = await this.db.query.properties.findFirst({
+      where: and(
+        eq(schema.properties.reference, reference),
+        isNull(schema.properties.deletedAt),
+      ),
+      columns: { id: true, cityId: true, starRating: true },
+    });
+
+    if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);
+
+    assertCanWrite(claims, property.cityId);
+
+    await this.db
+      .update(schema.properties)
+      .set({ starRating: input.starRating, updatedAt: new Date() })
+      .where(eq(schema.properties.id, property.id));
+
+    /*
+      BEFORE and AFTER, because this is a claim about a real building that a customer reads and
+      filters on. «It was three and now it is five» is the question somebody asks afterwards, and
+      an entry recording only the new value cannot answer it.
+    */
+    await this.audit.record({
+      actorUserId: claims?.sub,
+      actorRole: claims?.role,
+      action: 'property.star_rating_set',
+      subjectType: 'property',
+      subjectId: property.id,
+      before: { starRating: property.starRating },
+      after: { starRating: input.starRating },
+    });
+
+    return { reference, starRating: input.starRating };
+  }
+
   async reviewProperty(
     claims: AccessTokenClaims | undefined,
     reference: string,
