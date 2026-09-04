@@ -489,6 +489,21 @@
     :where(button, select, summary, [role='button']) {
       min-height: 2.5rem;
     }
+
+    /*
+      A checkbox or radio is 15-16px however it is styled, and enlarging the BOX would be wrong:
+      a 40px tick is not a checkbox, it is a button pretending to be one. What a finger actually
+      presses is the LABEL — the input and its words together — so that is what carries the floor.
+      One rule rather than thirteen class strings across three applications, for the same reason
+      the control floor above is one rule: the next checkbox is the one nobody remembers.
+
+      Measured at 390px on تعديل, where «معروضة للحجز» was a 16px target (2026-09-04). Scoped to a
+      label that CONTAINS the input, so a label sitting beside a text field is untouched.
+    */
+    :where(label:has(> input[type='checkbox']), label:has(> input[type='radio'])) {
+      min-height: 2.5rem;
+      align-items: center;
+    }
   }
 }
 
