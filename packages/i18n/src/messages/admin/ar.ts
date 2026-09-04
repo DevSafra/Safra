@@ -939,6 +939,15 @@ export const ar = {
       /* تصنيف النجوم — the official classification, visible at every status (Bashar, 2026-09-04). */
       colStars: 'النجوم',
       starUnset: 'بلا تصنيف',
+      /*
+        A villa is «لا ينطبق», an unclassified hotel is «بلا تصنيف» — two different facts.
+
+        One says the scheme does not apply to this kind of place; the other says it applies and
+        nobody has answered yet. Printing «بلا تصنيف» against a camp would read as a gap somebody
+        should fill, and an operator would go looking for the control that fills it.
+      */
+      starNotApplicable: 'لا ينطبق',
+      starHotelsOnly: 'تصنيف النجوم يخصّ الفنادق فقط.',
       starRatingLabel: 'تصنيف النجوم',
       starRatingHint:
         'التصنيف الرسمي للعقار من 1 إلى 5 نجوم. يظهر للعملاء على كل شاشة يُعرض فيها العقار، ويمكن تصحيحه في أي حالة — بما فيها العقارات المنشورة، التي لا يستطيع الشريك تعديلها.',

@@ -194,6 +194,9 @@ export const en = {
   'validation.too_long': 'This value is too long.',
   'validation.account_number': 'An account number is 4 to 34 letters or digits.',
   'validation.star_rating': 'Choose a star rating from 1 to 5.',
+  'validation.star_rating_required': 'A hotel must have a star rating.',
+  'validation.star_rating_not_a_hotel':
+    'Star ratings apply to hotels only. This accommodation type does not carry one.',
   'validation.payout_method': 'Unknown transfer method.',
   'validation.swift': 'A SWIFT code is 8 or 11 characters.',
   'validation.out_of_range': 'The value is outside the allowed range.',

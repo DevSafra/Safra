@@ -223,6 +223,10 @@ export const de = {
   'validation.account_number':
     'Eine Kontonummer besteht aus 4 bis 34 Buchstaben oder Ziffern.',
   'validation.star_rating': 'Wählen Sie eine Sterne-Klassifizierung von 1 bis 5.',
+  'validation.star_rating_required':
+    'Für ein Hotel ist eine Sterne-Klassifizierung erforderlich.',
+  'validation.star_rating_not_a_hotel':
+    'Sterne-Klassifizierungen gelten nur für Hotels. Diese Unterkunftsart hat keine.',
   'validation.payout_method': 'Unbekannte Überweisungsart.',
   'validation.swift': 'Ein SWIFT-Code hat 8 oder 11 Zeichen.',
   'validation.out_of_range': 'Der Wert liegt außerhalb des zulässigen Bereichs.',

@@ -183,6 +183,9 @@ export const ar = {
   'validation.too_long': 'هذه القيمة طويلة جداً.',
   'validation.account_number': 'رقم الحساب يجب أن يتكوّن من 4 إلى 34 حرفاً أو رقماً.',
   'validation.star_rating': 'اختر تصنيف النجوم من 1 إلى 5.',
+  'validation.star_rating_required': 'تصنيف النجوم مطلوب للفنادق.',
+  'validation.star_rating_not_a_hotel':
+    'تصنيف النجوم يخصّ الفنادق فقط. لا يُمنح لهذا النوع من الإقامات.',
   'validation.payout_method': 'طريقة التحويل غير معروفة.',
   'validation.swift': 'رمز السويفت يجب أن يتكوّن من 8 أو 11 خانة.',
   'validation.out_of_range': 'القيمة خارج النطاق المسموح.',
