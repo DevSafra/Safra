@@ -1094,9 +1094,17 @@ export const ar = {
     colStay: 'الإقامة',
     colAmount: 'المبلغ',
     back: 'رجوع',
-    /* Read-only, and the screen says why rather than leaving a partner hunting for a button. */
+    /*
+      Read-only, and the screen says why rather than leaving a partner hunting for a button.
+
+      «راسل الدعم», not an address (Bashar, 2026-09-05). This was the last surviving copy of
+      `partners@safra.com` in the portal: the same line was taken out of the sidebar on 2026-08-14
+      for the reason recorded in `shell.tsx` — الدعم is a SCREEN, it opens a tracked thread, and an
+      email beside it offers a second, worse route with no reference, no status and no record on the
+      partner's own account.
+    */
     readOnly:
-      'هذه الصفحة للاطّلاع فقط. جدولة التحويلات وتنفيذها يتمّان من سفرة؛ لأي استفسار راسل partners@safra.com.',
+      'هذه الصفحة للاطّلاع فقط. جدولة التحويلات وتنفيذها يتمّان من سفرة؛ لأي استفسار راسل الدعم.',
     /* The link across to where the destination is maintained — now inside الإعدادات. */
     accountsLink: 'حسابات التحويل',
 

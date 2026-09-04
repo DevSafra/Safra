@@ -112,6 +112,24 @@ test('a mismatched confirmation never reaches the API', async ({ page }) => {
 });
 
 /**
+ * The portal points at الدعم, never at an address.
+ *
+ * `partners@safra.com` was removed from the sidebar on 2026-08-14 for a stated reason — الدعم is a
+ * SCREEN that opens a tracked thread, and an email beside it offers a second, worse route with no
+ * reference, no status and no record on the partner's account. It survived on مستحقاتي until
+ * Bashar found it on 2026-09-05. A rule applied to one surface and not swept is a rule that comes
+ * back, so this looks at the whole page rather than at the sentence it was found in.
+ */
+test('names الدعم rather than an email address', async ({ page }) => {
+  await page.goto('/payouts', { waitUntil: 'domcontentloaded' });
+
+  const text = await page.locator('main').innerText();
+
+  expect(text).toContain('راسل الدعم');
+  expect(text, 'no address anywhere on the screen').not.toContain('@safra.com');
+});
+
+/**
  * مستحقاتي answers «how much, and when» — the two questions it used to answer neither of.
  *
  * The grouping assertion is the one that matters: the portal shipped with a hand-written set of
