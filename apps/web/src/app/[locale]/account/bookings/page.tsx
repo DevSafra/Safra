@@ -5,6 +5,8 @@ import { getTranslations } from 'next-intl/server';
 import { AccountShell } from '@/components/account-shell';
 import { DateRange } from '@/components/date-range';
 import { StatusPill, customerBookingStatus } from '@/components/booking-status-pill';
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
+import { formatMoney } from '@/lib/localise';
 import { getAccountSummary, getMyBookings } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -96,8 +98,13 @@ export default async function AccountBookingsPage({
                         status={shown}
                         label={dynamicMessage(t, `status.${shown}`, shown)}
                       />
+                      {/* Money, not a bare decimal — see the note on the schema's `currency`. */}
                       <span className="text-sm text-gold" dir="ltr">
-                        {booking.totalAmount}
+                        {formatMoney(
+                          booking.totalAmount,
+                          booking.currency?.code ?? DEFAULT_MONEY_CURRENCY,
+                          locale,
+                        )}
                       </span>
                     </span>
                   </Link>

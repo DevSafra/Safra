@@ -2,6 +2,9 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
+
+import { formatMoney } from '@/lib/localise';
 import { AccountShell } from '@/components/account-shell';
 import { BackLink } from '@/components/back-link';
 import { PartnerAds } from '@/components/partner-ads';
@@ -126,7 +129,13 @@ export default async function BookingDetailPage({
           })}
         </Row>
         <Row label={t('bookingTotal')}>
-          <span dir="ltr">{booking.totalAmount}</span>
+          <span dir="ltr">
+            {formatMoney(
+              booking.totalAmount,
+              booking.currency?.code ?? DEFAULT_MONEY_CURRENCY,
+              locale,
+            )}
+          </span>
         </Row>
         <Row label={t('bookingPlaced')}>
           <span dir="ltr">{booking.createdAt.slice(0, 10)}</span>

@@ -91,6 +91,15 @@ const bookingSchema = z.object({
   nights: z.number(),
   guestsAdults: z.number(),
   totalAmount: z.string(),
+  /*
+    The code, so the amount can be written as money.
+
+    Both booking payloads carried `totalAmount` and a `currencyId` UUID, so these screens printed
+    the raw decimal — «191.990», three decimals and no symbol, where every other surface said
+    «$191.99». `.nullable()` rather than a default: an absent code means the API stopped sending
+    it, and inventing one would print a plausible currency over an unknown amount.
+  */
+  currency: z.object({ code: z.string() }).nullable().optional(),
   createdAt: z.union([z.string(), z.date()]).transform((v) => new Date(v).toISOString()),
 });
 
@@ -158,6 +167,16 @@ const bookingDetailSchema = z.object({
   guestsChildren: z.number().nullable().optional(),
   guestsInfants: z.number().nullable().optional(),
   totalAmount: z.string(),
+  /*
+    The code, so the amount can be written as money.
+
+    Both booking payloads carried `totalAmount` and a `currencyId` UUID, so these screens printed
+    the raw decimal — «191.990», three decimals and no symbol, where every other surface said
+    «$191.99». `.nullable()` rather than a default: an absent code means the API stopped sending
+    it, and inventing one would print a plausible currency over an unknown amount.
+  */
+  currency: z.object({ code: z.string() }).nullable().optional(),
+
   /*
     Where the stay is, as the city's public slug — for the partner ads §9.3 targets by city.
 

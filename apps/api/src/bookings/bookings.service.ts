@@ -100,6 +100,21 @@ export class BookingsService {
     // second COUNT query over the whole table.
     const rows = await this.db.query.bookings.findMany({
       columns: BOOKING_COLUMNS,
+      with: {
+        /*
+          The currency's CODE, because an amount without one is not money.
+
+          The projection carried `currencyId` — a UUID no screen can render — so the customer's own
+          booking list and its detail page printed «191.990»: three decimals, no symbol, on the two
+          screens where somebody checks what they paid. Every other surface in the platform showed
+          «$191.99» for the same row. Found by driving the journey on 2026-09-04.
+
+          `DEFAULT_MONEY_CURRENCY` is not a substitute here: SAFRA prices in five currencies and
+          SYP and USD differ by four orders of magnitude, which is the whole reason «no amount is
+          ever written without its currency» is a standing rule.
+        */
+        currency: { columns: { code: true } },
+      },
       where: and(...conditions),
       orderBy: [desc(schema.bookings.createdAt), desc(schema.bookings.id)],
       limit: query.limit + 1,
@@ -156,6 +171,8 @@ export class BookingsService {
       columns: BOOKING_COLUMNS,
       where: and(...conditions),
       with: {
+        /* The code, for the reason given on the list query above. */
+        currency: { columns: { code: true } },
         property: { columns: { nameAr: true, nameEn: true, nameDe: true } },
         unit: { columns: { nameAr: true, nameEn: true, nameDe: true } },
         /*
