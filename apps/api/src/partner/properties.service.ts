@@ -6,6 +6,7 @@ import { schema } from '@safra/db';
 import {
   ERROR,
   PERMISSIONS as P,
+  usesStarRating,
   type PropertyCreateInput,
   type PropertyUpdateInput,
   type UnitCreateInput,
@@ -486,8 +487,17 @@ export class PropertiesService {
           address: input.address,
           /* Empty means none: the field is optional, and `''` would be a room called nothing. */
           roomNumber: input.roomNumber?.trim() || null,
-          /* Required by the schema, so it is always here — see the note on the column. */
-          starRating: input.starRating,
+          /*
+            A hotel's classification, and NOTHING for anything else (Bashar, 2026-09-04).
+
+            `propertyCreateSchema` already refuses a villa that sends one, so this is not the
+            check — it is the guarantee that survives a caller the schema has not met. `?? null`
+            rather than leaving the key out, because an explicit null says «this listing has no
+            classification» where an absent key would inherit whatever a default decided.
+          */
+          starRating: usesStarRating(input.propertyTypeCode)
+            ? (input.starRating ?? null)
+            : null,
           latitude: input.latitude ?? null,
           longitude: input.longitude ?? null,
           attributes: input.attributes,
@@ -594,11 +604,25 @@ export class PropertiesService {
     if (input.roomNumber !== undefined)
       patch['roomNumber'] = input.roomNumber.trim() || null;
     /*
-      No `|| null` and no clearing: unlike a room number there is no "none" to go back to. A
-      partner either declares a classification or leaves the one they declared, and the schema's
-      1-5 bound means an empty submission arrives as `undefined` and is simply not patched.
+      The star classification, judged against the listing's STORED type.
+
+      `propertyUpdateSchema` can only decide the case where a patch names the type AND the rating
+      together; a patch naming just the rating depends on what this listing already is, which no
+      schema can see. So the second half is here — and it refuses rather than silently dropping,
+      for the same reason the schema does: a partner who is quietly ignored believes they declared
+      something they did not.
+
+      No clearing: unlike a room number there is no "none" to go back to. A hotel either declares a
+      classification or keeps the one it declared, and an empty submission arrives as `undefined`
+      and is simply not patched.
     */
-    if (input.starRating !== undefined) patch['starRating'] = input.starRating;
+    if (input.starRating !== undefined) {
+      if (!usesStarRating(property.propertyType.code)) {
+        throw badRequest(ERROR.VALIDATION_STAR_RATING_NOT_A_HOTEL);
+      }
+
+      patch['starRating'] = input.starRating;
+    }
     if (input.attributes !== undefined) patch['attributes'] = input.attributes;
     if (input.latitude !== undefined) patch['latitude'] = input.latitude;
     if (input.longitude !== undefined) patch['longitude'] = input.longitude;
@@ -870,6 +894,12 @@ export class PropertiesService {
         isNull(schema.properties.deletedAt),
       ),
       columns: { id: true, status: true, slug: true },
+      /*
+        The TYPE, because the star classification is a hotel classification and `update` has to
+        know what kind of place this is. Only the code — one text column through an existing
+        foreign key, on a read that already runs.
+      */
+      with: { propertyType: { columns: { code: true } } },
     });
 
     if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);

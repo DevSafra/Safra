@@ -1,3 +1,4 @@
+import { usesStarRating } from '@safra/contracts';
 import { eq, sql } from 'drizzle-orm';
 
 import { createDatabase, schema, type Database, type Transaction } from '@safra/db';
@@ -1093,10 +1094,15 @@ async function build(db: Seeder): Promise<void> {
             Spread across all five deliberately: a testbed where every hotel is four stars cannot
             show that the filter narrows anything, which is the one thing it exists to show.
 
+            HOTELS ONLY (Bashar, 2026-09-04). A villa or a camp carries no classification at
+            all, so seeding one would put a state in the testbed that the API refuses to create.
+
             NOT the same as `rating`, which the note below is about — that is the guest review
             average and a trigger owns it.
           */
-          starRating: starRatingFor(property.slug),
+          starRating: usesStarRating(propertyType.code)
+            ? starRatingFor(property.slug)
+            : null,
           /* No rating or count — a trigger owns both. See the note above the partner insert. */
         })
         .returning();

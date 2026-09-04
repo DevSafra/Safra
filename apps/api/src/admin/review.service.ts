@@ -14,6 +14,7 @@ import {
   SANCTIONS_POLICY_SETTING,
   SEEN_BADGE_CAP,
   isSanctionsPolicy,
+  usesStarRating,
   type SanctionsPolicy,
   type SeenSection,
   type PartnerCommissionInput,
@@ -212,6 +213,8 @@ export class ReviewService {
             columns: { reference: true, displayName: true, verification: true },
           },
           city: { columns: { slug: true, nameAr: true } },
+          /* The TYPE, so the queue can tell a hotel nobody classified from a villa. */
+          propertyType: { columns: { code: true } },
         },
         orderBy: (p, { asc }) => [asc(p.createdAt)],
         limit: query.limit,
@@ -459,11 +462,25 @@ export class ReviewService {
         isNull(schema.properties.deletedAt),
       ),
       columns: { id: true, cityId: true, starRating: true },
+      /* The TYPE, because only a hotel carries a classification (Bashar, 2026-09-04). */
+      with: { propertyType: { columns: { code: true } } },
     });
 
     if (!property) throw notFound(ERROR.PROPERTY_NOT_FOUND);
 
     assertCanWrite(claims, property.cityId);
+
+    /*
+      A reviewer cannot classify a villa either.
+
+      The console hides the control for a non-hotel, and that is a courtesy — this is the control.
+      Somebody who deletes the `disabled` attribute, replays the request, or reaches the endpoint
+      from a script meets the same refusal a partner does, and it names the reason rather than
+      answering a generic 400.
+    */
+    if (!usesStarRating(property.propertyType.code)) {
+      throw badRequest(ERROR.VALIDATION_STAR_RATING_NOT_A_HOTEL);
+    }
 
     await this.db
       .update(schema.properties)
