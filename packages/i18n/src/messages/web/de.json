@@ -216,7 +216,9 @@
   },
   "notFound": {
     "title": "Seite nicht gefunden",
-    "home": "Zurück zur Startseite"
+    "home": "Zurück zur Startseite",
+    "body": "Der Link ist vielleicht veraltet, die Unterkunft nicht mehr verfügbar oder die Adresse falsch geschrieben.",
+    "search": "Unterkunft suchen"
   },
   "calendar": {
     "title": "Verfügbarkeit: kommende Tage",

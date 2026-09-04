@@ -216,7 +216,9 @@
   },
   "notFound": {
     "title": "Page not found",
-    "home": "Back to the home page"
+    "home": "Back to the home page",
+    "body": "The link may be old, the property may no longer be listed, or the address may be mistyped.",
+    "search": "Search for a stay"
   },
   "calendar": {
     "title": "Availability: coming days",
