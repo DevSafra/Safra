@@ -71,6 +71,8 @@ const GROUP_OF_PREFIX: Readonly<Record<string, PermissionGroup>> = {
   coupon: 'money',
   price: 'money',
   fx_rate: 'money',
+  /* SAFRA's own destinations and revenue transfers — money, not platform settings. */
+  safra_payout: 'money',
 
   partner: 'partners',
   partner_application: 'partners',

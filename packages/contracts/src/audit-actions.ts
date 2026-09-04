@@ -274,6 +274,21 @@ export const AUDIT_ACTIONS = [
   'partner_type.created',
   'partner_type.updated',
   'partner_type.deleted',
+  /*
+    SAFRA's own treasury (Bashar, 2026-09-05). Every step of both lifecycles — the destination and
+    the transfer — because this is the money the platform keeps, and «who sent SAFRA's revenue
+    where, and who approved the account» must be answerable from the trail alone.
+  */
+  'safra_payout_account.created',
+  'safra_payout_account.updated',
+  'safra_payout_account.verified',
+  'safra_payout_account.rejected',
+  'safra_payout_account.deleted',
+  'safra_payout.opened',
+  'safra_payout.released',
+  'safra_payout.paid',
+  'safra_payout.held',
+  'safra_payout.cancelled',
   'conversation.started',
   'conversation.closed',
   'dispute.resolved',

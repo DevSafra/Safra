@@ -250,6 +250,16 @@ export const PERMISSIONS = {
    * against without being able to change it.
    */
   CATALOGUE_MANAGE: 'catalogue.manage',
+  /**
+   * SAFRA's own payout destinations and revenue transfers (Bashar, 2026-09-05).
+   *
+   * Two permissions, split the way the partner flow splits: MANAGE creates and edits a destination,
+   * EXECUTE moves the money. They are separate because they protect different things — entering an
+   * account is clerical, and sending SAFRA's revenue to it is not — and because that separation is
+   * the only thing that makes four-eyes expressible through the role map later.
+   */
+  SAFRA_PAYOUT_MANAGE: 'safra_payout.manage',
+  SAFRA_PAYOUT_EXECUTE: 'safra_payout.execute',
   FX_RATE_MANAGE: 'fx_rate.manage',
   AD_READ: 'ad.read',
   AD_MANAGE: 'ad.manage',

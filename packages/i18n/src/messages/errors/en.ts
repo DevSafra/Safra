@@ -213,6 +213,18 @@ export const en = {
   'geo.city_not_found': 'City not found.',
   'geo.country_not_found': 'Country not found.',
   'geo.category_not_found': 'Category not found.',
+  'safra_payout.account_not_found': 'No SAFRA payout account with that identifier.',
+  'safra_payout.no_destination':
+    'No verified, active SAFRA payout account. Nothing can be transferred until one is verified and active.',
+  'safra_payout.not_found': 'No transfer with that identifier.',
+  'safra_payout.period_overlap':
+    'This period overlaps transfer {reference}. Periods may not overlap, so revenue is never transferred twice.',
+  'safra_payout.period_order': 'The period cannot end before it starts.',
+  'safra_payout.nothing_accrued': 'No SAFRA revenue accrued in that period.',
+  'safra_payout.not_releasable': 'This transfer cannot be approved in its current state.',
+  'safra_payout.not_payable': 'A transfer must be approved before it can be marked paid.',
+  'safra_payout.already_final':
+    'The transfer is paid or cancelled and can no longer be changed.',
   'catalogue.not_found': 'No catalogue entry with that code.',
   'catalogue.code_taken': 'That code is already in use. Choose another.',
   'catalogue.in_use':

@@ -23,6 +23,7 @@ export * from './booking.js';
 export * from './payment.js';
 export * from './wallet.js';
 export * from './dispute.js';
+export * from './safra.js';
 export * from './review.js';
 export * from './favourite.js';
 export * from './messaging.js';

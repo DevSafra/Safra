@@ -250,6 +250,21 @@ export const ledgerAccount = pgEnum('ledger_account', [
   'safra_commission_partner',
   'partner_payable',
   'partner_payout',
+  /**
+   * SAFRA withdrawing its OWN revenue to its own bank account (Bashar, 2026-09-05).
+   *
+   * The mirror of `partner_payout`, and it exists for the same reason. Commission, the customer
+   * fee and advertising revenue accrue as CREDITS to `safra_commission_customer`,
+   * `safra_commission_partner` and `ad_revenue`, and until now **nothing ever debited them** —
+   * SAFRA's earnings accumulated in the books for ever with no record of collection, so «what have
+   * we actually taken out» had no answer anywhere in the platform.
+   *
+   * A SAFRA payout DEBITS each revenue account for the amount it settles and CREDITS this one for
+   * the total, in one balanced entry group the payout row points at. Outstanding revenue is then
+   * exactly `credits − debits` on the revenue accounts, derived from the ledger rather than
+   * tracked beside it.
+   */
+  'safra_payout',
   'refund',
   'wallet_credit',
   'wallet_debit',

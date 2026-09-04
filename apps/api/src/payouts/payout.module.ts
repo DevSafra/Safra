@@ -8,6 +8,8 @@ import {
   PartnerPayoutAccountController,
 } from './payout-account.controller.js';
 import { PayoutAccountService } from './payout-account.service.js';
+import { SafraPayoutController } from './safra-payout.controller.js';
+import { SafraPayoutService } from './safra-payout.service.js';
 import { AdminPayoutController, PartnerPayoutController } from './payout.controller.js';
 import { PayoutScheduler } from './payout.scheduler.js';
 import { PayoutService } from './payout.service.js';
@@ -20,6 +22,7 @@ import { PayoutService } from './payout.service.js';
     AdminPayoutController,
     PartnerPayoutAccountController,
     AdminPayoutAccountController,
+    SafraPayoutController,
   ],
   /*
     `AuditService` is listed here rather than imported from a shared module because that is how
@@ -33,6 +36,7 @@ import { PayoutService } from './payout.service.js';
   providers: [
     PayoutService,
     PayoutAccountService,
+    SafraPayoutService,
     PayoutScheduler,
     AuditService,
     FieldEncryptionService,

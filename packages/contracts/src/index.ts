@@ -18,6 +18,7 @@ export * from './invoice.js';
 export * from './pagination.js';
 export * from './payment.js';
 export * from './payout-account.js';
+export * from './safra-payout.js';
 export * from './partner-application.js';
 export * from './partner-contract.js';
 export * from './partner-employee.js';

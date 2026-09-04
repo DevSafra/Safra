@@ -201,6 +201,17 @@ export const ar = {
   'geo.city_not_found': 'لم يُعثر على هذه المدينة.',
   'geo.country_not_found': 'لم يُعثر على الدولة.',
   'geo.category_not_found': 'لم يُعثر على الفئة.',
+  'safra_payout.account_not_found': 'لا يوجد حساب تحويل لسفرة بهذا المعرّف.',
+  'safra_payout.no_destination':
+    'لا حساب تحويل موثّق ومفعَّل لسفرة. لا يمكن تحويل أي مبلغ قبل توثيق حساب وتفعيله.',
+  'safra_payout.not_found': 'لا يوجد تحويل بهذا المعرّف.',
+  'safra_payout.period_overlap':
+    'تتداخل هذه الفترة مع التحويل {reference}. الفترتان لا تتقاطعان حتى لا تُحوَّل الإيرادات مرّتين.',
+  'safra_payout.period_order': 'تاريخ نهاية الفترة يجب ألا يسبق بدايتها.',
+  'safra_payout.nothing_accrued': 'لا إيرادات مستحقّة لسفرة في هذه الفترة.',
+  'safra_payout.not_releasable': 'لا يمكن اعتماد هذا التحويل في حالته الحالية.',
+  'safra_payout.not_payable': 'يجب اعتماد التحويل قبل تسجيله مدفوعاً.',
+  'safra_payout.already_final': 'التحويل مدفوع أو ملغى، ولا يمكن تغييره.',
   'catalogue.not_found': 'لا يوجد عنصر بهذا الرمز في الكتالوج.',
   'catalogue.code_taken': 'هذا الرمز مستخدم بالفعل. اختر رمزاً آخر.',
   'catalogue.in_use':

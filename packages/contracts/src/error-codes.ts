@@ -177,6 +177,26 @@ export const ERROR = {
     that was true at release is not evidence about the state at payment.
   */
   PAYOUT_NO_VERIFIED_ACCOUNT: 'payout.no_verified_account',
+
+  /*
+    ── SAFRA's own payout destinations and revenue transfers (Bashar, 2026-09-05) ─────────
+    Their own codes rather than the `payout.*` ones beside them. The two flows are deliberately
+    impossible to confuse — a reader told «لا يوجد حساب تحويل موثّق للشريك» while paying SAFRA's own
+    revenue is being told about the wrong party, and the refusals are the place that confusion
+    would surface first.
+  */
+  SAFRA_PAYOUT_ACCOUNT_NOT_FOUND: 'safra_payout.account_not_found',
+  /* No verified, active destination. The absolute guard: SAFRA's money moves nowhere without one. */
+  SAFRA_PAYOUT_NO_DESTINATION: 'safra_payout.no_destination',
+  SAFRA_PAYOUT_NOT_FOUND: 'safra_payout.not_found',
+  /* Two payouts over the same dates would settle the same revenue twice. */
+  SAFRA_PAYOUT_PERIOD_OVERLAP: 'safra_payout.period_overlap',
+  SAFRA_PAYOUT_PERIOD_ORDER: 'safra_payout.period_order',
+  /* A period with no revenue in it. Opening one would be a transfer of nothing. */
+  SAFRA_PAYOUT_NOTHING_ACCRUED: 'safra_payout.nothing_accrued',
+  SAFRA_PAYOUT_NOT_RELEASABLE: 'safra_payout.not_releasable',
+  SAFRA_PAYOUT_NOT_PAYABLE: 'safra_payout.not_payable',
+  SAFRA_PAYOUT_ALREADY_FINAL: 'safra_payout.already_final',
   PAYOUT_ACCOUNT_UNVERIFIED_AT_PAYMENT: 'payout.account_unverified_at_payment',
   PAYOUT_ACCOUNT_NOT_FOUND: 'payout_account.not_found',
   PAYOUT_ACCOUNT_NOT_PENDING: 'payout_account.not_pending',

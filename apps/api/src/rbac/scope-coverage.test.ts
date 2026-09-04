@@ -65,6 +65,10 @@ const NO_CITY: readonly { readonly route: RegExp; readonly why: string }[] = [
   },
   { route: /admin\/cities/, why: 'geo — the cities themselves' },
   { route: /admin\/geo/, why: 'geo' },
+  {
+    route: /admin\/safra-payouts/,
+    why: "SAFRA's own treasury — its revenue and its destinations belong to the platform, not to a city. A city-scoped view of what SAFRA has earned would be a different report, and this is not it",
+  },
   { route: /admin\/fx-rates/, why: 'currencies — platform-level' },
   { route: /admin\/staff(-roles)?/, why: 'staff administration — unscoped by decision' },
   { route: /admin\/me/, why: "the reader's own display preferences" },

@@ -243,6 +243,21 @@ export const de = {
   'geo.city_not_found': 'Stadt nicht gefunden.',
   'geo.country_not_found': 'Land nicht gefunden.',
   'geo.category_not_found': 'Kategorie nicht gefunden.',
+  'safra_payout.account_not_found': 'Kein SAFRA-Auszahlungskonto mit dieser Kennung.',
+  'safra_payout.no_destination':
+    'Kein verifiziertes, aktives SAFRA-Auszahlungskonto. Vor Verifizierung und Aktivierung kann nichts überwiesen werden.',
+  'safra_payout.not_found': 'Keine Überweisung mit dieser Kennung.',
+  'safra_payout.period_overlap':
+    'Dieser Zeitraum überschneidet sich mit Überweisung {reference}. Zeiträume dürfen sich nicht überschneiden, damit Erlöse nie doppelt überwiesen werden.',
+  'safra_payout.period_order': 'Der Zeitraum kann nicht vor seinem Beginn enden.',
+  'safra_payout.nothing_accrued':
+    'In diesem Zeitraum sind keine SAFRA-Erlöse angefallen.',
+  'safra_payout.not_releasable':
+    'Diese Überweisung kann im aktuellen Zustand nicht freigegeben werden.',
+  'safra_payout.not_payable':
+    'Eine Überweisung muss freigegeben sein, bevor sie als bezahlt markiert werden kann.',
+  'safra_payout.already_final':
+    'Die Überweisung ist bezahlt oder storniert und kann nicht mehr geändert werden.',
   'catalogue.not_found': 'Kein Katalogeintrag mit diesem Code.',
   'catalogue.code_taken': 'Dieser Code ist bereits vergeben. Bitte einen anderen wählen.',
   'catalogue.in_use':

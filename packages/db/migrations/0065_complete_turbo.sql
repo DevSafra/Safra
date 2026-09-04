@@ -1,0 +1,2 @@
+DROP INDEX "safra_payout_accounts_default_idx";--> statement-breakpoint
+CREATE UNIQUE INDEX "safra_payout_accounts_default_idx" ON "safra_payout_accounts" USING btree ("is_default") WHERE is_default AND deleted_at IS NULL;

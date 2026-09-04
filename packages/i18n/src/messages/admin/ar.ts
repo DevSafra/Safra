@@ -3321,6 +3321,9 @@ export const ar = {
    * evidence, so it is translated HERE and never at the source.
    */
   auditSubject: {
+    /* خزينة سفرة (2026-09-05) — the destination, and the transfer that reaches it. */
+    safra_payout_account: 'حساب تحويل سفرة',
+    safra_payout: 'تحويل إيرادات سفرة',
     /* كتالوج المنصّة (2026-09-04) — the three entities a super admin manages there. */
     amenity: 'خدمة',
     cancellation_policy: 'سياسة إلغاء',
@@ -3441,6 +3444,18 @@ export const ar = {
     'partner_type.created': 'إضافة نوع شريك',
     'partner_type.updated': 'تعديل نوع شريك',
     'partner_type.deleted': 'حذف نوع شريك',
+
+    /* خزينة سفرة — حسابات تحويل سفرة نفسها وتحويلات إيراداتها (2026-09-05). */
+    'safra_payout_account.created': 'إضافة حساب تحويل لسفرة',
+    'safra_payout_account.updated': 'تعديل حساب تحويل سفرة',
+    'safra_payout_account.verified': 'توثيق حساب تحويل سفرة',
+    'safra_payout_account.rejected': 'رفض حساب تحويل سفرة',
+    'safra_payout_account.deleted': 'حذف حساب تحويل سفرة',
+    'safra_payout.opened': 'فتح تحويل إيرادات سفرة',
+    'safra_payout.released': 'اعتماد تحويل إيرادات سفرة',
+    'safra_payout.paid': 'تسجيل تحويل إيرادات سفرة مدفوعاً',
+    'safra_payout.held': 'تعليق تحويل إيرادات سفرة',
+    'safra_payout.cancelled': 'إلغاء تحويل إيرادات سفرة',
     'city.created': 'إضافة مدينة',
     'city.updated': 'تعديل مدينة',
     'city.deleted': 'حذف مدينة',
