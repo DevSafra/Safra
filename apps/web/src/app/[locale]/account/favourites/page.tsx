@@ -7,6 +7,7 @@ import { SaveButton } from '@/components/save-button';
 import { getAccountSummary, getMyFavourites } from '@/lib/account';
 import { ACCOUNT_METADATA, requireAccount } from '@/lib/account-page';
 import { localisedName } from '@/lib/localise';
+import { StarRating } from '@safra/ui';
 import { getCurrencyCatalogue } from '@/lib/catalog';
 import { convertForDisplay, displayCurrency } from '@/lib/currency';
 
@@ -42,6 +43,8 @@ export default async function AccountFavouritesPage({
   const cursor = typeof query['cursor'] === 'string' ? query['cursor'] : '';
 
   const t = await getTranslations('account');
+
+  const ts = await getTranslations('starRating');
 
   /*
     A saved listing is a BROWSE surface — somebody comparing what they shortlisted — so its price
@@ -112,7 +115,20 @@ export default async function AccountFavouritesPage({
                   ) : null}
                 </div>
 
-                <p className="text-sm text-muted">{localisedName(item.city, locale)}</p>
+                {/*
+                  The classification with the city, as on every other listing surface — a saved
+                  listing is a listing, and a reader comparing their favourites needs the same
+                  fact the search results showed them.
+                */}
+                <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
+                  {item.starRating ? (
+                    <StarRating
+                      value={item.starRating}
+                      label={ts('stars', { count: item.starRating })}
+                    />
+                  ) : null}
+                  <span>{localisedName(item.city, locale)}</span>
+                </p>
 
                 {/* An unavailable listing says so rather than quietly disappearing. */}
                 {!item.isAvailable ? (

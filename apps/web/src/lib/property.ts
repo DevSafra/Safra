@@ -30,6 +30,12 @@ const propertyDetailSchema = z.object({
     countryCode: z.string(),
   }),
   propertyTypeCode: z.string(),
+  /*
+    The official CLASSIFICATION, 1-5, not the guest review score beside it. `.nullable()` because
+    2,703 listings predate the field — a `.default()` would invent one for every hotel on the
+    platform, which is exactly the failure `docs/i18n.md`'s sibling note about defaults describes.
+  */
+  starRating: z.number().int().min(1).max(5).nullable(),
   rating: z.string().nullable(),
   reviewsCount: z.number(),
   badges: z.array(z.string()),

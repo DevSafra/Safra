@@ -11,6 +11,7 @@ import { priceWithCustomerFee } from '@/lib/customer-fee';
 import { localisedName, localisedText } from '@/lib/localise';
 import { getProperty, imageUrl, type PropertyDetail } from '@/lib/property';
 import { dynamicMessage } from '@/lib/dynamic-message';
+import { StarRating } from '@safra/ui';
 import { getCurrencyCatalogue } from '@/lib/catalog';
 import { convertForDisplay, displayCurrency } from '@/lib/currency';
 
@@ -136,6 +137,7 @@ export default async function PropertyPage({
   const tnav = await getTranslations('nav');
   const ta = await getTranslations('amenities');
   const tt = await getTranslations('propertyTypes');
+  const ts = await getTranslations('starRating');
   const tc = await getTranslations('city');
   const tcal = await getTranslations('calendar');
 
@@ -223,15 +225,57 @@ export default async function PropertyPage({
             <h1 className="font-display text-3xl font-bold text-gold sm:text-4xl">
               {name}
             </h1>
-            <p className="mt-2 text-sm text-muted">
-              {dynamicMessage(tt, property.propertyTypeCode, property.propertyTypeCode)} ·{' '}
-              {cityName}
-              {property.rating ? ` · ★ ${property.rating}` : ''}
-              {property.reviewsCount > 0
-                ? ` · ${t('reviews', { count: property.reviewsCount })}`
-                : ''}
-              {' · '}
-              <span className="text-faint">{property.reference}</span>
+            {/*
+              ── Type, CLASSIFICATION, city, then the review score ──────────────
+
+              The star row sits with the property TYPE and the review score keeps its own «★ 4.6 ·
+              132 reviews» further along, exactly as on the card. This is the one screen where both
+              facts are guaranteed to appear together, so the separation matters most here: a row
+              of five shapes is a classification, a glyph with a decimal beside a count is an
+              average of opinions, and a reader never has to be told which is which.
+
+              It became a flex row of spans rather than a concatenated string because a component
+              cannot be interpolated into one — and `items-center` so the stars sit on the text's
+              centre line rather than its baseline.
+            */}
+            {/*
+              ── The classification on its OWN line, under the name ─────────────
+
+              It was inline in the meta line, between the type and the city, which is where the
+              CARD puts it — and on a card that line is «فندق ★★★☆☆ · حلب» and reads cleanly. Here
+              the same line carries five facts («فندق · حلب · ★ 5.0 · تقييم واحد · PRO-002503»),
+              and a screenshot showed the stars landing in the middle of that sentence next to the
+              review score's "★ 5.0". Both were legible; neither was PROMINENT.
+
+              Bashar's requirement is «the user should immediately see its star rating», so on the
+              one screen with room for it, it gets its own line directly under the name — which is
+              also where booking.com puts it, and which puts a whole line between it and the review
+              score it must not be confused with. The component is the same; only the placement
+              differs, and the placement is what the space allows.
+            */}
+            {property.starRating ? (
+              <p className="mt-2">
+                <StarRating
+                  value={property.starRating}
+                  size="md"
+                  label={ts('stars', { count: property.starRating })}
+                />
+              </p>
+            ) : null}
+
+            <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
+              <span>
+                {dynamicMessage(tt, property.propertyTypeCode, property.propertyTypeCode)}
+              </span>
+              <span>
+                · {cityName}
+                {property.rating ? ` · ★ ${property.rating}` : ''}
+                {property.reviewsCount > 0
+                  ? ` · ${t('reviews', { count: property.reviewsCount })}`
+                  : ''}
+                {' · '}
+                <span className="text-faint">{property.reference}</span>
+              </span>
             </p>
 
             {/*

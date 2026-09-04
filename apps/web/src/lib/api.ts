@@ -32,7 +32,10 @@ interface FetchOptions {
    * would offer a room that is already gone.
    */
   revalidate?: number | false;
-  searchParams?: Record<string, string | string[] | number | boolean | undefined>;
+  searchParams?: Record<
+    string,
+    string | number | boolean | readonly (string | number)[] | undefined
+  >;
 }
 
 async function apiFetch<T>(
@@ -47,7 +50,13 @@ async function apiFetch<T>(
 
     // Repeated params for arrays — the API normalises single vs repeated values.
     if (Array.isArray(value)) {
-      for (const item of value) url.searchParams.append(key, item);
+      /*
+        `String(item)`, because not every repeated parameter is a list of strings: `starRatings` is
+        a list of NUMBERS and `URLSearchParams.append` would coerce it anyway. Saying so keeps the
+        signature honest rather than widening the array type to `unknown[]`, which would let a
+        future caller pass an object and get «[object Object]» in a query string.
+      */
+      for (const item of value) url.searchParams.append(key, String(item));
     } else {
       url.searchParams.set(key, String(value));
     }
@@ -101,6 +110,12 @@ export const searchResultItemSchema = z.object({
   cityNameEn: z.string(),
   cityNameDe: z.string(),
   propertyTypeCode: z.string(),
+  /*
+    The official CLASSIFICATION, 1-5 — not `rating`, which is the guest review score.
+    `.nullable()` and never `.default()`: a listing that predates the field has no
+    classification, and a default would invent one for 2,703 real hotels.
+  */
+  starRating: z.number().int().min(1).max(5).nullable(),
   rating: z.string().nullable(),
   reviewsCount: z.number(),
   badges: z.array(z.string()),
@@ -170,6 +185,8 @@ export interface SearchParams {
   propertyTypeCode?: string | undefined;
   attributes?: string[] | undefined;
   amenityCodes?: string[] | undefined;
+  /** The star classification filter — ORed, because a property has exactly one. */
+  starRatings?: number[] | undefined;
   /**
    * The nightly range, the free-cancellation switch and the cursor.
    *

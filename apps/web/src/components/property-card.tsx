@@ -9,6 +9,7 @@ import { imageUrl } from '@/lib/property';
 import { getCurrencyCatalogue } from '@/lib/catalog';
 import { convertForDisplay, displayCurrency } from '@/lib/currency';
 import { dynamicMessage } from '@/lib/dynamic-message';
+import { StarRating } from '@safra/ui';
 
 /**
  * A search result card (§5.5, §5.6).
@@ -68,6 +69,7 @@ export async function PropertyCard({
 }) {
   const t = await getTranslations('property');
   const tt = await getTranslations('propertyTypes');
+  const ts = await getTranslations('starRating');
   const common = await getTranslations('common');
 
   /*
@@ -178,8 +180,26 @@ export async function PropertyCard({
           stayed — and they were set at the size the design reserves for a footnote. `--faint` is
           the quietest step in the ladder and was doing the second-quietest one's work.
         */}
-        <p className="mt-1 text-[12.5px] text-muted">
-          {dynamicMessage(tt, item.propertyTypeCode, item.propertyTypeCode)} · {city}
+        {/*
+          ── The star CLASSIFICATION, on the TYPE line ──────────────────────────
+
+          Deliberately here and not beside «★ 4.6» above. That figure is the guest REVIEW score, and
+          two star-shaped things on one card is a customer reading an opinion as a classification.
+          A classification belongs with what it classifies, so «فندق ★★★★☆ · دمشق» reads as one
+          fact about the building and the review score keeps its own corner with its own count.
+
+          Absent when it is null. 2,703 listings predate the field and inventing «١ نجمة» for a
+          hotel nobody has classified would be a claim, not a blank.
+        */}
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12.5px] text-muted">
+          <span>{dynamicMessage(tt, item.propertyTypeCode, item.propertyTypeCode)}</span>
+          {item.starRating ? (
+            <StarRating
+              value={item.starRating}
+              label={ts('stars', { count: item.starRating })}
+            />
+          ) : null}
+          <span>· {city}</span>
         </p>
 
         {/* Trust badges (§5.6). Awarded by SAFRA, never set by the partner. */}
