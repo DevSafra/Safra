@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { ButtonToast } from '@/components/button-toast';
+
 /**
  * The save-to-favourites control (handoff §6, المفضلة).
  *
@@ -22,6 +24,7 @@ import { useRouter } from 'next/navigation';
 export function SaveButton({
   slug,
   initiallySaved,
+  signInHref,
   labels,
 }: {
   readonly slug: string;
@@ -33,6 +36,15 @@ export function SaveButton({
    * itself after mounting, which keeps the page cacheable.
    */
   readonly initiallySaved?: boolean;
+  /**
+   * Where to send somebody who has to sign in first, carrying their way back.
+   *
+   * Built by the SERVER, never here from the current URL: it is a redirect target, and a redirect
+   * target assembled in the browser from whatever path happens to be showing is the shape that
+   * turns a control into an open redirect. The page knows its own locale and its own slug — the
+   * same reasoning `returnQuery` states for the console's back links.
+   */
+  readonly signInHref: string;
   readonly labels: {
     readonly save: string;
     readonly saved: string;
@@ -85,6 +97,26 @@ export function SaveButton({
         body: JSON.stringify({ slug }),
       });
 
+      /*
+        401 is not a failure to report — it is a missing account, and «تعذّر الحفظ. حاول مرة أخرى»
+        was a lie about it: trying again fails identically, forever, and nothing on the screen said
+        an account was needed (Bashar hit exactly this, 2026-09-04).
+
+        The page cannot know in advance. It is cached with `revalidate = 60`, so its HTML is shared
+        between readers and carries nobody's session — which is also why `initiallySaved` is absent
+        here. So the button asks, and turns the one answer that has a next step into that step.
+
+        `next` brings them back to the listing they were looking at, which is the whole point of
+        signing in at that moment.
+      */
+      if (response.status === 401) {
+        setSaved(!next);
+        setBusy(false);
+        router.push(signInHref);
+
+        return;
+      }
+
       if (!response.ok) {
         setSaved(!next);
         setFailed(true);
@@ -110,27 +142,67 @@ export function SaveButton({
       collapsed to 38px next to a 44px action, which reads as one of the two having gone wrong. Same
       question the site header answered on 2026-09-02, same answer.
     */
-    <div className="grid gap-1">
+    <div className="relative w-fit">
       <button
         type="button"
         onClick={() => void toggle()}
         aria-pressed={saved}
-        className={`inline-flex min-h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border px-4 text-sm transition-colors sm:min-h-11 ${
+        className={`inline-flex min-h-10 w-fit cursor-pointer items-center gap-2 rounded-lg border px-4 text-sm font-semibold transition-colors duration-200 ease-out-strong sm:min-h-11 ${
           saved
             ? 'border-gold bg-gold/12 text-gold'
-            : 'border-line text-muted hover:border-gold hover:text-gold'
+            : 'border-text2/30 bg-field text-text hover:border-gold hover:bg-gold/10'
         }`}
       >
-        {/* The heart is decoration: the label carries the meaning, so it is hidden from readers. */}
-        <span aria-hidden="true">{saved ? '♥' : '♡'}</span>
+        {/*
+          The heart is decoration: the label carries the meaning, so it is hidden from readers.
+
+          Hover moves the BORDER and the fill, never the label.
+
+          `--gold` on this button's ground is 3.46:1 — fine for a border, under the 4.5
+          floor for a 14px label — so a hover that recoloured the text made it harder to
+          read at exactly the moment somebody was reading it. Darkening the gold is the
+          other way out and Bashar has rejected that twice: the brand colour is the
+          design's.
+        */}
+        <HeartIcon filled={saved} />
         {saved ? labels.saved : labels.save}
       </button>
 
-      {failed ? (
-        <p role="alert" className="text-xs text-bad">
-          {labels.failed}
-        </p>
-      ) : null}
+      {/*
+        The same toast the share button uses, for the same reason: it was a block underneath, so a
+        failed save pushed the whole page down and back up. Two implementations of «a short message
+        about this control» is how they come to behave differently.
+      */}
+      <ButtonToast message={failed ? { text: labels.failed, tone: 'bad' } : null} />
     </div>
+  );
+}
+
+/**
+ * The heart, drawn.
+ *
+ * It was «♡» and «♥» — Unicode, which is the operating system's drawing rather than the product's:
+ * it arrives at a different weight and a different baseline on every platform, and beside a stroked
+ * share mark on the same row that difference is the first thing the eye finds. One path, filled or
+ * stroked, at the same 1.75 stroke as every other icon here.
+ *
+ * `fill` and `stroke` both animate, so pressing it fills rather than swaps.
+ */
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      aria-hidden
+      width="17"
+      height="17"
+      viewBox="0 0 24 24"
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="shrink-0 transition-colors duration-200 ease-out-strong"
+    >
+      <path d="M12 20.4 3.9 12.3a5 5 0 0 1 7.1-7.05L12 6.2l1-.95a5 5 0 0 1 7.1 7.05Z" />
+    </svg>
   );
 }

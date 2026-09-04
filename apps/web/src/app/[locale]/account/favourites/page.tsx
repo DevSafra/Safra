@@ -138,6 +138,7 @@ export default async function AccountFavouritesPage({
 
                 <div className="mt-auto pt-2">
                   <SaveButton
+                    signInHref={`/${locale}/login?next=${encodeURIComponent(`/${locale}/account/favourites`)}`}
                     slug={item.slug}
                     initiallySaved
                     labels={{

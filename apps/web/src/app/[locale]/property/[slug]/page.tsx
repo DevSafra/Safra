@@ -5,7 +5,9 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { SaveButton } from '@/components/save-button';
+import { ShareButton } from '@/components/share-button';
 import { PropertyGallery } from '@/components/property-gallery';
+import { priceWithCustomerFee } from '@/lib/customer-fee';
 import { localisedName, localisedText } from '@/lib/localise';
 import { getProperty, imageUrl, type PropertyDetail } from '@/lib/property';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -99,6 +101,37 @@ export default async function PropertyPage({
   const property = await getProperty(slug);
   if (!property) notFound();
 
+  /*
+    Where sign-in returns somebody who pressed «حفظ في المفضلة» without an account.
+
+    Built from the values PARSED above, never from the raw query string — the same allow-list rule
+    `PropertyCard`'s `stay` prop and the console's `returnQuery` both state: a redirect target
+    assembled from whatever a crafted link happened to carry is how a control becomes an open
+    redirect.
+
+    The party travels with it. Returning them to a bare property URL would drop the dates and the
+    guests they searched with, and a family of four would come back as a party of two — which is
+    the defect the SRS audit found on this exact path in 2026-08-25.
+  */
+  const stay = new URLSearchParams({
+    adults: String(adults),
+    children: String(children),
+    infants: String(infants),
+  });
+
+  /*
+    The dates are carried by SHAPE, because this page does not otherwise parse them — it prices
+    from `defaultStay`, computed off the calendar. `YYYY-MM-DD` or nothing: a shape test is an
+    allow-list, and it cannot pass through anything that is not a date.
+  */
+  for (const key of ['checkIn', 'checkOut'] as const) {
+    const value = first(query[key]);
+
+    if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) stay.set(key, value);
+  }
+
+  const backHere = `/${locale}/property/${property.slug}?${stay.toString()}`;
+
   const t = await getTranslations('property');
   const tnav = await getTranslations('nav');
   const ta = await getTranslations('amenities');
@@ -141,8 +174,18 @@ export default async function PropertyPage({
     displayCurrency(),
   ]);
 
+  /*
+    The fee is IN the figure, as it is in every card (Bashar, 2026-09-03).
+
+    `basePrice` is the partner's own rate and stays that in the payload; the fee is applied here,
+    at the point of display, from the rule the same endpoint sends. A flat fee is per BOOKING, so a
+    per-night «from» price carries the whole of it — which is exact for the one-night stay the
+    figure is a floor for, and never understates a longer one.
+  */
   const nightly = convertForDisplay(
-    cheapest?.basePrice ?? '0',
+    cheapest
+      ? priceWithCustomerFee(cheapest.basePrice, cheapest.currencyCode, property.fees)
+      : '0',
     cheapest?.currencyCode ?? 'USD',
     locale,
     target,
@@ -220,28 +263,33 @@ export default async function PropertyPage({
             it is not arbitrary: the name answers «what is this» and belongs where the eye starts,
             the action answers «and now what» and belongs where it finishes.
 
-            «احجز الآن» is an ANCHOR to the panel further down, not a second booking form. Two
-            places to book one stay is two places to keep in step, and the panel is where the dates
-            and the price live. On a phone the panel is below the fold and this is the only prompt
-            above it.
+            **Share and save, not book** (Bashar, 2026-09-04). «احجز الآن» stood here as an ANCHOR
+            to the panel three screens down — never a second booking form, because two places to
+            book one stay is two places to keep in step. The panel is where the dates and the price
+            are, and it carries the real action; a link to it that looked identical to it was the
+            weaker half of a duplicated call.
+
+            What is left is the pair that belongs together: the two things a reader does TO a
+            listing rather than with it. It is also booking.com's own arrangement.
+
+            **The one thing given up**: on a phone the booking panel is below the fold, and this was
+            the only prompt above it. Worth watching — if it costs bookings, the answer is a sticky
+            bar at the foot of the viewport rather than putting this back, because that is the
+            pattern that keeps the action visible without duplicating it.
           */}
           <div className="flex flex-wrap items-center gap-2">
-            <a
-              href="#booking"
-              className="btn-gold inline-flex min-h-10 items-center rounded-lg px-5 text-sm font-bold transition-[opacity] duration-200 ease-out-strong hover:opacity-90 sm:min-h-11"
-            >
-              {t('bookNow')}
-            </a>
+            <ShareButton
+              labels={{
+                share: t('share'),
+                copied: t('shareCopied'),
+                failed: t('shareFailed'),
+              }}
+            />
 
             {/*
-              «حفظ في المفضلة» beside «احجز الآن» (Bashar, 2026-09-03), which is where booking.com
-              keeps its own pair. It sat under the name before, in the column that answers «what is
-              this» — and saving is not a fact about the listing, it is something the reader does to
-              it. Both of the things a person can do here are now in one place.
-
-              AFTER the action in the DOM, so on an Arabic page «احجز الآن» takes the start of the
-              cluster and this sits beside it. The booking is the primary and reads first in both
-              directions.
+              «حفظ في المفضلة» (Bashar, 2026-09-03). It sat under the name before, in the column
+              that answers «what is this» — and saving is not a fact about the listing, it is
+              something the reader does to it.
 
               No `initiallySaved`: this page is cached (`revalidate = 60`), so its HTML is shared
               between readers and must carry nobody's shortlist. The button asks for its own state
@@ -249,6 +297,7 @@ export default async function PropertyPage({
             */}
             <SaveButton
               slug={property.slug}
+              signInHref={`/${locale}/login?next=${encodeURIComponent(backHere)}`}
               labels={{
                 save: t('save'),
                 saved: t('saved'),
