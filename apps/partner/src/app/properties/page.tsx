@@ -11,7 +11,7 @@ import { requireVerifiedPartner, sectionAccess } from '@/lib/gate';
 import { Shell } from '@/components/shell';
 import { SectionRefusal } from '@/components/section-refusal';
 import { Ltr } from '@/components/ltr';
-import { statusTone } from '@safra/ui';
+import { StarRating, statusTone } from '@safra/ui';
 
 import { TONES } from '@/lib/tones';
 
@@ -186,7 +186,24 @@ function Card({ property }: { readonly property: PartnerProperty }) {
           ) : null}
         </div>
 
-        <p className="mt-1 text-[11.5px] text-faint">{meta}</p>
+        {/*
+          The classification on the meta line, with the city and the type (Bashar, 2026-09-04:
+          «make it clearly visible in the property management screens»).
+
+          Not beside «★ 4.6» in the corner: that is the guest review score, and this card is the
+          one screen where a partner sees both — putting a second star shape next to it is how a
+          partner comes to believe SAFRA has changed their classification because a guest left a
+          review. Absent when null, with no placeholder: the edit form is where that is answered.
+        */}
+        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11.5px] text-faint">
+          {property.starRating ? (
+            <StarRating
+              value={property.starRating}
+              label={t.properties.starOption[property.starRating] ?? ''}
+            />
+          ) : null}
+          <span>{meta}</span>
+        </p>
 
         {property.attributes.length > 0 ? (
           <ul className="mt-2.5 flex flex-wrap gap-1.5">

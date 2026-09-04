@@ -92,6 +92,8 @@ const propertySchema = z.object({
   nameEn: z.string().nullable(),
   /** «رقم الغرفة/الوحدة». Null on every listing created before 2026-08-19, and on any villa. */
   roomNumber: z.string().nullable(),
+  /* The official classification, 1-5. Null on a listing that predates the field. */
+  starRating: z.number().int().min(1).max(5).nullable(),
   status: z.string(),
   rating: z.string().nullable(),
   reviewsCount: z.number(),
@@ -547,6 +549,8 @@ const partnerPropertySchema = z.object({
   address: z.string(),
   /** «رقم الغرفة/الوحدة». Null where the partner had nothing to put. */
   roomNumber: z.string().nullable(),
+  /* The official classification, 1-5. Null on a listing that predates the field. */
+  starRating: z.number().int().min(1).max(5).nullable(),
   latitude: z.string().nullable(),
   longitude: z.string().nullable(),
   attributes: z.array(z.string()),

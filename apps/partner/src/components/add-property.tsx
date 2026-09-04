@@ -7,6 +7,7 @@ import { TRIP_ATTRIBUTES } from '@safra/contracts';
 
 import type { PropertyFormReference } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
+import { STAR_VALUES } from '@/lib/stars';
 import { t, tripAttribute } from '@/lib/strings';
 
 /** §7.2: "اختر حتى 4" — the handoff's own ceiling, and the API's is ten. */
@@ -93,6 +94,7 @@ export function AddProperty({
         body: JSON.stringify({
           citySlug: text('citySlug'),
           propertyTypeCode: text('propertyTypeCode'),
+          starRating: text('starRating'),
           cancellationPolicyCode: text('cancellationPolicyCode'),
           /* Arabic only. The console and the customer site fall back to it. */
           name: { ar: text('name') },
@@ -181,6 +183,22 @@ export function AddProperty({
             options={reference.propertyTypes.map((type) => ({
               value: type.code,
               label: type.nameAr,
+            }))}
+          />
+          {/*
+            The star CLASSIFICATION, required on creation (Bashar, 2026-09-04).
+
+            Placed immediately after the property type because it classifies the type — a four-star
+            hotel is one answer, not two unrelated fields two rows apart. A select of five rather
+            than a star widget: this is a DECLARATION the partner already knows, not a rating they
+            are forming an opinion about, and five options is one tap on a phone.
+          */}
+          <Select
+            name="starRating"
+            label={t.properties.fStarRating}
+            options={STAR_VALUES.map((value) => ({
+              value: String(value),
+              label: t.properties.starOption[value] ?? String(value),
             }))}
           />
           <Select

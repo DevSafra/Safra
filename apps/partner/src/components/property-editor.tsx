@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 
 import type { PartnerPropertyDetail, PropertyFormReference } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
+import { STAR_VALUES } from '@/lib/stars';
 import { t, tripAttribute } from '@/lib/strings';
 import { TRIP_ATTRIBUTES } from '@safra/contracts';
 
@@ -51,6 +52,7 @@ export function PropertyEditor({
     roomNumber: property.roomNumber ?? '',
     citySlug: property.citySlug,
     propertyTypeCode: property.propertyTypeCode,
+    starRating: property.starRating === null ? '' : String(property.starRating),
     cancellationPolicyCode: property.cancellationPolicyCode,
     latitude: property.latitude ?? '',
     longitude: property.longitude ?? '',
@@ -106,6 +108,16 @@ export function PropertyEditor({
     if (form.citySlug !== property.citySlug) patch['citySlug'] = form.citySlug;
     if (form.propertyTypeCode !== property.propertyTypeCode) {
       patch['propertyTypeCode'] = form.propertyTypeCode;
+    }
+    /*
+      Sent only when it CHANGED and only when it is a real value.
+
+      Unlike a room number there is no "clear it" — the schema's 1-5 bound has no empty, and a
+      listing that predates the field starts blank. So an untouched blank sends nothing, which
+      leaves the null alone, and picking a value sends it.
+    */
+    if (form.starRating !== '' && form.starRating !== String(property.starRating ?? '')) {
+      patch['starRating'] = Number(form.starRating);
     }
     if (form.cancellationPolicyCode !== property.cancellationPolicyCode) {
       patch['cancellationPolicyCode'] = form.cancellationPolicyCode;
@@ -242,6 +254,29 @@ export function PropertyEditor({
             value: type.code,
             label: type.nameAr,
           }))}
+        />
+        {/*
+          The classification, beside the type it classifies — the same order the creation form
+          uses, so a partner editing a listing meets the fields where they left them.
+
+          The blank option exists ONLY for a listing that predates the field: it is the current
+          state, and removing it would make the select silently claim a rating nobody declared the
+          moment the form rendered. Once a value is chosen there is no way back to blank, which is
+          correct — «not classified» is a historical state, not a choice.
+        */}
+        <Select
+          label={t.properties.fStarRating}
+          value={form.starRating}
+          onChange={set('starRating')}
+          options={[
+            ...(property.starRating === null
+              ? [{ value: '', label: t.properties.starUnset }]
+              : []),
+            ...STAR_VALUES.map((value) => ({
+              value: String(value),
+              label: t.properties.starOption[value] ?? String(value),
+            })),
+          ]}
         />
         <Select
           label={t.editProperty.policy}
