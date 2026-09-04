@@ -13,6 +13,7 @@ import {
   multiplyDecimalStrings,
   toMinor,
 } from '../common/money.js';
+import { customerFeeMinor, customerFeeRule } from './customer-fee.js';
 import { DEFAULT_MONEY_CURRENCY, ERROR } from '@safra/contracts';
 import { notFound, badRequest } from '../common/errors/app-error.js';
 
@@ -182,24 +183,16 @@ export class PricingService {
       nightly.push({ date: night.date, amount: fromMinor(minor, scale) });
     }
 
-    // ── Customer fee (§2.1, configured on the Rules Engine page) ────────────
-    const feeMode = (await this.settings.get<string>(
-      'commission.customer_fee_mode',
-      'flat',
-    )) as 'flat' | 'percent';
-    const feeValue = await this.settings.getNumber('commission.customer_fee_value', 0);
+    /*
+      ── Customer fee (§2.1, configured on the Rules Engine page) ────────────
 
-    /**
-     * A flat fee is per BOOKING, not per night.
-     *
-     * The approved settings screen says "رسوم ثابتة تضاف على كل حجز" — a fixed fee
-     * added to every booking. Charging it per night would quietly multiply it by the
-     * length of stay.
-     */
-    const customerFeeMinor =
-      feeMode === 'percent'
-        ? applyRate(baseMinor, feeValue)
-        : toMinor(feeValue.toFixed(scale), scale);
+      Read through `customer-fee.ts`, which the SEARCH service also uses to make browse prices
+      fee-inclusive. Two copies of this rule would let a card and this quote disagree about money.
+    */
+    const feeRule = await customerFeeRule(this.settings);
+    const feeMode = feeRule.mode;
+    const feeValue = feeRule.value;
+    const customerFeeMinorAmount = customerFeeMinor(baseMinor, feeRule, scale);
 
     // ── Partner commission (§2.1) ───────────────────────────────────────────
     /*
@@ -230,7 +223,7 @@ export class PricingService {
       `coupon_discount` leg to balance, which is where the money actually comes from.
     */
     const discountMinor = toMinor(input.discountAmount ?? '0', scale);
-    const grossMinor = baseMinor + customerFeeMinor;
+    const grossMinor = baseMinor + customerFeeMinorAmount;
 
     if (discountMinor < 0n || discountMinor > grossMinor) {
       /* `CouponService` caps at the stay, so reaching here means a caller invented a figure. */
@@ -255,7 +248,7 @@ export class PricingService {
       baseAmount: fromMinor(baseMinor, scale),
       customerFeeMode: feeMode,
       customerFeeValue: feeValue.toString(),
-      customerFeeAmount: fromMinor(customerFeeMinor, scale),
+      customerFeeAmount: fromMinor(customerFeeMinorAmount, scale),
       partnerCommissionRate: partnerRate.toString(),
       partnerCommissionAmount: fromMinor(partnerCommissionMinor, scale),
       totalAmount: fromMinor(totalMinor, scale),

@@ -47,7 +47,26 @@ function isoDate(days: number): string {
 describeIfDb('SearchService', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '');
   const db: Database = harness.db;
-  const search = new SearchService(db, new SettingsService(db));
+  const settings = new SettingsService(db);
+  const search = new SearchService(db, settings);
+
+  /**
+   * Sets SAFRA's customer fee for one test, inside its own transaction.
+   *
+   * The service caches for thirty seconds, so the write alone is not enough — a later test would
+   * read a value the rollback has already undone. `invalidate()` is why the cache has that method.
+   */
+  const setCustomerFee = async (mode: 'flat' | 'percent', value: number) => {
+    await db.execute(sql`
+      UPDATE settings SET value = ${JSON.stringify(mode)}::jsonb
+      WHERE key = 'commission.customer_fee_mode'
+    `);
+    await db.execute(sql`
+      UPDATE settings SET value = ${String(value)}::jsonb
+      WHERE key = 'commission.customer_fee_value'
+    `);
+    settings.invalidate();
+  };
 
   /** The city these fixtures live in, so the suite never sees the rest of the database. */
   let citySlug = '';
@@ -80,6 +99,21 @@ describeIfDb('SearchService', () => {
   beforeEach(async () => {
     await harness.begin();
     await seed();
+
+    /*
+      No fee, so the tests below assert the SQL's accommodation arithmetic and nothing else.
+
+      Search prices include SAFRA's fee since 2026-09-03 — a card and a checkout that disagree
+      about money is the defect that change closed. But these tests are about overrides, arrival
+      nights and price floors, and folding a settings value into all of them would make every
+      expectation here a statement about the Rules Engine as well. The fee gets its own block at
+      the end, where it is the subject rather than a term.
+    */
+    await setCustomerFee('flat', 0);
+  });
+
+  afterEach(() => {
+    settings.invalidate();
   });
 
   afterEach(async () => {
@@ -141,7 +175,7 @@ describeIfDb('SearchService', () => {
 
     /* Two units, 100 and 250 a night; the search must quote the 100 one. */
     expect(cheap?.unitId).toBe(cheapUnitId);
-    expect(cheap?.stayTotal).toBe('200.000');
+    expect(cheap?.stayTotal).toBe('200.00');
   });
 
   it('excludes a unit whose days are closed in the range', async () => {
@@ -238,7 +272,7 @@ describeIfDb('SearchService', () => {
     const cheap = result.items.find((item) => item.slug === cheapPropertySlug);
 
     /* 175 for the overridden night + 100 for the plain one. */
-    expect(cheap?.stayTotal).toBe('275.000');
+    expect(cheap?.stayTotal).toBe('275.00');
     expect(cheap?.nightlyFrom).toBe('137.50');
   });
 
@@ -253,7 +287,7 @@ describeIfDb('SearchService', () => {
     const result = await search.search(query());
 
     expect(result.items.find((item) => item.slug === cheapPropertySlug)?.stayTotal).toBe(
-      '200.000',
+      '200.00',
     );
   });
 
@@ -268,7 +302,7 @@ describeIfDb('SearchService', () => {
     const result = await search.search(query());
 
     expect(result.items.find((item) => item.slug === cheapPropertySlug)?.stayTotal).toBe(
-      '200.000',
+      '200.00',
     );
   });
 
@@ -321,7 +355,7 @@ describeIfDb('SearchService', () => {
     const cheap = result.items.find((item) => item.slug === cheapPropertySlug);
 
     expect(cheap?.unitId).toBe(secondUnitId);
-    expect(cheap?.stayTotal).toBe('500.000');
+    expect(cheap?.stayTotal).toBe('500.00');
   });
 
   it('filters on trip attributes, requiring ALL of them', async () => {
@@ -517,6 +551,70 @@ describeIfDb('SearchService', () => {
     });
   });
 
+  /**
+   * Every price a guest is shown includes SAFRA's fee (Bashar, 2026-09-03).
+   *
+   * He saw «$100» on a card and «$101.99» at checkout, on three surfaces, and the fee had just
+   * stopped being itemised — so nothing on the page accounted for the difference. These assert the
+   * two halves that have to hold for a browse price to be believable: the total is what will be
+   * charged, and the per-night figure is that total divided by the nights, so a card printing both
+   * multiplies.
+   */
+  describe('SAFRA s customer fee', () => {
+    it('is inside the stay total', async () => {
+      await setCustomerFee('flat', 1.99);
+
+      const { items } = await search.search(query());
+
+      expect(items.find((item) => item.slug === cheapPropertySlug)?.stayTotal).toBe(
+        '201.99',
+      );
+    });
+
+    it('is spread across the nightly figure, not added to it', async () => {
+      await setCustomerFee('flat', 1.99);
+
+      const cheap = (await search.search(query())).items.find(
+        (item) => item.slug === cheapPropertySlug,
+      );
+
+      /* 201.99 over two nights, not 100 + 1.99 per night. */
+      expect(cheap?.nightlyFrom).toBe('101.00');
+    });
+
+    it('takes a percentage of the base when that is the mode', async () => {
+      await setCustomerFee('percent', 0.1);
+
+      const { items } = await search.search(query());
+
+      expect(items.find((item) => item.slug === cheapPropertySlug)?.stayTotal).toBe(
+        '220.00',
+      );
+    });
+
+    /* Zero is not «no fee configured» by accident — it must leave the price exactly as it was. */
+    it('leaves the price alone when it is zero', async () => {
+      await setCustomerFee('flat', 0);
+
+      const { items } = await search.search(query());
+
+      expect(items.find((item) => item.slug === cheapPropertySlug)?.stayTotal).toBe(
+        '200.00',
+      );
+    });
+
+    /* The ORDER must not move: a constant added to every row leaves cheapest-first unchanged. */
+    it('does not disturb price ordering', async () => {
+      await setCustomerFee('flat', 1.99);
+
+      const withFee = await slugs({ sort: 'price_asc' });
+
+      await setCustomerFee('flat', 0);
+
+      expect(withFee).toEqual(await slugs({ sort: 'price_asc' }));
+    });
+  });
+
   it('does not leak the columns that exist only to drive ORDER BY', async () => {
     const item = (await search.search(query())).items[0] as unknown as Record<
       string,
@@ -539,7 +637,7 @@ describeIfDb('SearchService', () => {
                             fx_rate_to_syp, total_syp, cancellation_policy_snapshot)
       SELECT cp.id, u.id, u.property_id, ${partnerId}::uuid, p.city_id,
              ${isoDate(IN)}::date, ${isoDate(OUT)}::date, 2, ${status}::booking_status,
-             '200.000', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
+             '200.00', '1.99', '1.99', '0.0700', '14.00', '201.99', '186.00',
              u.currency_id, '13000.00000000', '2625870.00', '{"code":"flex"}'::jsonb
       FROM units u
       JOIN properties p ON p.id = u.property_id

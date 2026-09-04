@@ -2,11 +2,22 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { sql } from 'drizzle-orm';
 
 import type { Database } from '@safra/db';
-import { ERROR, type SearchQuery, evaluateArrival } from '@safra/contracts';
+import {
+  ERROR,
+  type SearchQuery,
+  currencyDecimals,
+  evaluateArrival,
+} from '@safra/contracts';
 
 import { DATABASE } from '../database/database.module.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { badRequest, notFound } from '../common/errors/app-error.js';
+import { divideDecimalStrings, fromMinor, toMinor } from '../common/money.js';
+import {
+  customerFeeMinor,
+  customerFeeRule,
+  type CustomerFeeRule,
+} from '../bookings/customer-fee.js';
 
 export interface SearchResultItem {
   propertyReference: string;
@@ -482,7 +493,27 @@ export class SearchService {
 
     const all = rows.rows;
     const hasMore = all.length > query.limit;
-    const items = (hasMore ? all.slice(0, query.limit) : all).map(stripSortColumns);
+    /*
+      Every price a guest is shown INCLUDES SAFRA's fee (Bashar, 2026-09-03).
+
+      The query totals accommodation only — `u.base_price * nights` plus overrides — and the fee is
+      added at checkout. So a card said «$100» and the last screen said «$101.99», with nothing on
+      the page accounting for the difference now that the fee is no longer itemised. He saw exactly
+      that on three surfaces and said «I still see the price not including it».
+
+      Added HERE rather than in the SQL for two reasons. The fee is a flat amount per BOOKING, not
+      a per-night rate, so it does not belong inside a per-unit total that the query also uses to
+      rank; and the ordering must not change — a constant added to every row leaves the sort
+      identical, and a percentage fee is monotonic in the base, so `price_asc` still means cheapest
+      first either way. `stay_total_sort` is deliberately left alone for that reason.
+
+      `nightlyFrom` is recomputed from the inclusive total rather than having the fee added to it:
+      the card prints both, and «$101 / الليلة» over «$201.99 لليلتين» has to multiply.
+    */
+    const feeRule = await customerFeeRule(this.settings);
+    const items = (hasMore ? all.slice(0, query.limit) : all)
+      .map(stripSortColumns)
+      .map((item) => this.withCustomerFee(item, nights, feeRule));
 
     return {
       items,
@@ -495,6 +526,35 @@ export class SearchService {
       */
       previousCursor: offset > 0 ? encodeOffset(Math.max(0, offset - query.limit)) : null,
       firstBookableDate: verdict.firstBookableDate,
+    };
+  }
+
+  /**
+   * One row's prices, with the customer fee folded in.
+   *
+   * The scale comes from the row's OWN currency, so a three-decimal dinar is not rounded to cents
+   * on the way through. Division for the per-night figure rounds half-up at that scale, which can
+   * leave `nightly × nights` a minor unit away from the total on a stay whose fee does not divide
+   * evenly — unavoidable when one flat fee is spread across N nights, and the total is the figure
+   * that is charged.
+   */
+  private withCustomerFee(
+    item: SearchResultItem,
+    nights: number,
+    rule: CustomerFeeRule,
+  ): SearchResultItem {
+    const scale = currencyDecimals(item.currencyCode);
+    const baseMinor = toMinor(item.stayTotal, scale);
+    const grossMinor = baseMinor + customerFeeMinor(baseMinor, rule, scale);
+
+    return {
+      ...item,
+      stayTotal: fromMinor(grossMinor, scale),
+      nightlyFrom: divideDecimalStrings(
+        fromMinor(grossMinor, scale),
+        String(nights),
+        scale,
+      ),
     };
   }
 
