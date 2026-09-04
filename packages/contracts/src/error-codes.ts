@@ -170,6 +170,18 @@ export const ERROR = {
   /** A dispute that is open or investigating freezes the partner's entitlement. */
   PAYOUT_FROZEN_BY_DISPUTE: 'payout.frozen_by_dispute',
   PAYOUT_PARTNER_NOT_SCREENED: 'payout.partner_not_screened',
+  /*
+    §11.4 and Bashar, 2026-09-04: «A payout must never be released or marked as paid unless it is
+    linked to an active, verified payout account.» Both verbs, and both are checked — an account
+    can be edited back to `pending` or removed between the release and the transfer, so the state
+    that was true at release is not evidence about the state at payment.
+  */
+  PAYOUT_NO_VERIFIED_ACCOUNT: 'payout.no_verified_account',
+  PAYOUT_ACCOUNT_UNVERIFIED_AT_PAYMENT: 'payout.account_unverified_at_payment',
+  PAYOUT_ACCOUNT_NOT_FOUND: 'payout_account.not_found',
+  PAYOUT_ACCOUNT_NOT_PENDING: 'payout_account.not_pending',
+  /** Removing the account a scheduled payout is already pointed at would strand that transfer. */
+  PAYOUT_ACCOUNT_IN_USE: 'payout_account.in_use',
   PARTNER_ALREADY_VERIFIED: 'partner.already_verified',
   /** §8.1 — «يجب رفع وثائق التحقق قبل تفعيل الحساب». */
   PARTNER_PROFILE_MISSING: 'partner.profile_missing',
@@ -546,6 +558,9 @@ export const ERROR = {
   GIFT_CARD_CASH_ONLY: 'gift_card.cash_only',
   WALLET_INSUFFICIENT_BALANCE: 'wallet.insufficient_balance',
   VALIDATION_TOO_LONG: 'validation.too_long',
+  VALIDATION_ACCOUNT_NUMBER: 'validation.account_number',
+  VALIDATION_PAYOUT_METHOD: 'validation.payout_method',
+  VALIDATION_SWIFT: 'validation.swift',
   /** A number outside the range the field allows — §8.1's coordinates, for one. */
   VALIDATION_OUT_OF_RANGE: 'validation.out_of_range',
   /** A machine identifier that is not lower-case letters, digits and underscores. */

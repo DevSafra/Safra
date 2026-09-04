@@ -125,6 +125,13 @@ export const PARTNER_SECTION_PERMISSIONS = {
   arrivals: P.BOOKING_CHECK_IN,
   violations: P.VIOLATION_READ,
   payouts: P.PAYOUT_READ_OWN,
+  /*
+    حسابات التحويل is a SUB-page of مستحقاتي and gates on a different capability, because the two
+    are different questions: reading what SAFRA has paid, and deciding where it goes. Its
+    permission is the owner's only — an employee who may read the payouts still may not move the
+    destination — so it needs its own entry rather than inheriting the parent's.
+  */
+  payoutAccounts: P.PAYOUT_ACCOUNT_MANAGE_OWN,
   contracts: P.PARTNER_CONTRACT_SIGN_OWN,
   coupons: P.PARTNER_COUPON_DECIDE,
   employees: P.PARTNER_EMPLOYEE_MANAGE,

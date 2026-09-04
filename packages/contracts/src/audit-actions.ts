@@ -137,8 +137,29 @@ export const AUDIT_ACTIONS = [
   'partner_document.viewed',
   'partner_document.reviewed',
   'partner_contract.viewed',
+  /*
+    The payout-account lifecycle (Bashar, 2026-09-04: «All changes must be fully audited»).
+
+    Five actions rather than one, because the questions asked afterwards are different ones: who
+    put these details on file, who changed them, who approved them, who refused them and why, and
+    who took them away. A single `payout_account.changed` would answer none of those without
+    reading the payload, and the payload is not what an investigator searches on.
+  */
+  'payout_account.added',
+  'payout_account.updated',
+  'payout_account.verified',
+  'payout_account.rejected',
+  'payout_account.removed',
   'partner_payout.released',
   'partner_payout.paid',
+  /*
+    Both written by `PayoutService` since it was built, and neither was ever declared here — so
+    سجل التدقيق printed the raw identifier for a held payout. Found on 2026-09-04 by the first test
+    that ever pressed «تعليق», which is the point of the sweep in `audit-catalogue.integration.test`:
+    an action nobody exercises is an action nobody notices is unnamed.
+  */
+  'partner_payout.held',
+  'partner_payout.hold_lifted',
   'partner_payout.cancelled',
   'partner_payout.closed',
   'partner_application.submitted',

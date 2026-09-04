@@ -20,7 +20,6 @@ export const PERMISSIONS = {
   // ── Bookings ──────────────────────────────────────────────────────────────
   BOOKING_READ_OWN: 'booking.read_own',
   BOOKING_READ_ALL: 'booking.read_all',
-  BOOKING_CREATE: 'booking.create',
   /** Changing a booking state is restricted — SRS §9.4 "specific permissions only". */
   BOOKING_UPDATE_STATUS: 'booking.update_status',
   BOOKING_CANCEL: 'booking.cancel',
@@ -45,8 +44,27 @@ export const PERMISSIONS = {
    */
   PAYOUT_READ_OWN: 'payout.read_own',
   PAYOUT_EXECUTE: 'payout.execute',
-  /** Reading a partner's bank details — finance only. */
+  /**
+   * A partner entering and maintaining THEIR OWN transfer details (Bashar, 2026-09-04).
+   *
+   * Held by the owner and absent from `PARTNER_EMPLOYEE_PERMISSIONS`, for the reason
+   * `PAYOUT_READ_OWN` is: where the business gets paid is not a receptionist's to change, and an
+   * employee account is the cheapest thing for an attacker to obtain inside a partner.
+   */
+  PAYOUT_ACCOUNT_MANAGE_OWN: 'payout_account.manage_own',
+  /** Reading a partner's bank details — finance only, and masked even then. */
   PAYOUT_ACCOUNT_READ: 'payout_account.read',
+  /**
+   * Staff entering or correcting a partner's transfer details on their behalf.
+   *
+   * The second of the two doors Bashar asked for. It is separate from `PAYOUT_ACCOUNT_VERIFY` so
+   * that the person who TYPES an account and the person who APPROVES it can be required to be two
+   * different people — the oldest control there is against a payment redirected from the inside.
+   * The service enforces that separation; splitting the permission is what makes it expressible.
+   */
+  PAYOUT_ACCOUNT_MANAGE: 'payout_account.manage',
+  /** Approving or refusing an account, which is what makes it payable. */
+  PAYOUT_ACCOUNT_VERIFY: 'payout_account.verify',
   WALLET_READ: 'wallet.read',
   /** Manually crediting a wallet moves real money; audited without exception. */
   WALLET_ADJUST: 'wallet.adjust',
@@ -241,7 +259,12 @@ const P = PERMISSIONS;
 const CUSTOMER: Permission[] = [
   P.REVIEW_CREATE,
   P.BOOKING_READ_OWN,
-  P.BOOKING_CREATE,
+  /*
+    `BOOKING_CREATE` was here and is gone (2026-09-04). It could never be checked: §4 lets a GUEST
+    book with no account at all, so `POST /bookings` is `@Public()` and always will be — a
+    permission on it would refuse the majority of customers. It sat in this list granting nothing,
+    which is worse than a missing capability, because its presence reads as coverage.
+  */
   P.WALLET_READ,
   P.GIFT_CARD_READ,
   P.MESSAGE_READ,
@@ -265,6 +288,7 @@ const PARTNER: Permission[] = [
   P.MESSAGE_READ,
   P.MESSAGE_SEND,
   P.PAYOUT_READ_OWN,
+  P.PAYOUT_ACCOUNT_MANAGE_OWN,
   P.REVIEW_READ_OWN,
   /* الرد and إبلاغ — the two remedies P-006 allows. Hiding is not among them. */
   P.REVIEW_RESPOND_OWN,
@@ -333,6 +357,8 @@ const FINANCE_OFFICER: Permission[] = [
   P.PAYOUT_READ,
   P.PAYOUT_EXECUTE,
   P.PAYOUT_ACCOUNT_READ,
+  P.PAYOUT_ACCOUNT_MANAGE,
+  P.PAYOUT_ACCOUNT_VERIFY,
   P.WALLET_READ,
   P.WALLET_ADJUST,
   P.GIFT_CARD_READ,

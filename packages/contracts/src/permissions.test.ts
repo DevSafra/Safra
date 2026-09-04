@@ -195,7 +195,10 @@ describe('resolvePermissions', () => {
   });
 
   it('does not produce duplicates when an override repeats the baseline', () => {
-    const resolved = resolvePermissions('customer', [P.BOOKING_CREATE, P.BOOKING_CREATE]);
+    const resolved = resolvePermissions('customer', [
+      P.BOOKING_READ_OWN,
+      P.BOOKING_READ_OWN,
+    ]);
     expect(new Set(resolved).size).toBe(resolved.length);
   });
 });
