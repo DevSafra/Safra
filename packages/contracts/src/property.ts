@@ -55,6 +55,23 @@ export const propertyCreateSchema = z
      * room. `.trim()` so a field submitted with only spaces is empty, not a room called " ".
      */
     roomNumber: z.string().trim().max(20).optional(),
+    /**
+     * The official star CLASSIFICATION, 1 to 5 (Bashar, 2026-09-04).
+     *
+     * REQUIRED on creation — "every hotel/accommodation must have a star rating" — and that bound
+     * lives here rather than on the column, because it is a rule about what a partner may SUBMIT.
+     * The column stays nullable so it can keep holding the 2,703 listings that predate the field;
+     * a NOT NULL with a default would have invented a checkable claim about 2,700 real hotels.
+     *
+     * `z.coerce` because it arrives from a `<select>` as a string on every one of the three forms
+     * that send it. Without the coercion the schema refuses "4" and the partner reads a validation
+     * error about a field they filled in correctly.
+     */
+    starRating: z.coerce
+      .number({ message: ERROR.VALIDATION_STAR_RATING })
+      .int(ERROR.VALIDATION_STAR_RATING)
+      .min(1, ERROR.VALIDATION_STAR_RATING)
+      .max(5, ERROR.VALIDATION_STAR_RATING),
     latitude: latitudeSchema.optional(),
     longitude: longitudeSchema.optional(),
     /**
@@ -85,6 +102,37 @@ export const propertyCreateSchema = z
       .optional(),
   })
   .strict();
+
+/**
+ * Staff setting or correcting a property's star classification (Bashar, 2026-09-04).
+ *
+ * ## Why a dedicated endpoint rather than a general property editor
+ *
+ * The console cannot edit a property at all — it approves and rejects. That is deliberate: §8.1
+ * says SAFRA verified the address, the photographs and the documents AGAINST EACH OTHER, and a
+ * console that could quietly rewrite a listing's address would invalidate its own verification.
+ * None of that argument applies to the classification, which is a single bounded number a reviewer
+ * checks against the partner's papers.
+ *
+ * It is needed rather than convenient. 2,703 listings predate the field and 2,016 of them are
+ * PUBLISHED, which the partner may no longer edit — so without this, «the Super Admin must be able
+ * to see the star rating for every property, including properties already published» would show
+ * an empty column for the entire existing catalogue, permanently. It is also the only path for a
+ * hotel that is re-classified after it goes live.
+ *
+ * One field, so the blast radius is one field.
+ */
+export const propertyStarRatingSchema = z
+  .object({
+    starRating: z.coerce
+      .number({ message: ERROR.VALIDATION_STAR_RATING })
+      .int(ERROR.VALIDATION_STAR_RATING)
+      .min(1, ERROR.VALIDATION_STAR_RATING)
+      .max(5, ERROR.VALIDATION_STAR_RATING),
+  })
+  .strict();
+
+export type PropertyStarRatingInput = z.infer<typeof propertyStarRatingSchema>;
 
 export type PropertyCreateInput = z.infer<typeof propertyCreateSchema>;
 

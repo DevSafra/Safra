@@ -559,6 +559,7 @@ export const ERROR = {
   WALLET_INSUFFICIENT_BALANCE: 'wallet.insufficient_balance',
   VALIDATION_TOO_LONG: 'validation.too_long',
   VALIDATION_ACCOUNT_NUMBER: 'validation.account_number',
+  VALIDATION_STAR_RATING: 'validation.star_rating',
   VALIDATION_PAYOUT_METHOD: 'validation.payout_method',
   VALIDATION_SWIFT: 'validation.swift',
   /** A number outside the range the field allows — §8.1's coordinates, for one. */

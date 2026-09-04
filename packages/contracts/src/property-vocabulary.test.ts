@@ -31,6 +31,8 @@ describe('the trip-attribute vocabulary is closed', () => {
     name: { ar: 'بيت', en: 'House', de: 'Haus' },
     description: { ar: 'وصف', en: 'Description', de: 'Beschreibung' },
     address: 'شارع ١',
+    /* Required since 2026-09-04 — every new listing declares its classification. */
+    starRating: 4,
   };
 
   it('accepts every attribute the platform publishes', () => {

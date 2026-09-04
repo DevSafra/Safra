@@ -210,6 +210,8 @@ export const AUDIT_ACTIONS = [
 
   // ── Inventory ─────────────────────────────────────────────────────────────
   'property.created',
+  /* A reviewer setting or correcting a listing's star classification (2026-09-04). */
+  'property.star_rating_set',
   'property.updated',
   'property.submitted_for_review',
   'property.approved',

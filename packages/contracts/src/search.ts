@@ -94,6 +94,20 @@ export const searchQuerySchema = z
     minPrice: z.coerce.number().min(0).max(1_000_000).optional(),
     maxPrice: z.coerce.number().min(0).max(1_000_000).optional(),
     freeCancellationOnly: z.coerce.boolean().default(false),
+    /**
+     * Star classification, as a MULTI-SELECT (Bashar, 2026-09-04: "1★, 2★, 3★, 4★, 5★ and
+     * combinations where appropriate").
+     *
+     * A set rather than a minimum, because "4 or 5 stars" and "3 stars only" are both things
+     * people look for and a `minStars` could not express the second. `queryArray` is the same
+     * preprocessor the amenity and attribute filters use, so one selection and several arrive in
+     * the same shape — the bug that helper exists to prevent.
+     *
+     * ORed within the filter, unlike amenities which are ANDed: a property has many amenities and
+     * exactly ONE classification, so requiring all of them selected would return nothing every
+     * time more than one box was ticked.
+     */
+    starRatings: queryArray(z.coerce.number().int().min(1).max(5)).default([]),
 
     /** §5.5: default order is "SAFRA recommends", NOT cheapest-first. */
     sort: z
