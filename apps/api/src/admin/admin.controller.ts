@@ -9,12 +9,14 @@ import {
   type PartnerTwoFactorResetInput,
   type PartnerVerifyInput,
   type PropertyReviewInput,
+  type PropertyStarRatingInput,
   type SanctionsImportInput,
   type SanctionsScreeningInput,
   partnerTwoFactorResetSchema,
   partnerCommissionSchema,
   partnerVerifySchema,
   propertyReviewSchema,
+  propertyStarRatingSchema,
   sanctionsImportSchema,
   sanctionsScreeningSchema,
 } from '@safra/contracts';
@@ -94,6 +96,29 @@ export class AdminController {
     @Param('reference') reference: string,
   ) {
     return this.review.propertyDetail(reference, user);
+  }
+
+  /**
+   * Setting or correcting a listing's star classification (Bashar, 2026-09-04).
+   *
+   * `PROPERTY_APPROVE`, the same permission as the review decision: whoever is trusted to say a
+   * listing may go live is trusted to say what it is classified as, and inventing a permission for
+   * one bounded number would be a capability nobody grants and nothing checks.
+   *
+   * PUT rather than PATCH: there is one field, it is always sent in full, and there is no partial
+   * form of «four stars».
+   */
+  @Put('properties/:reference/star-rating')
+  @RequirePermissions(P.PROPERTY_APPROVE)
+  @AuditExempt(
+    'Audited by ReviewService as property.star_rating_set, with before and after.',
+  )
+  async setPropertyStarRating(
+    @CurrentUser() user: AccessTokenClaims | undefined,
+    @Param('reference') reference: string,
+    @Body(new ZodValidationPipe(propertyStarRatingSchema)) body: PropertyStarRatingInput,
+  ) {
+    return this.review.setStarRating(user, reference, body);
   }
 
   @Post('properties/:reference/review')
