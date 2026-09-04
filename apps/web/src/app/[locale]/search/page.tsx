@@ -8,7 +8,12 @@ import { PropertyCard } from '@/components/property-card';
 import { SearchFilters } from '@/components/search-filters';
 import { SearchForm } from '@/components/search-form';
 import { isLocale, type Locale } from '@/i18n/routing';
-import { getAmenities, getCities, getPropertyTypes } from '@/lib/catalog';
+import {
+  getAmenities,
+  getCities,
+  getPropertyTypes,
+  getPublicSettings,
+} from '@/lib/catalog';
 import { searchSafely } from '@/lib/api';
 import { todayInDamascus } from '@/lib/settings';
 
@@ -205,6 +210,14 @@ export default async function SearchPage({
   const freeCancellationOnly = first(query['freeCancellationOnly']) === 'true';
   const cursor = first(query['cursor']) || undefined;
 
+  /*
+    The cutoff hour as the customer reads it — «17:00» — from the setting rather than a literal.
+    Padded rather than formatted with `Intl`: it is a clock hour on the 24-hour dial, the same
+    string in all three locales, and `Intl.DateTimeFormat` would drag a real date into it.
+  */
+  const publicSettings = await getPublicSettings();
+  const cutoffHourLabel = `${String(cutoffHour(publicSettings)).padStart(2, '0')}:00`;
+
   const results = await searchSafely({
     checkIn,
     checkOut,
@@ -329,7 +342,18 @@ export default async function SearchPage({
           role="status"
           className="mt-6 rounded-card border border-warn/40 bg-warn/10 p-4 text-sm text-warn"
         >
-          {t('cutoffNotice', { hour: '17:00', date: results.notice.firstBookableDate })}
+          {t('cutoffNotice', {
+            /*
+              The CONFIGURED hour, not a literal.
+
+              This said «17:00» whatever the setting was, so an operator who moved the cutoff to
+              20:00 left every customer reading a sentence that named the wrong hour — and since
+              2026-09-04 the rule can be switched off entirely, at which point this notice cannot
+              appear at all. A message that states a rule has to read the rule.
+            */
+            hour: cutoffHourLabel,
+            date: results.notice.firstBookableDate,
+          })}
         </p>
       ) : null}
 
@@ -524,4 +548,19 @@ function Arrow({ direction }: { direction: 'back' | 'forward' }) {
 function addDays(date: string, days: number): string {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/**
+ * The configured cutoff hour, or 17 when the setting cannot be read as one.
+ *
+ * `Number(undefined)` and `Number('evening')` are both `NaN`, and `NaN` here does not fail — it
+ * renders «NaN:00» into a sentence explaining a rule to a customer. The API validates this key as
+ * `hourOfDay` on write, so the guard is for the value arriving some other way: an unseeded row, a
+ * hand-edited one, or a future change to what `publicSettings` returns. Same discipline as
+ * `SettingsService.getNumber`, on the other side of the wire.
+ */
+function cutoffHour(settings: Record<string, unknown>): number {
+  const hour = Number(settings['booking.same_day_cutoff_hour']);
+
+  return Number.isInteger(hour) && hour >= 0 && hour <= 23 ? hour : 17;
 }
