@@ -2,7 +2,12 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 
-import { getContracts, getPartner, getSanctionsStatus } from '@/lib/api';
+import {
+  getContracts,
+  getPartner,
+  getPayoutAccounts,
+  getSanctionsStatus,
+} from '@/lib/api';
 import { Ltr, StatusPill } from '@/components/admin-table';
 import { statusTone } from '@/lib/status-tone';
 import { ScreeningPanel } from '@/components/screening-panel';
@@ -11,6 +16,7 @@ import { DEFAULT_SANCTIONS_POLICY } from '@safra/contracts';
 import { PartnerContractPanel } from '@/components/partner-contract-panel';
 import { VerifyPartner } from '@/components/verify-partner';
 import { PartnerCommission } from '@/components/partner-commission';
+import { PayoutAccountsPanel } from '@/components/payout-accounts-panel';
 import { PartnerTwoFactor } from '@/components/partner-two-factor';
 import { PartnerSuspension } from '@/components/partner-suspension';
 import { BackLink, type BackTarget } from '@/components/back-link';
@@ -59,10 +65,11 @@ export default async function PartnerPage({
    * The list's health is fetched alongside the partner, so the screening panel can
    * explain a refusal before the reviewer triggers it rather than after.
    */
-  const [partner, listStatus, contracts] = await Promise.all([
+  const [partner, listStatus, contracts, payoutAccounts] = await Promise.all([
     getPartner(reference),
     getSanctionsStatus(),
     getContracts(reference),
+    getPayoutAccounts(reference),
   ]);
 
   if (partner === 'unauthenticated') {
@@ -212,23 +219,25 @@ export default async function PartnerPage({
             this business be paid, and does the account look like theirs", and the full number would
             be a credential on a screen every reader of الشركاء can open.
           */}
+          {/*
+            The details themselves moved to their own section below (Bashar, 2026-09-04), because
+            they are no longer a fact to read — they are a thing to enter, approve or refuse. What
+            stays here is the one-line answer «are any on file», which is what a reviewer working
+            down this panel actually wants at this point.
+          */}
           <Row
             label={t.sections.partnerDetail.payoutDetails}
             value={
-              partner.payoutAccounts.length === 0 ? (
+              payoutAccounts === 'failed' || payoutAccounts === 'unauthenticated' ? (
                 <span className="text-faint">
                   {t.sections.partnerDetail.noPayoutDetails}
                 </span>
               ) : (
-                <ul className="grid gap-1">
-                  {partner.payoutAccounts.map((acc) => (
-                    <li key={`${acc.method}-${acc.last4}`}>
-                      {acc.accountHolder}
-                      {acc.bankName ? ` · ${acc.bankName}` : ''} ·{' '}
-                      <Ltr>{`••••${acc.last4}`}</Ltr>
-                    </li>
-                  ))}
-                </ul>
+                <span className="text-faint2">
+                  {payoutAccounts.length === 0
+                    ? t.sections.partnerDetail.noPayoutDetails
+                    : t.sections.partnerDetail.payoutDetailsHint}
+                </span>
               )
             }
           />
@@ -258,6 +267,23 @@ export default async function PartnerPage({
         الإعدادات: `commission.partner_rate` is the PLATFORM's rate and belongs there; what one
         partner agreed is a fact about that partner and belongs on their record.
       */}
+      {/* ── Where the money goes (§11.4, Bashar 2026-09-04) ──────────────────── */}
+      <Section title={t.sections.payoutAccounts.title}>
+        <PayoutAccountsPanel
+          reference={partner.reference}
+          /*
+            An empty list on a failed read, for the reason the contract panel gives: the panel's
+            own copy explains what to do next, and hiding it would make a transient API failure
+            look like a partner who has no transfer details — which is a very different fact.
+          */
+          accounts={
+            payoutAccounts === 'failed' || payoutAccounts === 'unauthenticated'
+              ? []
+              : payoutAccounts
+          }
+        />
+      </Section>
+
       <Section title={t.sections.partnerDetail.commissionTitle}>
         <PartnerCommission
           reference={partner.reference}

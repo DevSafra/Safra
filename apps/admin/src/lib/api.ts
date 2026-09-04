@@ -352,6 +352,44 @@ export async function getPartner(reference: string) {
 }
 
 /**
+ * A partner's payout accounts, masked (§11.4).
+ *
+ * `last4` may be an EMPTY STRING and the schema says so rather than requiring four characters: a
+ * Sham Cash wallet number can be shorter than four, and masking a three-character value by taking
+ * its last four would return the whole thing. `last4` in `@safra/contracts` returns '' in that
+ * case, and a schema that refused it would fail the parse on exactly the account whose number is
+ * most exposed.
+ */
+const payoutAccountSchema = z.object({
+  id: z.string(),
+  method: z.string(),
+  accountHolder: z.string(),
+  last4: z.string(),
+  bankName: z.string().nullable(),
+  swiftCode: z.string().nullable(),
+  currency: z.string(),
+  isPrimary: z.boolean(),
+  status: z.enum(['pending', 'verified', 'rejected']),
+  /* Which DOOR it came through, derived by the API — see `PayoutAccountView`. */
+  submittedByPartner: z.boolean(),
+  verifiedAt: timestamp,
+  verifiedBy: z.string().nullable(),
+  rejectedAt: timestamp,
+  rejectionReason: z.string().nullable(),
+  createdAt: timestamp,
+  updatedAt: timestamp,
+});
+
+export type PayoutAccount = z.infer<typeof payoutAccountSchema>;
+
+export async function getPayoutAccounts(reference: string) {
+  return staffFetch(
+    `/admin/partners/${encodeURIComponent(reference)}/payout-accounts`,
+    z.array(payoutAccountSchema),
+  );
+}
+
+/**
  * §9.2's listing queue.
  *
  * No `status`. The endpoint filters on `status = 'pending_review'` and does not select the
@@ -2070,6 +2108,20 @@ export async function getPayoutRegistry(
 const payoutDetailSchema = payoutSchema.extend({
   id: z.string(),
   entryGroupId: z.string().nullable(),
+  /*
+    WHERE this transfer is going, masked. Null until the payout is released — before that there is
+    no destination to name, and `.nullable()` rather than `.default()` so an unreleased payout reads
+    as «not decided yet» instead of inventing an empty account.
+  */
+  destination: z
+    .object({
+      method: z.string(),
+      accountHolder: z.string(),
+      last4: z.string(),
+      bankName: z.string().nullable(),
+      status: z.string(),
+    })
+    .nullable(),
   bookings: z.array(
     z.object({
       bookingReference: z.string(),
