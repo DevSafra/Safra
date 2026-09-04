@@ -1046,6 +1046,8 @@ export const ar = {
       markPaidHint:
         'يُسجّل أن المال غادر سفرة ويُنشئ الحركة الدفترية. لا يمكن التراجع — التحويل المدفوع سجل ثابت.',
       paidReferenceLabel: 'مرجع الحوالة من البنك',
+      /* The account a released payout is going to — masked, and only once it is released. */
+      destination: 'حساب التحويل',
       hold: 'تعليق',
       holdHint: 'يوقف التحويل مؤقتًا مع تسجيل السبب.',
       liftHold: 'رفع التعليق',
@@ -2768,6 +2770,7 @@ export const ar = {
       noMapLocation: 'لم يُحدَّد',
       payoutDetails: 'بيانات التحويل المالي',
       noPayoutDetails: 'لا بيانات تحويل مسجّلة',
+      payoutDetailsHint: 'راجع بيانات التحويل من قسم حسابات التحويل أدناه.',
       applied: 'تاريخ التقديم',
       documents: 'الوثائق',
       noDocuments:
@@ -2779,6 +2782,87 @@ export const ar = {
       theirListings: 'عقاراته',
       noListings: 'لا عقارات مُقدَّمة.',
       decision: 'القرار',
+    },
+
+    /**
+     * حسابات التحويل — the destination of a partner's money, entered and approved here (§11.4).
+     *
+     * Bashar, 2026-09-04: staff may «enter or update payout-account details on behalf of the
+     * partner … when required», every change needs verification before it is payable, and the
+     * console «should display appropriately masked account details by default».
+     *
+     * So this panel shows the holder, the bank and the last four digits, and there is no control
+     * anywhere that reveals the rest — not a hidden one, not a permission-gated one. Staff verify
+     * that the details LOOK like the right business; they do not need the number to do that, and
+     * a full account number sitting on a screen is a credential in front of every reader.
+     */
+    payoutAccounts: {
+      title: 'حسابات التحويل',
+      intro:
+        'لا يُطلق أي تحويل ولا يُسجَّل كمدفوع إلا إلى حساب موثَّق. أي حساب جديد وأي تعديل على بيانات حساب يعود إلى المراجعة.',
+      empty: 'لا حسابات تحويل مسجّلة لهذا الشريك.',
+      add: 'إضافة حساب نيابةً عن الشريك',
+      edit: 'تعديل',
+      remove: 'حذف',
+      save: 'حفظ',
+      cancel: 'إلغاء',
+      verify: 'توثيق',
+      reject: 'رفض',
+      primary: 'الحساب المعتمد',
+      submittedByPartner: 'أدخلها الشريك',
+      submittedByStaff: 'أدخلها فريق سفرة',
+      verifiedOn: 'وُثِّق في {date}',
+      rejectedOn: 'رُفض في {date}',
+      rejectionReason: 'سبب الرفض',
+      /*
+        Separation of duties, said as GUIDANCE rather than as a refusal.
+
+        It used to promise «لا يمكن توثيق حساب أدخلته بنفسك», which the API no longer enforces — a
+        sentence describing a rule that does not exist is worse than none, because the operator
+        stops looking for the control it names. What the platform does is RECORD both actors, so
+        this asks for the second pair of eyes where one is available.
+      */
+      ownSubmissionNote:
+        'يُفضَّل أن يوثّق الحساب زميل غير الذي أدخله؛ يُسجَّل الاثنان في سجل التدقيق.',
+      masked: 'ينتهي بـ',
+      fields: {
+        method: 'طريقة التحويل',
+        accountHolder: 'اسم صاحب الحساب',
+        accountNumber: 'رقم الحساب / IBAN',
+        bankName: 'اسم المصرف',
+        swiftCode: 'رمز السويفت (اختياري)',
+        currency: 'عملة التحويل',
+      },
+      methods: {
+        bank_transfer: 'حوالة مصرفية',
+        sham_cash: 'شام كاش',
+        cash_office: 'مكتب صرافة',
+      } as Record<string, string>,
+      rejectDialog: {
+        title: 'رفض حساب التحويل',
+        message: 'اكتب سبب الرفض؛ يقرأه الشريك ويصحّح على أساسه.',
+        reason: 'سبب الرفض',
+        confirm: 'رفض الحساب',
+        cancel: 'إلغاء',
+      },
+      confirmVerify: {
+        title: 'توثيق حساب التحويل',
+        message:
+          'بعد التوثيق تصبح مستحقات هذا الشريك قابلة للتحويل إلى هذا الحساب. تأكّد من مطابقة الاسم والمصرف وآخر أربعة أرقام للمستندات.',
+        confirm: 'توثيق',
+        cancel: 'إلغاء',
+      },
+      confirmRemove: {
+        title: 'حذف حساب التحويل',
+        message: 'سيُحذف هذا الحساب ولن تُحوَّل إليه أي مستحقات. هل تريد المتابعة؟',
+        confirm: 'حذف',
+        cancel: 'إلغاء',
+      },
+      saved: 'حُفظت بيانات الحساب وأُرسلت للمراجعة.',
+      verified: 'وُثِّق حساب التحويل.',
+      rejected: 'رُفض حساب التحويل.',
+      removed: 'حُذف حساب التحويل.',
+      failed: 'تعذّر تنفيذ العملية. تحقّق من الحقول وحاول مرة أخرى.',
     },
 
     twoFactor: {
@@ -3101,6 +3185,7 @@ export const ar = {
    * evidence, so it is translated HERE and never at the source.
    */
   auditSubject: {
+    partner_payout_account: 'حساب تحويل شريك',
     coupon: 'كوبون',
     advertiser: 'معلن',
     ad_campaign: 'حملة إعلانية',
@@ -3309,7 +3394,14 @@ export const ar = {
     'partner.location_set': 'تحديد موقع الشريك على الخريطة',
     'partner.invitation_resent': 'إعادة إرسال دعوة شريك مُسجَّل مباشرةً',
     'partner_contract.viewed': 'عرض عقد شراكة',
+    'payout_account.added': 'إضافة حساب تحويل',
+    'payout_account.updated': 'تعديل حساب تحويل',
+    'payout_account.verified': 'التحقق من حساب تحويل',
+    'payout_account.rejected': 'رفض حساب تحويل',
+    'payout_account.removed': 'حذف حساب تحويل',
     'partner_payout.released': 'الإفراج عن مستحقات شريك',
+    'partner_payout.held': 'تعليق مستحقات شريك',
+    'partner_payout.hold_lifted': 'رفع تعليق مستحقات شريك',
     'partner_payout.paid': 'دفع مستحقات شريك',
     'partner_payout.cancelled': 'إلغاء مستحقات شريك',
     'partner_payout.closed': 'إغلاق دورة مستحقات',
@@ -3491,6 +3583,17 @@ export const ar = {
       rejected: 'مرفوض',
     } as Record<string, string>,
 
+    /*
+      A payout account's own review, which is NOT the partner's (§11.4). «موثَّق» rather than
+      «معتمد» for the same reason `in_review` is «قيد التحقق» rather than «قيد المراجعة»: the two
+      pills sit on one screen, and a shared word would make two different facts read as one.
+    */
+    payoutAccountStatus: {
+      pending: 'قيد المراجعة',
+      verified: 'موثَّق',
+      rejected: 'مرفوض',
+    } as Record<string, string>,
+
     partnerTier: {
       new: 'جديد',
       needs_improvement: 'يحتاج تحسين',
@@ -3570,6 +3673,16 @@ export const ar = {
      */
     payloadKey: {
       reason: 'السبب',
+      /* The payout-account lifecycle — masked in the trail exactly as it is on screen. */
+      partnerId: 'الشريك',
+      method: 'طريقة التحويل',
+      accountHolder: 'اسم صاحب الحساب',
+      last4: 'آخر أربعة أرقام',
+      bankName: 'اسم المصرف',
+      /* Whether an edit sent the account back for verification — see `isMaterialChange`. */
+      reverified: 'أُعيد إلى المراجعة',
+      /* Which account a released payout is going to. An id, never the details themselves. */
+      payoutAccountId: 'حساب التحويل',
       /* How much of a booking was settled from the customer's wallet rather than charged. */
       walletApplied: 'المدفوع من المحفظة',
       /*
@@ -3893,6 +4006,11 @@ export const ar = {
      * unchanged, exactly like a typed cancellation reason.
      */
     payloadValue: {
+      /* The payout rails, as `PAYOUT_METHODS` spells them. */
+      bank_transfer: 'حوالة مصرفية',
+      sham_cash: 'شام كاش',
+      cash_office: 'مكتب صرافة',
+
       'EC-001': 'أُغلقت صفحة الدفع قبل إتمامه، فانتهت مهلة الحجز وأُعيدت التواريخ',
 
       /*

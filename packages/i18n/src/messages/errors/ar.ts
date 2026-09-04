@@ -88,6 +88,13 @@ export const ar = {
   'payout.nothing_to_pay': 'لا مبلغ مستحق في هذه الفترة.',
   'payout.frozen_by_dispute': 'نزاع مفتوح يجمّد استحقاق التحويل لهذه الحجوزات.',
   'payout.partner_not_screened': 'لا يمكن إطلاق التحويل قبل فحص العقوبات لهذا الشريك.',
+  'payout.no_verified_account':
+    'لا يمكن إطلاق التحويل قبل التحقق من حساب تحويل نشط لهذا الشريك.',
+  'payout.account_unverified_at_payment':
+    'تغيّر حساب التحويل المرتبط بهذه الدفعة ولم يعد محقَّقاً. تحقّق منه ثم أعد المحاولة.',
+  'payout_account.not_found': 'حساب التحويل غير موجود.',
+  'payout_account.not_pending': 'تمت مراجعة حساب التحويل هذا مسبقاً.',
+  'payout_account.in_use': 'لا يمكن حذف حساب تحويل مرتبط بدفعة مجدولة.',
   'partner.already_verified': 'تم التحقق من هذا الشريك بالفعل.',
   'partner.profile_missing': 'هذا الحساب غير مرتبط بملف شريك.',
   'partner.type_unknown': 'نوع الشريك غير معروف.',
@@ -174,6 +181,9 @@ export const ar = {
   'support.ticket_not_found': 'لم يُعثر على طلب الدعم هذا.',
   'support.ticket_closed': 'طلب الدعم هذا مغلق. يرجى فتح طلب جديد.',
   'validation.too_long': 'هذه القيمة طويلة جداً.',
+  'validation.account_number': 'رقم الحساب يجب أن يتكوّن من 4 إلى 34 حرفاً أو رقماً.',
+  'validation.payout_method': 'طريقة التحويل غير معروفة.',
+  'validation.swift': 'رمز السويفت يجب أن يتكوّن من 8 أو 11 خانة.',
   'validation.out_of_range': 'القيمة خارج النطاق المسموح.',
   'validation.code_invalid':
     'المعرّف يجب أن يبدأ بحرف إنجليزي صغير ويحوي أحرفًا صغيرة وأرقامًا وشرطة سفلية فقط.',

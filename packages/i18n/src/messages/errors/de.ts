@@ -110,6 +110,14 @@ export const de = {
     'Ein offener Fall sperrt die Auszahlung für diese Buchungen.',
   'payout.partner_not_screened':
     'Diese Auszahlung kann erst nach der Sanktionsprüfung des Partners freigegeben werden.',
+  'payout.no_verified_account':
+    'Diese Auszahlung kann erst freigegeben werden, wenn der Partner ein aktives, verifiziertes Auszahlungskonto hat.',
+  'payout.account_unverified_at_payment':
+    'Das Auszahlungskonto dieser Überweisung ist nicht mehr verifiziert. Bitte verifizieren und erneut versuchen.',
+  'payout_account.not_found': 'Auszahlungskonto nicht gefunden.',
+  'payout_account.not_pending': 'Dieses Auszahlungskonto wurde bereits geprüft.',
+  'payout_account.in_use':
+    'Ein Auszahlungskonto mit einer geplanten Überweisung kann nicht entfernt werden.',
   'partner.already_verified': 'Der Partner ist bereits verifiziert.',
   'partner.profile_missing': 'Dieses Konto ist keinem Partnerprofil zugeordnet.',
   'partner.type_unknown': 'Unbekannter Partnertyp.',
@@ -212,6 +220,10 @@ export const de = {
   'support.ticket_closed':
     'Diese Support-Anfrage ist geschlossen. Bitte eröffnen Sie eine neue.',
   'validation.too_long': 'Dieser Wert ist zu lang.',
+  'validation.account_number':
+    'Eine Kontonummer besteht aus 4 bis 34 Buchstaben oder Ziffern.',
+  'validation.payout_method': 'Unbekannte Überweisungsart.',
+  'validation.swift': 'Ein SWIFT-Code hat 8 oder 11 Zeichen.',
   'validation.out_of_range': 'Der Wert liegt außerhalb des zulässigen Bereichs.',
   'validation.code_invalid':
     'Die Kennung muss mit einem Kleinbuchstaben beginnen und darf nur Kleinbuchstaben, Ziffern und Unterstriche enthalten.',

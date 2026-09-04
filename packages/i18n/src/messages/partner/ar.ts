@@ -1036,6 +1036,66 @@ export const ar = {
     /* Read-only, and the screen says why rather than leaving a partner hunting for a button. */
     readOnly:
       'هذه الصفحة للاطّلاع فقط. جدولة التحويلات وتنفيذها يتمّان من سفرة؛ لأي استفسار راسل partners@safra.com.',
+    /* The link across to where the destination is maintained — its own screen, its own task. */
+    accountsLink: 'حسابات التحويل',
+  },
+
+  /**
+   * حسابات التحويل — where SAFRA sends this partner's money (Bashar, 2026-09-04).
+   *
+   * Its own screen rather than a panel above مستحقاتي, for two reasons. It is a different task —
+   * «أين تصلني الأموال» is set up once and revisited rarely, while «ماذا وصلني» is read every
+   * month — and «مرفوض» beside a «ملغى» payout would put two red pills on one screen for two
+   * unrelated facts, which is the collision rule 2 exists to prevent.
+   */
+  payoutAccounts: {
+    title: 'حسابات التحويل',
+    intro:
+      'هذه هي الجهة التي تصلك عليها مستحقاتك. لحمايتك، يراجع فريق سفرة كل حساب جديد وكل تعديل على بيانات حساب قبل اعتماده، ولا يُحوَّل أي مبلغ إلا إلى حساب موثَّق.',
+    empty: 'لا حسابات تحويل مسجّلة بعد. أضف حسابًا ليتمكّن فريق سفرة من تحويل مستحقاتك.',
+    add: 'إضافة حساب تحويل',
+    edit: 'تعديل',
+    remove: 'حذف',
+    save: 'حفظ',
+    cancel: 'إلغاء',
+    primary: 'الحساب المعتمد',
+    /* The state, said as a sentence rather than only as a pill — the pill is the summary. */
+    statePending: 'قيد المراجعة من سفرة. لا يمكن التحويل إليه قبل اعتماده.',
+    stateVerified: 'موثَّق. تُحوَّل مستحقاتك إلى هذا الحساب.',
+    stateRejected: 'مرفوض. صحّح البيانات وأعد الإرسال للمراجعة.',
+    rejectionReason: 'سبب الرفض',
+    /* Why an edit costs another review — said before the partner edits, not after. */
+    editWarning:
+      'أي تعديل على بيانات التحويل يعيد الحساب إلى المراجعة، ويتوقّف التحويل إليه حتى يُعتمد من جديد.',
+    fields: {
+      method: 'طريقة التحويل',
+      accountHolder: 'اسم صاحب الحساب',
+      accountNumber: 'رقم الحساب / IBAN',
+      bankName: 'اسم المصرف',
+      swiftCode: 'رمز السويفت (اختياري)',
+      currency: 'عملة التحويل',
+    },
+    /* The full number is never shown back — not even to the partner who typed it. */
+    masked: 'ينتهي بـ',
+    methods: {
+      bank_transfer: 'حوالة مصرفية',
+      sham_cash: 'شام كاش',
+      cash_office: 'مكتب صرافة',
+    } as Record<string, string>,
+    status: {
+      pending: 'قيد المراجعة',
+      verified: 'موثَّق',
+      rejected: 'مرفوض',
+    } as Record<string, string>,
+    confirmRemove: {
+      title: 'حذف حساب التحويل',
+      message: 'سيُحذف هذا الحساب ولن تُحوَّل إليه أي مستحقات. هل تريد المتابعة؟',
+      confirm: 'حذف',
+      cancel: 'إلغاء',
+    },
+    saved: 'تم حفظ بيانات الحساب وإرسالها للمراجعة.',
+    removed: 'تم حذف حساب التحويل.',
+    failed: 'تعذّر حفظ البيانات. تحقّق من الحقول وحاول مرة أخرى.',
   },
 
   /** Payout state, in the partner's language. Same values and same colours as the console. */

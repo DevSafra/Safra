@@ -66,6 +66,15 @@ const STATUS_TONES: Record<string, Tone> = {
   sent: 'sky',
   initiated: 'sky',
   /** Indigo: الدفع already spends sky on `initiated`. */
+  /*
+    A payout account that has been checked and may receive money (§11.4).
+
+    Indigo rather than a green: the console's partner screen already paints `approved` lime for the
+    partner's own verification and `active` green for their contract, and the sanctions pill takes
+    teal. A fourth green on that screen is four things a reader cannot tell apart — which is rule 2
+    — and «موثَّق» is a different fact from «معتمد», so it must not look like it.
+  */
+  verified: 'indigo',
   authorized: 'indigo',
 
   /**
@@ -194,6 +203,14 @@ export const VOCABULARIES: Readonly<Record<string, readonly string[]>> = {
     'archived',
   ],
   verification: ['pending', 'in_review', 'approved', 'rejected'],
+  /*
+    Where a partner's money goes, and whether anybody has checked it (§11.4).
+
+    Its own vocabulary rather than a reuse of `verification`: the two move independently — a
+    partner approved in January can change their bank in June — and a shared list would make the
+    console's two pills look like one fact told twice.
+  */
+  payoutAccount: ['pending', 'verified', 'rejected'],
   /**
    * «طلبات الشراكة» — a request to join, before there is a partner.
    *

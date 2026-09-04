@@ -94,6 +94,14 @@ export const en = {
   'payout.frozen_by_dispute': 'An open dispute freezes the payout for these bookings.',
   'payout.partner_not_screened':
     'This payout cannot be released before the partner has been screened.',
+  'payout.no_verified_account':
+    'This payout cannot be released until the partner has an active, verified payout account.',
+  'payout.account_unverified_at_payment':
+    'The payout account on this transfer is no longer verified. Verify it and try again.',
+  'payout_account.not_found': 'Payout account not found.',
+  'payout_account.not_pending': 'This payout account has already been reviewed.',
+  'payout_account.in_use':
+    'A payout account attached to a scheduled transfer cannot be removed.',
   'partner.already_verified': 'Partner is already verified.',
   'partner.profile_missing': 'This account is not linked to a partner profile.',
   'partner.type_unknown': 'Unknown partner type.',
@@ -184,6 +192,9 @@ export const en = {
   'support.ticket_not_found': 'That support request could not be found.',
   'support.ticket_closed': 'This support request is closed. Please open a new one.',
   'validation.too_long': 'This value is too long.',
+  'validation.account_number': 'An account number is 4 to 34 letters or digits.',
+  'validation.payout_method': 'Unknown transfer method.',
+  'validation.swift': 'A SWIFT code is 8 or 11 characters.',
   'validation.out_of_range': 'The value is outside the allowed range.',
   'validation.code_invalid':
     'The identifier must start with a lower-case letter and contain only lower-case letters, digits and underscores.',
