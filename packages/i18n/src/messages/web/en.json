@@ -182,6 +182,9 @@
     "save": "Save to favourites",
     "saved": "Saved to favourites",
     "saveFailed": "Could not save. Try again.",
+    "share": "Share",
+    "shareCopied": "Link copied",
+    "shareFailed": "Could not share. Copy the link from the address bar.",
     "slider": {
       "title": "Property photos",
       "open": "View photo",

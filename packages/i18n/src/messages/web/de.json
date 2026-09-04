@@ -182,6 +182,9 @@
     "save": "Zu Favoriten hinzufügen",
     "saved": "In Favoriten gespeichert",
     "saveFailed": "Speichern fehlgeschlagen. Bitte erneut versuchen.",
+    "share": "Teilen",
+    "shareCopied": "Link kopiert",
+    "shareFailed": "Teilen nicht möglich. Kopieren Sie den Link aus der Adressleiste.",
     "slider": {
       "title": "Fotos der Unterkunft",
       "open": "Foto ansehen",
