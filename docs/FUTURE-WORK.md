@@ -427,6 +427,57 @@ carries a note saying that filtering by stars excludes every other accommodation
 that silently removes whole categories of inventory is the failure the price note beside it already
 guards against.
 
+### Same-day booking cutoff — made switchable, 2026-09-04
+
+**Bashar's requirement.** The same-day cutoff must be configurable from the settings or Rules
+Engine _"without requiring a deployment"_, switchable globally on and off, enforced by the API
+rather than hidden by the client, audited like any other business-rule change, and _"existing
+behaviour should remain the safe default unless the administrator explicitly changes it."_
+
+**What shipped.** `booking.same_day_cutoff_enabled`, a `boolean` setting seeded `true`, editable on
+الإعدادات under «قواعد الحجز» — the console needed no new code, because a boolean already renders as
+a switch there and the `booking.` prefix already claims the group. `SettingsService.getBoolean`
+reads it; `evaluateArrival` and `firstBookableDate` in `@safra/contracts` take a `cutoffEnabled`
+parameter **defaulting to `true`**, so a caller that forgets it keeps the restriction.
+
+**Three properties that are deliberate, and each is held by a test:**
+
+1. **Disabled means TODAY, not "no arrival rule."** A past arrival is still refused, with its own
+   code. They share a verdict type, so switching one off could have taken the other with it.
+2. **An unreadable or absent setting keeps the cutoff.** The fallback is `true` at the call site
+   and `getBoolean` refuses to coerce — `Boolean('false')` is `true` and `Boolean(0)` is `false`,
+   and the second of those silently opens same-day booking on every city.
+3. **The client re-implements nothing.** `minDate`, the recommended-stays rail and the search form
+   all read the date the API named (`firstBookableDate`), so switching the rule needs no client
+   change and the picker cannot drift from the endpoint that enforces it.
+
+**Driven in browsers, both directions**: switch off in الإعدادات → the same search that answered
+400 `same_day_closed` answers 200 with real stays, and the customer's cutoff notice disappears →
+switch back on → the refusal and the notice both return. No restart, no deployment. Each toggle
+wrote an `audit_log` row with actor, IP and user agent, plus a `settings_history` row.
+
+**Discovered while testing, worth knowing:** `settings_history` is append-only (a trigger raises on
+DELETE) and holds a foreign key to `settings`, so **a setting anybody has ever edited through the
+console can never be hard-deleted by any route.** A test that deleted a settings row passed until
+the first real toggle was made in a browser, then failed for a reason unrelated to what it covered.
+
+**Also fixed alongside it:** the customer's «حجوزات اليوم أُغلقت» notice named «17:00» whatever the
+setting said, so an operator who moved the cutoff to 20:00 left every customer reading the wrong
+hour. It now reads the configured hour, and falls back to 17 rather than rendering «NaN:00» if the
+value is ever unreadable.
+
+### Property type changes — accepted and silently ignored, fixed 2026-09-04
+
+**Bashar's requirement.** _"If the API accepts a property type change request, then the change must
+either be fully supported or explicitly refused. I do not want requests that appear to succeed
+while silently ignoring the requested change."_
+
+`PATCH` on a partner's property accepted `propertyTypeCode`, answered 200, and never wrote it. The
+change is now **supported**, with the dependent rule updated: the star classification is hotel-only,
+so hotel → villa clears the classification, villa → hotel requires one in the same patch or is
+refused `validation.star_rating_required`, and an unknown type is refused `property.type_unknown`.
+Five integration assertions, each watched to fail against the silent-ignore behaviour.
+
 ## 1b. Where the remaining work is written down
 
 **Engineering is complete. Everything below this line is operational, and every item now has a
