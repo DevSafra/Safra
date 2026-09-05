@@ -201,7 +201,21 @@
     "scoreVeryGood": "Very good",
     "scoreGood": "Good",
     "scoreFair": "Fair",
-    "guestsLoved": "What guests who stayed here liked"
+    "guestsLoved": "What guests who stayed here liked",
+    "unitsTitle": "Choose your unit",
+    "unitsNote": "Prices are for the dates you chose and include SAFRA's fee. Pick the unit that suits you, then continue to payment.",
+    "unitsOne": "One unit is available at this property.",
+    "propertyAmenities": "Property facilities",
+    "propertyAmenitiesNote": "Available to every guest at the property.",
+    "unitAmenitiesLabel": "This unit's facilities",
+    "bookThisUnit": "Book this unit",
+    "chooseUnit": "Choose a unit",
+    "unitLayout": "{bedrooms, plural, one {# bedroom} other {# bedrooms}} · {beds, plural, one {# bed} other {# beds}} · {bathrooms, plural, one {# bathroom} other {# bathrooms}}",
+    "unitNightsMin": "Minimum {count, plural, one {# night} other {# nights}}",
+    "unitNightsMax": "Maximum {count, plural, one {# night} other {# nights}}",
+    "unitAvailable": "Available for your dates",
+    "unitCheapest": "Lowest price",
+    "unitAmenitiesNone": "No facilities specific to this unit."
   },
   "city": {
     "availableStays": "Available stays in {city}",

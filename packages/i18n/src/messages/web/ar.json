@@ -201,7 +201,21 @@
     "scoreVeryGood": "جيد جدًا",
     "scoreGood": "جيد",
     "scoreFair": "مقبول",
-    "guestsLoved": "ما أحبه الضيوف الذين أقاموا هنا"
+    "guestsLoved": "ما أحبه الضيوف الذين أقاموا هنا",
+    "unitsTitle": "اختر وحدتك",
+    "unitsNote": "الأسعار للمدة المختارة وتشمل رسوم سفرة. اختر الوحدة التي تناسبك ثم تابع إلى الدفع.",
+    "unitsOne": "وحدة واحدة متاحة في هذا العقار.",
+    "propertyAmenities": "مرافق العقار",
+    "propertyAmenitiesNote": "متاحة لجميع نزلاء العقار.",
+    "unitAmenitiesLabel": "مرافق هذه الوحدة",
+    "bookThisUnit": "احجز هذه الوحدة",
+    "chooseUnit": "اختر وحدة",
+    "unitLayout": "{bedrooms, plural, zero {بلا غرف نوم} one {غرفة نوم} two {غرفتا نوم} few {# غرف نوم} many {# غرفة نوم} other {# غرفة نوم}} · {beds, plural, zero {بلا أسرّة} one {سرير واحد} two {سريران} few {# أسرّة} many {# سريرًا} other {# سرير}} · {bathrooms, plural, zero {بلا حمّام} one {حمّام واحد} two {حمّامان} few {# حمّامات} many {# حمّامًا} other {# حمّام}}",
+    "unitNightsMin": "أقل مدة {count, plural, zero {لا ليالٍ} one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}}",
+    "unitNightsMax": "أقصى مدة {count, plural, zero {لا ليالٍ} one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}}",
+    "unitAvailable": "متاحة للتواريخ المختارة",
+    "unitCheapest": "الأقل سعراً",
+    "unitAmenitiesNone": "لا مرافق خاصة بهذه الوحدة."
   },
   "city": {
     "availableStays": "الإقامات المتاحة في {city}",

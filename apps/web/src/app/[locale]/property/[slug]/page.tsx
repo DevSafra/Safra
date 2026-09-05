@@ -7,6 +7,7 @@ import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { SaveButton } from '@/components/save-button';
 import { ShareButton } from '@/components/share-button';
 import { PropertyGallery } from '@/components/property-gallery';
+import { UnitSelector } from '@/components/unit-selector';
 import { priceWithCustomerFee } from '@/lib/customer-fee';
 import { localisedName, localisedText } from '@/lib/localise';
 import { getProperty, imageUrl, type PropertyDetail } from '@/lib/property';
@@ -377,26 +378,69 @@ export default async function PropertyPage({
             </section>
           ) : null}
 
-          {/* ── Amenities (§5.6) ──────────────────────────────────────────── */}
-          {cheapest && cheapest.amenityCodes.length > 0 ? (
+          {/* ── The rooms, and the choice between them ────────────────────── */}
+          <UnitSelector
+            units={property.units}
+            locale={locale}
+            propertySlug={property.slug}
+            stay={{
+              checkIn: stay.get('checkIn') ?? defaultStay.checkIn,
+              checkOut: stay.get('checkOut') ?? defaultStay.checkOut,
+            }}
+            guests={{ adults, children, infants }}
+            priceWithFee={(basePrice, currencyCode) =>
+              convertForDisplay(
+                priceWithCustomerFee(basePrice, currencyCode, property.fees),
+                currencyCode,
+                locale,
+                target,
+                rates,
+              ).text
+            }
+            amenityName={(code) => dynamicMessage(ta, code, code)}
+            copy={{
+              title: t('unitsTitle'),
+              note: t('unitsNote'),
+              one: t('unitsOne'),
+              book: t('bookThisUnit'),
+              layout: (u) =>
+                t('unitLayout', {
+                  bedrooms: u.bedrooms,
+                  beds: u.beds,
+                  bathrooms: u.bathrooms,
+                }),
+              guestsUpTo: (count) => t('guestsUpTo', { count }),
+              nightsMin: (count) => t('unitNightsMin', { count }),
+              nightsMax: (count) => t('unitNightsMax', { count }),
+              available: t('unitAvailable'),
+              cheapest: t('unitCheapest'),
+              amenitiesLabel: t('unitAmenitiesLabel'),
+              amenitiesNone: t('unitAmenitiesNone'),
+              cancellation: t('cancellationPolicy'),
+              cancellationName: policyName(property.cancellationPolicy, locale),
+            }}
+          />
+
+          {/* ── What the BUILDING offers, as opposed to a room (Bashar, 2026-09-06) ── */}
+          {property.amenityCodes.length > 0 ? (
             <section>
-              <h2 className="font-display text-xl text-text">{t('amenities')}</h2>
+              <h2 className="font-display text-xl text-text">{t('propertyAmenities')}</h2>
+              <p className="mt-1 text-sm text-muted">{t('propertyAmenitiesNote')}</p>
               {/*
-                Bordered boxes, as booking.com draws them — a grid of bordered cells is scannable in
-                a way a bulleted list is not, and this is a list people scan for one word.
+                Bordered cells, as booking.com draws them — scannable in a way a bulleted list is
+                not, and this is a list people scan for one word.
 
-                **No icon, deliberately.** The reference gives each amenity its own glyph; the
-                `amenities` catalogue carries an `icon` column and it is populated for **0 of 12**
-                rows, so the honest alternatives were twelve identical marks or none. Twelve
-                identical ticks is decoration pretending to be information. The `✓` that used to sit
-                here was worse still: a unicode glyph standing in for an icon system, which is the
-                one substitution the craft floor names outright.
+                **No icon, deliberately.** The `amenities` catalogue carries an `icon` column and it
+                is populated for 0 of 12 rows, so the honest alternatives were twelve identical
+                marks or none. Twelve identical ticks is decoration pretending to be information,
+                and a unicode glyph standing in for an icon system is the one substitution the
+                craft floor names outright.
 
-                Distinct icons need either that column filled or an icon library adopted; both are
-                recorded rather than faked.
+                This list used to be the CHEAPEST UNIT's amenities under the heading «المرافق»,
+                which told a guest the building had whatever the smallest room happened to have.
               */}
               <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {cheapest.amenityCodes.map((code) => (
+                {property.amenityCodes.map((code) => (
                   <li
                     key={code}
                     className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-text"
@@ -634,12 +678,33 @@ export default async function PropertyPage({
                   the chosen range is not bookable, which is a truthful screen rather than a
                   silently substituted stay.
                 */}
-                <Link
-                  href={`/${locale}/checkout?property=${property.slug}&unitId=${cheapest.id}&checkIn=${stay.get('checkIn') ?? defaultStay.checkIn}&checkOut=${stay.get('checkOut') ?? defaultStay.checkOut}&adults=${Math.min(adults, cheapest.maxGuests)}&children=${children}&infants=${infants}`}
-                  className="mt-5 block rounded-lg btn-gold px-5 py-3 text-center font-semibold transition-opacity hover:opacity-90"
-                >
-                  {t('bookNow')}
-                </Link>
+                {/*
+                  With more than one unit this CHOOSES rather than books.
+
+                  The sidebar price is a «from» figure taken off the cheapest unit, and the button
+                  under it used to book that unit — so a guest reading «من ٩٦٫٩٩» on a two-room
+                  chalet and pressing «احجز الآن» silently bought the smaller room. The figure and
+                  the action disagreed, and nothing on the way through said so.
+
+                  Now it sends them to the list, where every unit states its own price and terms and
+                  carries its own action. With exactly one unit there is nothing to choose, so it
+                  still books, and the label says which of the two it is doing.
+                */}
+                {property.units.length > 1 ? (
+                  <a
+                    href="#units"
+                    className="mt-5 block rounded-lg btn-gold px-5 py-3 text-center font-semibold transition-opacity hover:opacity-90"
+                  >
+                    {t('chooseUnit')}
+                  </a>
+                ) : (
+                  <Link
+                    href={`/${locale}/checkout?property=${property.slug}&unitId=${cheapest.id}&checkIn=${stay.get('checkIn') ?? defaultStay.checkIn}&checkOut=${stay.get('checkOut') ?? defaultStay.checkOut}&adults=${Math.min(adults, cheapest.maxGuests)}&children=${children}&infants=${infants}`}
+                    className="mt-5 block rounded-lg btn-gold px-5 py-3 text-center font-semibold transition-opacity hover:opacity-90"
+                  >
+                    {t('bookNow')}
+                  </Link>
+                )}
 
                 {/*
                   "Ask SAFRA", never "contact the property". §5.6 and P-001 forbid

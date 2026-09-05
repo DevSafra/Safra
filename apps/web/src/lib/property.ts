@@ -40,6 +40,8 @@ const propertyDetailSchema = z.object({
   reviewsCount: z.number(),
   badges: z.array(z.string()),
   attributes: z.array(z.string()),
+  /* The BUILDING's own amenities. Each unit below carries its own, and the page keeps them apart. */
+  amenityCodes: z.array(z.string()),
   cancellationPolicy: z.object({
     code: z.string(),
     nameAr: z.string(),
