@@ -150,6 +150,7 @@ export const ar = {
     geo: 'المدن والدول والعملات',
     cityCategories: 'الفئات',
     catalogue: 'كتالوج المنصّة',
+    treasury: 'خزينة سفرة',
     reports: 'التقارير',
     settings: 'الإعدادات',
     staffRoles: 'أدوار الموظفين',
@@ -543,6 +544,111 @@ export const ar = {
       deleteTypeTitle: 'حذف نوع شريك',
       deleteTypeBody:
         'يُحذف السجل من القوائم. لا يمكن حذف نوع عليه شركاء أو طلبات — عندها أوقفه بدل حذفه.',
+    },
+
+    /*
+      خزينة سفرة — إيرادات سفرة نفسها، وحساباتها، وتحويلاتها (Bashar, 2026-09-05).
+
+      قبل هذه الشاشة كانت عمولات سفرة ورسومها وإيرادات إعلاناتها تتراكم في الدفاتر ولا يخصمها شيء:
+      الدفاتر تعرف ما كسبته سفرة ولا تعرف ما حصّلته، ولم يكن هناك مكان يُسجَّل فيه الحساب الذي
+      تصل إليه أموالها. الشريك يملك الاثنين منذ 2026-09-04.
+    */
+    treasury: {
+      title: 'خزينة سفرة',
+      note: 'إيرادات سفرة نفسها: عمولة الشريك، رسوم العميل، وإيرادات الإعلانات. «غير المحوَّل» يُحسب من دفتر الأستاذ مباشرة — الفرق بين ما تراكم وما خرج فعلاً — ولا يُخزَّن في أي مكان.',
+
+      // ── الملخّص ────────────────────────────────────────────────────────────
+      accrued: 'إجمالي الإيرادات المتراكمة',
+      transferred: 'المحوَّل فعلاً',
+      outstanding: 'غير المحوَّل',
+      bySource: 'التفصيل حسب المصدر',
+      sourceCommissionPartner: 'عمولة الشريك',
+      sourceCommissionCustomer: 'رسوم العميل',
+      sourceAdRevenue: 'إيرادات الإعلانات',
+      /* A stream added to the ledger and not to the catalogue reads as itself, never as a code. */
+      sourceOther: 'مصدر آخر',
+      colAccrued: 'المتراكم',
+      colTransferred: 'المحوَّل',
+      inSyp: 'بالليرة السورية',
+
+      // ── الحسابات ───────────────────────────────────────────────────────────
+      accountsTitle: 'حسابات تحويل سفرة',
+      accountsNote:
+        'الحسابات التي تصل إليها أموال سفرة. كل حساب جديد يبدأ «قيد المراجعة» ولا يُحوَّل إليه شيء قبل توثيقه وتفعيله. حساب واحد فقط يكون الافتراضي.',
+      accountsEmpty: 'لا حسابات بعد. أضف حساباً قبل فتح أي تحويل.',
+      accountAdd: '+ إضافة حساب',
+      accountAddTitle: 'حساب تحويل جديد',
+      accountEditTitle: 'تعديل الحساب',
+      label: 'اسم الحساب',
+      labelHint: 'اسم يعرفه فريق المالية، مثل «الحساب التشغيلي».',
+      method: 'طريقة التحويل',
+      accountHolder: 'اسم صاحب الحساب',
+      accountNumber: 'رقم الحساب / IBAN',
+      accountNumberHint:
+        'يُخزَّن مشفَّراً ولا يظهر بعد الحفظ — تُعرض آخر أربعة أرقام فقط.',
+      bankName: 'اسم المصرف',
+      swiftCode: 'رمز SWIFT (اختياري)',
+      currency: 'العملة',
+      colHolder: 'صاحب الحساب',
+      colBank: 'المصرف',
+      colLast4: 'آخر أربعة',
+      colDefault: 'الافتراضي',
+      colActive: 'مفعَّل',
+      colStatus: 'الحالة',
+      colTransfers: 'التحويلات',
+      isDefault: 'الحساب الافتراضي للتحويلات',
+      isActive: 'مفعَّل — يمكن التحويل إليه',
+      verify: 'توثيق',
+      reject: 'رفض',
+      rejectReason: 'سبب الرفض',
+      verified: 'موثّق',
+      pending: 'قيد المراجعة',
+      rejected: 'مرفوض',
+      yes: 'نعم',
+      no: 'لا',
+      remove: 'حذف',
+      /* Retiring versus deleting, said before either is pressed. */
+      deleteAccountTitle: 'حذف حساب تحويل',
+      deleteAccountBody:
+        'لا يمكن حذف حساب استُخدم في تحويل — عندها أوقفه بدل حذفه، فيبقى سجل التحويل مشيراً إليه.',
+      deactivateTitle: 'إيقاف حساب',
+      deactivateBody:
+        'يختفي من وجهات التحويل الجديدة، وتبقى التحويلات السابقة إليه كما هي.',
+      verifyTitle: 'توثيق حساب',
+      verifyBody: 'بعد التوثيق يصبح الحساب مؤهّلاً لاستقبال إيرادات سفرة.',
+
+      // ── التحويلات ──────────────────────────────────────────────────────────
+      payoutsTitle: 'تحويلات الإيرادات',
+      payoutsNote:
+        'كل تحويل يغطّي فترة، ويخصم من حسابات الإيراد ما تراكم فيها. الفترات لا تتقاطع حتى لا تُحوَّل الإيرادات نفسها مرّتين. تسجيل التحويل مدفوعاً هو الخطوة الوحيدة التي تكتب في دفتر الأستاذ.',
+      payoutsEmpty: 'لا تحويلات بعد.',
+      payoutOpen: '+ فتح تحويل',
+      payoutOpenTitle: 'تحويل جديد',
+      periodStart: 'من تاريخ',
+      periodEnd: 'إلى تاريخ',
+      notes: 'ملاحظات (اختياري)',
+      colReference: 'المرجع',
+      colPeriod: 'الفترة',
+      colNet: 'الصافي',
+      colDestination: 'الوجهة',
+      colPaidAt: 'تاريخ الدفع',
+      release: 'اعتماد',
+      markPaid: 'تسجيل مدفوعاً',
+      hold: 'تعليق',
+      cancel: 'إلغاء',
+      paidReference: 'مرجع الحوالة المصرفية',
+      paidReferenceHint: 'ما يظهر على كشف الحساب، حتى يمكن مطابقة التحويل لاحقاً.',
+      reason: 'السبب',
+      markPaidTitle: 'تسجيل التحويل مدفوعاً',
+      markPaidBody:
+        'هذه الخطوة تكتب حركة في دفتر الأستاذ: تُخصم حسابات الإيراد ويُقيَّد المبلغ على «تحويلات سفرة». لا يمكن التراجع عنها.',
+      holdTitle: 'تعليق تحويل',
+      cancelTitle: 'إلغاء تحويل',
+      /* The ledger group each paid transfer discharged — traceability, stated on the row. */
+      entryGroup: 'حركة دفتر الأستاذ',
+      noDestination: 'لا وجهة محدَّدة',
+      openFailed: 'تعذّر فتح التحويل.',
+      saved: 'حُفظ.',
     },
 
     slider: {
@@ -3793,6 +3899,20 @@ export const ar = {
       bank_transfer: 'تحويل مصرفي',
     } as Record<string, string>,
 
+    /*
+      The OUTGOING rails, which are not the incoming methods above and never were.
+
+      `paymentMethod` lists what a customer pays WITH — Visa, Mastercard, Klarna, a wallet. This
+      lists what SAFRA pays OUT over, and the two sets differ because a card is a pull instrument:
+      it collects money, it does not receive it. Keeping one list for both would put «Klarna» in a
+      picker for choosing where a bank transfer lands.
+    */
+    payoutMethod: {
+      bank_transfer: 'حوالة مصرفية',
+      sham_cash: 'شام كاش',
+      cash_office: 'مكتب صرافة',
+    } as Record<string, string>,
+
     paymentStatus: {
       initiated: 'بدأت',
       requires_action: 'تحتاج إجراء',
@@ -3855,6 +3975,17 @@ export const ar = {
      */
     payloadKey: {
       reason: 'السبب',
+      /*
+        Written by the خزينة سفرة lifecycle (2026-09-05). `destination` is the masked account a
+        transfer went to and `entryGroupId` the ledger movement it posted — the two an auditor
+        asks for first, which is why the payload carries them rather than only the reference.
+      */
+      destination: 'الوجهة',
+      entryGroupId: 'مجموعة القيد',
+      isDefault: 'الحساب الافتراضي',
+      label: 'الاسم',
+      periodStart: 'من تاريخ',
+      periodEnd: 'إلى تاريخ',
       /*
         Written by `unit.created` since a partner could add a unit to an existing listing
         (2026-09-04). `propertyReference` rather than an id, because the audit screen's reader

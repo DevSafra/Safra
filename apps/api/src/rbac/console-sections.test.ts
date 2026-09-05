@@ -12,6 +12,7 @@ import { AdminPartnerApplicationController } from '../partner/partner-applicatio
 import { CommsController } from '../admin/comms.controller.js';
 import { PERMISSIONS_KEY } from './decorators.js';
 import { CatalogueController } from '../admin/catalogue.controller.js';
+import { SafraPayoutController } from '../payouts/safra-payout.controller.js';
 import { RegistriesController } from '../admin/registries.controller.js';
 import { StaffController } from '../admin/staff.controller.js';
 import { StaffRolesController } from '../admin/staff-roles.controller.js';
@@ -84,6 +85,12 @@ const SECTION_HANDLERS: Record<
     message if their read is refused, exactly as the note above this map describes.
   */
   catalogue: [CatalogueController, 'amenities', 'getAmenities'],
+  /*
+    خزينة سفرة reads three things. The REVENUE summary is the primary one — it is the panel at the
+    top and the reason a reader opens the section; the destinations and the transfer list degrade to
+    their own message if either read is refused.
+  */
+  treasury: [SafraPayoutController, 'revenue', 'getSafraRevenue'],
   reports: [RegistriesController, 'reportCards', 'getReports'],
   settings: [AdminOperationsController, 'listSettings', 'getSettings'],
   audit: [AdminOperationsController, 'auditLog', 'getAuditLog'],

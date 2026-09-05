@@ -127,6 +127,7 @@ const NAV: readonly NavItem[] = [
   /* Directly under المدن، because a category is a property OF a city (Bashar, 2026-08-30). */
   { key: 'cityCategories', href: '/city-categories' },
   { key: 'catalogue', href: '/catalogue' },
+  { key: 'treasury', href: '/treasury' },
   { key: 'reports', href: '/reports' },
   { key: 'settings', href: '/settings' },
   { key: 'audit', href: '/audit' },

@@ -94,6 +94,15 @@ export const CONSOLE_SECTION_PERMISSIONS = {
     `CATALOGUE_MANAGE`, checked on every write route, which no other role holds.
   */
   catalogue: P.SETTINGS_READ,
+  /*
+    خزينة سفرة — SAFRA's own revenue and where it is collected (2026-09-05).
+
+    `LEDGER_READ` opens it, because the summary is a question about the books and finance already
+    holds that. Changing a destination or moving money needs `SAFRA_PAYOUT_MANAGE` /
+    `SAFRA_PAYOUT_EXECUTE`, checked on every write route — reading what the platform earned and
+    deciding where it goes are deliberately different authorities.
+  */
+  treasury: P.LEDGER_READ,
   reports: P.REPORT_READ,
   settings: P.SETTINGS_READ,
   audit: P.AUDIT_LOG_READ,

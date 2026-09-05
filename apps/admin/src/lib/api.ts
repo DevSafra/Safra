@@ -1575,6 +1575,88 @@ export async function getCataloguePartnerTypes() {
   );
 }
 
+/**
+ * خزينة سفرة — SAFRA's own revenue, its destinations, and the transfers between them.
+ *
+ * `outstanding` is DERIVED by the API from the ledger rather than stored anywhere, so the figure
+ * on screen is a question the books answer. A second source of truth about money is one that
+ * eventually disagrees with the first.
+ */
+const safraRevenueSchema = z.object({
+  accrued: z.string(),
+  transferred: z.string(),
+  outstanding: z.string(),
+  byAccount: z.array(
+    z.object({ account: z.string(), accrued: z.string(), transferred: z.string() }),
+  ),
+});
+
+export type SafraRevenue = z.infer<typeof safraRevenueSchema>;
+
+const safraAccountSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  method: z.string(),
+  accountHolder: z.string(),
+  /** Only the last four. The ciphertext is never selected, let alone returned. */
+  last4: z.string(),
+  bankName: z.string().nullable(),
+  swiftCode: z.string().nullable(),
+  currency: z.string(),
+  isDefault: z.boolean(),
+  isActive: z.boolean(),
+  status: z.enum(['pending', 'verified', 'rejected']),
+  createdBy: z.string().nullable(),
+  verifiedAt: z.string().nullable(),
+  verifiedBy: z.string().nullable(),
+  rejectedAt: z.string().nullable(),
+  rejectionReason: z.string().nullable(),
+  payouts: z.number(),
+});
+
+export type SafraAccount = z.infer<typeof safraAccountSchema>;
+
+const safraPayoutSchema = z.object({
+  id: z.string(),
+  reference: z.string(),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  commissionPartner: z.string(),
+  commissionCustomer: z.string(),
+  adRevenue: z.string(),
+  netAmount: z.string(),
+  status: z.string(),
+  accountLabel: z.string().nullable(),
+  accountLast4: z.string().nullable(),
+  scheduledFor: z.string().nullable(),
+  paidAt: z.string().nullable(),
+  paidReference: z.string().nullable(),
+  holdReason: z.string().nullable(),
+  /** The ledger movement it discharged — what makes the two reconcile in both directions. */
+  entryGroupId: z.string().nullable(),
+  notes: z.string().nullable(),
+});
+
+export type SafraPayout = z.infer<typeof safraPayoutSchema>;
+
+export async function getSafraRevenue() {
+  return staffFetch('/admin/safra-payouts/revenue', safraRevenueSchema);
+}
+
+export async function getSafraAccounts() {
+  return staffFetch(
+    '/admin/safra-payouts/accounts',
+    z.object({ accounts: z.array(safraAccountSchema) }),
+  );
+}
+
+export async function getSafraPayouts() {
+  return staffFetch(
+    '/admin/safra-payouts',
+    z.object({ payouts: z.array(safraPayoutSchema) }),
+  );
+}
+
 export async function getCityCategories() {
   return staffFetch(
     '/admin/geo/categories',
