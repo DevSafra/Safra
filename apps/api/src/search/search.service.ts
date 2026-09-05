@@ -151,14 +151,33 @@ export class SearchService {
      * which a worker computes from partner score, rating, response speed,
      * cancellation rate and data completeness.
      */
+    /*
+      Every ordering ends in the property id, and that is not tidiness.
+
+      Paging here is OFFSET, and OFFSET only partitions a result set when the sort is a TOTAL
+      order. None of these four was: recommendation score, rating and stay total all tie freely —
+      the testbed alone has twenty-four stays sharing a name and a price — and on tied rows
+      PostgreSQL may return any order it likes, independently per query. Page one and page two are
+      two queries, so a tied row could appear on both while another appeared on neither.
+
+      It was not theoretical and it was not intermittent: measured on 2026-09-05, one unit came
+      back on BOTH pages in ten runs out of ten. A customer paging a search saw a property twice
+      and never saw another one at all.
+
+      `property_id_sort` is `p.id` and the outer select is DISTINCT ON (property_id), so it is
+      unique across the result set — which is exactly what makes the order total. It sorts last, so
+      it decides nothing except between rows that were already equal.
+    */
+    const tiebreak = sql`, c.property_id_sort ASC`;
+
     const orderBy = {
       // These reference the snake_case sort aliases from the `candidates` CTE, not
       // the quoted camelCase output columns — unquoted identifiers fold to
       // lowercase, so "stayTotal" is not reachable as c.stay_total.
-      recommended: sql`c.recommendation_score DESC, c.rating DESC NULLS LAST, c.stay_total_sort ASC`,
-      price_asc: sql`c.stay_total_sort ASC, c.recommendation_score DESC`,
-      price_desc: sql`c.stay_total_sort DESC, c.recommendation_score DESC`,
-      rating_desc: sql`c.rating DESC NULLS LAST, c.recommendation_score DESC`,
+      recommended: sql`c.recommendation_score DESC, c.rating DESC NULLS LAST, c.stay_total_sort ASC${tiebreak}`,
+      price_asc: sql`c.stay_total_sort ASC, c.recommendation_score DESC${tiebreak}`,
+      price_desc: sql`c.stay_total_sort DESC, c.recommendation_score DESC${tiebreak}`,
+      rating_desc: sql`c.rating DESC NULLS LAST, c.recommendation_score DESC${tiebreak}`,
     }[query.sort];
 
     const offset = this.decodeOffset(query.cursor);

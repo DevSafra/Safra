@@ -535,6 +535,58 @@ describeIfDb('SearchService', () => {
    * it does hold is the thing worth holding: a default search must return what it returned before
    * bedrooms existed, and it goes red the moment zero starts excluding anything.
    */
+  /*
+    A result appears on exactly one page.
+
+    Paging is OFFSET, which only partitions a result set when the sort is a TOTAL order. Every
+    ordering used to end on a column that ties freely — score, rating, price — and on tied rows
+    PostgreSQL may choose any order, independently for each query. Page one and page two being two
+    queries, a tied row could come back on both while another came back on neither.
+
+    Measured before the fix: one unit on both pages in ten runs out of ten, against the live
+    testbed. The customer app's own e2e caught it once and then stopped, because its page size put
+    the tie somewhere else — which is why this asserts the RULE, for every sort, rather than
+    re-checking the one case that happened to surface.
+  */
+  describe('paging past the first screenful', () => {
+    const SORTS = ['recommended', 'price_asc', 'price_desc', 'rating_desc'] as const;
+
+    /*
+      UNSCOPED, deliberately — this suite's own city fixture is too clean to catch it.
+
+      The first version searched the fixture city, where a handful of properties have distinct
+      scores and prices. Removing the tiebreaker from the service left it GREEN: with no tied rows
+      there is nothing for an unstable sort to reorder, so the test reported a coverage it did not
+      have. The testbed at large has 970 properties sharing one score and rating, which is the
+      condition the defect needs, so that is what this searches.
+    */
+    const wide = (sort: (typeof SORTS)[number], cursor?: string) =>
+      search.search(query({ sort, limit: 12, citySlug: undefined, cursor }));
+
+    it.each(SORTS)('shows no result twice when sorted by %s', async (sort) => {
+      const first = await wide(sort);
+
+      /* Without a second page there is no boundary to get wrong, and nothing to assert. */
+      if (!first.nextCursor) return;
+
+      const second = await wide(sort, first.nextCursor);
+
+      const shared = second.items
+        .map((item) => item.unitId)
+        .filter((id) => first.items.some((item) => item.unitId === id));
+
+      expect(shared, `${sort}: these came back on both pages`).toStrictEqual([]);
+    });
+
+    /* And the order is the same each time it is asked, which is what makes a page address mean something. */
+    it('answers an identical query identically', async () => {
+      const once = await slugs({ limit: 6, citySlug: undefined });
+      const twice = await slugs({ limit: 6, citySlug: undefined });
+
+      expect(twice).toStrictEqual(once);
+    });
+  });
+
   describe('the bedrooms requirement', () => {
     it('keeps only units with at least that many bedrooms', async () => {
       expect(await slugs({ bedrooms: 3 })).toEqual([dearPropertySlug]);
