@@ -11,6 +11,7 @@ import { ENV } from '../../config/env.js';
 import { SettingsService } from '../../settings/settings.service.js';
 import type { PaymentProvider } from '../payment-provider.port.js';
 import { ManualTransferProvider } from './manual-transfer.provider.js';
+import { InternalCaptureProvider } from './internal-capture.provider.js';
 import { SimulatorProvider } from './simulator.provider.js';
 import { unavailable } from '../../common/errors/app-error.js';
 
@@ -52,8 +53,15 @@ export class PaymentProviderRegistry {
     @Inject(ENV) env: Env,
     private readonly settings: SettingsService,
     manualTransfer: ManualTransferProvider,
+    internalCapture: InternalCaptureProvider,
   ) {
     this.register(manualTransfer);
+
+    /*
+      Refund resolution only. Without it a staff-captured booking cannot be given back, because
+      refunds look the provider up by the slug the payment was taken under.
+    */
+    this.register(internalCapture);
 
     /**
      * Conditional registration, not a conditional branch at call time. If the
@@ -75,9 +83,16 @@ export class PaymentProviderRegistry {
     this.providers.set(provider.slug, provider);
   }
 
-  /** Every registered slug, for the admin settings screen to offer. */
+  /**
+   * Every slug a routing row may send a new payment to.
+   *
+   * Excludes refund-only providers: `internal` has to be resolvable so staff-captured bookings can
+   * be refunded, and must not thereby become a way to charge somebody.
+   */
   availableSlugs(): string[] {
-    return [...this.providers.keys()];
+    return [...this.providers.values()]
+      .filter((provider) => provider.acceptsNewPayments !== false)
+      .map((provider) => provider.slug);
   }
 
   /**

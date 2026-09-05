@@ -33,6 +33,7 @@ import type { AuditService } from '../common/audit/audit.service.js';
 import type { FxRateService } from '../fx/fx-rate.service.js';
 import type { SettingsService } from '../settings/settings.service.js';
 import { JobRunService } from '../common/jobs/job-run.service.js';
+import { InternalCaptureProvider } from './providers/internal-capture.provider.js';
 
 /**
  * The payment path against a REAL PostgreSQL.
@@ -106,6 +107,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       } as never,
       settings,
       new ManualTransferProvider(),
+      new InternalCaptureProvider(),
     );
 
     access = new BookingAccessService(db);
@@ -1032,6 +1034,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
             Promise.resolve({ '*': ['manual_transfer'] } as unknown as T),
         } as unknown as SettingsService,
         new ManualTransferProvider(),
+        new InternalCaptureProvider(),
       );
 
       expect(await offlineOnly.availableMethodsForCountry('SY')).toStrictEqual([]);
@@ -1048,9 +1051,61 @@ describeIfDb('payment collection, webhooks and refunds', () => {
             Promise.resolve({ '*': ['some_unsigned_acquirer'] } as unknown as T),
         } as unknown as SettingsService,
         new ManualTransferProvider(),
+        new InternalCaptureProvider(),
       );
 
       expect(await misconfigured.availableMethodsForCountry('SY')).toStrictEqual([]);
+    });
+  });
+
+  /*
+    Money staff recorded by hand can be given back.
+
+    `createInternalPayment` writes `provider = 'internal'` for a capture with no gateway behind it,
+    and the slug was left out of the registry deliberately — there is no acquirer to ask for an
+    authorisation. But refunds route back by that same slug, so those bookings could not be
+    refunded at all: the quote answered 200, the console offered «استرداد» because the booking was
+    paid, and the API answered 409 for ever. 146 bookings were in that state.
+  */
+  describe('a capture staff recorded by hand', () => {
+    it('can be refunded, and waits for finance rather than claiming to be done', async () => {
+      const booking = await db.execute<{ reference: string }>(sql`
+        SELECT b.reference
+          FROM bookings b
+          JOIN payments p ON p.booking_id = b.id
+         WHERE p.provider = 'internal'
+           AND p.status = 'captured'
+           AND b.wallet_amount = 0
+           AND b.deleted_at IS NULL
+           AND b.base_amount > 0
+           AND NOT EXISTS (SELECT 1 FROM refunds r WHERE r.booking_id = b.id
+                             AND r.deleted_at IS NULL)
+         LIMIT 1
+      `);
+
+      const reference = booking.rows[0]?.reference;
+
+      expect(reference, 'the fixture has a staff-captured booking').toBeDefined();
+
+      const result = await refunds.execute(
+        reference!,
+        'تحقق من الاسترداد اليدوي',
+        undefined,
+      );
+
+      /*
+        `processing`, not `completed`. Nobody has sent anything yet — an offline rail settles on a
+        human's timetable, and telling the customer their money is on its way when no instruction
+        exists anywhere is the failure this state exists to prevent.
+      */
+      expect(result.status, 'recorded and waiting for finance').toBe('processing');
+      expect(Number(result.amount)).toBeGreaterThan(0);
+    });
+
+    /* Resolvable for refunds must not mean chargeable. */
+    it('is not somewhere a routing row can send a new payment', () => {
+      expect(registry.availableSlugs()).not.toContain('internal');
+      expect(registry.bySlug('internal'), 'but it resolves for a refund').toBeDefined();
     });
   });
 

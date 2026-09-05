@@ -8,6 +8,7 @@ import { BookingDetailService } from './booking-detail.service.js';
 import { PaymentProviderRegistry } from '../payments/providers/provider.registry.js';
 import { ManualTransferProvider } from '../payments/providers/manual-transfer.provider.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { InternalCaptureProvider } from '../payments/providers/internal-capture.provider.js';
 
 /**
  * Internal notes on a booking, and the two things about them that are easy to get wrong (§9.4).
@@ -64,6 +65,7 @@ describeIfDb('internal notes on a booking', () => {
       { PAYMENT_SIMULATOR_ENABLED: false } as never,
       null as never,
       new ManualTransferProvider(),
+      new InternalCaptureProvider(),
     ),
     /*
       Neither suite compensates anybody, and `null` here surfaces as a crash the moment one tries

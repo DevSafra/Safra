@@ -10,6 +10,7 @@ import { ManualTransferProvider } from '../payments/providers/manual-transfer.pr
 import { PaymentProviderRegistry } from '../payments/providers/provider.registry.js';
 import type { WalletAdjustmentService } from '../wallet/wallet-adjustment.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
+import { InternalCaptureProvider } from '../payments/providers/internal-capture.provider.js';
 
 /**
  * §9.4's booking record stops at the edge of a member's city scope.
@@ -54,6 +55,7 @@ describeIfDb('a booking record outside a city scope', () => {
       { PAYMENT_SIMULATOR_ENABLED: false } as never,
       null as never,
       new ManualTransferProvider(),
+      new InternalCaptureProvider(),
     ),
     /*
       A COUNTING stub rather than the real adjustment service.

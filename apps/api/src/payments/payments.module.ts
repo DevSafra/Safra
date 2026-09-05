@@ -12,6 +12,7 @@ import { NotificationService } from '../notifications/notification.service.js';
 import { RefundService } from './refund.service.js';
 import { SystemRefundService } from './system-refund.service.js';
 import { ManualTransferProvider } from './providers/manual-transfer.provider.js';
+import { InternalCaptureProvider } from './providers/internal-capture.provider.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
 import { WalletModule } from '../wallet/wallet.module.js';
 
@@ -33,6 +34,7 @@ import { WalletModule } from '../wallet/wallet.module.js';
   providers: [
     WebhookRetentionService,
     ManualTransferProvider,
+    InternalCaptureProvider,
     PaymentProviderRegistry,
     PaymentIntentService,
     PaymentWebhookService,

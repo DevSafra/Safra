@@ -121,6 +121,15 @@ export interface PaymentProvider {
    */
   readonly isOffline: boolean;
 
+  /**
+   * False for a provider that exists only to give money BACK.
+   *
+   * `internal` marks a capture staff recorded by hand. It must be resolvable so those bookings can
+   * be refunded, and must never appear as somewhere a routing row can send a new payment — which
+   * is what `availableSlugs()` offers. Absent means true, so every real provider is unaffected.
+   */
+  readonly acceptsNewPayments?: boolean;
+
   createIntent(input: CreateIntentInput): Promise<IntentOutcome>;
 
   /**

@@ -16,6 +16,7 @@ import type { NotificationService } from '../notifications/notification.service.
 import { SettingsService } from '../settings/settings.service.js';
 import { SystemRefundService } from './system-refund.service.js';
 import { WalletService } from '../wallet/wallet.service.js';
+import { InternalCaptureProvider } from './providers/internal-capture.provider.js';
 
 /**
  * §6.4's «استرداد كامل» — the refund on a booking SAFRA itself cancelled.
@@ -49,6 +50,7 @@ describeIfDb('the system refund sweep', () => {
     } as never,
     new SettingsService(db),
     new ManualTransferProvider(),
+    new InternalCaptureProvider(),
   );
   const refunds = new RefundService(
     db,
