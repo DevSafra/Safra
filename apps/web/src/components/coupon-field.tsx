@@ -72,12 +72,28 @@ export function CouponField({
       const body: unknown = await response.json().catch(() => null);
 
       if (!response.ok) {
+        /*
+          `code`, not `message`.
+
+          The API answers `{ statusCode, code, message }` where `code` is the machine key
+          (`coupon.not_for_partner`) and `message` is ENGLISH prose for logs. `copy.messages` is
+          keyed by code, so reading `message` looked the sentence up in a map of codes, missed every
+          single time, and fell through to the general «تعذّر تطبيق هذا الكود».
+
+          The effect was that EVERY refusal reason was thrown away. A customer whose code was for a
+          different property, or not yet started, or already used, was told only that it did not
+          work — the exact failure `couponMessages` was written to prevent, and it was invisible
+          because the fallback is a plausible sentence rather than a broken one.
+
+          The same mistake was found and fixed in the console's partner onboarding; the comment
+          there still records it. It was never swept across to this app.
+        */
         const returned =
-          typeof body === 'object' && body !== null && 'message' in body
-            ? String(body.message)
+          typeof body === 'object' && body !== null && 'code' in body
+            ? String(body.code)
             : '';
 
-        /* By CODE. An unknown one falls back to the general sentence rather than showing English. */
+        /* An unknown code still falls back to the general sentence rather than showing English. */
         setError(copy.messages[returned] ?? copy.invalid);
 
         return;
