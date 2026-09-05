@@ -137,8 +137,14 @@ test.describe('every admin section the design specifies', () => {
 
       23 since 2026-09-04: كتالوج المنصّة, where amenities, cancellation policies and partner types
       became manageable instead of SQL-only.
+
+      24 since 2026-09-05: خزينة سفرة. SAFRA's own revenue had accrued in the ledger since the
+      platform opened and nothing had ever debited it — there was no screen on which to ask what
+      the company had earned, taken out, or was still owed itself. It sits below الإعلانات and
+      above التقارير because it reads as the last of the money sections rather than the first of
+      the reporting ones.
     */
-    expect(hrefs.length).toBe(23);
+    expect(hrefs.length).toBe(24);
 
     for (const href of hrefs) {
       const response = await page.goto(href);

@@ -498,6 +498,46 @@ reversed either — 36.4 B credited against 48 M ever paid. A partner payout sel
 permanently overstated but harmless. Bringing it in line would be the symmetric change, and it was
 out of the scope Bashar set.
 
+#### FIXED — three payout forms defaulted to SYP, and USD is the platform's standard
+
+**Bashar, 2026-09-05:** _"make USD the default operating, pricing and payout currency across the
+platform wherever a default currency is required... do not change the ledger accounting currency."_
+
+That is already the design — `DEFAULT_MONEY_CURRENCY = 'USD'` is what the platform quotes and
+defaults to, `ACCOUNTING_CURRENCY = 'SYP'` is what the ledger counts in, and `preferredCurrency()`
+has decided pickers since Bashar set the rule on 2026-08-30. **Nothing about the accounting model
+was touched.** What the request actually found was three forms that never asked:
+
+- the partner's payout account (`payout-accounts-manager.tsx`),
+- the console's view of a partner's payout account (`payout-accounts-panel.tsx`),
+- the SAFRA treasury destination (`safra-accounts.tsx`) — which had **no currency control at all**,
+  so a SAFRA account could only ever be recorded in Syrian pounds. A dollar destination was not
+  expressible. It is a field now.
+
+Five more places spelled `'USD'` where the shared constant was meant. One spelling, so the next
+change lands everywhere.
+
+**Held by a sweep, not by care.** `currency-default.test.ts` had three tests proving
+`preferredCurrency` returns the right answer and none proving any form calls it — the same gap the
+email rule names ("a helper test proves the helper works and says nothing about the template that
+forgot to call it"). It now walks every `.tsx` in the three apps and fails on a currency
+initialised to a written-out code. Watched to fail against each of the three forms.
+
+#### OPEN — two tests failed once each in full runs and passed alone and on re-run
+
+- `payments … paying partly from the wallet … returns the balance when the booking expires unpaid`
+- `customer-search … the result can be paged past the first screenful` (two slugs shared between
+  page one and page two — the shape of a cursor being ignored, but it does not reproduce)
+
+**Neither cause is established.** Both have the shape of the cross-file races already found in the
+treasury suite — vitest runs files in parallel threads against one database, and the browser suites
+run against the same one — but that is a hypothesis. Each passed twice on re-run.
+
+**This is a Stage 6 blocker in miniature:** an unattended overnight runner cannot tell a flake from
+a regression. Either these are found and closed, or the runner re-runs a failure before reporting
+it and marks the difference. Recorded rather than dismissed, because a suite nobody trusts is worse
+than a smaller one that is trusted.
+
 #### OPEN — one payments test failed once in a full run and passed alone and on re-run
 
 `payment collection, webhooks and refunds > paying partly from the wallet > returns the balance when
@@ -743,6 +783,13 @@ refused `validation.star_rating_required`, and an unknown type is refused `prope
 Five integration assertions, each watched to fail against the silent-ignore behaviour.
 
 ## 1b. Where the remaining work is written down
+
+**`docs/PAYMENT-AND-PAYOUT-RAILS.md`** — the Stage 4 determination Bashar asked for on 2026-09-05:
+whether Visa, Mastercard, Klarna and Sham Cash are payment methods, payout destinations, or both.
+Short answer: cards and Klarna are payment methods and must NOT join the payout list, SAFRA already
+models the split correctly, and the real gap is that no provider is registered behind any of the
+four customer-facing methods. Visa and Mastercard resumed operating in Syria in May 2026, which
+changes what is worth pursuing.
 
 **Engineering is complete. Everything below this line is operational, and every item now has a
 document that makes it executable without further discovery.**
