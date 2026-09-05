@@ -28,8 +28,28 @@ export async function PATCH(
     );
   }
 
+  /*
+    Only the fields the caller actually SENT.
+
+    `propertyUpdateSchema` is `.partial()`, but `attributes` carries `.default([])` and a zod
+    default survives partial: parsing `{ amenityCodes: [...] }` returns
+    `{ amenityCodes: [...], attributes: [] }`. The API writes `attributes` whenever it is defined,
+    so this proxy was adding an empty list to every PATCH — and `properties.service` sets it
+    verbatim. A partner correcting an address was silently clearing the listing's trip attributes,
+    and a request touching nothing structural was refused as structural.
+
+    Found on 2026-09-06 when an amenity-only patch answered 409 property.not_structurally_editable:
+    the refusal named a field the client had never sent. Validate against the schema, then send the
+    intersection with what arrived — the defaults are what the schema is FOR on a create, and are
+    exactly wrong on a patch.
+  */
+  const sent = new Set(Object.keys(body ?? {}));
+  const body_ = Object.fromEntries(
+    Object.entries(parsed.data).filter(([key]) => sent.has(key)),
+  );
+
   return proxy(`/partner/properties/${encodeURIComponent(reference)}`, {
     method: 'PATCH',
-    body: parsed.data,
+    body: body_,
   });
 }

@@ -116,6 +116,19 @@ const propertyBaseSchema = z
      */
     attributes: z.array(tripAttributeSchema).max(10).default([]),
     /**
+     * What the BUILDING offers, as opposed to what a room does (Bashar, 2026-09-06).
+     *
+     * The same catalogue `unitCreateSchema.amenityCodes` draws on, attached one level up. A pool,
+     * a lift, parking and a reception desk are facts about the property; a kettle and a balcony are
+     * facts about the room. Before this the partner had only the room level, so a hotel's pool had
+     * to be repeated on every room — and a guest reading it could not tell whether it was theirs.
+     *
+     * Honoured on BOTH create and update, deliberately: the note on `initialUnits` below records
+     * what happens when a schema advertises a field the service discards, and this is that field's
+     * shape exactly.
+     */
+    amenityCodes: z.array(z.string().trim().min(1).max(40)).max(60).optional(),
+    /**
      * The units to open the listing with — §7.2's «عدد الوحدات» and «السعر لليلة».
      *
      * Optional, so the endpoint's existing callers are unaffected. Present because the handoff's
@@ -221,6 +234,24 @@ export type PropertyCreateInput = z.infer<typeof propertyCreateSchema>;
 export const propertyUpdateSchema = propertyBaseSchema
   .omit({ initialUnits: true })
   .partial()
+  /*
+    A PATCH schema may not carry DEFAULTS, and `.partial()` does not remove them.
+
+    `attributes` is `.default([])` on the base schema, which is right for a create — a listing with
+    no attributes is an empty list, not a missing one. On a patch it is a trap: zod fills the field
+    in whether or not the caller sent it, so parsing `{ amenityCodes: [...] }` yields
+    `{ amenityCodes: [...], attributes: [] }`, and `PropertiesService.update` writes `attributes`
+    whenever it is defined. Every partner PATCH was therefore CLEARING the listing's trip
+    attributes — correcting an address wiped «جبلي» and «عائلي» with it.
+
+    The default is applied at every parse boundary, so stripping it in the route proxy was not
+    enough: the API's own validation pipe put it straight back. It has to be absent from the schema
+    a patch is judged by, which is this one.
+
+    Found on 2026-09-06 by an amenity-only patch answering 409 property.not_structurally_editable —
+    the refusal named a field the caller had never sent.
+  */
+  .extend({ attributes: z.array(tripAttributeSchema).max(10).optional() })
   .strict()
   /*
     The half of the hotel rule a PATCH can decide on its own.
