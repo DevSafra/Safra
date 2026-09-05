@@ -47,6 +47,21 @@ export class PropertyDetailService {
         p.description_ar, p.description_en, p.description_de,
         p.address, p.latitude, p.longitude,
         p.star_rating, p.rating, p.reviews_count, p.badges, p.attributes,
+        /*
+          The BUILDING's amenities, separate from each unit's (Bashar, 2026-09-06).
+
+          A guest has to be able to tell whether the pool is the hotel's or the room's, and one
+          merged list cannot say. Retired amenities drop out of what is advertised — a listing keeps
+          its link, but a facility SAFRA has withdrawn is not promised to a customer.
+        */
+        COALESCE(
+          (SELECT array_agg(am.code ORDER BY am.sort_order)
+             FROM property_amenities pam
+             JOIN amenities am ON am.id = pam.amenity_id
+              AND am.deleted_at IS NULL AND am.is_active
+            WHERE pam.property_id = p.id),
+          '{}'
+        ) AS amenity_codes,
         ci.slug AS city_slug, ci.name_ar AS city_name_ar, ci.name_en AS city_name_en,
         ci.name_de AS city_name_de, ci.timezone AS city_timezone,
         co.code AS country_code,
@@ -118,6 +133,7 @@ export class PropertyDetailService {
       reviewsCount: Number(row['reviews_count'] ?? 0),
       badges: row['badges'],
       attributes: row['attributes'],
+      amenityCodes: row['amenity_codes'],
       cancellationPolicy: {
         code: row['policy_code'],
         nameAr: row['policy_name_ar'],

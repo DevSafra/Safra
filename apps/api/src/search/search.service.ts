@@ -394,12 +394,32 @@ export class SearchService {
           }
           ${
             query.amenityCodes.length > 0
-              ? sql`AND (
+              ? /*
+                  EITHER level satisfies a filter (Bashar, 2026-09-06).
+
+                  A guest ticking «مسبح» means the building has one; ticking «شرفة» means the room
+                  does. They are the same control and the customer does not think of them as two
+                  questions, so the filter counts distinct codes across the UNION of what the unit
+                  declares and what its property declares.
+
+                  Before property amenities existed this read `unit_amenities` alone, which was
+                  right then and silently wrong the moment a partner moved the hotel's pool up to
+                  the property: the facility was still true, still shown on the page, and the
+                  property vanished from the filter that asked for it.
+
+                  DISTINCT over the union, so a code held at BOTH levels counts once and cannot
+                  make a two-filter search pass on one satisfied filter.
+                */
+                sql`AND (
                   SELECT COUNT(DISTINCT a.code)
-                  FROM unit_amenities ua
-                  JOIN amenities a ON a.id = ua.amenity_id
-                  WHERE ua.unit_id = u.id
-                    AND a.code IN ${query.amenityCodes}
+                  FROM (
+                    SELECT ua.amenity_id FROM unit_amenities ua WHERE ua.unit_id = u.id
+                    UNION
+                    SELECT pa.amenity_id FROM property_amenities pa
+                     WHERE pa.property_id = u.property_id
+                  ) held
+                  JOIN amenities a ON a.id = held.amenity_id
+                  WHERE a.code IN ${query.amenityCodes}
                 ) = ${query.amenityCodes.length}`
               : sql``
           }

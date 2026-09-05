@@ -333,6 +333,35 @@ export const units = pgTable(
   ],
 );
 
+/**
+ * What the PROPERTY offers, as opposed to what a room does.
+ *
+ * The second half of a distinction the platform did not draw (Bashar, 2026-09-06). A pool, a
+ * reception desk, parking and a lift belong to the building; air conditioning, a balcony and a
+ * kettle belong to the room somebody sleeps in. Holding both on `unit_amenities` forced a partner
+ * to repeat the building's facilities on every room, and left a guest unable to tell whether the
+ * pool they were reading about was theirs or the hotel's.
+ *
+ * Deliberately the same SHAPE as `unit_amenities` — same catalogue, same two columns, same index —
+ * because they are the same relationship at two levels, and a second modelling would drift. The
+ * amenity catalogue is shared: a code is a code, and what changes is what it is attached to.
+ */
+export const propertyAmenities = pgTable(
+  'property_amenities',
+  {
+    propertyId: foreignId('property_id')
+      .notNull()
+      .references(() => properties.id),
+    amenityId: foreignId('amenity_id')
+      .notNull()
+      .references(() => amenities.id),
+  },
+  (t) => [
+    primaryKey({ columns: [t.propertyId, t.amenityId] }),
+    index('property_amenities_amenity_idx').on(t.amenityId),
+  ],
+);
+
 export const unitAmenities = pgTable(
   'unit_amenities',
   {
@@ -392,6 +421,7 @@ export const propertiesRelations = relations(properties, ({ one, many }) => ({
   }),
   images: many(propertyImages),
   units: many(units),
+  amenities: many(propertyAmenities),
 }));
 
 export const unitsRelations = relations(units, ({ one, many }) => ({
@@ -411,6 +441,18 @@ export const propertyImagesRelations = relations(propertyImages, ({ one }) => ({
   property: one(properties, {
     fields: [propertyImages.propertyId],
     references: [properties.id],
+  }),
+}));
+
+/* The inverse side of `propertiesRelations.amenities` — a many() without it throws at QUERY time. */
+export const propertyAmenitiesRelations = relations(propertyAmenities, ({ one }) => ({
+  property: one(properties, {
+    fields: [propertyAmenities.propertyId],
+    references: [properties.id],
+  }),
+  amenity: one(amenities, {
+    fields: [propertyAmenities.amenityId],
+    references: [amenities.id],
   }),
 }));
 

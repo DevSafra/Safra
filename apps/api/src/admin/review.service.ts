@@ -384,6 +384,14 @@ export class ReviewService {
           this projection is the staff view of a listing under review and the English name is part
           of what is being reviewed.
         */
+        /*
+          What the BUILDING declares (Bashar, 2026-09-06).
+
+          A reviewer approving a listing is approving its claims, and «مسبح» is a claim. Before
+          property amenities existed there was nothing at this level to check; now there is, and a
+          moderator who cannot see it is approving something they have not read.
+        */
+        amenities: { with: { amenity: { columns: { code: true, nameAr: true } } } },
         units: {
           columns: {
             nameAr: true,
@@ -400,7 +408,11 @@ export class ReviewService {
             it. Per UNIT rather than per property: `units.currency_id` is the column the price is
             denominated in, and two units of one property are free to differ.
           */
-          with: { currency: { columns: { code: true } } },
+          with: {
+            currency: { columns: { code: true } },
+            /* And what each ROOM declares, which is a different set of claims. */
+            amenities: { with: { amenity: { columns: { code: true, nameAr: true } } } },
+          },
         },
       },
     });
@@ -420,7 +432,37 @@ export class ReviewService {
     /* `cityId` was for the check above; it does not belong in the response. */
     const { cityId: _cityId, ...visible } = property;
 
-    return visible;
+    /*
+      Flattened to CODES before it leaves.
+
+      Drizzle returns a join row per link — `[{ amenity: { code } }]` — and a console screen
+      rendering `unit.amenities[0].amenity.code` is a screen that breaks the day the relation is
+      renamed. The wire shape is the same `amenityCodes` every other surface already speaks, so the
+      console, the partner portal and the customer app all read one spelling.
+    */
+    return {
+      ...visible,
+      /*
+        The NAME travels with the code, because the console has no amenity catalogue of its own.
+
+        Amenity names are administrator-managed reference data — a row in `amenities`, edited on
+        كتالوج المنصّة — not copy in a message file, exactly like a city's name. Sending only the
+        code would force the console to invent a second place where those words live, and it would
+        drift from the one an administrator actually edits.
+      */
+      amenityCodes: visible.amenities.map((link) => ({
+        code: link.amenity.code,
+        nameAr: link.amenity.nameAr,
+      })),
+      amenities: undefined,
+      units: visible.units.map(({ amenities, ...unit }) => ({
+        ...unit,
+        amenityCodes: amenities.map((link) => ({
+          code: link.amenity.code,
+          nameAr: link.amenity.nameAr,
+        })),
+      })),
+    };
   }
 
   /**

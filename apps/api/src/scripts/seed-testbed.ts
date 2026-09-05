@@ -771,6 +771,9 @@ async function build(db: Seeder): Promise<void> {
   await db.execute(sql`DELETE FROM unit_amenities WHERE unit_id IN (
     SELECT un.id FROM units un JOIN properties pr ON pr.id = un.property_id
     WHERE pr.partner_id IN (${testbedPartners}))`);
+  /* The property's own amenity rows pin the property, the same way a unit's pin the unit. */
+  await db.execute(sql`DELETE FROM property_amenities WHERE property_id IN (
+    SELECT id FROM properties WHERE partner_id IN (${testbedPartners}))`);
   await db.execute(sql`DELETE FROM units WHERE property_id IN (
     SELECT id FROM properties WHERE partner_id IN (${testbedPartners}))`);
   await db.execute(sql`DELETE FROM property_images WHERE property_id IN (

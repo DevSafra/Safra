@@ -470,6 +470,13 @@
       "when": 1788617824141,
       "tag": "0066_commission_reversal_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1788646054975,
+      "tag": "0067_property_amenities",
+      "breakpoints": true
     }
   ]
 }

@@ -207,6 +207,7 @@ export class PropertiesService {
       property_type_code: string;
       cancellation_policy_code: string;
       review_notes: string | null;
+      amenity_codes: string[];
     }>(sql`
       SELECT pr.id, pr.reference, pr.slug, pr.status::text AS status,
              pr.name_ar, pr.name_en, pr.name_de,
@@ -216,7 +217,22 @@ export class PropertiesService {
              ci.slug AS city_slug, ci.name_ar AS city_name_ar,
              pt.code AS property_type_code,
              cp.code AS cancellation_policy_code,
-             pr.review_notes
+             pr.review_notes,
+             /*
+               What the BUILDING offers, so the editor can pre-fill it.
+
+               The same correlated-subquery shape the unit projection below uses, and for the same
+               reason a JOIN is wrong here: pr.id is already bare in this SELECT. Retired amenities
+               are excluded from what a partner edits while an existing link survives, exactly as
+               resolveAmenityIds decides. (No backticks in here: one ends the sql template.)
+             */
+             COALESCE(
+               (SELECT array_agg(a.code ORDER BY a.sort_order)
+                  FROM property_amenities pa
+                  JOIN amenities a ON a.id = pa.amenity_id AND a.deleted_at IS NULL
+                 WHERE pa.property_id = pr.id),
+               '{}'
+             ) AS amenity_codes
       FROM properties pr
       JOIN cities ci               ON ci.id = pr.city_id
       JOIN property_types pt       ON pt.id = pr.property_type_id
@@ -295,6 +311,8 @@ export class PropertiesService {
       latitude: row.latitude,
       longitude: row.longitude,
       attributes: row.attributes ?? [],
+      /* The property's OWN amenities; each unit carries its own list below. */
+      amenityCodes: row.amenity_codes ?? [],
       citySlug: row.city_slug,
       cityNameAr: row.city_name_ar,
       propertyTypeCode: row.property_type_code,
@@ -627,7 +645,22 @@ export class PropertiesService {
     const partnerId = requirePartnerId(claims, P.PROPERTY_MANAGE_OWN);
     const property = await this.findOwned(partnerId, reference);
 
+    /*
+      Facilities are an ONGOING responsibility, like prices — not a structural claim.
+
+      §8.1 freezes what SAFRA verified: the address, the city, the classification. A pool closing
+      for the winter or a car park opening is neither, and a listing that cannot say so is a listing
+      that lies to guests until staff intervene. `UnitEditor` already draws exactly this line for a
+      room's prices, capacity and amenities, all editable after publication; a property's facilities
+      being frozen while its rooms' were not was an inconsistency rather than a rule.
+
+      So an amenity-ONLY patch is allowed at any status, and anything touching a verified field is
+      still refused. `structural` is what the request would change besides the facilities.
+    */
+    const structural = Object.keys(input).filter((key) => key !== 'amenityCodes');
+
     if (
+      structural.length > 0 &&
       !STRUCTURALLY_EDITABLE.includes(
         property.status as (typeof STRUCTURALLY_EDITABLE)[number],
       )
@@ -749,15 +782,41 @@ export class PropertiesService {
       patch['cancellationPolicyId'] = policy.id;
     }
 
-    if (Object.keys(patch).length === 0) {
+    /*
+      Amenities count as a change even though they are not a column on the row.
+
+      Without the second clause, a partner who ticked the hotel's pool and changed nothing else was
+      told there was nothing to update — the same refusal as an empty request. `updateUnit` already
+      makes this distinction for the room level; this is the property level catching up.
+    */
+    if (Object.keys(patch).length === 0 && input.amenityCodes === undefined) {
       throw badRequest(ERROR.SETTING_NO_UPDATABLE_FIELDS);
     }
 
     await this.db.transaction(async (tx) => {
-      await tx
-        .update(schema.properties)
-        .set(patch)
-        .where(eq(schema.properties.id, property.id));
+      if (Object.keys(patch).length > 0) {
+        await tx
+          .update(schema.properties)
+          .set(patch)
+          .where(eq(schema.properties.id, property.id));
+      }
+
+      if (input.amenityCodes !== undefined) {
+        const amenityIds = await this.resolveAmenityIds(input.amenityCodes);
+
+        /* A set, replaced wholesale, so the result is exactly what the partner submitted. */
+        await tx
+          .delete(schema.propertyAmenities)
+          .where(eq(schema.propertyAmenities.propertyId, property.id));
+
+        if (amenityIds.length > 0) {
+          await tx
+            .insert(schema.propertyAmenities)
+            .values(
+              amenityIds.map((amenityId) => ({ propertyId: property.id, amenityId })),
+            );
+        }
+      }
 
       await this.audit.record(
         {
@@ -766,13 +825,22 @@ export class PropertiesService {
           action: 'property.updated',
           subjectType: 'property',
           subjectId: property.id,
-          after: patch,
+          after: {
+            ...patch,
+            ...(input.amenityCodes ? { amenityCodes: input.amenityCodes } : {}),
+          },
         },
         tx as unknown as Database,
       );
     });
 
-    return { reference, updated: Object.keys(patch) };
+    return {
+      reference,
+      updated: [
+        ...Object.keys(patch),
+        ...(input.amenityCodes === undefined ? [] : ['amenityCodes']),
+      ],
+    };
   }
 
   /**

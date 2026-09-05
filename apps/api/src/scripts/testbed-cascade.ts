@@ -75,6 +75,7 @@ export const CASCADE_HANDLES = new Set<string>([
   'property_images',
   'reviews',
   'unit_amenities',
+  'property_amenities',
   'wallet_transactions',
 ]);
 
