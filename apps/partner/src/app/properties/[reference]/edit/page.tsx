@@ -9,6 +9,7 @@ import {
   getPropertyFormReference,
   sidebarBadges,
 } from '@/lib/api';
+import { PropertyAmenities } from '@/components/property-amenities';
 import { PropertyEditor } from '@/components/property-editor';
 import { SubmitForReview } from '@/components/submit-for-review';
 import { UnitEditor } from '@/components/unit-editor';
@@ -93,6 +94,23 @@ export default async function EditPropertyPage({
         ) : (
           <Locked reference={property.reference} />
         )}
+
+        {/*
+          Facilities sit OUTSIDE the structural form, and above الوحدات.
+
+          A published listing may not change its address and may change its facilities, so they
+          cannot live in the same gated form — see the component's own note. Above the units because
+          a guest reads the building before the room.
+        */}
+        <PropertyAmenities
+          reference={property.reference}
+          initial={property.amenityCodes}
+          amenities={
+            amenities === 'failed' || amenities === 'unauthenticated'
+              ? []
+              : amenities.amenities
+          }
+        />
 
         <section className="grid gap-2">
           <h3 className="text-[13px] font-bold text-text">{t.editProperty.units}</h3>

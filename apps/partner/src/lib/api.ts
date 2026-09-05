@@ -554,6 +554,8 @@ const partnerPropertySchema = z.object({
   latitude: z.string().nullable(),
   longitude: z.string().nullable(),
   attributes: z.array(z.string()),
+  /* What the BUILDING offers. Each unit below carries its own list. */
+  amenityCodes: z.array(z.string()),
   citySlug: z.string(),
   cityNameAr: z.string(),
   propertyTypeCode: z.string(),

@@ -637,6 +637,10 @@ export const ar = {
    * that, and names what IS editable, rather than showing a form whose submit is refused.
    */
   editProperty: {
+    /* Property-level facilities, distinct from a room's (Bashar, 2026-09-06). */
+    propertyAmenitiesLabel: 'مرافق العقار',
+    propertyAmenitiesHint:
+      'ما يتوفّر في المبنى لجميع النزلاء — مثل المسبح والمصعد وموقف السيارات. مرافق الغرفة نفسها تُحدَّد في كل وحدة على حدة.',
     title: 'تعديل العقار',
     back: 'رجوع إلى العقارات',
     section: 'بيانات العقار',
@@ -745,6 +749,7 @@ export const ar = {
     unitSaving: 'جارٍ الحفظ…',
     unitSaved: 'حُفظت الوحدة.',
     unitFailed: 'تعذّر حفظ الوحدة. راجع الحقول وحاول مرة أخرى.',
+    amenitiesFailed: 'تعذّر حفظ مرافق العقار. حاول مرة أخرى.',
     unitsNote:
       'الأسعار والإتاحة تبقى قابلة للتعديل في كل الحالات، حتى بعد نشر العقار — فهي مسؤوليتك المستمرة (P-006).',
   },
