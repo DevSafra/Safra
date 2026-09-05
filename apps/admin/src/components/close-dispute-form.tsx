@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 import { t, apiErrorOf } from '@/lib/strings';
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /**
  * Closing a dispute (design handoff §8, "فتح النزاع ←").
@@ -116,7 +117,7 @@ export function CloseDisputeForm({ reference }: { reference: string }) {
                     the customer's wallet actually holds, so what is sent here is the amount SAFRA
                     decided to pay, not an assumption about where it lands.
                   */
-                  compensationCurrency: 'USD',
+                  compensationCurrency: DEFAULT_MONEY_CURRENCY,
                 }
               : {}),
           }),

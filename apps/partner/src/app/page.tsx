@@ -14,6 +14,7 @@ import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
 import { fill, t, violationKind } from '@/lib/strings';
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /**
  * لوحة التحكم (design handoff §7.1).
@@ -129,7 +130,9 @@ function Kpis({
         label={t.dashboard.kpiEarnings}
         value={
           earnings ? (
-            <Ltr>{amount(earnings.amount, earnings.currencyCode ?? 'USD')}</Ltr>
+            <Ltr>
+              {amount(earnings.amount, earnings.currencyCode ?? DEFAULT_MONEY_CURRENCY)}
+            </Ltr>
           ) : (
             t.dashboard.noData
           )
@@ -583,7 +586,10 @@ function Alerts({
                 <>
                   {' · '}
                   {fill(t.dashboard.alertFine, {
-                    amount: amount(alert.fineAmount, alert.currencyCode ?? 'USD'),
+                    amount: amount(
+                      alert.fineAmount,
+                      alert.currencyCode ?? DEFAULT_MONEY_CURRENCY,
+                    ),
                   })}
                 </>
               ) : null}

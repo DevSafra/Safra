@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { CURRENCY_CATALOGUE, PAYOUT_METHODS } from '@safra/contracts';
+import { CURRENCY_CATALOGUE, preferredCurrency, PAYOUT_METHODS } from '@safra/contracts';
 import { statusTone, useConfirm } from '@safra/ui';
 import { errorMessage } from '@safra/i18n';
 
@@ -257,7 +257,18 @@ function AccountForm({
   const [number, setNumber] = useState('');
   const [bank, setBank] = useState(account?.bankName ?? '');
   const [swift, setSwift] = useState(account?.swiftCode ?? '');
-  const [currency, setCurrency] = useState(account?.currency ?? 'SYP');
+  /*
+    The platform's standard currency, not a literal.
+
+    A partner opening this form has not chosen anything yet, and what they get by not choosing is
+    what SAFRA quotes and pays in. `preferredCurrency` is that decision, made once in contracts and
+    already applied to the geography, advertising and gift-card forms — this one and the treasury's
+    were written later and each spelled 'SYP' again, which is four orders of magnitude away from
+    what the platform actually prices in.
+  */
+  const [currency, setCurrency] = useState(
+    account?.currency ?? preferredCurrency(CURRENCY_CATALOGUE.map((one) => one.code)),
+  );
 
   return (
     <form

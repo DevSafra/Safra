@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { CURRENCY_CATALOGUE, PAYOUT_METHODS } from '@safra/contracts';
+import { CURRENCY_CATALOGUE, PAYOUT_METHODS, preferredCurrency } from '@safra/contracts';
 import { useConfirm } from '@safra/ui';
 
 import { Ltr, StatusPill } from '@/components/admin-table';
@@ -307,7 +307,10 @@ function AccountForm({
   const [number, setNumber] = useState('');
   const [bank, setBank] = useState(account?.bankName ?? '');
   const [swift, setSwift] = useState(account?.swiftCode ?? '');
-  const [currency, setCurrency] = useState(account?.currency ?? 'SYP');
+  /* The platform's standard currency — the same rule the partner's own form follows. */
+  const [currency, setCurrency] = useState(
+    account?.currency ?? preferredCurrency(CURRENCY_CATALOGUE.map((one) => one.code)),
+  );
 
   const ready = holder.trim().length >= 2 && number.trim().length >= 4;
 

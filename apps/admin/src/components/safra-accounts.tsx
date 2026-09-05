@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-import { PAYOUT_METHODS } from '@safra/contracts';
+import { CURRENCY_CATALOGUE, PAYOUT_METHODS, preferredCurrency } from '@safra/contracts';
 import { useConfirm } from '@safra/ui';
 
 import { AdminTable, StatusPill, type AdminColumn } from '@/components/admin-table';
@@ -330,7 +330,16 @@ function AddAccount({ onClose }: { readonly onClose: () => void }) {
     accountNumber: '',
     bankName: '',
     swiftCode: '',
-    currency: 'SYP',
+    /*
+      The platform's standard currency, and a field rather than a constant.
+
+      This was a hardcoded 'SYP' with no control beside it, so a SAFRA destination could only ever
+      be recorded as Syrian pounds — a dollar account was not expressible. It is what the account
+      is DENOMINATED in, which is a fact about the bank rather than about the ledger: transfers are
+      still posted in the accounting currency, so opening this up changes what an operator can
+      describe and nothing about what is counted.
+    */
+    currency: preferredCurrency(CURRENCY_CATALOGUE.map((one) => one.code)),
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -406,6 +415,16 @@ function AddAccount({ onClose }: { readonly onClose: () => void }) {
       <Row>
         <Field label={c.bankName} value={form.bankName} onChange={set('bankName')} />
         <Field label={c.swiftCode} value={form.swiftCode} onChange={set('swiftCode')} />
+      </Row>
+      <Row>
+        <SelectField label={c.currency} value={form.currency} onChange={set('currency')}>
+          {CURRENCY_CATALOGUE.map((one) => (
+            <option key={one.code} value={one.code}>
+              {one.nameAr} ({one.code})
+            </option>
+          ))}
+        </SelectField>
+        <span />
       </Row>
 
       <Actions

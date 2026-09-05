@@ -14,6 +14,7 @@ import { dynamicMessage } from '@/lib/dynamic-message';
 import { StarRating } from '@safra/ui';
 import { getCurrencyCatalogue } from '@/lib/catalog';
 import { convertForDisplay, displayCurrency } from '@/lib/currency';
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /**
  * Property page (SRS §5.6).
@@ -188,7 +189,7 @@ export default async function PropertyPage({
     cheapest
       ? priceWithCustomerFee(cheapest.basePrice, cheapest.currencyCode, property.fees)
       : '0',
-    cheapest?.currencyCode ?? 'USD',
+    cheapest?.currencyCode ?? DEFAULT_MONEY_CURRENCY,
     locale,
     target,
     rates,

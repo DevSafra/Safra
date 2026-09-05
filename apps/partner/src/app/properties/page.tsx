@@ -18,6 +18,7 @@ import { TONES } from '@/lib/tones';
 import { amount } from '@/lib/format';
 import { coverUrl } from '@/lib/media';
 import { fill, propertyStatus, propertyType, t, tripAttribute } from '@/lib/strings';
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /**
  * عقاراتي (design handoff §7.2) — the listing cards.
@@ -260,7 +261,12 @@ function Card({ property }: { readonly property: PartnerProperty }) {
         <div className="mt-auto pt-3.5">
           {property.fromPrice ? (
             <p className="text-[17px] font-extrabold text-gold">
-              <Ltr>{amount(property.fromPrice, property.currencyCode ?? 'USD')}</Ltr>
+              <Ltr>
+                {amount(
+                  property.fromPrice,
+                  property.currencyCode ?? DEFAULT_MONEY_CURRENCY,
+                )}
+              </Ltr>
               <span className="text-[12px] font-normal text-faint">
                 {' '}
                 {t.properties.perNight}

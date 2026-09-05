@@ -7,6 +7,7 @@ import { Shell } from '@/components/shell';
 import { SectionRefusal } from '@/components/section-refusal';
 import { amount, count } from '@/lib/format';
 import { t } from '@/lib/strings';
+import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /**
  * الكوبونات — the coupons SAFRA has offered this partner (Bashar, 2026-09-01).
@@ -136,7 +137,10 @@ function Section({
                   <>
                     {' · '}
                     {t.coupons.minBooking}:{' '}
-                    {amount(coupon.minBookingAmount, coupon.currencyCode ?? 'USD')}
+                    {amount(
+                      coupon.minBookingAmount,
+                      coupon.currencyCode ?? DEFAULT_MONEY_CURRENCY,
+                    )}
                   </>
                 ) : null}
                 {coupon.status === 'accepted' ? (
@@ -174,7 +178,7 @@ function discountOf(coupon: PartnerCoupon): string {
     return `${Number(coupon.value)}٪`;
   }
 
-  return amount(coupon.value, coupon.currencyCode ?? 'USD');
+  return amount(coupon.value, coupon.currencyCode ?? DEFAULT_MONEY_CURRENCY);
 }
 
 /** A date as the portal writes them — the day only, which is all a coupon window has. */
