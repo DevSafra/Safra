@@ -459,42 +459,56 @@ ordinary cancellation refunds a share of `base_amount` and keeps the service fee
 `total_amount` because the partner never answered and the stay never happened. Both directions are
 mutation-tested — under-filtering and over-filtering each turn the suite red.
 
-#### OPEN — SAFRA keeps 962,598,000 SYP of commission on stays that were refunded entirely
+#### DECIDED AND IMPLEMENTED — commission is reversed when a stay is refunded in full
 
-**A business question, deliberately not answered in code, and measured in the browser on
-2026-09-05.** Refunding `BKG-TEST-01f483d3` through the console returned **200.000 of its 201.990
-total** — the whole stay price, with the 1.990 service fee kept — and SAFRA's outstanding figure
-correctly did not move, because the rule is that a full refund means `total_amount`.
+**Bashar, 2026-09-05:** _"If a booking is fully refunded to the customer, the associated partner
+commission should also be reversed. SAFRA should not continue recognising partner commission
+revenue when the underlying booking value has been fully returned and the partner ultimately earned
+nothing."_ Service fees keep their existing behaviour, to be revisited separately if needed.
 
-That is right for the fee and questionable for the commission, and the platform currently treats
-them the same. Across the testbed, **5,289 bookings** returned 100% of `base_amount` and kept the
-fee. On those SAFRA holds:
+Implemented as a real ledger reversal rather than a reporting filter, so the account balance itself
+is the truth:
 
-|                         | amount              | is it defensible?                                                                                                                                                                                   |
-| ----------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| service fee kept        | 136,826,430 SYP     | **Yes.** `refund.service.ts` states the fee is earned when the booking is made; the customer got a booking and gave it up.                                                                          |
-| partner commission kept | **962,598,000 SYP** | **Nothing in the code justifies it.** It is a percentage of stay revenue that went back to the customer in full, on which the partner earned nothing. It survives only because no code reverses it. |
+- `LedgerService.reverseCommissionIfFullyRefunded` posts `DEBIT safra_commission_partner` /
+  `CREDIT refund` once cumulative completed refunds reach **`base_amount`**. Called from all three
+  paths on which a refund settles — wallet-only inline, provider reply, provider webhook — and
+  idempotent on the absence of an existing debit, because a provider that both replies and sends a
+  webhook would otherwise give the money back twice.
+- Migration `0066` backfilled the history: **14,842 bookings, 2,701,244,000 SYP**. The ledger still
+  balances exactly (85,154,376,205 each side).
+- The threshold is `base_amount`, not `total_amount`. The commission is a percentage of the STAY,
+  so the stay is what must have gone back; the fee is a separate rule with a separate threshold and
+  is still only written off when the whole total returns.
 
-962,598,000 SYP is **64% of the 1,494,117,860 SYP the treasury currently reports as earned.**
+**A transfer and a reversal both debit the same account**, so the summary now tells them apart by
+whether the entry group also credits `safra_payout`. That mark is intrinsic to the ledger — the
+first version asked the `safra_payouts` table instead, which meant deleting a payout row would
+silently reclassify its transfers as revenue write-offs.
 
-Three defensible answers — SAFRA keeps the full commission (it did the work of selling the
-booking), SAFRA scales the commission to the stay revenue actually retained, or SAFRA keeps a fixed
-floor — and they differ by most of a billion. **Bashar's decision, not an engineering one.** The
-change would be to the same `HAVING` clause, comparing against `base_amount` rather than
-`total_amount`, or to a proportional reversal at refund time.
+**Outstanding can now be negative, and the screen says so.** Reversing commission on periods that
+were already paid out leaves SAFRA having transferred more than it recognises. The tile renames
+itself to «محوَّل بالزيادة» in amber with a sentence explaining the difference comes out of future
+revenue, rather than printing a minus sign against the words for money still owed. On the testbed
+this reads −319,379,930, almost entirely because the browser suite settled periods against the old
+gross basis before the reversal existed.
 
-**Note on the browser check:** the refund path itself is exercised nightly at the integration level
-by `revenue that was refunded > keeps a partly refunded booking`, which tops a refund up to the
-whole total and asserts the commission stops counting. That test runs inside a rollback and is safe
-to repeat; a browser spec that issued a real refund every night would consume the fixture, so the
-browser sighting was done once, by hand, and recorded here.
+**Still open, and deliberately untouched:** `partner_payable` is credited at capture and never
+reversed either — 36.4 B credited against 48 M ever paid. A partner payout selects on
+`bookings.status = 'completed'` so a refunded booking is never paid, which makes the liability
+permanently overstated but harmless. Bringing it in line would be the symmetric change, and it was
+out of the scope Bashar set.
 
-**Also found while doing it:** `BKG-2026-069122` offered «استرداد» in the console and the API
-answered **409 `payment.refund_unavailable`** — its payment used provider `internal`, which has no
-refund handler registered. 177 captured payments are on that provider. The refusal is clean and
-correctly coded rather than a crash, and the refund QUOTE answers 200, which is why the control is
-offered. Whether `internal` is a real settlement route that needs a refund handler, or a fixture
-artefact, needs confirming before launch.
+#### OPEN — one payments test failed once in a full run and passed alone and on re-run
+
+`payment collection, webhooks and refunds > paying partly from the wallet > returns the balance when
+the booking expires unpaid` failed in one `pnpm verify` and passed in the next, and passes in
+isolation. **The cause is not established.** It has the shape of the cross-file races already found
+in the treasury suite — vitest runs files in parallel threads against one database — but that is a
+hypothesis, not a finding, and a wallet-balance assertion is not obviously platform-wide.
+
+**This matters for Stage 6 more than for now:** an unattended overnight runner cannot tell a flake
+from a regression, so either the race is found and closed or the runner has to re-run a failure
+before reporting it. Recorded here rather than dismissed.
 
 #### FIXED — the SAFRA payout integration suite depended on nobody using the feature
 

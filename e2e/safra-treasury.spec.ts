@@ -30,16 +30,18 @@ test.use({ storageState: STAFF_STATE, viewport: { width: 1440, height: 1000 } })
  * One figure, read from the SCREEN rather than from the API.
  *
  * The requirement is that a super admin can SEE accrued, transferred and outstanding — so the
- * assertion has to look where they look. (The first version called the API directly and got
+ * assertion has to look where they look. Found by a stable NAME rather than by the Arabic label,
+ * because the outstanding tile renames itself when the position goes negative. (The first version called the API directly and got
  * `undefined`: `/admin/*` takes a bearer token the console attaches server-side, and Playwright's
  * request fixture carries the browser's cookie and not that. A test asserting on `undefined`
  * would have passed the moment somebody wrote `toBeDefined()` instead.)
  */
 async function figure(page: Page, label: string): Promise<number> {
-  const text = await page.locator(`[data-figure="${label}"]`).innerText();
-  const digits = text.match(/([\d,]+(?:\.\d+)?)/)?.[1] ?? '0';
+  const raw = await page
+    .locator(`[data-figure="${label}"]`)
+    .getAttribute('data-figure-value');
 
-  return Number(digits.replace(/,/g, ''));
+  return Number(raw ?? '0');
 }
 
 test('the summary states accrued, transferred and outstanding, by source', async ({
@@ -158,9 +160,9 @@ test('the whole lifecycle: create, verify, activate, open, release, pay', async 
 
   // ── 4. OPEN a transfer for a period ───────────────────────────────────────
   const before = {
-    outstanding: await figure(page, 'غير المحوَّل'),
-    transferred: await figure(page, 'المحوَّل فعلاً'),
-    accrued: await figure(page, 'إجمالي الإيرادات المتراكمة'),
+    outstanding: await figure(page, 'outstanding'),
+    transferred: await figure(page, 'transferred'),
+    accrued: await figure(page, 'accrued'),
   };
 
   /*
@@ -268,9 +270,9 @@ test('the whole lifecycle: create, verify, activate, open, release, pay', async 
   await expect(page.locator('[data-entry-group]').first()).toBeVisible();
 
   const after = {
-    outstanding: await figure(page, 'غير المحوَّل'),
-    transferred: await figure(page, 'المحوَّل فعلاً'),
-    accrued: await figure(page, 'إجمالي الإيرادات المتراكمة'),
+    outstanding: await figure(page, 'outstanding'),
+    transferred: await figure(page, 'transferred'),
+    accrued: await figure(page, 'accrued'),
   };
 
   console.log(

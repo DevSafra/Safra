@@ -561,6 +561,15 @@ export const ar = {
       accrued: 'إجمالي الإيرادات المتراكمة',
       transferred: 'المحوَّل فعلاً',
       outstanding: 'غير المحوَّل',
+      /*
+        A transfer can outrun the revenue behind it: a booking settled in one period and refunded
+        in the next reverses commission that has already been paid out. The figure is then negative
+        and MEANS something — it is recovered from what accrues next — so it is named rather than
+        printed with a minus sign in front of the word for what is still owed.
+      */
+      overTransferred: 'محوَّل بالزيادة',
+      overTransferredNote:
+        'حُوِّل أكثر ممّا اعتُرف به من إيراد، بعد ردّ عمولات عن حجوزات استُرجعت بالكامل. يُخصم الفارق من الإيراد المتراكم لاحقاً.',
       bySource: 'التفصيل حسب المصدر',
       sourceCommissionPartner: 'عمولة الشريك',
       sourceCommissionCustomer: 'رسوم العميل',
