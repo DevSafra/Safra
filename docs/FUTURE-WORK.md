@@ -459,16 +459,42 @@ ordinary cancellation refunds a share of `base_amount` and keeps the service fee
 `total_amount` because the partner never answered and the stay never happened. Both directions are
 mutation-tested — under-filtering and over-filtering each turn the suite red.
 
-#### OPEN — does SAFRA keep a full commission on a half-refunded stay?
+#### OPEN — SAFRA keeps 962,598,000 SYP of commission on stays that were refunded entirely
 
-**A business question, deliberately not answered in code.** A booking refunded 50% of `base_amount`
-currently keeps **100%** of its `safra_commission_partner` credit. The partner loses half the stay
-revenue; SAFRA's commission was computed on the whole of it and is not reduced.
+**A business question, deliberately not answered in code, and measured in the browser on
+2026-09-05.** Refunding `BKG-TEST-01f483d3` through the console returned **200.000 of its 201.990
+total** — the whole stay price, with the 1.990 service fee kept — and SAFRA's outstanding figure
+correctly did not move, because the rule is that a full refund means `total_amount`.
 
-Three defensible answers — SAFRA keeps the full commission (it did the work of selling the booking
-regardless), SAFRA scales its commission to the amount retained, or SAFRA keeps a fixed floor —
-and they are worth different amounts of money. **Bashar's decision, not an engineering one.** The
-predicate is a single `HAVING` clause and is the only place that would change.
+That is right for the fee and questionable for the commission, and the platform currently treats
+them the same. Across the testbed, **5,289 bookings** returned 100% of `base_amount` and kept the
+fee. On those SAFRA holds:
+
+|                         | amount              | is it defensible?                                                                                                                                                                                   |
+| ----------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| service fee kept        | 136,826,430 SYP     | **Yes.** `refund.service.ts` states the fee is earned when the booking is made; the customer got a booking and gave it up.                                                                          |
+| partner commission kept | **962,598,000 SYP** | **Nothing in the code justifies it.** It is a percentage of stay revenue that went back to the customer in full, on which the partner earned nothing. It survives only because no code reverses it. |
+
+962,598,000 SYP is **64% of the 1,494,117,860 SYP the treasury currently reports as earned.**
+
+Three defensible answers — SAFRA keeps the full commission (it did the work of selling the
+booking), SAFRA scales the commission to the stay revenue actually retained, or SAFRA keeps a fixed
+floor — and they differ by most of a billion. **Bashar's decision, not an engineering one.** The
+change would be to the same `HAVING` clause, comparing against `base_amount` rather than
+`total_amount`, or to a proportional reversal at refund time.
+
+**Note on the browser check:** the refund path itself is exercised nightly at the integration level
+by `revenue that was refunded > keeps a partly refunded booking`, which tops a refund up to the
+whole total and asserts the commission stops counting. That test runs inside a rollback and is safe
+to repeat; a browser spec that issued a real refund every night would consume the fixture, so the
+browser sighting was done once, by hand, and recorded here.
+
+**Also found while doing it:** `BKG-2026-069122` offered «استرداد» in the console and the API
+answered **409 `payment.refund_unavailable`** — its payment used provider `internal`, which has no
+refund handler registered. 177 captured payments are on that provider. The refusal is clean and
+correctly coded rather than a crash, and the refund QUOTE answers 200, which is why the control is
+offered. Whether `internal` is a real settlement route that needs a refund handler, or a fixture
+artefact, needs confirming before launch.
 
 #### FIXED — the SAFRA payout integration suite depended on nobody using the feature
 
