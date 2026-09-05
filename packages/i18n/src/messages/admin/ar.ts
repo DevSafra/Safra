@@ -2949,6 +2949,9 @@ export const ar = {
       retired: 'موقوف',
     },
     propertyDetail: {
+      /* The two amenity levels a moderator reviews (Bashar, 2026-09-06). */
+      propertyAmenities: 'مرافق العقار',
+      noAmenities: 'لم يحدّد الشريك أي مرافق للعقار.',
       listing: 'بيانات العقار',
       address: 'العنوان',
       slug: 'المعرّف',

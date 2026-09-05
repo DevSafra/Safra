@@ -300,6 +300,23 @@ export default async function PropertyPage({
         )}
       </Section>
 
+      <Section title={t.sections.propertyDetail.propertyAmenities}>
+        {property.amenityCodes.length === 0 ? (
+          <p className="text-sm text-faint">{t.sections.propertyDetail.noAmenities}</p>
+        ) : (
+          <ul className="flex flex-wrap gap-1.5">
+            {property.amenityCodes.map((one) => (
+              <li
+                key={one.code}
+                className="rounded-lg border border-line2 px-2.5 py-1 text-[12.5px] text-text2"
+              >
+                {one.nameAr}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
       <Section title={t.sections.propertyDetail.units}>
         {property.units.length === 0 ? (
           <p className="text-sm text-bad">{t.sections.propertyDetail.noUnits}</p>
@@ -315,7 +332,22 @@ export default async function PropertyPage({
                 key={unit.nameAr}
                 className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-card px-4 py-3"
               >
-                <span className="text-text">{unit.nameAr}</span>
+                <span className="text-text">
+                  {unit.nameAr}
+                  {/*
+                    What this ROOM claims, beside its name (Bashar, 2026-09-06).
+
+                    A moderator approving a listing is approving its claims, and a facility is a
+                    claim. Shown per unit rather than merged with the property's, because the
+                    distinction is the thing being reviewed: a pool declared on a room and a pool
+                    declared on the building are different assertions about the world.
+                  */}
+                  {unit.amenityCodes.length > 0 ? (
+                    <span className="mt-1 block text-[11px] text-faint2">
+                      {unit.amenityCodes.map((one) => one.nameAr).join(' · ')}
+                    </span>
+                  ) : null}
+                </span>
                 <span className="text-xs text-faint">
                   {plural(t.sections.propertyDetail.unitLine, {
                     guests: unit.maxGuests,

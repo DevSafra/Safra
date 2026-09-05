@@ -484,8 +484,12 @@ const propertyDetailSchema = z.object({
       */
       currency: z.object({ code: z.string() }),
       minNights: z.number(),
+      /* What this ROOM claims, which a moderator is approving along with everything else. */
+      amenityCodes: z.array(z.object({ code: z.string(), nameAr: z.string() })),
     }),
   ),
+  /* And what the BUILDING claims — a separate set, reviewed separately. */
+  amenityCodes: z.array(z.object({ code: z.string(), nameAr: z.string() })),
 });
 
 export type PropertyDetail = z.infer<typeof propertyDetailSchema>;
