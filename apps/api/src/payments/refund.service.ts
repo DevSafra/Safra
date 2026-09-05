@@ -329,6 +329,7 @@ export class RefundService {
       `);
 
       await this.markPaymentRefundState(payment.id);
+      await this.ledger.reverseCommissionIfFullyRefunded(this.db, booking.id);
       await this.tellTheCustomer(booking, quote);
 
       return {
@@ -365,6 +366,16 @@ export class RefundService {
      */
     if (status !== 'failed') {
       await this.markPaymentRefundState(payment.id);
+
+      /*
+        Only once the money is actually back. A refund still `processing` at the provider has not
+        returned anything, so recognising the reversal here would give the commission up before the
+        customer had the funds — and the webhook path posts it when that provider confirms.
+      */
+      if (status === 'completed') {
+        await this.ledger.reverseCommissionIfFullyRefunded(this.db, booking.id);
+      }
+
       await this.tellTheCustomer(booking, quote);
     }
 

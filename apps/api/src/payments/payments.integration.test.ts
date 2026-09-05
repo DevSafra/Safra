@@ -192,7 +192,7 @@ describeIfDb('payment collection, webhooks and refunds', () => {
       notifications,
       { APP_URL: 'https://safra.test' } as never,
     );
-    webhooks = new PaymentWebhookService(db, registry, actions, access);
+    webhooks = new PaymentWebhookService(db, registry, actions, access, ledger);
     /*
       The REAL notification service, which this suite already builds and whose transport it already
       captures — so §10.3's refund mail is exercised by every refund test here rather than stubbed.

@@ -53,16 +53,18 @@ describeIfDb('SafraPayoutService', () => {
   const harness = createRollbackDatabase(DATABASE_URL ?? '', 'repeatable read');
   let db: Database;
   let service: SafraPayoutService;
+  let ledger: LedgerService;
   let actor: AccessTokenClaims;
 
   beforeEach(async () => {
     await harness.begin();
     db = harness.db;
+    ledger = new LedgerService(db);
     service = new SafraPayoutService(
       db,
       new AuditService(db),
       new FieldEncryptionService(TEST_ENV),
-      new LedgerService(db),
+      ledger,
     );
 
     /* A real user id: `audit_log.actor_user_id` is a foreign key and a fabricated one rolls the write back. */
@@ -245,111 +247,178 @@ describeIfDb('SafraPayoutService', () => {
     and would then be edited to match whatever the service happened to answer, which is a test that
     can never fail.
   */
-  describe('revenue that was refunded', () => {
-    /** The gross figure — every credit on the three accounts, refunds ignored. */
-    async function gross(): Promise<number> {
-      const row = await db.execute<{ total: string }>(sql`
-        SELECT coalesce(sum(amount_syp), 0)::text AS total
-          FROM ledger_entries
-         WHERE account::text IN ('safra_commission_partner', 'safra_commission_customer',
-                                 'ad_revenue')
-           AND direction = 'credit'
-      `);
+  /*
+    What a refund does to SAFRA's own revenue — two accounts, two different answers.
 
-      return Number(row.rows[0]?.total ?? 0);
+    Bashar decided on 2026-09-05 that a booking refunded to its full stay price gives up its
+    partner commission, and that the service fee keeps the behaviour it had. So the two accounts
+    are held to DIFFERENT thresholds, by two different mechanisms, and each test below names which:
+
+      - COMMISSION is reversed in the ledger once refunds reach `base_amount`.
+      - The FEE is filtered out of the summary only when the whole `total_amount` went back.
+
+    A test that checked one account would pass against a service that applied one rule to both.
+  */
+  describe('revenue that was refunded', () => {
+    /** Accrued for one account, as the service reports it. */
+    async function accruedOn(account: string): Promise<number> {
+      const summary = await service.revenueSummary();
+
+      return Number(
+        summary.byAccount.find((one) => one.account === account)?.accrued ?? 0,
+      );
     }
 
-    it('leaves a fully refunded booking out of the accrued total', async () => {
-      const summary = await service.revenueSummary();
-      const grossTotal = await gross();
-
-      /*
-        The control that makes the next assertion mean something. If the fixture held no fully
-        refunded bookings, accrued would equal gross and the test below would pass against a
-        service that filters nothing at all.
-      */
-      expect(grossTotal, 'the fixture has refunded revenue to exclude').toBeGreaterThan(
-        Number(summary.accrued),
-      );
-
-      const excluded = await db.execute<{ total: string }>(sql`
-        SELECT coalesce(sum(e.amount_syp), 0)::text AS total
-          FROM ledger_entries e
-         WHERE e.account::text IN ('safra_commission_partner', 'safra_commission_customer',
-                                   'ad_revenue')
-           AND e.direction = 'credit'
-           AND EXISTS (
-             SELECT 1
-               FROM refunds r
-               JOIN bookings b ON b.id = r.booking_id
-              WHERE r.booking_id = e.booking_id
-                AND r.status = 'completed'
-                AND r.deleted_at IS NULL
-              GROUP BY b.total_amount
-             HAVING sum(r.amount) >= b.total_amount
-           )
+    /** A booking whose stay price went back in full, with its commission still standing. */
+    async function fullyRefundedBooking() {
+      const rows = await db.execute<{ id: string; commission: string; fee: string }>(sql`
+        SELECT b.id::text,
+               (b.partner_commission_amount * b.fx_rate_to_syp)::text AS commission,
+               (b.customer_fee_amount * b.fx_rate_to_syp)::text AS fee
+          FROM bookings b
+         WHERE b.partner_commission_amount > 0
+           AND coalesce((SELECT sum(r.amount) FROM refunds r
+                          WHERE r.booking_id = b.id AND r.status = 'completed'
+                            AND r.deleted_at IS NULL), 0) >= b.base_amount
+           AND NOT EXISTS (SELECT 1 FROM ledger_entries e
+                            WHERE e.booking_id = b.id
+                              AND e.account = 'safra_commission_partner'
+                              AND e.direction = 'debit')
+           AND EXISTS (SELECT 1 FROM ledger_entries e
+                        WHERE e.booking_id = b.id
+                          AND e.account = 'safra_commission_partner'
+                          AND e.direction = 'credit')
+         LIMIT 1
       `);
 
-      expect(
-        Number(summary.accrued),
-        'accrued is gross minus exactly what was refunded in full',
-      ).toBeCloseTo(grossTotal - Number(excluded.rows[0]?.total ?? 0), 0);
+      return rows.rows[0];
+    }
+
+    it('gives back the commission on a booking refunded to its full stay price', async () => {
+      const booking = await fullyRefundedBooking();
+
+      expect(booking, 'the fixture has one to reverse').toBeDefined();
+
+      const before = await accruedOn('safra_commission_partner');
+      const posted = await ledger.reverseCommissionIfFullyRefunded(db, booking!.id);
+
+      expect(posted, 'it posted a group').not.toBeNull();
+
+      const after = await accruedOn('safra_commission_partner');
+
+      expect(before - after, 'accrued fell by exactly the commission').toBeCloseTo(
+        Number(booking!.commission),
+        0,
+      );
     });
 
     /*
-      The opposite control, and the one that stops the predicate being written as "any refund".
+      The opposite control, and the reason the two accounts cannot share one rule.
 
-      An ordinary cancellation refunds a share of base_amount and KEEPS the service fee, which is
-      earned when the booking is made. A service that excluded every booking carrying any refund
-      would pass the test above and silently write off revenue SAFRA is entitled to.
+      A stay refunded to `base_amount` keeps its service fee — `refund.service.ts` calls the fee
+      earned when the booking is made, and Bashar left that standing when he decided the commission
+      question. A service that applied the commission threshold to both accounts would pass the
+      test above and quietly write off revenue SAFRA is entitled to.
     */
-    it('keeps a partly refunded booking, whose service fee was earned', async () => {
-      const partial = await db.execute<{ booking_id: string; kept: string }>(sql`
-        SELECT e.booking_id::text AS booking_id, sum(e.amount_syp)::text AS kept
-          FROM ledger_entries e
-         WHERE e.account::text IN ('safra_commission_partner', 'safra_commission_customer')
-           AND e.direction = 'credit'
-           AND EXISTS (
-             SELECT 1 FROM refunds r
-              WHERE r.booking_id = e.booking_id
-                AND r.status = 'completed' AND r.deleted_at IS NULL
-           )
-           AND NOT EXISTS (
-             SELECT 1
-               FROM refunds r
-               JOIN bookings b ON b.id = r.booking_id
-              WHERE r.booking_id = e.booking_id
-                AND r.status = 'completed' AND r.deleted_at IS NULL
-              GROUP BY b.total_amount
-             HAVING sum(r.amount) >= b.total_amount
-           )
-         GROUP BY e.booking_id
+    it('keeps the service fee on that same booking, which is a separate rule', async () => {
+      const booking = await fullyRefundedBooking();
+
+      expect(booking).toBeDefined();
+
+      const before = await accruedOn('safra_commission_customer');
+
+      await ledger.reverseCommissionIfFullyRefunded(db, booking!.id);
+
+      expect(
+        await accruedOn('safra_commission_customer'),
+        'the fee is untouched by a commission reversal',
+      ).toBeCloseTo(before, 0);
+    });
+
+    /* Three code paths complete a refund, so calling twice must not give the money back twice. */
+    it('reverses once however many times it is asked', async () => {
+      const booking = await fullyRefundedBooking();
+
+      expect(booking).toBeDefined();
+      expect(
+        await ledger.reverseCommissionIfFullyRefunded(db, booking!.id),
+      ).not.toBeNull();
+
+      const after = await accruedOn('safra_commission_partner');
+
+      expect(
+        await ledger.reverseCommissionIfFullyRefunded(db, booking!.id),
+        'the second call posts nothing',
+      ).toBeNull();
+      expect(await accruedOn('safra_commission_partner')).toBeCloseTo(after, 0);
+    });
+
+    /*
+      The invariant the whole reporting split rests on.
+
+      A reversal and a transfer both DEBIT the same account. If the summary cannot tell them apart
+      it reports revenue SAFRA gave back as money SAFRA took out — the same figure, the opposite
+      meaning. The mark is that a transfer's group credits `safra_payout`.
+    */
+    it('does not report a reversal as money transferred out', async () => {
+      const booking = await fullyRefundedBooking();
+
+      expect(booking).toBeDefined();
+
+      const before = await service.revenueSummary();
+
+      await ledger.reverseCommissionIfFullyRefunded(db, booking!.id);
+
+      const after = await service.revenueSummary();
+
+      expect(Number(after.transferred), 'transferred did not move').toBeCloseTo(
+        Number(before.transferred),
+        0,
+      );
+      expect(Number(after.accrued), 'accrued did').toBeLessThan(Number(before.accrued));
+    });
+
+    /*
+      The boundary itself, from the other side.
+
+      Bashar's rule is that the stay price has to have gone back IN FULL. A booking refunded part
+      of the way is a customer who changed their mind late and got a share back — the partner still
+      lost the night and SAFRA still sold the booking. Without this, the threshold could be written
+      as "any refund at all" and every test above would still pass.
+    */
+    it('keeps the commission on a booking only partly refunded', async () => {
+      /*
+        Built here rather than looked for. Almost every refund in the fixture is for the whole stay
+        price, so a search would have found nothing and the test would have skipped — which reads
+        as coverage and is not. Half of base_amount is unambiguously short of the threshold.
+      */
+      const clean = await db.execute<{ id: string }>(sql`
+        SELECT b.id::text
+          FROM bookings b
+         WHERE b.partner_commission_amount > 0
+           AND NOT EXISTS (SELECT 1 FROM refunds r
+                            WHERE r.booking_id = b.id AND r.deleted_at IS NULL)
+           AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id)
          LIMIT 1
       `);
 
-      const row = partial.rows[0];
+      const row = clean.rows[0];
 
-      expect(row, 'the fixture has a partly refunded booking to protect').toBeDefined();
+      expect(row, 'a booking with commission and no refund').toBeDefined();
 
-      const before = Number((await service.revenueSummary()).accrued);
-
-      /* Refund the REST of it, and the same booking must drop out. */
       await db.execute(sql`
         INSERT INTO refunds (payment_id, booking_id, amount, currency_id,
                              applied_refund_percent, reason, status, wallet_amount)
-        SELECT p.id, b.id, b.total_amount, b.currency_id, 100, 'test top-up', 'completed', 0
-          FROM bookings b
-          JOIN payments p ON p.booking_id = b.id
-         WHERE b.id = ${row!.booking_id}::uuid
+        SELECT p.id, b.id, round(b.base_amount / 2, 2), b.currency_id, 50,
+               'half the stay, deliberately short of the threshold', 'completed', 0
+          FROM bookings b JOIN payments p ON p.booking_id = b.id
+         WHERE b.id = ${row!.id}::uuid
          LIMIT 1
       `);
-
-      const after = Number((await service.revenueSummary()).accrued);
-
       expect(
-        before - after,
-        'once the whole total is back, its commission stops counting',
-      ).toBeCloseTo(Number(row!.kept), 0);
+        await ledger.reverseCommissionIfFullyRefunded(db, row!.id),
+        'nothing is reversed while the stay is only part refunded',
+      ).toBeNull();
     });
 
     /* Advertising revenue has no booking, so a join written carelessly deletes the ad business. */

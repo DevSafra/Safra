@@ -84,8 +84,57 @@ const REFUNDED_JOIN = sql`
   ) refunded ON refunded.booking_id = e.booking_id
 `;
 
-/** Keeps only what SAFRA earned. A null booking_id is advertising revenue and is always earned. */
-const EARNED = sql`AND refunded.booking_id IS NULL`;
+/**
+ * Keeps only what SAFRA earned — and after 2026-09-05, only for the SERVICE FEE.
+ *
+ * Bashar decided that a booking whose stay price went back in full gives up its partner
+ * commission, and that the fee keeps its existing behaviour. Those are two different thresholds,
+ * so they cannot both be a filter here:
+ *
+ *   - The COMMISSION is now reversed IN THE LEDGER when cumulative refunds reach `base_amount`
+ *     (`LedgerService.reverseCommissionIfFullyRefunded`), so its balance is already net and
+ *     filtering it here as well would subtract the same money twice.
+ *   - The FEE is not reversed anywhere, and is only unearned in the §6.4 case where the whole
+ *     `total_amount` went back. That is the case `REFUNDED_JOIN` matches, so the filter stays —
+ *     for that one account.
+ *
+ * A null booking_id is advertising revenue and is always earned.
+ */
+const EARNED = sql`
+  AND (e.account::text <> 'safra_commission_customer' OR refunded.booking_id IS NULL)
+`;
+
+/**
+ * Which debits are a TRANSFER, as opposed to revenue given back.
+ *
+ * Before the commission reversal existed, every debit on a revenue account was a payout, so
+ * "transferred" could simply sum them. It cannot any more: a reversal debits the same account, and
+ * counting it as transferred would report money SAFRA had taken out when the truth is the exact
+ * opposite — money it stopped being owed.
+ *
+ * ## The mark is in the LEDGER, not in the payouts table
+ *
+ * The first version joined `safra_payouts` on `entry_group_id` and asked whether a row was there.
+ * That made the classification depend on a row OUTSIDE the ledger: deleting a payout would leave
+ * its debits behind and silently reclassify them as reversals, turning transfers into revenue
+ * write-offs. The test suite proved it by clearing the table in a fixture, and accrued went
+ * negative for a reason that had nothing to do with any refund.
+ *
+ * A transfer group always credits `safra_payout`; a reversal group credits `refund`. That fact is
+ * intrinsic to the entry group and survives anything happening to other tables, so it is what the
+ * question is asked of. The subquery is a small distinct set — `safra_payout` has one row per
+ * transfer — so it hashes once rather than probing per row.
+ */
+const PAYOUT_JOIN = sql`
+  LEFT JOIN (
+    SELECT DISTINCT entry_group_id
+      FROM ledger_entries
+     WHERE account = 'safra_payout'
+  ) xfer ON xfer.entry_group_id = e.entry_group_id
+`;
+
+/** A transfer out. Everything else debited from a revenue account is revenue given back. */
+const IS_TRANSFER = sql`xfer.entry_group_id IS NOT NULL`;
 
 export interface SafraPayoutAccountRow {
   readonly id: string;
@@ -424,10 +473,14 @@ export class SafraPayoutService {
       transferred: string;
     }>(sql`
       SELECT e.account::text AS account,
-             coalesce(sum(e.amount_syp) FILTER (WHERE e.direction = 'credit'), 0)::text AS accrued,
-             coalesce(sum(e.amount_syp) FILTER (WHERE e.direction = 'debit'), 0)::text AS transferred
+             (coalesce(sum(e.amount_syp) FILTER (WHERE e.direction = 'credit'), 0)
+              - coalesce(sum(e.amount_syp)
+                  FILTER (WHERE e.direction = 'debit' AND NOT ${IS_TRANSFER}), 0))::text AS accrued,
+             coalesce(sum(e.amount_syp)
+               FILTER (WHERE e.direction = 'debit' AND ${IS_TRANSFER}), 0)::text AS transferred
       FROM ledger_entries e
       ${REFUNDED_JOIN}
+      ${PAYOUT_JOIN}
       WHERE e.account::text IN ${SAFRA_REVENUE_ACCOUNTS}
         ${EARNED}
       GROUP BY e.account
@@ -636,7 +689,19 @@ export class SafraPayoutService {
 
     if (!account) throw conflict(ERROR.SAFRA_PAYOUT_NO_DESTINATION);
 
-    /* One SYP leg per stream that contributed anything. */
+    /*
+      One SYP leg per stream that contributed anything — in EITHER direction.
+
+      A stream can now come out negative over a period: the commission reversals booked in it can
+      exceed the commission earned in it, which is what happens in a month with more refunds than
+      new bookings. Such a stream is a CREDIT of its absolute value rather than a dropped row, and
+      the difference is not cosmetic — dropping it left the debits short of the `net_amount`
+      credited to `safra_payout`, and the deferred balance trigger would have rejected the whole
+      transfer at COMMIT with a database error instead of a refusal anybody could read.
+
+      Debits minus credits across the streams equals the net, which the single `safra_payout` leg
+      then credits, so the group balances whichever way a stream went.
+    */
     const legs = (
       [
         ['safra_commission_partner', payout.commission_partner_amount],
@@ -644,11 +709,11 @@ export class SafraPayoutService {
         ['ad_revenue', payout.ad_revenue_amount],
       ] as const
     )
-      .filter(([, amount]) => Number(amount) > 0)
+      .filter(([, amount]) => Number(amount) !== 0)
       .map(([account_, amount]) => ({
         account: account_,
-        direction: 'debit' as const,
-        amount,
+        direction: Number(amount) > 0 ? ('debit' as const) : ('credit' as const),
+        amount: Number(amount) > 0 ? amount : String(Math.abs(Number(amount)).toFixed(2)),
         description: `SAFRA payout ${payout.reference}`,
       }));
 
@@ -772,11 +837,14 @@ export class SafraPayoutService {
    */
   private async accruedIn(from: string, to: string) {
     const rows = await this.db.execute<{ account: string; total: string }>(sql`
-      SELECT e.account::text AS account, coalesce(sum(e.amount_syp), 0)::text AS total
+      SELECT e.account::text AS account,
+             (coalesce(sum(e.amount_syp) FILTER (WHERE e.direction = 'credit'), 0)
+              - coalesce(sum(e.amount_syp)
+                  FILTER (WHERE e.direction = 'debit' AND NOT ${IS_TRANSFER}), 0))::text AS total
       FROM ledger_entries e
       ${REFUNDED_JOIN}
+      ${PAYOUT_JOIN}
       WHERE e.account::text IN ${SAFRA_REVENUE_ACCOUNTS}
-        AND e.direction = 'credit'
         ${EARNED}
         AND e.created_at >= ${from}::date
         AND e.created_at < (${to}::date + INTERVAL '1 day')

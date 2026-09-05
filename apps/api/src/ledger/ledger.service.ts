@@ -410,4 +410,123 @@ export class LedgerService {
       balanced: debit === credit,
     };
   }
+
+  /**
+   * Gives back the partner commission on a booking whose stay price went back in full.
+   *
+   * ## Bashar's decision, 2026-09-05
+   *
+   * "If a booking is fully refunded to the customer, the associated partner commission should also
+   * be reversed. SAFRA should not continue recognising partner commission revenue when the
+   * underlying booking value has been fully returned and the partner ultimately earned nothing."
+   *
+   * Before this, 962,598,000 SYP of commission stood across 5,289 bookings whose customers had
+   * every riyal of the stay price returned — sixty-four per cent of what the treasury called
+   * earned. It survived only because nothing reversed it.
+   *
+   * ## The threshold is base_amount, not total_amount
+   *
+   * The commission is a percentage of the STAY, so the stay is what has to have gone back. The
+   * service fee is a separate question with a separate answer that Bashar left standing: an
+   * ordinary cancellation returns base_amount and keeps the fee, and the fee stays recognised.
+   * That asymmetry is the whole point of the two thresholds, and it is why this reverses one
+   * account and not both.
+   *
+   * ## Why the counter-leg is the refund account
+   *
+   * The refund already debited `refund` for everything that went back and credited wherever it
+   * went. Crediting `refund` here says that this much of that outflow was funded by SAFRA giving
+   * up revenue it had booked, rather than by SAFRA spending. It touches only the two accounts the
+   * decision is about; `partner_payable` is left alone, because a partner payout selects on a
+   * booking being completed and so never pays a refunded one anyway.
+   *
+   * ## Idempotent, because three code paths complete a refund
+   *
+   * A wallet-only refund completes inline, a provider refund completes on its reply, and an
+   * asynchronous provider completes on a webhook. All three call this, so it must be safe to call
+   * twice — the guard is the absence of a debit on the account for this booking, which is the
+   * state itself rather than a flag beside it.
+   */
+  async reverseCommissionIfFullyRefunded(
+    tx: Database,
+    bookingId: string,
+  ): Promise<{ entryGroupId: string } | null> {
+    const rows = await tx.execute<{
+      base_amount: string;
+      commission: string;
+      currency_id: string;
+      fx_rate_to_syp: string;
+      partner_id: string | null;
+      refunded: string;
+      already: string;
+    }>(sql`
+      SELECT b.base_amount::text,
+             b.partner_commission_amount::text AS commission,
+             b.currency_id::text,
+             b.fx_rate_to_syp::text,
+             b.partner_id::text,
+             coalesce((
+               SELECT sum(r.amount) FROM refunds r
+                WHERE r.booking_id = b.id
+                  AND r.status = 'completed'
+                  AND r.deleted_at IS NULL
+             ), 0)::text AS refunded,
+             (
+               SELECT count(*) FROM ledger_entries e
+                WHERE e.booking_id = b.id
+                  AND e.account = 'safra_commission_partner'
+                  AND e.direction = 'debit'
+             )::text AS already
+        FROM bookings b
+       WHERE b.id = ${bookingId}
+    `);
+
+    const row = rows.rows[0];
+
+    if (!row) return null;
+
+    /* Already given back. The guard is the ledger's own state, so a retry cannot double-reverse. */
+    if (Number(row.already) > 0) return null;
+
+    const commission = toMinor(row.commission, MONEY_SCALE);
+
+    if (commission <= 0n) return null;
+    if (toMinor(row.refunded, MONEY_SCALE) < toMinor(row.base_amount, MONEY_SCALE))
+      return null;
+
+    /*
+      Its OWN transaction, because all three callers reach here AFTER theirs has closed.
+
+      `post` writes one leg per statement and the balance trigger is deferred to COMMIT. Outside a
+      transaction each statement commits by itself, so the trigger fired on the debit alone and
+      raised "debits 182000.00 <> credits 0.00" — a half-written group rejecting itself. The legs
+      have to reach COMMIT together, which is what this wraps them in. Nested inside a caller that
+      already has one, it is a savepoint and behaves the same.
+    */
+    return tx.transaction(async (inner) =>
+      this.post(
+        inner as unknown as Database,
+        [
+          {
+            account: 'safra_commission_partner',
+            direction: 'debit',
+            amount: row.commission,
+            description: 'Commission reversed, booking refunded in full',
+          },
+          {
+            account: 'refund',
+            direction: 'credit',
+            amount: row.commission,
+            description: 'Commission reversed, booking refunded in full',
+          },
+        ],
+        {
+          currencyId: row.currency_id,
+          fxRateToSyp: row.fx_rate_to_syp,
+          bookingId,
+          partnerId: row.partner_id ?? undefined,
+        },
+      ),
+    );
+  }
 }

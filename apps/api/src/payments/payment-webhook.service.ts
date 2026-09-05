@@ -8,6 +8,7 @@ import type { Database } from '@safra/db';
 import { BookingActionsService } from '../bookings/booking-actions.service.js';
 import { BookingAccessService } from '../bookings/booking-access.service.js';
 import { DATABASE } from '../database/database.module.js';
+import { LedgerService } from '../ledger/ledger.service.js';
 import { describeError, framesOnly } from '../common/errors/safe-error.js';
 import type { NormalisedEvent } from './payment-provider.port.js';
 import { PaymentProviderRegistry } from './providers/provider.registry.js';
@@ -44,6 +45,7 @@ export class PaymentWebhookService {
     private readonly registry: PaymentProviderRegistry,
     private readonly bookingActions: BookingActionsService,
     private readonly access: BookingAccessService,
+    private readonly ledger: LedgerService,
   ) {}
 
   async handle(
@@ -289,6 +291,13 @@ export class PaymentWebhookService {
         AND (${event.amount?.value ?? null}::numeric IS NULL
              OR amount = ${event.amount?.value ?? null}::numeric)
     `);
+
+    /*
+      The third of three paths on which a refund becomes final, and the one that is easiest to
+      forget: an asynchronous provider settles here rather than in the call that asked it to. The
+      reversal is idempotent, so a provider that both replies and sends a webhook posts it once.
+    */
+    await this.ledger.reverseCommissionIfFullyRefunded(this.db, payment.booking_id);
 
     return 'accepted';
   }
