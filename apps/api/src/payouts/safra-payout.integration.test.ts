@@ -37,7 +37,20 @@ const DATABASE_URL = process.env['DATABASE_URL'];
 const describeIfDb = DATABASE_URL ? describe : describe.skip;
 
 describeIfDb('SafraPayoutService', () => {
-  const harness = createRollbackDatabase(DATABASE_URL ?? '');
+  /*
+    One snapshot for the whole test, because every figure here is platform-wide.
+
+    `revenueSummary` sums the entire ledger, so a test that reads it, acts, and reads it again is
+    comparing two moments in a database other suites are committing to in parallel — vitest runs
+    files in threads and they all share one database. Under READ COMMITTED that showed up as
+    "earning did not change: expected 1500977570 to be close to 1500561830", a difference produced
+    by somebody else's booking rather than by anything this test did.
+
+    REPEATABLE READ gives every statement in the transaction the same snapshot, so concurrent
+    commits are invisible and the only thing that can move a figure is this test. The metrics suite
+    uses the same harness setting for the same reason.
+  */
+  const harness = createRollbackDatabase(DATABASE_URL ?? '', 'repeatable read');
   let db: Database;
   let service: SafraPayoutService;
   let actor: AccessTokenClaims;
@@ -61,6 +74,21 @@ describeIfDb('SafraPayoutService', () => {
       sub: staff.rows[0]?.id,
       role: 'super_admin',
     } as unknown as AccessTokenClaims;
+
+    /*
+      An empty transfer table, inside the rollback.
+
+      Every test here opens a period near today, and a PAID transfer claims its period for ever —
+      so the browser suite, which drives the real lifecycle against the same database, left rows
+      that made nine of these fail with a period-overlap conflict. Nothing was wrong with the
+      service: the suite silently depended on nobody having used the feature.
+
+      Clearing inside the transaction is what makes them independent of each other AND of any other
+      suite. It rolls back with everything else, so the real transfers are still there afterwards.
+      Both tables, and the payouts first — safra_payouts references the accounts.
+    */
+    await db.execute(sql`DELETE FROM safra_payouts`);
+    await db.execute(sql`DELETE FROM safra_payout_accounts`);
   });
 
   afterEach(async () => {
@@ -206,6 +234,132 @@ describeIfDb('SafraPayoutService', () => {
         'safra_commission_customer',
         'safra_commission_partner',
       ]);
+    });
+  });
+
+  /*
+    Revenue that went back to the customer is not revenue.
+
+    These assert against figures computed in SQL written INDEPENDENTLY of the service, rather than
+    against constants: a hard-coded expectation would go stale the first time the fixture changed
+    and would then be edited to match whatever the service happened to answer, which is a test that
+    can never fail.
+  */
+  describe('revenue that was refunded', () => {
+    /** The gross figure — every credit on the three accounts, refunds ignored. */
+    async function gross(): Promise<number> {
+      const row = await db.execute<{ total: string }>(sql`
+        SELECT coalesce(sum(amount_syp), 0)::text AS total
+          FROM ledger_entries
+         WHERE account::text IN ('safra_commission_partner', 'safra_commission_customer',
+                                 'ad_revenue')
+           AND direction = 'credit'
+      `);
+
+      return Number(row.rows[0]?.total ?? 0);
+    }
+
+    it('leaves a fully refunded booking out of the accrued total', async () => {
+      const summary = await service.revenueSummary();
+      const grossTotal = await gross();
+
+      /*
+        The control that makes the next assertion mean something. If the fixture held no fully
+        refunded bookings, accrued would equal gross and the test below would pass against a
+        service that filters nothing at all.
+      */
+      expect(grossTotal, 'the fixture has refunded revenue to exclude').toBeGreaterThan(
+        Number(summary.accrued),
+      );
+
+      const excluded = await db.execute<{ total: string }>(sql`
+        SELECT coalesce(sum(e.amount_syp), 0)::text AS total
+          FROM ledger_entries e
+         WHERE e.account::text IN ('safra_commission_partner', 'safra_commission_customer',
+                                   'ad_revenue')
+           AND e.direction = 'credit'
+           AND EXISTS (
+             SELECT 1
+               FROM refunds r
+               JOIN bookings b ON b.id = r.booking_id
+              WHERE r.booking_id = e.booking_id
+                AND r.status = 'completed'
+                AND r.deleted_at IS NULL
+              GROUP BY b.total_amount
+             HAVING sum(r.amount) >= b.total_amount
+           )
+      `);
+
+      expect(
+        Number(summary.accrued),
+        'accrued is gross minus exactly what was refunded in full',
+      ).toBeCloseTo(grossTotal - Number(excluded.rows[0]?.total ?? 0), 0);
+    });
+
+    /*
+      The opposite control, and the one that stops the predicate being written as "any refund".
+
+      An ordinary cancellation refunds a share of base_amount and KEEPS the service fee, which is
+      earned when the booking is made. A service that excluded every booking carrying any refund
+      would pass the test above and silently write off revenue SAFRA is entitled to.
+    */
+    it('keeps a partly refunded booking, whose service fee was earned', async () => {
+      const partial = await db.execute<{ booking_id: string; kept: string }>(sql`
+        SELECT e.booking_id::text AS booking_id, sum(e.amount_syp)::text AS kept
+          FROM ledger_entries e
+         WHERE e.account::text IN ('safra_commission_partner', 'safra_commission_customer')
+           AND e.direction = 'credit'
+           AND EXISTS (
+             SELECT 1 FROM refunds r
+              WHERE r.booking_id = e.booking_id
+                AND r.status = 'completed' AND r.deleted_at IS NULL
+           )
+           AND NOT EXISTS (
+             SELECT 1
+               FROM refunds r
+               JOIN bookings b ON b.id = r.booking_id
+              WHERE r.booking_id = e.booking_id
+                AND r.status = 'completed' AND r.deleted_at IS NULL
+              GROUP BY b.total_amount
+             HAVING sum(r.amount) >= b.total_amount
+           )
+         GROUP BY e.booking_id
+         LIMIT 1
+      `);
+
+      const row = partial.rows[0];
+
+      expect(row, 'the fixture has a partly refunded booking to protect').toBeDefined();
+
+      const before = Number((await service.revenueSummary()).accrued);
+
+      /* Refund the REST of it, and the same booking must drop out. */
+      await db.execute(sql`
+        INSERT INTO refunds (payment_id, booking_id, amount, currency_id,
+                             applied_refund_percent, reason, status, wallet_amount)
+        SELECT p.id, b.id, b.total_amount, b.currency_id, 100, 'test top-up', 'completed', 0
+          FROM bookings b
+          JOIN payments p ON p.booking_id = b.id
+         WHERE b.id = ${row!.booking_id}::uuid
+         LIMIT 1
+      `);
+
+      const after = Number((await service.revenueSummary()).accrued);
+
+      expect(
+        before - after,
+        'once the whole total is back, its commission stops counting',
+      ).toBeCloseTo(Number(row!.kept), 0);
+    });
+
+    /* Advertising revenue has no booking, so a join written carelessly deletes the ad business. */
+    it('keeps advertising revenue, which has no booking to refund', async () => {
+      const summary = await service.revenueSummary();
+      const ads = summary.byAccount.find((one) => one.account === 'ad_revenue');
+
+      expect(Number(ads?.accrued), 'ad revenue survives the refund join').toBeGreaterThan(
+        0,
+      );
     });
   });
 
@@ -461,6 +615,14 @@ describeIfDb('SafraPayoutService', () => {
       SELECT action, (coalesce(before, '{}'::jsonb) || coalesce(after, '{}'::jsonb))::text AS payload
       FROM audit_log
       WHERE action LIKE 'safra_payout%'
+        /*
+          THIS test's two subjects, not every SAFRA audit row ever written.
+
+          Unscoped, it read the whole table and picked up the browser suite's committed transfer,
+          then asserted that row carried an account number this test never created. The subject id
+          is what ties an audit row to the thing it describes, so it is what the query filters on.
+        */
+        AND subject_id IN (${acc.id}::uuid, ${id}::uuid)
       ORDER BY created_at
     `);
 

@@ -434,6 +434,55 @@ initial controlled launch, explicitly _"rather than introducing unrelated featur
 is what the pass has found and what was done about each. **Fixed** items shipped as part of the
 reconciliation; **open** items are reported for a decision and are NOT closed.
 
+#### FIXED — SAFRA's own revenue figure counted money it had given back
+
+The treasury screen told a super admin that **2,914,246,440 SYP** was outstanding and collectable.
+**1,984,534,890 SYP of that — fifty-seven per cent — sat on 9,547 bookings that had been refunded
+in full.** Acting on the figure would have moved money out of a bank account that never held it.
+
+The cause was a wrong reading of a deliberately GROSS ledger. A booking payment credits the three
+revenue accounts at capture; a refund does not debit them, it debits the separate `refund` contra
+account. The partner side makes the same choice — `partner_payable` stands at 36.4 billion credited
+against 48 million ever paid — and protects itself by selecting bookings whose status is
+`completed` rather than by reading that balance. The first version of the SAFRA payout read the
+credits directly and so treated gross booking revenue as earned revenue.
+
+Fixed by one anti-join shared by the summary and the accrual query, excluding bookings refunded to
+at least their `total_amount`. Written first as a correlated `NOT EXISTS` at 566 ms and rewritten
+as an anti-join at 78 ms, both measured. The screen now reads 929,711,550, and a browser run
+settling 2026-08-31 took 107,586,960 of that day's 173,481,750 gross, leaving the refunded portion
+behind.
+
+**Only a refund of the whole total disqualifies a booking**, and that asymmetry is deliberate: an
+ordinary cancellation refunds a share of `base_amount` and keeps the service fee, which
+`refund.service.ts` describes as earned when the booking is made. A §6.4 full refund returns
+`total_amount` because the partner never answered and the stay never happened. Both directions are
+mutation-tested — under-filtering and over-filtering each turn the suite red.
+
+#### OPEN — does SAFRA keep a full commission on a half-refunded stay?
+
+**A business question, deliberately not answered in code.** A booking refunded 50% of `base_amount`
+currently keeps **100%** of its `safra_commission_partner` credit. The partner loses half the stay
+revenue; SAFRA's commission was computed on the whole of it and is not reduced.
+
+Three defensible answers — SAFRA keeps the full commission (it did the work of selling the booking
+regardless), SAFRA scales its commission to the amount retained, or SAFRA keeps a fixed floor —
+and they are worth different amounts of money. **Bashar's decision, not an engineering one.** The
+predicate is a single `HAVING` clause and is the only place that would change.
+
+#### FIXED — the SAFRA payout integration suite depended on nobody using the feature
+
+Nine of eighteen tests failed with a period-overlap conflict as soon as the browser suite drove the
+real lifecycle against the same database, because a paid transfer claims its period for ever and
+every test opened a window near today. A tenth read the whole `audit_log` unscoped and asserted the
+browser suite's row carried an account number it had never created.
+
+Both are the same defect — a suite that silently assumed it was alone. Fixed by clearing the two
+SAFRA tables inside the rollback transaction, and by scoping the audit query to the subject ids the
+test itself created. **This class matters for Stage 6:** an unattended overnight runner executes
+the browser and integration suites against one database, so any suite that assumes an untouched
+world fails on the second night for a reason unrelated to the code.
+
 #### FIXED — a listing could not be submitted for review, by anyone
 
 **The most serious finding of the pass.** `POST /partner/properties/:reference/submit` had its

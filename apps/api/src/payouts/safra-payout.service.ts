@@ -21,6 +21,72 @@ import { actorName } from '../common/actor-name.sql.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 
+/**
+ * Revenue SAFRA actually EARNED, as opposed to revenue it merely booked.
+ *
+ * ## The ledger is deliberately gross, and reading it as net is the bug this closes
+ *
+ * A booking payment credits the three revenue accounts at CAPTURE. A later refund does not debit
+ * them: it debits the separate contra account and credits wherever the money went back to. That is
+ * a consistent choice and the partner side makes the same one — partner_payable stands at 36.4
+ * billion credited against 48 million ever paid, because a partner payout does not read that
+ * balance, it selects bookings whose status is completed.
+ *
+ * So the credits on these accounts are GROSS booking revenue, and the first version of this
+ * service read them as earned revenue. On the live data that overstated what SAFRA could withdraw
+ * by 1,984,534,890 SYP across 9,547 bookings — fifty-seven per cent of everything accrued — and
+ * the figure a finance officer would have acted on is the one that moves money out of a real bank
+ * account. A screen that says two point nine billion is collectable when one point nine eight of
+ * it went back to customers is worse than a screen with no figure at all.
+ *
+ * ## Only a refund of the WHOLE total disqualifies a booking
+ *
+ * The two refund paths differ exactly here, and the difference is deliberate:
+ *
+ *   - An ordinary cancellation refunds a percentage of base_amount and KEEPS the service fee,
+ *     which refund.service.ts describes as earned when the booking is made. The customer got a
+ *     booking and gave it up, so the fee stands and this predicate leaves it alone.
+ *   - A section 6.4 full refund returns total_amount, fee included, because the partner never
+ *     answered and the stay never existed. Its own comment says keeping the fee would mean SAFRA
+ *     profits from its own partner failure. Nothing was earned, so nothing is withdrawable.
+ *
+ * The comparison is therefore against total_amount and not against zero: a half refund must still
+ * leave its fee accrued, which is what the test asserts rather than assumes.
+ *
+ * ## Advertising revenue has no booking, and must survive this
+ *
+ * ad_revenue entries carry a null booking_id. Without the first branch they would all be filtered
+ * out and the ad business would silently vanish from SAFRA's own revenue.
+ *
+ * What this does NOT decide is the partial case: a booking refunded 50% of base still carries
+ * 100% of the partner commission. Whether SAFRA keeps a full commission on half a stay is a
+ * business question, not an engineering one, and it is recorded in FUTURE-WORK rather than
+ * answered here.
+ *
+ * ## An anti-join, because the correlated form missed the budget
+ *
+ * Written first as a correlated NOT EXISTS, it re-ran the refund lookup once per ledger row and
+ * measured 566 ms — over the 200 ms a request is allowed. Aggregating the refunds ONCE and
+ * hash-joining measures 78 ms on the same data. Both figures were measured, not estimated.
+ *
+ * The join and the predicate below travel together: the join is pointless without the predicate
+ * and the predicate does not compile without the join, so both queries take both.
+ */
+const REFUNDED_JOIN = sql`
+  LEFT JOIN (
+    SELECT r.booking_id
+      FROM refunds r
+      JOIN bookings b ON b.id = r.booking_id
+     WHERE r.status = 'completed'
+       AND r.deleted_at IS NULL
+     GROUP BY r.booking_id, b.total_amount
+    HAVING sum(r.amount) >= b.total_amount
+  ) refunded ON refunded.booking_id = e.booking_id
+`;
+
+/** Keeps only what SAFRA earned. A null booking_id is advertising revenue and is always earned. */
+const EARNED = sql`AND refunded.booking_id IS NULL`;
+
 export interface SafraPayoutAccountRow {
   readonly id: string;
   readonly label: string;
@@ -361,7 +427,9 @@ export class SafraPayoutService {
              coalesce(sum(e.amount_syp) FILTER (WHERE e.direction = 'credit'), 0)::text AS accrued,
              coalesce(sum(e.amount_syp) FILTER (WHERE e.direction = 'debit'), 0)::text AS transferred
       FROM ledger_entries e
+      ${REFUNDED_JOIN}
       WHERE e.account::text IN ${SAFRA_REVENUE_ACCOUNTS}
+        ${EARNED}
       GROUP BY e.account
       ORDER BY e.account
     `);
@@ -706,8 +774,10 @@ export class SafraPayoutService {
     const rows = await this.db.execute<{ account: string; total: string }>(sql`
       SELECT e.account::text AS account, coalesce(sum(e.amount_syp), 0)::text AS total
       FROM ledger_entries e
+      ${REFUNDED_JOIN}
       WHERE e.account::text IN ${SAFRA_REVENUE_ACCOUNTS}
         AND e.direction = 'credit'
+        ${EARNED}
         AND e.created_at >= ${from}::date
         AND e.created_at < (${to}::date + INTERVAL '1 day')
       GROUP BY e.account

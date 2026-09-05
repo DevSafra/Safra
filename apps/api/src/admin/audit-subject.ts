@@ -118,6 +118,25 @@ const SOURCES: Record<string, Source> = {
     ) || ' · ••••' || partner_payout_accounts.account_number_last4`,
     href: (row) => `/partners/${row.reference}`,
   },
+  /*
+    SAFRA's own transfers and destinations, which both resolve onto the treasury screen.
+
+    There is no per-transfer page: خزينة سفرة shows the accounts and the transfer history on one
+    screen, so that is where an auditor following an entry needs to land. The label carries the
+    reference or the masked tail, never the account number.
+  */
+  safra_payout: {
+    table: 'safra_payouts',
+    reference: sql`reference`,
+    label: sql`reference`,
+    href: () => '/treasury',
+  },
+  safra_payout_account: {
+    table: 'safra_payout_accounts',
+    reference: sql`label`,
+    label: sql`label || ' · ••••' || safra_payout_accounts.account_number_last4`,
+    href: () => '/treasury',
+  },
   partner_application: {
     table: 'partner_applications',
     reference: sql`reference`,
