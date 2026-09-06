@@ -216,7 +216,9 @@
     "unitAvailable": "Für Ihre Daten verfügbar",
     "unitCheapest": "Niedrigster Preis",
     "unitAmenitiesNone": "Keine Ausstattung speziell für diese Einheit.",
-    "unitsLeft": "{count, plural, one {# Zimmer übrig} other {# Zimmer übrig}}"
+    "unitsLeft": "{count, plural, one {# Zimmer übrig} other {# Zimmer übrig}}",
+    "unitSoldOut": "Für Ihre Daten nicht verfügbar",
+    "unitPickOther": "Andere Daten oder eine andere Kategorie wählen."
   },
   "city": {
     "availableStays": "Verfügbare Unterkünfte in {city}",

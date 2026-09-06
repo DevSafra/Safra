@@ -39,7 +39,7 @@ export class PropertyDetailService {
    * 404s exactly like a nonexistent one — no way to tell from outside whether a
    * slug exists but is hidden.
    */
-  async bySlug(slug: string) {
+  async bySlug(slug: string, stay?: { checkIn: string; checkOut: string }) {
     const rows = await this.db.execute<Record<string, unknown>>(sql`
       SELECT
         p.reference, p.slug,
@@ -85,7 +85,7 @@ export class PropertyDetailService {
     if (!row) throw notFound(ERROR.PROPERTY_NOT_FOUND);
 
     const [units, images, calendar, fees, reviews] = await Promise.all([
-      this.units(slug),
+      this.units(slug, stay),
       this.images(slug),
       this.calendar(slug),
       this.publicFees(),
@@ -223,12 +223,75 @@ export class PropertyDetailService {
     }));
   }
 
-  private async units(slug: string) {
+  /**
+   * The rooms, and — when the reader has dates — whether each one can actually be booked.
+   *
+   * ## Why availability belongs here
+   *
+   * This list had no dates at all: it returned every active unit, and the page linked to whichever
+   * came first. So on 2026-09-06, with one of two suites booked for 6–8 September, the page still
+   * said «غرفتان متبقيتان» for exactly those dates AND pointed «احجز هذه الوحدة» at the room that
+   * was taken — while its free sibling was unreachable. A guest would fill in their name, phone and
+   * card details and be refused at creation.
+   *
+   * ## The same rule search uses, not a second one
+   *
+   * Both anti-joins are copied from `SearchService`'s `available` CTE deliberately: an absent
+   * `availability_days` row means OPEN (§8.4 puts the burden on the partner to close dates), and
+   * the booking overlap uses the same `[)` bound as the exclusion constraint, so this can never
+   * disagree with the constraint about what overlapping means. Two definitions of "available" would
+   * drift, and the direction they drift in is a page offering what the API refuses.
+   *
+   * Units are ANNOTATED rather than filtered out. A room type that is fully booked should say so
+   * rather than vanish — a guest who cannot see the suite does not know the hotel has one.
+   */
+  private async units(slug: string, stay?: { checkIn: string; checkOut: string }) {
+    const nights = stay
+      ? Math.round(
+          (Date.parse(`${stay.checkOut}T00:00:00Z`) -
+            Date.parse(`${stay.checkIn}T00:00:00Z`)) /
+            86_400_000,
+        )
+      : 0;
+
+    const available = stay
+      ? sql`(
+          ${nights} >= u.min_nights
+          AND (u.max_nights IS NULL OR ${nights} <= u.max_nights)
+          AND NOT EXISTS (
+            SELECT 1 FROM availability_days ad
+             WHERE ad.unit_id = u.id
+               AND ad.date >= ${stay.checkIn}::date
+               AND ad.date <  ${stay.checkOut}::date
+               AND (
+                 ad.status <> 'available'
+                 OR (ad.date = ${stay.checkIn}::date
+                     AND ad.min_nights IS NOT NULL
+                     AND ${nights} < ad.min_nights)
+               )
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM bookings b
+             WHERE b.unit_id = u.id
+               AND b.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
+               AND daterange(b.check_in, b.check_out, '[)')
+                   && daterange(${stay.checkIn}::date, ${stay.checkOut}::date, '[)')
+          )
+        )`
+      : /* No dates, no claim: the reader has not asked about a stay yet. */ sql`true`;
+
+    /*
+      Hoisted, because a nested template inside the ORDER BY would not parse — and because with no
+      dates `available` is the constant `true`, which Postgres refuses outright in an ORDER BY.
+    */
+    const availableFirst = stay ? sql`, ${available} DESC` : sql``;
+
     const rows = await this.db.execute<Record<string, unknown>>(sql`
       SELECT
         u.id, u.name_ar, u.name_en, u.name_de,
         u.max_guests, u.bedrooms, u.beds, u.bathrooms,
         u.base_price, u.min_nights, u.max_nights, u.room_type_code,
+        ${available} AS available,
         cur.code AS currency_code,
         COALESCE(
           ARRAY_AGG(a.code ORDER BY a.sort_order) FILTER (WHERE a.code IS NOT NULL),
@@ -241,7 +304,14 @@ export class PropertyDetailService {
       LEFT JOIN amenities a ON a.id = ua.amenity_id AND a.deleted_at IS NULL
       WHERE p.slug = ${slug} AND u.is_active AND u.deleted_at IS NULL
       GROUP BY u.id, cur.code
-      ORDER BY u.base_price
+      /*
+        Available first within a price, so a group's first row is one a guest can actually book.
+
+        Only when there ARE dates: with none the expression is a constant, and Postgres refuses a
+        bare constant in ORDER BY — "non-integer constant in ORDER BY", which took out every review
+        test the moment this shipped. (No backticks in here: one ends the sql template.)
+      */
+      ORDER BY u.base_price${availableFirst}, u.id
     `);
 
     return rows.rows.map((r) => ({
@@ -257,6 +327,7 @@ export class PropertyDetailService {
       maxNights: r['max_nights'] === null ? null : Number(r['max_nights']),
       roomTypeCode: r['room_type_code'],
       amenityCodes: r['amenity_codes'],
+      available: r['available'] === true,
     }));
   }
 

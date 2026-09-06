@@ -72,6 +72,7 @@ export function UnitSelector({
     available: string;
     cheapest: string;
     left: (count: number) => string;
+    soldOut: string;
     amenitiesLabel: string;
     amenitiesNone: string;
     cancellation: string;
@@ -132,8 +133,14 @@ export function UnitSelector({
 
       <ul className="mt-4 grid gap-3">
         {rows.map((group, index) => {
-          /* Cheapest of the group: the API sorted by price, so the first is it. */
-          const unit = group[0]!;
+          /*
+            The cheapest AVAILABLE room of the type — the API orders available first within a price,
+            so a group's first row is one a guest can actually book. Falling back to the first when
+            none is free keeps the type on the page, described but not offered.
+          */
+          const free = group.filter((one) => one.available);
+          const unit = free[0] ?? group[0]!;
+          const soldOut = free.length === 0;
 
           return (
             <li
@@ -163,10 +170,16 @@ export function UnitSelector({
                     {copy.guestsUpTo(unit.maxGuests)} · {copy.layout(unit)}
                   </p>
 
-                  {/* How many of this type are left — the count a quantity column would have held. */}
-                  {group.length > 1 ? (
+                  {/*
+                    The count is of what is FREE, not of what exists.
+
+                    It counted the group — every physical room of the type — so a hotel with one of
+                    its two suites booked still promised «غرفتان متبقيتان» for exactly those dates.
+                    The number a guest reads has to be the number they can have.
+                  */}
+                  {free.length > 1 ? (
                     <p className="mt-1 text-xs font-semibold text-gold">
-                      {copy.left(group.length)}
+                      {copy.left(free.length)}
                     </p>
                   ) : null}
 
@@ -214,18 +227,29 @@ export function UnitSelector({
                     {priceWithFee(unit.basePrice, unit.currencyCode)}
                   </p>
 
-                  <Link
+                  {soldOut ? (
                     /*
-                    THIS unit, with the guest's own dates and party — the same contract the sidebar
-                    link uses, so a choice made here and a choice made there reach checkout the same
-                    way. The party is capped at what the unit sleeps, because sending more guests
-                    than it takes is a quote the API will refuse.
+                    Described, not offered. The type stays on the page — a guest who cannot
+                    see the suite does not learn the hotel has one — but nothing here
+                    pretends it can be booked, which is what a link to a taken room did.
                   */
-                    href={`/${locale}/checkout?property=${propertySlug}&unitId=${unit.id}&checkIn=${stay.checkIn}&checkOut=${departureFor(unit)}&adults=${Math.min(guests.adults, unit.maxGuests)}&children=${guests.children}&infants=${guests.infants}`}
-                    className="block rounded-lg btn-gold px-4 py-2.5 text-center text-sm font-semibold transition-opacity hover:opacity-90"
-                  >
-                    {copy.book}
-                  </Link>
+                    <p className="text-center text-sm font-semibold text-warn sm:text-end">
+                      {copy.soldOut}
+                    </p>
+                  ) : (
+                    <Link
+                      /*
+                      THIS unit, with the guest's own dates and party — the same contract the sidebar
+                      link uses, so a choice made here and a choice made there reach checkout the same
+                      way. The party is capped at what the unit sleeps, because sending more guests
+                      than it takes is a quote the API will refuse.
+                    */
+                      href={`/${locale}/checkout?property=${propertySlug}&unitId=${unit.id}&checkIn=${stay.checkIn}&checkOut=${departureFor(unit)}&adults=${Math.min(guests.adults, unit.maxGuests)}&children=${guests.children}&infants=${guests.infants}`}
+                      className="block rounded-lg btn-gold px-4 py-2.5 text-center text-sm font-semibold transition-opacity hover:opacity-90"
+                    >
+                      {copy.book}
+                    </Link>
+                  )}
                 </div>
               </div>
             </li>

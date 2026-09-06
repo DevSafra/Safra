@@ -101,7 +101,21 @@ export default async function PropertyPage({
   const children = whole(first(query['children']), 0, 20);
   const infants = whole(first(query['infants']), 0, 10);
 
-  const property = await getProperty(slug);
+  /*
+    The reader's OWN dates reach the API, so each room says whether it can be booked for them.
+
+    Read straight from the query rather than from `stay` below, which is built after this. Absent or
+    malformed dates simply mean no availability claim is made — the API treats the stay as optional
+    for exactly that reason.
+  */
+  const askedCheckIn = first(query['checkIn']);
+  const askedCheckOut = first(query['checkOut']);
+  const askedStay =
+    askedCheckIn && askedCheckOut && askedCheckIn < askedCheckOut
+      ? { checkIn: askedCheckIn, checkOut: askedCheckOut }
+      : undefined;
+
+  const property = await getProperty(slug, askedStay);
   if (!property) notFound();
 
   /*
@@ -415,6 +429,7 @@ export default async function PropertyPage({
               available: t('unitAvailable'),
               cheapest: t('unitCheapest'),
               left: (count) => t('unitsLeft', { count }),
+              soldOut: t('unitSoldOut'),
               amenitiesLabel: t('unitAmenitiesLabel'),
               amenitiesNone: t('unitAmenitiesNone'),
               cancellation: t('cancellationPolicy'),

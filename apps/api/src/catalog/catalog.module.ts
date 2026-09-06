@@ -1,4 +1,4 @@
-import { Controller, Get, Module, Param } from '@nestjs/common';
+import { Controller, Get, Module, Param, Query } from '@nestjs/common';
 
 import { Public } from '../rbac/decorators.js';
 import { CatalogService } from './catalog.service.js';
@@ -29,9 +29,26 @@ class CatalogController {
 
   /** §5.6 — the full property page payload. */
   @Public()
+  /*
+    The stay is OPTIONAL and only ever narrows what the rooms claim.
+
+    Without dates the page still lists every room; with them, each says whether it can be booked
+    for that window. A reader who has not chosen dates is not told anything about availability,
+    which is the honest answer rather than a default window's answer.
+  */
   @Get('properties/:slug')
-  async property(@Param('slug') slug: string) {
-    return this.properties.bySlug(slug);
+  async property(
+    @Param('slug') slug: string,
+    @Query('checkIn') checkIn?: string,
+    @Query('checkOut') checkOut?: string,
+  ) {
+    const iso = /^\d{4}-\d{2}-\d{2}$/;
+    const stay =
+      checkIn && checkOut && iso.test(checkIn) && iso.test(checkOut) && checkIn < checkOut
+        ? { checkIn, checkOut }
+        : undefined;
+
+    return this.properties.bySlug(slug, stay);
   }
 
   /** The business kinds «انضم كشريك» offers. See the service for why these are rows. */

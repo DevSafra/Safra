@@ -216,7 +216,9 @@
     "unitAvailable": "Available for your dates",
     "unitCheapest": "Lowest price",
     "unitAmenitiesNone": "No facilities specific to this unit.",
-    "unitsLeft": "{count, plural, one {# room left} other {# rooms left}}"
+    "unitsLeft": "{count, plural, one {# room left} other {# rooms left}}",
+    "unitSoldOut": "Not available for your dates",
+    "unitPickOther": "Try other dates, or choose another type."
   },
   "city": {
     "availableStays": "Available stays in {city}",

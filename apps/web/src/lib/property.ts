@@ -69,6 +69,8 @@ const propertyDetailSchema = z.object({
       maxNights: z.number().nullable(),
       roomTypeCode: z.string().nullable(),
       amenityCodes: z.array(z.string()),
+      /* Whether THIS room can be booked for the dates asked about; true when none were. */
+      available: z.boolean(),
     }),
   ),
   images: z.array(
@@ -129,11 +131,36 @@ export type PropertyDetail = z.infer<typeof propertyDetailSchema>;
  * calendar is illustrative. The booking flow re-validates availability against the
  * exclusion constraint, so a minute of staleness cannot oversell anything.
  */
-export async function getProperty(slug: string): Promise<PropertyDetail | null> {
+export async function getProperty(
+  slug: string,
+  stay?: { checkIn: string; checkOut: string },
+): Promise<PropertyDetail | null> {
+  /*
+    The stay travels to the API, which decides what is bookable.
+
+    Availability is not something the page can work out — it is a question about `bookings` and
+    `availability_days` — and the answer is what makes the room list honest rather than a catalogue.
+  */
+  const query = stay ? `?checkIn=${stay.checkIn}&checkOut=${stay.checkOut}` : '';
+
   try {
     const response = await fetch(
-      `${API_URL}/api/v1/properties/${encodeURIComponent(slug)}`,
-      { headers: { Accept: 'application/json' }, next: { revalidate: 60 } },
+      `${API_URL}/api/v1/properties/${encodeURIComponent(slug)}${query}`,
+      {
+        headers: { Accept: 'application/json' },
+        /*
+          Availability is never cached; the description is.
+
+          The page is worth caching — photographs, prose, reviews and the amenity lists change
+          rarely. What a room's availability says must not be, because it is the one fact on the
+          page that another guest can invalidate: with a 60-second window, two people could both be
+          shown the last suite and one of them would be refused after entering their card details.
+
+          So a request that ASKS about a stay is live, and a request with no dates keeps the minute.
+          Measured on 2026-09-06: the count still read six immediately after a booking took one.
+        */
+        next: { revalidate: stay ? 0 : 60 },
+      },
     );
 
     if (!response.ok) return null;

@@ -216,7 +216,9 @@
     "unitAvailable": "متاحة للتواريخ المختارة",
     "unitCheapest": "الأقل سعراً",
     "unitAmenitiesNone": "لا مرافق خاصة بهذه الوحدة.",
-    "unitsLeft": "{count, plural, zero {لا غرف متبقية} one {غرفة واحدة متبقية} two {غرفتان متبقيتان} few {# غرف متبقية} many {# غرفة متبقية} other {# غرفة متبقية}}"
+    "unitsLeft": "{count, plural, zero {لا غرف متبقية} one {غرفة واحدة متبقية} two {غرفتان متبقيتان} few {# غرف متبقية} many {# غرفة متبقية} other {# غرفة متبقية}}",
+    "unitSoldOut": "غير متاحة للتواريخ المختارة",
+    "unitPickOther": "جرّب تواريخ أخرى أو اختر نوعاً آخر."
   },
   "city": {
     "availableStays": "الإقامات المتاحة في {city}",
