@@ -76,7 +76,11 @@ export class VoucherService {
     return voucherQrPayload(await this.load(reference));
   }
 
-  private async load(reference: string): Promise<VoucherRow> {
+  /*
+    Not private: a test that can only see a PDF's bytes cannot tell a complete voucher from a blank
+    one, and the fields on it are exactly what this change is about.
+  */
+  async load(reference: string): Promise<VoucherRow> {
     /*
       No money column is selected, and that is deliberate rather than incidental.
 
@@ -107,6 +111,18 @@ export class VoucherService {
       SELECT b.reference, b.status::text AS status,
              b.check_in::text AS check_in, b.check_out::text AS check_out,
              b.nights, b.guests_adults, b.guests_children,
+             b.rooms,
+             /*
+               WHICH doors, not just how many.
+
+               A voucher for a three-room booking named one room type and reception handed over one
+               key. The labels are what a desk clerk actually needs — «101, 102, 103» — and they
+               come from booking_units, which is the only record of what this booking holds.
+             */
+             (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
+                FROM booking_units bu
+                JOIN units bu_u ON bu_u.id = bu.unit_id
+               WHERE bu.booking_id = b.id AND bu_u.unit_label IS NOT NULL) AS room_labels,
              cp.full_name AS customer_name,
              coalesce(pr.name_ar, pr.name_en) AS property_name,
              coalesce(u.name_ar, u.name_en)   AS unit_name,
@@ -137,6 +153,9 @@ export interface VoucherRow extends Record<string, unknown> {
   check_in: string;
   check_out: string;
   nights: number;
+  rooms: number;
+  /** Comma-separated physical room numbers, or null where the partner numbers nothing. */
+  room_labels: string | null;
   guests_adults: number;
   guests_children: number;
   customer_name: string;
@@ -165,6 +184,12 @@ export function voucherQrPayload(booking: VoucherRow): string {
     `guest:${booking.customer_name}`,
     `property:${booking.property_name}`,
     `unit:${booking.unit_name}`,
+    /*
+      The count and the doors. A scanner reading «unit:غرفة مزدوجة» on a three-room booking told a
+      clerk nothing about the other two — the booking held them and the voucher did not say so.
+    */
+    `rooms:${booking.rooms}`,
+    ...(booking.room_labels === null ? [] : [`room_numbers:${booking.room_labels}`]),
     `in:${booking.check_in}`,
     `out:${booking.check_out}`,
     `guests:${booking.guests_adults + booking.guests_children}`,
@@ -194,7 +219,13 @@ const esc = (value: string): string =>
  * `renderContractPdf`. A missing stylesheet would not fail, it would print unstyled, which is the
  * failure mode that reaches a customer rather than a log.
  */
-function voucherHtml(booking: VoucherRow, qrDataUri: string): string {
+/*
+  Exported so a test can read the DOCUMENT rather than a PDF's bytes.
+
+  «the voucher is a PDF and a PDF is opaque» is how a missing field ships: the only assertion left
+  is that a file exists, which is true of a blank one.
+*/
+export function voucherHtml(booking: VoucherRow, qrDataUri: string): string {
   const guests = booking.guests_adults + booking.guests_children;
 
   return `<!doctype html>
@@ -227,7 +258,8 @@ function voucherHtml(booking: VoucherRow, qrDataUri: string): string {
     <div class="fields">
       <div class="row"><span class="label">العميل</span><span class="value">${esc(booking.customer_name)}</span></div>
       <div class="row"><span class="label">العقار</span><span class="value">${esc(booking.property_name)}</span></div>
-      <div class="row"><span class="label">الوحدة</span><span class="value">${esc(booking.unit_name)}</span></div>
+      <div class="row"><span class="label">الوحدة</span><span class="value">${esc(booking.unit_name)}${booking.rooms > 1 ? ` × ${booking.rooms}` : ''}</span></div>
+      ${booking.room_labels === null ? '' : `<div class="row"><span class="label">أرقام الغرف</span><span class="value ltr">${esc(booking.room_labels)}</span></div>`}
       <div class="row"><span class="label">المدينة</span><span class="value">${esc(booking.city_name)}</span></div>
       <div class="row"><span class="label">الوصول</span><span class="value ltr">${esc(booking.check_in)}</span></div>
       <div class="row"><span class="label">المغادرة</span><span class="value ltr">${esc(booking.check_out)}</span></div>
@@ -245,7 +277,8 @@ function voucherHtml(booking: VoucherRow, qrDataUri: string): string {
   <div class="en">
     <div class="row"><span class="label">Guest</span><span class="value">${esc(booking.customer_name)}</span></div>
     <div class="row"><span class="label">Property</span><span class="value">${esc(booking.property_name)}</span></div>
-    <div class="row"><span class="label">Unit</span><span class="value">${esc(booking.unit_name)}</span></div>
+    <div class="row"><span class="label">Unit</span><span class="value">${esc(booking.unit_name)}${booking.rooms > 1 ? ` × ${booking.rooms}` : ''}</span></div>
+    ${booking.room_labels === null ? '' : `<div class="row"><span class="label">Room numbers</span><span class="value">${esc(booking.room_labels)}</span></div>`}
     <div class="row"><span class="label">City</span><span class="value">${esc(booking.city_name)}</span></div>
     <div class="row"><span class="label">Check-in</span><span class="value">${esc(booking.check_in)}</span></div>
     <div class="row"><span class="label">Check-out</span><span class="value">${esc(booking.check_out)}</span></div>

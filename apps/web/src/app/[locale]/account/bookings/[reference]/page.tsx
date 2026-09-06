@@ -117,6 +117,22 @@ export default async function BookingDetailPage({
           {localisedName(booking.property, locale)}
           {' · '}
           <span className="text-muted">{localisedName(booking.unit, locale)}</span>
+          {/*
+            HOW MANY of that room.
+
+            A booking may hold several identical rooms, and this screen — the one a guest opens to
+            check what they paid for — named the type and stopped. The count was written on the
+            booking and read by nothing. Shown only above one, because «غرفة واحدة» beside a room
+            name is a word that tells nobody anything.
+          */}
+          {(booking.rooms ?? 1) > 1 ? (
+            <>
+              {' · '}
+              <span className="font-semibold text-gold">
+                {t('roomsCount', { count: booking.rooms ?? 1 })}
+              </span>
+            </>
+          ) : null}
         </Row>
         <Row label={t('bookingStay')}>
           <DateRange from={booking.checkIn} to={booking.checkOut} locale={locale} /> ·{' '}

@@ -28,6 +28,15 @@ const BOOKING_COLUMNS = {
   checkIn: true,
   checkOut: true,
   nights: true,
+  /*
+    How many rooms, and which trip they belong to.
+
+    Both were written on every booking and read by nothing: a guest who paid for three rooms saw
+    «غرفة مزدوجة قياسية» on their own booking and no count anywhere, and support had no handle for
+    a guest whose stay took two bookings.
+  */
+  rooms: true,
+  bookingGroupReference: true,
   guestsAdults: true,
   guestsChildren: true,
   guestsInfants: true,

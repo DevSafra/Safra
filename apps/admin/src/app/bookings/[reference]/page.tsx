@@ -92,6 +92,19 @@ export default async function BookingPage({
     <Shell back={back}>
       <header>
         <p className="font-mono text-xs text-faint">{booking.reference}</p>
+        {/*
+          The TRIP, beside the booking.
+
+          A guest who took two doubles and a suite made two bookings — one room type each — and
+          rang support saying «my booking». There were two references and nothing recording that
+          they were one arrival. Shown next to the reference because that is where an agent's eye
+          already is, and it is searchable the same way.
+        */}
+        {booking.tripReference ? (
+          <p className="font-mono text-[11px] text-faint2">
+            {t.sections.bookingDetail.tripReference}: {booking.tripReference}
+          </p>
+        ) : null}
         <h1 className="mt-1 text-2xl font-semibold text-text">{booking.property.name}</h1>
         {/*
           «مراسلة» — the customer AND the host, in ONE thread.
@@ -172,7 +185,22 @@ export default async function BookingPage({
           title={t.sections.bookingDetail.property}
           name={booking.property.name}
           reference={booking.property.reference}
-          lines={[booking.property.unit, booking.property.city]}
+          /*
+            The unit line now states how many rooms and, where the partner numbers them, which.
+            An operator answering «the guest says they booked three» could not see the count at
+            all — it was on the booking and on no screen.
+          */
+          lines={[
+            booking.property.rooms > 1
+              ? `${booking.property.unit} · ${plural(t.sections.bookingDetail.roomsCount, { count: booking.property.rooms })}`
+              : booking.property.unit,
+            ...(booking.property.roomLabels === null
+              ? []
+              : [
+                  `${t.sections.bookingDetail.roomNumbers}: ${booking.property.roomLabels}`,
+                ]),
+            booking.property.city,
+          ]}
           href={detailHref(
             '/properties',
             booking.property.reference,

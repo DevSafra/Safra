@@ -53,6 +53,7 @@ type BookingRow = {
   name_ar: string;
   name_en: string | null;
   name_de: string | null;
+  rooms: number;
   unit_name_ar: string;
   unit_name_en: string;
   unit_name_de: string;
@@ -133,6 +134,12 @@ export class InvoicesService {
         Joined, not snapshotted — the same known limitation the property name carries above, and
         recorded there rather than restated here.
       */
+      /*
+        How many of that unit. An invoice for three rooms that names one is a document a company's
+        accounts department cannot reconcile — the total is three times the room and nothing on the
+        page says why.
+      */
+      b.rooms,
       un.name_ar AS unit_name_ar,
       un.name_en AS unit_name_en,
       un.name_de AS unit_name_de,
@@ -179,6 +186,7 @@ export class InvoicesService {
         nameAr: row.unit_name_ar,
         nameEn: row.unit_name_en,
         nameDe: row.unit_name_de,
+        rooms: row.rooms,
       },
       city: {
         nameAr: row.city_name_ar,

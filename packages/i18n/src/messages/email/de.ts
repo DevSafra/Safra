@@ -14,7 +14,7 @@ export const de = {
   },
   bookingConfirmed: {
     subject: 'Ihre Buchung ist bestätigt — {reference}',
-    body: 'Ihre SAFRA-Buchung ist bestätigt.\n\nBuchungsnummer: {reference}\nUnterkunft: {property}\nZimmer: {unit}\nAnreise: {checkIn}\nAbreise: {checkOut}\n\nIhr Voucher ist angehängt, mit einem QR-Code zur Prüfung bei der Ankunft. Zeigen Sie ihn vor oder nennen Sie die Buchungsnummer.\n\nIhr SAFRA-Team',
+    body: 'Ihre SAFRA-Buchung ist bestätigt.\n\nBuchungsnummer: {reference}\nUnterkunft: {property}\nZimmer: {unit}\nAnzahl Zimmer: {rooms}\nAnreise: {checkIn}\nAbreise: {checkOut}\n\nIhr Voucher ist angehängt, mit einem QR-Code zur Prüfung bei der Ankunft. Zeigen Sie ihn vor oder nennen Sie die Buchungsnummer.\n\nIhr SAFRA-Team',
   },
   passwordReset: {
     subject: 'SAFRA-Passwort zurücksetzen',

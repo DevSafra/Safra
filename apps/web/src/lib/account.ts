@@ -160,6 +160,12 @@ const bookingDetailSchema = z.object({
   /* Where the stay is. A reference and a total describe a transaction, not a trip. */
   property: translatedNameSchema,
   unit: translatedNameSchema,
+  /*
+    How many rooms of that type. `.nullable().optional()` rather than `.default(1)` — a default
+    would invent «one room» for a payload that stopped sending the field, which on a three-room
+    booking is a confident lie about what the guest paid for.
+  */
+  rooms: z.number().nullable().optional(),
   checkIn: z.string(),
   checkOut: z.string(),
   nights: z.number(),
@@ -273,6 +279,12 @@ const pendingReviewSchema = z.object({
   bookingReference: z.string(),
   property: translatedNameSchema,
   unit: translatedNameSchema,
+  /*
+    How many rooms of that type. `.nullable().optional()` rather than `.default(1)` — a default
+    would invent «one room» for a payload that stopped sending the field, which on a three-room
+    booking is a confident lie about what the guest paid for.
+  */
+  rooms: z.number().nullable().optional(),
   checkIn: z.string(),
   checkOut: z.string(),
 });
@@ -295,6 +307,12 @@ export async function getPendingReviews() {
 const reviewEligibilitySchema = z.object({
   property: translatedNameSchema,
   unit: translatedNameSchema,
+  /*
+    How many rooms of that type. `.nullable().optional()` rather than `.default(1)` — a default
+    would invent «one room» for a payload that stopped sending the field, which on a three-room
+    booking is a confident lie about what the guest paid for.
+  */
+  rooms: z.number().nullable().optional(),
   stayCompleted: z.boolean(),
   alreadyReviewed: z.boolean(),
   eligible: z.boolean(),
@@ -365,6 +383,12 @@ const myReviewSchema = z.object({
   createdAt: z.string(),
   property: translatedNameSchema,
   unit: translatedNameSchema,
+  /*
+    How many rooms of that type. `.nullable().optional()` rather than `.default(1)` — a default
+    would invent «one room» for a payload that stopped sending the field, which on a three-room
+    booking is a confident lie about what the guest paid for.
+  */
+  rooms: z.number().nullable().optional(),
 });
 
 export type MyReview = z.infer<typeof myReviewSchema>;
@@ -444,6 +468,12 @@ const invoiceSummarySchema = z.object({
   property: translatedNameSchema.extend({ slug: z.string() }),
   /* WHICH ROOM — a receipt for a suite must not read like one for a standard room. */
   unit: translatedNameSchema,
+  /*
+    How many rooms of that type. `.nullable().optional()` rather than `.default(1)` — a default
+    would invent «one room» for a payload that stopped sending the field, which on a three-room
+    booking is a confident lie about what the guest paid for.
+  */
+  rooms: z.number().nullable().optional(),
   city: translatedNameSchema,
   currencyCode: z.string(),
   totalAmount: z.string(),

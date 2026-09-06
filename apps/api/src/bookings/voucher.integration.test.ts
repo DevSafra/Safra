@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createRollbackDatabase, type Database } from '@safra/db';
 
-import { VoucherService } from './voucher.service.js';
+import { VoucherService, voucherHtml } from './voucher.service.js';
 
 /**
  * The voucher and its QR code (SRS §6.3 step 6, §6.5).
@@ -59,6 +59,62 @@ describeIfDb('the booking voucher', () => {
    * The fixture's amounts are deliberately unusual so their absence means something: a booking
    * priced at 201.99 would let `not.toContain('9')` pass by accident.
    */
+  /**
+   * A three-room booking must say so, on the document reception acts on.
+   *
+   * The voucher named the room TYPE and stopped, so a guest arriving on three rooms handed over a
+   * paper describing one and the desk had no way to know. `bookings.rooms` was written by the
+   * booking flow and read by nothing — the capability-with-no-surface shape, on the surface where
+   * it costs the most.
+   */
+  it('states how many rooms, and which ones', async () => {
+    const payload = await decode(await vouchers.qr(reference));
+
+    expect(payload, 'the QR carries the count').toContain('rooms:3');
+
+    /*
+      And the printed document, which is what a person reads — in BOTH of its renderings.
+
+      The voucher prints Arabic and English, and `toContain` was satisfied by either: gutting the
+      Arabic block left the English one and the assertion stayed green. A count on half a document
+      is a count the reader of the other half does not get.
+    */
+    const html = voucherHtml(await vouchers.load(reference), 'data:,');
+
+    expect(
+      html.split('× 3').length - 1,
+      'the count is printed in both the Arabic and the English block',
+    ).toBe(2);
+
+    /* And the room numbers, likewise on both. */
+    expect(html, 'Arabic names the rooms').toContain('أرقام الغرف');
+    expect(html, 'English names them too').toContain('Room numbers');
+
+    /*
+      And the DOORS. A scanner showing «rooms:3» tells a clerk how many keys, not which — the
+      labels come from `booking_units`, the only record of what this booking actually holds.
+    */
+    expect(payload, 'and the rooms it holds').toMatch(/room_numbers:.+/);
+  });
+
+  /**
+   * The opposite control: a single-room booking says nothing about counts.
+   *
+   * Without it, «always print the count» would pass the test above and put «× 1» on every voucher
+   * the platform has ever issued.
+   */
+  it('says nothing about quantity on a one-room booking', async () => {
+    await db.execute(sql`UPDATE bookings SET rooms = 1 WHERE reference = ${reference}`);
+
+    const payload = await decode(await vouchers.qr(reference));
+
+    expect(payload).toContain('rooms:1');
+
+    const single = voucherHtml(await vouchers.load(reference), 'data:,');
+
+    expect(single, 'no «× 1» beside the room name').not.toContain('× 1');
+  });
+
   it('reveals no payment data', async () => {
     const payload = await decode(await vouchers.qr(reference));
 
@@ -163,24 +219,47 @@ describeIfDb('the booking voucher', () => {
                'published'
         FROM pa, ref RETURNING id, partner_id
       ), un AS (
-        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price, currency_id)
-        SELECT pr.id, 'وحدة القسيمة', 'Unit', 'Einheit', 4, '100.00', ref.currency_id
-        FROM pr, ref RETURNING id
+        /*
+          THREE numbered rooms of one type, because the booking below holds three.
+
+          The first version made one unit and a booking claiming three — a state the platform never
+          produces, since allocateRooms writes a booking_units row per room. A fixture that
+          cannot reach the field it is protecting is worse than no fixture, and this one could not:
+          the voucher's room numbers come from those rows.
+        */
+        INSERT INTO units (property_id, name_ar, name_en, name_de, max_guests, base_price,
+                           currency_id, room_type_code, unit_label)
+        SELECT pr.id, 'وحدة القسيمة', 'Unit', 'Einheit', 4, '100.00', ref.currency_id,
+               'voucher_type', label
+        FROM pr, ref, unnest(ARRAY['101', '102', '103']) AS label
+        RETURNING id, unit_label
+      ), lead_unit AS (
+        SELECT id FROM un ORDER BY unit_label LIMIT 1
       ), bk AS (
         INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
-                              check_in, check_out, guests_adults, guests_children, status, paid_at,
+                              check_in, check_out, guests_adults, guests_children, rooms,
+                              status, paid_at,
                               confirmed_at,
                               base_amount, customer_fee_value, customer_fee_amount,
                               partner_commission_rate, partner_commission_amount,
                               total_amount, partner_payable_amount, currency_id,
                               fx_rate_to_syp, total_syp, cancellation_policy_snapshot)
-        SELECT cp.id, un.id, pr.id, pr.partner_id, ref.city_id,
+        SELECT cp.id, lead_unit.id, pr.id, pr.partner_id, ref.city_id,
                current_date + 1100, current_date + 1103, 2, 1,
+               /* THREE rooms, because one is the case that hid the defect. */
+               3,
                'confirmed'::booking_status, now(), now(),
                /* Deliberately distinctive amounts — see the note on the prohibition test. */
                '747.53', '13.31', '13.31', '0.0700', '52.33', '761.84', '699.22',
                ref.currency_id, '13000.00000000', '9891920.00', '{"code":"flex"}'::jsonb
-        FROM cp, un, pr, ref RETURNING reference
+        FROM cp, lead_unit, pr, ref RETURNING id, reference
+      ), allocated AS (
+        /* The other two rooms. The lead one is written by the bookings_hold_lead_room trigger. */
+        INSERT INTO booking_units (booking_id, unit_id, check_in, check_out, status)
+        SELECT bk.id, un.id, current_date + 1100, current_date + 1103, 'confirmed'
+        FROM bk, un
+        ON CONFLICT (booking_id, unit_id) DO NOTHING
+        RETURNING booking_id
       )
       SELECT reference FROM bk
     `);

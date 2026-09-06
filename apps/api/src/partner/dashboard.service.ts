@@ -266,6 +266,8 @@ export class PartnerDashboardService {
       amount: string;
       currency_code: string;
       deadline_at: string | null;
+      rooms: number;
+      room_labels: string | null;
     }>(sql`
       SELECT b.reference,
              un.name_ar AS unit_name,
@@ -275,7 +277,17 @@ export class PartnerDashboardService {
              (b.guests_adults + coalesce(b.guests_children, 0))::int AS guests,
              b.total_amount::text AS amount,
              c.code AS currency_code,
-             b.confirmation_deadline_at::text AS deadline_at
+             b.confirmation_deadline_at::text AS deadline_at,
+             /*
+               How many rooms are being asked for. A partner deciding whether to accept within two
+               hours was shown the room TYPE and no count — so a request for three of their six
+               doubles looked exactly like a request for one.
+             */
+             b.rooms,
+             (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
+                FROM booking_units bu
+                JOIN units bu_u ON bu_u.id = bu.unit_id
+               WHERE bu.booking_id = b.id AND bu_u.unit_label IS NOT NULL) AS room_labels
       FROM bookings b
       JOIN units un ON un.id = b.unit_id
       JOIN properties pr ON pr.id = b.property_id
@@ -289,6 +301,8 @@ export class PartnerDashboardService {
     return result.rows.map((row) => ({
       reference: row.reference,
       unitName: row.unit_name,
+      rooms: row.rooms,
+      roomLabels: row.room_labels,
       propertyName: row.property_name,
       checkIn: row.check_in,
       checkOut: row.check_out,

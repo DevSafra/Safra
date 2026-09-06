@@ -726,6 +726,10 @@ export const ar = {
     unitTypeCount:
       '{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان متطابقتان} few {# غرف متطابقة} many {# غرفة متطابقة} other {# غرفة متطابقة}}',
     unitTypeHint: 'تُعرض للضيف كنوع واحد، ويختار عدد الغرف التي يريدها منها.',
+    /* On the arrivals list: how many rooms this guest booked and which doors to hand over. */
+    arrivalRoomsCount:
+      '{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}}',
+    arrivalRoomNumbers: 'أرقام الغرف',
     unitQuantity: 'عدد الغرف المتطابقة',
     unitQuantityHint:
       'إن كان لديك عدة غرف متطابقة من هذا النوع، اكتب عددها هنا بدل تكرار النموذج. تُنشئ سفرة صفًّا لكل غرفة حتى لا تُحجز غرفة واحدة مرتين، وتظهر جميعها للضيف كنوع واحد.',

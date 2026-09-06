@@ -215,6 +215,9 @@ const dashboardSchema = z.object({
     z.object({
       reference: z.string(),
       unitName: z.string(),
+      /* How many rooms this booking holds, and which physical rooms — reception hands over keys. */
+      rooms: z.number(),
+      roomLabels: z.string().nullable(),
       propertyName: z.string(),
       checkIn: z.string(),
       checkOut: z.string(),
@@ -937,6 +940,9 @@ export async function getAssignableCapabilities() {
  */
 const arrivalSchema = z.object({
   reference: z.string(),
+  /* How many rooms this booking holds, and which physical rooms — reception hands over keys. */
+  rooms: z.number(),
+  roomLabels: z.string().nullable(),
   guestName: z.string(),
   propertyName: z.string(),
   unitName: z.string(),

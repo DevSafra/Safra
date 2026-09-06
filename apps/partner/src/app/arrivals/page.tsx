@@ -12,7 +12,7 @@ import { SectionRefusal } from '@/components/section-refusal';
 import { ArrivalActions } from '@/components/arrival-actions';
 import { Ltr } from '@/components/ltr';
 import { count } from '@/lib/format';
-import { fill, t } from '@/lib/strings';
+import { fill, plural, t } from '@/lib/strings';
 
 /**
  * الوصول اليوم — the desk screen (Bashar, 2026-08-23).
@@ -229,7 +229,27 @@ function Row({ arrival }: { arrival: PartnerArrival }) {
           <p className="text-sm font-semibold text-text">{arrival.guestName}</p>
           <p className="text-[12.5px] text-muted">
             {arrival.propertyName} · {arrival.unitName}
+            {/*
+              HOW MANY, and WHICH.
+
+              This is the check-in list. A guest arriving on a three-room booking was shown here as
+              one room, so the person handing over keys had no way to know — the count was on the
+              booking and on no screen a partner sees.
+            */}
+            {arrival.rooms > 1 ? (
+              <>
+                {' · '}
+                <span className="font-semibold text-gold">
+                  {plural(t.editProperty.arrivalRoomsCount, { count: arrival.rooms })}
+                </span>
+              </>
+            ) : null}
           </p>
+          {arrival.roomLabels && arrival.rooms > 1 ? (
+            <p className="text-[11.5px] text-faint">
+              {t.editProperty.arrivalRoomNumbers}: <Ltr>{arrival.roomLabels}</Ltr>
+            </p>
+          ) : null}
           {/* The reference is a Latin run on an Arabic line — isolated as a VALUE, never a label. */}
           <Ltr className="text-[12px] text-faint">{arrival.reference}</Ltr>
         </div>

@@ -625,7 +625,8 @@
     "disputesResolution": "ردّ سفرة",
     "disputesOpened": "فُتح",
     "voucherOpen": "فتح القسيمة (PDF)",
-    "voucherHint": "تحتوي على رمز QR للتحقق عند الوصول."
+    "voucherHint": "تحتوي على رمز QR للتحقق عند الوصول.",
+    "roomsCount": "{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}}"
   },
   "ads": {
     "title": "أماكن قريبة من إقامتك",

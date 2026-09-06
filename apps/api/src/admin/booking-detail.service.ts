@@ -144,6 +144,13 @@ export class BookingDetailService {
              pr.reference AS property_reference,
              coalesce(pr.name_ar, pr.name_en) AS property_name,
              coalesce(u.name_ar, u.name_en)   AS unit_name,
+             b.rooms,
+             b.booking_group_reference,
+             /* Which physical rooms this booking holds — the answer support is asked for. */
+             (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
+                FROM booking_units bu
+                JOIN units bu_u ON bu_u.id = bu.unit_id
+               WHERE bu.booking_id = b.id AND bu_u.unit_label IS NOT NULL) AS room_labels,
              ci.name_ar AS city_name
       FROM bookings b
       JOIN currencies cur       ON cur.id = b.currency_id
@@ -228,10 +235,18 @@ export class BookingDetailService {
         nothing and is what every other admin service does, so a future nullable column cannot turn
         a name into a blank cell here.
       */
+      /* The trip this booking belongs to — see `bookings.booking_group_reference`. */
+      tripReference: booking['booking_group_reference'] ?? null,
       property: {
         reference: booking['property_reference'],
         name: booking['property_name'],
         unit: booking['unit_name'],
+        /*
+          What support is actually asked. «The guest says they booked three rooms» is unanswerable
+          from a screen that names the room TYPE — these two say how many and which doors.
+        */
+        rooms: booking['rooms'],
+        roomLabels: booking['room_labels'] ?? null,
         city: booking['city_name'],
       },
       money: {

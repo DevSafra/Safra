@@ -789,10 +789,15 @@ const bookingDetailSchema = z.object({
     name: z.string(),
     phone: z.string(),
   }),
+  /* Null on a booking made before trips existed; every new booking carries one. */
+  tripReference: z.string().nullable(),
   property: z.object({
     reference: z.string(),
     name: z.string(),
     unit: z.string(),
+    /* How many rooms of that type, and which physical rooms they are. */
+    rooms: z.number(),
+    roomLabels: z.string().nullable(),
     city: z.string(),
   }),
   money: z.object({

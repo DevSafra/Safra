@@ -64,6 +64,15 @@ export function bookingConfirmedMail(input: {
    * room, so the message and its own attachment disagreed.
    */
   unit: string;
+  /**
+   * HOW MANY of that room.
+   *
+   * A booking may hold several identical rooms since 2026-09-06, and the confirmation named the
+   * type and not the count — so a guest who paid for three was told about «غرفة مزدوجة قياسية» and
+   * nothing else. The voucher attached to this very mail states the count, which is the same
+   * message-disagrees-with-its-own-attachment shape the `unit` field was added to fix.
+   */
+  rooms: number;
   checkIn: string;
   checkOut: string;
   locale: string;
@@ -75,6 +84,7 @@ export function bookingConfirmedMail(input: {
       reference: input.reference,
       property: input.property,
       unit: input.unit,
+      rooms: input.rooms,
       checkIn: input.checkIn,
       checkOut: input.checkOut,
     }),

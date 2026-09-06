@@ -13,7 +13,7 @@ import {
 import { Shell } from '@/components/shell';
 import { Ltr } from '@/components/ltr';
 import { amount, count } from '@/lib/format';
-import { fill, t, violationKind } from '@/lib/strings';
+import { fill, plural, t, violationKind } from '@/lib/strings';
 import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 /**
@@ -298,7 +298,20 @@ function Requests({
                     <Ltr>{request.reference}</Ltr>
                   </p>
                   <p className="mt-0.5 text-[12.5px] text-muted">
-                    {request.unitName} · {request.checkIn} ← {request.checkOut} ·{' '}
+                    {request.unitName}
+                    {/*
+                      HOW MANY rooms are being asked for. A partner has two hours to accept, and a
+                      request for three of their six doubles looked identical to a request for one.
+                    */}
+                    {request.rooms > 1 ? (
+                      <span className="font-semibold text-gold">
+                        {' · '}
+                        {plural(t.editProperty.arrivalRoomsCount, {
+                          count: request.rooms,
+                        })}
+                      </span>
+                    ) : null}{' '}
+                    · {request.checkIn} ← {request.checkOut} ·{' '}
                     {fill(t.dashboard.requestsNights, { n: count(request.nights) })} ·{' '}
                     {fill(t.dashboard.requestsGuests, { n: count(request.guests) })}
                   </p>

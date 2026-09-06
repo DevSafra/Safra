@@ -631,6 +631,7 @@ export class BookingActionsService {
         email: string;
         property: string;
         unit: string;
+        rooms: number;
         check_in: string;
         check_out: string;
         locale: string | null;
@@ -638,6 +639,7 @@ export class BookingActionsService {
         SELECT cp.email, coalesce(pr.name_ar, pr.name_en) AS property,
                /* The ROOM, which the attached voucher names and this message did not. */
                coalesce(un.name_ar, un.name_en) AS unit,
+               b.rooms,
                b.check_in::text AS check_in, b.check_out::text AS check_out,
                u.preferred_locale AS locale,
                b.id, b.customer_profile_id
@@ -662,6 +664,7 @@ export class BookingActionsService {
           reference,
           property: row.property,
           unit: row.unit,
+          rooms: row.rooms,
           checkIn: row.check_in,
           checkOut: row.check_out,
           locale: row.locale ?? 'ar',

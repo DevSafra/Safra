@@ -2690,6 +2690,12 @@ export const ar = {
     },
 
     bookingDetail: {
+      /* How many rooms a booking holds, and which physical rooms they are (Bashar, 2026-09-06). */
+      roomsCount:
+        '{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}}',
+      roomNumbers: 'أرقام الغرف',
+      /* The trip — the other bookings this guest made for the same stay. */
+      tripReference: 'مرجع الرحلة',
       /**
        * Interpolated lines, as templates.
        *

@@ -66,6 +66,17 @@ export interface InvoiceProperty extends InvoiceTranslatedName {
   readonly slug: string;
 }
 
+/**
+ * The unit an invoice is for, and HOW MANY of it.
+ *
+ * A stay of three identical rooms is one booking with one total. An invoice naming the room type
+ * and not the count is a document nobody can reconcile — the figure is three times the nightly
+ * rate and the page gives no reason for it.
+ */
+export interface InvoiceUnit extends InvoiceTranslatedName {
+  readonly rooms: number;
+}
+
 export interface InvoicePayment {
   readonly reference: string;
   readonly method: string;
@@ -94,7 +105,7 @@ export interface InvoiceSummary {
    * thirteen-room hotel is not: a suite at 371.99 and a standard room at 73.99 produced receipts
    * distinguishable only by the figure. Somebody reconciling a card statement cannot do that.
    */
-  readonly unit: InvoiceTranslatedName;
+  readonly unit: InvoiceUnit;
   readonly city: InvoiceTranslatedName;
   readonly currencyCode: string;
   /** `bookings.total_amount`, read verbatim. */

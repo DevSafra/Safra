@@ -105,6 +105,8 @@ export class ArrivalsService {
       guest_name: string;
       property_name: string;
       unit_name: string;
+      rooms: number;
+      room_labels: string | null;
       check_in: string;
       check_out: string;
       nights: number;
@@ -116,6 +118,12 @@ export class ArrivalsService {
              cp.full_name AS guest_name,
              p.name_ar    AS property_name,
              u.name_ar    AS unit_name,
+             b.rooms,
+             /* The doors, for the person handing over keys. See voucher.service.ts. */
+             (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
+                FROM booking_units bu
+                JOIN units bu_u ON bu_u.id = bu.unit_id
+               WHERE bu.booking_id = b.id AND bu_u.unit_label IS NOT NULL) AS room_labels,
              b.check_in::text, b.check_out::text, b.nights,
              (b.guests_adults + b.guests_children + b.guests_infants)::int AS guests,
              b.status::text AS status, b.checked_in_at::text
@@ -145,6 +153,8 @@ export class ArrivalsService {
         guestName: row.guest_name,
         propertyName: row.property_name,
         unitName: row.unit_name,
+        rooms: row.rooms,
+        roomLabels: row.room_labels,
         checkIn: row.check_in,
         checkOut: row.check_out,
         nights: row.nights,
@@ -307,7 +317,11 @@ export class ArrivalsService {
 
     const rows = await this.db.execute<ArrivalRow>(sql`
       SELECT b.reference, cp.full_name AS guest_name,
-             p.name_ar AS property_name, u.name_ar AS unit_name,
+             p.name_ar AS property_name, u.name_ar AS unit_name, b.rooms,
+             (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
+                FROM booking_units bu
+                JOIN units bu_u ON bu_u.id = bu.unit_id
+               WHERE bu.booking_id = b.id AND bu_u.unit_label IS NOT NULL) AS room_labels,
              b.check_in::text, b.check_out::text, b.nights,
              (b.guests_adults + b.guests_children + b.guests_infants)::int AS guests,
              b.status::text AS status, b.checked_in_at::text
@@ -339,7 +353,11 @@ export class ArrivalsService {
   private async one(partnerId: string, reference: string): Promise<Arrival> {
     const rows = await this.db.execute<ArrivalRow>(sql`
       SELECT b.reference, cp.full_name AS guest_name,
-             p.name_ar AS property_name, u.name_ar AS unit_name,
+             p.name_ar AS property_name, u.name_ar AS unit_name, b.rooms,
+             (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
+                FROM booking_units bu
+                JOIN units bu_u ON bu_u.id = bu.unit_id
+               WHERE bu.booking_id = b.id AND bu_u.unit_label IS NOT NULL) AS room_labels,
              b.check_in::text, b.check_out::text, b.nights,
              (b.guests_adults + b.guests_children + b.guests_infants)::int AS guests,
              b.status::text AS status, b.checked_in_at::text

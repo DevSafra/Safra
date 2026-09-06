@@ -625,7 +625,8 @@
     "disputesResolution": "SAFRA’s answer",
     "disputesOpened": "Raised",
     "voucherOpen": "Open voucher (PDF)",
-    "voucherHint": "It carries a QR code for verification on arrival."
+    "voucherHint": "It carries a QR code for verification on arrival.",
+    "roomsCount": "{count, plural, one {1 room} other {# rooms}}"
   },
   "ads": {
     "title": "Nearby, from our partners",

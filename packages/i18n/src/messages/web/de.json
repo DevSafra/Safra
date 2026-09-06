@@ -625,7 +625,8 @@
     "disputesResolution": "Antwort von SAFRA",
     "disputesOpened": "Eröffnet",
     "voucherOpen": "Voucher öffnen (PDF)",
-    "voucherHint": "Enthält einen QR-Code zur Prüfung bei der Ankunft."
+    "voucherHint": "Enthält einen QR-Code zur Prüfung bei der Ankunft.",
+    "roomsCount": "{count, plural, one {1 Zimmer} other {# Zimmer}}"
   },
   "ads": {
     "title": "In der Nähe, von unseren Partnern",
