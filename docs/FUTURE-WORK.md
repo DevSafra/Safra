@@ -846,6 +846,36 @@ One full-suite run failed a sidebar-badge comparison immediately after the conso
 and passed on every run since. The runner must wait for the applications to be _serving correctly_,
 not merely accepting connections, or it will report environment noise as product failure.
 
+### Room-type inventory — shipped 2026-09-06, with two things left open
+
+A booking may now hold several identical rooms. `booking_units` carries one row per physical room
+and the double-booking guarantee moved with it (`booking_units_no_overlapping_stays`, post/0022);
+`bookings.rooms` is the quantity; two triggers keep the copy honest — one syncs status and dates
+from the booking, the other writes the lead room on INSERT so a booking created by ANY path (the
+staff console, the seed scripts, whatever is written next) still holds the room it names.
+
+Search, the property page and the partner calendar all read `booking_units` now, because a booking
+of four suites names one and holds four.
+
+**Open — a partner cannot yet CHANGE a quantity.** They can state one when adding a room type, and
+each room is editable and deactivatable afterwards, but there is no «make this five» control on an
+existing type. Adding rooms is `addUnit` again with the same type code and price; reducing is
+deactivating the rooms nobody has booked. Both are doable by hand and neither has a screen. Small
+piece of work, not a blocker — a partner can always add another type.
+
+**Open — the Super Admin console does not show configured inventory during moderation.** Bashar
+asked for «configured inventory + remaining availability» on the review screen. The console shows
+the units; it does not group them by type or state how many of each are free for a date range. The
+data is all there (`booking_units` plus `availability_days`); it needs a panel.
+
+**A note for anyone touching the allocation.** «Interchangeable» is defined in three places and they
+must agree: `allocateRooms` (same property, same `room_type_code`, same `base_price`, same
+`max_guests`), the property page's grouping key, and the partner list's grouping key. They were NOT
+aligned at first — a security pass found that a type code on a $50 and a $500 room let «pick the
+cheap one, ask for two» buy the dear one at the cheap one's rate. `room-inventory.integration.test.ts`
+holds that guard; if you widen the definition in one place, widen it in all three or the stepper
+will offer a quantity checkout refuses.
+
 ### SAFRA service fee — visibility made configurable, 2026-09-04
 
 **Bashar's requirement.** _"One shared setting and one consistent pricing rule, without per-surface
