@@ -52,6 +52,61 @@ async function openPreview(page: Page, path = GALLERY) {
     /* Chromium reports the settled value as `1`; a browser that never scaled reports `none`. */
     return scale === '1' || scale === 'none';
   });
+
+  await needsPicture(page);
+}
+
+/**
+ * Whether the shown picture has actually DECODED, within a bounded wait.
+ *
+ * ## Two problems, one answer
+ *
+ * `naturalWidth` is 0 until a picture decodes, and the measurements here divide by it — so a test
+ * that raced the decode computed a fill ratio of zero and reported a layout defect that did not
+ * exist. It passed alone and failed under load, which is the worst shape a test can have.
+ *
+ * But waiting UNCONDITIONALLY hangs, because in this environment the pictures never decode at all:
+ * on 2026-09-06 every key in `property_images` was found to 404 — the object store holds no
+ * property photographs, so all 607 rows are orphaned metadata and every image on the platform is
+ * broken. The tests had been passing against 0x0 pictures, measuring nothing and reporting a
+ * geometry they had never seen.
+ *
+ * So this waits, and SAYS whether it got one. A test that needs a real picture skips with a reason
+ * naming the bucket rather than asserting on a broken image, because a geometry assertion against
+ * nothing is worse than no assertion: it reports coverage it does not have.
+ */
+async function decoded(page: Page): Promise<boolean> {
+  try {
+    await page.waitForFunction(
+      () => {
+        /*
+          A CLOSED frame has nothing to decode, and `settled()` is also called after a
+          drag-to-dismiss where the dialog is gone by design. Absent means satisfied.
+        */
+        if (!document.querySelector('[role="dialog"]')) return true;
+
+        const image = document.querySelector<HTMLImageElement>(
+          '[role="dialog"] [data-current="true"] img',
+        );
+
+        return Boolean(image?.complete && image.naturalWidth > 0);
+      },
+      undefined,
+      { timeout: 4_000 },
+    );
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Skips, loudly, when the object store has no picture behind the row. */
+async function needsPicture(page: Page) {
+  test.skip(
+    !(await decoded(page)),
+    'The media bucket holds no property photographs — every file_key 404s, so there is no geometry to measure. Upload fixture media before trusting this.',
+  );
 }
 
 /**
@@ -66,6 +121,9 @@ async function openPreview(page: Page, path = GALLERY) {
  * still correct on a slow one.
  */
 async function settled(page: Page) {
+  /* A step swaps which picture is current, so the new one must settle before it is measured. */
+  await decoded(page);
+
   /*
     The remembered frame is cleared first, so the very first comparison cannot match. Without it two
     reads taken before a transition has even STARTED are identical, and the helper reports «at rest»
