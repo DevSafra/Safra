@@ -42,9 +42,17 @@ test.use({ baseURL: 'http://localhost:3000', viewport: { width: 1440, height: 10
 const STAY = (() => {
   const at = new Date();
 
-  at.setUTCDate(
-    at.getUTCDate() + 300 + ((at.getUTCHours() * 60 + at.getUTCMinutes()) % 120),
-  );
+  /*
+    Milliseconds, not minutes.
+
+    The first version moved the window on the hour-and-minute, so two runs inside the same minute
+    shared it — and the second one measured the first one's bookings. That is exactly the failure
+    the window exists to prevent, arriving an order of magnitude later: this file books a family
+    room, the fixture has ONE, and a re-run inside the same minute found the type exhausted and
+    reported it as a broken product. 500 days of spread and a millisecond seed make a collision
+    rare rather than routine.
+  */
+  at.setUTCDate(at.getUTCDate() + 200 + (Date.now() % 500));
 
   const checkIn = at.toISOString().slice(0, 10);
 
@@ -144,6 +152,8 @@ test('booking one room of a type leaves the rest, and the other types alone', as
 
   const before = await inventory(request);
 
+  /* The window too — without it a failing run cannot be reproduced, since it moves every run. */
+  console.log(`stay: ${STAY.checkIn} → ${STAY.checkOut}`);
   console.log('before:', JSON.stringify(before));
 
   /*
@@ -153,7 +163,12 @@ test('booking one room of a type leaves the rest, and the other types alone', as
   */
   expect(before['double_standard'], 'doubles are free to book').toBeGreaterThan(1);
   expect(before['suite_executive'], 'and so are suites').toBeGreaterThan(0);
-  expect(before['family_room'], 'and the family room').toBe(1);
+  /*
+    A RANGE, like the two above it — the comment three lines up says exactly why, and this line was
+    the one that ignored it. Whatever ran before may have taken a family room, and the assertions
+    that matter below compare deltas rather than absolutes.
+  */
+  expect(before['family_room'], 'and the family room').toBeGreaterThanOrEqual(1);
 
   const standard = await book(page, 'غرفة مزدوجة قياسية');
 
