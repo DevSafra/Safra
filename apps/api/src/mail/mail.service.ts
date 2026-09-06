@@ -110,6 +110,22 @@ export class MailService {
       this.logger.error(
         `Failed to send "${mail.subject}" to ${mail.to}: ` + `${describeError(error)}`,
       );
+
+      /*
+        And RETHROWN, which it was not until 2026-09-06.
+        
+        Swallowing it made every failed mail on the platform record itself as a success:
+        `NotificationService.deliver` marks the row `sent` on the line after this call returns, so a
+        message that never left was written down as delivered with no failure reason and one
+        attempt. Nothing retried it — `MailProcessor`'s own note says throwing is how a job asks
+        BullMQ to try again — and the re-drive could not find it, because a lost notification is
+        found by being `queued` or `failed` and this was neither.
+        
+        It was discovered by driving a booking to confirmation and looking in the inbox: the
+        customer's «تأكيد حجزك» had NEVER been delivered, on any booking, while the table said every
+        one had. A log line is not a record; the row is the record, and it was lying.
+      */
+      throw error;
     }
   }
 }
