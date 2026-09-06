@@ -434,6 +434,45 @@ initial controlled launch, explicitly _"rather than introducing unrelated featur
 is what the pass has found and what was done about each. **Fixed** items shipped as part of the
 reconciliation; **open** items are reported for a decision and are NOT closed.
 
+#### FIXED — the testbed had almost no multi-unit properties, and three defects were hiding there
+
+**Bashar, 2026-09-06:** _"I want it exercised against realistic hotel structures rather than mostly
+single-unit properties."_ The testbed had **1,539 published properties with exactly one unit and
+eight with two**, so the accommodation-selection journey was only ever walked against a list of one.
+
+`grand-umayyad-hotel` is now thirteen rooms in four types — six interchangeable standard doubles,
+four with a sea view, two suites, one family room — differing on price, occupancy, layout, minimum
+stay and facilities, with `strict` cancellation and its own building-level amenities. The seeder
+gained `roomTypeCode`, per-unit layout and amenities, and a per-property policy and amenity list.
+
+**Three defects surfaced within an hour of the fixture existing, none of which any suite could have
+found before:**
+
+1. **Thirteen rooms rendered as thirteen rows**, six of them identical, so a guest picked one at
+   random. `roomTypeCode` is the schema's own answer and was **null on all 46,571 units** — the
+   grouping it was designed for had never run. Interchangeable rooms now collapse to one row with
+   «٦ غرف متبقية»; a one-of-a-kind room keeps its own row and claims no remainder.
+2. **Checkout never named the room.** It quoted the right price and said only «فندق أمية الكبير ·
+   دمشق» — a guest who chose a suite could not tell they were not buying the standard double. On a
+   one-unit listing the property name was also the room's, so this was invisible.
+3. **`quote` did not apply the stay rules `create` does.** A suite takes two nights; the property
+   page's default window is built from the CHEAPEST room's one-night minimum. So the suite's link
+   was born asking for a stay the suite forbids, `quote` priced it anyway, and the guest entered
+   their name, phone and card details before `create` answered **UNIT_MIN_NIGHTS**. Both halves
+   fixed: the quote enforces the rule, and a unit's link extends the window to the minimum it
+   states on its own row. Held by `booking-stay-rules.integration.test.ts`, which asserts the two
+   paths AGREE rather than naming one refusal.
+
+**And the testbed reset was broken.** `booking_internal_notes` is append-only, and the reset must
+delete the bookings those notes hang off — so **`db:testbed` could not re-run on any machine where
+a fixture booking had ever been given a staff note**, which is every machine the suites have run on.
+The same trigger-lowering `ledger_entries` and `wallet_transactions` already get. This one matters
+for Stage 6: an overnight runner with no reproducible fixture has nothing to run against.
+
+`e2e/multi-unit-hotel.spec.ts` walks the shape on every run — four choices not thirteen rows, each
+with its own terms, the chosen room reaching checkout at its own price for a stay it accepts, and
+the moderator reviewing all thirteen physical rooms.
+
 #### FIXED — SAFRA's own revenue figure counted money it had given back
 
 The treasury screen told a super admin that **2,914,246,440 SYP** was outstanding and collectable.

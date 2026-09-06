@@ -215,7 +215,8 @@
     "unitNightsMax": "أقصى مدة {count, plural, zero {لا ليالٍ} one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}}",
     "unitAvailable": "متاحة للتواريخ المختارة",
     "unitCheapest": "الأقل سعراً",
-    "unitAmenitiesNone": "لا مرافق خاصة بهذه الوحدة."
+    "unitAmenitiesNone": "لا مرافق خاصة بهذه الوحدة.",
+    "unitsLeft": "{count, plural, zero {لا غرف متبقية} one {غرفة واحدة متبقية} two {غرفتان متبقيتان} few {# غرف متبقية} many {# غرفة متبقية} other {# غرفة متبقية}}"
   },
   "city": {
     "availableStays": "الإقامات المتاحة في {city}",

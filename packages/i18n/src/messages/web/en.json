@@ -215,7 +215,8 @@
     "unitNightsMax": "Maximum {count, plural, one {# night} other {# nights}}",
     "unitAvailable": "Available for your dates",
     "unitCheapest": "Lowest price",
-    "unitAmenitiesNone": "No facilities specific to this unit."
+    "unitAmenitiesNone": "No facilities specific to this unit.",
+    "unitsLeft": "{count, plural, one {# room left} other {# rooms left}}"
   },
   "city": {
     "availableStays": "Available stays in {city}",

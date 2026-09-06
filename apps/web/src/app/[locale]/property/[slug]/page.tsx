@@ -414,6 +414,7 @@ export default async function PropertyPage({
               nightsMax: (count) => t('unitNightsMax', { count }),
               available: t('unitAvailable'),
               cheapest: t('unitCheapest'),
+              left: (count) => t('unitsLeft', { count }),
               amenitiesLabel: t('unitAmenitiesLabel'),
               amenitiesNone: t('unitAmenitiesNone'),
               cancellation: t('cancellationPolicy'),

@@ -157,6 +157,23 @@ export default async function CheckoutPage({
   const name = localisedText(property.name, locale);
   const cityName = localisedName(property.city, locale);
 
+  /*
+    WHICH ROOM, on the panel where the money is agreed (Bashar, 2026-09-06).
+
+    The summary named the property and the city and never the unit. On a one-room listing that was
+    merely terse; on a thirteen-room hotel it is the whole question — a guest who chose «جناح
+    تنفيذي» saw «فندق أمية الكبير · دمشق» and a price, with nothing on the page confirming they were
+    not buying the standard double. The right room WAS being quoted; it simply was not named.
+
+    Invisible until the testbed grew a realistic hotel, because every fixture had one unit and the
+    property name was therefore also the room's.
+
+    Falls back to nothing rather than to a guess: an id that matches no unit is a bad link, and the
+    quote above has already refused it.
+  */
+  const chosenUnit = property.units.find((one) => one.id === unitId);
+  const unitName = chosenUnit ? localisedText(chosenUnit.name, locale) : null;
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <h1 className="font-display text-3xl font-bold text-gold">{t('title')}</h1>
@@ -199,6 +216,9 @@ export default async function CheckoutPage({
               <p className="mt-1 text-sm text-faint">
                 {name} · {cityName}
               </p>
+              {unitName ? (
+                <p className="text-sm font-semibold text-text2">{unitName}</p>
+              ) : null}
               <p className="text-sm text-faint">
                 <DateRange from={checkIn} to={checkOut} locale={locale} /> ·{' '}
                 {tp('totalFor', { nights: priced.nights })}

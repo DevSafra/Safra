@@ -215,7 +215,8 @@
     "unitNightsMax": "Höchstens {count, plural, one {# Nacht} other {# Nächte}}",
     "unitAvailable": "Für Ihre Daten verfügbar",
     "unitCheapest": "Niedrigster Preis",
-    "unitAmenitiesNone": "Keine Ausstattung speziell für diese Einheit."
+    "unitAmenitiesNone": "Keine Ausstattung speziell für diese Einheit.",
+    "unitsLeft": "{count, plural, one {# Zimmer übrig} other {# Zimmer übrig}}"
   },
   "city": {
     "availableStays": "Verfügbare Unterkünfte in {city}",
