@@ -434,6 +434,38 @@ initial controlled launch, explicitly _"rather than introducing unrelated featur
 is what the pass has found and what was done about each. **Fixed** items shipped as part of the
 reconciliation; **open** items are reported for a decision and are NOT closed.
 
+#### FIXED — no customer had ever received a booking confirmation, and the table said they all had
+
+**The most serious finding of this review.** Driving a booking to confirmation and then looking in
+the inbox — rather than at the code — turned up two defects that compound into one silent failure.
+
+1. **The voucher Buffer did not survive the queue.** A job's data is stored as JSON, and
+   `JSON.stringify(Buffer)` yields `{ type: 'Buffer', data: [ … ] }`. So the PDF that §6.5 attaches
+   to «تأكيد حجزك» reached the mailer as an ordinary object and every send failed with
+   `The "chunk" argument must be of type string or an instance of Buffer`. Reproduced on demand in
+   the worker log on 2026-09-06.
+2. **`MailService.send` swallowed the error.** It logged and returned normally, so
+   `NotificationService.deliver` marked the row `sent` on the next line — one attempt, no failure
+   reason. Nothing retried it: `MailProcessor`'s own note says throwing is how a job asks BullMQ to
+   try again, and nothing threw. The re-drive could not find it either, because a lost notification
+   is found by being `queued` or `failed` and this was neither.
+
+Together: **zero confirmation emails across 500 stored messages**, while every booking's record
+claimed delivery. §6.1's whole promise is that SAFRA confirms within two hours, and the message
+that tells the customer had never once been sent. No log anybody reads, no failed row, no alert.
+
+Fixed at both ends — `send` rethrows, and the queue boundary revives the Buffers it serialised.
+Verified by driving the journey: the confirmation now arrives carrying `BKG-….pdf`, 124 KB of real
+PDF.
+
+**And it named the hotel, not the room.** Same gap as the invoice: on a thirteen-room hotel, «تأكيد
+حجزك» said only which property. The mail's own attached voucher named the room, so the message and
+its attachment disagreed. The unit is in the body now, in all three locales.
+
+`e2e/booking-confirmation-journey.spec.ts` drives the whole chain on every run — guest chooses a
+room, finance confirms the transfer, the partner accepts, the confirmation arrives naming that room,
+and the voucher rides with it.
+
 #### OPEN — the media bucket holds no property photographs at all, and 13 tests were passing on it
 
 **Every `property_images.file_key` 404s.** Checked on 2026-09-06 against the running object store —
