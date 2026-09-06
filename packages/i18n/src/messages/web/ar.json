@@ -234,6 +234,10 @@
     "summaryEmpty": "لم تختر غرفة بعد. اختر واحدة من القائمة لترى التفاصيل والمجموع هنا.",
     "unitChosen": "مختارة",
     "summaryRoomLine": "الغرفة × {nights, plural, zero {لا ليالٍ} one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}}",
+    "summaryRooms": "عدد الغرف",
+    "summaryRoomsLine": "{rooms, plural, one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}} × {nights, plural, one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}}",
+    "summaryRoomsAll": "اخترت كل الغرف المتاحة من هذا النوع.",
+    "unitsCount": "{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}}",
     "summaryFee": "رسوم سفرة"
   },
   "city": {

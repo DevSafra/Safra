@@ -32,6 +32,7 @@ export function CheckoutForm({
   countries,
   locale,
   unitId,
+  rooms,
   checkIn,
   checkOut,
   adults,
@@ -51,6 +52,7 @@ export function CheckoutForm({
   readonly countries: readonly DialOption[];
   locale: Locale;
   unitId: string;
+  rooms: number;
   checkIn: string;
   checkOut: string;
   adults: number;
@@ -124,6 +126,7 @@ export function CheckoutForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           unitId,
+          rooms,
           checkIn,
           checkOut,
           adults,

@@ -76,6 +76,14 @@ export default async function CheckoutPage({
   */
   const children = whole(first(query['children']), 0, 20);
   const infants = whole(first(query['infants']), 0, 10);
+  /*
+    How many rooms, clamped to the contract's own ceiling. The real limit is what the property has
+    free, which only the API can know — it re-reads availability inside the transaction that takes
+    the inventory, so a hand-typed `?rooms=9` is priced here and refused there with a sentence
+    naming how many are left, rather than being quietly reduced to something nobody asked for.
+  */
+  /* `whole` floors at zero, which is right for children and wrong here — a stay is at least one room. */
+  const rooms = Math.max(1, whole(first(query['rooms']), 1, 10));
 
   // Missing parameters mean the customer arrived here by a broken link rather than
   // through a property page. Say so plainly instead of rendering an empty form.
@@ -107,7 +115,7 @@ export default async function CheckoutPage({
    * on the other, so awaiting them in sequence would add latency for nothing (§3).
    */
   const [priced, methods, session, settings] = await Promise.all([
-    quote({ unitId, checkIn, checkOut }),
+    quote({ unitId, checkIn, checkOut, rooms }),
     availablePaymentMethods(property.city.countryCode),
     getSession(),
     getPublicSettings(),
@@ -190,6 +198,7 @@ export default async function CheckoutPage({
             countries={dialOptions(locale)}
             locale={locale}
             unitId={unitId}
+            rooms={rooms}
             checkIn={checkIn}
             checkOut={checkOut}
             adults={adults}
@@ -223,6 +232,20 @@ export default async function CheckoutPage({
                 <DateRange from={checkIn} to={checkOut} locale={locale} /> ·{' '}
                 {tp('totalFor', { nights: priced.nights })}
               </p>
+              {/*
+                How many rooms, from the QUOTE rather than from the query string.
+
+                The last screen before somebody pays must confirm what they are paying for, and the
+                room count is now part of that — a stay priced for three rooms and described as one
+                is the same defect «عدد الضيوف» was, one field along. Reading it back from the
+                priced answer means the number shown is the number charged, even if the link was
+                edited between the property page and here.
+              */}
+              {priced.rooms > 1 ? (
+                <p className="text-sm text-faint">
+                  {tp('summaryRooms')}: {tp('unitsCount', { count: priced.rooms })}
+                </p>
+              ) : null}
               {/*
                 §6.3 step 3 names EIGHT things this panel must show, and «عدد الضيوف» was the one it
                 did not. The count was read off the query string and submitted, never rendered — so
@@ -331,6 +354,7 @@ export default async function CheckoutPage({
               <CouponField
                 locale={locale}
                 unitId={unitId}
+                rooms={rooms}
                 checkIn={checkIn}
                 checkOut={checkOut}
                 currencyCode={priced.currencyCode}

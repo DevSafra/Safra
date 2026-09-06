@@ -1,6 +1,10 @@
 'use client';
 
-import { useBookingSelection, type ChosenRoom } from '@/components/booking-selection';
+import {
+  useBookingSelection,
+  type ChosenRoom,
+  type RoomPrice,
+} from '@/components/booking-selection';
 
 /**
  * One room type, prepared by the server.
@@ -41,6 +45,9 @@ export interface RoomView {
   readonly maxGuests: number;
   readonly minNights: number;
   readonly capacityText: string;
+  /** One entry per bookable quantity, priced by the server. See `RoomPrice`. */
+  readonly prices: readonly RoomPrice[];
+  readonly maxRooms: number;
 }
 
 /**
@@ -201,10 +208,8 @@ function toChosen(room: RoomView): ChosenRoom {
     minNights: room.minNights,
     capacityText: room.capacityText,
     amenityNames: room.amenityNames,
-    roomLineLabel: room.roomLineLabel,
-    roomLineAmount: room.roomLineAmount,
-    feeAmount: room.feeAmount,
-    total: room.totalText,
+    prices: room.prices,
+    maxRooms: room.maxRooms,
     checkIn: room.checkIn,
     checkOut: room.checkOut,
     nightsText: room.nightsText,

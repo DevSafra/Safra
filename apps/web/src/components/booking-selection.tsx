@@ -2,6 +2,32 @@
 
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 
+/**
+ * One quantity's worth of money, pre-formatted.
+ *
+ * Every figure a guest reads is currency-converted and ICU-pluralised, and both of those need the
+ * server. So rather than shipping a formatter to the browser to multiply a total by a room count,
+ * the server prices EVERY quantity the guest could pick — at most ten, and usually two or three —
+ * and the stepper indexes into them. Nothing is computed client-side, so nothing can round
+ * differently from what checkout will charge.
+ */
+export interface RoomPrice {
+  readonly roomLineLabel: string;
+  readonly roomLineAmount: string;
+  readonly feeAmount: string;
+  readonly total: string;
+  /**
+   * The same total as a plain number, for anything READING the card rather than looking at it.
+   *
+   * The rendered figure is Arabic-Indic digits inside a currency format, and parsing that back is
+   * how an assertion comes to agree with a screen that is wrong — the reasoning `data-figure-value`
+   * records on the treasury tiles, which this follows.
+   */
+  readonly totalValue: number;
+  /** «حتى ٨ ضيوف» across the whole booking — two rooms sleeping four each sleep eight. */
+  readonly capacityText: string;
+}
+
 /** What the guest has chosen, and everything the summary needs to describe it. */
 export interface ChosenRoom {
   readonly unitId: string;
@@ -22,10 +48,9 @@ export interface ChosenRoom {
    * one place a reader checks the arithmetic, so it shows the room, the fee and the total as three
    * lines that reconcile.
    */
-  readonly roomLineLabel: string;
-  readonly roomLineAmount: string;
-  readonly feeAmount: string;
-  readonly total: string;
+  readonly prices: readonly RoomPrice[];
+  /** How many of this type are free for these nights — the ceiling on the stepper. */
+  readonly maxRooms: number;
   readonly checkIn: string;
   readonly checkOut: string;
   readonly nightsText: string;
@@ -34,7 +59,10 @@ export interface ChosenRoom {
 
 interface Selection {
   readonly chosen: ChosenRoom | null;
+  /** How many rooms of the chosen type, always between 1 and `chosen.maxRooms`. */
+  readonly rooms: number;
   readonly choose: (room: ChosenRoom) => void;
+  readonly setRooms: (next: number) => void;
   readonly clear: () => void;
 }
 
@@ -60,10 +88,33 @@ const SelectionContext = createContext<Selection | null>(null);
  */
 export function BookingSelectionProvider({ children }: { readonly children: ReactNode }) {
   const [chosen, setChosen] = useState<ChosenRoom | null>(null);
+  const [rooms, setRoomsRaw] = useState(1);
 
   const value = useMemo<Selection>(
-    () => ({ chosen, choose: setChosen, clear: () => setChosen(null) }),
-    [chosen],
+    () => ({
+      chosen,
+      rooms,
+      /*
+        Choosing a room RESETS the quantity.
+
+        A guest who took three of a standard room and then switched to the suite has not asked for
+        three suites — and the suite may not have three. Carrying the number across would either
+        quote a stay they did not ask for or exceed what the hotel has, and both are worse than
+        starting the new choice at one.
+      */
+      choose: (room: ChosenRoom) => {
+        setChosen(room);
+        setRoomsRaw(1);
+      },
+      /* Clamped here rather than at the control, so no caller can put the card out of range. */
+      setRooms: (next: number) =>
+        setRoomsRaw(Math.min(Math.max(1, next), chosen?.maxRooms ?? 1)),
+      clear: () => {
+        setChosen(null);
+        setRoomsRaw(1);
+      },
+    }),
+    [chosen, rooms],
   );
 
   return <SelectionContext.Provider value={value}>{children}</SelectionContext.Provider>;

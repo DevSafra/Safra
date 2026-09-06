@@ -30,6 +30,7 @@ import { useCoupon } from './coupon-context';
 export function CouponField({
   locale,
   unitId,
+  rooms,
   checkIn,
   checkOut,
   currencyCode,
@@ -37,6 +38,7 @@ export function CouponField({
 }: {
   readonly locale: 'ar' | 'en' | 'de';
   readonly unitId: string;
+  readonly rooms: number;
   readonly checkIn: string;
   readonly checkOut: string;
   readonly currencyCode: string;
@@ -66,7 +68,7 @@ export function CouponField({
       const response = await fetch(`/${locale}/api/coupon-preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.trim(), unitId, checkIn, checkOut }),
+        body: JSON.stringify({ code: code.trim(), unitId, rooms, checkIn, checkOut }),
       });
 
       const body: unknown = await response.json().catch(() => null);

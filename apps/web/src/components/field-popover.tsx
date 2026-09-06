@@ -135,6 +135,7 @@ export function Stepper({
   onChange,
   increase,
   decrease,
+  tone = 'sky',
 }: {
   label: string;
   value: number;
@@ -144,6 +145,14 @@ export function Stepper({
   /** A `{field}` template from the catalogue, filled here rather than in twelve call sites. */
   increase: string;
   decrease: string;
+  /**
+   * Which accent the control wears, because it now appears on two surfaces.
+   *
+   * The search popover is a neutral panel and sky is its accent; the booking card is gold
+   * throughout. A page picks ONE accent and keeps it, so a blue stepper inside the gold summary
+   * reads as a control borrowed from somewhere else — which is exactly what it would have been.
+   */
+  tone?: 'sky' | 'gold';
 }) {
   return (
     <div className="flex items-center justify-between gap-6">
@@ -152,13 +161,10 @@ export function Stepper({
         <Step
           label={decrease.replace('{field}', label)}
           glyph="−"
+          tone={tone}
           disabled={value <= min}
           onClick={() => onChange(value - 1)}
         />
-        {/*
-          `tabular-nums` so the row does not shift by a pixel between «1» and «8», and a fixed
-          width so it does not shift between one digit and two.
-        */}
         {/*
           `tabular-nums` so the row does not shift by a pixel between «1» and «8», and a fixed
           width so it does not shift between one digit and two.
@@ -173,6 +179,7 @@ export function Stepper({
         <Step
           label={increase.replace('{field}', label)}
           glyph="+"
+          tone={tone}
           disabled={value >= max}
           onClick={() => onChange(value + 1)}
         />
@@ -184,21 +191,39 @@ export function Stepper({
 function Step({
   label,
   glyph,
+  tone,
   disabled,
   onClick,
 }: {
   label: string;
   glyph: string;
+  tone: 'sky' | 'gold';
   disabled: boolean;
   onClick: () => void;
 }) {
+  /*
+    Written as whole class strings rather than assembled from fragments, because Tailwind scans the
+    source for literals — a `text-${tone}` produces a class that exists nowhere in the stylesheet
+    and the control renders unstyled.
+  */
+  const accent =
+    tone === 'gold'
+      ? 'text-gold not-disabled:hover:border-[rgba(var(--goldA),0.55)] not-disabled:hover:bg-[rgba(var(--goldA),0.08)]'
+      : 'text-sky not-disabled:hover:border-sky';
+
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
-      className="grid size-8 cursor-pointer place-items-center rounded-lg border border-line text-base text-sky transition-[border-color,color] duration-200 ease-out-strong not-disabled:hover:border-sky disabled:cursor-not-allowed disabled:border-line/60 disabled:text-faint"
+      /*
+        The disabled state was measured, not assumed: it used to come out rgb(62,101,150) against
+        an enabled rgb(46,102,168) — two blues nobody could tell apart, so a stepper at its ceiling
+        looked exactly like one with room to move. `opacity` on the whole button is what makes the
+        difference unmissable, and it cannot be beaten by a colour utility further down the cascade.
+      */
+      className={`grid size-8 cursor-pointer place-items-center rounded-lg border border-line text-base transition-[border-color,color,background-color,opacity] duration-200 ease-out-strong disabled:cursor-not-allowed disabled:border-line/50 disabled:opacity-35 active:scale-95 ${accent}`}
     >
       {/* A mathematical sign, not a word: no letters, so `no-hardcoded-text` does not apply. */}
       <span aria-hidden>{glyph}</span>

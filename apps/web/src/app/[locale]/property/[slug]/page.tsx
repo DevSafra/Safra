@@ -158,6 +158,8 @@ export default async function PropertyPage({
   const ts = await getTranslations('starRating');
   const tc = await getTranslations('city');
   const tcal = await getTranslations('calendar');
+  /* The stepper's «زيادة {field}» / «إنقاص {field}», shared with the search form's steppers. */
+  const tstep = await getTranslations('search');
 
   const name = localisedText(property.name, locale);
   const description = localisedText(property.description, locale);
@@ -258,10 +260,52 @@ export default async function PropertyPage({
     const shown = (amount: string) =>
       convertForDisplay(amount, unit.currencyCode, locale, target, rates).text;
 
+    /* The same conversion as a number rather than a sentence — see `RoomPrice.totalValue`. */
+    const value = (amount: string) =>
+      Number(
+        convertForDisplay(amount, unit.currencyCode, 'en', target, rates).text.replace(
+          /[^\d.]/g,
+          '',
+        ),
+      );
+
     /* The room alone, the fee alone, and their sum — three figures that reconcile on screen. */
     const roomOnly = multiplyMoney(unit.basePrice, unit.currencyCode, nights);
     const withFee = priceWithCustomerFee(roomOnly, unit.currencyCode, property.fees);
     const feeOnly = subtractMoney(withFee, roomOnly, unit.currencyCode);
+
+    /*
+      Every quantity the guest could choose, priced here.
+
+      The card's stepper indexes into this rather than multiplying anything. Money is converted to
+      the reader's currency and counts are ICU plurals — Arabic has six forms — and both need the
+      server, so a client-side multiplication would either ship a formatter to the browser or print
+      a figure rounded differently from the one checkout charges. There are at most `free.length`
+      of these, and a hotel floor is a handful of rooms.
+
+      The FEE is applied to the multiplied base rather than multiplied itself, which is what the
+      API does — `customerFeeMinor` scales a PERCENT fee with the base and adds a FLAT one once per
+      booking. Charging a flat fee per room here would have printed a total the charge does not
+      match, and a card that disagrees with the payment is worse than a card with no breakdown.
+    */
+    const prices = Array.from({ length: Math.max(1, free.length) }, (_, i) => {
+      const count = i + 1;
+      const roomsOnly = multiplyMoney(unit.basePrice, unit.currencyCode, nights * count);
+      const roomsWithFee = priceWithCustomerFee(
+        roomsOnly,
+        unit.currencyCode,
+        property.fees,
+      );
+
+      return {
+        roomLineLabel: t('summaryRoomsLine', { rooms: count, nights }),
+        roomLineAmount: shown(roomsOnly),
+        feeAmount: shown(subtractMoney(roomsWithFee, roomsOnly, unit.currencyCode)),
+        total: shown(roomsWithFee),
+        totalValue: value(roomsWithFee),
+        capacityText: t('guestsUpTo', { count: unit.maxGuests * count }),
+      };
+    });
 
     return {
       unitId: unit.id,
@@ -285,6 +329,8 @@ export default async function PropertyPage({
       perNightText: shown(
         priceWithCustomerFee(unit.basePrice, unit.currencyCode, property.fees),
       ),
+      prices,
+      maxRooms: Math.max(1, free.length),
       roomLineLabel: t('summaryRoomLine', { nights }),
       roomLineAmount: shown(roomOnly),
       feeAmount: shown(feeOnly),
@@ -755,6 +801,15 @@ export default async function PropertyPage({
                       remove: t('summaryRemove'),
                       /* The PARTY, resolved once — the card cannot be handed a formatter. */
                       guestsCount: t('summaryGuests', { count: adults + children }),
+                      rooms: t('summaryRooms'),
+                      roomsAll: t('summaryRoomsAll'),
+                      /*
+                        The same two templates the search form's steppers use, not a second pair.
+                        It is one control with one pair of words; a copy per screen is how four
+                        galleries came to behave four different ways.
+                      */
+                      increase: tstep('increase'),
+                      decrease: tstep('decrease'),
                       fee: t('summaryFee'),
                       total: t('summaryTotal'),
                       policy: t('summaryPolicy'),

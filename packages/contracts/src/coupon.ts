@@ -151,6 +151,8 @@ export const couponPreviewSchema = z
     unitId: z.string().uuid(ERROR.VALIDATION_REQUIRED),
     checkIn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, ERROR.VALIDATION_DATE_FORMAT),
     checkOut: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, ERROR.VALIDATION_DATE_FORMAT),
+    /* Same ceiling as the booking it previews — see `bookingCreateSchema`. */
+    rooms: z.number().int().min(1).max(10).default(1),
   })
   .strict();
 

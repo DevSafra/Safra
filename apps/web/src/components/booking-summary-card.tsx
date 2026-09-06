@@ -3,6 +3,9 @@
 import Link from 'next/link';
 
 import { useBookingSelection } from '@/components/booking-selection';
+import { Stepper } from '@/components/field-popover';
+import { rangeArrow } from '@/lib/arrows';
+import type { Locale } from '@/i18n/routing';
 
 /**
  * The booking card, as a live summary of what the guest has chosen.
@@ -35,7 +38,7 @@ export function BookingSummaryCard({
   fromPrice,
   copy,
 }: {
-  readonly locale: string;
+  readonly locale: Locale;
   readonly propertySlug: string;
   readonly guests: { adults: number; children: number; infants: number };
   /** The «from» figure, shown only while nothing is chosen. */
@@ -56,6 +59,10 @@ export function BookingSummaryCard({
     change: string;
     remove: string;
     guestsCount: string;
+    rooms: string;
+    roomsAll: string;
+    increase: string;
+    decrease: string;
     fee: string;
     total: string;
     policy: string;
@@ -63,9 +70,16 @@ export function BookingSummaryCard({
     empty: string;
   };
 }) {
-  const { chosen, clear } = useBookingSelection();
+  const { chosen, rooms, setRooms, clear } = useBookingSelection();
 
-  if (!chosen) {
+  /*
+    The row for the quantity on screen. `?? prices[0]` is not a fallback that invents anything — the
+    array covers 1..maxRooms and `rooms` is clamped to it — it is what keeps this component total
+    rather than throwing on a state that should not exist.
+  */
+  const price = chosen?.prices[rooms - 1] ?? chosen?.prices[0];
+
+  if (!chosen || !price) {
     return (
       <>
         <p className="text-2xl font-bold text-gold">
@@ -127,14 +141,58 @@ export function BookingSummaryCard({
         What the ROOM sleeps, not the party — the party is on the line below with the nights.
         Both said «ضيفان» before, which reads as a rendering fault rather than two facts.
       */}
-      <p className="mt-1 text-[12.5px] text-muted">{chosen.capacityText}</p>
+      <p className="mt-1 text-[12.5px] text-muted">{price.capacityText}</p>
+
+      {/*
+        The quantity, offered only where there IS one to choose.
+
+        A villa is one of a kind and a stepper on it would be a control that cannot move — the
+        thing this review keeps finding, one door further in. Its ceiling is what the hotel has
+        free tonight, so the guest cannot ask for a fifth of four rooms and be refused at checkout
+        instead of here.
+      */}
+      {chosen.maxRooms > 1 ? (
+        <div
+          data-summary-rooms={rooms}
+          className="mt-3 rounded-lg border border-line2 px-3 py-2"
+        >
+          <Stepper
+            label={copy.rooms}
+            value={rooms}
+            min={1}
+            max={chosen.maxRooms}
+            onChange={setRooms}
+            increase={copy.increase}
+            decrease={copy.decrease}
+            tone="gold"
+          />
+          {/*
+            Said at the ceiling rather than left to a control that simply stops responding. A
+            disabled «+» tells a guest nothing about WHY, and «the hotel has no more» is the answer
+            they need in order to book two rooms here and the rest somewhere else.
+          */}
+          {rooms === chosen.maxRooms ? (
+            <p className="mt-1.5 text-[11.5px] leading-relaxed text-faint">
+              {copy.roomsAll}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="gold-rule my-3.5" />
 
       <dl className="grid gap-1.5 text-[12.5px]">
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-muted">{chosen.checkIn}</dt>
-          <dd className="text-muted">← {chosen.checkOut}</dd>
+          {/*
+            The arrow follows the READING direction, from `rangeArrow` — it was a hardcoded «←»,
+            which is right in Arabic and points from the departure back at the arrival in English
+            and German. Exactly the defect `DateRange` was extracted to stop happening again, and
+            it happened again here because this card wrote the glyph itself.
+          */}
+          <dd className="text-muted">
+            {rangeArrow(locale)} {chosen.checkOut}
+          </dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-faint">{chosen.nightsText}</dt>
@@ -152,19 +210,22 @@ export function BookingSummaryCard({
       */}
       <dl className="mt-3 grid gap-1.5 border-t border-line pt-3 text-[12.5px]">
         <div className="flex items-baseline justify-between gap-3">
-          <dt className="text-muted">{chosen.roomLineLabel}</dt>
-          <dd className="tabular-nums text-text">{chosen.roomLineAmount}</dd>
+          <dt className="text-muted">{price.roomLineLabel}</dt>
+          <dd className="tabular-nums text-text">{price.roomLineAmount}</dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
           <dt className="text-muted">{copy.fee}</dt>
-          <dd className="tabular-nums text-text">{chosen.feeAmount}</dd>
+          <dd className="tabular-nums text-text">{price.feeAmount}</dd>
         </div>
       </dl>
 
-      <div className="mt-3 flex items-baseline justify-between gap-3 rounded-lg border border-[rgba(var(--goldA),0.35)] bg-[rgba(var(--goldA),0.06)] px-3 py-2.5">
+      <div
+        data-summary-total={price.totalValue}
+        className="mt-3 flex items-baseline justify-between gap-3 rounded-lg border border-[rgba(var(--goldA),0.35)] bg-[rgba(var(--goldA),0.06)] px-3 py-2.5"
+      >
         <span className="text-[12.5px] font-bold text-text">{copy.total}</span>
         <span className="text-[17px] font-extrabold tabular-nums text-gold">
-          {chosen.total}
+          {price.total}
         </span>
       </div>
 
@@ -187,7 +248,7 @@ export function BookingSummaryCard({
         on cannot quote a different room or a different stay than the one they just agreed to.
       */}
       <Link
-        href={`/${locale}/checkout?property=${propertySlug}&unitId=${chosen.unitId}&checkIn=${chosen.checkIn}&checkOut=${chosen.checkOut}&adults=${Math.min(guests.adults, chosen.maxGuests)}&children=${guests.children}&infants=${guests.infants}`}
+        href={`/${locale}/checkout?property=${propertySlug}&unitId=${chosen.unitId}&rooms=${rooms}&checkIn=${chosen.checkIn}&checkOut=${chosen.checkOut}&adults=${Math.min(guests.adults, chosen.maxGuests * rooms)}&children=${guests.children}&infants=${guests.infants}`}
         className="mt-4 block rounded-lg btn-gold px-5 py-3 text-center font-semibold transition-opacity hover:opacity-90"
       >
         {copy.bookNow}

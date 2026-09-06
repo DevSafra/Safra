@@ -247,6 +247,12 @@ export class BookingCreationService {
     unitId: string;
     checkIn: string;
     checkOut: string;
+    /*
+      The quantity, because a PERCENTAGE coupon is worth more on three rooms than on one. Previewing
+      against a single room would show a discount smaller than the one the booking then applies —
+      two different numbers for the same code on two consecutive screens.
+    */
+    rooms?: number | undefined;
   }): Promise<CouponPreview> {
     const scope = await this.db.execute<{
       city_id: string;
@@ -270,6 +276,7 @@ export class BookingCreationService {
       unitId: input.unitId,
       checkIn: input.checkIn,
       checkOut: input.checkOut,
+      rooms: input.rooms,
     });
 
     const match = await this.coupons.preview(input.code, {
@@ -286,6 +293,7 @@ export class BookingCreationService {
       unitId: input.unitId,
       checkIn: input.checkIn,
       checkOut: input.checkOut,
+      rooms: input.rooms,
       discountAmount: match.discountAmount,
     });
 

@@ -234,6 +234,10 @@
     "summaryEmpty": "No room chosen yet. Pick one from the list to see its details and total here.",
     "unitChosen": "Selected",
     "summaryRoomLine": "Room × {nights, plural, one {# night} other {# nights}}",
+    "summaryRooms": "Rooms",
+    "summaryRoomsLine": "{rooms, plural, one {1 room} other {# rooms}} × {nights, plural, one {1 night} other {# nights}}",
+    "summaryRoomsAll": "That is every room of this type still free.",
+    "unitsCount": "{count, plural, one {1 room} other {# rooms}}",
     "summaryFee": "SAFRA fee"
   },
   "city": {

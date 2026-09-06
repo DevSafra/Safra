@@ -41,7 +41,16 @@ export function CheckoutTotal({
           </dd>
         </div>
       ) : null}
-      <div className="flex justify-between border-t border-line pt-2 text-base">
+      {/*
+        The figure as a NUMBER beside the sentence, for anything reading this rather than looking at
+        it. The rendered one is Arabic-Indic digits inside a currency format, and an assertion that
+        parses that back is one that can agree with a screen that is wrong — the same reasoning
+        `data-figure-value` records on the treasury tiles.
+      */}
+      <div
+        data-checkout-total={applied ? applied.totalAfter : total}
+        className="flex justify-between border-t border-line pt-2 text-base"
+      >
         <dt className="font-semibold text-text">{label}</dt>
         <dd className="font-semibold text-gold">
           {/*

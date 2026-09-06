@@ -234,6 +234,10 @@
     "summaryEmpty": "Noch kein Zimmer gewählt. Wählen Sie eines aus der Liste, um Details und Gesamtpreis hier zu sehen.",
     "unitChosen": "Ausgewählt",
     "summaryRoomLine": "Zimmer × {nights, plural, one {# Nacht} other {# Nächte}}",
+    "summaryRooms": "Zimmeranzahl",
+    "summaryRoomsLine": "{rooms, plural, one {1 Zimmer} other {# Zimmer}} × {nights, plural, one {1 Nacht} other {# Nächte}}",
+    "summaryRoomsAll": "Das sind alle noch freien Zimmer dieses Typs.",
+    "unitsCount": "{count, plural, one {1 Zimmer} other {# Zimmer}}",
     "summaryFee": "SAFRA-Gebühr"
   },
   "city": {
