@@ -42,7 +42,13 @@ test('the card answers what is about to be booked, and changes as the choice doe
 
   /* Immediately — no navigation, no reload. That is the whole requirement. */
   await expect(card, 'the room appears in the card').toContainText('جناح تنفيذي');
-  await expect(card, 'with the dates').toContainText('2027-06-10');
+  /*
+    The date as a PERSON reads it. The card printed «2027-06-10» — a machine's rendering, in the
+    last panel somebody reads before paying. The ISO form still travels, on the checkout link
+    asserted below, which is where a serial number belongs.
+  */
+  await expect(card, 'with the arrival, named').toContainText('10');
+  await expect(card, 'and the month as a word').toContainText(/حزيران|يونيو/);
   await expect(card, 'the nights').toContainText('ليلتان');
   await expect(card, 'its terms').toContainText('صارم');
   await expect(card, 'its facilities').toContainText('مطبخ');
@@ -52,10 +58,15 @@ test('the card answers what is about to be booked, and changes as the choice doe
     not the nightly figure doubled. 371.99, and the row it came from says 186.99 for one night.
   */
   await expect(card, 'the stay total is the stay, not a night').toContainText('371.99');
-  await expect(
-    suite,
-    'while the row keeps its fee-inclusive «from» rate, which is a different question',
-  ).toContainText('186.99');
+  /*
+    And the ROW says the same total, because the list prices whole stays.
+
+    It used to show «186.99» — one night — under a heading promising «الأسعار للمدة المختارة». The
+    two agreed only for one-night searches, so a two-night guest read 186.99 and paid 371.99. The
+    nightly rate is still there as the caption that explains the total.
+  */
+  await expect(suite, 'the row states the same stay total').toContainText('371.99');
+  await expect(suite, 'with the nightly rate explaining it').toContainText('185');
 
   // ── The button now names what it does ─────────────────────────────────────
   const book = card.getByRole('link', { name: 'احجز الآن' });

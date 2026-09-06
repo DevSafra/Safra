@@ -71,11 +71,15 @@ test('thirteen rooms read as four choices, each with its own terms', async ({ pa
   const suite = rows.filter({ hasText: 'جناح تنفيذي' });
 
   /*
-    186.99 — the suite's 185 with SAFRA's 1.99 fee already in it, which is how every price on the
-    customer side is stated. Asserting the bare base rate would have been asserting a figure no
-    guest is ever shown.
+    The STAY total for the dates asked for, which is what «الأسعار للمدة المختارة» above the list
+    promises — two nights of the suite at 185 plus SAFRA's 1.99 once. The row used to print the
+    one-night figure under that sentence, so a two-night guest compared 186.99 and paid 371.99.
+    Asserting the bare base rate would be asserting a figure no guest is ever shown.
   */
-  await expect(suite, 'the suite is priced as itself').toContainText('186.99');
+  await expect(suite, 'the suite is priced for the stay asked for').toContainText(
+    '371.99',
+  );
+  await expect(suite, 'and says the nightly rate it came from').toContainText('185');
   await expect(suite, 'and sleeps four').toContainText('4');
   await expect(suite, 'its own facilities').toContainText('مطبخ');
   await expect(suite, 'and its minimum stay').toContainText('ليلتان');

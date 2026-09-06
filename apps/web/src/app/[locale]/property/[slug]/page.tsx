@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { isLocale, routing, type Locale } from '@/i18n/routing';
+import { readableDate } from '@/lib/readable-date';
 import { SaveButton } from '@/components/save-button';
 import { ShareButton } from '@/components/share-button';
 import { PropertyGallery } from '@/components/property-gallery';
@@ -341,6 +342,11 @@ export default async function PropertyPage({
       perNightText: shown(
         priceWithCustomerFee(unit.basePrice, unit.currencyCode, property.fees),
       ),
+      /* How the headline total was reached — the nightly rate and the night count. */
+      stayCaption: t('unitStayCaption', {
+        rate: shown(unit.basePrice),
+        nights,
+      }),
       prices,
       maxRooms: Math.max(1, free.length),
       roomLineLabel: t('summaryRoomLine', { nights }),
@@ -349,6 +355,13 @@ export default async function PropertyPage({
       totalText: shown(withFee),
       checkIn: askedStayWindow.checkIn,
       checkOut: departure.toISOString().slice(0, 10),
+      /*
+        The same dates as words. «2026-10-05» in an Arabic booking summary is a machine's rendering
+        of a date, and the card is the last thing a guest reads before committing — the one place
+        the arrival should be a day of the week rather than a serial number.
+      */
+      checkInText: readableDate(askedStayWindow.checkIn, locale),
+      checkOutText: readableDate(departure.toISOString().slice(0, 10), locale),
       nights,
       nightsText: t('summaryNights', { count: nights }),
       maxGuests: unit.maxGuests,
@@ -563,6 +576,7 @@ export default async function PropertyPage({
                 cheapest: t('unitCheapest'),
                 soldOut: t('unitSoldOut'),
                 amenitiesLabel: t('unitAmenitiesLabel'),
+                stayTotalLabel: t('unitStayTotalLabel'),
                 amenitiesNone: t('unitAmenitiesNone'),
                 cancellation: t('cancellationPolicy'),
               }}
@@ -800,12 +814,15 @@ export default async function PropertyPage({
                     locale={locale}
                     propertySlug={property.slug}
                     guests={{ adults, children, infants }}
-                    fromPrice={nightly.text}
+                    /*
+                      The cheapest ROOM's stay total, taken from the same view model the list
+                      renders — not computed again here. Two derivations of one figure is how a
+                      card and the row it summarises come to disagree.
+                    */
+                    fromPrice={rooms[0]?.totalText ?? nightly.text}
                     copy={{
-                      perNightSuffix: t('perNight'),
-                      guestsUpToParty: t('guestsUpTo', {
-                        count: cheapest.maxGuests,
-                      }),
+                      fromLabel: t('summaryFromLabel'),
+                      fromCaption: rooms[0]?.stayCaption ?? '',
                       chooseRoom: t('chooseRoom'),
                       bookNow: t('bookNow'),
                       selected: t('summarySelected'),

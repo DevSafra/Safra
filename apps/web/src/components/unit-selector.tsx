@@ -33,6 +33,8 @@ export interface RoomView {
   readonly policyText: string;
   readonly amenityNames: readonly string[];
   readonly perNightText: string;
+  /** «$72 لليلة · ليلتان» — how the headline total was reached. */
+  readonly stayCaption: string;
   /** Three lines that add to the total — see `ChosenRoom`. */
   readonly roomLineLabel: string;
   readonly roomLineAmount: string;
@@ -40,6 +42,8 @@ export interface RoomView {
   readonly totalText: string;
   readonly checkIn: string;
   readonly checkOut: string;
+  readonly checkInText: string;
+  readonly checkOutText: string;
   readonly nights: number;
   readonly nightsText: string;
   readonly maxGuests: number;
@@ -82,6 +86,7 @@ export function UnitSelector({
     readonly amenitiesLabel: string;
     readonly amenitiesNone: string;
     readonly cancellation: string;
+    readonly stayTotalLabel: string;
   };
 }) {
   const { chosen, choose } = useBookingSelection();
@@ -138,32 +143,60 @@ export function UnitSelector({
                     {copy.cancellation}: {room.policyText}
                   </p>
 
-                  <div className="mt-3">
-                    <h4 className="text-[12px] font-semibold text-text2">
-                      {copy.amenitiesLabel}
-                    </h4>
-                    {room.amenityNames.length > 0 ? (
-                      <ul className="mt-1.5 flex flex-wrap gap-1.5">
-                        {room.amenityNames.map((name) => (
-                          <li
-                            key={name}
-                            className="rounded-lg border border-line2 px-2.5 py-1 text-[12.5px] text-text2"
-                          >
-                            {name}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="mt-1 text-[12.5px] text-faint">
-                        {copy.amenitiesNone}
-                      </p>
-                    )}
-                  </div>
+                  {/*
+                    Chips with no heading of their own.
+
+                    «مرافق هذه الوحدة» above two pills cost a whole line in every row and told a
+                    reader nothing they could not see — a kettle and a balcony announce themselves.
+                    The label survives as `aria-label`, so the list is still named for anybody who
+                    cannot see the shape of it.
+                  */}
+                  {room.amenityNames.length > 0 ? (
+                    <ul
+                      aria-label={copy.amenitiesLabel}
+                      className="mt-2.5 flex flex-wrap gap-1.5"
+                    >
+                      {room.amenityNames.map((name) => (
+                        <li
+                          key={name}
+                          className="rounded-lg border border-line2 px-2.5 py-1 text-[12.5px] text-text2"
+                        >
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2.5 text-[12.5px] text-faint">
+                      {copy.amenitiesNone}
+                    </p>
+                  )}
                 </div>
 
-                <div className="flex flex-col items-stretch gap-2 sm:w-44 sm:items-end">
-                  <p className="text-lg font-extrabold tabular-nums text-gold sm:text-end">
-                    {room.perNightText}
+                {/*
+                  The price column, divided from the description rather than boxed inside it.
+
+                  A bordered panel here would be a card inside a card. A single logical border does
+                  the same separating work, and it only appears from `sm` up — below that the row is
+                  one column and a divider across it would read as a horizontal rule.
+                */}
+                <div className="flex flex-col items-stretch gap-1 border-line2 sm:w-48 sm:items-end sm:border-s sm:ps-5">
+                  {/*
+                    THE STAY TOTAL, not the nightly rate.
+
+                    «الأسعار للمدة المختارة» sits at the top of this list promising exactly that, and
+                    the figure under it was per-night: a two-night search showed «$73.99» on a room
+                    that costs $145.99. They agreed only for one-night stays, which is why the page
+                    looked right. The nightly rate stays underneath, because it is how a guest
+                    compares rooms — it just is not the number the sentence above promised.
+                  */}
+                  <span className="text-[11px] text-faint sm:text-end">
+                    {copy.stayTotalLabel}
+                  </span>
+                  <p className="text-xl font-extrabold tabular-nums text-gold sm:text-end">
+                    {room.totalText}
+                  </p>
+                  <p className="text-[11.5px] text-muted sm:text-end">
+                    {room.stayCaption}
                   </p>
 
                   {room.soldOut ? (
@@ -172,18 +205,26 @@ export function UnitSelector({
                       the suite does not learn the hotel has one — but nothing here pretends it can
                       be booked, which is what a link to a taken room did.
                     */
-                    <p className="text-center text-sm font-semibold text-warn sm:text-end">
+                    <p className="mt-2 text-center text-sm font-semibold text-warn sm:text-end">
                       {copy.soldOut}
                     </p>
                   ) : (
+                    /*
+                      SECONDARY, deliberately.
+
+                      Four filled gold buttons down one column gave the page four primary actions
+                      and no hierarchy — and none of them is the primary action anyway: this one
+                      CHOOSES a room, and «احجز الآن» in the summary commits to it. One filled
+                      button on the page, and it is the one that spends money.
+                    */
                     <button
                       type="button"
                       aria-pressed={isChosen}
                       onClick={() => choose(toChosen(room))}
-                      className={`block w-full cursor-pointer rounded-lg px-4 py-2.5 text-center text-sm font-semibold transition-opacity hover:opacity-90 ${
+                      className={`mt-2 block w-full cursor-pointer rounded-lg border px-4 py-2.5 text-center text-sm font-semibold transition-colors duration-200 ease-out-strong active:scale-[0.98] ${
                         isChosen
-                          ? 'border border-gold bg-[rgba(var(--goldA),0.15)] text-gold'
-                          : 'btn-gold'
+                          ? 'border-gold bg-[rgba(var(--goldA),0.15)] text-gold'
+                          : 'border-[rgba(var(--goldA),0.45)] text-gold hover:bg-[rgba(var(--goldA),0.08)]'
                       }`}
                     >
                       {isChosen ? copy.chosen : copy.book}
@@ -212,6 +253,8 @@ function toChosen(room: RoomView): ChosenRoom {
     maxRooms: room.maxRooms,
     checkIn: room.checkIn,
     checkOut: room.checkOut,
+    checkInText: room.checkInText,
+    checkOutText: room.checkOutText,
     nightsText: room.nightsText,
     policyText: room.policyText,
   };
