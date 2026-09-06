@@ -434,6 +434,33 @@ initial controlled launch, explicitly _"rather than introducing unrelated featur
 is what the pass has found and what was done about each. **Fixed** items shipped as part of the
 reconciliation; **open** items are reported for a decision and are NOT closed.
 
+#### OPEN — the media bucket holds no property photographs at all, and 13 tests were passing on it
+
+**Every `property_images.file_key` 404s.** Checked on 2026-09-06 against the running object store —
+the fixture keys, the load-test keys, the raw key and every rendered variant width. All 607 rows are
+orphaned metadata: the rows exist, the objects do not, and **every property photograph on the
+platform is a broken image**.
+
+The part that matters more than the broken images: **`image-preview.spec.ts` was reporting passes
+against pictures that had never loaded.** Thirteen of its fourteen tests measure geometry — fill
+ratio, panning limits, stepping between pictures — and `naturalWidth` is 0 on an image that 404s,
+so they were dividing by nothing and asserting on a box that was never painted. A test suite
+reporting coverage it does not have is the failure mode this review keeps finding, and here it was
+in the one place nobody would look, because it was green.
+
+They now wait for a decode and **skip with a reason naming the bucket** when there is none. Green
+went from "13 passed" to "13 skipped, 1 passed", which is the honest number.
+
+**What unblocks it:** fixture media has to be uploaded, not just referenced. `bootstrap-media`
+creates the bucket and sets its policy; nothing puts pictures in it, and no seed does either — the
+only writer is a partner uploading through the portal. Until that exists, no screen showing a
+photograph can be verified, which covers the gallery, the property card, the search results, the
+partner's image manager and every review with a picture.
+
+**Related and already known:** `safra-media-needs-a-public-bucket` records the 403 case, where the
+objects existed and the policy hid them. This is the other half — the policy is right now and there
+is nothing behind it.
+
 #### FIXED — the testbed reset destroyed the photographs and renumbered every reference
 
 Both found on 2026-09-06 by reseeding, which is exactly what an unattended runner does to get a

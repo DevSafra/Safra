@@ -217,12 +217,22 @@ test.describe('the partner dashboard', () => {
     expect(names.length).toBeGreaterThan(0);
 
     /*
-      Every listing belongs to the partner who signed in. Asserted on the NAME because the testbed
-      gives each partner a distinct one — a count alone would pass if the API returned three of
-      somebody else's.
+      Every listing belongs to the partner who signed in — asserted as the ABSENCE of anyone else's.
+
+      This used to require every name to contain «قصر الشرق», which was true only while that partner
+      owned exactly one family of listings. Adding a hotel to the same partner on 2026-09-06 broke
+      it, and the failure said nothing about scope: the listing WAS theirs.
+      
+      The invariant is that no OTHER partner's listing appears, so that is what this checks, against
+      the distinctive names the seeder gives the others. It survives a new fixture listing and still
+      fails the thing it exists to catch — an API that returned somebody else's inventory.
     */
+    const otherPartners = ['شاليهات الساحل', 'بيت دمشقي تراثي', 'نُزل الحلبي'];
+
     for (const name of names) {
-      expect(name).toContain('قصر الشرق');
+      for (const other of otherPartners) {
+        expect(name, `${other} is not this partner's`).not.toContain(other);
+      }
     }
 
     // The §7.2 card: a price, the trait chips and a status pill, not just a title.

@@ -648,8 +648,16 @@ export const ar = {
     lockedTitle: 'هذا العقار منشور، ولا يمكن تعديل بياناته الأساسية',
     lockedWhy:
       'راجعت سفرة العنوان والوثائق والصور معًا قبل النشر. تغيير العنوان أو المدينة بعد ذلك يُبطل تلك المراجعة بينما تبقى علامة التوثيق ظاهرة.',
+    /*
+      Names FACILITIES too, since 2026-09-06 (Bashar).
+
+      A published listing may now change what the building offers — a pool that closes for the
+      winter is an ongoing fact, not the verified address §8.1 freezes. The section sits on this
+      same screen, so a panel saying «لا يمكن تعديل بياناته الأساسية» while an editable facilities
+      form sat underneath was telling the partner two different things at once.
+    */
     lockedWhatYouCan:
-      'ما زال بإمكانك تعديل الأسعار والإتاحة من التقويم، وإدارة الصور، في أي وقت.',
+      'ما زال بإمكانك تعديل الأسعار والإتاحة من التقويم، وإدارة الصور، وتحديث مرافق العقار، في أي وقت.',
     lockedContact: 'لتغيير العنوان أو المدينة، راسل سفرة من صفحة الرسائل.',
     goCalendar: 'فتح التقويم',
     goImages: 'إدارة الصور',

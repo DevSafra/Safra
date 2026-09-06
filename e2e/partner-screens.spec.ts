@@ -125,7 +125,11 @@ test.describe('تعديل العقار', () => {
     const edited = `${original} — تعديل اختباري`;
 
     await address.fill(edited);
-    await page.getByRole('button', { name: t.editProperty.save }).click();
+    /* The STRUCTURAL form's save; the facilities section below has one of its own. */
+    await page
+      .getByRole('button', { name: t.editProperty.save })
+      .and(page.locator(':not([data-property-amenities-save])'))
+      .click();
 
     await expect(banner(page)).toContainText(t.editProperty.saved);
 
@@ -153,9 +157,22 @@ test.describe('تعديل العقار', () => {
     /* The REASON, not just the refusal — «لا يمكن» alone reads as a fault. */
     await expect(page.getByText(t.editProperty.lockedWhy)).toBeVisible();
 
-    /* No form at all: not a disabled one, which would still invite the work. */
+    /*
+      No STRUCTURAL form: not a disabled one, which would still invite the work.
+
+      Scoped to the save that belongs to that form, because since 2026-09-06 the screen carries a
+      second one. A published listing may edit its FACILITIES — a pool closing is an ongoing fact,
+      not the verified address §8.1 freezes — and that section has its own button under its own
+      marker. Asserting on the label alone made the two indistinguishable and failed on a screen
+      that was behaving correctly.
+    */
     await expect(page.getByLabel(t.editProperty.address)).toHaveCount(0);
-    await expect(page.getByRole('button', { name: t.editProperty.save })).toHaveCount(0);
+    await expect(
+      page
+        .getByRole('button', { name: t.editProperty.save })
+        .and(page.locator(':not([data-property-amenities-save])')),
+      'the structural form offers no save',
+    ).toHaveCount(0);
 
     /* And it names what IS still editable, so the screen is not a dead end. */
     await expect(
@@ -423,13 +440,20 @@ test.describe('الوحدات', () => {
     await page.goto(`${BASE}/properties/${reference}/edit`);
 
     const unit = page.locator('[data-unit]').first();
+    /*
+      The ON-SALE toggle specifically. A unit now carries twelve amenity checkboxes as well, so
+      «the checkbox» matches thirteen things — which this asked for and Playwright refused. The
+      failure had been there since the amenity picker shipped and nobody saw it, because the
+      partner project was silently not running.
+    */
+    const onSale = unit.locator('[data-unit-active]');
 
-    await unit.getByRole('checkbox').uncheck();
+    await onSale.uncheck();
 
     await expect(page.getByText(t.editProperty.unitInactiveNote)).toBeVisible();
 
     /* Not saved — the warning appears on intent, before the decision is committed. */
-    await unit.getByRole('checkbox').check();
+    await onSale.check();
   });
 });
 

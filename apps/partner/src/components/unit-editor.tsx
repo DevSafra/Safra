@@ -338,6 +338,12 @@ function UnitRow({
       <label className="flex items-center gap-2">
         <input
           type="checkbox"
+          /*
+            Its own handle. The amenity picker above puts twelve more checkboxes inside this unit,
+            so «the unit's checkbox» stopped identifying anything the day that shipped — and the
+            spec that says so could not tell them apart.
+          */
+          data-unit-active={unit.id}
           checked={form.isActive}
           onChange={(event) => set('isActive')(event.target.checked)}
           className="size-4 cursor-pointer"
