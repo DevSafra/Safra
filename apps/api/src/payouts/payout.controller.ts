@@ -49,6 +49,22 @@ export class PartnerPayoutController {
   }
 
   /** What one payout covers — the answer to "what is this $1,240 for". */
+  /**
+   * The partner's own money that an open dispute is holding.
+   *
+   * Same permission as the list beside it: it IS the payout question, answered for the part of it
+   * that has not reached a transfer. `PAYOUT_READ_OWN` scopes it to the token's own partner, so
+   * there is no version of this call that can ask about somebody else's.
+   */
+  @Get('withheld')
+  @RequirePermissions(P.PAYOUT_READ_OWN)
+  @AuditExempt(
+    'A partner reading what is held from their own transfers; changes nothing.',
+  )
+  async withheld(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return { withheld: await this.payouts.withheldForPartner(user) };
+  }
+
   @Get(':reference/bookings')
   @RequirePermissions(P.PAYOUT_READ_OWN)
   @AuditExempt('A partner reading their own transfers; changes nothing.')

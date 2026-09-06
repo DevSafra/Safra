@@ -330,6 +330,33 @@ export async function getMyPayouts() {
 }
 
 /**
+ * One booking whose payable an open dispute is holding.
+ *
+ * No customer name and no complaint text: the partner is owed an account of their MONEY, and
+ * whether they should also read and answer the complaint is a product decision nobody has taken.
+ */
+const withheldSchema = z.object({
+  reference: z.string(),
+  checkIn: z.string(),
+  checkOut: z.string(),
+  amount: z.string(),
+  currencyCode: z.string(),
+  disputeReference: z.string(),
+  openedAt: z.string(),
+  /* The transfer this stay is blocking, where it is already on one. Null before it accrues. */
+  payoutReference: z.string().nullable(),
+});
+
+export type WithheldBooking = z.infer<typeof withheldSchema>;
+
+export async function getMyWithheldPayouts() {
+  return partnerFetch(
+    '/partner/payouts/withheld',
+    z.object({ withheld: z.array(withheldSchema) }),
+  );
+}
+
+/**
  * Where SAFRA sends this partner's money, masked (§11.4).
  *
  * The account number is not in this payload and never has been — the API's read projection does

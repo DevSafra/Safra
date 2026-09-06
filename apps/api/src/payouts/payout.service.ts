@@ -512,6 +512,80 @@ export class PayoutService {
   }
 
   /**
+   * The partner's own money that a dispute is holding back.
+   *
+   * ## Why this exists
+   *
+   * A booking under an open dispute is silently excluded from accrual: the partner's payable
+   * simply does not appear, with no figure and no list. The payouts page states the RULE — «أي حجز
+   * عليه نزاع مفتوح يبقى مجمّدًا» — and could not say how much or on which stays. Meanwhile the
+   * console shows SAFRA «مستحقات مجمّدة: 19». One side of a money question could see the answer
+   * and the side whose money it is could not.
+   *
+   * ## What it deliberately does NOT return
+   *
+   * Not the customer's name and not what they wrote. The partner is a party to the money and is
+   * owed an account of it; whether they should also read the complaint and answer it is a product
+   * decision about partner participation in disputes, and inventing one here would be answering a
+   * question nobody asked. The dispute REFERENCE is included so support can be given a handle.
+   */
+  async withheldForPartner(claims: AccessTokenClaims | undefined) {
+    const partnerId = requirePartnerId(claims, P.PAYOUT_READ_OWN);
+
+    const rows = await this.db.execute<{
+      reference: string;
+      check_in: string;
+      check_out: string;
+      amount: string;
+      currency_code: string;
+      dispute_reference: string;
+      opened_at: string;
+      payout_reference: string | null;
+    }>(sql`
+      SELECT b.reference,
+             b.check_in::text  AS check_in,
+             b.check_out::text AS check_out,
+             b.partner_payable_amount::text AS amount,
+             cur.code AS currency_code,
+             d.reference AS dispute_reference,
+             d.created_at::text AS opened_at,
+             /*
+               The payout this booking is BLOCKING, where there is one. That is the fact the
+               partner most needs: one disputed stay refuses the whole transfer, not just its own
+               share, and a list of amounts without it would understate what is actually held.
+             */
+             (SELECT po.reference
+                FROM partner_payout_items i
+                JOIN partner_payouts po ON po.id = i.payout_id
+               WHERE i.booking_id = b.id
+                 AND po.deleted_at IS NULL
+                 AND po.status NOT IN ('paid', 'cancelled')
+               LIMIT 1) AS payout_reference
+      FROM bookings b
+      JOIN currencies cur ON cur.id = b.currency_id
+      JOIN disputes d
+        ON d.booking_id = b.id
+       AND d.status IN ('open', 'investigating')
+       AND d.deleted_at IS NULL
+      WHERE b.partner_id = ${partnerId}
+        AND ${HELD_BY_DISPUTE}
+      ORDER BY d.created_at
+      LIMIT 100
+    `);
+
+    return rows.rows.map((row) => ({
+      reference: row.reference,
+      checkIn: row.check_in,
+      checkOut: row.check_out,
+      amount: row.amount,
+      currencyCode: row.currency_code,
+      disputeReference: row.dispute_reference,
+      openedAt: row.opened_at,
+      payoutReference: row.payout_reference,
+    }));
+  }
+
+  /**
    * What the last accrual reported, so the endpoint can answer with it.
    *
    * Read back from `scheduled_job_runs` rather than returned by `accrue`, because the caller may
@@ -902,6 +976,47 @@ const PAYOUT_COLUMNS = sql`
  * its list and its count — see `listForStaff`. Keeping both shapes here means the column list is
  * still written once; a second copy is how a registry comes to disagree with its own detail screen.
  */
+/**
+ * A booking whose payable a dispute is holding — by EITHER of the two mechanisms.
+ *
+ * The freeze bites twice, and the first version of this only modelled the first:
+ *
+ *  1. **At accrual.** A completed booking with an open dispute is excluded, so its payable never
+ *     joins a payout at all.
+ *  2. **At release.** A booking already ON a payout when the dispute opens is caught by the
+ *     re-check in `release`, which refuses the WHOLE payout with `PAYOUT_FROZEN_BY_DISPUTE`.
+ *
+ * The second is the one that matters more and the one nobody could see: on this database it is a
+ * payout of $5,031.30 across seventeen bookings, six disputed, sitting «قيد التجميع» with nothing
+ * on the partner's screen saying it cannot move or why.
+ */
+const HELD_BY_DISPUTE = sql`
+  b.deleted_at IS NULL
+  AND b.partner_payable_amount > 0
+  AND EXISTS (
+    SELECT 1 FROM disputes d
+    WHERE d.booking_id = b.id
+      AND d.status IN ('open', 'investigating')
+      AND d.deleted_at IS NULL
+  )
+  AND (
+    /* (1) Would have accrued, and did not. Conditions lifted verbatim from the accrual above. */
+    (
+      b.status = 'completed'
+      AND b.paid_at IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM partner_payout_items i WHERE i.booking_id = b.id)
+    )
+    /* (2) Already on a payout that has not been paid — it will refuse to release. */
+    OR EXISTS (
+      SELECT 1
+      FROM partner_payout_items i
+      JOIN partner_payouts po ON po.id = i.payout_id
+      WHERE i.booking_id = b.id
+        AND po.deleted_at IS NULL
+        AND po.status NOT IN ('paid', 'cancelled')
+    )
+  )`;
+
 const PAYOUT_SELECT = sql`
   ${PAYOUT_COLUMNS}
   FROM partner_payouts p

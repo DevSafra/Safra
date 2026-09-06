@@ -3,6 +3,8 @@ import Link from 'next/link';
 import {
   getMyPayoutAccounts,
   getMyPayouts,
+  getMyWithheldPayouts,
+  type WithheldBooking,
   type PartnerPayout,
   sidebarBadges,
 } from '@/lib/api';
@@ -96,7 +98,11 @@ export default async function PayoutsPage() {
     The accounts are read HERE so the summary can name the destination — and say when there is
     none. Both reads are the partner's own and neither blocks the other, so they go together.
   */
-  const [payouts, accounts] = await Promise.all([getMyPayouts(), getMyPayoutAccounts()]);
+  const [payouts, accounts, withheld] = await Promise.all([
+    getMyPayouts(),
+    getMyPayoutAccounts(),
+    getMyWithheldPayouts(),
+  ]);
 
   const suspended =
     profile !== 'failed' && profile !== 'unauthenticated' && profile.suspension !== null;
@@ -138,6 +144,24 @@ export default async function PayoutsPage() {
             accounts={
               accounts === 'failed' || accounts === 'unauthenticated' ? [] : accounts
             }
+          />
+
+          {/*
+            What is being HELD, directly under the summary it explains.
+
+            A booking under an open dispute is excluded from accrual silently: the partner's
+            payable did not appear and nothing said why. The page carried the rule as a sentence
+            and no figure — while the console showed SAFRA «مستحقات مجمّدة: 19». Placed here
+            because it is the answer to «why is my pending total lower than I expected», and that
+            question is asked while looking at the total.
+          */}
+          <Withheld
+            rows={
+              withheld === 'failed' || withheld === 'unauthenticated'
+                ? []
+                : withheld.withheld
+            }
+            payouts={payouts}
           />
 
           {payouts.length === 0 ? (
@@ -276,6 +300,108 @@ function Summary({
           </Link>
         </p>
       )}
+    </section>
+  );
+}
+
+/**
+ * Bookings whose payable an open dispute is holding.
+ *
+ * Absent entirely when nothing is held — a heading over an empty list tells a partner they have a
+ * problem they do not have. Every amount carries its currency, per the standing rule: SAFRA prices
+ * in five and settles in one, and a bare figure here is money nobody can act on.
+ */
+function Withheld({
+  rows,
+  payouts,
+}: {
+  readonly rows: readonly WithheldBooking[];
+  /** The partner's own transfers, so a blocked one can be named with the sum it is holding. */
+  readonly payouts: readonly PartnerPayout[];
+}) {
+  if (rows.length === 0) return null;
+
+  /*
+    Totalled PER CURRENCY, not summed across them.
+
+    A partner may hold bookings priced in dollars and in lira; adding those together produces a
+    number that is not money. The same reasoning the payout groups already follow.
+  */
+  const totals = new Map<string, number>();
+
+  for (const row of rows) {
+    totals.set(
+      row.currencyCode,
+      (totals.get(row.currencyCode) ?? 0) + Number(row.amount),
+    );
+  }
+
+  /* The transfers these stays are stopping, each named once however many stays point at it. */
+  const references = [
+    ...new Set(rows.map((row) => row.payoutReference).filter((one) => one !== null)),
+  ];
+  const blocked = references
+    .map((reference) => payouts.find((one) => one.reference === reference))
+    .filter((one): one is PartnerPayout => one !== undefined);
+
+  return (
+    <section
+      data-withheld
+      className="grid gap-3 rounded-card border border-[rgba(var(--warnA),0.35)] bg-[rgba(var(--warnA),0.05)] p-5"
+    >
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-[13px] font-bold text-warn">{t.payouts.withheldHeading}</h2>
+        <span className="ms-auto text-[12.5px] font-bold tabular-nums text-warn">
+          {t.payouts.withheldTotal}:{' '}
+          {[...totals].map(([code, sum]) => amount(sum.toFixed(2), code)).join(' · ')}
+        </span>
+      </div>
+
+      <p className="text-[11.5px] leading-relaxed text-text2">{t.payouts.withheldNote}</p>
+
+      {/*
+        The sum actually stopped, said ONCE.
+
+        Two things were wrong with saying it per row. It repeated identically on every stay
+        blocking the same transfer — six rows, six copies of one sentence. And the header total was
+        the disputed stays' own value, $344.10, while the money that cannot move is the whole
+        transfer, $3,248.49: a true figure telling the wrong story, which is the shape this whole
+        review keeps finding.
+      */}
+      {blocked.length > 0 ? (
+        <p className="text-[12px] font-semibold text-warn">
+          {blocked.length === 1
+            ? fill(t.payouts.withheldBlocking, {
+                reference: blocked[0]!.reference,
+                amount: amount(blocked[0]!.netAmount, blocked[0]!.currencyCode),
+              })
+            : fill(t.payouts.withheldBlockingMany, {
+                references: blocked.map((one) => one.reference).join(' · '),
+              })}
+        </p>
+      ) : null}
+
+      <ul className="grid gap-2">
+        {rows.map((row) => (
+          <li
+            key={row.reference}
+            className="grid gap-1 rounded-lg border border-line2 bg-card p-3 text-[12px]"
+          >
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <Ltr className="font-mono text-[11.5px] text-text2">{row.reference}</Ltr>
+              <span className="ms-auto font-bold tabular-nums text-text">
+                {amount(row.amount, row.currencyCode)}
+              </span>
+            </div>
+            <p className="text-[11px] text-faint">
+              {t.payouts.withheldStay}: <Ltr>{row.checkIn}</Ltr> ←{' '}
+              <Ltr>{row.checkOut}</Ltr> · {t.payouts.withheldDispute}:{' '}
+              <Ltr>{row.disputeReference}</Ltr> · {t.payouts.withheldOpened}:{' '}
+              <Ltr>{row.openedAt.slice(0, 10)}</Ltr>
+            </p>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

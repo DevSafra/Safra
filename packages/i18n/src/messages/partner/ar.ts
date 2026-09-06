@@ -1120,6 +1120,21 @@ export const ar = {
    * loosely here becomes somebody planning around money that has not been sent.
    */
   payouts: {
+    /* Money held back by an open dispute — the partner could see the rule and not the figure. */
+    withheldHeading: 'مبالغ مجمّدة بسبب نزاعات',
+    withheldNote:
+      'على هذه الحجوزات نزاعات مفتوحة، فلا تُحوَّل مستحقاتها حتى تُغلق. لا يلزمك أي إجراء؛ سفرة تدرس كل نزاع وتُعلمك بالنتيجة.',
+    /*
+      The fact that matters most, and the one a per-booking figure hides: one disputed stay stops
+      the WHOLE transfer, so the money actually held back is the transfer's total, not the stay's.
+    */
+    withheldBlocking:
+      'يوقف هذا التحويل {reference} بالكامل ({amount}) حتى تُغلق النزاعات.',
+    withheldBlockingMany: 'توقف تحويلات: {references}.',
+    withheldTotal: 'المجموع المجمّد',
+    withheldDispute: 'النزاع',
+    withheldOpened: 'فُتح',
+    withheldStay: 'الإقامة',
     title: 'مستحقاتي',
     note: 'يُضاف الحجز إلى مستحقاتك بعد اكتمال الإقامة وتحصيل الدفع. أي حجز عليه نزاع مفتوح يبقى مجمّدًا حتى يُغلق النزاع.',
     empty: 'لا مستحقات مسجّلة بعد.',
