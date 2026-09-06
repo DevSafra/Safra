@@ -943,9 +943,21 @@ export class PropertiesService {
       partner may edit, and a grouping key that changes when somebody fixes a typo would split a
       floor of identical rooms into two types.
     */
+    /*
+      `rt-` with a HYPHEN, never `type_` with an underscore.
+
+      A generated identifier must not be shaped like an enum code. `audit-catalogue` sweeps every
+      audit payload value matching `^[a-z][a-z0-9]*(_[a-z0-9]+)+$` and demands an Arabic word for
+      it — the rule that stops سجل التدقيق printing raw identifiers at an operator. A minted
+      `type_06b6e709` matched that pattern exactly, so every room type created a value that could
+      never have a word, because there is a new one for every room type for ever.
+
+      The hyphen is not cosmetic: it is what keeps an identifier and a vocabulary distinguishable
+      by shape, here and anywhere else this value travels.
+    */
     const groupCode =
       input.roomTypeCode ??
-      (input.quantity > 1 ? `type_${randomUUID().slice(0, 8)}` : null);
+      (input.quantity > 1 ? `rt-${randomUUID().slice(0, 8)}` : null);
 
     const unitIds = await this.db.transaction(async (tx) => {
       const rows = await tx
@@ -1014,7 +1026,16 @@ export class PropertiesService {
               propertyReference,
               maxGuests: input.maxGuests,
               basePrice: input.basePrice,
-              roomTypeCode: groupCode,
+              /*
+                The quantity, and deliberately NOT the type code.
+
+                An audit payload is prose an operator reads, and `audit-catalogue` holds every key
+                and coded value in it to an Arabic word. A generated `type_06b6e709` cannot have
+                one — there is a new value per room type, for ever — so writing it turned a
+                readable trail into a list of identifiers nobody can name. The grouping key is on
+                `units` where it belongs; what a reader of this row needs is how many rooms the
+                partner asked for.
+              */
               quantity: input.quantity,
             },
           },

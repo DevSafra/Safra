@@ -3992,6 +3992,8 @@ export const ar = {
      * the payload at all is that a dispute can turn on which fine was applied.
      */
     payloadKey: {
+      /* How many identical rooms a partner asked for when adding a room type. */
+      quantity: 'العدد',
       reason: 'السبب',
       /*
         Written by the خزينة سفرة lifecycle (2026-09-05). `destination` is the masked account a
