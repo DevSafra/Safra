@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 
@@ -252,6 +254,7 @@ export class PropertiesService {
       id: string;
       name_ar: string;
       unit_label: string | null;
+      room_type_code: string | null;
       max_guests: number;
       bedrooms: number;
       beds: number;
@@ -263,7 +266,8 @@ export class PropertiesService {
       is_active: boolean;
       amenity_codes: string[];
     }>(sql`
-      SELECT un.id, un.name_ar, un.unit_label, un.max_guests, un.bedrooms, un.beds,
+      SELECT un.id, un.name_ar, un.unit_label, un.room_type_code,
+             un.max_guests, un.bedrooms, un.beds,
              un.bathrooms, un.base_price::text, cur.code AS currency_code,
              un.min_nights, un.max_nights, un.is_active,
              /*
@@ -326,6 +330,12 @@ export class PropertiesService {
         id: unit.id,
         nameAr: unit.name_ar,
         unitLabel: unit.unit_label,
+        /*
+          Which rooms are interchangeable. Sent so الوحدات can group them: a partner who said «six
+          of these» got six identical rows and no way to see that the platform had understood them
+          as one type — a capability with nothing on screen to show for it.
+        */
+        roomTypeCode: unit.room_type_code,
         maxGuests: unit.max_guests,
         bedrooms: unit.bedrooms,
         beds: unit.beds,
@@ -925,55 +935,103 @@ export class PropertiesService {
 
     const amenityIds = await this.resolveAmenityIds(input.amenityCodes);
 
-    const unitId = await this.db.transaction(async (tx) => {
-      const [unit] = await tx
+    /*
+      A quantity above one creates SEVERAL rows, and they need to be recognisably the same type —
+      that is the whole point of the number. Where the partner named a type code it is honoured;
+      where they did not, one is derived so the rooms still group on the property page and in the
+      allocation. Derived from the unit id rather than from the name: a name is Arabic prose a
+      partner may edit, and a grouping key that changes when somebody fixes a typo would split a
+      floor of identical rooms into two types.
+    */
+    const groupCode =
+      input.roomTypeCode ??
+      (input.quantity > 1 ? `type_${randomUUID().slice(0, 8)}` : null);
+
+    const unitIds = await this.db.transaction(async (tx) => {
+      const rows = await tx
         .insert(schema.units)
-        .values({
-          propertyId: property.id,
-          nameAr: input.name.ar,
-          nameEn: input.name.en ?? input.name.ar,
-          nameDe: input.name.de ?? input.name.ar,
-          maxGuests: input.maxGuests,
-          bedrooms: input.bedrooms,
-          beds: input.beds,
-          bathrooms: input.bathrooms,
-          basePrice: input.basePrice.toFixed(2),
-          currencyId: currency.id,
-          minNights: input.minNights,
-          maxNights: input.maxNights ?? null,
-          roomTypeCode: input.roomTypeCode ?? null,
-          unitLabel: input.unitLabel ?? null,
-        })
+        .values(
+          Array.from({ length: input.quantity }, (_, index) => ({
+            propertyId: property.id,
+            nameAr: input.name.ar,
+            nameEn: input.name.en ?? input.name.ar,
+            nameDe: input.name.de ?? input.name.ar,
+            maxGuests: input.maxGuests,
+            bedrooms: input.bedrooms,
+            beds: input.beds,
+            bathrooms: input.bathrooms,
+            basePrice: input.basePrice.toFixed(2),
+            currencyId: currency.id,
+            minNights: input.minNights,
+            maxNights: input.maxNights ?? null,
+            roomTypeCode: groupCode,
+            /*
+              The label is what reception says to a guest, so it has to distinguish the rooms. A
+              partner who typed one for a quantity of four gets it numbered; a partner who typed
+              none gets nothing, because an invented «1» on a single room is noise, and a real room
+              number is a thing only they know.
+            */
+            unitLabel:
+              input.unitLabel === undefined
+                ? null
+                : input.quantity > 1
+                  ? `${input.unitLabel} ${index + 1}`
+                  : input.unitLabel,
+          })),
+        )
         .returning({ id: schema.units.id });
 
-      if (!unit) throw new Error('Unit insert returned no row.');
+      if (rows.length !== input.quantity) {
+        throw new Error('Unit insert returned the wrong number of rows.');
+      }
 
       if (amenityIds.length > 0) {
         await tx
           .insert(schema.unitAmenities)
-          .values(amenityIds.map((amenityId) => ({ unitId: unit.id, amenityId })));
+          .values(
+            rows.flatMap((unit) =>
+              amenityIds.map((amenityId) => ({ unitId: unit.id, amenityId })),
+            ),
+          );
       }
 
-      await this.audit.record(
-        {
-          actorUserId: claims?.sub,
-          actorRole: claims?.role,
-          action: 'unit.created',
-          subjectType: 'unit',
-          subjectId: unit.id,
-          after: {
-            propertyReference,
-            maxGuests: input.maxGuests,
-            basePrice: input.basePrice,
-          },
-        },
-        tx as unknown as Database,
-      );
+      /*
+        One audit row PER ROOM, not one for the batch.
 
-      return unit.id;
+        Each row is a separate piece of sellable inventory that can be priced, closed and booked on
+        its own, and an audit trail that recorded «four rooms created» could not answer which room
+        a later change was made to. `subjectId` has to name a subject that exists.
+      */
+      for (const unit of rows) {
+        await this.audit.record(
+          {
+            actorUserId: claims?.sub,
+            actorRole: claims?.role,
+            action: 'unit.created',
+            subjectType: 'unit',
+            subjectId: unit.id,
+            after: {
+              propertyReference,
+              maxGuests: input.maxGuests,
+              basePrice: input.basePrice,
+              roomTypeCode: groupCode,
+              quantity: input.quantity,
+            },
+          },
+          tx as unknown as Database,
+        );
+      }
+
+      return rows.map((unit) => unit.id);
     });
 
-    return { unitId, propertyReference };
+    return {
+      /* The first room, so the existing single-unit callers are unchanged. */
+      unitId: unitIds[0] as string,
+      unitIds,
+      quantity: unitIds.length,
+      propertyReference,
+    };
   }
 
   async updateUnit(

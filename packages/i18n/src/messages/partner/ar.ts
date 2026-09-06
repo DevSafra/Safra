@@ -722,6 +722,15 @@ export const ar = {
     unitAddHint:
       'الوحدة هي ما يُحجز فعلاً: غرفة أو شقة أو منزل بسعره وسعته. العقار بلا وحدة لا يظهر في البحث ولا يمكن حجزه.',
     unitAddSubmit: 'أضف الوحدة',
+    /* The quantity — a floor of identical rooms is described once and counted (Bashar, 2026-09-06). */
+    unitTypeCount:
+      '{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان متطابقتان} few {# غرف متطابقة} many {# غرفة متطابقة} other {# غرفة متطابقة}}',
+    unitTypeHint: 'تُعرض للضيف كنوع واحد، ويختار عدد الغرف التي يريدها منها.',
+    unitQuantity: 'عدد الغرف المتطابقة',
+    unitQuantityHint:
+      'إن كان لديك عدة غرف متطابقة من هذا النوع، اكتب عددها هنا بدل تكرار النموذج. تُنشئ سفرة صفًّا لكل غرفة حتى لا تُحجز غرفة واحدة مرتين، وتظهر جميعها للضيف كنوع واحد.',
+    unitQuantityAdded:
+      '{count, plural, zero {لم تُضف غرف} one {أُضيفت غرفة واحدة} two {أُضيفت غرفتان} few {أُضيفت # غرف} many {أُضيفت # غرفة} other {أُضيفت # غرفة}}.',
     unitAddSaving: 'جارٍ الإضافة…',
     unitAdded: 'أُضيفت الوحدة.',
     unitAddFailed: 'تعذّرت إضافة الوحدة. راجع الحقول وحاول مرة أخرى.',

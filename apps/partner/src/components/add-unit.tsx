@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { AmenityPicker } from '@/components/amenity-picker';
 import type { OfferableAmenity } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
-import { t } from '@/lib/strings';
+import { plural, t } from '@/lib/strings';
 
 /**
  * Adding a unit to an EXISTING listing — the other step nobody could take (Bashar, 2026-09-04).
@@ -56,7 +56,12 @@ export function AddUnit({
   const [message, setMessage] = useState<{ kind: 'ok' | 'bad'; text: string } | null>(
     null,
   );
-  const [form, setForm] = useState({ name: '', maxGuests: '2', basePrice: '' });
+  const [form, setForm] = useState({
+    name: '',
+    maxGuests: '2',
+    basePrice: '',
+    quantity: '1',
+  });
   const [amenityCodes, setAmenityCodes] = useState<string[]>([]);
 
   const set = (key: keyof typeof form) => (value: string) => {
@@ -85,6 +90,12 @@ export function AddUnit({
             name: { ar: form.name.trim() },
             maxGuests: Number(form.maxGuests),
             basePrice: Number(form.basePrice),
+            /*
+              How many identical rooms. The API creates a row per room and groups them under one
+              type code — a partner describes the type once instead of filling this form fourteen
+              times for a hotel floor.
+            */
+            quantity: Math.max(1, Math.trunc(Number(form.quantity) || 1)),
             currencyCode,
             amenityCodes,
           }),
@@ -102,8 +113,20 @@ export function AddUnit({
         return;
       }
 
-      setMessage({ kind: 'ok', text: t.editProperty.unitAdded });
-      setForm({ name: '', maxGuests: '2', basePrice: '' });
+      /*
+        The confirmation NAMES the number, because the form created something the partner cannot
+        see from one row: «أُضيفت ٦ غرف» is the only place the quantity is confirmed back to them.
+      */
+      const created = Math.max(1, Math.trunc(Number(form.quantity) || 1));
+
+      setMessage({
+        kind: 'ok',
+        text:
+          created > 1
+            ? plural(t.editProperty.unitQuantityAdded, { count: created })
+            : t.editProperty.unitAdded,
+      });
+      setForm({ name: '', maxGuests: '2', basePrice: '', quantity: '1' });
       setAmenityCodes([]);
       setBusy(false);
       /* The new unit arrives as a row of its own, which is the confirmation that it landed. */
@@ -153,9 +176,13 @@ export function AddUnit({
       ) : null}
 
       {/*
-        No `dir` override on the name: a field a person types into follows the page, which on this
-        screen is RTL. The two numbers below use the same `Number_` shape the unit rows use, so one
-        screen does not hold two answers to «what does a numeric field look like».
+        No `dir` override on ANY field here.
+
+        A field a person types into follows the page, which on this screen is RTL — the standing
+        rule, and the two numeric inputs below were breaking it: `dir="ltr"` sets the direction AND
+        moves the element's start edge, so the label sat on the right of its own field and the value
+        on the far left of it. Digits are a left-to-right RUN and the bidi algorithm lays them out
+        correctly inside an RTL field without being told.
       */}
       <label className="grid gap-1">
         <span className="text-[12px] text-muted">{t.editProperty.unitName}</span>
@@ -173,7 +200,6 @@ export function AddUnit({
           <span className="text-[12px] text-muted">{t.editProperty.unitGuestsField}</span>
           <input
             type="number"
-            dir="ltr"
             min={1}
             max={50}
             value={form.maxGuests}
@@ -187,7 +213,6 @@ export function AddUnit({
           <span className="text-[12px] text-muted">{t.editProperty.unitPrice}</span>
           <input
             type="number"
-            dir="ltr"
             min={0}
             step="0.01"
             value={form.basePrice}
@@ -200,6 +225,9 @@ export function AddUnit({
         {/*
           The currency is SHOWN, not chosen. It is the listing's own — a second currency among a
           property's units would price one room in dollars and the next in lira on the same card.
+
+          `dir="ltr"` STAYS on this one: it is read-only, so it is a DISPLAY of a Latin code rather
+          than a field anybody types into, and the rule that forbids the override is about typing.
         */}
         <label className="grid gap-1">
           <span className="text-[12px] text-muted">{t.editProperty.unitCurrency}</span>
@@ -211,6 +239,30 @@ export function AddUnit({
           />
         </label>
       </div>
+
+      {/*
+        The quantity, on its own row rather than as a fourth column.
+
+        It is a different KIND of answer from the three above — those describe what one room is,
+        this says how many of them exist — and putting it beside the price invited reading it as
+        part of the price. Its own row with the sentence underneath is what makes «6» mean six
+        rooms rather than six of anything else.
+      */}
+      <label className="grid gap-1">
+        <span className="text-[12px] text-muted">{t.editProperty.unitQuantity}</span>
+        <input
+          type="number"
+          min={1}
+          max={50}
+          value={form.quantity}
+          onChange={(event) => set('quantity')(event.target.value)}
+          required
+          className="min-h-10 rounded-lg border border-line bg-field px-3 py-2 text-[12.5px] text-text sm:w-40 lg:min-h-0"
+        />
+        <span className="text-[11.5px] leading-relaxed text-faint">
+          {t.editProperty.unitQuantityHint}
+        </span>
+      </label>
 
       <AmenityPicker
         amenities={amenities}

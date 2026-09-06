@@ -810,6 +810,7 @@ describeIfDb('PropertiesService.readOwn', () => {
         basePrice: 100,
         currencyCode: 'USD',
         minNights: 1,
+        quantity: 1,
         amenityCodes: [code],
       });
 
@@ -819,6 +820,90 @@ describeIfDb('PropertiesService.readOwn', () => {
       const unit = property.units.find((one) => one.nameAr === 'وحدة بخدمات');
 
       expect(unit?.amenityCodes, 'the projection returns them').toContain(code);
+    });
+
+    /**
+     * A room TYPE, stated once and counted (Bashar, 2026-09-06).
+     *
+     * A hotel floor of fourteen identical doubles was fourteen passes through the same form. What
+     * matters here is not that fourteen rows appear — it is that they are recognisably ONE type, so
+     * the property page groups them and the booking allocation can hand a guest three of them.
+     */
+    it('a quantity creates that many rooms, grouped as one type', async () => {
+      const created = await service.addUnit(partner(otherPartnerId), otherReference, {
+        name: { ar: 'غرفة مزدوجة للاختبار' },
+        maxGuests: 2,
+        bedrooms: 1,
+        beds: 1,
+        bathrooms: 1,
+        basePrice: 90,
+        currencyCode: 'USD',
+        minNights: 1,
+        unitLabel: 'غرفة',
+        quantity: 4,
+        amenityCodes: [],
+      });
+
+      expect(created.quantity).toBe(4);
+      expect(new Set(created.unitIds).size, 'four DISTINCT rooms').toBe(4);
+
+      const rows = await db.execute<{
+        room_type_code: string | null;
+        unit_label: string | null;
+      }>(sql`
+        SELECT room_type_code, unit_label
+          FROM units
+         WHERE id IN ${created.unitIds}
+         ORDER BY unit_label
+      `);
+
+      const codes = new Set(rows.rows.map((row) => row.room_type_code));
+
+      expect(codes.size, 'one type code across all four').toBe(1);
+      expect([...codes][0], 'and it is not null, or nothing groups').not.toBeNull();
+
+      /* The labels distinguish them, because reception hands out a specific door. */
+      expect(rows.rows.map((row) => row.unit_label)).toStrictEqual([
+        'غرفة 1',
+        'غرفة 2',
+        'غرفة 3',
+        'غرفة 4',
+      ]);
+    });
+
+    /**
+     * The opposite control: one room is still one room, with nothing invented.
+     *
+     * Without this the feature could be "always group and always number" and the test above would
+     * pass — leaving every villa on the platform carrying a type code it shares with nothing and a
+     * label reading «غرفة 1».
+     */
+    it('a single room gets no type code and no numbering', async () => {
+      const created = await service.addUnit(partner(otherPartnerId), otherReference, {
+        name: { ar: 'شاليه مفرد للاختبار' },
+        maxGuests: 4,
+        bedrooms: 2,
+        beds: 2,
+        bathrooms: 1,
+        basePrice: 250,
+        currencyCode: 'USD',
+        minNights: 1,
+        unitLabel: 'الشاليه',
+        quantity: 1,
+        amenityCodes: [],
+      });
+
+      expect(created.quantity).toBe(1);
+
+      const rows = await db.execute<{
+        room_type_code: string | null;
+        unit_label: string | null;
+      }>(sql`
+        SELECT room_type_code, unit_label FROM units WHERE id = ${created.unitId}
+      `);
+
+      expect(rows.rows[0]?.room_type_code).toBeNull();
+      expect(rows.rows[0]?.unit_label).toBe('الشاليه');
     });
 
     /** An edit REPLACES the set — the API's own comment says so, and a diff would drift. */
@@ -839,6 +924,7 @@ describeIfDb('PropertiesService.readOwn', () => {
         basePrice: 100,
         currencyCode: 'USD',
         minNights: 1,
+        quantity: 1,
         amenityCodes: [first!.code],
       });
 
@@ -876,6 +962,7 @@ describeIfDb('PropertiesService.readOwn', () => {
               basePrice: 100,
               currencyCode: 'USD',
               minNights: 1,
+              quantity: 1,
               amenityCodes: [code],
             })
             .catch((error: unknown) => error),
@@ -896,6 +983,7 @@ describeIfDb('PropertiesService.readOwn', () => {
               basePrice: 100,
               currencyCode: 'USD',
               minNights: 1,
+              quantity: 1,
               amenityCodes: ['no-such-amenity'],
             })
             .catch((error: unknown) => error),
@@ -970,6 +1058,7 @@ describeIfDb('PropertiesService.readOwn', () => {
               basePrice: 100,
               currencyCode: 'USD',
               minNights: 1,
+              quantity: 1,
               amenityCodes: [],
             })
             .catch((error: unknown) => error),
@@ -988,6 +1077,7 @@ describeIfDb('PropertiesService.readOwn', () => {
         basePrice: 100,
         currencyCode: 'USD',
         minNights: 1,
+        quantity: 1,
         amenityCodes: [],
       });
 

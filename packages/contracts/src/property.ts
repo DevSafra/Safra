@@ -290,11 +290,28 @@ export const unitCreateSchema = z
     maxNights: z.number().int().min(1).max(365).optional(),
     /**
      * Groups interchangeable units for display, e.g. "double_sea_view". NOT a
-     * quantity — one row is one physical unit, which is what keeps the booking
-     * exclusion constraint exact.
+     * quantity — one row is still one physical unit, which is what keeps the
+     * booking exclusion constraint exact. `quantity` below is how a partner
+     * asks for several of them without typing the form several times.
      */
     roomTypeCode: z.string().trim().min(1).max(60).optional(),
     unitLabel: z.string().trim().min(1).max(60).optional(),
+    /**
+     * How many identical rooms of this type to open (Bashar, 2026-09-06).
+     *
+     * A hotel floor with fourteen identical doubles was fourteen passes through this form. The
+     * platform now creates the rows, groups them under one `roomTypeCode` and numbers their
+     * labels — so a partner describes a room TYPE once and says how many there are.
+     *
+     * It does NOT become a column. Each room stays its own row because the double-booking
+     * guarantee is an EXCLUDE constraint over `(unit_id, dates)`, and a counter cannot be made
+     * safe under concurrency the way that constraint is. This is an authoring convenience over an
+     * unchanged model, which is the only version of it worth having.
+     *
+     * Capped at 50, matching `initialUnits.count` on the create form — the same act on the other
+     * screen, so the two must not disagree about what is allowed.
+     */
+    quantity: z.number().int().min(1).max(50).default(1),
     amenityCodes: z.array(z.string().trim().min(1).max(40)).max(40).default([]),
   })
   .strict()

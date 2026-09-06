@@ -8,7 +8,7 @@ import type { OfferableAmenity, PartnerPropertyDetail } from '@/lib/api';
 import { codeOfResponse, refusalFor } from '@/lib/refusal';
 import { AddUnit } from '@/components/add-unit';
 import { AmenityPicker } from '@/components/amenity-picker';
-import { t } from '@/lib/strings';
+import { t, plural } from '@/lib/strings';
 
 type Unit = PartnerPropertyDetail['units'][number];
 
@@ -76,9 +76,82 @@ export function UnitEditor({
         {t.editProperty.unitsNote}
       </p>
 
-      {units.map((unit) => (
-        <UnitRow key={unit.id} reference={reference} unit={unit} amenities={amenities} />
-      ))}
+      {/*
+        Grouped by TYPE, not listed flat.
+
+        A partner who answered «ستّ غرف» once got six identical rows and no sign the platform had
+        understood them as one thing — the definition and the physical inventory looked the same,
+        which is the distinction Bashar asked for. A type now has a heading saying how many rooms
+        it holds, and the rooms sit under it, still individually priced and closable because each
+        one really is a separate piece of inventory.
+
+        A one-of-a-kind unit has no `roomTypeCode` and gets no heading: a villa announcing that it
+        is «غرفة واحدة متطابقة» would be a control's worth of noise around a single row.
+      */}
+      {groupByType(units).map((group) => {
+        const rooms = group.units.map((unit) => (
+          <UnitRow
+            key={unit.id}
+            reference={reference}
+            unit={unit}
+            amenities={amenities}
+          />
+        ));
+
+        /* One of a kind: no heading and nothing to fold. It IS the room. */
+        if (group.units.length === 1) {
+          return (
+            <div key={group.key} className="grid gap-3">
+              {rooms}
+            </div>
+          );
+        }
+
+        return (
+          /*
+            Folded shut.
+
+            Saying «ستّ غرف» once used to be six passes through the add form; now it is one press,
+            and the six full-height editors it produces are a page nobody can scan. So a TYPE reads
+            as a line — its name, how many rooms it holds, and what that means to a guest — and the
+            rooms open when a partner has business with them.
+
+            `<details>` rather than component state: it works before hydration, and the disclosure
+            triangle is an affordance every reader already knows.
+          */
+          <details
+            key={group.key}
+            data-unit-type={group.key}
+            className="group rounded-card border border-line bg-card px-4 py-3"
+          >
+            {/*
+              `list-none` and a rotating chevron, the same disclosure التقويمات already draws in
+              this app. The browser's own marker is inconsistent across engines and invisible under
+              some resets, and a folded group with no affordance is a row nobody knows they can
+              open — which would have hidden six rooms behind nothing.
+            */}
+            <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2.5 gap-y-1">
+              <span
+                aria-hidden
+                className="text-[11px] text-faint transition-transform group-open:rotate-90"
+              >
+                ‹
+              </span>
+              <span className="text-[12.5px] font-bold text-text">
+                {group.units[0]?.nameAr}
+              </span>
+              <span className="text-[11.5px] font-semibold text-gold">
+                {plural(t.editProperty.unitTypeCount, { count: group.units.length })}
+              </span>
+              <span className="text-[11px] text-faint">
+                {t.editProperty.unitTypeHint}
+              </span>
+            </summary>
+
+            <div className="mt-3 grid gap-3 border-t border-line pt-3">{rooms}</div>
+          </details>
+        );
+      })}
 
       {/* The listing's own currency, so a second unit cannot price in a different one. */}
       <AddUnit
@@ -88,6 +161,25 @@ export function UnitEditor({
       />
     </div>
   );
+}
+
+/**
+ * Rooms gathered under the type they belong to, in the order they arrived.
+ *
+ * A null `roomTypeCode` means one of a kind, so it groups with NOTHING — keyed by the unit's own
+ * id rather than by the absent code, or every villa on a listing would collapse into one group
+ * called "null".
+ */
+function groupByType(units: readonly Unit[]): { key: string; units: readonly Unit[] }[] {
+  const groups = new Map<string, Unit[]>();
+
+  for (const unit of units) {
+    const key = unit.roomTypeCode ?? `unit:${unit.id}`;
+
+    groups.set(key, [...(groups.get(key) ?? []), unit]);
+  }
+
+  return [...groups].map(([key, grouped]) => ({ key, units: grouped }));
 }
 
 function UnitRow({

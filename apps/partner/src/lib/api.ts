@@ -567,6 +567,8 @@ const partnerPropertySchema = z.object({
       id: z.string(),
       nameAr: z.string(),
       unitLabel: z.string().nullable(),
+      /* Null for a one-of-a-kind unit; shared by every room of an interchangeable type. */
+      roomTypeCode: z.string().nullable(),
       maxGuests: z.number(),
       bedrooms: z.number(),
       beds: z.number(),
