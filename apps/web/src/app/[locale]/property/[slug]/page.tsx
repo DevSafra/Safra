@@ -7,8 +7,10 @@ import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { SaveButton } from '@/components/save-button';
 import { ShareButton } from '@/components/share-button';
 import { PropertyGallery } from '@/components/property-gallery';
+import { BookingSelectionProvider } from '@/components/booking-selection';
+import { BookingSummaryCard } from '@/components/booking-summary-card';
 import { UnitSelector } from '@/components/unit-selector';
-import { priceWithCustomerFee } from '@/lib/customer-fee';
+import { multiplyMoney, priceWithCustomerFee, subtractMoney } from '@/lib/customer-fee';
 import { localisedName, localisedText } from '@/lib/localise';
 import { getProperty, imageUrl, type PropertyDetail } from '@/lib/property';
 import { dynamicMessage } from '@/lib/dynamic-message';
@@ -186,7 +188,6 @@ export default async function PropertyPage({
     The visitor's chosen currency, and the rates that reach it. Both reads are cached for five
     minutes and deduplicated per request, so this costs nothing the page was not already paying.
   */
-  const common = await getTranslations('common');
   const [{ rates }, target] = await Promise.all([
     getCurrencyCatalogue(),
     displayCurrency(),
@@ -210,38 +211,134 @@ export default async function PropertyPage({
     rates,
   );
 
-  return (
-    <article className="mx-auto max-w-7xl px-4 py-8">
-      <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
-        {/* Both breadcrumb links are controls — see the note on the city page. */}
-        <Link
-          href={`/${locale}`}
-          className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
-        >
-          {tc('backHome')}
-        </Link>
-        <span aria-hidden className="mx-2">
-          ←
-        </span>
-        <Link
-          href={`/${locale}/city/${property.city.slug}`}
-          className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
-        >
-          {cityName}
-        </Link>
-        <span aria-hidden className="mx-2">
-          ←
-        </span>
-        <span className="text-muted">{name}</span>
-      </nav>
+  /*
+    The rooms, prepared for a CLIENT component.
 
-      <header className="mt-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="font-display text-3xl font-bold text-gold sm:text-4xl">
-              {name}
-            </h1>
-            {/*
+    Grouping, availability, pricing, plurals and amenity names are all resolved here, because the
+    selector has to be a client component — choosing a room updates the card beside it — and a
+    server component may not hand one a function. Every figure is computed once, so a row and the
+    summary card can never disagree about what a stay costs.
+  */
+  const groups = new Map<string, PropertyDetail['units']>();
+
+  for (const unit of property.units) {
+    /* Null means one of a kind — a villa, a farm — so it groups with nothing. */
+    const key = unit.roomTypeCode ?? `unit:${unit.id}`;
+
+    groups.set(key, [...(groups.get(key) ?? []), unit]);
+  }
+
+  const askedStayWindow = {
+    checkIn: stay.get('checkIn') ?? defaultStay.checkIn,
+    checkOut: stay.get('checkOut') ?? defaultStay.checkOut,
+  };
+
+  const rooms = [...groups.values()].map((group, index) => {
+    /* The cheapest AVAILABLE room of the type; the API orders available first within a price. */
+    const free = group.filter((one) => one.available);
+    const unit = free[0] ?? group[0]!;
+
+    /*
+      A departure this unit will accept.
+
+      The page's default window comes from the CHEAPEST room's minimum, so on a hotel whose suite
+      takes two nights the suite's link was born asking for a stay the suite forbids. Only ever
+      extends, and only when the chosen window is too short.
+    */
+    const asked = Math.round(
+      (Date.parse(`${askedStayWindow.checkOut}T00:00:00Z`) -
+        Date.parse(`${askedStayWindow.checkIn}T00:00:00Z`)) /
+        86_400_000,
+    );
+    const nights = Math.max(asked, unit.minNights);
+    const departure = new Date(`${askedStayWindow.checkIn}T00:00:00Z`);
+
+    departure.setUTCDate(departure.getUTCDate() + nights);
+
+    const shown = (amount: string) =>
+      convertForDisplay(amount, unit.currencyCode, locale, target, rates).text;
+
+    /* The room alone, the fee alone, and their sum — three figures that reconcile on screen. */
+    const roomOnly = multiplyMoney(unit.basePrice, unit.currencyCode, nights);
+    const withFee = priceWithCustomerFee(roomOnly, unit.currencyCode, property.fees);
+    const feeOnly = subtractMoney(withFee, roomOnly, unit.currencyCode);
+
+    return {
+      unitId: unit.id,
+      name: unit.name[locale as 'ar'] ?? unit.name.ar ?? '',
+      cheapest: index === 0,
+      soldOut: free.length === 0,
+      /* What is FREE, not what exists — and silent when there is only ever one. */
+      leftText: free.length > 1 ? t('unitsLeft', { count: free.length }) : null,
+      occupancyText: `${t('guestsUpTo', { count: unit.maxGuests })} · ${t('unitLayout', {
+        bedrooms: unit.bedrooms,
+        beds: unit.beds,
+        bathrooms: unit.bathrooms,
+      })}`,
+      termsText: `${t('unitAvailable')} · ${t('unitNightsMin', { count: unit.minNights })}${
+        unit.maxNights === null
+          ? ''
+          : ` · ${t('unitNightsMax', { count: unit.maxNights })}`
+      }`,
+      policyText: policyName(property.cancellationPolicy, locale),
+      amenityNames: unit.amenityCodes.map((code) => dynamicMessage(ta, code, code)),
+      perNightText: shown(
+        priceWithCustomerFee(unit.basePrice, unit.currencyCode, property.fees),
+      ),
+      roomLineLabel: t('summaryRoomLine', { nights }),
+      roomLineAmount: shown(roomOnly),
+      feeAmount: shown(feeOnly),
+      totalText: shown(withFee),
+      checkIn: askedStayWindow.checkIn,
+      checkOut: departure.toISOString().slice(0, 10),
+      nights,
+      nightsText: t('summaryNights', { count: nights }),
+      maxGuests: unit.maxGuests,
+      minNights: unit.minNights,
+      capacityText: t('guestsUpTo', { count: unit.maxGuests }),
+    };
+  });
+
+  return (
+    /*
+      One client boundary around BOTH the room list and the summary card.
+
+      They sit in different columns of a server-rendered page, and a choice in one has to appear in
+      the other at once. A provider spanning them is the only way to share that state — see
+      `booking-selection.tsx`.
+    */
+    <BookingSelectionProvider>
+      <article className="mx-auto max-w-7xl px-4 py-8">
+        <nav aria-label={tnav('breadcrumb')} className="text-sm text-faint">
+          {/* Both breadcrumb links are controls — see the note on the city page. */}
+          <Link
+            href={`/${locale}`}
+            className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
+          >
+            {tc('backHome')}
+          </Link>
+          <span aria-hidden className="mx-2">
+            ←
+          </span>
+          <Link
+            href={`/${locale}/city/${property.city.slug}`}
+            className="inline-flex min-h-10 items-center hover:text-gold lg:min-h-0"
+          >
+            {cityName}
+          </Link>
+          <span aria-hidden className="mx-2">
+            ←
+          </span>
+          <span className="text-muted">{name}</span>
+        </nav>
+
+        <header className="mt-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="font-display text-3xl font-bold text-gold sm:text-4xl">
+                {name}
+              </h1>
+              {/*
               ── Type, CLASSIFICATION, city, then the review score ──────────────
 
               The star row sits with the property TYPE and the review score keeps its own «★ 4.6 ·
@@ -254,7 +351,7 @@ export default async function PropertyPage({
               cannot be interpolated into one — and `items-center` so the stars sit on the text's
               centre line rather than its baseline.
             */}
-            {/*
+              {/*
               ── The classification on its OWN line, under the name ─────────────
 
               It was inline in the meta line, between the type and the city, which is where the
@@ -269,32 +366,36 @@ export default async function PropertyPage({
               score it must not be confused with. The component is the same; only the placement
               differs, and the placement is what the space allows.
             */}
-            {property.starRating ? (
-              <p className="mt-2">
-                <StarRating
-                  value={property.starRating}
-                  size="md"
-                  label={ts('stars', { count: property.starRating })}
-                />
+              {property.starRating ? (
+                <p className="mt-2">
+                  <StarRating
+                    value={property.starRating}
+                    size="md"
+                    label={ts('stars', { count: property.starRating })}
+                  />
+                </p>
+              ) : null}
+
+              <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
+                <span>
+                  {dynamicMessage(
+                    tt,
+                    property.propertyTypeCode,
+                    property.propertyTypeCode,
+                  )}
+                </span>
+                <span>
+                  · {cityName}
+                  {property.rating ? ` · ★ ${property.rating}` : ''}
+                  {property.reviewsCount > 0
+                    ? ` · ${t('reviews', { count: property.reviewsCount })}`
+                    : ''}
+                  {' · '}
+                  <span className="text-faint">{property.reference}</span>
+                </span>
               </p>
-            ) : null}
 
-            <p className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">
-              <span>
-                {dynamicMessage(tt, property.propertyTypeCode, property.propertyTypeCode)}
-              </span>
-              <span>
-                · {cityName}
-                {property.rating ? ` · ★ ${property.rating}` : ''}
-                {property.reviewsCount > 0
-                  ? ` · ${t('reviews', { count: property.reviewsCount })}`
-                  : ''}
-                {' · '}
-                <span className="text-faint">{property.reference}</span>
-              </span>
-            </p>
-
-            {/*
+              {/*
               The address, on its own line under the name — booking.com's arrangement, and it earns
               the line: «where is it» is the second question anybody asks and it was buried in a
               section two screens down.
@@ -304,21 +405,21 @@ export default async function PropertyPage({
               the section it lands on is the one that also says the exact address arrives after
               booking (§5.6, P-001) — which is the part a pin would otherwise imply away.
             */}
-            <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-              <PinIcon />
-              <span>
-                {property.addressApproximate}, {cityName}
-              </span>
-              <a
-                href="#location"
-                className="inline-flex min-h-10 items-center font-semibold text-gold underline decoration-gold/40 underline-offset-2 lg:min-h-0 hover:decoration-gold"
-              >
-                {t('location')}
-              </a>
-            </p>
-          </div>
+              <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+                <PinIcon />
+                <span>
+                  {property.addressApproximate}, {cityName}
+                </span>
+                <a
+                  href="#location"
+                  className="inline-flex min-h-10 items-center font-semibold text-gold underline decoration-gold/40 underline-offset-2 lg:min-h-0 hover:decoration-gold"
+                >
+                  {t('location')}
+                </a>
+              </p>
+            </div>
 
-          {/*
+            {/*
             The actions at the reading END, opposite the name — booking.com's own arrangement, and
             it is not arbitrary: the name answers «what is this» and belongs where the eye starts,
             the action answers «and now what» and belongs where it finishes.
@@ -337,16 +438,16 @@ export default async function PropertyPage({
             bar at the foot of the viewport rather than putting this back, because that is the
             pattern that keeps the action visible without duplicating it.
           */}
-          <div className="flex flex-wrap items-center gap-2">
-            <ShareButton
-              labels={{
-                share: t('share'),
-                copied: t('shareCopied'),
-                failed: t('shareFailed'),
-              }}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <ShareButton
+                labels={{
+                  share: t('share'),
+                  copied: t('shareCopied'),
+                  failed: t('shareFailed'),
+                }}
+              />
 
-            {/*
+              {/*
               «حفظ في المفضلة» (Bashar, 2026-09-03). It sat under the name before, in the column
               that answers «what is this» — and saving is not a fact about the listing, it is
               something the reader does to it.
@@ -355,94 +456,68 @@ export default async function PropertyPage({
               between readers and must carry nobody's shortlist. The button asks for its own state
               after mounting, which keeps the page cacheable.
             */}
-            <SaveButton
-              slug={property.slug}
-              signInHref={`/${locale}/login?next=${encodeURIComponent(backHere)}`}
-              labels={{
-                save: t('save'),
-                saved: t('saved'),
-                failed: t('saveFailed'),
+              <SaveButton
+                slug={property.slug}
+                signInHref={`/${locale}/login?next=${encodeURIComponent(backHere)}`}
+                labels={{
+                  save: t('save'),
+                  saved: t('saved'),
+                  failed: t('saveFailed'),
+                }}
+              />
+            </div>
+          </div>
+
+          {property.badges.length > 0 ? (
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {property.badges.map((badge) => (
+                <li
+                  key={badge}
+                  className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs text-gold"
+                >
+                  {badge === 'safra_verified' ? t('badgeVerified') : t('badgeRecommends')}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </header>
+
+        {/* ── Gallery ────────────────────────────────────────────────────────── */}
+        <Gallery property={property} locale={locale} name={name} t={t} />
+
+        <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_20rem]">
+          <div className="space-y-8">
+            {description ? (
+              <section>
+                <p className="whitespace-pre-line text-muted">{description}</p>
+              </section>
+            ) : null}
+
+            {/* ── The rooms, and the choice between them ────────────────────── */}
+            <UnitSelector
+              rooms={rooms}
+              copy={{
+                title: t('unitsTitle'),
+                note: t('unitsNote'),
+                one: t('unitsOne'),
+                book: t('bookThisUnit'),
+                chosen: t('unitChosen'),
+                cheapest: t('unitCheapest'),
+                soldOut: t('unitSoldOut'),
+                amenitiesLabel: t('unitAmenitiesLabel'),
+                amenitiesNone: t('unitAmenitiesNone'),
+                cancellation: t('cancellationPolicy'),
               }}
             />
-          </div>
-        </div>
 
-        {property.badges.length > 0 ? (
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {property.badges.map((badge) => (
-              <li
-                key={badge}
-                className="rounded-full border border-gold/40 bg-gold/10 px-3 py-1 text-xs text-gold"
-              >
-                {badge === 'safra_verified' ? t('badgeVerified') : t('badgeRecommends')}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </header>
-
-      {/* ── Gallery ────────────────────────────────────────────────────────── */}
-      <Gallery property={property} locale={locale} name={name} t={t} />
-
-      <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_20rem]">
-        <div className="space-y-8">
-          {description ? (
-            <section>
-              <p className="whitespace-pre-line text-muted">{description}</p>
-            </section>
-          ) : null}
-
-          {/* ── The rooms, and the choice between them ────────────────────── */}
-          <UnitSelector
-            units={property.units}
-            locale={locale}
-            propertySlug={property.slug}
-            stay={{
-              checkIn: stay.get('checkIn') ?? defaultStay.checkIn,
-              checkOut: stay.get('checkOut') ?? defaultStay.checkOut,
-            }}
-            guests={{ adults, children, infants }}
-            priceWithFee={(basePrice, currencyCode) =>
-              convertForDisplay(
-                priceWithCustomerFee(basePrice, currencyCode, property.fees),
-                currencyCode,
-                locale,
-                target,
-                rates,
-              ).text
-            }
-            amenityName={(code) => dynamicMessage(ta, code, code)}
-            copy={{
-              title: t('unitsTitle'),
-              note: t('unitsNote'),
-              one: t('unitsOne'),
-              book: t('bookThisUnit'),
-              layout: (u) =>
-                t('unitLayout', {
-                  bedrooms: u.bedrooms,
-                  beds: u.beds,
-                  bathrooms: u.bathrooms,
-                }),
-              guestsUpTo: (count) => t('guestsUpTo', { count }),
-              nightsMin: (count) => t('unitNightsMin', { count }),
-              nightsMax: (count) => t('unitNightsMax', { count }),
-              available: t('unitAvailable'),
-              cheapest: t('unitCheapest'),
-              left: (count) => t('unitsLeft', { count }),
-              soldOut: t('unitSoldOut'),
-              amenitiesLabel: t('unitAmenitiesLabel'),
-              amenitiesNone: t('unitAmenitiesNone'),
-              cancellation: t('cancellationPolicy'),
-              cancellationName: policyName(property.cancellationPolicy, locale),
-            }}
-          />
-
-          {/* ── What the BUILDING offers, as opposed to a room (Bashar, 2026-09-06) ── */}
-          {property.amenityCodes.length > 0 ? (
-            <section>
-              <h2 className="font-display text-xl text-text">{t('propertyAmenities')}</h2>
-              <p className="mt-1 text-sm text-muted">{t('propertyAmenitiesNote')}</p>
-              {/*
+            {/* ── What the BUILDING offers, as opposed to a room (Bashar, 2026-09-06) ── */}
+            {property.amenityCodes.length > 0 ? (
+              <section>
+                <h2 className="font-display text-xl text-text">
+                  {t('propertyAmenities')}
+                </h2>
+                <p className="mt-1 text-sm text-muted">{t('propertyAmenitiesNote')}</p>
+                {/*
                 Bordered cells, as booking.com draws them — scannable in a way a bulleted list is
                 not, and this is a list people scan for one word.
 
@@ -455,151 +530,157 @@ export default async function PropertyPage({
                 This list used to be the CHEAPEST UNIT's amenities under the heading «المرافق»,
                 which told a guest the building had whatever the smallest room happened to have.
               */}
-              <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {property.amenityCodes.map((code) => (
+                <ul className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {property.amenityCodes.map((code) => (
+                    <li
+                      key={code}
+                      className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-text"
+                    >
+                      {dynamicMessage(ta, code, code)}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {/* ── Availability calendar with all four states (§5.6) ─────────── */}
+            <section>
+              <h2 className="font-display text-xl text-text">{tcal('title')}</h2>
+              <ol className="mt-4 flex flex-wrap gap-1.5">
+                {property.calendar.slice(0, 28).map((day) => (
                   <li
-                    key={code}
-                    className="rounded-lg border border-line bg-card px-3 py-2.5 text-sm text-text"
+                    key={day.date}
+                    title={`${day.date} · ${tcal(day.status)}`}
+                    className={`flex w-14 flex-col items-center rounded-lg border px-1 py-1.5 text-center ${dayClasses(day.status)}`}
                   >
-                    {dynamicMessage(ta, code, code)}
+                    <span className="text-[10px] opacity-70">{day.date.slice(8)}</span>
+                    <span aria-hidden className="text-xs">
+                      {dayGlyph(day.status)}
+                    </span>
                   </li>
                 ))}
+              </ol>
+              <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-faint">
+                {(['available', 'booked', 'closed', 'maintenance'] as const).map(
+                  (state) => (
+                    <li key={state} className="flex items-center gap-1.5">
+                      <span aria-hidden className={legendDot(state)}>
+                        ●
+                      </span>
+                      {tcal(state)}
+                    </li>
+                  ),
+                )}
               </ul>
             </section>
-          ) : null}
 
-          {/* ── Availability calendar with all four states (§5.6) ─────────── */}
-          <section>
-            <h2 className="font-display text-xl text-text">{tcal('title')}</h2>
-            <ol className="mt-4 flex flex-wrap gap-1.5">
-              {property.calendar.slice(0, 28).map((day) => (
-                <li
-                  key={day.date}
-                  title={`${day.date} · ${tcal(day.status)}`}
-                  className={`flex w-14 flex-col items-center rounded-lg border px-1 py-1.5 text-center ${dayClasses(day.status)}`}
-                >
-                  <span className="text-[10px] opacity-70">{day.date.slice(8)}</span>
-                  <span aria-hidden className="text-xs">
-                    {dayGlyph(day.status)}
-                  </span>
-                </li>
-              ))}
-            </ol>
-            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-faint">
-              {(['available', 'booked', 'closed', 'maintenance'] as const).map(
-                (state) => (
-                  <li key={state} className="flex items-center gap-1.5">
-                    <span aria-hidden className={legendDot(state)}>
-                      ●
-                    </span>
-                    {tcal(state)}
-                  </li>
-                ),
-              )}
-            </ul>
-          </section>
+            {/* ── Cancellation policy (§7.4) ────────────────────────────────── */}
+            <section>
+              <h2 className="font-display text-xl text-text">
+                {t('cancellationPolicy')}
+              </h2>
+              <div className="mt-3 rounded-card border border-line bg-card p-5">
+                <p className="font-semibold text-text">
+                  {policyName(property.cancellationPolicy, locale)}
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  {policyDescription(property.cancellationPolicy, locale)}
+                </p>
+                <p className="mt-3 text-xs text-faint">
+                  {t('refundFloor', {
+                    percent: property.cancellationPolicy.minRefundPercent,
+                  })}
+                </p>
+              </div>
+            </section>
 
-          {/* ── Cancellation policy (§7.4) ────────────────────────────────── */}
-          <section>
-            <h2 className="font-display text-xl text-text">{t('cancellationPolicy')}</h2>
-            <div className="mt-3 rounded-card border border-line bg-card p-5">
-              <p className="font-semibold text-text">
-                {policyName(property.cancellationPolicy, locale)}
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                {policyDescription(property.cancellationPolicy, locale)}
-              </p>
-              <p className="mt-3 text-xs text-faint">
-                {t('refundFloor', {
-                  percent: property.cancellationPolicy.minRefundPercent,
-                })}
-              </p>
-            </div>
-          </section>
+            {/* ── Location, deliberately approximate (§5.6, P-001) ──────────── */}
+            <section id="location" className="scroll-mt-28">
+              <h2 className="font-display text-xl text-text">{t('location')}</h2>
+              <div className="mt-3 rounded-card border border-line bg-card p-5">
+                <p className="text-sm text-muted">
+                  {property.addressApproximate}, {cityName}
+                </p>
+                <p className="mt-2 text-xs text-faint">
+                  {t('exactLocationAfterBooking')}
+                </p>
+              </div>
+            </section>
 
-          {/* ── Location, deliberately approximate (§5.6, P-001) ──────────── */}
-          <section id="location" className="scroll-mt-28">
-            <h2 className="font-display text-xl text-text">{t('location')}</h2>
-            <div className="mt-3 rounded-card border border-line bg-card p-5">
-              <p className="text-sm text-muted">
-                {property.addressApproximate}, {cityName}
-              </p>
-              <p className="mt-2 text-xs text-faint">{t('exactLocationAfterBooking')}</p>
-            </div>
-          </section>
+            {/* ── What guests said (§5.6, §7.3) ──────────────────────────────── */}
+            <section>
+              <h2 className="font-display text-xl text-text">{t('reviewsTitle')}</h2>
 
-          {/* ── What guests said (§5.6, §7.3) ──────────────────────────────── */}
-          <section>
-            <h2 className="font-display text-xl text-text">{t('reviewsTitle')}</h2>
-
-            {property.reviews.length === 0 ? (
-              <p className="mt-3 text-sm text-faint">{t('reviewsEmpty')}</p>
-            ) : (
-              <>
-                {/*
+              {property.reviews.length === 0 ? (
+                <p className="mt-3 text-sm text-faint">{t('reviewsEmpty')}</p>
+              ) : (
+                <>
+                  {/*
                   The sample is named as a sample. `reviewsCount` is the trigger-maintained total
                   over published reviews, so "the 10 most recent of 132" cannot drift from the ★
                   beside the title — both come from the same aggregate.
                 */}
-                <p className="mt-1 text-xs text-faint">
-                  {t('reviewsShowing', {
-                    shown: property.reviews.length,
-                    total: property.reviewsCount,
-                  })}
-                </p>
+                  <p className="mt-1 text-xs text-faint">
+                    {t('reviewsShowing', {
+                      shown: property.reviews.length,
+                      total: property.reviewsCount,
+                    })}
+                  </p>
 
-                <ul className="mt-3 space-y-3">
-                  {property.reviews.map((review) => (
-                    <li
-                      key={review.reference}
-                      className="rounded-card border border-line bg-card p-5"
-                    >
-                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                        <span className="text-sm font-semibold text-text">
-                          {review.author ?? ''}
-                        </span>
-                        {/*
+                  <ul className="mt-3 space-y-3">
+                    {property.reviews.map((review) => (
+                      <li
+                        key={review.reference}
+                        className="rounded-card border border-line bg-card p-5"
+                      >
+                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <span className="text-sm font-semibold text-text">
+                            {review.author ?? ''}
+                          </span>
+                          {/*
                           `dir="ltr"`: a ★ followed by a digit is a Latin run, and the star is
                           bidi-neutral — without this it lands on the wrong side of the number.
                         */}
-                        <span dir="ltr" className="text-sm font-bold text-gold">
-                          <span aria-hidden>★</span> {review.rating}
-                        </span>
-                        <span className="text-xs text-faint">{t('reviewsVerified')}</span>
-                        <span className="ms-auto text-xs text-faint">
-                          {review.createdAt.slice(0, 10)}
-                        </span>
-                      </div>
-
-                      <p className="mt-2 text-sm leading-relaxed text-muted">
-                        {review.body}
-                      </p>
-
-                      {review.partnerReply ? (
-                        <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3">
-                          <p className="text-xs font-semibold text-gold">
-                            {t('reviewsPartnerReply')}
-                          </p>
-                          <p className="mt-1 text-sm leading-relaxed text-muted">
-                            {review.partnerReply}
-                          </p>
+                          <span dir="ltr" className="text-sm font-bold text-gold">
+                            <span aria-hidden>★</span> {review.rating}
+                          </span>
+                          <span className="text-xs text-faint">
+                            {t('reviewsVerified')}
+                          </span>
+                          <span className="ms-auto text-xs text-faint">
+                            {review.createdAt.slice(0, 10)}
+                          </span>
                         </div>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </section>
-        </div>
 
-        {/* ── Booking panel ─────────────────────────────────────────────────── */}
-        {/*
+                        <p className="mt-2 text-sm leading-relaxed text-muted">
+                          {review.body}
+                        </p>
+
+                        {review.partnerReply ? (
+                          <div className="mt-3 rounded-lg border border-gold/30 bg-gold/5 px-4 py-3">
+                            <p className="text-xs font-semibold text-gold">
+                              {t('reviewsPartnerReply')}
+                            </p>
+                            <p className="mt-1 text-sm leading-relaxed text-muted">
+                              {review.partnerReply}
+                            </p>
+                          </div>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </section>
+          </div>
+
+          {/* ── Booking panel ─────────────────────────────────────────────────── */}
+          {/*
           `scroll-mt` so the sticky header does not land on top of the panel the anchor just jumped
           to — the same reason every row on the console carries one.
         */}
-        <aside id="booking" className="scroll-mt-28 lg:sticky lg:top-24 lg:self-start">
-          {/*
+          <aside id="booking" className="scroll-mt-28 lg:sticky lg:top-24 lg:self-start">
+            {/*
             The score, the count, and one thing a guest actually said — booking.com's card, and the
             reason it sits ABOVE the price is that it answers the question the price provokes. A
             rating with no sentence under it is a number; a sentence with a name under it is a
@@ -608,152 +689,101 @@ export default async function PropertyPage({
             One review, not a carousel: the full set is a section further down, and a panel that
             paged through them would compete with the thing beside it for the same attention.
           */}
-          {property.rating ? (
-            <div className="mb-3 rounded-card border border-line bg-card p-5">
-              <div className="flex items-center gap-3">
-                <span className="btn-gold grid min-w-11 place-items-center rounded-lg px-2.5 py-1.5 text-lg font-bold">
-                  {property.rating}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-text">{scoreWord}</span>
-                  {property.reviewsCount > 0 ? (
-                    <span className="block text-xs text-muted">
-                      {t('reviews', { count: property.reviewsCount })}
-                    </span>
-                  ) : null}
-                </span>
-              </div>
+            {property.rating ? (
+              <div className="mb-3 rounded-card border border-line bg-card p-5">
+                <div className="flex items-center gap-3">
+                  <span className="btn-gold grid min-w-11 place-items-center rounded-lg px-2.5 py-1.5 text-lg font-bold">
+                    {property.rating}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-text">{scoreWord}</span>
+                    {property.reviewsCount > 0 ? (
+                      <span className="block text-xs text-muted">
+                        {t('reviews', { count: property.reviewsCount })}
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
 
-              {highlight ? (
-                <figure className="mt-4 border-t border-line pt-4">
-                  <figcaption className="text-xs font-semibold text-muted">
-                    {t('guestsLoved')}
-                  </figcaption>
-                  {/*
+                {highlight ? (
+                  <figure className="mt-4 border-t border-line pt-4">
+                    <figcaption className="text-xs font-semibold text-muted">
+                      {t('guestsLoved')}
+                    </figcaption>
+                    {/*
                     A real quotation mark pair, not the ASCII kind, and the body is clamped to three
                     lines: a panel quote is a snippet somebody reads at a glance, and the whole
                     review is one section down for anybody who wants it.
                   */}
-                  <blockquote className="mt-2 line-clamp-3 text-sm leading-relaxed text-text">
-                    “{highlight.body}”
-                  </blockquote>
-                  {highlight.author ? (
-                    <p className="mt-2 text-xs text-faint">{highlight.author}</p>
-                  ) : null}
-                </figure>
-              ) : null}
-            </div>
-          ) : null}
-
-          <div className="rounded-card border border-gold/30 bg-card p-5">
-            {cheapest ? (
-              <>
-                <p className="text-2xl font-semibold text-gold">
-                  {nightly.text}
-                  <span className="ms-1 text-sm font-normal text-faint">
-                    {t('perNight')}
-                  </span>
-                </p>
-                {/*
-                  The listing's own currency, printed whenever the figure above is not it.
-
-                  A browse price converts so it can be compared; the amount a booking is actually
-                  made against is this one, and checkout will show it. Omitting this line would
-                  turn an estimate into what looks like a quote.
-                */}
-                {nightly.converted ? (
-                  <p className="mt-1 text-xs text-faint">
-                    {common('convertedFrom', { amount: nightly.original })}
-                  </p>
+                    <blockquote className="mt-2 line-clamp-3 text-sm leading-relaxed text-text">
+                      “{highlight.body}”
+                    </blockquote>
+                    {highlight.author ? (
+                      <p className="mt-2 text-xs text-faint">{highlight.author}</p>
+                    ) : null}
+                  </figure>
                 ) : null}
-                <p className="mt-1 text-sm text-muted">
-                  {t('guestsUpTo', { count: cheapest.maxGuests })}
-                </p>
+              </div>
+            ) : null}
 
-                <div className="gold-rule my-4" />
+            <div className="rounded-card border border-gold/30 bg-card p-5">
+              {cheapest ? (
+                <>
+                  {/*
+                  The card is LIVE now: it answers "what am I about to book, and what does it cost"
+                  from the guest's own choice, and its button names which of the two states it is in
+                  — «اختر غرفة» while nothing is chosen, «احجز الآن» once something is.
 
-                {/*
-                  Carries the unit and a concrete date range, because checkout needs both to quote
-                  a price.
-
-                  **The reader's OWN dates when they have them**, and the calendar's first bookable
-                  window only when they do not. It used `defaultStay` unconditionally, so somebody
-                  who searched 23–25 March, read a two-night price on the card and pressed «احجز
-                  الآن» arrived at a checkout for TONIGHT — one night, a different total, and
-                  nothing on the way through saying the stay had been changed. Driven and measured
-                  on 2026-09-04: searched 2027-03-23→25, booked 2026-09-04→05, $203.98 became
-                  $96.99.
-
-                  It is the same defect the SRS audit found in this link in August, in the same
-                  place, for the PARTY rather than the dates — «a family of four reached checkout as
-                  a party of two». The party was fixed then and the dates were left.
-
-                  The fallback still matters and is kept: a reader arriving from a bookmark or a
-                  city tile has no dates, and a checkout with none refuses. Availability stays the
-                  API's to judge — it re-quotes and answers «هذه الوحدة غير متاحة لهذه التواريخ» if
-                  the chosen range is not bookable, which is a truthful screen rather than a
-                  silently substituted stay.
+                  It used to show the cheapest room's «from» price above a button that booked that
+                  room, so a guest reading «من ٧٣٫٩٩» on a thirteen-room hotel and pressing it
+                  silently bought the smallest one. The figure and the action disagreed.
                 */}
-                {/*
-                  With more than one unit this CHOOSES rather than books.
+                  <BookingSummaryCard
+                    locale={locale}
+                    propertySlug={property.slug}
+                    guests={{ adults, children, infants }}
+                    fromPrice={nightly.text}
+                    copy={{
+                      perNightSuffix: t('perNight'),
+                      guestsUpToParty: t('guestsUpTo', {
+                        count: cheapest.maxGuests,
+                      }),
+                      chooseRoom: t('chooseRoom'),
+                      bookNow: t('bookNow'),
+                      selected: t('summarySelected'),
+                      change: t('summaryChange'),
+                      remove: t('summaryRemove'),
+                      /* The PARTY, resolved once — the card cannot be handed a formatter. */
+                      guestsCount: t('summaryGuests', { count: adults + children }),
+                      fee: t('summaryFee'),
+                      total: t('summaryTotal'),
+                      policy: t('summaryPolicy'),
+                      amenities: t('summaryAmenities'),
+                      empty: t('summaryEmpty'),
+                    }}
+                  />
 
-                  The sidebar price is a «from» figure taken off the cheapest unit, and the button
-                  under it used to book that unit — so a guest reading «من ٩٦٫٩٩» on a two-room
-                  chalet and pressing «احجز الآن» silently bought the smaller room. The figure and
-                  the action disagreed, and nothing on the way through said so.
-
-                  Now it sends them to the list, where every unit states its own price and terms and
-                  carries its own action. With exactly one unit there is nothing to choose, so it
-                  still books, and the label says which of the two it is doing.
+                  {/*
+                  "Ask SAFRA", never "contact the property". §5.6 and P-001 forbid exposing partner
+                  contact details before confirmation.
                 */}
-                {property.units.length > 1 ? (
-                  <a
-                    href="#units"
-                    className="mt-5 block rounded-lg btn-gold px-5 py-3 text-center font-semibold transition-opacity hover:opacity-90"
-                  >
-                    {t('chooseUnit')}
-                  </a>
-                ) : (
                   <Link
-                    href={`/${locale}/checkout?property=${property.slug}&unitId=${cheapest.id}&checkIn=${stay.get('checkIn') ?? defaultStay.checkIn}&checkOut=${stay.get('checkOut') ?? defaultStay.checkOut}&adults=${Math.min(adults, cheapest.maxGuests)}&children=${children}&infants=${infants}`}
-                    className="mt-5 block rounded-lg btn-gold px-5 py-3 text-center font-semibold transition-opacity hover:opacity-90"
+                    href={`/${locale}/account/support`}
+                    className="mt-2 block rounded-lg border border-line px-5 py-3 text-center text-sm text-muted transition-colors hover:border-gold hover:text-gold"
                   >
-                    {t('bookNow')}
+                    {t('askSafra')}
                   </Link>
-                )}
 
-                {/*
-                  "Ask SAFRA", never "contact the property". §5.6 and P-001 forbid
-                  exposing partner contact details before confirmation.
-                */}
-                <Link
-                  /*
-                    `/account/support`, which is where الدعم actually lives.
-
-                    This pointed at `/${locale}/support` — a route that has never existed — so
-                    «اسأل سفرة» on every property page answered 404. Found by sweeping every
-                    internal link against the routes each app really serves (2026-08-29); nothing
-                    HTTP-level could see it, because the page around it returns 200.
-
-                    The `?property=` it also carried is gone: the support screen reads `cursor` and
-                    nothing else, so it was a parameter that looked handled and was not. Prefilling
-                    the question with the property is a real improvement and a separate decision.
-                  */
-                  href={`/${locale}/account/support`}
-                  className="mt-2 block rounded-lg border border-line px-5 py-3 text-center text-sm text-muted transition-colors hover:border-gold hover:text-gold"
-                >
-                  {t('askSafra')}
-                </Link>
-
-                <p className="mt-4 text-xs text-faint">{t('notInstantNotice')}</p>
-              </>
-            ) : (
-              <p className="text-sm text-muted">{t('noUnits')}</p>
-            )}
-          </div>
-        </aside>
-      </div>
-    </article>
+                  <p className="mt-4 text-xs text-faint">{t('notInstantNotice')}</p>
+                </>
+              ) : (
+                <p className="text-sm text-muted">{t('noUnits')}</p>
+              )}
+            </div>
+          </aside>
+        </div>
+      </article>
+    </BookingSelectionProvider>
   );
 }
 

@@ -90,14 +90,19 @@ async function book(
   await page.goto(`/ar/property/${SLUG}?${QUERY}`, { waitUntil: 'domcontentloaded' });
 
   const row = page.locator('#units > ul > li').filter({ hasText: typeName });
-  const link = row.getByRole('link', { name: 'احجز هذه الوحدة' });
 
-  const href = (await link.getAttribute('href')) ?? '';
+  /* Choose on the row, commit on the card — the two acts a guest performs. */
+  await row.getByRole('button', { name: 'احجز هذه الوحدة' }).click();
+
+  const card = page.locator('aside#booking');
+  const book = card.getByRole('link', { name: 'احجز الآن' });
+
+  const href = (await book.getAttribute('href')) ?? '';
   const unitId = /unitId=([0-9a-f-]{36})/.exec(href)?.[1] ?? '';
 
   expect(unitId, `${typeName} offers a bookable room`).toMatch(/[0-9a-f-]{36}/);
 
-  await link.click();
+  await book.click();
   await page.waitForURL(/\/checkout\?/);
 
   /* The room is NAMED where the money is agreed — not just priced. */

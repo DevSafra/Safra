@@ -100,3 +100,33 @@ export function customerLines<T extends FeeLine>(
         : line,
     );
 }
+
+/**
+ * A money string multiplied by a whole number of nights, exactly.
+ *
+ * In MINOR UNITS, because `Number('96.99') * 2` is 193.98000000000002 and a stay total printed from
+ * that is a figure a guest can see is wrong. The same reason every other amount on this platform is
+ * handled as an integer of the smallest unit.
+ *
+ * Unparseable in, unchanged out — the same refusal `priceWithCustomerFee` makes, and for the same
+ * reason: a price this function invented would be worse than one it declined to compute.
+ */
+export function multiplyMoney(base: string, currency: string, nights: number): string {
+  const scale = currencyDecimals(currency);
+  const minor = moneyToMinor(base, scale);
+
+  if (minor === null || !Number.isInteger(nights) || nights < 1) return base;
+
+  return moneyFromMinor(minor * BigInt(nights), scale);
+}
+
+/** One money string less another, exactly — used to state a fee as its own line. */
+export function subtractMoney(total: string, part: string, currency: string): string {
+  const scale = currencyDecimals(currency);
+  const totalMinor = moneyToMinor(total, scale);
+  const partMinor = moneyToMinor(part, scale);
+
+  if (totalMinor === null || partMinor === null) return total;
+
+  return moneyFromMinor(totalMinor - partMinor, scale);
+}

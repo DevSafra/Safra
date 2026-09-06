@@ -98,13 +98,25 @@ test('the room a guest chooses is the room checkout quotes', async ({ page }) =>
   await page.goto(`/ar/property/${SLUG}`, { waitUntil: 'domcontentloaded' });
 
   const suite = page.locator('#units > ul > li').filter({ hasText: 'جناح تنفيذي' });
-  const book = suite.getByRole('link', { name: 'احجز هذه الوحدة' });
 
+  /*
+    Choosing and booking are two acts now.
+
+    The row used to be a link straight to checkout; it fills the summary card beside the page, and
+    «احجز الآن» there is the commitment — so this is the journey a guest actually walks.
+  */
+  await suite.getByRole('button', { name: 'احجز هذه الوحدة' }).click();
+
+  const card = page.locator('aside#booking');
+
+  await expect(card, 'the card holds the choice').toContainText('جناح تنفيذي');
+
+  const book = card.getByRole('link', { name: 'احجز الآن' });
   const href = (await book.getAttribute('href')) ?? '';
 
   /*
-    The link carries a specific PHYSICAL room, not a type. Booking targets one `unit_id` because
-    the exclusion constraint does, and the grouping above is a display concern only.
+    The link carries a specific PHYSICAL room, not a type. Booking targets one `unit_id` because the
+    exclusion constraint does, and the grouping on the page is a display concern only.
   */
   expect(href, 'the choice travels as a unit id').toMatch(/unitId=[0-9a-f-]{36}/);
 
