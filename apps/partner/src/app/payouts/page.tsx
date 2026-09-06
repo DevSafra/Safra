@@ -212,6 +212,30 @@ function Summary({
 
   return (
     <section className="grid gap-2 rounded-card border border-line bg-card p-4.5">
+      {/*
+        One constant route to where destinations are maintained.
+
+        The only link across to الإعدادات used to sit inside the «no account yet» warning, so a
+        partner who HAD an account could read which one their money goes to and had no way to reach
+        the screen that changes it — they had to already know الإعدادات existed. `accountsLink` was
+        written for this and had no caller.
+
+        In the header rather than beside the state message, because navigation is not a property of
+        the state: where the accounts live is the same fact whether one is set up or not, and a link
+        that appears and disappears teaches a reader nothing about where things are.
+      */}
+      <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="text-[12px] font-bold tracking-wide text-faint">
+          {t.payouts.summaryHeading}
+        </span>
+        <Link
+          href="/settings"
+          className="inline-flex min-h-10 items-center text-[12px] font-semibold text-gold underline underline-offset-2 lg:min-h-0"
+        >
+          {t.payouts.accountsLink}
+        </Link>
+      </span>
+
       <p className="text-[15px] leading-relaxed font-semibold text-text">
         {pending && currency && open.length > 0 ? (
           plural(t.payouts.summaryPending, {
