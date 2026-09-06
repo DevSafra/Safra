@@ -25,6 +25,9 @@ export type Arrival = {
   guestName: string;
   propertyName: string;
   unitName: string;
+  /** How many rooms this booking holds, and which physical rooms — reception hands over keys. */
+  rooms: number;
+  roomLabels: string | null;
   checkIn: string;
   checkOut: string;
   nights: number;
@@ -384,6 +387,8 @@ export interface ArrivalRow extends Record<string, unknown> {
   guest_name: string;
   property_name: string;
   unit_name: string;
+  rooms: number;
+  room_labels: string | null;
   check_in: string;
   check_out: string;
   nights: number;
@@ -398,6 +403,8 @@ function toArrival(row: ArrivalRow): Arrival {
     guestName: row.guest_name,
     propertyName: row.property_name,
     unitName: row.unit_name,
+    rooms: row.rooms,
+    roomLabels: row.room_labels,
     checkIn: row.check_in,
     checkOut: row.check_out,
     nights: row.nights,
