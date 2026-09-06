@@ -162,8 +162,9 @@ test('a facility declared on the property reaches every surface as the property�
 
     await expect(units, 'the rooms are on the page').toBeVisible();
     await expect(
-      units.getByRole('link', { name: 'احجز هذه الوحدة' }).first(),
-      'each room can be booked on its own',
+      /* A BUTTON since the rows became a choice rather than a link off the page. */
+      units.getByRole('button', { name: 'احجز هذه الوحدة' }).first(),
+      'each room can be chosen on its own',
     ).toBeVisible();
     await expect(units, 'the building’s pool is not a room’s').not.toContainText('مسبح');
 

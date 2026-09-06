@@ -56,7 +56,13 @@ async function bookTheSuite(page: Page): Promise<string> {
 
   const row = page.locator('#units > ul > li').filter({ hasText: ROOM });
 
-  await row.getByRole('link', { name: 'احجز هذه الوحدة' }).click();
+  /*
+    Choose on the row, commit on the card. The row used to link straight to checkout; it now fills
+    the summary beside the page and «احجز الآن» there is the commitment — so this walks the two
+    acts a guest actually performs.
+  */
+  await row.getByRole('button', { name: 'احجز هذه الوحدة' }).click();
+  await page.locator('aside#booking').getByRole('link', { name: 'احجز الآن' }).click();
   await page.waitForURL(/\/checkout\?/);
 
   await expect(page.locator('aside'), 'checkout names the room').toContainText(ROOM);
