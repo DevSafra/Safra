@@ -442,6 +442,8 @@ const invoiceSummarySchema = z.object({
   checkOut: z.string(),
   nights: z.number(),
   property: translatedNameSchema.extend({ slug: z.string() }),
+  /* WHICH ROOM — a receipt for a suite must not read like one for a standard room. */
+  unit: translatedNameSchema,
   city: translatedNameSchema,
   currencyCode: z.string(),
   totalAmount: z.string(),

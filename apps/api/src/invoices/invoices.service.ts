@@ -53,6 +53,9 @@ type BookingRow = {
   name_ar: string;
   name_en: string | null;
   name_de: string | null;
+  unit_name_ar: string;
+  unit_name_en: string;
+  unit_name_de: string;
   city_name_ar: string;
   city_name_en: string | null;
   city_name_de: string | null;
@@ -119,6 +122,20 @@ export class InvoicesService {
       b.check_out::text  AS check_out,
       b.nights,
       p.slug, p.name_ar, p.name_en, p.name_de,
+      /*
+        WHICH ROOM the receipt is for (Bashar, 2026-09-06).
+
+        The invoice named the property and never the unit, which on a one-room listing was the same
+        thing and on a thirteen-room hotel is not: a receipt for 371.99 was indistinguishable from
+        one for 73.99 except by the figure itself. A customer reconciling a card statement, or a
+        company claiming a stay, cannot tell a suite from a standard room.
+
+        Joined, not snapshotted — the same known limitation the property name carries above, and
+        recorded there rather than restated here.
+      */
+      un.name_ar AS unit_name_ar,
+      un.name_en AS unit_name_en,
+      un.name_de AS unit_name_de,
       ci.name_ar AS city_name_ar,
       ci.name_en AS city_name_en,
       ci.name_de AS city_name_de,
@@ -137,6 +154,7 @@ export class InvoicesService {
     return sql`
       FROM bookings b
       JOIN properties p  ON p.id = b.property_id
+      JOIN units un      ON un.id = b.unit_id
       JOIN cities ci     ON ci.id = p.city_id
       JOIN currencies cur ON cur.id = b.currency_id
     `;
@@ -156,6 +174,11 @@ export class InvoicesService {
         nameAr: row.name_ar,
         nameEn: row.name_en,
         nameDe: row.name_de,
+      },
+      unit: {
+        nameAr: row.unit_name_ar,
+        nameEn: row.unit_name_en,
+        nameDe: row.unit_name_de,
       },
       city: {
         nameAr: row.city_name_ar,

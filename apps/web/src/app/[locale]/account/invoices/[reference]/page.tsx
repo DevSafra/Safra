@@ -164,7 +164,9 @@ export default async function AccountInvoicePage({
           <h2 className="mt-4 font-display text-lg text-text">
             {localisedName(invoice.property, locale)}
           </h2>
-          <p className="mt-1 text-sm text-muted">{localisedName(invoice.city, locale)}</p>
+          <p className="mt-1 text-sm text-muted">
+            {localisedName(invoice.unit, locale)} · {localisedName(invoice.city, locale)}
+          </p>
 
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">
             <div>

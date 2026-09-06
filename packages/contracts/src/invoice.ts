@@ -87,6 +87,14 @@ export interface InvoiceSummary {
   readonly checkOut: string;
   readonly nights: number;
   readonly property: InvoiceProperty;
+  /**
+   * WHICH ROOM the stay was in (Bashar, 2026-09-06).
+   *
+   * The receipt named the property alone, which on a one-unit listing is the same thing and on a
+   * thirteen-room hotel is not: a suite at 371.99 and a standard room at 73.99 produced receipts
+   * distinguishable only by the figure. Somebody reconciling a card statement cannot do that.
+   */
+  readonly unit: InvoiceTranslatedName;
   readonly city: InvoiceTranslatedName;
   readonly currencyCode: string;
   /** `bookings.total_amount`, read verbatim. */
