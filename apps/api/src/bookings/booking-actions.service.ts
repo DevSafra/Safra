@@ -630,17 +630,21 @@ export class BookingActionsService {
         customer_profile_id: string;
         email: string;
         property: string;
+        unit: string;
         check_in: string;
         check_out: string;
         locale: string | null;
       }>(sql`
         SELECT cp.email, coalesce(pr.name_ar, pr.name_en) AS property,
+               /* The ROOM, which the attached voucher names and this message did not. */
+               coalesce(un.name_ar, un.name_en) AS unit,
                b.check_in::text AS check_in, b.check_out::text AS check_out,
                u.preferred_locale AS locale,
                b.id, b.customer_profile_id
         FROM bookings b
         JOIN customer_profiles cp ON cp.id = b.customer_profile_id
         JOIN properties pr        ON pr.id = b.property_id
+        JOIN units un             ON un.id = b.unit_id
         LEFT JOIN users u         ON u.id = cp.user_id
         WHERE b.reference = ${reference}
       `);
@@ -657,6 +661,7 @@ export class BookingActionsService {
           to: row.email,
           reference,
           property: row.property,
+          unit: row.unit,
           checkIn: row.check_in,
           checkOut: row.check_out,
           locale: row.locale ?? 'ar',

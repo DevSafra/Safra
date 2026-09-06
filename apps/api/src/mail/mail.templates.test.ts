@@ -56,6 +56,7 @@ const RENDERERS: {
         locale,
         reference: 'BKG-2026-000042',
         property: 'فندق قصر الشرق',
+        unit: 'جناح تنفيذي',
         checkIn: '2026-09-01',
         checkOut: '2026-09-04',
         voucher: Buffer.from('%PDF-1.4 test'),

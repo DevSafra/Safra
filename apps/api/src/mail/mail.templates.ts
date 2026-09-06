@@ -55,6 +55,15 @@ export function bookingConfirmedMail(input: {
   to: string;
   reference: string;
   property: string;
+  /**
+   * WHICH ROOM (Bashar, 2026-09-06).
+   *
+   * The confirmation named the property and not the unit, which on a one-room listing is the same
+   * thing and on a thirteen-room hotel is not: a guest who chose «جناح تنفيذي» was told only that
+   * their booking at the hotel was confirmed. The voucher attached to this very mail names the
+   * room, so the message and its own attachment disagreed.
+   */
+  unit: string;
   checkIn: string;
   checkOut: string;
   locale: string;
@@ -65,6 +74,7 @@ export function bookingConfirmedMail(input: {
     ...compose((m) => m.bookingConfirmed, input.locale, {
       reference: input.reference,
       property: input.property,
+      unit: input.unit,
       checkIn: input.checkIn,
       checkOut: input.checkOut,
     }),

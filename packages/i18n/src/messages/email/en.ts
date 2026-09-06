@@ -14,7 +14,7 @@ export const en = {
   },
   bookingConfirmed: {
     subject: 'Your booking is confirmed — {reference}',
-    body: 'Your SAFRA booking is confirmed.\n\nBooking number: {reference}\nProperty: {property}\nCheck-in: {checkIn}\nCheck-out: {checkOut}\n\nYour voucher is attached, with a QR code for verification on arrival. Show it, or quote the booking number to your host.\n\nThe SAFRA team',
+    body: 'Your SAFRA booking is confirmed.\n\nBooking number: {reference}\nProperty: {property}\nRoom: {unit}\nCheck-in: {checkIn}\nCheck-out: {checkOut}\n\nYour voucher is attached, with a QR code for verification on arrival. Show it, or quote the booking number to your host.\n\nThe SAFRA team',
   },
   passwordReset: {
     subject: 'Reset your SAFRA password',
