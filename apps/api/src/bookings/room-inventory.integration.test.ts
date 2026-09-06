@@ -330,6 +330,149 @@ describeIfDb('a booking that holds several identical rooms', () => {
     expect(given.rows).toHaveLength(2);
   });
 
+  /**
+   * Two room types on one trip get one trip reference.
+   *
+   * A guest who wants two doubles AND a suite makes two bookings — a booking carries one room type
+   * and a quantity — and until now nothing recorded that they belonged together. Support saw two
+   * references, finance saw two payments, and neither could say it was one arrival.
+   */
+  it('a second booking for the same stay joins the first one’s trip', async () => {
+    const STAY = stay(8);
+    const type = await roomType(STAY);
+
+    expect(type).toBeDefined();
+
+    /* A second type at the same property, or there is no second booking to make. */
+    const other = await db.execute<{ id: string }>(sql`
+      SELECT u.id::text AS id
+        FROM units u
+       WHERE u.property_id = (SELECT property_id FROM units WHERE id = ${type!.unit_id})
+         AND u.room_type_code IS DISTINCT FROM ${type!.room_type_code}
+         AND u.is_active AND u.deleted_at IS NULL
+       LIMIT 1
+    `);
+
+    expect(other.rows[0], 'the fixture property has a second room type').toBeDefined();
+
+    const first = await service.createDraft(
+      { unitId: type!.unit_id, ...STAY, rooms: 2, adults: 2, guest },
+      undefined,
+      {},
+    );
+    const second = await service.createDraft(
+      { unitId: other.rows[0]!.id, ...STAY, rooms: 1, adults: 2, guest },
+      undefined,
+      {},
+    );
+
+    const refs = await db.execute<{ trip: string; reference: string }>(sql`
+      SELECT booking_group_reference AS trip, reference
+        FROM bookings WHERE reference IN (${first.reference}, ${second.reference})
+    `);
+
+    expect(refs.rows).toHaveLength(2);
+    expect(refs.rows[0]!.trip, 'both bookings, one trip').toBe(refs.rows[1]!.trip);
+    expect(refs.rows[0]!.trip).toMatch(/^TRP-\d{4}-/);
+  });
+
+  /**
+   * The opposite control: a DIFFERENT stay is a different trip.
+   *
+   * Without this, "always reuse the last group" would pass the test above and put a guest's summer
+   * holiday and their winter one under one reference.
+   */
+  it('a booking for different dates starts its own trip', async () => {
+    const one = stay(9);
+    const two = stay(10);
+    const type = await roomType(one);
+
+    expect(type).toBeDefined();
+
+    const first = await service.createDraft(
+      { unitId: type!.unit_id, ...one, rooms: 1, adults: 2, guest },
+      undefined,
+      {},
+    );
+    const later = await service.createDraft(
+      { unitId: type!.unit_id, ...two, rooms: 1, adults: 2, guest },
+      undefined,
+      {},
+    );
+
+    const refs = await db.execute<{ trip: string }>(sql`
+      SELECT booking_group_reference AS trip
+        FROM bookings WHERE reference IN (${first.reference}, ${later.reference})
+    `);
+
+    expect(refs.rows[0]!.trip).not.toBe(refs.rows[1]!.trip);
+  });
+
+  /**
+   * An UNPAID booking that times out gives every room back — through the real sweep.
+   *
+   * Bashar's requirement is that cancellation, expiry AND failure all release the rooms. Only
+   * cancellation had a test. Expiry runs through `SlaService`, which writes `cancelled` on a
+   * booking whose payment window has closed — and the release depends on the
+   * `bookings_sync_units` trigger seeing that write, not on the sweep knowing `booking_units`
+   * exists. This drives the SQL the sweep actually runs rather than trusting that reading.
+   */
+  it('a booking whose payment window closes releases all of its rooms', async () => {
+    const STAY = stay(11);
+    const type = await roomType(STAY);
+
+    expect(type).toBeDefined();
+
+    const created = await service.createDraft(
+      { unitId: type!.unit_id, ...STAY, rooms: 3, adults: 2, guest },
+      undefined,
+      {},
+    );
+
+    expect(await held(created.reference), 'three rooms held while unpaid').toBe(3);
+
+    /* Push the payment window into the past, which is the only condition the sweep tests. */
+    await db.execute(sql`
+      UPDATE bookings
+         SET confirmation_deadline_at = now() - INTERVAL '1 minute'
+       WHERE reference = ${created.reference}
+    `);
+
+    /* The sweep's own statement, verbatim from `expireUnpaidBookings`. */
+    const expired = await db.execute<{ reference: string }>(sql`
+      UPDATE bookings
+         SET status = 'cancelled',
+             cancelled_at = now(),
+             cancellation_reason = 'system.payment_expired'
+       WHERE status = 'pending_payment'
+         AND confirmation_deadline_at IS NOT NULL
+         AND confirmation_deadline_at < now()
+         AND deleted_at IS NULL
+         AND reference = ${created.reference}
+      RETURNING reference
+    `);
+
+    expect(expired.rows, 'the sweep matched it').toHaveLength(1);
+
+    const holding = await db.execute<{ n: number }>(sql`
+      SELECT COUNT(*)::int AS n
+        FROM booking_units bu JOIN bookings b ON b.id = bu.booking_id
+       WHERE b.reference = ${created.reference}
+         AND bu.status IN ('pending_payment','pending_confirmation','confirmed','checked_in','disputed')
+    `);
+
+    expect(holding.rows[0]!.n, 'every room released, not just the one it names').toBe(0);
+
+    /* And all three can be sold again — the assertion that makes the release mean something. */
+    const resold = await service.createDraft(
+      { unitId: type!.unit_id, ...STAY, rooms: 3, adults: 2, guest },
+      undefined,
+      {},
+    );
+
+    expect(await held(resold.reference)).toBe(3);
+  });
+
   it('a cancellation gives every one of the rooms back', async () => {
     const STAY = stay(6);
     const type = await roomType(STAY);

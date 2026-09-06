@@ -484,6 +484,13 @@
       "when": 1788718281959,
       "tag": "0068_room_inventory",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1788726826553,
+      "tag": "0069_booking_group_reference",
+      "breakpoints": true
     }
   ]
 }

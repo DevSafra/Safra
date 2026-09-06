@@ -51,6 +51,20 @@ export const bookings = pgTable(
         sql`'BKG-' || to_char(now(), 'YYYY') || '-' || reference_number(nextval('booking_reference_seq'))`,
       ),
 
+    /**
+     * One guest's TRIP — the bookings they made for one property and one stay, in one sitting.
+     *
+     * Not a grouping of the rooms inside this booking; `bookingUnits` is that. This exists for the
+     * guest who wanted two doubles AND a suite, which is two bookings because a booking carries one
+     * room type — so support, finance and the console had two references and nothing saying they
+     * were one trip.
+     *
+     * Bounded on purpose (see 0069): a window and a cap, because an unbounded rule turned 2,910
+     * load-test bookings into a single "trip". Additive and never load-bearing — nothing reads it
+     * to decide availability, money or permissions.
+     */
+    bookingGroupReference: text('booking_group_reference'),
+
     customerProfileId: foreignId('customer_profile_id')
       .notNull()
       .references(() => customerProfiles.id),
@@ -239,6 +253,7 @@ export const bookings = pgTable(
     index('bookings_city_dates_idx').on(t.cityId, t.checkIn),
     index('bookings_unit_dates_idx').on(t.unitId, t.checkIn, t.checkOut),
     index('bookings_created_idx').on(t.createdAt),
+    index('bookings_group_reference_idx').on(t.bookingGroupReference),
   ],
 );
 

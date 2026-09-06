@@ -107,3 +107,7 @@ BEGIN
   RETURN encode(v_bytes, 'hex')::uuid;
 END;
 $$ LANGUAGE plpgsql VOLATILE;
+
+-- A trip's reference. See `bookings.booking_group_reference` (0069) — one guest's
+-- rooms at one property over one stay, however many bookings that took.
+CREATE SEQUENCE IF NOT EXISTS booking_group_reference_seq START 1;

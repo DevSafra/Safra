@@ -124,6 +124,64 @@ export class BookingCreationService {
   }
 
   /**
+   * The TRIP this booking belongs to.
+   *
+   * A guest taking two doubles and a suite makes two bookings, because a booking carries one room
+   * type and a quantity. Nothing recorded that they were one trip, so support saw two references,
+   * finance saw two payments, and neither could say they belonged together.
+   *
+   * ## The rule is bounded, and both bounds were earned
+   *
+   * Same guest, same property, same dates, **within two hours**, and **fewer than ten** bookings
+   * already in the group. A real guest adds a second room type within minutes; the window and the
+   * cap exist because the unbounded version of this rule, run over the existing data, produced one
+   * "trip" containing 2,910 bookings. A group that would breach either bound simply starts a new
+   * one — which is what an operator sees today, rather than a wrong answer stated confidently.
+   *
+   * ## Never load-bearing
+   *
+   * Nothing decides anything from this. If it groups wrongly, a support agent sees one trip as two
+   * — the status quo. That is what makes a heuristic acceptable here, and it is why this must not
+   * be used to decide availability, money or access.
+   */
+  private async tripReference(
+    tx: Parameters<Parameters<Database['transaction']>[0]>[0],
+    input: {
+      customerProfileId: string;
+      propertyId: string;
+      checkIn: string;
+      checkOut: string;
+    },
+  ): Promise<string> {
+    const existing = await tx.execute<{ reference: string }>(sql`
+      SELECT b.booking_group_reference AS reference
+        FROM bookings b
+       WHERE b.customer_profile_id = ${input.customerProfileId}
+         AND b.property_id         = ${input.propertyId}
+         AND b.check_in            = ${input.checkIn}::date
+         AND b.check_out           = ${input.checkOut}::date
+         AND b.booking_group_reference IS NOT NULL
+         AND b.created_at > now() - INTERVAL '2 hours'
+         AND b.deleted_at IS NULL
+       GROUP BY b.booking_group_reference
+      HAVING COUNT(*) < 10
+       ORDER BY MAX(b.created_at) DESC
+       LIMIT 1
+    `);
+
+    const found = existing.rows[0]?.reference;
+
+    if (found) return found;
+
+    const minted = await tx.execute<{ reference: string }>(sql`
+      SELECT 'TRP-' || to_char(now(), 'YYYY') || '-'
+             || reference_number(nextval('booking_group_reference_seq')) AS reference
+    `);
+
+    return minted.rows[0]!.reference;
+  }
+
+  /**
    * Writes one `booking_units` row per room the booking holds.
    *
    * ## Why the chosen room is pinned first
@@ -585,9 +643,17 @@ export class BookingCreationService {
           claims,
         );
 
+        const bookingGroupReference = await this.tripReference(tx, {
+          customerProfileId,
+          propertyId: unit.property_id,
+          checkIn: input.checkIn,
+          checkOut: input.checkOut,
+        });
+
         const [booking] = await tx
           .insert(schema.bookings)
           .values({
+            bookingGroupReference,
             customerProfileId,
             unitId: input.unitId,
             propertyId: unit.property_id,
