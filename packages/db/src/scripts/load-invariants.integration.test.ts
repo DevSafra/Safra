@@ -66,11 +66,20 @@ describeIfDb('the double-booking invariant detects an overlap', () => {
     db = harness.db;
 
     /*
-      The constraint has to go before the overlapping row can exist. Inside the harness's
-      transaction, so it returns on rollback.
+      BOTH guarantees have to go before the overlapping row can exist, and so does the trigger that
+      feeds the second one. Inside the harness's transaction, so all three return on rollback.
+
+      There are two since 2026-09-06: a booking may hold several rooms, so the exclusion constraint
+      was copied onto `booking_units`, and `bookings_hold_lead_room` writes a row there for every
+      booking whatever created it. Dropping only the original left this suite unable to write the
+      invalid row it exists to detect — which read as the DETECTOR being broken rather than as the
+      guarantee having got stronger.
     */
     await db.execute(
       sql`ALTER TABLE bookings DROP CONSTRAINT bookings_no_overlapping_stays_v3`,
+    );
+    await db.execute(
+      sql`ALTER TABLE booking_units DROP CONSTRAINT booking_units_no_overlapping_stays`,
     );
   });
 

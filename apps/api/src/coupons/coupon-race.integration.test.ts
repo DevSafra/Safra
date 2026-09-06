@@ -82,6 +82,15 @@ describeIfDb('the last redemption of a coupon', () => {
     }
 
     if (madeBookings.length > 0) {
+      /*
+        The rooms first. `booking_units` references the booking, so deleting the booking stops on
+        it — and a cleanup that silently fails leaves these fixtures behind at deterministic dates,
+        where the NEXT run collides with them on the overlap constraint and reports a broken
+        product. Which is what happened.
+      */
+      await db.execute(
+        sql`DELETE FROM booking_units WHERE ${inArray(schema.bookingUnits.bookingId, madeBookings)}`,
+      );
       await db.execute(
         sql`DELETE FROM bookings WHERE ${inArray(schema.bookings.id, madeBookings)}`,
       );

@@ -52,6 +52,8 @@ export const CASCADE_ROOTS = [
 export const CASCADE_HANDLES = new Set<string>([
   ...CASCADE_ROOTS,
   'availability_days',
+  /* One row per physical room a booking holds. A pure child of bookings — see 0068. */
+  'booking_units',
   'booking_internal_notes',
   'booking_verifications',
   'coupon_redemptions',

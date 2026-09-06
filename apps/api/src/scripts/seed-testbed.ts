@@ -1019,6 +1019,14 @@ async function build(db: Seeder): Promise<void> {
   await db.execute(
     sql`DELETE FROM coupon_redemptions WHERE booking_id IN (${testbedBookings})`,
   );
+  /*
+    The physical rooms a booking held. A pure child of `bookings` with a plain foreign key, so the
+    delete below stops on it — which is exactly what `testbed-cascade` caught when the table was
+    added and nothing was told about it.
+  */
+  await db.execute(
+    sql`DELETE FROM booking_units WHERE booking_id IN (${testbedBookings})`,
+  );
 
   await db.execute(sql`DELETE FROM bookings WHERE id IN (${testbedBookings})`);
 
