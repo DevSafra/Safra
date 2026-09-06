@@ -160,7 +160,21 @@ export class BookingCreationService {
     const interchangeable =
       input.roomTypeCode === null
         ? sql`u.id = ${input.leadUnitId}`
-        : sql`u.property_id = ${input.propertyId} AND u.room_type_code = ${input.roomTypeCode}`;
+        : sql`u.property_id = ${input.propertyId}
+             AND u.room_type_code = ${input.roomTypeCode}
+             /*
+               INTERCHANGEABLE means the guest cannot tell them apart, and the two facts that
+               decide that are what it costs and how many it sleeps.
+
+               A type code is a partner's free-text label. Nothing stops one being put on a $50
+               room and a $500 room, and this allocation prices every room at the LEAD room's rate
+               and multiplies its capacity — so without these two the cheapest room of a type would
+               be a way to buy the dearest, and a party of eight could be given rooms that sleep
+               four between them. Not an attack anyone needs privileges for: pick the cheap room,
+               ask for two.
+             */
+             AND u.base_price = (SELECT base_price FROM units WHERE id = ${input.leadUnitId})
+             AND u.max_guests = (SELECT max_guests FROM units WHERE id = ${input.leadUnitId})`;
 
     const free = await tx.execute<{ id: string }>(sql`
       SELECT u.id::text AS id

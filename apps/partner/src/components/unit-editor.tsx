@@ -174,7 +174,16 @@ function groupByType(units: readonly Unit[]): { key: string; units: readonly Uni
   const groups = new Map<string, Unit[]>();
 
   for (const unit of units) {
-    const key = unit.roomTypeCode ?? `unit:${unit.id}`;
+    /*
+      Price and capacity are part of the identity, not just the code — the same key the property
+      page and the booking allocation use. A partner who changed one room's price has stopped it
+      being interchangeable with its siblings, and a heading still counting it among them would
+      promise a guest a quantity the platform will not sell.
+    */
+    const key =
+      unit.roomTypeCode === null
+        ? `unit:${unit.id}`
+        : `${unit.roomTypeCode}|${unit.basePrice}|${unit.maxGuests}`;
 
     groups.set(key, [...(groups.get(key) ?? []), unit]);
   }

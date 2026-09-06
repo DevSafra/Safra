@@ -224,8 +224,20 @@ export default async function PropertyPage({
   const groups = new Map<string, PropertyDetail['units']>();
 
   for (const unit of property.units) {
-    /* Null means one of a kind — a villa, a farm — so it groups with nothing. */
-    const key = unit.roomTypeCode ?? `unit:${unit.id}`;
+    /*
+      Null means one of a kind — a villa, a farm — so it groups with nothing.
+
+      The price and the capacity are part of the KEY, not just the code, because they are part of
+      the allocation's definition of interchangeable: booking N rooms prices them all at the chosen
+      room's rate and multiplies its capacity, so it will only ever fill a quantity with rooms that
+      match on both. Grouping on the code alone would let this page offer «6 rooms left» and cap the
+      stepper at six, and checkout would then refuse at four — a control that appears to work and
+      cannot complete.
+    */
+    const key =
+      unit.roomTypeCode === null
+        ? `unit:${unit.id}`
+        : `${unit.roomTypeCode}|${unit.basePrice}|${unit.maxGuests}`;
 
     groups.set(key, [...(groups.get(key) ?? []), unit]);
   }

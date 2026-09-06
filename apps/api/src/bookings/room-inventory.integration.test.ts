@@ -276,6 +276,60 @@ describeIfDb('a booking that holds several identical rooms', () => {
     expect(rows.rows[0]!.status).toBe('confirmed');
   });
 
+  /**
+   * A dearer room sharing a type code is NOT interchangeable with a cheap one.
+   *
+   * Found in the security pass over this change, not by a failing test. The allocation groups by
+   * `room_type_code`, which is free text a partner types, and it prices every room it hands out at
+   * the LEAD room's rate. So «pick the cheapest room of the type, ask for two» was a way to be
+   * given the dearest one at the cheap one's price — no privileges, no tampering, just the form.
+   *
+   * Same reasoning for capacity: the booking's guest limit is the lead room's `max_guests` times
+   * the quantity, so a sibling that sleeps fewer would let a party be sold rooms it does not fit in.
+   */
+  it('will not fill a quantity with a dearer room that merely shares the type code', async () => {
+    const STAY = stay(7);
+    const type = await roomType(STAY);
+
+    expect(type).toBeDefined();
+
+    /* Make one room of the type cost more, exactly the state a partner can create by hand. */
+    const dearer = await db.execute<{ id: string }>(sql`
+      UPDATE units
+         SET base_price = base_price * 4
+       WHERE room_type_code = ${type!.room_type_code}
+         AND id <> ${type!.unit_id}
+         AND id = (
+           SELECT id FROM units
+            WHERE room_type_code = ${type!.room_type_code} AND id <> ${type!.unit_id}
+            LIMIT 1
+         )
+      RETURNING id::text AS id
+    `);
+
+    expect(dearer.rows.length, 'the fixture had a sibling to make dearer').toBe(1);
+
+    const created = await service.createDraft(
+      { unitId: type!.unit_id, ...STAY, rooms: 2, adults: 2, guest },
+      undefined,
+      {},
+    );
+
+    const given = await db.execute<{ id: string }>(sql`
+      SELECT bu.unit_id::text AS id
+        FROM booking_units bu JOIN bookings b ON b.id = bu.booking_id
+       WHERE b.reference = ${created.reference}
+    `);
+
+    expect(
+      given.rows.map((row) => row.id),
+      'the dearer room was not handed out at the cheap room’s rate',
+    ).not.toContain(dearer.rows[0]!.id);
+
+    /* And the guest still got the two rooms they paid for, from the ones that DO match. */
+    expect(given.rows).toHaveLength(2);
+  });
+
   it('a cancellation gives every one of the rooms back', async () => {
     const STAY = stay(6);
     const type = await roomType(STAY);
