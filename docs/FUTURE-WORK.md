@@ -846,6 +846,46 @@ One full-suite run failed a sidebar-badge comparison immediately after the conso
 and passed on every run since. The runner must wait for the applications to be _serving correctly_,
 not merely accepting connections, or it will report environment noise as product failure.
 
+### The room count reached every surface — 2026-09-06
+
+`bookings.rooms` was written by the booking flow and read by NOTHING. A guest paid for three rooms
+and: the confirmation email named one room type, the voucher named one, the partner's confirmation
+queue named one, the check-in list named one, the invoice named one, and the console could not
+answer «how many did they book». None of it would have failed a test of the booking flow, because
+the booking flow was correct — the capability-with-no-surface shape, on seven surfaces at once.
+
+Now stated on: the customer's booking page, checkout, the confirmation email, the voucher and its
+QR, the invoice payload, the partner's confirmation queue and arrivals list, and the console's
+booking detail. `e2e/multi-room-downstream.spec.ts` books three rooms for real and then goes and
+looks at each one.
+
+**Door numbers are partner-side only, deliberately.** They were briefly on the guest's voucher and
+the security pass took them off: that document names the guest, so a voucher left on a table says
+which room a named person is sleeping in — and it promises a specific door the front desk may
+reassign at check-in. The numbers are on the partner's arrivals list and the console's booking
+detail, which belong to the people who hand over keys. `voucher.integration.test.ts` asserts their
+ABSENCE from the voucher and the e2e spec asserts their PRESENCE on the console, because either
+assertion alone would pass a build that had lost them everywhere.
+
+### Trip reference — added 2026-09-06, bounded on purpose
+
+`bookings.booking_group_reference` groups the bookings one guest made for one property and one stay.
+It does NOT group the rooms inside a booking — `booking_units` does that. It exists for the guest
+who wanted two doubles AND a suite: that is two bookings, because a booking carries one room type
+and a quantity, and support, finance and the console had two references with nothing tying them
+together.
+
+**The rule is bounded and the bound was earned.** Grouping on (customer, property, dates) alone
+produced a single "trip" of 2,910 bookings against the existing data — a load generator writing one
+customer and window repeatedly. The live rule adds a two-hour window and a cap of ten; the backfill
+gives any set larger than ten a trip each. It is additive and never load-bearing: nothing reads it
+to decide availability, money or permissions, so a wrong grouping shows an agent one trip as two,
+which is what they see today.
+
+**Open:** there is no basket, so a guest wanting two room types still makes two bookings and two
+payments. The trip reference makes that legible; it does not make it one transaction. A real basket
+is the fix and it is not started.
+
 ### Room-type inventory — shipped 2026-09-06, with two things left open
 
 A booking may now hold several identical rooms. `booking_units` carries one row per physical room
