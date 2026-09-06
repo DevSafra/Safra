@@ -222,10 +222,30 @@ test('confirming receipt is not offered on a booking whose rail reports for itse
   await expect(page.locator('[data-status-pill]').first()).toHaveText(
     t.bookingStatus['pending_payment'] ?? '',
   );
+
+  /*
+    The RULE, not a sample: the control appears exactly when the rail is an offline one.
+
+    This used to assert the button was simply absent, on the assumption that an ordinary unpaid
+    booking is on a card. That assumption died on 2026-09-06, and not because of a test: **no card
+    acquirer is registered**, so `manual_transfer` is the only rail checkout can offer and every new
+    booking awaits a bank transfer. The first `pending_payment` row is now an offline one, and the
+    button is correctly there.
+    
+    Asserting the biconditional survives either configuration — and says what the screen is actually
+    promising, which the absence never did.
+  */
+  const offline = await page
+    .locator('main')
+    .innerText()
+    .then((text) => text.includes(t.enums.paymentMethod['bank_transfer'] ?? '\u0000'));
+
   await expect(
     page.getByRole('button', { name: copy.capturePayment, exact: true }),
-    'a card is captured by its webhook, never by an operator',
-  ).toHaveCount(0);
+    offline
+      ? 'an offline transfer is confirmed by an operator, because no webhook will'
+      : 'a card is captured by its webhook, never by an operator',
+  ).toHaveCount(offline ? 1 : 0);
 });
 
 /**

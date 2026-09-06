@@ -434,6 +434,74 @@ initial controlled launch, explicitly _"rather than introducing unrelated featur
 is what the pass has found and what was done about each. **Fixed** items shipped as part of the
 reconciliation; **open** items are reported for a decision and are NOT closed.
 
+#### FIXED — the testbed reset destroyed the photographs and renumbered every reference
+
+Both found on 2026-09-06 by reseeding, which is exactly what an unattended runner does to get a
+clean fixture — so both are Stage 6 blockers rather than inconveniences.
+
+- **`db:testbed` deleted `property_images` and nothing put them back.** The only writer is a partner
+  uploading through the portal, so the loss was permanent: after one reset every image-dependent
+  browser spec failed and stayed failing, while 607 photographs still existed for other listings.
+  The seeder now borrows **three distinct keys** from a row the reset does not touch — the objects
+  are already in the bucket, so no upload is needed. Three DISTINCT, because six `image-preview`
+  tests move BETWEEN pictures and a gallery of one repeated photograph has nothing to move between;
+  with the first single-key version those tests could not run at all.
+- **`properties.reference` is generated on insert, so a reseed renumbers every listing.** Five specs
+  had a `PRO-…` written down; after a reset they opened «هذه الصفحة غير موجودة» against a console
+  that was working perfectly. `e2e/property-reference.ts` resolves a reference from the SLUG, which
+  the seeder writes verbatim and which therefore survives. No spec may hard-code one again.
+
+#### OPEN — one chromium flake stops the entire partner suite from running
+
+`signed-in` depends on `signed-in-setup`, which depends on `chromium`. Playwright SKIPS a dependent
+project when its dependency has any failure, so a single flaky chromium test leaves twenty-plus
+partner and cross-app specs unexecuted — reported as **"4 did not run"**, not as a failure.
+
+Observed with `image-preview`'s two measurement tests, which pass alone and fail under parallel load
+because they measure a painted box while a 200 ms entrance is still settling. The consequence is the
+dangerous part: **an overnight run reports "380 passed, 2 failed" while a fifth of the suite never
+ran**, and nothing in that line says so.
+
+Two things are needed before Stage 6 can be trusted: the runner must fail loudly on any
+`did not run`, and the geometry tests need to wait on the transition rather than race it.
+
+#### FIXED — driving the multi-unit booking journey found four more
+
+Bashar, 2026-09-06: _"Do not treat reading the code as equivalent to driving the journey."_ So it
+was driven — search, property, comparison, selection, checkout, creation — on the thirteen-room
+hotel, for three room types. Everything below was found by doing it, and none of it by reading.
+
+1. **The room list had no dates at all.** It returned every active unit regardless of availability,
+   so with one of two suites booked for 6–8 September the page still said «غرفتان متبقيتان» for
+   exactly those dates AND pointed «احجز هذه الوحدة» at **the room that was taken**, while its free
+   sibling was unreachable. A guest would have entered their name, phone and card details and been
+   refused at creation. The endpoint now takes an optional stay and annotates each unit, using the
+   two anti-joins copied from `SearchService` verbatim — an absent `availability_days` row means
+   open, and the booking overlap uses the same `[)` bound as the exclusion constraint, so the page
+   can never disagree with the constraint about what "overlapping" means.
+2. **The count promised rooms that were gone.** It counted the group — every physical room of the
+   type — rather than the free ones. It counts what a guest can actually have, and a type with none
+   left is described but not offered rather than linking nowhere.
+3. **Availability was ISR-cached for a minute.** The property page caches for 60s, which is right
+   for photographs and prose and wrong for the one fact another guest can invalidate: two people
+   could both be shown the last suite. A request that asks about a stay is now live; one with no
+   dates keeps the minute.
+4. **The invoice never named the room.** It joined `properties` and `cities` and not `units`, so a
+   receipt for a 371.99 suite was indistinguishable from one for a 73.99 standard room except by
+   the figure. Nobody reconciling a card statement can do that.
+
+**Inventory behaves correctly, and is now asserted rather than assumed.** Booking one physical room
+takes exactly one from its type — six standard doubles became five — and leaves the four sea-view
+rooms, the two suites and the family room untouched. That is what one row per physical room buys,
+and `multi-unit-journey.spec.ts` drives it on every run with a stay window derived from the clock,
+so each run gets untouched inventory rather than measuring the last one's leftovers.
+
+**One test assumption died of a real fact.** `booking-actions` asserted that an unpaid booking never
+offers «تأكيد استلام الحوالة», on the premise that an ordinary booking is on a card. **No card
+acquirer is registered**, so `manual_transfer` is the only rail checkout can offer and every new
+booking awaits a bank transfer — the button is correctly there. It now asserts the biconditional,
+which is what the screen actually promises and survives either configuration.
+
 #### FIXED — the testbed had almost no multi-unit properties, and three defects were hiding there
 
 **Bashar, 2026-09-06:** _"I want it exercised against realistic hotel structures rather than mostly
