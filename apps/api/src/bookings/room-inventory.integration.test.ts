@@ -473,6 +473,156 @@ describeIfDb('a booking that holds several identical rooms', () => {
     expect(await held(resold.reference)).toBe(3);
   });
 
+  /**
+   * A booking of SEVERAL room types — «مزدوجة × 2، جناح × 1» (Bashar, 2026-09-07).
+   *
+   * The model priced accommodation as one nightly rate multiplied by a quantity, which is why the
+   * allocation required every room to match the chosen one on price. A family needing a double and
+   * a suite had to make two bookings — two payments, two vouchers, two confirmations.
+   *
+   * What is watched here is that the money is a SUM: each type at its own rate, the rooms adding
+   * up to the booking's base, and the fee charged once for the booking rather than once per type.
+   */
+  it('books two room types at once, and the rooms sum to the base', async () => {
+    const STAY = stay(12);
+    const type = await roomType(STAY);
+
+    expect(type).toBeDefined();
+
+    /* A SECOND type at the same property, priced differently — the case that could not exist. */
+    const other = await db.execute<{ id: string; base_price: string }>(sql`
+      SELECT u.id::text AS id, u.base_price::text AS base_price
+        FROM units u
+       WHERE u.property_id = (SELECT property_id FROM units WHERE id = ${type!.unit_id})
+         AND u.base_price <> (SELECT base_price FROM units WHERE id = ${type!.unit_id})
+         AND u.is_active AND u.deleted_at IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM booking_units bu
+           WHERE bu.unit_id = u.id
+             AND bu.status IN ('pending_payment','pending_confirmation','confirmed','checked_in','disputed')
+             AND daterange(bu.check_in, bu.check_out, '[)')
+                 && daterange(${STAY.checkIn}::date, ${STAY.checkOut}::date, '[)')
+         )
+       LIMIT 1
+    `);
+
+    expect(other.rows[0], 'the property has a differently priced type').toBeDefined();
+
+    const priced = await service.quote({
+      unitId: type!.unit_id,
+      ...STAY,
+      lines: [
+        { unitId: type!.unit_id, rooms: 2 },
+        { unitId: other.rows[0]!.id, rooms: 1 },
+      ],
+    });
+
+    expect(priced.rooms, 'three rooms across two types').toBe(3);
+
+    const created = await service.createDraft(
+      {
+        unitId: type!.unit_id,
+        ...STAY,
+        rooms: 2,
+        additionalLines: [{ unitId: other.rows[0]!.id, rooms: 1 }],
+        adults: 2,
+        guest,
+      },
+      undefined,
+      {},
+    );
+
+    const rows = await db.execute<{
+      rooms: number;
+      base: string;
+      room_sum: string;
+      types: number;
+      distinct_amounts: number;
+    }>(sql`
+      SELECT b.rooms,
+             b.base_amount::text AS base,
+             sum(bu.accommodation_amount)::text AS room_sum,
+             /*
+               By RATE, not by type code. Two counts were wrong before this one: room_type_code
+               alone ignores a one-of-a-kind room's NULL, and a property may put one code on rooms
+               at two prices. What the basket has to prove is that two DIFFERENTLY PRICED types
+               were booked together, which is the thing the old model could not do.
+             */
+             count(DISTINCT u.base_price)::int AS types,
+             count(DISTINCT bu.accommodation_amount)::int AS distinct_amounts
+        FROM bookings b
+        JOIN booking_units bu ON bu.booking_id = b.id
+        JOIN units u ON u.id = bu.unit_id
+       WHERE b.reference = ${created.reference}
+       GROUP BY b.rooms, b.base_amount
+    `);
+
+    const row = rows.rows[0]!;
+
+    expect(row.rooms, 'the booking holds three rooms').toBe(3);
+    expect(row.types, 'of two different types').toBe(2);
+
+    /*
+      And priced DIFFERENTLY. Without this the test would pass against a build that priced every
+      room at the lead type's rate — which is exactly the multiplication this change replaced.
+    */
+    expect(row.distinct_amounts, 'each type at its own rate').toBe(2);
+
+    /*
+      THE invariant. Every room records what it cost, and those add to the booking's accommodation
+      — including the LEAD room, which the trigger writes before the allocation runs and which an
+      `ON CONFLICT DO NOTHING` would have left contributing nothing.
+    */
+    expect(Number(row.room_sum), 'the rooms sum to the base').toBeCloseTo(
+      Number(row.base),
+      2,
+    );
+
+    /* And the fee is charged ONCE for the booking, not once per type. */
+    expect(Number(priced.customerFeeAmount)).toBeLessThan(Number(priced.baseAmount));
+  });
+
+  /**
+   * A line naming a unit at ANOTHER property is refused.
+   *
+   * A booking spanning two hotels would carry one partner, one commission rate, one policy and one
+   * voucher describing two places — and `bookings.property_id` is a single column, so the second
+   * property would simply not be recorded. It answers as «not found», so a caller cannot use a
+   * basket to probe which units exist elsewhere.
+   */
+  it('refuses a room type belonging to a different property', async () => {
+    const STAY = stay(13);
+    const type = await roomType(STAY);
+
+    expect(type).toBeDefined();
+
+    const elsewhere = await db.execute<{ id: string }>(sql`
+      SELECT u.id::text AS id FROM units u
+       WHERE u.property_id <> (SELECT property_id FROM units WHERE id = ${type!.unit_id})
+         AND u.is_active AND u.deleted_at IS NULL
+       LIMIT 1
+    `);
+
+    expect(elsewhere.rows[0]).toBeDefined();
+
+    const refusal = await service
+      .createDraft(
+        {
+          unitId: type!.unit_id,
+          ...STAY,
+          rooms: 1,
+          additionalLines: [{ unitId: elsewhere.rows[0]!.id, rooms: 1 }],
+          adults: 2,
+          guest,
+        },
+        undefined,
+        {},
+      )
+      .catch((error: unknown) => error);
+
+    expect(codeOf(refusal)).toBe(ERROR.UNIT_NOT_FOUND);
+  });
+
   it('a cancellation gives every one of the rooms back', async () => {
     const STAY = stay(6);
     const type = await roomType(STAY);

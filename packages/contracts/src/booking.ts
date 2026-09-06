@@ -25,6 +25,28 @@ export const bookingCreateSchema = z
       free, which only the server can know and which it checks when it allocates.
     */
     rooms: z.number().int().min(1).max(10).default(1),
+    /**
+     * OTHER room types on the same booking — «مزدوجة × 2، جناح × 1» (Bashar, 2026-09-07).
+     *
+     * The lead type is `unitId` × `rooms` above; these are the rest. Written as an addition rather
+     * than by replacing the pair with one list, because `bookings.unit_id` is a real column that
+     * every downstream query joins — the lead line keeps it meaningful, and no existing caller has
+     * to learn a new shape to book one type.
+     *
+     * Five extra types, and the SERVER caps the total rooms: a booking is a family's trip, not a
+     * block reservation, and a group taking a floor is a conversation with the hotel.
+     */
+    additionalLines: z
+      .array(
+        z
+          .object({
+            unitId: z.string().uuid(),
+            rooms: z.number().int().min(1).max(10),
+          })
+          .strict(),
+      )
+      .max(5)
+      .default([]),
     adults: z.number().int().min(1).max(30),
     children: z.number().int().min(0).max(20).default(0),
     infants: z.number().int().min(0).max(10).default(0),

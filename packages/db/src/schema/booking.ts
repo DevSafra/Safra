@@ -71,10 +71,13 @@ export const bookings = pgTable(
     /**
      * The room this booking LEADS with, and the one every downstream surface names.
      *
-     * A booking of four identical suites names one of them here and lists all four in
-     * `booking_units`. That is not a half-truth: a quantity is only offered over rooms of the SAME
-     * type, so the type, the rate, the policy and the amenities on this row describe all of them —
-     * what differs is only which physical doors the guest is handed at reception.
+     * The LEAD line's unit — the first room type the guest chose.
+     *
+     * On a single-type booking this describes every room it holds. Since 0070 a booking may mix
+     * types — «مزدوجة × 2، جناح × 1» — and then this names one of several, so a surface rendering
+     * a booking's accommodation must render the LINES from `bookingUnits`, not this column. A
+     * screen printing only this unit's name on a mixed booking is a defect rather than a
+     * simplification, and `docs/FUTURE-WORK.md` lists the surfaces that were taught to do it.
      */
     unitId: foreignId('unit_id')
       .notNull()
@@ -285,6 +288,22 @@ export const bookingUnits = pgTable(
     unitId: foreignId('unit_id')
       .notNull()
       .references(() => units.id),
+
+    /**
+     * What THIS room costs for the whole stay, at the rate that applied when it was booked.
+     *
+     * Snapshotted rather than derived: `availabilityDays` carries per-date overrides a partner may
+     * edit afterwards, and an invoice that recomputed itself from today's calendar would restate a
+     * price the guest never agreed to.
+     *
+     * It is what makes a MIXED booking possible. A booking's accommodation used to be one nightly
+     * rate multiplied by rooms and nights, which is why every allocated room had to match the
+     * chosen one on price; now it is the SUM of these, so a suite and a standard room can sit on
+     * one booking at their own rates and every figure still adds up.
+     *
+     * Nullable only for rows written before 0070; every row this platform writes carries one.
+     */
+    accommodationAmount: money('accommodation_amount'),
 
     /** Copied from the booking, maintained by the `bookings_sync_units` trigger. Never written by hand. */
     checkIn: date('check_in').notNull(),

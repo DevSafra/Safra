@@ -45,8 +45,21 @@ export interface PriceBreakdown {
   rooms: number;
   fxRateToSyp: string;
   totalSyp: string;
-  /** Per-night prices actually used, for the customer's breakdown. */
+  /** Per-night prices actually used, for the LEAD line. See `lines` for a mixed basket. */
   nightly: { date: string; amount: string }[];
+  /** One entry per room TYPE in the basket, in the order the caller asked for them. */
+  lines: PriceLine[];
+}
+
+/** One room type on a booking, and what it costs. */
+export interface PriceLine {
+  readonly unitId: string;
+  readonly rooms: number;
+  /** Whole-stay accommodation for ONE room of this type. */
+  readonly perRoomAmount: string;
+  /** `perRoomAmount` × `rooms`. */
+  readonly amount: string;
+  readonly nightly: { date: string; amount: string }[];
 }
 
 @Injectable()
@@ -134,16 +147,42 @@ export class PricingService {
      */
     discountAmount?: string | undefined;
     /**
-     * How many identical rooms of this type, default one.
+     * How many rooms of `unitId`'s type — the single-type shorthand.
      *
-     * Multiplies the base and nothing else, because everything else DERIVES from the base: the
-     * customer fee, the partner commission and its USD cap, the total and the SYP conversion all
-     * read `baseMinor` below. Multiplying the total instead would charge one room's fee for four
-     * rooms — and a percentage cap would be applied to a quarter of the money it is meant to cap.
+     * Kept because most bookings are one type and the caller should not have to build a list to
+     * say so. Ignored when `lines` is given.
      */
     rooms?: number | undefined;
+    /**
+     * A BASKET: several room types on one booking.
+     *
+     * «مزدوجة × 2، جناح × 1» is one family's trip, and pricing it is a SUM rather than a
+     * multiplication — which is the whole reason the accommodation could not mix types before. The
+     * customer fee, the partner commission and its USD cap, the total and the SYP conversion all
+     * derive from the summed base, so each of them is charged once for the booking rather than once
+     * per line.
+     */
+    lines?: readonly { unitId: string; rooms: number }[] | undefined;
   }): Promise<PriceBreakdown> {
+    /*
+      The basket, normalised. A caller giving `unitId` + `rooms` is asking for a basket of one, and
+      collapsing the two shapes here means everything below has exactly one case to handle.
+    */
+    const basket =
+      input.lines && input.lines.length > 0
+        ? input.lines.map((line) => ({
+            unitId: line.unitId,
+            rooms: Math.max(1, Math.trunc(line.rooms)),
+          }))
+        : [
+            {
+              unitId: input.unitId,
+              rooms: Math.max(1, Math.trunc(input.rooms ?? 1)),
+            },
+          ];
+
     const rows = await this.db.execute<{
+      unit_id: string;
       date: string;
       price: string;
       currency_code: string;
@@ -153,6 +192,7 @@ export class PricingService {
       commission_cap_usd: string | null;
     }>(sql`
       SELECT
+        u.id::text AS unit_id,
         d.day::date::text AS date,
         COALESCE(ad.price, u.base_price)::text AS price,
         cur.code AS currency_code,
@@ -170,8 +210,16 @@ export class PricingService {
         ${input.checkIn}::date, ${input.checkOut}::date - INTERVAL '1 day', INTERVAL '1 day'
       ) AS d(day)
       LEFT JOIN availability_days ad ON ad.unit_id = u.id AND ad.date = d.day::date
-      WHERE u.id = ${input.unitId} AND u.deleted_at IS NULL
-      ORDER BY d.day
+      /*
+        Every unit in the basket, in one round trip. Written with sql.join rather than an array
+        parameter: a JS array inside a template expands to a TUPLE, not a Postgres array, which is
+        a documented trap in this codebase and has cost a silent no-op before.
+      */
+      WHERE u.id IN (${sql.join(
+        basket.map((line) => sql`${line.unitId}`),
+        sql`, `,
+      )}) AND u.deleted_at IS NULL
+      ORDER BY u.id, d.day
     `);
 
     const nights = rows.rows;
@@ -184,23 +232,58 @@ export class PricingService {
 
     const scale = first.decimals;
 
-    // ── Sum the nightly rates in minor units ────────────────────────────────
-    let baseMinor = 0n;
-    const nightly: { date: string; amount: string }[] = [];
+    // ── Sum each line's nightly rates, then sum the lines ───────────────────
+    /*
+      A room's whole-stay cost is the sum of ITS nights, and the booking's accommodation is the sum
+      of its rooms. That is the change that lets a basket mix types: a suite and a standard room
+      each carry their own rate, and nothing multiplies one rate by a quantity it does not describe.
+    */
+    const perUnit = new Map<string, { date: string; amount: string }[]>();
 
     for (const night of nights) {
-      const minor = toMinor(night.price, scale);
-      baseMinor += minor;
-      nightly.push({ date: night.date, amount: fromMinor(minor, scale) });
+      const table = perUnit.get(night.unit_id) ?? [];
+
+      table.push({
+        date: night.date,
+        amount: fromMinor(toMinor(night.price, scale), scale),
+      });
+      perUnit.set(night.unit_id, table);
+    }
+
+    let baseMinor = 0n;
+    let rooms = 0;
+    const lines: PriceLine[] = [];
+
+    for (const line of basket) {
+      const table = perUnit.get(line.unitId);
+
+      /* A unit the basket names and the catalogue does not have is a refusal, never a free room. */
+      if (!table || table.length === 0) throw notFound(ERROR.UNIT_NOT_FOUND);
+
+      const perRoom = table.reduce(
+        (sum, night) => sum + toMinor(night.amount, scale),
+        0n,
+      );
+      const lineMinor = perRoom * BigInt(line.rooms);
+
+      baseMinor += lineMinor;
+      rooms += line.rooms;
+
+      lines.push({
+        unitId: line.unitId,
+        rooms: line.rooms,
+        perRoomAmount: fromMinor(perRoom, scale),
+        amount: fromMinor(lineMinor, scale),
+        nightly: table,
+      });
     }
 
     /*
-      `nightly` stays the rate for ONE room — it is the rate table a guest reads, and «$185 a night»
-      does not become «$370 a night» because they took two. The quantity multiplies the base.
+      The LEAD line's nightly table, for callers that show one rate. On a mixed basket it describes
+      the first type only — which is why `lines` exists and why anything rendering a booking's
+      accommodation reads that instead.
     */
-    const rooms = Math.max(1, Math.trunc(input.rooms ?? 1));
-
-    baseMinor *= BigInt(rooms);
+    const nightly = lines[0]?.nightly ?? [];
 
     /*
       ── Customer fee (§2.1, configured on the Rules Engine page) ────────────
@@ -275,8 +358,9 @@ export class PricingService {
       partnerPayableAmount: fromMinor(payableMinor, scale),
       currencyCode: first.currency_code,
       currencyId: first.currency_id,
-      nights: nights.length,
+      nights: nightly.length,
       rooms,
+      lines,
       fxRateToSyp: fxRate,
       totalSyp,
       nightly,

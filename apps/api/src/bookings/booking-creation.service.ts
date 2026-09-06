@@ -19,13 +19,23 @@ import { CouponService } from '../coupons/coupon.service.js';
 import type { AccessTokenClaims } from '../auth/token.service.js';
 import { badRequest, conflict, notFound } from '../common/errors/app-error.js';
 
+/**
+ * The most rooms one booking may hold, across every type in the basket.
+ *
+ * A booking is a family's trip. A group taking a floor is a conversation with the hotel, and an
+ * uncapped basket is an invitation to price a stay with a number chosen to overflow something.
+ */
+const MAX_ROOMS_PER_BOOKING = 10;
+
 /** PostgreSQL raises 23P01 when an EXCLUDE constraint rejects a row. */
 const EXCLUSION_VIOLATION = '23P01';
 
 export interface BookingDraftInput {
   unitId: string;
-  /** How many identical rooms of this type. One when the caller says nothing. */
+  /** How many rooms of the LEAD type. One when the caller says nothing. */
   rooms?: number | undefined;
+  /** Other room types on the same booking. The lead is `unitId` × `rooms` above. */
+  additionalLines?: readonly { unitId: string; rooms: number }[] | undefined;
   checkIn: string;
   checkOut: string;
   adults: number;
@@ -60,6 +70,8 @@ export class BookingCreationService {
     checkIn: string;
     checkOut: string;
     rooms?: number | undefined;
+    /** A basket of room types. See `PricingService.quote`. */
+    lines?: readonly { unitId: string; rooms: number }[] | undefined;
   }) {
     const price = await this.pricing.quote(input);
 
@@ -84,6 +96,16 @@ export class BookingCreationService {
       nights: price.nights,
       /* Echoed back so checkout can show «غرفتان» beside the total it is about to charge for. */
       rooms: price.rooms,
+      /*
+        One entry per room TYPE. A basket's total is the sum of these, so a checkout showing only
+        the aggregate would be asking somebody to pay a figure with no working shown.
+      */
+      lines: price.lines.map((line) => ({
+        unitId: line.unitId,
+        rooms: line.rooms,
+        perRoomAmount: line.perRoomAmount,
+        amount: line.amount,
+      })),
       baseAmount: price.baseAmount,
       customerFeeAmount: price.customerFeeAmount,
       totalAmount: price.totalAmount,
@@ -182,6 +204,75 @@ export class BookingCreationService {
   }
 
   /**
+   * How many people the basket sleeps, across every type in it.
+   *
+   * Read from the database rather than from the request: capacity is a fact about the rooms, and a
+   * caller who could state it would be a caller who could book a suite for twelve.
+   */
+  private async basketCapacity(
+    basket: readonly { unitId: string; rooms: number }[],
+  ): Promise<number> {
+    const rows = await this.db.execute<{ id: string; max_guests: number }>(sql`
+      SELECT id::text AS id, max_guests
+        FROM units
+       WHERE id IN (${sql.join(
+         basket.map((line) => sql`${line.unitId}`),
+         sql`, `,
+       )})
+         AND is_active AND deleted_at IS NULL
+    `);
+
+    const capacityOf = new Map(rows.rows.map((row) => [row.id, row.max_guests]));
+
+    let total = 0;
+
+    for (const line of basket) {
+      const each = capacityOf.get(line.unitId);
+
+      /* A unit the basket names and the catalogue does not have is a refusal, never free space. */
+      if (each === undefined) throw notFound(ERROR.UNIT_NOT_FOUND);
+
+      total += each * line.rooms;
+    }
+
+    return total;
+  }
+
+  /**
+   * A non-lead line's own property and type code.
+   *
+   * The property is checked, not trusted: every line of a basket must belong to the SAME property
+   * as the lead. A booking spanning two hotels would have one partner, one commission rate, one
+   * cancellation policy and one voucher describing two places — and `bookings.property_id` is a
+   * single column, so the second property would simply not be recorded.
+   */
+  private async unitGrouping(
+    tx: Parameters<Parameters<Database['transaction']>[0]>[0],
+    unitId: string,
+    propertyId: string,
+  ): Promise<{ property_id: string; room_type_code: string | null }> {
+    const rows = await tx.execute<{
+      property_id: string;
+      room_type_code: string | null;
+    }>(sql`
+      SELECT property_id::text AS property_id, room_type_code
+        FROM units
+       WHERE id = ${unitId}
+         AND property_id = ${propertyId}
+         AND is_active
+         AND deleted_at IS NULL
+       LIMIT 1
+    `);
+
+    const found = rows.rows[0];
+
+    /* Answers exactly as a unit that does not exist: a caller cannot probe another property. */
+    if (!found) throw notFound(ERROR.UNIT_NOT_FOUND);
+
+    return found;
+  }
+
+  /**
    * Writes one `booking_units` row per room the booking holds.
    *
    * ## Why the chosen room is pinned first
@@ -208,6 +299,8 @@ export class BookingCreationService {
       checkIn: string;
       checkOut: string;
       rooms: number;
+      /** What ONE room of this type costs for the stay. Written onto every row of the line. */
+      perRoomAmount?: string | undefined;
     },
   ): Promise<void> {
     /*
@@ -295,12 +388,30 @@ export class BookingCreationService {
         chosen.map((unitId) => ({
           bookingId: input.bookingId,
           unitId,
+          /*
+            Snapshotted here, so a booking's accommodation is the SUM of its rooms rather than one
+            rate multiplied. It is what lets a basket mix types, and what lets an invoice restate a
+            price the guest agreed to after a partner has edited their calendar.
+          */
+          accommodationAmount: input.perRoomAmount ?? null,
           checkIn: input.checkIn,
           checkOut: input.checkOut,
           status: 'pending_payment' as const,
         })),
       )
-      .onConflictDoNothing();
+      /*
+        UPDATE on conflict, not DO NOTHING.
+
+        The lead room is already here — `bookings_hold_lead_room` writes it the moment the booking
+        is inserted, so that a booking created by any other path still holds the room it names —
+        and that row carries no amount. `DO NOTHING` would have left it NULL, so the lead room
+        would have contributed zero and the booking's rooms would not have summed to its base. The
+        invariant is asserted directly in `room-inventory.integration.test.ts`.
+      */
+      .onConflictDoUpdate({
+        target: [schema.bookingUnits.bookingId, schema.bookingUnits.unitId],
+        set: { accommodationAmount: input.perRoomAmount ?? null },
+      });
   }
 
   /**
@@ -521,10 +632,28 @@ export class BookingCreationService {
       Four suites sleeping four each hold sixteen people, so the limit is per-BOOKING rather than
       per-room. Checking one room's capacity against the whole party would refuse a family that
       booked exactly enough rooms for itself — which is the reason they asked for several.
+
+      Across every LINE since 2026-09-07: a basket of «مزدوجة × 2، جناح × 1» sleeps what the two
+      types sleep together, and reading only the lead type's capacity would refuse the mixed
+      booking that exists precisely to fit a family the single type could not.
     */
-    const rooms = Math.max(1, Math.trunc(input.rooms ?? 1));
+    const leadRooms = Math.max(1, Math.trunc(input.rooms ?? 1));
+    const extraLines = (input.additionalLines ?? []).map((line) => ({
+      unitId: line.unitId,
+      rooms: Math.max(1, Math.trunc(line.rooms)),
+    }));
+    const basket = [{ unitId: input.unitId, rooms: leadRooms }, ...extraLines];
+    const rooms = basket.reduce((sum, line) => sum + line.rooms, 0);
+
+    if (rooms > MAX_ROOMS_PER_BOOKING) {
+      throw badRequest(ERROR.UNIT_NOT_ENOUGH_ROOMS, {
+        available: MAX_ROOMS_PER_BOOKING,
+        requested: rooms,
+      });
+    }
+
+    const capacity = await this.basketCapacity(basket);
     const guests = input.adults + (input.children ?? 0); // infants do not occupy a bed
-    const capacity = unit.max_guests * rooms;
 
     if (guests > capacity) {
       throw badRequest(ERROR.UNIT_GUEST_LIMIT, {
@@ -594,7 +723,7 @@ export class BookingCreationService {
       unitId: input.unitId,
       checkIn: input.checkIn,
       checkOut: input.checkOut,
-      rooms,
+      lines: basket,
     });
 
     /*
@@ -625,7 +754,7 @@ export class BookingCreationService {
             unitId: input.unitId,
             checkIn: input.checkIn,
             checkOut: input.checkOut,
-            rooms,
+            lines: basket,
             discountAmount: preview.discountAmount,
           });
 
@@ -724,15 +853,37 @@ export class BookingCreationService {
           runs INSIDE the booking's transaction — a partial allocation rolls the whole booking back
           rather than leaving a guest holding three of the four rooms they paid for.
         */
-        await this.allocateRooms(tx, {
-          bookingId: booking.id,
-          leadUnitId: input.unitId,
-          propertyId: unit.property_id,
-          roomTypeCode: unit.room_type_code,
-          checkIn: input.checkIn,
-          checkOut: input.checkOut,
-          rooms,
-        });
+        /*
+          One allocation PER LINE, each within its own type.
+
+          The rooms of a line are interchangeable with each other and with nothing else — the guard
+          in `allocateRooms` still requires matching property, type, price and capacity, which is
+          what stops a cheap room being a way to buy a dear one. A basket is several of those
+          guarantees side by side, not a relaxation of any of them.
+
+          Sequential inside the booking's transaction, so a line that cannot be filled rolls the
+          whole booking back rather than leaving a family holding two of the four rooms they paid
+          for.
+        */
+        for (const line of basket) {
+          const lineUnit =
+            line.unitId === input.unitId
+              ? { property_id: unit.property_id, room_type_code: unit.room_type_code }
+              : await this.unitGrouping(tx, line.unitId, unit.property_id);
+
+          await this.allocateRooms(tx, {
+            bookingId: booking.id,
+            leadUnitId: line.unitId,
+            propertyId: lineUnit.property_id,
+            roomTypeCode: lineUnit.room_type_code,
+            checkIn: input.checkIn,
+            checkOut: input.checkOut,
+            rooms: line.rooms,
+            /* What one room of this type costs for the stay, snapshotted onto every row. */
+            perRoomAmount: price.lines.find((one) => one.unitId === line.unitId)
+              ?.perRoomAmount,
+          });
+        }
 
         /*
           The coupon is SPENT here, in the booking's own transaction.
