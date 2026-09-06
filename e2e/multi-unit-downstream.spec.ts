@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
-import { propertyReference } from './property-reference.js';
+import { requirePublishedReference } from './partner-fixtures.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -28,8 +28,15 @@ test.use({
   viewport: { width: 1440, height: 1000 },
 });
 
-test('the partner sees which room each booking is for', async ({ page }) => {
-  await page.goto('/bookings', { waitUntil: 'domcontentloaded' });
+test('the partner sees which room each arrival is for', async ({ page }) => {
+  /*
+    «الوصول», not «/bookings» — the portal has no bookings route.
+
+    The partner's queue is arrivals: who is coming, to which room, and with how many people. Money
+    is deliberately absent from it. The first version of this test navigated to a route that does
+    not exist and read an error page, which is a test finding a fact about itself.
+  */
+  await page.goto('/arrivals', { waitUntil: 'domcontentloaded' });
 
   const main = page.locator('main');
 
@@ -41,16 +48,20 @@ test('the partner sees which room each booking is for', async ({ page }) => {
     A room type by name. The partner's job on the morning of an arrival is to have THAT room ready,
     so a list that named only the property would be telling them to prepare a hotel.
   */
+  /*
+    A room by NAME. The partner's job on the morning of an arrival is to have THAT room ready, so a
+    queue naming only the property would be telling them to prepare a hotel.
+  */
   expect(
-    /غرفة مزدوجة|جناح تنفيذي|غرفة عائلية|غرفة/.test(text),
-    'the bookings list names rooms, not just properties',
+    /غرفة|جناح|شاليه|وحدة/.test(text),
+    'the arrivals queue names rooms, not just properties',
   ).toBe(true);
 
-  console.log('--- PARTNER BOOKINGS ---\n' + text.slice(0, 400));
+  console.log('--- PARTNER ARRIVALS ---\n' + text.slice(0, 400));
 });
 
 test('the partner calendar is per room, not per property', async ({ page, request }) => {
-  const reference = await propertyReference(request, SLUG);
+  const reference = await requirePublishedReference(request, SLUG);
 
   await page.goto(`/properties/${reference}/calendar`, { waitUntil: 'domcontentloaded' });
 
@@ -76,22 +87,31 @@ test('the moderator sees the room on the booking, its timeline and its audit tra
   const page = await staff.newPage();
 
   try {
-    /* A booking on the hotel, found the way a person finds one: through the registry. */
-    await page.goto('http://localhost:3001/bookings?q=BKG-2026-418085', {
+    /*
+      A booking on THIS hotel, found the way a person finds one — and never written down.
+
+      `db:testbed` deletes and recreates its bookings, so a reference in the source is a reference
+      that stops existing. The console's own registry is filtered to the property and the first row
+      is taken, which is what a moderator does.
+    */
+    await page.goto(`http://localhost:3001/bookings?q=${encodeURIComponent('أمية')}`, {
       waitUntil: 'domcontentloaded',
     });
 
-    const row = page.locator('a[href*="/bookings/BKG-2026-418085"]').first();
+    const row = page.locator('a[href*="/bookings/BKG-"]').first();
 
-    await expect(row, 'the booking is findable').toBeVisible({ timeout: 20_000 });
+    await expect(row, 'the hotel has a booking to review').toBeVisible({
+      timeout: 20_000,
+    });
     await row.click();
 
     const main = page.locator('main');
 
-    await expect(main, 'the detail names the room').toContainText('جناح تنفيذي', {
+    /* Whichever room it is, the detail must name one — that is the claim under test. */
+    await expect(main, 'and the hotel it is in').toContainText('أمية', {
       timeout: 20_000,
     });
-    await expect(main, 'and the hotel it is in').toContainText('أمية');
+    await expect(main, 'the detail names the room').toContainText(/غرفة|جناح|وحدة/);
 
     console.log('--- CONSOLE BOOKING ---\n' + (await main.innerText()).slice(0, 500));
   } finally {

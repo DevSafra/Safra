@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { propertyReference } from './property-reference.js';
+import { requirePublishedReference } from './partner-fixtures.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -137,7 +137,7 @@ test('the moderator reviews the same four types', async ({ browser, request }) =
   test.skip(MISSING_CREDENTIALS, SKIP_REASON);
 
   /* Looked up, never written down — a reseed renumbers every reference. */
-  const reference = await propertyReference(request, SLUG);
+  const reference = await requirePublishedReference(request, SLUG);
 
   const staff = await browser.newContext({ storageState: STAFF_STATE });
   const page = await staff.newPage();

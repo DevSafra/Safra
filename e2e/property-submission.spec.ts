@@ -1,6 +1,7 @@
 import { expect, test, type Browser } from '@playwright/test';
 
 import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
+import { findReference } from './partner-fixtures.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -29,7 +30,13 @@ import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
  * Deliberately NOT approve: publishing changes the fixture permanently and would put an unreviewed
  * test listing into the customer site's search results.
  */
-const DRAFT = 'PRO-363249';
+/*
+  Resolved per run, never written down: a reseed renumbers every reference — see
+  `partner-fixtures.ts`. The draft is not published, so it is found by walking the partner's own
+  registry rather than through the public endpoint.
+*/
+const DRAFT_SLUG = 'qasr-al-sharq-lodge';
+let DRAFT = '';
 
 test.skip(MISSING_CREDENTIALS, SKIP_REASON);
 test.describe.configure({ mode: 'serial' });
@@ -80,6 +87,8 @@ async function rejectFromConsole(browser: Browser, reason: string): Promise<bool
 }
 
 test('a partner submits a listing and SAFRA reviews it', async ({ page, browser }) => {
+  DRAFT = await findReference(page, DRAFT_SLUG);
+
   /* Whatever the last run left behind, start from a listing this partner may submit. */
   await rejectFromConsole(browser, 'إعادة ضبط التجربة الآلية');
 

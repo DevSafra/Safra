@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Page } from '@playwright/test';
 
 import { PARTNER_BASE as BASE } from './partner-session.js';
 
@@ -36,15 +36,9 @@ const NAMES: Record<string, string> = {
  * partner's own registry and matching the name the seed gave them.
  */
 export async function findReference(page: Page, slug: string): Promise<string> {
-  const response = await page.request.get(
-    `http://localhost:4000/api/v1/properties/${slug}`,
-  );
+  const published = await publishedReference(page.request, slug);
 
-  if (response.ok()) {
-    const body = (await response.json()) as { reference?: string };
-
-    if (body.reference) return body.reference;
-  }
+  if (published) return published;
 
   await page.goto(`${BASE}/properties`);
 
@@ -80,4 +74,46 @@ export async function findReference(page: Page, slug: string): Promise<string> {
   expect(references, `no fixture listing matched the slug ${slug}`).toHaveLength(0);
 
   return '';
+}
+
+/**
+ * The reference of a PUBLISHED listing, from the public endpoint — or null if it is not published.
+ *
+ * Split out so a spec with no page can ask: `beforeAll` has a `request` fixture and no browser, and
+ * several specs only ever need a published listing. `findReference` above falls back to walking the
+ * partner's registry, which a draft needs and a request cannot do.
+ *
+ * ## Why no spec may write a reference down
+ *
+ * `db:testbed` deletes its fixture listings and creates them again, and `properties.reference` is
+ * generated on insert — so every reset renumbers them. On 2026-09-06 a reseed turned `PRO-598653`
+ * into `PRO-601709`, and five specs that had one written down began opening «هذه الصفحة غير موجودة»
+ * against a console that was working perfectly. A slug is derived from the name and written
+ * verbatim, so the slug is the identity a spec should hold.
+ */
+export async function publishedReference(
+  request: APIRequestContext,
+  slug: string,
+): Promise<string | null> {
+  const response = await request.get(
+    `http://localhost:4000/api/v1/properties/${encodeURIComponent(slug)}`,
+  );
+
+  if (!response.ok()) return null;
+
+  const { reference } = (await response.json()) as { reference?: string };
+
+  return typeof reference === 'string' && reference.length > 0 ? reference : null;
+}
+
+/** The same, but refusing to continue when it is missing — for a spec that cannot go on without it. */
+export async function requirePublishedReference(
+  request: APIRequestContext,
+  slug: string,
+): Promise<string> {
+  const reference = await publishedReference(request, slug);
+
+  if (!reference) throw new Error(`No published property for slug "${slug}".`);
+
+  return reference;
 }
