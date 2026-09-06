@@ -62,7 +62,11 @@ describeIfDb('schema relations', () => {
     expect(edges.length).toBeGreaterThan(20);
   });
 
-  it.each(edges)('$table.$field resolves', async ({ table, field }) => {
+  /*
+    No dot between the two placeholders: vitest reads `$table.$field` as a nested PATH — property
+    `$field` of `table` — so both collapsed to "undefined resolves" and a failure named no relation.
+  */
+  it.each(edges)('$table → $field resolves', async ({ table, field }) => {
     const db: Database = createDatabase(DATABASE_URL as string, 1);
 
     try {
