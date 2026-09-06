@@ -32,9 +32,15 @@ const ROOM = 'جناح تنفيذي';
 const STAY = (() => {
   const at = new Date();
 
-  at.setUTCDate(
-    at.getUTCDate() + 400 + ((at.getUTCHours() * 60 + at.getUTCMinutes()) % 90),
-  );
+  /*
+    Milliseconds, not minutes.
+
+    This books the executive suite, of which the hotel has two, and a booking cannot be un-made
+    through the pages a guest uses. A window that only moved on the minute meant two runs inside
+    the same minute competed for the same two rooms — the second met a 409 and reported it as the
+    booking flow being broken. Same fault, same fix, as `multi-unit-journey`.
+  */
+  at.setUTCDate(at.getUTCDate() + 400 + (Date.now() % 500));
 
   const checkIn = at.toISOString().slice(0, 10);
 
@@ -49,6 +55,9 @@ test.use({ viewport: { width: 1440, height: 1000 } });
 
 /** The guest's own booking, made by choosing a room on the page. */
 async function bookTheSuite(page: Page): Promise<string> {
+  /* Logged, because the window moves every run and a failure has to be reproducible. */
+  console.log(`stay: ${STAY.checkIn} → ${STAY.checkOut}`);
+
   await page.goto(
     `http://localhost:3000/ar/property/${SLUG}?checkIn=${STAY.checkIn}&checkOut=${STAY.checkOut}&adults=2`,
     { waitUntil: 'domcontentloaded' },
