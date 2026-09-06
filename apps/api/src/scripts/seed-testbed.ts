@@ -100,6 +100,20 @@ interface UnitSpec {
   readonly nameEn: string;
   readonly price: number;
   readonly maxGuests: number;
+  /**
+   * Groups INTERCHANGEABLE rooms, e.g. `double_standard` (Bashar, 2026-09-06).
+   *
+   * A hotel with six identical doubles is six rows sharing one code — never one row with a
+   * quantity, because the exclusion constraint keys on `unit_id`. It was null on all 46,571 units,
+   * so the grouping the schema was designed around had never been exercised by anything.
+   */
+  readonly roomTypeCode?: string;
+  readonly bedrooms?: number;
+  readonly beds?: number;
+  readonly bathrooms?: number;
+  readonly minNights?: number;
+  /** What THIS room offers, as opposed to the building — see `PropertySpec.amenityCodes`. */
+  readonly amenityCodes?: readonly string[];
 }
 
 interface PropertySpec {
@@ -113,6 +127,16 @@ interface PropertySpec {
   /** From `TRIP_ATTRIBUTES` — the ONE shared vocabulary (§5.6). Never a list forked here. */
   readonly attributes: readonly string[];
   readonly units: readonly UnitSpec[];
+  /**
+   * Which of §7.4's ladders applies. Defaults to the first, which every fixture used to share.
+   *
+   * A testbed where every listing is `flex` cannot show that the refund tiers differ, and the
+   * cancellation summary on a unit row is then the same sentence everywhere — which proves nothing
+   * about a screen whose job is to tell them apart.
+   */
+  readonly cancellationPolicyCode?: string;
+  /** What the BUILDING offers. Distinct from any room's, and shown apart from them. */
+  readonly amenityCodes?: readonly string[];
   /**
    * Where this listing sits in the §8.1 lifecycle. Defaults to published.
    *
@@ -208,6 +232,196 @@ const PARTNERS: readonly PartnerSpec[] = [
         units: [
           { nameAr: 'غرفة مزدوجة', nameEn: 'Double Room', price: 65, maxGuests: 2 },
           { nameAr: 'جناح تنفيذي', nameEn: 'Executive Suite', price: 140, maxGuests: 4 },
+        ],
+      },
+      {
+        /*
+          A REAL hotel shape (Bashar, 2026-09-06).
+
+          The testbed had 1,539 published properties with exactly one unit and eight with two, so
+          the accommodation-selection journey — the one a guest actually walks — was only ever
+          exercised against a list of one. This is thirteen rooms in four types: six interchangeable
+          standard doubles, four with a view, two suites and a family room.
+
+          Six rows sharing `double_standard` is the shape the schema was designed for and nothing
+          had ever produced: one row per PHYSICAL room, because the exclusion constraint keys on
+          `unit_id`, with the type grouping them for display. `room_type_code` was null on all
+          46,571 units before this.
+
+          The types differ on every axis a guest compares — price, occupancy, bedrooms, minimum
+          stay and facilities — because a fixture where they differ only by name cannot show that a
+          screen tells them apart.
+        */
+        nameAr: 'فندق أمية الكبير',
+        nameEn: 'Grand Umayyad Hotel',
+        slug: 'grand-umayyad-hotel',
+        attributes: ['history', 'business', 'internet', 'parking'],
+        citySlug: 'damascus',
+        type: 'hotel',
+        address: 'شارع الثورة، دمشق',
+        descriptionAr:
+          'فندق خمس نجوم في وسط دمشق، بثلاث عشرة غرفة موزّعة على أربعة أنواع، ومرافق كاملة.',
+        /* Strict, so the refund ladder on this listing differs from every other fixture's. */
+        cancellationPolicyCode: 'strict',
+        /* The BUILDING's, and none of them repeated on a room. */
+        amenityCodes: ['pool', 'parking', 'reception_24h', 'breakfast'],
+        units: [
+          {
+            nameAr: 'غرفة مزدوجة قياسية',
+            nameEn: 'Standard Double Room',
+            roomTypeCode: 'double_standard',
+            price: 72,
+            maxGuests: 2,
+            bedrooms: 1,
+            beds: 1,
+            bathrooms: 1,
+            minNights: 1,
+            amenityCodes: ['air_conditioning', 'wifi'],
+          },
+          {
+            nameAr: 'غرفة مزدوجة قياسية',
+            nameEn: 'Standard Double Room',
+            roomTypeCode: 'double_standard',
+            price: 72,
+            maxGuests: 2,
+            bedrooms: 1,
+            beds: 1,
+            bathrooms: 1,
+            minNights: 1,
+            amenityCodes: ['air_conditioning', 'wifi'],
+          },
+          {
+            nameAr: 'غرفة مزدوجة قياسية',
+            nameEn: 'Standard Double Room',
+            roomTypeCode: 'double_standard',
+            price: 72,
+            maxGuests: 2,
+            bedrooms: 1,
+            beds: 1,
+            bathrooms: 1,
+            minNights: 1,
+            amenityCodes: ['air_conditioning', 'wifi'],
+          },
+          {
+            nameAr: 'غرفة مزدوجة قياسية',
+            nameEn: 'Standard Double Room',
+            roomTypeCode: 'double_standard',
+            price: 72,
+            maxGuests: 2,
+            bedrooms: 1,
+            beds: 1,
+            bathrooms: 1,
+            minNights: 1,
+            amenityCodes: ['air_conditioning', 'wifi'],
+          },
+          {
+            nameAr: 'غرفة مزدوجة قياسية',
+            nameEn: 'Standard Double Room',
+            roomTypeCode: 'double_standard',
+            price: 72,
+            maxGuests: 2,
+            bedrooms: 1,
+            beds: 1,
+            bathrooms: 1,
+            minNights: 1,
+            amenityCodes: ['air_conditioning', 'wifi'],
+          },
+          {
+            nameAr: 'غرفة مزدوجة قياسية',
+            nameEn: 'Standard Double Room',
+            roomTypeCode: 'double_standard',
+            price: 72,
+            maxGuests: 2,
+            bedrooms: 1,
+            beds: 1,
+            bathrooms: 1,
+            minNights: 1,
+            amenityCodes: ['air_conditioning', 'wifi'],
+          },
+          {
+            nameAr: 'غرفة مزدوجة بإطلالة',
+            nameEn: 'Double Room with View',
+            roomTypeCode: 'double_view',
+            price: 98,
+            maxGuests: 2,
+            bedrooms: 1,
+            beds: 1,
+            bathrooms: 1,
+            minNights: 2,
+            amenityCodes: ['air_conditioning', 'wifi', 'sea_view'],
+          },
+          {
+            nameAr: 'غرفة مزدوجة بإطلالة',
+            nameEn: 'Double Room with View',
+            roomTypeCode: 'double_view',
+            price: 98,
+            maxGuests: 2,
+            bedrooms: 1,
+            beds: 1,
+            bathrooms: 1,
+            minNights: 2,
+            amenityCodes: ['air_conditioning', 'wifi', 'sea_view'],
+          },
+          {
+            nameAr: 'غرفة مزدوجة بإطلالة',
+            nameEn: 'Double Room with View',
+            roomTypeCode: 'double_view',
+            price: 98,
+            maxGuests: 2,
+            bedrooms: 1,
+            beds: 1,
+            bathrooms: 1,
+            minNights: 2,
+            amenityCodes: ['air_conditioning', 'wifi', 'sea_view'],
+          },
+          {
+            nameAr: 'غرفة مزدوجة بإطلالة',
+            nameEn: 'Double Room with View',
+            roomTypeCode: 'double_view',
+            price: 98,
+            maxGuests: 2,
+            bedrooms: 1,
+            beds: 1,
+            bathrooms: 1,
+            minNights: 2,
+            amenityCodes: ['air_conditioning', 'wifi', 'sea_view'],
+          },
+          {
+            nameAr: 'جناح تنفيذي',
+            nameEn: 'Executive Suite',
+            roomTypeCode: 'suite_executive',
+            price: 185,
+            maxGuests: 4,
+            bedrooms: 2,
+            beds: 3,
+            bathrooms: 2,
+            minNights: 2,
+            amenityCodes: ['air_conditioning', 'wifi', 'kitchen', 'sea_view'],
+          },
+          {
+            nameAr: 'جناح تنفيذي',
+            nameEn: 'Executive Suite',
+            roomTypeCode: 'suite_executive',
+            price: 185,
+            maxGuests: 4,
+            bedrooms: 2,
+            beds: 3,
+            bathrooms: 2,
+            minNights: 2,
+            amenityCodes: ['air_conditioning', 'wifi', 'kitchen', 'sea_view'],
+          },
+          {
+            nameAr: 'غرفة عائلية',
+            nameEn: 'Family Room',
+            roomTypeCode: 'family_room',
+            price: 150,
+            maxGuests: 6,
+            bedrooms: 2,
+            beds: 4,
+            bathrooms: 2,
+            minNights: 1,
+            amenityCodes: ['air_conditioning', 'wifi', 'kitchen'],
+          },
         ],
       },
       {
@@ -555,6 +769,8 @@ async function build(db: Seeder): Promise<void> {
   const propertyTypes = await db.select().from(schema.propertyTypes);
   const partnerTypes = await db.select().from(schema.partnerTypes);
   const policies = await db.select().from(schema.cancellationPolicies);
+  /* Read once: every listing and every room resolves its facilities against this. */
+  const amenityRows = await db.select().from(schema.amenities);
 
   const cityBySlug = new Map(cities.map((c) => [c.slug, c]));
   const typeByCode = new Map(propertyTypes.map((t) => [t.code, t]));
@@ -751,9 +967,25 @@ async function build(db: Seeder): Promise<void> {
   await db.execute(
     sql`DELETE FROM booking_verifications WHERE booking_id IN (${testbedBookings})`,
   );
+  /*
+    Append-only, like the ledger above — so the reset has to lower the guard for one statement.
+
+    `booking_internal_notes` carries `deny_mutation`, which raises on any DELETE. The reset must
+    remove the bookings those notes hang off, so the two rules deadlocked: **`db:testbed` could not
+    re-run on any machine where a fixture booking had ever been given a staff note**, and the
+    message named a table nobody was looking at. Found on 2026-09-06 while seeding realistic hotel
+    data — the reset failed before it reached anything new.
+
+    The same treatment `ledger_entries` and `wallet_transactions` already get, and for the same
+    reason: immutability protects a live audit trail, and a testbed reset is a deliberate,
+    destructive, local operation that has to be able to undo its own fixtures. The trigger goes
+    straight back on.
+  */
+  await db.execute(sql`ALTER TABLE booking_internal_notes DISABLE TRIGGER USER`);
   await db.execute(
     sql`DELETE FROM booking_internal_notes WHERE booking_id IN (${testbedBookings})`,
   );
+  await db.execute(sql`ALTER TABLE booking_internal_notes ENABLE TRIGGER USER`);
   await db.execute(
     sql`DELETE FROM coupon_redemptions WHERE booking_id IN (${testbedBookings})`,
   );
@@ -1085,7 +1317,12 @@ async function build(db: Seeder): Promise<void> {
           ...((property.status ?? 'published') === 'published'
             ? { verifiedAt: new Date() }
             : {}),
-          cancellationPolicyId: policy.id,
+          /* This listing's own ladder, falling back to the shared default. */
+          cancellationPolicyId:
+            (property.cancellationPolicyCode
+              ? policies.find((one) => one.code === property.cancellationPolicyCode)
+              : undefined
+            )?.id ?? policy.id,
           attributes: [...property.attributes],
           /*
             A star CLASSIFICATION, so a fresh testbed can demonstrate the filter.
@@ -1148,10 +1385,43 @@ async function build(db: Seeder): Promise<void> {
             basePrice: money(unit.price),
             currencyId: usd.id,
             unitLabel: room,
+            ...(unit.roomTypeCode ? { roomTypeCode: unit.roomTypeCode } : {}),
+            ...(unit.bedrooms === undefined ? {} : { bedrooms: unit.bedrooms }),
+            ...(unit.beds === undefined ? {} : { beds: unit.beds }),
+            ...(unit.bathrooms === undefined ? {} : { bathrooms: unit.bathrooms }),
+            ...(unit.minNights === undefined ? {} : { minNights: unit.minNights }),
           })
           .returning();
 
-        if (made) units.push({ id: made.id, price: unit.price });
+        if (made) {
+          units.push({ id: made.id, price: unit.price });
+
+          /* What this ROOM offers. Unknown codes are skipped rather than failing the seed. */
+          const codes = unit.amenityCodes ?? [];
+          const ids = amenityRows
+            .filter((one) => codes.includes(one.code))
+            .map((one) => one.id);
+
+          if (ids.length > 0) {
+            await db
+              .insert(schema.unitAmenities)
+              .values(ids.map((amenityId) => ({ unitId: made.id, amenityId })));
+          }
+        }
+      }
+
+      /* And what the BUILDING offers, which is a different list read on a different section. */
+      const propertyCodes = property.amenityCodes ?? [];
+      const propertyAmenityIds = amenityRows
+        .filter((one) => propertyCodes.includes(one.code))
+        .map((one) => one.id);
+
+      if (propertyAmenityIds.length > 0) {
+        await db
+          .insert(schema.propertyAmenities)
+          .values(
+            propertyAmenityIds.map((amenityId) => ({ propertyId: row.id, amenityId })),
+          );
       }
 
       madeUnits.set(property.slug, units);
