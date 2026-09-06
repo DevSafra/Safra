@@ -51,8 +51,12 @@ export interface ChosenRoom {
   readonly prices: readonly RoomPrice[];
   /** How many of this type are free for these nights — the ceiling on the stepper. */
   readonly maxRooms: number;
+  /** ISO, for the checkout link — the machine's copy. */
   readonly checkIn: string;
   readonly checkOut: string;
+  /** «الأحد 5 أكتوبر», for the reader. Two renderings of one fact, and both are needed. */
+  readonly checkInText: string;
+  readonly checkOutText: string;
   readonly nightsText: string;
   readonly policyText: string;
 }

@@ -41,7 +41,7 @@ export function BookingSummaryCard({
   readonly locale: Locale;
   readonly propertySlug: string;
   readonly guests: { adults: number; children: number; infants: number };
-  /** The «from» figure, shown only while nothing is chosen. */
+  /** The cheapest STAY for the chosen dates, shown only while nothing is chosen. */
   readonly fromPrice: string;
   /*
     Every label is a STRING, never a formatter.
@@ -51,8 +51,8 @@ export function BookingSummaryCard({
     formats them and passes the sentence.
   */
   readonly copy: {
-    perNightSuffix: string;
-    guestsUpToParty: string;
+    fromLabel: string;
+    fromCaption: string;
     chooseRoom: string;
     bookNow: string;
     selected: string;
@@ -82,13 +82,17 @@ export function BookingSummaryCard({
   if (!chosen || !price) {
     return (
       <>
-        <p className="text-2xl font-bold text-gold">
-          {fromPrice}
-          <span className="ms-1 text-sm font-normal text-muted">
-            {copy.perNightSuffix}
-          </span>
-        </p>
-        <p className="mt-1 text-sm text-muted">{copy.guestsUpToParty}</p>
+        {/*
+          The cheapest STAY, not the cheapest night.
+
+          The list beside this one prices whole stays — «إجمالي الإقامة $145.99» — and this card
+          answered «$73.99 / الليلة». Two different kinds of number for the same rooms, one above
+          the other, and the smaller one is the one a guest anchors on. Same shape as a row now:
+          label, figure, and the nightly rate underneath saying how it was reached.
+        */}
+        <p className="text-[11px] text-faint">{copy.fromLabel}</p>
+        <p className="mt-0.5 text-2xl font-bold tabular-nums text-gold">{fromPrice}</p>
+        <p className="mt-0.5 text-[12px] text-muted">{copy.fromCaption}</p>
 
         <div className="gold-rule my-4" />
 
@@ -119,14 +123,25 @@ export function BookingSummaryCard({
           who picked the wrong room wants a different one and a guest who changed their mind wants
           the page back — and a card with no way out of a choice is a trap.
         */}
-        <span className="ms-auto flex gap-3">
-          <a href="#units" className="text-[12px] text-gold underline underline-offset-2">
+        {/*
+          Both at least 40px tall below `lg`, where the input is a finger.
+
+          They are STANDALONE controls, not links inside a sentence, so the inline exemption does
+          not cover them — and «إزالة الاختيار» undoes a choice, which is the last control anybody
+          should have to aim at. `inline-flex` because `min-height` does nothing to an inline
+          element, and the negative margin keeps the row the height it looks.
+        */}
+        <span className="-my-2 ms-auto flex gap-3">
+          <a
+            href="#units"
+            className="inline-flex min-h-10 items-center text-[12px] text-gold underline underline-offset-2 lg:min-h-0"
+          >
             {copy.change}
           </a>
           <button
             type="button"
             onClick={clear}
-            className="cursor-pointer text-[12px] text-muted underline underline-offset-2"
+            className="inline-flex min-h-10 cursor-pointer items-center text-[12px] text-muted underline underline-offset-2 transition-colors hover:text-text2 lg:min-h-0"
           >
             {copy.remove}
           </button>
@@ -183,15 +198,15 @@ export function BookingSummaryCard({
 
       <dl className="grid gap-1.5 text-[12.5px]">
         <div className="flex items-baseline justify-between gap-3">
-          <dt className="text-muted">{chosen.checkIn}</dt>
+          <dt className="text-text2">{chosen.checkInText}</dt>
           {/*
             The arrow follows the READING direction, from `rangeArrow` — it was a hardcoded «←»,
             which is right in Arabic and points from the departure back at the arrival in English
             and German. Exactly the defect `DateRange` was extracted to stop happening again, and
             it happened again here because this card wrote the glyph itself.
           */}
-          <dd className="text-muted">
-            {rangeArrow(locale)} {chosen.checkOut}
+          <dd className="text-text2">
+            {rangeArrow(locale)} {chosen.checkOutText}
           </dd>
         </div>
         <div className="flex items-baseline justify-between gap-3">
