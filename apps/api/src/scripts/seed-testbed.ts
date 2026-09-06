@@ -772,6 +772,36 @@ async function build(db: Seeder): Promise<void> {
   /* Read once: every listing and every room resolves its facilities against this. */
   const amenityRows = await db.select().from(schema.amenities);
 
+  /*
+    A photograph key that is already in the bucket, borrowed for the fixture listings.
+
+    Chosen from a row this reset does NOT delete, so the object behind it is still there. Null on a
+    database that has never had an image, which the step below reports rather than papering over.
+  */
+  /*
+    THREE DISTINCT keys, not one repeated.
+
+    The first version borrowed a single key and wrote it three times. Six `image-preview` tests
+    exercise moving BETWEEN pictures — the arrows, the chevrons, the rail, panning, the swipe — and
+    against three copies of one photograph there is nothing to move between. A gallery of identical
+    images is not a gallery.
+  */
+  const borrowedImages = await db
+    .select({
+      fileKey: schema.propertyImages.fileKey,
+      width: schema.propertyImages.width,
+      height: schema.propertyImages.height,
+      variantWidths: schema.propertyImages.variantWidths,
+    })
+    .from(schema.propertyImages)
+    .limit(3);
+
+  if (borrowedImages.length === 0) {
+    console.warn(
+      '  no photograph to borrow: fixture listings will have none, and image specs will skip.',
+    );
+  }
+
   const cityBySlug = new Map(cities.map((c) => [c.slug, c]));
   const typeByCode = new Map(propertyTypes.map((t) => [t.code, t]));
   const partnerTypeByCode = new Map(partnerTypes.map((t) => [t.code, t]));
@@ -1422,6 +1452,38 @@ async function build(db: Seeder): Promise<void> {
           .values(
             propertyAmenityIds.map((amenityId) => ({ propertyId: row.id, amenityId })),
           );
+      }
+
+      /*
+        Photographs, because the reset deletes them and NOTHING else puts them back.
+
+        `property_images` rows are written by exactly one thing — a partner uploading through the
+        portal — so clearing them in the cleanup above made the loss permanent: after a single
+        `db:testbed`, every image-dependent browser spec pinned to a fixture property failed and
+        stayed failing, on a platform where 607 photographs still existed for other listings. Found
+        on 2026-09-06 when a reseed broke `image-preview.spec.ts`.
+
+        The OBJECT is not re-uploaded; the rows point at a key already in the bucket, taken from a
+        listing that has one. Several listings sharing a photograph is meaningless in a testbed and
+        is what makes this repeatable without an object store round-trip. With no key to borrow the
+        step is skipped and says so, because inventing one would produce rows whose images 404 —
+        which is the same blank page with a more confusing cause.
+      */
+      if (borrowedImages.length > 0 && (property.status ?? 'published') === 'published') {
+        await db.insert(schema.propertyImages).values(
+          borrowedImages.map((image, index) => ({
+            propertyId: row.id,
+            fileKey: image.fileKey,
+            altAr: property.nameAr,
+            altEn: property.nameEn,
+            altDe: property.nameEn,
+            width: image.width,
+            height: image.height,
+            variantWidths: image.variantWidths,
+            isCover: index === 0,
+            sortOrder: index + 1,
+          })),
+        );
       }
 
       madeUnits.set(property.slug, units);

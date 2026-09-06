@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 
+import { propertyReference } from './property-reference.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -24,7 +25,6 @@ import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
  * building's facilities stay separate from the room's the whole way.
  */
 const SLUG = 'grand-umayyad-hotel';
-const PROPERTY = 'PRO-598653';
 
 const TYPES = [
   { name: 'غرفة مزدوجة قياسية', left: '6 غرف متبقية' },
@@ -133,14 +133,17 @@ test('the room a guest chooses is the room checkout quotes', async ({ page }) =>
   console.log('--- CHECKOUT ---\n' + (await main.innerText()).slice(0, 380));
 });
 
-test('the moderator reviews the same four types', async ({ browser }) => {
+test('the moderator reviews the same four types', async ({ browser, request }) => {
   test.skip(MISSING_CREDENTIALS, SKIP_REASON);
+
+  /* Looked up, never written down — a reseed renumbers every reference. */
+  const reference = await propertyReference(request, SLUG);
 
   const staff = await browser.newContext({ storageState: STAFF_STATE });
   const page = await staff.newPage();
 
   try {
-    await page.goto(`http://localhost:3001/properties/${PROPERTY}`, {
+    await page.goto(`http://localhost:3001/properties/${reference}`, {
       waitUntil: 'domcontentloaded',
     });
 

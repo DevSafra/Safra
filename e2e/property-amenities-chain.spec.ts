@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
+import { propertyReference } from './property-reference.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -26,7 +27,8 @@ import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
  * version assumed a clean fixture and hung for the full timeout on a working build the first time
  * a previous run left the boxes ticked.
  */
-const PROPERTY = 'PRO-363247';
+/* Resolved per run: a reseed renumbers references — see property-reference.ts. */
+let PROPERTY = '';
 const SLUG = 'qasr-al-sharq-malki';
 
 /** Unmistakably the building's, and absent from this fixture's unit lists. */
@@ -34,6 +36,10 @@ const PROPERTY_LEVEL = ['pool', 'parking'];
 
 test.skip(MISSING_CREDENTIALS, SKIP_REASON);
 test.describe.configure({ mode: 'serial' });
+test.beforeAll(async ({ request }) => {
+  PROPERTY = await propertyReference(request, SLUG);
+});
+
 test.use({
   baseURL: PARTNER_BASE,
   storageState: PARTNER_STATE,

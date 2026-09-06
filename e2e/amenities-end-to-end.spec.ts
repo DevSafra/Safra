@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { PARTNER_BASE, PARTNER_STATE } from './partner-session.js';
+import { propertyReference } from './property-reference.js';
 import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
 
 /**
@@ -30,11 +31,16 @@ import { MISSING_CREDENTIALS, SKIP_REASON, STAFF_STATE } from './staff.js';
  * asserted rather than assumed — a cleanup that silently failed would leave the next run measuring
  * this one's leftovers.
  */
-const PROPERTY = 'PRO-363247';
+/* Resolved per run: a reseed renumbers references — see property-reference.ts. */
+let PROPERTY = '';
 const SLUG = 'qasr-al-sharq-malki';
 
 test.skip(MISSING_CREDENTIALS, SKIP_REASON);
 test.describe.configure({ mode: 'serial' });
+test.beforeAll(async ({ request }) => {
+  PROPERTY = await propertyReference(request, SLUG);
+});
+
 test.use({
   baseURL: PARTNER_BASE,
   storageState: PARTNER_STATE,
