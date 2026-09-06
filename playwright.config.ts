@@ -103,10 +103,27 @@ export default defineConfig({
      * the limiter to make a test suite pass was considered and rejected: it is a live control
      * against credential stuffing, and the suite is the thing that should bend.
      */
+    /*
+      Depends on the STAFF SESSION, not on the chromium suite (Bashar, 2026-09-06).
+
+      It used to depend on `chromium`, for ordering: partner specs run after staff specs because
+      they share a database. But Playwright SKIPS a dependent project when its dependency has any
+      failure — so one flaky chromium test silently prevented twenty-plus partner and cross-app
+      specs from running at all, and the run reported «380 passed, 2 failed» with a quiet «4 did not
+      run» beside it. A fifth of the suite went unexecuted and nothing said so.
+
+      Ordering is a RUNNER's job and success is a project's; conflating them made a flake into a
+      coverage hole. `scripts/e2e-run.mjs` now sequences the projects and fails loudly on anything
+      that did not run, so this only needs what it actually needs: the staff session, which several
+      partner specs open a console with.
+
+      The throttle reason the old comment gave was already stale — auth limits were keyed on
+      IP + ACCOUNT on 2026-08-07, so these sign-ins stopped competing for one budget.
+    */
     {
       name: 'signed-in-setup',
       use: { ...devices['Desktop Chrome'] },
-      dependencies: ['chromium'],
+      dependencies: ['setup'],
       testMatch: /partner\.setup\.ts/,
     },
     {

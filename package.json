@@ -36,7 +36,8 @@
     "load:invariants": "pnpm --filter @safra/db load:invariants",
     "load:accounts": "pnpm --filter @safra/api load:accounts",
     "load:token": "pnpm --filter @safra/api load:token",
-    "worker": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api start:worker'"
+    "worker": "sh -c 'set -a; . ./.env; set +a; pnpm --filter @safra/api start:worker'",
+    "e2e:run": "sh -c 'set -a; . ./.env; set +a; node scripts/e2e-run.mjs'"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
