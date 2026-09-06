@@ -56,6 +56,23 @@ export class BookingCreationService {
   async quote(input: { unitId: string; checkIn: string; checkOut: string }) {
     const price = await this.pricing.quote(input);
 
+    /*
+      The stay rules, which `create` has always applied and this did not.
+      
+      A quote is what the customer decides on: it prices the checkout page, and pressing «تابع إلى
+      الدفع» sends the same dates to `create`. So a quote that prices a stay `create` will refuse is
+      a screen that takes a guest's name, phone and card details for a booking that cannot exist —
+      the "control that appears to work but does not complete" shape, one door earlier.
+      
+      Invisible until 2026-09-06 because every fixture unit had `min_nights = 1`, so the two paths
+      could never disagree. A realistic hotel has a suite that takes two nights and a standard room
+      that takes one, and the property page linked to both with the same dates.
+      
+      Read here rather than threaded out of pricing: pricing's job is what a stay COSTS, and
+      whether it is allowed is this service's.
+    */
+    await this.assertStayIsAllowed(input.unitId, price.nights);
+
     return {
       nights: price.nights,
       baseAmount: price.baseAmount,
@@ -64,6 +81,37 @@ export class BookingCreationService {
       currencyCode: price.currencyCode,
       nightly: price.nightly,
     };
+  }
+
+  /**
+   * The minimum and maximum stay a unit accepts.
+   *
+   * One rule, asked in two places — `quote` before the customer commits and `create` when they do.
+   * `create` keeps its own inline copy because it has the unit row in hand already and re-reading
+   * it inside the booking transaction would be a second query for a value it holds; what matters is
+   * that the two ANSWER the same, which `booking-min-nights.integration.test.ts` asserts directly.
+   */
+  private async assertStayIsAllowed(unitId: string, nights: number): Promise<void> {
+    const rows = await this.db.execute<{ min_nights: number; max_nights: number | null }>(
+      sql`
+        SELECT min_nights, max_nights
+          FROM units
+         WHERE id = ${unitId} AND is_active AND deleted_at IS NULL
+         LIMIT 1
+      `,
+    );
+
+    const unit = rows.rows[0];
+
+    /* No unit is `pricing.quote`'s refusal to make, and it has already made it. */
+    if (!unit) return;
+
+    if (nights < unit.min_nights) {
+      throw badRequest(ERROR.UNIT_MIN_NIGHTS, { min: unit.min_nights });
+    }
+    if (unit.max_nights !== null && nights > unit.max_nights) {
+      throw badRequest(ERROR.UNIT_MAX_NIGHTS, { max: unit.max_nights });
+    }
   }
 
   /**
