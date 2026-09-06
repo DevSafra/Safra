@@ -115,7 +115,7 @@ export function PropertyAmenities({
           onClick={() => void save()}
           className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg btn-gold px-4 py-2 text-[12.5px] font-bold disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0"
         >
-          {busy ? c.saving : c.save}
+          {busy ? c.propertyAmenitiesSaving : c.propertyAmenitiesSave}
         </button>
       </span>
     </section>

@@ -639,6 +639,16 @@ export const ar = {
   editProperty: {
     /* Property-level facilities, distinct from a room's (Bashar, 2026-09-06). */
     propertyAmenitiesLabel: 'مرافق العقار',
+    /*
+      Its OWN verb, not «حفظ التعديلات» again (2026-09-06).
+
+      The facilities section sits on the same screen as the property form, and both said the same
+      four words. A partner looking at two identical buttons cannot tell what either one saves —
+      and the ambiguity was real enough that three browser specs could not tell them apart either,
+      which is the machine noticing what a reader would have.
+    */
+    propertyAmenitiesSave: 'حفظ المرافق',
+    propertyAmenitiesSaving: 'جارٍ حفظ المرافق…',
     propertyAmenitiesHint:
       'ما يتوفّر في المبنى لجميع النزلاء — مثل المسبح والمصعد وموقف السيارات. مرافق الغرفة نفسها تُحدَّد في كل وحدة على حدة.',
     title: 'تعديل العقار',
@@ -1136,6 +1146,8 @@ export const ar = {
       'هذه الصفحة للاطّلاع فقط. جدولة التحويلات وتنفيذها يتمّان من سفرة؛ لأي استفسار راسل الدعم.',
     /* The link across to where the destination is maintained — now inside الإعدادات. */
     accountsLink: 'حسابات التحويل',
+    /* The summary block's own heading, so the route beside it has something to sit against. */
+    summaryHeading: 'ملخّص التحويلات',
 
     /*
       The summary (Bashar, 2026-09-04: «design the pages … much better»).

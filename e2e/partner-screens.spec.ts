@@ -125,11 +125,7 @@ test.describe('تعديل العقار', () => {
     const edited = `${original} — تعديل اختباري`;
 
     await address.fill(edited);
-    /* The STRUCTURAL form's save; the facilities section below has one of its own. */
-    await page
-      .getByRole('button', { name: t.editProperty.save })
-      .and(page.locator(':not([data-property-amenities-save])'))
-      .click();
+    await page.getByRole('button', { name: t.editProperty.save }).click();
 
     await expect(banner(page)).toContainText(t.editProperty.saved);
 
@@ -158,21 +154,14 @@ test.describe('تعديل العقار', () => {
     await expect(page.getByText(t.editProperty.lockedWhy)).toBeVisible();
 
     /*
-      No STRUCTURAL form: not a disabled one, which would still invite the work.
+      No form at all: not a disabled one, which would still invite the work.
 
-      Scoped to the save that belongs to that form, because since 2026-09-06 the screen carries a
-      second one. A published listing may edit its FACILITIES — a pool closing is an ongoing fact,
-      not the verified address §8.1 freezes — and that section has its own button under its own
-      marker. Asserting on the label alone made the two indistinguishable and failed on a screen
-      that was behaving correctly.
+      A published listing DOES still carry a facilities section — a pool closing is an ongoing fact,
+      not the verified address §8.1 freezes — but that section names its own action «حفظ المرافق»,
+      so this assertion stays about the structural form and reads as one sentence again.
     */
     await expect(page.getByLabel(t.editProperty.address)).toHaveCount(0);
-    await expect(
-      page
-        .getByRole('button', { name: t.editProperty.save })
-        .and(page.locator(':not([data-property-amenities-save])')),
-      'the structural form offers no save',
-    ).toHaveCount(0);
+    await expect(page.getByRole('button', { name: t.editProperty.save })).toHaveCount(0);
 
     /* And it names what IS still editable, so the screen is not a dead end. */
     await expect(
