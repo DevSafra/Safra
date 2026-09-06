@@ -86,15 +86,19 @@ describeIfDb('the booking voucher', () => {
       'the count is printed in both the Arabic and the English block',
     ).toBe(2);
 
-    /* And the room numbers, likewise on both. */
-    expect(html, 'Arabic names the rooms').toContain('أرقام الغرف');
-    expect(html, 'English names them too').toContain('Room numbers');
+    /* And no door numbers printed on it — the same reasoning as the QR above. */
+    expect(html, 'no room numbers on the printed voucher').not.toContain('أرقام الغرف');
+    expect(html, 'nor in the English block').not.toContain('Room numbers');
 
     /*
-      And the DOORS. A scanner showing «rooms:3» tells a clerk how many keys, not which — the
-      labels come from `booking_units`, the only record of what this booking actually holds.
+      And NOT the doors. This document names the guest; a room number beside a name tells a finder
+      which room a named person is in, and it promises a specific door the front desk may reassign.
+      The numbers live on the partner's arrivals list and the console instead.
     */
-    expect(payload, 'and the rooms it holds').toMatch(/room_numbers:.+/);
+    expect(payload, 'no room numbers on a guest-held document').not.toMatch(
+      /room_numbers/,
+    );
+    expect(payload, 'and none of the labels either').not.toContain('101');
   });
 
   /**

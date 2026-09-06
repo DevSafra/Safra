@@ -122,6 +122,16 @@ test('finance captures the money and the partner accepts three rooms', async ({
     */
     await expect(main, 'and names the trip').toContainText('TRP-');
 
+    /*
+      The DOOR NUMBERS, here and not on the guest's voucher.
+
+      The security pass over this change took them off the voucher: that document names the guest,
+      and a room number beside a name tells whoever finds it which room a named person is in. This
+      is the opposite control — without it, "remove the numbers" would have quietly removed them
+      from the screens belonging to the people who actually hand over keys.
+    */
+    await expect(main, 'the console names which rooms').toContainText('أرقام الغرف');
+
     const capture = console_.getByRole('button', {
       name: 'تأكيد استلام الحوالة',
       exact: true,

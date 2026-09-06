@@ -111,18 +111,13 @@ export class VoucherService {
       SELECT b.reference, b.status::text AS status,
              b.check_in::text AS check_in, b.check_out::text AS check_out,
              b.nights, b.guests_adults, b.guests_children,
-             b.rooms,
              /*
-               WHICH doors, not just how many.
-
-               A voucher for a three-room booking named one room type and reception handed over one
-               key. The labels are what a desk clerk actually needs — «101, 102, 103» — and they
-               come from booking_units, which is the only record of what this booking holds.
+               How many rooms. NOT which — see the note in voucherQrPayload: this document names
+               the guest, and a room number beside a name is a fact only reception needs. Not
+               selected at all rather than selected and unused, so nothing here can print it by
+               accident.
              */
-             (SELECT string_agg(bu_u.unit_label, ', ' ORDER BY bu_u.unit_label)
-                FROM booking_units bu
-                JOIN units bu_u ON bu_u.id = bu.unit_id
-               WHERE bu.booking_id = b.id AND bu_u.unit_label IS NOT NULL) AS room_labels,
+             b.rooms,
              cp.full_name AS customer_name,
              coalesce(pr.name_ar, pr.name_en) AS property_name,
              coalesce(u.name_ar, u.name_en)   AS unit_name,
@@ -154,8 +149,6 @@ export interface VoucherRow extends Record<string, unknown> {
   check_out: string;
   nights: number;
   rooms: number;
-  /** Comma-separated physical room numbers, or null where the partner numbers nothing. */
-  room_labels: string | null;
   guests_adults: number;
   guests_children: number;
   customer_name: string;
@@ -185,11 +178,23 @@ export function voucherQrPayload(booking: VoucherRow): string {
     `property:${booking.property_name}`,
     `unit:${booking.unit_name}`,
     /*
-      The count and the doors. A scanner reading «unit:غرفة مزدوجة» on a three-room booking told a
-      clerk nothing about the other two — the booking held them and the voucher did not say so.
+      The COUNT, and deliberately not the room numbers.
+
+      A scanner reading «unit:غرفة مزدوجة» on a three-room booking told a clerk nothing about the
+      other two, so the count belongs here. The DOORS do not, for two reasons found in the security
+      pass over this change:
+
+      - This document names the guest. Printing their room number beside their name means a
+        voucher left on a café table, forwarded, or photographed says which room a named person is
+        sleeping in. Reception already knows; nobody else needs to.
+      - It over-promises. The allocation reserves specific rows because the exclusion constraint
+        needs them, but which physical door a guest is handed is the front desk's call at check-in.
+        A number printed on a guest's paper is a promise the hotel has not made.
+
+      The numbers are on the partner's arrivals list and the console's booking detail — the screens
+      belonging to the people who hand over keys.
     */
     `rooms:${booking.rooms}`,
-    ...(booking.room_labels === null ? [] : [`room_numbers:${booking.room_labels}`]),
     `in:${booking.check_in}`,
     `out:${booking.check_out}`,
     `guests:${booking.guests_adults + booking.guests_children}`,
@@ -259,7 +264,6 @@ export function voucherHtml(booking: VoucherRow, qrDataUri: string): string {
       <div class="row"><span class="label">العميل</span><span class="value">${esc(booking.customer_name)}</span></div>
       <div class="row"><span class="label">العقار</span><span class="value">${esc(booking.property_name)}</span></div>
       <div class="row"><span class="label">الوحدة</span><span class="value">${esc(booking.unit_name)}${booking.rooms > 1 ? ` × ${booking.rooms}` : ''}</span></div>
-      ${booking.room_labels === null ? '' : `<div class="row"><span class="label">أرقام الغرف</span><span class="value ltr">${esc(booking.room_labels)}</span></div>`}
       <div class="row"><span class="label">المدينة</span><span class="value">${esc(booking.city_name)}</span></div>
       <div class="row"><span class="label">الوصول</span><span class="value ltr">${esc(booking.check_in)}</span></div>
       <div class="row"><span class="label">المغادرة</span><span class="value ltr">${esc(booking.check_out)}</span></div>
@@ -278,7 +282,6 @@ export function voucherHtml(booking: VoucherRow, qrDataUri: string): string {
     <div class="row"><span class="label">Guest</span><span class="value">${esc(booking.customer_name)}</span></div>
     <div class="row"><span class="label">Property</span><span class="value">${esc(booking.property_name)}</span></div>
     <div class="row"><span class="label">Unit</span><span class="value">${esc(booking.unit_name)}${booking.rooms > 1 ? ` × ${booking.rooms}` : ''}</span></div>
-    ${booking.room_labels === null ? '' : `<div class="row"><span class="label">Room numbers</span><span class="value">${esc(booking.room_labels)}</span></div>`}
     <div class="row"><span class="label">City</span><span class="value">${esc(booking.city_name)}</span></div>
     <div class="row"><span class="label">Check-in</span><span class="value">${esc(booking.check_in)}</span></div>
     <div class="row"><span class="label">Check-out</span><span class="value">${esc(booking.check_out)}</span></div>
