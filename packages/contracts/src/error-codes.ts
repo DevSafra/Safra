@@ -516,6 +516,8 @@ export const ERROR = {
   /* A city must always have a photograph: the public destination card draws one (Bashar, 2026-09-02). */
   GEO_CITY_IMAGE_LAST_ONE: 'geo.city_image_last_one',
   UNIT_UNAVAILABLE_ON: 'unit.unavailable_on',
+  /* Asked for four of a room type and only two are free for those nights. */
+  UNIT_NOT_ENOUGH_ROOMS: 'unit.not_enough_rooms',
   UNIT_GUEST_LIMIT: 'unit.guest_limit',
   UNIT_MAX_NIGHTS: 'unit.max_nights',
   UNIT_MIN_NIGHTS: 'unit.min_nights',

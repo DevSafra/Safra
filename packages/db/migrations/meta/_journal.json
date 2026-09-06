@@ -477,6 +477,13 @@
       "when": 1788646054975,
       "tag": "0067_property_amenities",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1788718281959,
+      "tag": "0068_room_inventory",
+      "breakpoints": true
     }
   ]
 }

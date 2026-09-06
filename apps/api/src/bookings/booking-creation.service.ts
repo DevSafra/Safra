@@ -24,6 +24,8 @@ const EXCLUSION_VIOLATION = '23P01';
 
 export interface BookingDraftInput {
   unitId: string;
+  /** How many identical rooms of this type. One when the caller says nothing. */
+  rooms?: number | undefined;
   checkIn: string;
   checkOut: string;
   adults: number;
@@ -53,7 +55,12 @@ export class BookingCreationService {
    * amounts are deliberately withheld: §7.2 forbids exposing partner financials, and
    * a guest quoting a price has no business learning either.
    */
-  async quote(input: { unitId: string; checkIn: string; checkOut: string }) {
+  async quote(input: {
+    unitId: string;
+    checkIn: string;
+    checkOut: string;
+    rooms?: number | undefined;
+  }) {
     const price = await this.pricing.quote(input);
 
     /*
@@ -75,6 +82,8 @@ export class BookingCreationService {
 
     return {
       nights: price.nights,
+      /* Echoed back so checkout can show «غرفتان» beside the total it is about to charge for. */
+      rooms: price.rooms,
       baseAmount: price.baseAmount,
       customerFeeAmount: price.customerFeeAmount,
       totalAmount: price.totalAmount,
@@ -112,6 +121,114 @@ export class BookingCreationService {
     if (unit.max_nights !== null && nights > unit.max_nights) {
       throw badRequest(ERROR.UNIT_MAX_NIGHTS, { max: unit.max_nights });
     }
+  }
+
+  /**
+   * Writes one `booking_units` row per room the booking holds.
+   *
+   * ## Why the chosen room is pinned first
+   *
+   * `ORDER BY` puts the guest's own choice at the top so it is never the room dropped when only
+   * some of the requested quantity is free. A guest who picked room 204 from the list and got 207
+   * instead would be right to call that a different booking from the one they made.
+   *
+   * ## Why availability is re-read here and not trusted from the page
+   *
+   * The property page's counts were true when it rendered. This runs in the transaction that
+   * actually takes the inventory, so it reads `booking_units` and `availability_days` again — and
+   * even that is only advisory. The exclusion constraint is what makes the answer safe under
+   * concurrency; this query exists so the ordinary case gets a sentence naming how many are left
+   * rather than a bare conflict.
+   */
+  private async allocateRooms(
+    tx: Parameters<Parameters<Database['transaction']>[0]>[0],
+    input: {
+      bookingId: string;
+      leadUnitId: string;
+      propertyId: string;
+      roomTypeCode: string | null;
+      checkIn: string;
+      checkOut: string;
+      rooms: number;
+    },
+  ): Promise<void> {
+    /*
+      A room with no type code is one of a kind — a villa, a farmhouse. It is interchangeable with
+      nothing, so the only room it can allocate is itself, and asking for two of it is refused
+      below rather than silently filled with a neighbouring listing.
+    */
+    const interchangeable =
+      input.roomTypeCode === null
+        ? sql`u.id = ${input.leadUnitId}`
+        : sql`u.property_id = ${input.propertyId} AND u.room_type_code = ${input.roomTypeCode}`;
+
+    const free = await tx.execute<{ id: string }>(sql`
+      SELECT u.id::text AS id
+      FROM units u
+      WHERE ${interchangeable}
+        AND u.is_active
+        AND u.deleted_at IS NULL
+        -- Not already held by a live stay overlapping these nights.
+        AND NOT EXISTS (
+          SELECT 1 FROM booking_units bu
+          WHERE bu.unit_id = u.id
+            -- Not counting THIS booking's own lead room, which the AFTER INSERT
+            -- trigger has already written. Without this the allocation would read
+            -- the guest's own choice as taken and refuse the booking making it.
+            AND bu.booking_id <> ${input.bookingId}
+            AND bu.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in', 'disputed')
+            AND daterange(bu.check_in, bu.check_out, '[)')
+                && daterange(${input.checkIn}::date, ${input.checkOut}::date, '[)')
+        )
+        -- Nor closed by the partner's calendar on any night of the stay.
+        AND NOT EXISTS (
+          SELECT 1 FROM availability_days ad
+          WHERE ad.unit_id = u.id
+            AND ad.date >= ${input.checkIn}::date
+            AND ad.date <  ${input.checkOut}::date
+            AND ad.status <> 'available'
+
+        )
+      -- The guest's own choice first; after that, a stable order so two runs agree.
+      ORDER BY (u.id = ${input.leadUnitId}) DESC, u.unit_label NULLS LAST, u.id
+      LIMIT ${input.rooms}
+    `);
+
+    const chosen = free.rows.map((row) => row.id);
+
+    if (chosen.length < input.rooms) {
+      throw conflict(ERROR.UNIT_NOT_ENOUGH_ROOMS, {
+        available: chosen.length,
+        requested: input.rooms,
+      });
+    }
+
+    /*
+      The lead room must be among them. If the guest's choice was taken between the page and here,
+      the allocation would otherwise quietly hand them a sibling while `bookings.unit_id` still
+      names the one they picked — a booking whose own two columns disagree.
+    */
+    if (!chosen.includes(input.leadUnitId)) {
+      throw conflict(ERROR.BOOKING_DATES_JUST_TAKEN);
+    }
+
+    /*
+      `onConflictDoNothing` because the lead room is already here: an AFTER INSERT trigger on
+      `bookings` writes it, so that a booking created by any OTHER path — the staff console, a seed
+      script, whatever is written next — still holds the room it names. This insert adds the rest.
+    */
+    await tx
+      .insert(schema.bookingUnits)
+      .values(
+        chosen.map((unitId) => ({
+          bookingId: input.bookingId,
+          unitId,
+          checkIn: input.checkIn,
+          checkOut: input.checkOut,
+          status: 'pending_payment' as const,
+        })),
+      )
+      .onConflictDoNothing();
   }
 
   /**
@@ -210,6 +327,7 @@ export class BookingCreationService {
       city_timezone: string;
       city_cutoff_hour: number | null;
       max_guests: number;
+      room_type_code: string | null;
       min_nights: number;
       max_nights: number | null;
       property_status: string;
@@ -220,7 +338,8 @@ export class BookingCreationService {
       policy_min_refund: number;
     }>(sql`
       SELECT
-        u.id AS unit_id, u.property_id, u.max_guests, u.min_nights, u.max_nights,
+        u.id AS unit_id, u.property_id, u.max_guests, u.room_type_code,
+        u.min_nights, u.max_nights,
         p.partner_id, p.city_id, p.status AS property_status,
         (pa.suspended_at IS NOT NULL) AS partner_suspended,
         ci.timezone AS city_timezone, ci.same_day_cutoff_hour AS city_cutoff_hour,
@@ -318,10 +437,18 @@ export class BookingCreationService {
     }
 
     // ── Party size and stay length ──────────────────────────────────────────
+    /*
+      Four suites sleeping four each hold sixteen people, so the limit is per-BOOKING rather than
+      per-room. Checking one room's capacity against the whole party would refuse a family that
+      booked exactly enough rooms for itself — which is the reason they asked for several.
+    */
+    const rooms = Math.max(1, Math.trunc(input.rooms ?? 1));
     const guests = input.adults + (input.children ?? 0); // infants do not occupy a bed
-    if (guests > unit.max_guests) {
+    const capacity = unit.max_guests * rooms;
+
+    if (guests > capacity) {
       throw badRequest(ERROR.UNIT_GUEST_LIMIT, {
-        max: unit.max_guests,
+        max: capacity,
         requested: guests,
       });
     }
@@ -387,6 +514,7 @@ export class BookingCreationService {
       unitId: input.unitId,
       checkIn: input.checkIn,
       checkOut: input.checkOut,
+      rooms,
     });
 
     /*
@@ -417,6 +545,7 @@ export class BookingCreationService {
             unitId: input.unitId,
             checkIn: input.checkIn,
             checkOut: input.checkOut,
+            rooms,
             discountAmount: preview.discountAmount,
           });
 
@@ -444,6 +573,7 @@ export class BookingCreationService {
             cityId: unit.city_id,
             checkIn: input.checkIn,
             checkOut: input.checkOut,
+            rooms,
             guestsAdults: input.adults,
             guestsChildren: input.children ?? 0,
             guestsInfants: input.infants ?? 0,
@@ -492,6 +622,29 @@ export class BookingCreationService {
           });
 
         if (!booking) throw new Error('Booking insert returned no row.');
+
+        /*
+          ── Hand over the physical rooms ──────────────────────────────────────
+
+          The guest chose a room TYPE and a quantity; these are the doors. The one they clicked is
+          always among them and comes first, so `bookings.unit_id` names a room the booking really
+          holds rather than an arbitrary sibling.
+
+          The SELECT is advisory and the CONSTRAINT is the guarantee. Two guests racing for the last
+          suite both see it free here; one commits and the other is refused 23P01 by
+          `booking_units_no_overlapping_stays` and handled by the catch below. Which is why this
+          runs INSIDE the booking's transaction — a partial allocation rolls the whole booking back
+          rather than leaving a guest holding three of the four rooms they paid for.
+        */
+        await this.allocateRooms(tx, {
+          bookingId: booking.id,
+          leadUnitId: input.unitId,
+          propertyId: unit.property_id,
+          roomTypeCode: unit.room_type_code,
+          checkIn: input.checkIn,
+          checkOut: input.checkOut,
+          rooms,
+        });
 
         /*
           The coupon is SPENT here, in the booking's own transaction.
@@ -599,6 +752,7 @@ export class BookingCreationService {
             totalAmount: price.totalAmount,
             currencyCode: price.currencyCode,
             nights: price.nights,
+            rooms: price.rooms,
           },
         };
       });

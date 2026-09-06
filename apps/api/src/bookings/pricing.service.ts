@@ -41,6 +41,8 @@ export interface PriceBreakdown {
   currencyCode: string;
   currencyId: string;
   nights: number;
+  /** How many identical rooms this price covers. One unless the guest asked for more. */
+  rooms: number;
   fxRateToSyp: string;
   totalSyp: string;
   /** Per-night prices actually used, for the customer's breakdown. */
@@ -131,6 +133,15 @@ export class PricingService {
      * what stops a price quote acquiring a dependency on who is asking.
      */
     discountAmount?: string | undefined;
+    /**
+     * How many identical rooms of this type, default one.
+     *
+     * Multiplies the base and nothing else, because everything else DERIVES from the base: the
+     * customer fee, the partner commission and its USD cap, the total and the SYP conversion all
+     * read `baseMinor` below. Multiplying the total instead would charge one room's fee for four
+     * rooms — and a percentage cap would be applied to a quarter of the money it is meant to cap.
+     */
+    rooms?: number | undefined;
   }): Promise<PriceBreakdown> {
     const rows = await this.db.execute<{
       date: string;
@@ -182,6 +193,14 @@ export class PricingService {
       baseMinor += minor;
       nightly.push({ date: night.date, amount: fromMinor(minor, scale) });
     }
+
+    /*
+      `nightly` stays the rate for ONE room — it is the rate table a guest reads, and «$185 a night»
+      does not become «$370 a night» because they took two. The quantity multiplies the base.
+    */
+    const rooms = Math.max(1, Math.trunc(input.rooms ?? 1));
+
+    baseMinor *= BigInt(rooms);
 
     /*
       ── Customer fee (§2.1, configured on the Rules Engine page) ────────────
@@ -257,6 +276,7 @@ export class PricingService {
       currencyCode: first.currency_code,
       currencyId: first.currency_id,
       nights: nights.length,
+      rooms,
       fxRateToSyp: fxRate,
       totalSyp,
       nightly,

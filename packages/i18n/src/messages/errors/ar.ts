@@ -339,6 +339,8 @@ export const ar = {
   'geo.city_image_last_one':
     'لا يمكن حذف الصورة الأخيرة للمدينة. ارفع صورة بديلة أولاً، ثم احذف هذه.',
   'unit.unavailable_on': 'الوحدة غير متاحة في {date}.',
+  'unit.not_enough_rooms':
+    'لم يبقَ سوى {available} من هذه الغرفة في هذه التواريخ، وقد طُلب {requested}.',
   'unit.guest_limit': 'تتسع هذه الوحدة لـ {max} ضيوف، وقد طُلب {requested}.',
   'unit.max_nights': 'تسمح هذه الوحدة بـ {max} ليلة كحد أقصى.',
   'unit.min_nights': 'تتطلب هذه الوحدة {min} ليلة على الأقل.',

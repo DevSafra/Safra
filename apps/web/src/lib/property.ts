@@ -197,6 +197,12 @@ export function imageUrl(
 
 const quoteSchema = z.object({
   nights: z.number(),
+  /*
+    How many rooms the quote covers. `.default(1)` would be the wrong tool here — it invents a
+    plausible value for a field the API might have stopped sending, and «غرفة واحدة» over a total
+    charged for four is the exact failure that rule exists to prevent.
+  */
+  rooms: z.number().int().min(1),
   baseAmount: z.string(),
   customerFeeAmount: z.string(),
   totalAmount: z.string(),
@@ -218,11 +224,13 @@ export async function quote(input: {
   unitId: string;
   checkIn: string;
   checkOut: string;
+  rooms?: number | undefined;
 }): Promise<Quote | null> {
   const url = new URL(`${API_URL}/api/v1/bookings/quote`);
   url.searchParams.set('unitId', input.unitId);
   url.searchParams.set('checkIn', input.checkIn);
   url.searchParams.set('checkOut', input.checkOut);
+  if (input.rooms !== undefined) url.searchParams.set('rooms', String(input.rooms));
 
   try {
     const response = await fetch(url, {

@@ -372,6 +372,8 @@ export const en = {
   'geo.city_image_last_one':
     'A city cannot be left without a photograph. Upload a replacement first, then delete this one.',
   'unit.unavailable_on': 'The unit is not available on {date}.',
+  'unit.not_enough_rooms':
+    'Only {available} of this room are left on these dates; {requested} were requested.',
   'unit.guest_limit': 'This unit accommodates {max} guests; {requested} were requested.',
   'unit.max_nights': 'This unit allows at most {max} nights.',
   'unit.min_nights': 'This unit requires at least {min} nights.',

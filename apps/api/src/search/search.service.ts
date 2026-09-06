@@ -365,8 +365,13 @@ export class SearchService {
           -- Anti-join 2: no live booking overlaps. Uses the same '[)' bound as the
           -- exclusion constraint, so search and the constraint can never disagree
           -- about what "overlapping" means.
+          --
+          -- booking_units, not bookings: a booking of four suites NAMES one of
+          -- them and HOLDS four, so reading the booking row would offer the other
+          -- three to somebody else. Every booking has a row here whatever created
+          -- it — the bookings_hold_lead_room trigger sees to that.
           AND NOT EXISTS (
-            SELECT 1 FROM bookings b
+            SELECT 1 FROM booking_units b
             WHERE b.unit_id = u.id
               AND b.status IN ('pending_payment', 'pending_confirmation', 'confirmed', 'checked_in')
               AND daterange(b.check_in, b.check_out, '[)')

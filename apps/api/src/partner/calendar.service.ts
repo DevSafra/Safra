@@ -76,7 +76,7 @@ export class CalendarService {
       SELECT
         d.day::date::text                             AS date,
         -- A live booking always wins over the partner's declared state.
-        CASE WHEN b.id IS NOT NULL THEN 'booked'
+        CASE WHEN b.booking_id IS NOT NULL THEN 'booked'
              ELSE COALESCE(ad.status, 'available')
         END                                           AS status,
         COALESCE(ad.price, u.base_price)::text        AS price,
@@ -89,7 +89,11 @@ export class CalendarService {
       ) AS d(day)
       LEFT JOIN availability_days ad
         ON ad.unit_id = u.id AND ad.date = d.day::date
-      LEFT JOIN bookings b
+      -- booking_units, not bookings. A guest who books four identical suites
+      -- holds four rooms and the booking row names one, so reading the booking
+      -- would show the partner three of their own rooms as free on nights they
+      -- are sold. Only existence is asked of it, so nothing else changes.
+      LEFT JOIN booking_units b
         ON b.unit_id = u.id
        AND b.status IN ${OCCUPYING_STATUSES}
        AND d.day::date >= b.check_in
@@ -259,7 +263,7 @@ export class CalendarService {
         u.id                                          AS unit_id,
         d.day::date::text                             AS date,
         -- A live booking always wins over the partner's declared state, as the per-unit read does.
-        CASE WHEN b.id IS NOT NULL THEN 'booked'
+        CASE WHEN b.booking_id IS NOT NULL THEN 'booked'
              ELSE COALESCE(ad.status, 'available')
         END                                           AS status,
         COALESCE(ad.price, u.base_price)::text        AS price,
@@ -278,7 +282,11 @@ export class CalendarService {
       ) AS d(day)
       LEFT JOIN availability_days ad
         ON ad.unit_id = u.id AND ad.date = d.day::date
-      LEFT JOIN bookings b
+      -- booking_units, not bookings. A guest who books four identical suites
+      -- holds four rooms and the booking row names one, so reading the booking
+      -- would show the partner three of their own rooms as free on nights they
+      -- are sold. Only existence is asked of it, so nothing else changes.
+      LEFT JOIN booking_units b
         ON b.unit_id = u.id
        AND b.status IN ${OCCUPYING_STATUSES}
        AND d.day::date >= b.check_in

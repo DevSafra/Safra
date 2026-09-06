@@ -6,6 +6,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -53,6 +54,14 @@ export const bookings = pgTable(
     customerProfileId: foreignId('customer_profile_id')
       .notNull()
       .references(() => customerProfiles.id),
+    /**
+     * The room this booking LEADS with, and the one every downstream surface names.
+     *
+     * A booking of four identical suites names one of them here and lists all four in
+     * `booking_units`. That is not a half-truth: a quantity is only offered over rooms of the SAME
+     * type, so the type, the rate, the policy and the amenities on this row describe all of them —
+     * what differs is only which physical doors the guest is handed at reception.
+     */
     unitId: foreignId('unit_id')
       .notNull()
       .references(() => units.id),
@@ -70,6 +79,9 @@ export const bookings = pgTable(
     checkOut: date('check_out').notNull(),
     /** Derived in the database so it can never disagree with the dates. */
     nights: integer('nights').generatedAlwaysAs(sql`(check_out - check_in)`),
+
+    /** How many identical rooms of `unitId`'s type. The physical rooms are `bookingUnits`. */
+    rooms: smallint('rooms').notNull().default(1),
 
     guestsAdults: smallint('guests_adults').notNull(),
     guestsChildren: smallint('guests_children').notNull().default(0),
@@ -231,6 +243,48 @@ export const bookings = pgTable(
 );
 
 /**
+ * WHICH physical rooms a booking holds — one row per room, always at least one.
+ *
+ * ## This table is where the double-booking guarantee now lives
+ *
+ * `bookings_no_overlapping_stays_v3` protects the room a booking NAMES. A booking that holds four
+ * suites names one of them, so the other three needed a guarantee of their own, and
+ * `booking_units_no_overlapping_stays` (post/0022) is the same EXCLUDE constraint one table across.
+ * Two transactions racing for the last free room: one commits, the other gets 23P01. No amount of
+ * application care substitutes for that, which is why rooms are still individual rows and a
+ * partner's "quantity" is an authoring convenience rather than a counter.
+ *
+ * ## The three copied columns are not redundancy
+ *
+ * An exclusion constraint may only read its own table, and the predicate that decides whether a
+ * stay HOLDS inventory is the booking's status. So the dates and the status are copied here and a
+ * trigger on `bookings` keeps them in step — no service has to know this table exists, which is the
+ * only way a copy like this stays honest across a dozen callers that move a booking's status.
+ */
+export const bookingUnits = pgTable(
+  'booking_units',
+  {
+    bookingId: foreignId('booking_id')
+      .notNull()
+      .references(() => bookings.id),
+    unitId: foreignId('unit_id')
+      .notNull()
+      .references(() => units.id),
+
+    /** Copied from the booking, maintained by the `bookings_sync_units` trigger. Never written by hand. */
+    checkIn: date('check_in').notNull(),
+    checkOut: date('check_out').notNull(),
+    status: bookingStatus('status').notNull(),
+
+    ...createdAt,
+  },
+  (t) => [
+    primaryKey({ columns: [t.bookingId, t.unitId] }),
+    index('booking_units_unit_dates_idx').on(t.unitId, t.checkIn, t.checkOut),
+  ],
+);
+
+/**
  * Staff prose about one booking, never shown to the customer or the partner (§9.4).
  *
  * ## Why a table and not `bookings.internal_notes`
@@ -370,7 +424,7 @@ export const timelineEvents = pgTable(
   ],
 );
 
-export const bookingsRelations = relations(bookings, ({ one }) => ({
+export const bookingsRelations = relations(bookings, ({ one, many }) => ({
   customerProfile: one(customerProfiles, {
     fields: [bookings.customerProfileId],
     references: [customerProfiles.id],
@@ -386,4 +440,10 @@ export const bookingsRelations = relations(bookings, ({ one }) => ({
     fields: [bookings.currencyId],
     references: [currencies.id],
   }),
+  units: many(bookingUnits),
+}));
+
+export const bookingUnitsRelations = relations(bookingUnits, ({ one }) => ({
+  booking: one(bookings, { fields: [bookingUnits.bookingId], references: [bookings.id] }),
+  unit: one(units, { fields: [bookingUnits.unitId], references: [units.id] }),
 }));

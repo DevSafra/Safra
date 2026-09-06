@@ -421,6 +421,8 @@ export const de = {
   'geo.city_image_last_one':
     'Eine Stadt darf nicht ohne Foto bleiben. Laden Sie zuerst ein Ersatzbild hoch und löschen Sie dann dieses.',
   'unit.unavailable_on': 'Die Einheit ist am {date} nicht verfügbar.',
+  'unit.not_enough_rooms':
+    'Für diese Daten sind nur noch {available} dieses Zimmers frei; angefragt wurden {requested}.',
   'unit.guest_limit':
     'Diese Einheit bietet Platz für {max} Gäste; angefragt wurden {requested}.',
   'unit.max_nights': 'Diese Einheit erlaubt höchstens {max} Nächte.',

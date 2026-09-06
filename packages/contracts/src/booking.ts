@@ -16,6 +16,15 @@ export const bookingCreateSchema = z
     unitId: z.string().uuid(),
     checkIn: calendarDateSchema,
     checkOut: calendarDateSchema,
+    /*
+      How many identical rooms of this type.
+
+      Capped at 10 because it is a booking, not a block reservation — a group taking more than ten
+      rooms is a conversation with the hotel, and an uncapped quantity is an invitation to price a
+      stay with a number chosen to overflow something. The real ceiling is what the property has
+      free, which only the server can know and which it checks when it allocates.
+    */
+    rooms: z.number().int().min(1).max(10).default(1),
     adults: z.number().int().min(1).max(30),
     children: z.number().int().min(0).max(20).default(0),
     infants: z.number().int().min(0).max(10).default(0),
@@ -236,6 +245,20 @@ export const bookingQuoteSchema = z
     unitId: z.string().uuid(),
     checkIn: calendarDateSchema,
     checkOut: calendarDateSchema,
+    /*
+      How many identical rooms of this type.
+
+      Capped at 10 because it is a booking, not a block reservation — a group taking more than ten
+      rooms is a conversation with the hotel, and an uncapped quantity is an invitation to price a
+      stay with a number chosen to overflow something. The real ceiling is what the property has
+      free, which only the server can know and which it checks when it allocates.
+    */
+    /*
+      `coerce` because this one is a QUERY STRING — `?rooms=2` is the text "2", and a plain
+      `z.number()` refuses it. The create schema below takes a JSON body and stays strict, so a
+      client sending a quoted number there is told rather than quietly understood.
+    */
+    rooms: z.coerce.number().int().min(1).max(10).default(1),
   })
   .strict()
   .refine((q) => q.checkOut > q.checkIn, {
