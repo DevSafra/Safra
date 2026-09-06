@@ -117,3 +117,30 @@ export async function requirePublishedReference(
 
   return reference;
 }
+
+/**
+ * A partner's §13.2 reference, found by their display name on the console registry.
+ *
+ * `partners.reference` is generated on insert and `db:testbed` recreates its fixture partners, so
+ * every reset renumbers them exactly as it does properties — `PAR-433898` became `PAR-730422` on
+ * 2026-09-06, and a spec holding the old one opened «هذه الصفحة غير موجودة» against a console that
+ * was working. The display name is written verbatim by the seeder and survives.
+ *
+ * Needs a STAFF page: there is no public partner endpoint, and there should not be.
+ */
+export async function findPartnerReference(page: Page, name: string): Promise<string> {
+  await page.goto(`http://localhost:3001/partners?q=${encodeURIComponent(name)}`, {
+    waitUntil: 'domcontentloaded',
+  });
+
+  const href = await page
+    .locator('a[href*="/partners/PAR-"]')
+    .first()
+    .getAttribute('href');
+
+  const reference = /\/partners\/(PAR-\d+)/.exec(href ?? '')?.[1];
+
+  if (!reference) throw new Error(`No partner on the registry named "${name}".`);
+
+  return reference;
+}

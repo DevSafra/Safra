@@ -8,6 +8,7 @@ import {
   STAFF_STATE,
 } from './staff.js';
 import { PARTNER_BASE as PORTAL, PARTNER_STATE } from './partner-session.js';
+import { findPartnerReference } from './partner-fixtures.js';
 
 /**
  * Where a partner's money goes — entered in one app, approved in another, spent by a third.
@@ -56,8 +57,13 @@ const LAST4 = ACCOUNT_NUMBER.slice(-4);
 */
 const HOLDER = 'Qasr Al-Sharq Fixture';
 
-/** The fixture partner the portal session belongs to — five listings, one payout. */
-const PARTNER_REFERENCE = 'PAR-433898';
+/*
+  The fixture partner the portal session belongs to — resolved, never written down.
+
+  A reseed renumbers every partner exactly as it does every property; see `findPartnerReference`.
+*/
+const PARTNER_NAME = 'فندق قصر الشرق';
+let PARTNER_REFERENCE = '';
 
 /**
  * A DIFFERENT partner for the money half, and the reason is a real platform rule.
@@ -71,7 +77,7 @@ const PARTNER_REFERENCE = 'PAR-433898';
  * It is also the second of Bashar's two doors: nobody signs in as this partner here, so the account
  * is entered by STAFF on the partner's behalf, through the console.
  */
-const MONEY_PARTNER_REFERENCE = 'PAR-433900';
+let MONEY_PARTNER_REFERENCE = '';
 const MONEY_PARTNER_NAME = 'بيت دمشقي تراثي';
 
 /** A stable holder name, so a second run finds the account it made rather than adding another. */
@@ -122,6 +128,22 @@ test.describe('payout accounts, across the portal and the console', () => {
   /** Carried between tests, because the console addresses an account by id. */
   let accountId = '';
 
+  /*
+    Both references, resolved once on a staff page. `beforeAll` gets its own browser context, so it
+    cannot borrow a test's — and the registry is staff-only, correctly.
+  */
+  test.beforeAll(async ({ browser }) => {
+    const staff = await browser.newContext({ storageState: STAFF_STATE });
+    const page = await staff.newPage();
+
+    try {
+      PARTNER_REFERENCE = await findPartnerReference(page, PARTNER_NAME);
+      MONEY_PARTNER_REFERENCE = await findPartnerReference(page, MONEY_PARTNER_NAME);
+    } finally {
+      await staff.close();
+    }
+  });
+
   // ────────────────────────────────────────────────────────────────────────────
   test.describe('the partner enters their own details', () => {
     test.use({ storageState: PARTNER_STATE });
@@ -135,7 +157,19 @@ test.describe('payout accounts, across the portal and the console', () => {
         their own details» is not true of a screen with no route to it.
       */
       await page.getByRole('link', { name: 'حسابات التحويل' }).click();
-      await expect(page).toHaveURL(/\/payouts\/accounts$/);
+
+      /*
+        الإعدادات, not `/payouts/accounts` — the screen MOVED on 2026-09-05.
+
+        Bashar asked for حسابات التحويل to live inside a settings page alongside the password
+        change, and the old route now `permanentRedirect`s there so a bookmark still lands
+        somewhere real. This assertion still names the old URL, and it had been failing since the
+        day that shipped without anyone seeing it: the partner project was silently not running.
+
+        What the test is actually about is unchanged — the panel is reached by a LINK rather than by
+        typing a URL, because a page nothing links to is a page nobody finds.
+      */
+      await expect(page).toHaveURL(/\/settings$/);
 
       await expect(
         page.getByText('لا يُحوَّل أي مبلغ إلا إلى حساب موثَّق', { exact: false }),

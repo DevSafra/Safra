@@ -57,7 +57,16 @@ test('a partner declares an amenity and a guest sees it', async ({
   // ── 1. THE PARTNER SELECTS ────────────────────────────────────────────────
   await page.goto(`/properties/${PROPERTY}/edit`, { waitUntil: 'domcontentloaded' });
 
-  const picker = page.locator('[data-amenity-picker]').first();
+  /*
+    A UNIT's picker, scoped inside its unit block.
+
+    `[data-amenity-picker]` alone took the first on the page, and since 2026-09-06 that is the
+    PROPERTY's — the building's facilities section sits above الوحدات, because a guest reads the
+    building before the room. The spec then derived a "unit id" of `property-amenity` and hunted for
+    a form that could never match it, which surfaced as a two-minute click timeout rather than as
+    anything naming the real cause.
+  */
+  const picker = page.locator('[data-unit] [data-amenity-picker]').first();
 
   await expect(picker, 'the picker is on the screen at all').toBeVisible();
 

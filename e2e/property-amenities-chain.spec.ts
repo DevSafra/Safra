@@ -124,10 +124,27 @@ test('a facility declared on the property reaches every surface as the property�
       waitUntil: 'domcontentloaded',
     });
 
-    await expect(
-      guestPage.getByRole('heading', { name: 'مرافق العقار' }),
-      'the building has a section of its own',
-    ).toBeVisible({ timeout: 20_000 });
+    /*
+      Reloaded until it appears, because the guest page is CACHED for a minute.
+
+      A property's description, photographs and facilities are revalidated every 60s — right for
+      content that changes rarely, and it means a facility a partner ticks reaches guests within a
+      minute rather than instantly. That window is deliberate product behaviour, so the spec waits
+      it out rather than asserting the platform is broken. (Availability is exempt and always live;
+      see `getProperty` — a stale room count is a different kind of wrong.)
+    */
+    const heading = guestPage.getByRole('heading', { name: 'مرافق العقار' });
+
+    for (let attempt = 0; attempt < 14; attempt += 1) {
+      if (await heading.isVisible().catch(() => false)) break;
+
+      await guestPage.waitForTimeout(5_000);
+      await guestPage.reload({ waitUntil: 'domcontentloaded' });
+    }
+
+    await expect(heading, 'the building has a section of its own').toBeVisible({
+      timeout: 20_000,
+    });
 
     /*
       Scoped to the section. Asserting on the whole document would pass on a build that listed the
