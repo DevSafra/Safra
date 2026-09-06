@@ -95,7 +95,19 @@ test.describe('عدد الضيوف', () => {
     // ── And the property's «احجز الآن» carries it into checkout ───────────────
     await page.goto(toProperty);
 
-    const book = page.locator('a[href*="/checkout?"]').first();
+    /*
+      A room has to be CHOSEN first. The page used to link every row straight to checkout; since
+      the summary card became live there is no checkout link at all until a guest says which room
+      they want — deliberately, so that pressing «احجز الآن» can never mean a room they did not
+      pick. So the party is now carried across two hops rather than one, and both are walked here.
+    */
+    await page
+      .locator('#units > ul > li')
+      .first()
+      .getByRole('button', { name: 'احجز هذه الوحدة' })
+      .click();
+
+    const book = page.locator('aside#booking').locator('a[href*="/checkout?"]').first();
 
     await expect(book).toBeVisible({ timeout: 20_000 });
 
