@@ -371,6 +371,16 @@ function CurrencyForm({
   const [nameEn, setNameEn] = useState(currency.nameEn);
   const [nameDe, setNameDe] = useState(currency.nameDe);
   const [isActive, setIsActive] = useState(currency.isActive);
+  /*
+    The rate, as a STRING and starting from whatever is on record.
+
+    A string because that is what the contract takes: SYP rates are five significant digits and
+    climbing, and a JSON number arrives as an IEEE-754 double — the point of the decimal string is
+    that these figures stop being quietly wrong. `?? ''` rather than a zero, because a currency
+    with NO rate must present as empty and not as a rate of nothing.
+  */
+  const [rate, setRate] = useState(currency.rateToSyp ?? '');
+  const [source, setSource] = useState<'manual' | 'central_bank' | 'provider'>('manual');
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -405,6 +415,37 @@ function CurrencyForm({
         setError(apiErrorOf(await response.json().catch(() => null)));
 
         return;
+      }
+
+      /*
+        Then the RATE, and only when it changed.
+
+        A separate call because it is a separate record: `fx_rates` is append-only, so setting a
+        rate INSERTS a row and history is never rewritten — a booking that snapshotted an earlier
+        rate stays explicable. Posting it unchanged would add an identical row on every save and
+        make the audit trail unreadable.
+
+        Second, not first, and reported distinctly if it fails: the currency's own details are the
+        cheaper thing to lose, and an operator told «حُفظت بيانات العملة، وتعذّر حفظ سعر الصرف»
+        knows which half to retry. One «تعذّر» over two writes would not.
+      */
+      const changed = rate.trim() !== '' && rate.trim() !== (currency.rateToSyp ?? '');
+
+      if (changed && !currency.isAccounting) {
+        const posted = await fetch('/api/fx-rates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currency: currency.code, rate: rate.trim(), source }),
+        });
+
+        if (!posted.ok) {
+          setError(
+            `${c.fxRateFailed} ${apiErrorOf(await posted.json().catch(() => null))}`,
+          );
+          router.refresh();
+
+          return;
+        }
       }
 
       onClose();
@@ -493,6 +534,48 @@ function CurrencyForm({
         posting the platform has ever made in it, so «stop offering SYP» is not a thing this screen
         may express. Disabled AND said, because a control that is merely inert teaches nothing.
       */}
+        {/*
+          The rate, where the figure it replaces is already displayed on the row behind this modal.
+
+          Bashar, 2026-09-07: «I do not want operational workflows that require manual API calls.»
+          Until this field existed, `GET`/`POST /admin/fx-rates` had no caller in any application,
+          the panel behind this modal pointed at a settings screen with no such section, and EUR and
+          TRY were ACTIVE currencies the platform could not price at all.
+
+          `field-ltr` because a rate is a Latin decimal run — through the class rather than the
+          `dir` attribute, per the standing rule, and it is now defined in this app's stylesheet.
+
+          Absent for the accounting currency rather than disabled: SYP has no rate against itself
+          and the contract refuses it, so there is nothing here to grey out. Said, so an operator
+          who came looking is not left wondering.
+        */}
+        {currency.isAccounting ? (
+          <p className="text-[11.5px] text-faint">{c.fxRateAccounting}</p>
+        ) : (
+          <Row>
+            <Field
+              label={c.fxRateLabel}
+              value={rate}
+              onChange={setRate}
+              hint={c.fxRateHint}
+              className="field-ltr"
+              inputMode="decimal"
+            />
+            {/* `SelectField`, so a row of both lines up — it exists for exactly that. */}
+            <SelectField
+              label={c.fxRateSource}
+              value={source}
+              onChange={(value) =>
+                setSource(value as 'manual' | 'central_bank' | 'provider')
+              }
+            >
+              <option value="manual">{c.fxSourceManual}</option>
+              <option value="central_bank">{c.fxSourceCentralBank}</option>
+              <option value="provider">{c.fxSourceProvider}</option>
+            </SelectField>
+          </Row>
+        )}
+
         <CheckboxField
           label={c.currencyActive}
           checked={isActive}

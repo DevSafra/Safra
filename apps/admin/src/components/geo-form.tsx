@@ -47,6 +47,8 @@ export function Field({
   hint,
   name,
   disabled,
+  className,
+  inputMode,
 }: {
   readonly label: string;
   readonly value: string;
@@ -55,6 +57,14 @@ export function Field({
   readonly name?: string | undefined;
   /** A value the CODE decides — shown so it can be read, never typed. */
   readonly disabled?: boolean | undefined;
+  /**
+   * Appended, for the one case that needs it: `field-ltr` on a field whose VALUE reads left to
+   * right. Through the class rather than a `dir` attribute, per the standing rule — the attribute
+   * also moves the field's start edge and puts the caret opposite its own label.
+   */
+  readonly className?: string | undefined;
+  /** So a decimal field offers a numeric keypad on a phone without becoming `type="number"`. */
+  readonly inputMode?: 'decimal' | 'numeric' | undefined;
 }) {
   return (
     <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
@@ -65,9 +75,10 @@ export function Field({
         onChange={(event) => onChange?.(event.target.value)}
         readOnly={disabled ?? false}
         disabled={disabled ?? false}
+        {...(inputMode ? { inputMode } : {})}
         className={`${CONTROL} placeholder:text-faint ${
           disabled ? 'cursor-not-allowed bg-field text-faint' : ''
-        }`}
+        } ${className ?? ''}`}
       />
       {hint ? (
         <span className="text-[10.5px] font-normal text-faint2">{hint}</span>

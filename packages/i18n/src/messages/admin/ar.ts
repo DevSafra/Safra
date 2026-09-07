@@ -1616,7 +1616,28 @@ export const ar = {
       note: 'الأسعار تُعرض للعميل حسب البلد أو العملة المختارة. أسعار الصرف تُعدَّل من هنا لا من الكود (P-005).',
       citiesNote:
         'صفحة كل مدينة: أول ثلثها صور عالية الجودة، ثم وصف وتصنيفات وعروض — وتُستخدم لأهداف SEO لاحقاً.',
-      fxElsewhere: 'تعديل أسعار الصرف من شاشة أسعار الصرف — بسجل تغييرات مُدقَّق.',
+      /*
+        The rate is edited HERE now (Bashar, 2026-09-07).
+
+        This line used to read «تعديل أسعار الصرف من شاشة أسعار الصرف» and link to /settings — a
+        screen that has no such section. `GET`/`POST /admin/fx-rates` and the `FX_RATE_MANAGE`
+        permission existed with no caller in any application, so the only way to set a rate was an
+        authenticated request by hand, while EUR and TRY sat ACTIVE with no rate and the platform
+        refused to price in them.
+
+        So the signpost is replaced by the thing it pointed at: the rate is a field in the currency
+        editor, beside the figure this screen already displays.
+      */
+      fxHere:
+        'سعر الصرف يُحرَّر من زر «تعديل» على العملة، ويُسجَّل كل تغيير في سجل التدقيق.',
+      fxRateLabel: 'سعر الصرف مقابل الليرة السورية',
+      fxRateHint: 'رقم عشري موجب، حتى 8 منازل. يُسجَّل سعراً جديداً ولا يُعدَّل القديم.',
+      fxRateSource: 'المصدر',
+      fxSourceManual: 'إدخال يدوي',
+      fxSourceCentralBank: 'المصرف المركزي',
+      fxSourceProvider: 'مزوّد أسعار',
+      fxRateAccounting: 'الليرة السورية هي عملة الحساب — لا سعر لها مقابل نفسها.',
+      fxRateFailed: 'حُفظت بيانات العملة، وتعذّر حفظ سعر الصرف:',
     },
 
     reports: {
@@ -2653,6 +2674,41 @@ export const ar = {
       groupPartners: 'الشركاء والتعويضات',
       groupPartnersNote:
         'الغرامات، ورصيد المحفظة الذي يحصل عليه العميل عند تجاوز الشريك مهلته (P-007).',
+      /*
+        The sanctions list, and the means to replace it (Bashar, 2026-09-07).
+
+        «Please add the missing administrative surface for manual refresh/import so the platform is
+        not blocked solely by configuration.» The endpoint was the documented fallback and had no
+        caller anywhere, while the only snapshot on the platform was seventeen days old against a
+        seven-day limit — so partner verification was refusing and the only ways out were a feed URL
+        nobody had configured or a request crafted by hand.
+
+        The copy names the CONSEQUENCE rather than the mechanism: an operator opening this panel is
+        usually here because a verification refused, and «القائمة قديمة» is the sentence that
+        explains it.
+      */
+      sanctionsTitle: 'قائمة العقوبات',
+      sanctionsNote:
+        'يُفحص كل شريك قبل التوثيق مقابل القائمة الأوروبية الموحّدة. إن تجاوز عمر القائمة الحدّ المسموح تتوقّف عملية التوثيق — الفحص مقابل قائمة لا يمكن إثبات حداثتها يبدو التزاماً ولا يوفّره.',
+      sanctionsEntries: 'عدد المُدرَجين',
+      sanctionsFetched: 'تاريخ الاستيراد',
+      sanctionsAge: 'عمر القائمة',
+      sanctionsAgeDays: '{n} يوماً',
+      sanctionsStale: 'قديمة — التوثيق متوقّف',
+      sanctionsFresh: 'حديثة',
+      sanctionsNever: 'لم تُستورد أي قائمة بعد — التوثيق متوقّف.',
+      sanctionsUpload: 'ملف القائمة (XML)',
+      sanctionsUploadHint:
+        'نزّل تصدير القائمة الأوروبية الموحّدة بصيغة XML وارفعه هنا. يستبدل الملف القائمة الحالية بالكامل.',
+      sanctionsSource: 'المصدر',
+      sanctionsSourceEu: 'القائمة الأوروبية الموحّدة',
+      sanctionsImport: 'استيراد القائمة',
+      sanctionsImporting: 'يجري الاستيراد…',
+      sanctionsImported: 'تمّ استيراد {n} مُدرَجاً.',
+      sanctionsPickFile: 'اختر ملفاً أولاً.',
+      sanctionsPolicyRequired: 'السياسة: الفحص إلزامي قبل التوثيق.',
+      sanctionsPolicyAdvisory: 'السياسة: الفحص إرشادي — يُسجَّل ولا يمنع التوثيق.',
+      sanctionsPolicyOff: 'السياسة: الفحص معطّل.',
       groupCompliance: 'الامتثال',
       groupComplianceNote:
         'إلى أي حد تُلزم ضوابط الامتثال. هذا الإعداد يحدد ما إذا كان فحص العقوبات يمنع اعتماد شريك أو تحويل مستحقاته، أم يُسجَّل فقط.',
