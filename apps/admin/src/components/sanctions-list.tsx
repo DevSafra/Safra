@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { z } from 'zod';
 
 import type { SanctionsStatus } from '@/lib/api';
-import { ConsolePanel } from '@/components/console-shell';
 import { count, shortDateTime } from '@/lib/format';
 import { apiErrorOf, fill, t } from '@/lib/strings';
 
@@ -105,102 +104,107 @@ export function SanctionsList({ status }: { readonly status: SanctionsStatus }) 
         ? c.sanctionsPolicyAdvisory
         : c.sanctionsPolicyOff;
 
+  /*
+    No `ConsolePanel` here, deliberately.
+
+    It lives in `console-shell`, which reaches `session-server` and therefore `server-only` — so a
+    CLIENT component importing it fails the webpack build even though `tsc` is perfectly happy. The
+    page wraps this in the panel instead, which is where a server component belongs.
+  */
   return (
-    <ConsolePanel>
-      <section data-sanctions className="grid gap-3">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h2 className="text-[14px] font-extrabold text-gold">{c.sanctionsTitle}</h2>
+    <section data-sanctions className="grid gap-3">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-[14px] font-extrabold text-gold">{c.sanctionsTitle}</h2>
 
-          {/*
-            The consequence, in the reader's face rather than derived from a date.
+        {/*
+          The consequence, in the reader's face rather than derived from a date.
 
-            `stale` and `imported` come from the API together with the POLICY, because «القائمة
-            قديمة» means «verification is blocked» under `required` and «the screening you were
-            about to skip would have been unreliable anyway» under `advisory`. Two different things
-            to do about one fact.
-          */}
-          <span
-            className={`ms-auto text-[12px] font-bold ${
-              status.imported && !status.stale ? 'text-ok' : 'text-bad'
-            }`}
-          >
-            {!status.imported
-              ? c.sanctionsNever
-              : status.stale
-                ? c.sanctionsStale
-                : c.sanctionsFresh}
+          `stale` and `imported` come from the API together with the POLICY, because «القائمة
+          قديمة» means «verification is blocked» under `required` and «the screening you were
+          about to skip would have been unreliable anyway» under `advisory`. Two different things
+          to do about one fact.
+        */}
+        <span
+          className={`ms-auto text-[12px] font-bold ${
+            status.imported && !status.stale ? 'text-ok' : 'text-bad'
+          }`}
+        >
+          {!status.imported
+            ? c.sanctionsNever
+            : status.stale
+              ? c.sanctionsStale
+              : c.sanctionsFresh}
+        </span>
+      </div>
+
+      <p className="text-[11.5px] leading-relaxed text-text2">{c.sanctionsNote}</p>
+      <p className="text-[11.5px] text-faint">{policyLine}</p>
+
+      {status.imported ? (
+        <dl className="grid gap-2 text-[12.5px] sm:grid-cols-3">
+          <Fact label={c.sanctionsEntries} value={count(status.entryCount)} />
+          <Fact
+            label={c.sanctionsFetched}
+            value={status.fetchedAt ? shortDateTime(status.fetchedAt) : '—'}
+          />
+          <Fact
+            label={c.sanctionsAge}
+            value={
+              status.ageDays === null
+                ? '—'
+                : fill(c.sanctionsAgeDays, { n: count(status.ageDays) })
+            }
+          />
+        </dl>
+      ) : null}
+
+      <div className="grid gap-2 border-t border-line pt-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+          {c.sanctionsUpload}
+          <input
+            ref={input}
+            type="file"
+            accept=".xml,text/xml,application/xml"
+            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12px] text-text file:me-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-[rgba(var(--goldA),0.14)] file:px-3 file:py-1.5 file:text-[11.5px] file:font-bold file:text-gold lg:min-h-0"
+          />
+          <span className="text-[10.5px] font-normal text-faint2">
+            {c.sanctionsUploadHint}
           </span>
-        </div>
+        </label>
 
-        <p className="text-[11.5px] leading-relaxed text-text2">{c.sanctionsNote}</p>
-        <p className="text-[11.5px] text-faint">{policyLine}</p>
-
-        {status.imported ? (
-          <dl className="grid gap-2 text-[12.5px] sm:grid-cols-3">
-            <Fact label={c.sanctionsEntries} value={count(status.entryCount)} />
-            <Fact
-              label={c.sanctionsFetched}
-              value={status.fetchedAt ? shortDateTime(status.fetchedAt) : '—'}
-            />
-            <Fact
-              label={c.sanctionsAge}
-              value={
-                status.ageDays === null
-                  ? '—'
-                  : fill(c.sanctionsAgeDays, { n: count(status.ageDays) })
-              }
-            />
-          </dl>
-        ) : null}
-
-        <div className="grid gap-2 border-t border-line pt-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
-          <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-            {c.sanctionsUpload}
-            <input
-              ref={input}
-              type="file"
-              accept=".xml,text/xml,application/xml"
-              className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 py-2 text-[12px] text-text file:me-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-[rgba(var(--goldA),0.14)] file:px-3 file:py-1.5 file:text-[11.5px] file:font-bold file:text-gold lg:min-h-0"
-            />
-            <span className="text-[10.5px] font-normal text-faint2">
-              {c.sanctionsUploadHint}
-            </span>
-          </label>
-
-          <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
-            {c.sanctionsSource}
-            <select
-              value={source}
-              onChange={(event) => setSource(event.target.value as 'eu_consolidated')}
-              className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 text-[12.5px] text-text lg:min-h-0"
-            >
-              {/*
-                One option, deliberately. `SANCTIONS_SOURCES` also has `local_fixture`, which the
-                API refuses outside development — offering it here would be offering a choice that
-                answers with a refusal in the only environment that matters.
-              */}
-              <option value="eu_consolidated">{c.sanctionsSourceEu}</option>
-            </select>
-          </label>
-
-          <button
-            type="button"
-            onClick={() => void importList()}
-            disabled={busy}
-            className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] bg-[rgba(var(--goldA),0.06)] px-3 text-[12.5px] font-bold text-gold transition-transform duration-150 ease-out active:scale-[0.98] disabled:cursor-default disabled:opacity-60 lg:min-h-0 lg:py-1.5"
+        <label className="grid gap-1.5 text-[11.5px] font-semibold text-muted">
+          {c.sanctionsSource}
+          <select
+            value={source}
+            onChange={(event) => setSource(event.target.value as 'eu_consolidated')}
+            className="min-h-10 cursor-pointer rounded-lg border border-line bg-field px-3 text-[12.5px] text-text lg:min-h-0"
           >
-            {busy ? c.sanctionsImporting : c.sanctionsImport}
-          </button>
-        </div>
+            {/*
+              One option, deliberately. `SANCTIONS_SOURCES` also has `local_fixture`, which the
+              API refuses outside development — offering it here would be offering a choice that
+              answers with a refusal in the only environment that matters.
+            */}
+            <option value="eu_consolidated">{c.sanctionsSourceEu}</option>
+          </select>
+        </label>
 
-        {error === null ? null : <p className="text-[11.5px] text-bad">{error}</p>}
-        {done === null ? null : (
-          <p className="text-[11.5px] text-ok">
-            {fill(c.sanctionsImported, { n: count(done) })}
-          </p>
-        )}
-      </section>
-    </ConsolePanel>
+        <button
+          type="button"
+          onClick={() => void importList()}
+          disabled={busy}
+          className="inline-flex min-h-10 w-fit cursor-pointer items-center rounded-lg border border-[rgba(var(--goldA),0.4)] bg-[rgba(var(--goldA),0.06)] px-3 text-[12.5px] font-bold text-gold transition-transform duration-150 ease-out active:scale-[0.98] disabled:cursor-default disabled:opacity-60 lg:min-h-0 lg:py-1.5"
+        >
+          {busy ? c.sanctionsImporting : c.sanctionsImport}
+        </button>
+      </div>
+
+      {error === null ? null : <p className="text-[11.5px] text-bad">{error}</p>}
+      {done === null ? null : (
+        <p className="text-[11.5px] text-ok">
+          {fill(c.sanctionsImported, { n: count(done) })}
+        </p>
+      )}
+    </section>
   );
 }
 

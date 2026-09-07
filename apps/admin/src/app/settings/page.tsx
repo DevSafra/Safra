@@ -189,7 +189,9 @@ export default async function SettingsPage() {
         is «verification is blocked» and somebody would act on that.
       */}
       {sanctions === 'failed' || sanctions === 'unauthenticated' ? null : (
-        <SanctionsList status={sanctions} />
+        <ConsolePanel>
+          <SanctionsList status={sanctions} />
+        </ConsolePanel>
       )}
     </ConsoleShell>
   );
