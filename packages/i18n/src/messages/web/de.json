@@ -645,7 +645,7 @@
     "refundWalletLine": "{amount} erstattet, davon {walletAmount} in Ihr Guthaben",
     "refundPending": "In Bearbeitung — bis zur Gutschrift auf Ihrer Karte können einige Werktage vergehen.",
     "refundDone": "Abgeschlossen am {date}",
-    "refundReason": "Grund"
+    "refundPolicy": "{percent}% gemäß der Stornobedingung dieser Buchung"
   },
   "ads": {
     "title": "In der Nähe, von unseren Partnern",

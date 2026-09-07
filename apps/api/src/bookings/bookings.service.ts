@@ -217,21 +217,35 @@ export class BookingsService {
       who quoted it to their bank would be quoting the wrong reference. Not
       `initiated_by_user_id`: which member of staff issued a refund is not a fact about the
       customer's booking, and naming an employee on a customer-facing screen is the audit-privacy
-      finding this codebase already carries. The REASON is included — it is why their money came
-      back, and they are owed it.
+      finding this codebase already carries.
+
+      And NOT the free-text `reason`. It was included at first, and that was wrong: the console's
+      own hint describes the field as «saved with the financial movement» — internal — and 15,671
+      reasons already exist, written by staff under exactly that assumption. Exposing them
+      retroactively would surface internal prose to customers.
+
+      `applied_refund_percent` goes instead. It answers the question a customer actually has —
+      «why did I get half back» — from the cancellation policy rather than from somebody's typing,
+      and it is a number, so there is nothing in it that was never meant to be read.
     */
     const refunds = await this.db.execute<{
       amount: string;
       wallet_amount: string;
       status: string;
-      reason: string | null;
+      /*
+        A STRING, because `applied_refund_percent` is `numeric` and pg returns numerics as strings
+        — «100.00», not 100. Typing it as a number here compiled fine, failed the consumer's
+        `z.number()` at runtime, and the customer's whole booking payload stopped parsing: the page
+        rendered nothing at all, with the API answering 200. Converted below, once, on purpose.
+      */
+      percent: string | null;
       created_at: string;
       completed_at: string | null;
     }>(sql`
       SELECT r.amount::text        AS amount,
              r.wallet_amount::text AS wallet_amount,
              r.status::text        AS status,
-             r.reason,
+             r.applied_refund_percent::text AS percent,
              r.created_at::text    AS created_at,
              r.completed_at::text  AS completed_at
         FROM refunds r
@@ -263,7 +277,8 @@ export class BookingsService {
         amount: row.amount,
         walletAmount: row.wallet_amount,
         status: row.status,
-        reason: row.reason,
+        /* A whole number for display: «50%», never «50.00%». */
+        percent: row.percent === null ? null : Math.round(Number(row.percent)),
         createdAt: row.created_at,
         completedAt: row.completed_at,
       })),

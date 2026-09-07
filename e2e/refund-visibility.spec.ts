@@ -51,6 +51,25 @@ test('an operator refunds a booking of this customer', async ({ browser }) => {
     }
 
     expect(candidates.length, 'this customer has bookings').toBeGreaterThan(0);
+
+    /*
+      One that ALREADY shows a refund will do, and it is checked on the customer's own page —
+      the surface this spec is about.
+
+      Two earlier versions got this wrong: the first insisted on issuing a refund, so a re-run with
+      everything already refunded found no candidate; the second looked for the CUSTOMER app's
+      wording on the CONSOLE, which uses different words for the same fact.
+    */
+    for (const candidate of candidates.slice(0, 10)) {
+      await own.goto(`${WEB}/en/account/bookings/${candidate}`, {
+        waitUntil: 'domcontentloaded',
+      });
+
+      if ((await own.locator('[data-refunds]').count()) > 0) {
+        reference = candidate;
+        break;
+      }
+    }
   } finally {
     await customer.close();
   }
@@ -59,25 +78,6 @@ test('an operator refunds a booking of this customer', async ({ browser }) => {
   const page = await staff.newPage();
 
   try {
-    /*
-      An ALREADY-refunded booking will do.
-
-      This spec is about what the customer can SEE; issuing a refund is only setup. The first
-      version insisted on refunding something, so a second run — with every refundable booking
-      already refunded — found no candidate and reported the feature broken. Re-runnable now:
-      an existing refund is used, and a new one is issued only if there is none.
-    */
-    for (const candidate of candidates.slice(0, 10)) {
-      await page.goto(`${CONSOLE}/bookings/${candidate}`, {
-        waitUntil: 'domcontentloaded',
-      });
-
-      if ((await page.locator('main').innerText()).includes('أُعيد')) {
-        reference = candidate;
-        break;
-      }
-    }
-
     /* Nothing refunded yet: walk them until one offers a refund that can complete. */
     for (const candidate of reference === '' ? candidates.slice(0, 10) : []) {
       await page.goto(`${CONSOLE}/bookings/${candidate}`, {
@@ -170,16 +170,24 @@ test('the customer sees the refund on their own booking', async ({ browser }) =>
       /In progress|Completed on/,
     );
 
+    /* WHY it was this much — from the cancellation policy, as a percentage. */
+    await expect(refunds, 'and why it was this much').toContainText(/%/);
+
     /*
-      And NOT the plumbing. A payment-processor reference is the wrong thing for a customer to
-      quote to their bank, and the member of staff who issued a refund is not a fact about the
-      customer's booking — naming an employee on a customer-facing screen is the audit-privacy
-      finding this codebase already carries.
+      And NOT the plumbing, and NOT the staff prose.
+
+      A payment-processor reference is the wrong thing for a customer to quote to their bank, and
+      the member of staff who issued a refund is not a fact about the customer's booking. The
+      free-text REASON is excluded for a sharper reason: the console describes that field as
+      internal, and 15,671 of them were written by staff under exactly that assumption — so
+      showing it here would surface internal prose to customers retroactively. This spec created
+      one whose text it knows, which is what makes the assertion mean something.
     */
     const shown = await page.locator('main').innerText();
 
     expect(shown, 'no provider reference').not.toMatch(/pi_|ch_|re_[A-Za-z0-9]{8}/);
     expect(shown.toLowerCase(), 'no staff email').not.toContain('@safra.test');
+    expect(shown, 'no internal refund prose').not.toContain('اختبار آلي');
   } finally {
     await customer.close();
   }

@@ -645,7 +645,7 @@
     "refundWalletLine": "أُعيد {amount}، منها {walletAmount} إلى محفظتك",
     "refundPending": "قيد التنفيذ — قد يستغرق وصول المبلغ إلى بطاقتك عدة أيام عمل.",
     "refundDone": "اكتمل في {date}",
-    "refundReason": "السبب"
+    "refundPolicy": "{percent}% حسب سياسة الإلغاء المثبَّتة على الحجز"
   },
   "ads": {
     "title": "أماكن قريبة من إقامتك",

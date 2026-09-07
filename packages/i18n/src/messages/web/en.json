@@ -645,7 +645,7 @@
     "refundWalletLine": "{amount} refunded, {walletAmount} of it to your wallet",
     "refundPending": "In progress — it may take several working days to reach your card.",
     "refundDone": "Completed on {date}",
-    "refundReason": "Reason"
+    "refundPolicy": "{percent}% under the cancellation policy on this booking"
   },
   "ads": {
     "title": "Nearby, from our partners",

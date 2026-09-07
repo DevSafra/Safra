@@ -239,9 +239,14 @@ export default async function BookingDetailPage({
                         ? t('refundPending')
                         : t('refundDone', { date: refund.completedAt.slice(0, 10) })}
                     </span>
-                    {refund.reason ? (
+                    {/*
+                      WHY it was this much — from the cancellation policy, not from somebody's
+                      typing. The free-text reason is internal and thousands of them were written
+                      before any customer-facing screen read one.
+                    */}
+                    {refund.percent !== null ? (
                       <span className="text-xs text-faint2">
-                        {t('refundReason')}: {refund.reason}
+                        {t('refundPolicy', { percent: refund.percent })}
                       </span>
                     ) : null}
                   </li>

@@ -165,7 +165,11 @@ const refundSchema = z.object({
   amount: z.string(),
   walletAmount: z.string(),
   status: z.string(),
-  reason: z.string().nullable(),
+  /*
+    The policy percentage, NOT the staff reason. See the note on the API's query: the reason field
+    is internal prose and thousands of them were written before anything customer-facing read it.
+  */
+  percent: z.number().nullable(),
   createdAt: z.string(),
   completedAt: z.string().nullable(),
 });
