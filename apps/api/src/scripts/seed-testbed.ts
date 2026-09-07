@@ -975,6 +975,17 @@ async function build(db: Seeder): Promise<void> {
     these tables, which is exactly the point of it: the alternative is a reset that stops on a
     foreign key weeks later, on the run somebody needed at the time.
   */
+  /*
+    Fine applications before the transfers and the violations they point at. Same shape as the
+    recoveries below, and `testbed-cascade.integration.test.ts` failed on the commit that added
+    the table — which is exactly what it is for.
+  */
+  await db.execute(sql`DELETE FROM partner_fine_deductions
+    WHERE payout_id IN (SELECT id FROM partner_payouts
+                        WHERE partner_id IN (
+                          SELECT pa.id FROM partners pa JOIN users u ON u.id = pa.user_id
+                          WHERE lower(u.email) IN (${emailList})))`);
+
   await db.execute(sql`DELETE FROM partner_recovery_deductions
     WHERE recovery_id IN (SELECT id FROM partner_recoveries
                           WHERE booking_id IN (${testbedBookings}))`);
@@ -1214,6 +1225,11 @@ async function build(db: Seeder): Promise<void> {
     booking-shaped ones leaves any raised against a partner whose bookings have already gone —
     which is the shape of the ten tables this cascade was missing on 2026-08-27.
   */
+  await db.execute(
+    sql`DELETE FROM partner_fine_deductions
+        WHERE violation_id IN (SELECT id FROM partner_violations
+                               WHERE partner_id IN (${testbedPartners}))`,
+  );
   await db.execute(
     sql`DELETE FROM partner_recovery_deductions
         WHERE recovery_id IN (SELECT id FROM partner_recoveries

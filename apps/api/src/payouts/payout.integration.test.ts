@@ -1217,4 +1217,283 @@ describeIfDb('PayoutService', () => {
       expect(Number(applications.rows[0]!.n), 'one application, not three').toBe(1);
     });
   });
+
+  /*
+    A fine, collected through the transfer — which nothing did until 2026-09-07.
+
+    Bashar's decision: «Partner fines should be collected automatically through the payout process…
+    If a payout is smaller than the outstanding fine balance, deduct what is available and carry the
+    remaining amount forward. Do not create negative payouts. Keep fines and recoveries as separate
+    concepts and separate balances.»
+
+    `partner_payouts.fine_amount` had been in the money identity since payouts existed with NO
+    writer: the ladder imposed fines, the ledger recorded the partner owing them, and no transfer
+    ever took one back — 6,643 imposed and unwaived fines worth $66,430 on this database against
+    zero payouts that had ever carried one.
+  */
+  describe('a fine collected from a transfer', () => {
+    /** An imposed, unwaived fine on the fixture partner, in the fixture's own currency. */
+    async function imposeFine(amount: string): Promise<string> {
+      const made = await db.execute<{ id: string }>(sql`
+        INSERT INTO partner_violations
+          (partner_id, booking_id, kind, stage, occurrence_number,
+           fine_amount, fine_currency_id, fine_reason)
+        SELECT ${partnerId}, ${bookingIds[0]!}::uuid, 'stale_calendar', 'fined', 1,
+               ${amount}::numeric, b.currency_id, 'fine collection test'
+          FROM bookings b WHERE b.id = ${bookingIds[0]!}::uuid
+        RETURNING id::text
+      `);
+
+      return made.rows[0]!.id;
+    }
+
+    async function fineState(violationId: string) {
+      const rows = await db.execute<{
+        amount: string;
+        collected: string;
+        settled: string | null;
+      }>(sql`
+        SELECT fine_amount::text AS amount, fine_collected_amount::text AS collected,
+               collected_at::text AS settled
+          FROM partner_violations WHERE id = ${violationId}::uuid
+      `);
+
+      return rows.rows[0];
+    }
+
+    async function openTransfer() {
+      await service.accrue();
+
+      const found = await db.execute<{
+        id: string;
+        gross: string;
+        fine: string;
+        recovery: string;
+        net: string;
+      }>(sql`
+        SELECT id, gross_amount::text AS gross, fine_amount::text AS fine,
+               recovery_amount::text AS recovery, net_amount::text AS net
+          FROM partner_payouts
+         WHERE partner_id = ${partnerId} AND status = 'accruing' AND deleted_at IS NULL
+      `);
+
+      return found.rows[0];
+    }
+
+    it('deducts the fine and leaves the identity true', async () => {
+      if (bookingIds.length === 0) return;
+
+      const fine = await imposeFine('50.000');
+      const payout = await openTransfer();
+
+      expect(payout, 'a transfer accrued').toBeDefined();
+      expect(Number(payout!.gross), 'three stays').toBeCloseTo(558, 2);
+      expect(Number(payout!.fine), 'the fine came off it').toBeCloseTo(50, 2);
+      expect(Number(payout!.net), 'and the rest is due').toBeCloseTo(508, 2);
+      expect(Number(payout!.net), 'the identity the CHECK enforces').toBeCloseTo(
+        Number(payout!.gross) - Number(payout!.fine) - Number(payout!.recovery),
+        3,
+      );
+
+      const state = await fineState(fine);
+
+      expect(Number(state!.collected), 'the fine records what was taken').toBeCloseTo(
+        50,
+        2,
+      );
+      expect(state!.settled, 'and it is settled').not.toBeNull();
+
+      /* Walkable the other way: which transfer collected it. */
+      const applied = await db.execute<{ n: string; amount: string }>(sql`
+        SELECT count(*)::text AS n, coalesce(sum(amount), 0)::text AS amount
+          FROM partner_fine_deductions WHERE violation_id = ${fine}::uuid
+      `);
+
+      expect(Number(applied.rows[0]!.n)).toBe(1);
+      expect(Number(applied.rows[0]!.amount)).toBeCloseTo(50, 2);
+    });
+
+    /*
+      «Deduct what is available and carry the remaining amount forward. Do not create negative
+      payouts» — expressed as arithmetic. A fine larger than the transfer is the case where the
+      clamp is the only thing standing between a correct figure and a rejected statement.
+    */
+    it('takes only what the transfer can carry and carries the rest forward', async () => {
+      if (bookingIds.length === 0) return;
+
+      const fine = await imposeFine('900.000');
+      const payout = await openTransfer();
+
+      expect(Number(payout!.fine), 'only what the transfer was worth').toBeCloseTo(
+        558,
+        2,
+      );
+      expect(Number(payout!.net), 'nothing due, and nothing negative').toBeCloseTo(0, 2);
+
+      const state = await fineState(fine);
+
+      expect(Number(state!.collected)).toBeCloseTo(558, 2);
+      expect(state!.settled, 'still outstanding').toBeNull();
+      expect(
+        Number(state!.amount) - Number(state!.collected),
+        'the remainder waits for the next period',
+      ).toBeCloseTo(342, 2);
+    });
+
+    /*
+      A fine on the ladder but NOT imposed is not collected.
+
+      9,369 violations on this database carry a `fine_amount` at stage `recorded`, which the
+      console's own note says cannot happen. Collecting those would charge partners for penalties
+      nobody levied, so the stage is part of the predicate — and this is the control that proves it,
+      because every other test here uses an imposed one and would pass either way.
+    */
+    it('ignores a fine on a violation that was only recorded, and a waived one', async () => {
+      if (bookingIds.length === 0) return;
+
+      await db.execute(sql`
+        INSERT INTO partner_violations
+          (partner_id, booking_id, kind, stage, occurrence_number,
+           fine_amount, fine_currency_id, fine_reason)
+        SELECT ${partnerId}, ${bookingIds[0]!}::uuid, 'stale_calendar', 'recorded', 1,
+               '70.000'::numeric, b.currency_id, 'recorded, never imposed'
+          FROM bookings b WHERE b.id = ${bookingIds[0]!}::uuid
+      `);
+      await db.execute(sql`
+        INSERT INTO partner_violations
+          (partner_id, booking_id, kind, stage, occurrence_number,
+           fine_amount, fine_currency_id, fine_reason, waived_at, waived_reason)
+        SELECT ${partnerId}, ${bookingIds[1]!}::uuid, 'stale_calendar', 'fined', 2,
+               '80.000'::numeric, b.currency_id, 'imposed then waived', now(), 'appealed'
+          FROM bookings b WHERE b.id = ${bookingIds[1]!}::uuid
+      `);
+
+      const payout = await openTransfer();
+
+      expect(
+        Number(payout!.fine),
+        'neither a merely recorded fine nor a waived one is collected',
+      ).toBeCloseTo(0, 2);
+      expect(Number(payout!.net)).toBeCloseTo(558, 2);
+    });
+
+    /*
+      A fine and a recovery on one transfer: separate balances, ONE headroom.
+
+      `net_amount >= 0` bounds their sum, so this is where the order matters — the recovery is
+      taken first because it is money that was never owed, and the fine waits, which is the more
+      forgiving error when only one of them fits.
+    */
+    it('keeps a fine and a recovery separate while sharing the transfer', async () => {
+      if (bookingIds.length < 2) return;
+
+      /* A paid transfer, then a refund on one of its stays: that is the recovery. */
+      const paid = await openTransfer();
+
+      await service.close(paid!.id, finance);
+      await service.release(paid!.id, { scheduledFor: '2026-08-20' }, finance);
+      await service.markPaid(paid!.id, { paidReference: 'BANK-REF-BOTH' }, finance);
+
+      await db.execute(sql`
+        INSERT INTO payments (booking_id, method, provider, amount, currency_id, status,
+                              captured_at)
+        SELECT b.id, 'bank_transfer', 'manual', b.total_amount, b.currency_id, 'captured', now()
+          FROM bookings b WHERE b.id = ${bookingIds[0]!}::uuid
+      `);
+      await db.execute(sql`
+        INSERT INTO refunds (payment_id, booking_id, amount, currency_id,
+                             applied_refund_percent, reason, status, wallet_amount, completed_at)
+        SELECT p.id, b.id, b.base_amount, b.currency_id, 100, 'fine and recovery together',
+               'completed', 0, now()
+          FROM bookings b JOIN payments p ON p.booking_id = b.id
+         WHERE b.id = ${bookingIds[0]!}::uuid LIMIT 1
+      `);
+      await ledger.reverseForRefund(db, bookingIds[0]!);
+
+      const fine = await imposeFine('30.000');
+
+      /* A new stay, so there is a transfer for both balances to come off. */
+      await db.execute(sql`
+        INSERT INTO bookings (customer_profile_id, unit_id, property_id, partner_id, city_id,
+                              check_in, check_out, guests_adults, status,
+                              base_amount, customer_fee_value, customer_fee_amount,
+                              partner_commission_rate, partner_commission_amount,
+                              total_amount, partner_payable_amount, currency_id,
+                              fx_rate_to_syp, total_syp, cancellation_policy_snapshot,
+                              paid_at, confirmed_at, completed_at)
+        SELECT b.customer_profile_id, b.unit_id, b.property_id, b.partner_id, b.city_id,
+               (now() - interval '4 day')::date, (now() - interval '2 day')::date,
+               2, 'completed',
+               b.base_amount, b.customer_fee_value, b.customer_fee_amount,
+               b.partner_commission_rate, b.partner_commission_amount,
+               b.total_amount, b.partner_payable_amount, b.currency_id,
+               b.fx_rate_to_syp, b.total_syp, b.cancellation_policy_snapshot,
+               now(), now(), now()
+          FROM bookings b WHERE b.id = ${bookingIds[1]!} LIMIT 1
+      `);
+
+      const next = await openTransfer();
+
+      expect(Number(next!.gross), 'the new stay').toBeCloseTo(186, 2);
+      expect(Number(next!.recovery), 'the overpayment, taken first').toBeCloseTo(186, 2);
+      expect(Number(next!.fine), 'and nothing left for the fine this period').toBeCloseTo(
+        0,
+        2,
+      );
+      expect(Number(next!.net), 'never negative').toBeCloseTo(0, 2);
+
+      /* The two balances stayed separate, and the fine is untouched rather than half-taken. */
+      const state = await fineState(fine);
+
+      expect(Number(state!.collected), 'the fine waits its turn').toBeCloseTo(0, 2);
+      expect(state!.settled).toBeNull();
+    });
+
+    /* Cancelling gives a collected fine back, exactly as it does a recovery. */
+    it('returns the fine to outstanding when the transfer is cancelled', async () => {
+      if (bookingIds.length === 0) return;
+
+      const fine = await imposeFine('50.000');
+      const payout = await openTransfer();
+
+      expect(Number((await fineState(fine))!.collected)).toBeCloseTo(50, 2);
+
+      await service.cancel(payout!.id, { reason: 'fine release test' }, finance);
+
+      const state = await fineState(fine);
+
+      expect(
+        Number(state!.collected),
+        'nothing collected, because no transfer happened',
+      ).toBeCloseTo(0, 2);
+      expect(state!.settled).toBeNull();
+
+      const applied = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM partner_fine_deductions
+         WHERE payout_id = ${payout!.id}
+      `);
+
+      expect(Number(applied.rows[0]!.n)).toBe(0);
+    });
+
+    /* `retotal` runs on every accrual, so the same fine must not be taken twice. */
+    it('collects the same fine once however often the total is recomputed', async () => {
+      if (bookingIds.length === 0) return;
+
+      const fine = await imposeFine('50.000');
+
+      await openTransfer();
+      await service.accrue();
+      await service.accrue();
+
+      expect(Number((await fineState(fine))!.collected), 'taken once').toBeCloseTo(50, 2);
+
+      const applied = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM partner_fine_deductions
+         WHERE violation_id = ${fine}::uuid
+      `);
+
+      expect(Number(applied.rows[0]!.n), 'one application, not three').toBe(1);
+    });
+  });
 });

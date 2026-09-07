@@ -79,6 +79,8 @@ export const CASCADE_HANDLES = new Set<string>([
   */
   'partner_recoveries',
   'partner_recovery_deductions',
+  /* Each application of a fine to a transfer. A child of the violation AND the payout. */
+  'partner_fine_deductions',
   'partner_violations',
   'payment_provider_events',
   'property_images',

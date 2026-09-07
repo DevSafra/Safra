@@ -728,9 +728,33 @@ export const partnerViolations = pgTable(
      * produces an appeal nobody can answer.
      */
     fineReason: text('fine_reason'),
+    /**
+     * How much of the fine has been taken off a transfer (Bashar, 2026-09-07).
+     *
+     * «Partner fines should be collected automatically through the payout process… If a payout is
+     * smaller than the outstanding fine balance, deduct what is available and carry the remaining
+     * amount forward.» So the fine's own row carries the running total, and `fineAmount` stays the
+     * figure that was imposed.
+     *
+     * The balance lives HERE rather than in a table of its own: `partner_violations` already holds
+     * the fine, its currency, its reason and its waiver, and a second row claiming to know «how
+     * much is this fine» would be a second answer that drifts from the first.
+     *
+     * Separate from `partnerRecoveries` by instruction, and the reason holds on screen too: a fine
+     * is a penalty with a ladder and an appeal, a recovery is a correction of money never owed.
+     */
+    fineCollectedAmount: money('fine_collected_amount').notNull().default('0'),
     /** Portion credited to the customer vs retained by SAFRA (§6.4). */
     customerCompensationAmount: money('customer_compensation_amount'),
     scorePenalty: integer('score_penalty').notNull().default(0),
+    /**
+     * When the fine finished being collected — and it finally has a writer (2026-09-07).
+     *
+     * It was read by the partner's مخالفات screen and the console's enforcement view from the day
+     * it was added, and nothing ever set it: a «collected» date that was permanently empty. The
+     * payout path now writes it when `fineCollectedAmount` reaches `fineAmount`, and a CHECK holds
+     * the two in step so neither can claim something the other denies.
+     */
     collectedAt: timestamp('collected_at', { withTimezone: true }),
     waivedAt: timestamp('waived_at', { withTimezone: true }),
     waivedByUserId: foreignId('waived_by_user_id').references(() => users.id),
@@ -908,6 +932,36 @@ export const partnerPayouts = pgTable(
       .where(sql`status = 'accruing' AND deleted_at IS NULL`),
     index('partner_payouts_partner_idx').on(t.partnerId, t.createdAt),
     index('partner_payouts_status_idx').on(t.status, t.scheduledFor),
+  ],
+);
+
+/**
+ * Which transfer collected which fine, and how much of it.
+ *
+ * The mirror of `partnerRecoveryDeductions` — «how has this fine been paid down» — and separate
+ * from it because Bashar asked for fines and recoveries to stay separate concepts with separate
+ * balances (2026-09-07). One table for both would answer neither question cleanly: a partner
+ * looking at «$40 deducted» is entitled to know whether they were penalised or corrected.
+ *
+ * A fine is taken off a given transfer ONCE. The unique index says so, and a second bite would be
+ * a bug rather than a top-up.
+ */
+export const partnerFineDeductions = pgTable(
+  'partner_fine_deductions',
+  {
+    id: primaryId(),
+    violationId: foreignId('violation_id')
+      .notNull()
+      .references(() => partnerViolations.id),
+    payoutId: foreignId('payout_id')
+      .notNull()
+      .references(() => partnerPayouts.id),
+    amount: money('amount').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('partner_fine_deductions_once').on(t.violationId, t.payoutId),
+    index('partner_fine_deductions_payout_idx').on(t.payoutId),
   ],
 );
 

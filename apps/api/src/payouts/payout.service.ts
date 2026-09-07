@@ -172,14 +172,188 @@ export class PayoutService {
       WHERE p.id = ${payoutId}
     `);
 
+    /*
+      Release BOTH, then apply both. The order inside each half matters and so does this one.
+
+      Releasing first makes the whole thing a recomputation: `retotal` runs on every accrual and
+      correction, and a deduction that accumulated would take the same balance off one transfer
+      repeatedly.
+
+      Releasing both BEFORE applying either is the part that is easy to get wrong. They compete for
+      one headroom — `net_amount >= 0` bounds their SUM — so if the fines were still applied while
+      the recoveries were being decided, the recoveries would be sized against a figure that was
+      about to be released, and would come out short on every re-run.
+
+      Then: recoveries, then fines. A recovery is money that was never owed at all; a fine is a
+      charge the partner can appeal and have waived. So the correction is taken first and the
+      penalty waits, which is the more forgiving error when only one of them fits this period.
+    */
+    await this.releaseRecoveries(tx, payoutId);
+    await this.releaseFines(tx, payoutId);
+
     await this.applyRecoveries(tx, payoutId);
+    await this.applyFines(tx, payoutId);
+  }
+
+  /**
+   * Outstanding fines, collected through the ordinary transfer.
+   *
+   * ## Bashar's rule (2026-09-07)
+   *
+   * «Partner fines should be collected automatically through the payout process. The fine amount
+   * should be deducted from future partner payouts in the same way recoverable balances are
+   * handled. If a payout is smaller than the outstanding fine balance, deduct what is available and
+   * carry the remaining amount forward. Do not create negative payouts.»
+   *
+   * `partner_payouts.fine_amount` has been in the money identity since payouts existed and had no
+   * writer at all: the ladder imposed fines, the ledger recorded the partner owing them, and no
+   * transfer ever took one back. 6,643 imposed and unwaived fines worth $66,430 across 423 partners
+   * on this database, and zero payouts that had ever carried one.
+   *
+   * ## Only a fine that was actually IMPOSED
+   *
+   * `stage IN ('fined', 'suspension')`. A violation at `recorded` or `warned` is on the ladder and
+   * has not been fined — and 9,369 rows here carry a `fine_amount` at `recorded` anyway, which the
+   * console's own note says cannot happen. Collecting those would charge partners for penalties
+   * nobody levied, so the stage is part of the predicate rather than a comment about the data.
+   *
+   * A WAIVED fine is not collected, and a waiver after a partial collection simply stops the rest.
+   *
+   * ## It shares the headroom with recoveries and can never make a transfer negative
+   *
+   * `net_amount >= 0` is a CHECK, so the two together cannot exceed what the transfer is worth.
+   * `least(outstanding, headroom)` takes what fits and leaves the rest for the next period — which
+   * is «carry the remaining amount forward», enforced by the database rather than promised.
+   *
+   * ## Idempotent, because `retotal` runs often
+   *
+   * The applications are cleared and re-decided rather than accumulated, so the answer depends only
+   * on what is outstanding now. `releaseFines` is the other half, and cancellation uses it too.
+   */
+  private async applyFines(tx: Database, payoutId: string): Promise<void> {
+    const payout = await tx.execute<{
+      partner_id: string;
+      currency_id: string;
+      gross_amount: string;
+      recovery_amount: string;
+      status: string;
+    }>(sql`
+      SELECT partner_id::text, currency_id::text, gross_amount::text,
+             recovery_amount::text, status::text
+        FROM partner_payouts
+       WHERE id = ${payoutId} AND deleted_at IS NULL
+    `);
+
+    const row = payout.rows[0];
+
+    if (!row || row.status === 'paid' || row.status === 'cancelled') return;
+
+    /* Already released by `retotal`, along with the recoveries — see the note there. */
+    const outstanding = await tx.execute<{ id: string; left: string }>(sql`
+      SELECT id::text, (fine_amount - fine_collected_amount)::text AS left
+        FROM partner_violations
+       WHERE partner_id = ${row.partner_id}
+         AND fine_currency_id = ${row.currency_id}
+         AND deleted_at IS NULL
+         AND waived_at IS NULL
+         AND collected_at IS NULL
+         AND stage IN ('fined', 'suspension')
+         AND fine_amount IS NOT NULL
+         AND fine_amount > fine_collected_amount
+       ORDER BY created_at
+    `);
+
+    if (outstanding.rows.length === 0) return;
+
+    /*
+      What is left AFTER the recoveries have taken their share. Read from the row rather than
+      recomputed, because `applyRecoveries` has already written it.
+    */
+    let headroom =
+      toMinor(row.gross_amount, MONEY_SCALE) - toMinor(row.recovery_amount, MONEY_SCALE);
+
+    if (headroom <= 0n) return;
+
+    let taken = 0n;
+
+    for (const fine of outstanding.rows) {
+      if (headroom <= 0n) break;
+
+      const left = toMinor(fine.left, MONEY_SCALE);
+      const take = left > headroom ? headroom : left;
+
+      if (take <= 0n) continue;
+
+      const amount = fromMinor(take, MONEY_SCALE);
+
+      await tx.execute(sql`
+        INSERT INTO partner_fine_deductions (violation_id, payout_id, amount)
+        VALUES (${fine.id}, ${payoutId}, ${amount})
+      `);
+      await tx.execute(sql`
+        UPDATE partner_violations
+           SET fine_collected_amount = fine_collected_amount + ${amount}::numeric,
+               collected_at = CASE
+                 WHEN fine_collected_amount + ${amount}::numeric >= fine_amount THEN now()
+                 ELSE NULL
+               END,
+               updated_at = now()
+         WHERE id = ${fine.id}
+      `);
+
+      headroom -= take;
+      taken += take;
+    }
+
+    if (taken <= 0n) return;
+
+    await tx.execute(sql`
+      UPDATE partner_payouts
+         SET fine_amount = ${fromMinor(taken, MONEY_SCALE)},
+             net_amount = gross_amount - ${fromMinor(taken, MONEY_SCALE)}::numeric
+                          - recovery_amount,
+             updated_at = now()
+       WHERE id = ${payoutId}
+    `);
+  }
+
+  /**
+   * Puts back every fine this transfer had collected, so it is outstanding again.
+   *
+   * The mirror of `releaseRecoveries`, and needed for the same two reasons: it makes `applyFines` a
+   * recomputation rather than an accumulation, and CANCELLING a transfer has to give the money
+   * back. A fine left marked collected against a transfer that never happened is a penalty the
+   * partner paid without paying it.
+   *
+   * Both columns in one statement, because `net = gross - fine - recovery` is enforced per
+   * statement.
+   */
+  private async releaseFines(tx: Database, payoutId: string): Promise<void> {
+    await tx.execute(sql`
+      UPDATE partner_violations v
+         SET fine_collected_amount = v.fine_collected_amount - d.amount,
+             collected_at = NULL,
+             updated_at = now()
+        FROM partner_fine_deductions d
+       WHERE d.violation_id = v.id AND d.payout_id = ${payoutId}
+    `);
+    await tx.execute(sql`
+      DELETE FROM partner_fine_deductions WHERE payout_id = ${payoutId}
+    `);
+    await tx.execute(sql`
+      UPDATE partner_payouts
+         SET fine_amount = 0,
+             net_amount = gross_amount - recovery_amount
+       WHERE id = ${payoutId}
+    `);
   }
 
   /**
    * Puts back every balance this transfer had taken, so it is outstanding again.
    *
-   * Called at the top of `applyRecoveries`, which is what makes that a recomputation rather than an
-   * accumulation — and on CANCELLATION, which is where its absence was a real defect.
+   * Called by `retotal` before anything is applied, which is what makes the whole thing a
+   * recomputation rather than an accumulation — and on CANCELLATION, which is where its absence was
+   * a real defect.
    *
    * ## The cancellation case
    *
@@ -266,15 +440,7 @@ export class PayoutService {
     /* Paid or cancelled: frozen by trigger, and money already sent is not ours to restate. */
     if (!row || row.status === 'paid' || row.status === 'cancelled') return;
 
-    /*
-      Reset first, so this is a RECOMPUTATION rather than an accumulation.
-
-      `retotal` is called on every accrual and every correction. Adding to `recovery_amount` each
-      time would take the same balance repeatedly off one transfer; clearing the applications and
-      re-deciding them means the answer depends only on what is outstanding now.
-    */
-    await this.releaseRecoveries(tx, payoutId);
-
+    /* Already released by `retotal`, along with the fines — see the note there. */
     const outstanding = await tx.execute<{ id: string; left: string }>(sql`
       SELECT id::text, (amount - recovered_amount)::text AS left
         FROM partner_recoveries
@@ -650,6 +816,7 @@ export class PayoutService {
         final, because `applyRecoveries` refuses to touch a cancelled payout.
       */
       await this.releaseRecoveries(tx as unknown as Database, payoutId);
+      await this.releaseFines(tx as unknown as Database, payoutId);
 
       await tx.execute(sql`
         UPDATE partner_payouts
@@ -738,6 +905,74 @@ export class PayoutService {
       outstanding: row.outstanding,
       currencyCode: row.currency_code,
       createdAt: row.created_at,
+    }));
+  }
+
+  /**
+   * Fines this partner still owes, and how much of each has been taken.
+   *
+   * ## Why the partner sees it
+   *
+   * Bashar, 2026-09-07: «Finance, operations and the partner should be able to see the outstanding
+   * fine balance and how deductions are applied over time.» A deduction met only as a smaller
+   * transfer is the asymmetry this review keeps finding.
+   *
+   * ## Separate from the recoveries endpoint, by instruction
+   *
+   * «Keep fines and recoveries as separate concepts and separate balances.» Two calls and two
+   * panels, because a partner reading «$40 taken» is entitled to know whether they were penalised
+   * or corrected — and a fine, unlike a recovery, can be appealed and waived.
+   *
+   * ## Only what was actually imposed
+   *
+   * `stage IN ('fined', 'suspension')` and not waived, the same predicate the collection uses. A
+   * violation still at `recorded` has not been fined, and showing it as an outstanding balance
+   * would tell a partner they owe a penalty nobody has levied.
+   */
+  async finesForPartner(claims: AccessTokenClaims | undefined) {
+    const partnerId = requirePartnerId(claims, P.PAYOUT_READ_OWN);
+
+    const rows = await this.db.execute<{
+      kind: string;
+      booking_reference: string | null;
+      amount: string;
+      collected: string;
+      outstanding: string;
+      currency_code: string;
+      created_at: string;
+      reason: string | null;
+    }>(sql`
+      SELECT v.kind::text AS kind,
+             b.reference AS booking_reference,
+             v.fine_amount::text AS amount,
+             v.fine_collected_amount::text AS collected,
+             (v.fine_amount - v.fine_collected_amount)::text AS outstanding,
+             cur.code AS currency_code,
+             v.created_at::text AS created_at,
+             v.fine_reason AS reason
+        FROM partner_violations v
+        JOIN currencies cur ON cur.id = v.fine_currency_id
+        LEFT JOIN bookings b ON b.id = v.booking_id
+       WHERE v.partner_id = ${partnerId}
+         AND v.deleted_at IS NULL
+         AND v.waived_at IS NULL
+         AND v.collected_at IS NULL
+         AND v.stage IN ('fined', 'suspension')
+         AND v.fine_amount IS NOT NULL
+         AND v.fine_amount > v.fine_collected_amount
+       ORDER BY v.created_at
+       LIMIT 100
+    `);
+
+    return rows.rows.map((row) => ({
+      kind: row.kind,
+      bookingReference: row.booking_reference,
+      amount: row.amount,
+      collected: row.collected,
+      outstanding: row.outstanding,
+      currencyCode: row.currency_code,
+      createdAt: row.created_at,
+      reason: row.reason,
     }));
   }
 

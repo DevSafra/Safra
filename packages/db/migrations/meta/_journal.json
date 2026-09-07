@@ -512,6 +512,13 @@
       "when": 1788788021087,
       "tag": "0072_partner_recoveries",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1788791890165,
+      "tag": "0073_fine_collection",
+      "breakpoints": true
     }
   ]
 }

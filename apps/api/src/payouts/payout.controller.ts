@@ -84,6 +84,22 @@ export class PartnerPayoutController {
     return { recoveries: await this.payouts.recoveriesForPartner(user) };
   }
 
+  /**
+   * What this partner still owes in fines. Declared before `:reference` for the reason above.
+   *
+   * A separate call from `recoveries` by instruction (Bashar, 2026-09-07): fines and recoveries are
+   * separate concepts with separate balances, and one endpoint answering both would force the
+   * screen to explain which kind each row was.
+   */
+  @Get('fines')
+  @RequirePermissions(P.PAYOUT_READ_OWN)
+  @AuditExempt(
+    'A partner reading fines outstanding against their own transfers; changes nothing.',
+  )
+  async fines(@CurrentUser() user: AccessTokenClaims | undefined) {
+    return { fines: await this.payouts.finesForPartner(user) };
+  }
+
   @Get(':reference/bookings')
   @RequirePermissions(P.PAYOUT_READ_OWN)
   @AuditExempt('A partner reading their own transfers; changes nothing.')
