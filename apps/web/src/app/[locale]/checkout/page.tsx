@@ -48,6 +48,37 @@ function whole(raw: string | undefined, fallback: number, max: number): number {
   return Math.min(Math.max(Math.trunc(value), 0), max);
 }
 
+/**
+ * «uuid:2,uuid:1» — the other room types on a basket booking.
+ *
+ * Strict on purpose. A caller-supplied string reaches a price quote, so anything that is not a
+ * uuid and a small count is DROPPED rather than coerced: a line read as `NaN` rooms would quote a
+ * stay nobody asked for, and `0` would put a room type on the booking with nothing in it. Five
+ * extra types, matching the contract's own ceiling.
+ */
+function parseLines(raw: string | undefined): { unitId: string; rooms: number }[] {
+  if (!raw) return [];
+
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  return raw
+    .split(',')
+    .slice(0, 5)
+    .map((part) => {
+      const [unitId = '', count = ''] = part.split(':');
+      const rooms = Number(count);
+
+      return { unitId, rooms };
+    })
+    .filter(
+      (line) =>
+        uuid.test(line.unitId) &&
+        Number.isInteger(line.rooms) &&
+        line.rooms >= 1 &&
+        line.rooms <= 10,
+    );
+}
+
 export default async function CheckoutPage({
   params,
   searchParams,
@@ -84,6 +115,15 @@ export default async function CheckoutPage({
   */
   /* `whole` floors at zero, which is right for children and wrong here — a stay is at least one room. */
   const rooms = Math.max(1, whole(first(query['rooms']), 1, 10));
+  /*
+    The OTHER room types on this booking — «uuid:2,uuid:1».
+    
+    A basket mixes types, and the lead pair above carries only the first. Parsed strictly: anything
+    that is not a uuid and a count is dropped rather than coerced, because a malformed line would
+    otherwise reach the quote as a room nobody chose. The API validates the same shape again and is
+    the one that enforces.
+  */
+  const additionalLines = parseLines(first(query['lines']));
 
   // Missing parameters mean the customer arrived here by a broken link rather than
   // through a property page. Say so plainly instead of rendering an empty form.
@@ -115,7 +155,13 @@ export default async function CheckoutPage({
    * on the other, so awaiting them in sequence would add latency for nothing (§3).
    */
   const [priced, methods, session, settings] = await Promise.all([
-    quote({ unitId, checkIn, checkOut, rooms }),
+    quote({
+      unitId,
+      checkIn,
+      checkOut,
+      rooms,
+      lines: [{ unitId, rooms }, ...additionalLines],
+    }),
     availablePaymentMethods(property.city.countryCode),
     getSession(),
     getPublicSettings(),
@@ -182,6 +228,24 @@ export default async function CheckoutPage({
   const chosenUnit = property.units.find((one) => one.id === unitId);
   const unitName = chosenUnit ? localisedText(chosenUnit.name, locale) : null;
 
+  /*
+    EVERY room type on this booking, named and priced — from the QUOTE, not from the query string.
+    
+    A basket may hold «مزدوجة × 2، جناح × 1», and a summary naming only the lead type would be
+    asking somebody to pay a total whose largest component is invisible. Read back from the priced
+    answer so the lines shown are the lines charged, even if the link was edited on the way here.
+  */
+  const basket = priced.lines.map((line) => {
+    const unit = property.units.find((one) => one.id === line.unitId);
+
+    return {
+      unitId: line.unitId,
+      name: unit ? localisedText(unit.name, locale) : line.unitId,
+      rooms: line.rooms,
+      amount: line.amount,
+    };
+  });
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <h1 className="font-display text-3xl font-bold text-gold">{t('title')}</h1>
@@ -199,6 +263,7 @@ export default async function CheckoutPage({
             locale={locale}
             unitId={unitId}
             rooms={rooms}
+            additionalLines={additionalLines}
             checkIn={checkIn}
             checkOut={checkOut}
             adults={adults}
@@ -225,9 +290,40 @@ export default async function CheckoutPage({
               <p className="mt-1 text-sm text-faint">
                 {name} · {cityName}
               </p>
-              {unitName ? (
-                <p className="text-sm font-semibold text-text2">{unitName}</p>
-              ) : null}
+              {/*
+                One line per room TYPE, with its quantity and its subtotal.
+
+                It used to print the lead type's name alone. On a single-type booking that is the
+                whole truth; on a basket it names one of several, and «المجموع» below would be a
+                figure with no working shown. Renders as a plain list rather than the lead name
+                when there is only one line, so nothing changes for the ordinary booking.
+              */}
+              {basket.length === 1 && unitName ? (
+                <p className="text-sm font-semibold text-text2">
+                  {unitName}
+                  {basket[0]!.rooms > 1
+                    ? ` · ${tp('unitsCount', { count: basket[0]!.rooms })}`
+                    : ''}
+                </p>
+              ) : (
+                <ul data-checkout-basket className="mt-1 grid gap-1">
+                  {basket.map((line) => (
+                    <li
+                      key={line.unitId}
+                      className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm"
+                    >
+                      <span className="font-semibold text-text2">
+                        {line.name} · {tp('unitsCount', { count: line.rooms })}
+                      </span>
+                      <span className="tabular-nums text-muted">
+                        {formatMoney(line.amount, priced.currencyCode, locale, {
+                          exact: true,
+                        })}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <p className="text-sm text-faint">
                 <DateRange from={checkIn} to={checkOut} locale={locale} /> ·{' '}
                 {tp('totalFor', { nights: priced.nights })}
@@ -355,6 +451,7 @@ export default async function CheckoutPage({
                 locale={locale}
                 unitId={unitId}
                 rooms={rooms}
+                additionalLines={additionalLines}
                 checkIn={checkIn}
                 checkOut={checkOut}
                 currencyCode={priced.currencyCode}

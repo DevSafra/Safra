@@ -241,7 +241,19 @@
     "summaryRoomsLine": "{rooms, plural, one {1 Zimmer} other {# Zimmer}} × {nights, plural, one {1 Nacht} other {# Nächte}}",
     "summaryRoomsAll": "Das sind alle noch freien Zimmer dieses Typs.",
     "unitsCount": "{count, plural, one {1 Zimmer} other {# Zimmer}}",
-    "summaryFee": "SAFRA-Gebühr"
+    "summaryFee": "SAFRA-Gebühr",
+    "basketSelected": "Ihre Buchung",
+    "basketAddMore": "Weiteres Zimmer",
+    "basketClear": "Auswahl leeren",
+    "basketRemoveLine": "Entfernen",
+    "basketAdd": "Zur Buchung",
+    "basketInBasket": "{count, plural, one {In der Buchung · 1 Zimmer} other {In der Buchung · # Zimmer}}",
+    "basketFull": "Mehr Zimmer sind in einer Buchung nicht möglich. Für größere Gruppen wenden Sie sich an SAFRA.",
+    "basketCapacity": "Für {count, plural, one {1 Gast} other {# Gäste}}",
+    "basketEmpty": "Ihre Auswahl ist leer. Fügen Sie einen oder mehrere Zimmertypen hinzu, um Details und Gesamtpreis hier zu sehen.",
+    "basketAccommodation": "Unterkunft",
+    "basketTooShort": "Dieses Zimmer erfordert mindestens {count, plural, one {1 Nacht} other {# Nächte}} — ändern Sie die Daten, um es hinzuzufügen.",
+    "basketLineAll": "Mehr dieses Typs gibt es nicht."
   },
   "city": {
     "availableStays": "Verfügbare Unterkünfte in {city}",
@@ -626,7 +638,8 @@
     "disputesOpened": "Eröffnet",
     "voucherOpen": "Voucher öffnen (PDF)",
     "voucherHint": "Enthält einen QR-Code zur Prüfung bei der Ankunft.",
-    "roomsCount": "{count, plural, one {1 Zimmer} other {# Zimmer}}"
+    "roomsCount": "{count, plural, one {1 Zimmer} other {# Zimmer}}",
+    "bookingRoomsHeading": "Gebuchte Zimmer"
   },
   "ads": {
     "title": "In der Nähe, von unseren Partnern",

@@ -31,6 +31,7 @@ export function CouponField({
   locale,
   unitId,
   rooms,
+  additionalLines,
   checkIn,
   checkOut,
   currencyCode,
@@ -39,6 +40,8 @@ export function CouponField({
   readonly locale: 'ar' | 'en' | 'de';
   readonly unitId: string;
   readonly rooms: number;
+  /** The other room types, so a percentage coupon previews against the whole basket. */
+  readonly additionalLines: readonly { unitId: string; rooms: number }[];
   readonly checkIn: string;
   readonly checkOut: string;
   readonly currencyCode: string;
@@ -68,7 +71,14 @@ export function CouponField({
       const response = await fetch(`/${locale}/api/coupon-preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.trim(), unitId, rooms, checkIn, checkOut }),
+        body: JSON.stringify({
+          code: code.trim(),
+          unitId,
+          rooms,
+          additionalLines,
+          checkIn,
+          checkOut,
+        }),
       });
 
       const body: unknown = await response.json().catch(() => null);

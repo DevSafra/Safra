@@ -33,6 +33,7 @@ export function CheckoutForm({
   locale,
   unitId,
   rooms,
+  additionalLines,
   checkIn,
   checkOut,
   adults,
@@ -53,6 +54,8 @@ export function CheckoutForm({
   locale: Locale;
   unitId: string;
   rooms: number;
+  /** The OTHER room types on this booking. Empty for a single-type booking. */
+  additionalLines: readonly { unitId: string; rooms: number }[];
   checkIn: string;
   checkOut: string;
   adults: number;
@@ -127,6 +130,12 @@ export function CheckoutForm({
         body: JSON.stringify({
           unitId,
           rooms,
+          /*
+            The rest of the basket. `unitId` × `rooms` is the LEAD line, and these are the others —
+            the shape the create contract takes, so no translation happens between the screen and
+            the API.
+          */
+          additionalLines,
           checkIn,
           checkOut,
           adults,

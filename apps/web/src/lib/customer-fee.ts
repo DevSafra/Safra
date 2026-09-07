@@ -130,3 +130,18 @@ export function subtractMoney(total: string, part: string, currency: string): st
 
   return moneyFromMinor(totalMinor - partMinor, scale);
 }
+
+/**
+ * Every counted sentence a bounded control could need, indexed BY THE COUNT.
+ *
+ * A server component may not hand a client component a formatter, and the counts a booking basket
+ * deals in are bounded — at most ten rooms, and at most ten roomsful of guests. So the page
+ * resolves each one through the catalogue and the component indexes in. Index 0 is present and
+ * empty: nothing renders a count of nothing, and a hole would read as a missing translation.
+ */
+export function countedTexts(
+  resolve: (count: number) => string,
+  upTo = 10,
+): readonly string[] {
+  return ['', ...Array.from({ length: upTo }, (_, i) => resolve(i + 1))];
+}

@@ -281,6 +281,56 @@ export const bookingQuoteSchema = z
       client sending a quoted number there is told rather than quietly understood.
     */
     rooms: z.coerce.number().int().min(1).max(10).default(1),
+    /**
+     * A BASKET, as a query string: «uuid:2,uuid:1».
+     *
+     * A query cannot carry an array of objects, and inventing a bracketed convention would be a
+     * second parsing rule nobody else in this codebase uses. So it is one string with a stated
+     * shape, transformed here — once, at the boundary, where every other query value is validated.
+     *
+     * Malformed entries are REJECTED, never dropped: a quote is a figure somebody decides on, and
+     * silently pricing fewer rooms than the caller named is worse than refusing the request.
+     */
+    lines: z
+      .string()
+      .trim()
+      .max(400)
+      .optional()
+      .transform((raw, ctx) => {
+        if (!raw) return [] as { unitId: string; rooms: number }[];
+
+        const parts = raw.split(',');
+
+        if (parts.length > 6) {
+          ctx.addIssue({ code: 'custom', message: ERROR.VALIDATION_TOO_LONG });
+
+          return [] as { unitId: string; rooms: number }[];
+        }
+
+        const lines: { unitId: string; rooms: number }[] = [];
+
+        for (const part of parts) {
+          const [unitId = '', count = ''] = part.split(':');
+          const rooms = Number(count);
+
+          if (
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              unitId,
+            ) ||
+            !Number.isInteger(rooms) ||
+            rooms < 1 ||
+            rooms > 10
+          ) {
+            ctx.addIssue({ code: 'custom', message: ERROR.REQUEST_VALIDATION_FAILED });
+
+            return [] as { unitId: string; rooms: number }[];
+          }
+
+          lines.push({ unitId, rooms });
+        }
+
+        return lines;
+      }),
   })
   .strict()
   .refine((q) => q.checkOut > q.checkIn, {

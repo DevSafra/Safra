@@ -203,6 +203,21 @@ const quoteSchema = z.object({
     charged for four is the exact failure that rule exists to prevent.
   */
   rooms: z.number().int().min(1),
+  /*
+    One entry per room TYPE on the booking. `.default([])` is safe here in a way it would not be
+    for a count: an empty list of lines means «the lead type only», which is exactly what a
+    single-type booking is — it invents nothing.
+  */
+  lines: z
+    .array(
+      z.object({
+        unitId: z.string(),
+        rooms: z.number().int().min(1),
+        perRoomAmount: z.string(),
+        amount: z.string(),
+      }),
+    )
+    .default([]),
   baseAmount: z.string(),
   customerFeeAmount: z.string(),
   totalAmount: z.string(),
@@ -225,12 +240,24 @@ export async function quote(input: {
   checkIn: string;
   checkOut: string;
   rooms?: number | undefined;
+  /** A basket of room types. The lead pair above is the first of them. */
+  lines?: readonly { unitId: string; rooms: number }[] | undefined;
 }): Promise<Quote | null> {
   const url = new URL(`${API_URL}/api/v1/bookings/quote`);
   url.searchParams.set('unitId', input.unitId);
   url.searchParams.set('checkIn', input.checkIn);
   url.searchParams.set('checkOut', input.checkOut);
   if (input.rooms !== undefined) url.searchParams.set('rooms', String(input.rooms));
+  /*
+    The basket, as the API's own query shape expects it. Sent even for a single type, so the two
+    paths through this function differ in the STRING and not in the arithmetic behind it.
+  */
+  if (input.lines && input.lines.length > 0) {
+    url.searchParams.set(
+      'lines',
+      input.lines.map((line) => `${line.unitId}:${line.rooms}`).join(','),
+    );
+  }
 
   try {
     const response = await fetch(url, {

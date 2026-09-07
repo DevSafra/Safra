@@ -1,10 +1,6 @@
 'use client';
 
-import {
-  useBookingSelection,
-  type ChosenRoom,
-  type RoomPrice,
-} from '@/components/booking-selection';
+import { useBookingSelection, type BasketRoom } from '@/components/booking-selection';
 
 /**
  * One room type, prepared by the server.
@@ -49,9 +45,13 @@ export interface RoomView {
   readonly maxGuests: number;
   readonly minNights: number;
   readonly capacityText: string;
-  /** One entry per bookable quantity, priced by the server. See `RoomPrice`. */
-  readonly prices: readonly RoomPrice[];
   readonly maxRooms: number;
+  /** Whole-stay accommodation for ONE room, in the unit's own currency. */
+  readonly perRoomAmount: string;
+  readonly currencyCode: string;
+  /** True when this type's minimum stay is longer than the window the guest asked for. */
+  readonly tooShort: boolean;
+  readonly tooShortText: string | null;
 }
 
 /**
@@ -80,7 +80,8 @@ export function UnitSelector({
     readonly note: string;
     readonly one: string;
     readonly book: string;
-    readonly chosen: string;
+    /** «في الحجز · غرفتان», indexed by the count. See the card's note on why not a function. */
+    readonly inBasketTexts: readonly string[];
     readonly cheapest: string;
     readonly soldOut: string;
     readonly amenitiesLabel: string;
@@ -89,7 +90,7 @@ export function UnitSelector({
     readonly stayTotalLabel: string;
   };
 }) {
-  const { chosen, choose } = useBookingSelection();
+  const { add, countOf, hasRoom } = useBookingSelection();
 
   if (rooms.length === 0) return null;
 
@@ -102,7 +103,8 @@ export function UnitSelector({
 
       <ul className="mt-4 grid gap-3">
         {rooms.map((room) => {
-          const isChosen = chosen?.unitId === room.unitId;
+          /* How many of this type are already in the basket, if any. */
+          const inBasket = countOf(room.unitId);
 
           return (
             <li
@@ -114,7 +116,7 @@ export function UnitSelector({
                 so a guest scrolling the list can see where their choice came from.
               */
               className={`rounded-card border p-4 transition-colors sm:p-5 ${
-                isChosen
+                inBasket > 0
                   ? 'border-gold bg-[rgba(var(--goldA),0.05)]'
                   : 'border-line bg-card'
               }`}
@@ -199,7 +201,20 @@ export function UnitSelector({
                     {room.stayCaption}
                   </p>
 
-                  {room.soldOut ? (
+                  {room.tooShort ? (
+                    /*
+                      Shown, and not addable — with the reason.
+
+                      A booking has ONE stay, so a suite that takes two nights cannot join a
+                      one-night basket. Hiding it would tell a guest the hotel has no suite;
+                      offering a control that checkout refuses is the failure this review keeps
+                      finding. So the row states the minimum and what to do about it, and the room
+                      stays visible because knowing it exists is worth something.
+                    */
+                    <p className="mt-2 text-center text-[12px] font-semibold leading-relaxed text-warn sm:text-end">
+                      {room.tooShortText}
+                    </p>
+                  ) : room.soldOut ? (
                     /*
                       Described, not offered. The type stays on the page — a guest who cannot see
                       the suite does not learn the hotel has one — but nothing here pretends it can
@@ -217,17 +232,30 @@ export function UnitSelector({
                       CHOOSES a room, and «احجز الآن» in the summary commits to it. One filled
                       button on the page, and it is the one that spends money.
                     */
+                    /*
+                      ADDS to the basket rather than replacing it.
+
+                      It used to be a link to checkout, then a control that selected one room and
+                      discarded whatever was chosen before — so a family needing two doubles and a
+                      suite lost the doubles the moment they added the suite. Pressing it again
+                      adds another of the same type, which is what «أضف» means on a basket.
+
+                      Disabled at the basket's own ceiling rather than silently doing nothing: the
+                      row says why, because a control that stops answering reads as broken.
+                    */
                     <button
                       type="button"
-                      aria-pressed={isChosen}
-                      onClick={() => choose(toChosen(room))}
-                      className={`mt-2 block w-full cursor-pointer rounded-lg border px-4 py-2.5 text-center text-sm font-semibold transition-colors duration-200 ease-out-strong active:scale-[0.98] ${
-                        isChosen
+                      disabled={!hasRoom && inBasket === 0}
+                      onClick={() => add(toBasketRoom(room))}
+                      className={`mt-2 block w-full cursor-pointer rounded-lg border px-4 py-2.5 text-center text-sm font-semibold transition-colors duration-200 ease-out-strong active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 ${
+                        inBasket > 0
                           ? 'border-gold bg-[rgba(var(--goldA),0.15)] text-gold'
                           : 'border-[rgba(var(--goldA),0.45)] text-gold hover:bg-[rgba(var(--goldA),0.08)]'
                       }`}
                     >
-                      {isChosen ? copy.chosen : copy.book}
+                      {inBasket > 0
+                        ? (copy.inBasketTexts[inBasket] ?? copy.book)
+                        : copy.book}
                     </button>
                   )}
                 </div>
@@ -240,22 +268,22 @@ export function UnitSelector({
   );
 }
 
-/** What the card needs, taken from what the row already displayed. */
-function toChosen(room: RoomView): ChosenRoom {
+/** What the basket needs, taken from what the row already displayed. */
+function toBasketRoom(room: RoomView): BasketRoom {
   return {
     unitId: room.unitId,
     name: room.name,
     maxGuests: room.maxGuests,
     minNights: room.minNights,
-    capacityText: room.capacityText,
-    amenityNames: room.amenityNames,
-    prices: room.prices,
     maxRooms: room.maxRooms,
-    checkIn: room.checkIn,
-    checkOut: room.checkOut,
-    checkInText: room.checkInText,
-    checkOutText: room.checkOutText,
-    nightsText: room.nightsText,
+    /*
+      The unit's OWN currency, unconverted. The basket adds the lines up and converts once at the
+      end — converting each line and adding the results rounds per line and disagrees with the
+      charge.
+    */
+    perRoomAmount: room.perRoomAmount,
+    currencyCode: room.currencyCode,
     policyText: room.policyText,
+    amenityNames: room.amenityNames,
   };
 }

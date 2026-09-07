@@ -241,7 +241,19 @@
     "summaryRoomsLine": "{rooms, plural, one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}} × {nights, plural, one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}}",
     "summaryRoomsAll": "اخترت كل الغرف المتاحة من هذا النوع.",
     "unitsCount": "{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}}",
-    "summaryFee": "رسوم سفرة"
+    "summaryFee": "رسوم سفرة",
+    "basketSelected": "سلّة الحجز",
+    "basketAddMore": "أضف غرفة أخرى",
+    "basketClear": "إفراغ السلّة",
+    "basketRemoveLine": "إزالة",
+    "basketAdd": "أضف إلى الحجز",
+    "basketInBasket": "{count, plural, one {في الحجز · غرفة واحدة} two {في الحجز · غرفتان} few {في الحجز · # غرف} many {في الحجز · # غرفة} other {في الحجز · # غرفة}}",
+    "basketFull": "وصلت إلى أقصى عدد غرف في حجز واحد. للمجموعات الكبيرة راسل سفرة لترتيب الحجز.",
+    "basketCapacity": "تتسع لـ {count, plural, one {ضيف واحد} two {ضيفين} few {# ضيوف} many {# ضيفًا} other {# ضيف}}",
+    "basketEmpty": "سلّة الحجز فارغة. أضف نوع غرفة أو أكثر من القائمة لترى التفاصيل والمجموع هنا.",
+    "basketAccommodation": "الإقامة",
+    "basketTooShort": "أقل مدة لهذه الغرفة {count, plural, one {ليلة واحدة} two {ليلتان} few {# ليالٍ} many {# ليلة} other {# ليلة}} — عدّل التواريخ لإضافتها.",
+    "basketLineAll": "كل المتاح من هذا النوع."
   },
   "city": {
     "availableStays": "الإقامات المتاحة في {city}",
@@ -626,7 +638,8 @@
     "disputesOpened": "فُتح",
     "voucherOpen": "فتح القسيمة (PDF)",
     "voucherHint": "تحتوي على رمز QR للتحقق عند الوصول.",
-    "roomsCount": "{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}}"
+    "roomsCount": "{count, plural, zero {لا غرف} one {غرفة واحدة} two {غرفتان} few {# غرف} many {# غرفة} other {# غرفة}}",
+    "bookingRoomsHeading": "الغرف المحجوزة"
   },
   "ads": {
     "title": "أماكن قريبة من إقامتك",

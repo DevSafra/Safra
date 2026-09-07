@@ -112,7 +112,17 @@ export class BookingsController {
   async quote(
     @Query(new ZodValidationPipe(bookingQuoteSchema)) query: BookingQuoteInput,
   ) {
-    return this.creation.quote(query);
+    /*
+      `lines` arrives parsed by the schema. Passed through as the basket so a single-type quote and
+      a mixed one go down one code path — two paths would be two answers to «what does this cost».
+    */
+    return this.creation.quote({
+      ...query,
+      lines:
+        query.lines.length > 0
+          ? query.lines
+          : [{ unitId: query.unitId, rooms: query.rooms }],
+    });
   }
 
   /**

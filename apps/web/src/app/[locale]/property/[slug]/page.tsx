@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
 import { isLocale, routing, type Locale } from '@/i18n/routing';
+import { MAX_BASKET_ROOMS } from '@/lib/basket-limits';
 import { readableDate } from '@/lib/readable-date';
 import { SaveButton } from '@/components/save-button';
 import { ShareButton } from '@/components/share-button';
@@ -11,14 +12,19 @@ import { PropertyGallery } from '@/components/property-gallery';
 import { BookingSelectionProvider } from '@/components/booking-selection';
 import { BookingSummaryCard } from '@/components/booking-summary-card';
 import { UnitSelector } from '@/components/unit-selector';
-import { multiplyMoney, priceWithCustomerFee, subtractMoney } from '@/lib/customer-fee';
+import {
+  multiplyMoney,
+  priceWithCustomerFee,
+  subtractMoney,
+  countedTexts,
+} from '@/lib/customer-fee';
 import { localisedName, localisedText } from '@/lib/localise';
 import { getProperty, imageUrl, type PropertyDetail } from '@/lib/property';
 import { dynamicMessage } from '@/lib/dynamic-message';
 import { StarRating } from '@safra/ui';
 import { getCurrencyCatalogue } from '@/lib/catalog';
 import { convertForDisplay, displayCurrency } from '@/lib/currency';
-import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
+import { DEFAULT_MONEY_CURRENCY, preferredCurrency } from '@safra/contracts';
 
 /**
  * Property page (SRS §5.6).
@@ -248,77 +254,84 @@ export default async function PropertyPage({
     checkOut: stay.get('checkOut') ?? defaultStay.checkOut,
   };
 
+  const askedNights = Math.max(
+    1,
+    Math.round(
+      (Date.parse(`${askedStayWindow.checkOut}T00:00:00Z`) -
+        Date.parse(`${askedStayWindow.checkIn}T00:00:00Z`)) /
+        86_400_000,
+    ),
+  );
+
+  /*
+    ── ONE window for the whole page ─────────────────────────────────────────
+
+    A booking has one arrival and one departure, so a basket mixing room types has to share them.
+    The page used to extend the departure PER ROOM, which was right when a booking was one type and
+    is incoherent for a basket: two lines would have claimed two different stays.
+
+    Where the guest CHOSE dates, those dates are kept — honouring a search is not optional, and a
+    room whose minimum is longer is shown with the shortfall stated rather than silently repriced
+    for a stay nobody asked for.
+
+    Where they chose NOTHING, the window stretches to cover the longest minimum on offer, so the
+    default view of a hotel is one in which every room can actually be added. That is a default,
+    not a surprise: there is no expectation to violate.
+  */
+  /*
+    `has`, not `get() !== undefined`.
+
+    `URLSearchParams.get` returns NULL for a missing key, so the first version read as «the guest
+    chose dates» on every single request — and the default window never stretched to cover the
+    hotel's longest minimum, which is the whole point of it. Silent, and it would have shipped.
+  */
+  const chose = stay.has('checkIn') && stay.has('checkOut');
+  const longestMinimum = property.units.reduce(
+    (most, one) => (one.available ? Math.max(most, one.minNights) : most),
+    1,
+  );
+  const nights = chose ? askedNights : Math.max(askedNights, longestMinimum);
+  const departure = new Date(`${askedStayWindow.checkIn}T00:00:00Z`);
+
+  departure.setUTCDate(departure.getUTCDate() + nights);
+
+  const stayWindow = {
+    checkIn: askedStayWindow.checkIn,
+    checkOut: departure.toISOString().slice(0, 10),
+  };
+
+  /*
+    The largest capacity a basket here could reach: ten rooms of the roomiest type.
+
+    Bounded on purpose, because these become an ARRAY of resolved sentences — a client component
+    cannot be handed a formatter, and the alternative is shipping the ICU runtime to the browser
+    for two counted words.
+  */
+  const largestCapacity =
+    MAX_BASKET_ROOMS *
+    property.units.reduce((most, one) => Math.max(most, one.maxGuests), 1);
+
   const rooms = [...groups.values()].map((group, index) => {
     /* The cheapest AVAILABLE room of the type; the API orders available first within a price. */
     const free = group.filter((one) => one.available);
     const unit = free[0] ?? group[0]!;
 
     /*
-      A departure this unit will accept.
+      Whether this type can be added to a basket for THIS window.
 
-      The page's default window comes from the CHEAPEST room's minimum, so on a hotel whose suite
-      takes two nights the suite's link was born asking for a stay the suite forbids. Only ever
-      extends, and only when the chosen window is too short.
+      Not «is it free» — that is `free.length` — but «will it accept a stay this short». A suite
+      that takes two nights cannot join a one-night basket, and the row says the minimum and what
+      to do about it rather than offering a control that checkout would refuse.
     */
-    const asked = Math.round(
-      (Date.parse(`${askedStayWindow.checkOut}T00:00:00Z`) -
-        Date.parse(`${askedStayWindow.checkIn}T00:00:00Z`)) /
-        86_400_000,
-    );
-    const nights = Math.max(asked, unit.minNights);
-    const departure = new Date(`${askedStayWindow.checkIn}T00:00:00Z`);
-
-    departure.setUTCDate(departure.getUTCDate() + nights);
+    const tooShort = unit.minNights > nights;
 
     const shown = (amount: string) =>
       convertForDisplay(amount, unit.currencyCode, locale, target, rates).text;
-
-    /* The same conversion as a number rather than a sentence — see `RoomPrice.totalValue`. */
-    const value = (amount: string) =>
-      Number(
-        convertForDisplay(amount, unit.currencyCode, 'en', target, rates).text.replace(
-          /[^\d.]/g,
-          '',
-        ),
-      );
 
     /* The room alone, the fee alone, and their sum — three figures that reconcile on screen. */
     const roomOnly = multiplyMoney(unit.basePrice, unit.currencyCode, nights);
     const withFee = priceWithCustomerFee(roomOnly, unit.currencyCode, property.fees);
     const feeOnly = subtractMoney(withFee, roomOnly, unit.currencyCode);
-
-    /*
-      Every quantity the guest could choose, priced here.
-
-      The card's stepper indexes into this rather than multiplying anything. Money is converted to
-      the reader's currency and counts are ICU plurals — Arabic has six forms — and both need the
-      server, so a client-side multiplication would either ship a formatter to the browser or print
-      a figure rounded differently from the one checkout charges. There are at most `free.length`
-      of these, and a hotel floor is a handful of rooms.
-
-      The FEE is applied to the multiplied base rather than multiplied itself, which is what the
-      API does — `customerFeeMinor` scales a PERCENT fee with the base and adds a FLAT one once per
-      booking. Charging a flat fee per room here would have printed a total the charge does not
-      match, and a card that disagrees with the payment is worse than a card with no breakdown.
-    */
-    const prices = Array.from({ length: Math.max(1, free.length) }, (_, i) => {
-      const count = i + 1;
-      const roomsOnly = multiplyMoney(unit.basePrice, unit.currencyCode, nights * count);
-      const roomsWithFee = priceWithCustomerFee(
-        roomsOnly,
-        unit.currencyCode,
-        property.fees,
-      );
-
-      return {
-        roomLineLabel: t('summaryRoomsLine', { rooms: count, nights }),
-        roomLineAmount: shown(roomsOnly),
-        feeAmount: shown(subtractMoney(roomsWithFee, roomsOnly, unit.currencyCode)),
-        total: shown(roomsWithFee),
-        totalValue: value(roomsWithFee),
-        capacityText: t('guestsUpTo', { count: unit.maxGuests * count }),
-      };
-    });
 
     return {
       unitId: unit.id,
@@ -347,21 +360,29 @@ export default async function PropertyPage({
         rate: shown(unit.basePrice),
         nights,
       }),
-      prices,
       maxRooms: Math.max(1, free.length),
+      /*
+        The unit's OWN currency, unconverted — the basket sums the lines and converts once at the
+        end. Converting here and adding the converted figures would round per line and produce a
+        total that disagrees with the charge.
+      */
+      perRoomAmount: roomOnly,
+      currencyCode: unit.currencyCode,
+      tooShort,
+      tooShortText: tooShort ? t('basketTooShort', { count: unit.minNights }) : null,
       roomLineLabel: t('summaryRoomLine', { nights }),
       roomLineAmount: shown(roomOnly),
       feeAmount: shown(feeOnly),
       totalText: shown(withFee),
-      checkIn: askedStayWindow.checkIn,
-      checkOut: departure.toISOString().slice(0, 10),
+      checkIn: stayWindow.checkIn,
+      checkOut: stayWindow.checkOut,
       /*
         The same dates as words. «2026-10-05» in an Arabic booking summary is a machine's rendering
         of a date, and the card is the last thing a guest reads before committing — the one place
         the arrival should be a day of the week rather than a serial number.
       */
-      checkInText: readableDate(askedStayWindow.checkIn, locale),
-      checkOutText: readableDate(departure.toISOString().slice(0, 10), locale),
+      checkInText: readableDate(stayWindow.checkIn, locale),
+      checkOutText: readableDate(stayWindow.checkOut, locale),
       nights,
       nightsText: t('summaryNights', { count: nights }),
       maxGuests: unit.maxGuests,
@@ -571,8 +592,9 @@ export default async function PropertyPage({
                 title: t('unitsTitle'),
                 note: t('unitsNote'),
                 one: t('unitsOne'),
-                book: t('bookThisUnit'),
-                chosen: t('unitChosen'),
+                book: t('basketAdd'),
+                /* Resolved for every reachable count — a client component takes no formatter. */
+                inBasketTexts: countedTexts((count) => t('basketInBasket', { count })),
                 cheapest: t('unitCheapest'),
                 soldOut: t('unitSoldOut'),
                 amenitiesLabel: t('unitAmenitiesLabel'),
@@ -820,18 +842,45 @@ export default async function PropertyPage({
                       card and the row it summarises come to disagree.
                     */
                     fromPrice={rooms[0]?.totalText ?? nightly.text}
+                    stay={{
+                      checkIn: stayWindow.checkIn,
+                      checkOut: stayWindow.checkOut,
+                      checkInText: readableDate(stayWindow.checkIn, locale),
+                      checkOutText: readableDate(stayWindow.checkOut, locale),
+                    }}
+                    /*
+                      The rule and the rate table, as plain DATA.
+
+                      The basket adds its lines up and works the fee out on the sum, so it needs the
+                      fee RULE rather than a computed amount — and the rates, so it can convert the
+                      answer once at the end. All serialisable, which is what lets a server
+                      component hand it to a client one.
+                    */
+                    money={{
+                      /*
+                        `preferredCurrency`, never a typed code.
+                        
+                        A hardcoded «USD» is what `one-fee-rule.test.ts` sweeps for and it caught
+                        this one: a listing with no rooms would have priced in whatever code got
+                        typed here rather than in the platform's own default.
+                      */
+                      currencyCode: preferredCurrency(
+                        rooms.map((room) => room.currencyCode),
+                      ),
+                      target,
+                      rates,
+                      fees: property.fees,
+                    }}
                     copy={{
                       fromLabel: t('summaryFromLabel'),
                       fromCaption: rooms[0]?.stayCaption ?? '',
                       chooseRoom: t('chooseRoom'),
                       bookNow: t('bookNow'),
-                      selected: t('summarySelected'),
-                      change: t('summaryChange'),
-                      remove: t('summaryRemove'),
-                      /* The PARTY, resolved once — the card cannot be handed a formatter. */
-                      guestsCount: t('summaryGuests', { count: adults + children }),
-                      rooms: t('summaryRooms'),
-                      roomsAll: t('summaryRoomsAll'),
+                      selected: t('basketSelected'),
+                      remove: t('basketRemoveLine'),
+                      clear: t('basketClear'),
+                      addMore: t('basketAddMore'),
+                      roomsLabel: t('summaryRooms'),
                       /*
                         The same two templates the search form's steppers use, not a second pair.
                         It is one control with one pair of words; a copy per screen is how four
@@ -843,7 +892,26 @@ export default async function PropertyPage({
                       total: t('summaryTotal'),
                       policy: t('summaryPolicy'),
                       amenities: t('summaryAmenities'),
-                      empty: t('summaryEmpty'),
+                      empty: t('basketEmpty'),
+                      accommodation: t('basketAccommodation'),
+                      nightsText: t('summaryNights', { count: nights }),
+                      guestsText: t('summaryGuests', { count: adults + children }),
+                      /*
+                        Two ICU plurals the basket needs for numbers only IT knows — the capacity of
+                        a line, and of the whole basket. Passed as resolvers rather than strings
+                        because the count is not known until a guest has chosen; they are still
+                        catalogue messages, resolved on the server, so no formatter crosses the
+                        boundary and no sentence is assembled in a component.
+                      */
+                      capacityTexts: countedTexts(
+                        (count) => t('basketCapacity', { count }),
+                        largestCapacity,
+                      ),
+                      roomsCountTexts: countedTexts((count) =>
+                        t('unitsCount', { count }),
+                      ),
+                      full: t('basketFull'),
+                      lineAll: t('basketLineAll'),
                     }}
                   />
 

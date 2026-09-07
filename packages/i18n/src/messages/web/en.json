@@ -241,7 +241,19 @@
     "summaryRoomsLine": "{rooms, plural, one {1 room} other {# rooms}} × {nights, plural, one {1 night} other {# nights}}",
     "summaryRoomsAll": "That is every room of this type still free.",
     "unitsCount": "{count, plural, one {1 room} other {# rooms}}",
-    "summaryFee": "SAFRA fee"
+    "summaryFee": "SAFRA fee",
+    "basketSelected": "Your booking",
+    "basketAddMore": "Add another room",
+    "basketClear": "Empty basket",
+    "basketRemoveLine": "Remove",
+    "basketAdd": "Add to booking",
+    "basketInBasket": "{count, plural, one {In booking · 1 room} other {In booking · # rooms}}",
+    "basketFull": "That is the most rooms one booking can hold. For larger groups, contact SAFRA to arrange it.",
+    "basketCapacity": "Sleeps {count, plural, one {1 guest} other {# guests}}",
+    "basketEmpty": "Your basket is empty. Add one or more room types from the list to see the details and the total here.",
+    "basketAccommodation": "Accommodation",
+    "basketTooShort": "This room takes a minimum of {count, plural, one {1 night} other {# nights}} — change your dates to add it.",
+    "basketLineAll": "That is all of this type."
   },
   "city": {
     "availableStays": "Available stays in {city}",
@@ -626,7 +638,8 @@
     "disputesOpened": "Raised",
     "voucherOpen": "Open voucher (PDF)",
     "voucherHint": "It carries a QR code for verification on arrival.",
-    "roomsCount": "{count, plural, one {1 room} other {# rooms}}"
+    "roomsCount": "{count, plural, one {1 room} other {# rooms}}",
+    "bookingRoomsHeading": "Rooms booked"
   },
   "ads": {
     "title": "Nearby, from our partners",
