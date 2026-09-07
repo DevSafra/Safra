@@ -846,6 +846,62 @@ One full-suite run failed a sidebar-badge comparison immediately after the conso
 and passed on every run since. The runner must wait for the applications to be _serving correctly_,
 not merely accepting connections, or it will report environment noise as product failure.
 
+### The booking basket — several room types on one booking, 2026-09-07
+
+«غرفة مزدوجة × 2، جناح تنفيذي × 1، غرفة عائلية × 1» is one family's trip and was three bookings.
+A booking carried one room type and a quantity, and the allocation required every room it handed
+out to match the chosen one on property, type, PRICE and capacity — right for a model whose
+accommodation was one nightly rate multiplied, and the reason a basket was impossible.
+
+**What changed.** The multiplication is gone. `booking_units.accommodation_amount` records what each
+room cost, so a booking's accommodation is the SUM of its rooms and a suite can sit beside a
+standard room at its own rate. Backfilled across every existing booking; zero bookings where the
+rooms do not sum to the base.
+
+**`bookings.unit_id` is now the LEAD line.** On a single-type booking it describes every room; on a
+mixed one it names one of several. Every surface that renders a booking's accommodation reads
+`bookingLines()` instead — ONE shared SQL fragment, because seven separately written GROUP BYs
+would drift. Those surfaces are: the voucher and its QR, the confirmation email, the invoice, the
+customer's booking page and receipt, the partner's arrivals list and confirmation queue, and the
+console's booking detail. A screen printing only `unit_id`'s name on a mixed booking is a defect.
+
+**One stay window for the page.** A booking has one arrival and one departure, so a basket must
+share them. Where the guest chose dates those are kept and a room whose minimum is longer is shown
+with the shortfall stated rather than silently repriced. Where they chose nothing the window
+stretches to cover the longest minimum on offer, so the default view of a hotel is one where every
+room can be added.
+
+**Money is computed in the browser, deliberately.** Pre-computing every combination of types and
+quantities server-side is exponential. The card sums the lines in minor units through the same
+helpers the API uses and converts ONCE at the end; checkout re-quotes and is authoritative.
+`booking-basket.spec.ts` compares the two figures rather than trusting they agree.
+
+**Traps this cost.** `URLSearchParams.get()` returns null, not undefined, so «did the guest choose
+dates» was true on every request and the default window never stretched. `MAX_BASKET_ROOMS`
+imported from a `'use client'` module into a server component is not a plain number — the
+multiplication produced NaN and every capacity sentence rendered empty, with no error. And naming
+the invoice's line array `rooms` beside a `rooms` COUNT made a consumer's `z.number()` meet an
+array: the receipts list parsed as nothing and rendered empty while the API answered 200.
+
+**Open:** the basket is one PROPERTY. A trip across two hotels is still two bookings — one partner,
+one commission rate, one policy and one `property_id` per booking — and `booking_group_reference`
+is what makes those legible. A cross-property basket is not started and would be a much larger
+change than this one.
+
+### Super Admin moderation — configured inventory and remaining availability, 2026-09-07
+
+A thirteen-room hotel arrived on the moderation screen as thirteen rows, so a reviewer could not
+see «six doubles, four with a view, one family room, two suites» — the shape of what they were
+approving — and «is this hotel full tonight» took a database query. The screen now leads with the
+listing as INVENTORY: one row per room type, how many are configured, and how many are free
+tonight, with nothing-free drawn as a warning rather than a zero. The physical rooms are still
+listed below, because a reviewer approving a listing approves each room's claims and those are per
+room.
+
+«Free tonight» means not held by a live booking over tonight and not closed on the partner's
+calendar for tonight. Deliberately tonight rather than a range the reviewer picks: a date picker is
+a different feature, and the question this screen answers is what shape the listing is in.
+
 ### The room count reached every surface — 2026-09-06
 
 `bookings.rooms` was written by the booking flow and read by NOTHING. A guest paid for three rooms
