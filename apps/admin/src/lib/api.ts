@@ -2287,6 +2287,13 @@ const payoutSchema = z.object({
   periodEnd: z.string(),
   grossAmount: z.string(),
   fineAmount: z.string(),
+  /*
+    An earlier overpayment taken back on this transfer. A STRING, like every other money field
+    here — the column is `numeric` and pg answers "186.000", so `z.number()` would compile and
+    fail at runtime. Required rather than defaulted: `.default('0')` would invent «nothing
+    recovered» for a field the API had stopped sending, which is the one wrong answer.
+  */
+  recoveryAmount: z.string(),
   netAmount: z.string(),
   status: z.string(),
   scheduledFor: z.string().nullable(),

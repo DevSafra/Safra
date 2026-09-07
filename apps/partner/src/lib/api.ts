@@ -325,6 +325,13 @@ const partnerPayoutSchema = z.object({
   periodEnd: z.string(),
   grossAmount: z.string(),
   fineAmount: z.string(),
+  /*
+    An earlier overpayment taken back on this transfer. A STRING like the others — the column is
+    `numeric`, so pg answers "186.000" and a `z.number()` would compile and fail at runtime.
+    Required, never defaulted: inventing «nothing recovered» for a field the API stopped sending
+    is the one wrong answer a partner must not be given about their own money.
+  */
+  recoveryAmount: z.string(),
   netAmount: z.string(),
   status: z.string(),
   scheduledFor: z.string().nullable(),
@@ -339,6 +346,32 @@ export type PartnerPayout = z.infer<typeof partnerPayoutSchema>;
 
 export async function getMyPayouts() {
   return partnerFetch('/partner/payouts', z.array(partnerPayoutSchema));
+}
+
+/**
+ * A balance this partner still owes back, and the stay it came from.
+ *
+ * Bashar, 2026-09-07: «The outstanding recovery amount should be visible to finance, operations
+ * and the partner.» So it is read before it is taken rather than explained afterwards by a smaller
+ * transfer. The booking reference is here because a debt with no cause cannot be disputed; the
+ * guest is not, because the partner is a party to the money and not to the refund.
+ */
+const recoverySchema = z.object({
+  bookingReference: z.string(),
+  amount: z.string(),
+  recovered: z.string(),
+  outstanding: z.string(),
+  currencyCode: z.string(),
+  createdAt: z.string(),
+});
+
+export type PartnerRecovery = z.infer<typeof recoverySchema>;
+
+export async function getMyRecoveries() {
+  return partnerFetch(
+    '/partner/payouts/recoveries',
+    z.object({ recoveries: z.array(recoverySchema) }),
+  );
 }
 
 /**

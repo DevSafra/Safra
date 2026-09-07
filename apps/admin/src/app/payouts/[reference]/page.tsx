@@ -92,6 +92,22 @@ export default async function PayoutPage({
             label={t.sections.payouts.fine}
             value={<Ltr>{amount(payout.fineAmount, payout.currencyCode)}</Ltr>}
           />
+          {/*
+            Only when there IS one. A «مستعاد: $0.00» on every ordinary transfer would bury the
+            handful that carry a real recovery, and the identity below still adds up without it.
+          */}
+          {Number(payout.recoveryAmount) > 0 ? (
+            <Row
+              label={t.sections.payouts.recoveryAmount}
+              /*
+                No colour, matching the gross and fine rows it sits between. `warn` was tempting
+                and is wrong here: this screen renders a payout STATUS pill, and `pending_release`
+                is itself `warn` — a tone that means a status must not also mean a figure in the
+                same view. The label and the position carry it.
+              */
+              value={<Ltr>{amount(payout.recoveryAmount, payout.currencyCode)}</Ltr>}
+            />
+          ) : null}
           <Row
             label={t.sections.payouts.net}
             value={

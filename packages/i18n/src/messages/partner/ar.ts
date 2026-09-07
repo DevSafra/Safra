@@ -1170,6 +1170,25 @@ export const ar = {
       nothing on the screen accounting for the difference — and a number that changes silently is
       the thing a partner rings support about.
     */
+    /*
+      An overpayment being taken back (Bashar, 2026-09-07).
+
+      «The outstanding recovery amount should be visible to finance, operations and the partner.»
+      A deduction the partner meets only as a smaller transfer is the same asymmetry this platform
+      keeps finding: the console knew a figure and the business whose money it was did not.
+
+      Worded as an obligation with a CAUSE — the booking is named — because a debt nobody can trace
+      is a debt nobody can dispute. Deliberately not «غرامة»: a fine is a penalty they can appeal,
+      and this is money that was paid out before a guest was refunded.
+    */
+    recoveryTitle: 'مبالغ مستردّة من سفرة',
+    recoveryNote:
+      'حين يُسترد مبلغ للضيف بعد تحويل مستحقات ذلك الحجز، يُسجَّل الفرق كرصيد قابل للاستعادة ويُخصم من التحويلات القادمة. لا تُنشأ تحويلات سالبة ولا يُطلب منك سداد شيء خارج دورة التحويل.',
+    recoveryOutstanding: 'المتبقّي للاستعادة',
+    recoveryFromBooking: 'من الحجز',
+    recoveryCollected: 'استُعيد حتى الآن',
+    recoveryOnThisTransfer: 'خُصم من هذا التحويل',
+    recoveryNone: 'لا أرصدة قابلة للاستعادة.',
     refundedToGuest: 'أُعيد للضيف',
     refundedNote:
       'عند استرداد مبلغ للضيف يُخفَّض نصيب الشريك من ذلك الحجز بالنسبة نفسها، وتُخفَّض عمولة سفرة بالنسبة نفسها أيضاً. المبالغ أعلاه معروضة بعد الخصم.',
@@ -1214,6 +1233,8 @@ export const ar = {
     groupSettled: 'مكتملة',
     /* Fines are DEDUCTED from the gross — a net with an unexplained gap is a support ticket. */
     afterFine: '{gross} ناقص {fine} غرامات',
+    /* The same shape as the fine line beside it, for money taken back rather than penalised. */
+    afterRecovery: '{gross} ناقص {recovery} مستعاد من دفعة سابقة',
   },
 
   /*

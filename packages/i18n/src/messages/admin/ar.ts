@@ -1239,6 +1239,36 @@ export const ar = {
         rewritten rather than left standing. A note that describes the previous rule is worse than
         no note: an operator reads it as current and tells a partner something untrue.
       */
+      /*
+        Running the accrual sweep by hand (Bashar, 2026-09-07).
+
+        «I do not want operational workflows that require direct API calls when they should
+        reasonably be available through the Super Admin Console.» The endpoint had existed since
+        payouts did and no application called it, so attaching a completed booking to a transfer
+        meant waiting up to an hour for the timer.
+
+        The confirmation says what it will DO rather than asking whether the operator is sure: it
+        sweeps every partner, and the count it attaches is not knowable beforehand. «تجميع» is the
+        word the footnote above it already uses for the job, so the control and the record of it
+        read as the same thing.
+      */
+      accrueNow: 'تجميع المستحقات الآن',
+      accrueBusy: 'يجري التجميع…',
+      accrueTitle: 'تجميع مستحقات الشركاء؟',
+      accrueMessage:
+        'سيمرّ التجميع على كل الشركاء ويضيف كل حجز مكتمل ومدفوع إلى فترة التحويل المفتوحة لديه. لا يُحوَّل أي مبلغ بهذا الإجراء — الإصدار والدفع خطوتان منفصلتان.',
+      accrueConfirm: 'تجميع',
+      accrueDone: 'تمّ التجميع. حدِّث الصفحة إن لم تظهر الفترات الجديدة بعد.',
+      /*
+        An overpayment recovered on this transfer (Bashar, 2026-09-07).
+
+        Its own line rather than folded into «الغرامات», which is a penalty a partner can appeal.
+        Finance reading a recovery as a fine would be reading the wrong fact about the wrong
+        process, and would tell the partner the same thing if asked.
+      */
+      recoveryAmount: 'مستعاد من دفعة سابقة',
+      recoveryNote:
+        'مبالغ كانت قد حُوّلت للشريك ثم استُرد الحجز للعميل بعد التحويل. تُخصم من التحويلات القادمة ولا تُنشأ لها تحويلات سالبة.',
       colRefunded: 'مُسترد للعميل',
       refundedNote:
         'يُخفَّض مستحق الشريك بنسبة ما استُرد للعميل، وتُخفَّض عمولة سفرة بالنسبة نفسها. المبلغ المعروض هنا هو ما أُعيد للضيف، والمستحق المقابل معروض بعد الخصم.',

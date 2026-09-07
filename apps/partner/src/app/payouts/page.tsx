@@ -3,7 +3,9 @@ import Link from 'next/link';
 import {
   getMyPayoutAccounts,
   getMyPayouts,
+  getMyRecoveries,
   getMyWithheldPayouts,
+  type PartnerRecovery,
   type WithheldBooking,
   type PartnerPayout,
   sidebarBadges,
@@ -98,10 +100,11 @@ export default async function PayoutsPage() {
     The accounts are read HERE so the summary can name the destination — and say when there is
     none. Both reads are the partner's own and neither blocks the other, so they go together.
   */
-  const [payouts, accounts, withheld] = await Promise.all([
+  const [payouts, accounts, withheld, recoveries] = await Promise.all([
     getMyPayouts(),
     getMyPayoutAccounts(),
     getMyWithheldPayouts(),
+    getMyRecoveries(),
   ]);
 
   const suspended =
@@ -162,6 +165,22 @@ export default async function PayoutsPage() {
                 : withheld.withheld
             }
             payouts={payouts}
+          />
+
+          {/*
+            The other reason a total can be lower than expected, and the one that runs backwards.
+
+            Beside «مستحقات مجمّدة» deliberately: a partner looking at a smaller figure asks one
+            question, and there are now two answers to it — money held because a stay is disputed,
+            and money owed back because a stay was refunded after it was paid. Neither is
+            discoverable from the number itself.
+          */}
+          <Recoveries
+            rows={
+              recoveries === 'failed' || recoveries === 'unauthenticated'
+                ? []
+                : recoveries.recoveries
+            }
           />
 
           {payouts.length === 0 ? (
@@ -300,6 +319,90 @@ function Summary({
           </Link>
         </p>
       )}
+    </section>
+  );
+}
+
+/**
+ * What this partner owes back, said before it is taken.
+ *
+ * ## Why it is on this page
+ *
+ * Bashar, 2026-09-07: «The outstanding recovery amount should be visible to finance, operations
+ * and the partner.» A balance a partner meets only as a smaller transfer is the asymmetry this
+ * review keeps finding — the console knowing a figure the business whose money it is does not.
+ *
+ * It sits beside «مستحقات مجمّدة» because both answer the same question from opposite directions:
+ * money held because a stay is disputed, and money owed back because a stay was refunded after it
+ * had already been paid out.
+ *
+ * ## Each balance names its booking
+ *
+ * A debt with no cause cannot be disputed. The guest is not named: the partner is a party to the
+ * money and not to the refund, which is the same line `Withheld` draws.
+ *
+ * ## Nothing is drawn when nothing is owed
+ *
+ * The overwhelmingly common case, and an empty amber panel on every partner's payouts page would
+ * teach them to ignore the one that matters.
+ */
+function Recoveries({ rows }: { readonly rows: readonly PartnerRecovery[] }) {
+  if (rows.length === 0) return null;
+
+  /* Per currency, because a platform that settles in five must never add across them. */
+  const totals = new Map<string, number>();
+
+  for (const row of rows) {
+    totals.set(
+      row.currencyCode,
+      (totals.get(row.currencyCode) ?? 0) + Number(row.outstanding),
+    );
+  }
+
+  return (
+    <section
+      data-recoveries
+      className="grid gap-3 rounded-card border border-line2 bg-field p-5"
+    >
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-[13px] font-bold text-text">{t.payouts.recoveryTitle}</h2>
+        <span className="ms-auto text-[12.5px] font-bold tabular-nums text-text">
+          {t.payouts.recoveryOutstanding}:{' '}
+          {[...totals].map(([code, sum]) => amount(sum.toFixed(2), code)).join(' · ')}
+        </span>
+      </div>
+
+      <p className="text-[11.5px] leading-relaxed text-text2">{t.payouts.recoveryNote}</p>
+
+      <ul className="grid gap-1.5">
+        {rows.map((row) => (
+          <li
+            key={row.bookingReference}
+            data-recovery={row.bookingReference}
+            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-line px-3 py-2 text-[12px]"
+          >
+            <span className="text-muted">
+              {t.payouts.recoveryFromBooking}{' '}
+              <Ltr className="font-semibold text-sky">{row.bookingReference}</Ltr>
+            </span>
+
+            {/*
+              What has come back already, only when some has. «استُعيد 0» on a fresh balance is
+              noise, and the outstanding figure beside it already implies it.
+            */}
+            {Number(row.recovered) > 0 ? (
+              <span className="text-faint">
+                {t.payouts.recoveryCollected}:{' '}
+                <Ltr>{amount(row.recovered, row.currencyCode)}</Ltr>
+              </span>
+            ) : null}
+
+            <span className="ms-auto font-bold tabular-nums text-text">
+              <Ltr>{amount(row.outstanding, row.currencyCode)}</Ltr>
+            </span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -457,6 +560,7 @@ function Group({
  */
 function Card({ payout }: { readonly payout: PartnerPayout }) {
   const fined = Number(payout.fineAmount) > 0;
+  const recovered = Number(payout.recoveryAmount) > 0;
 
   return (
     <Link
@@ -511,6 +615,23 @@ function Card({ payout }: { readonly payout: PartnerPayout }) {
             {fill(t.payouts.afterFine, {
               gross: amount(payout.grossAmount, payout.currencyCode),
               fine: amount(payout.fineAmount, payout.currencyCode),
+            })}
+          </span>
+        ) : null}
+
+        {/*
+          Why a net can be smaller than the stays add up to, for the OTHER reason.
+
+          `fineAmount` was on the payload and on no screen until somebody noticed a partner
+          opening a support ticket about a figure the data already explained. `recoveryAmount`
+          arrived on 2026-09-07 and would have been the same defect on the same screen, so it says
+          so here from the start — and only when it is not zero, because «ناقص 0» is noise.
+        */}
+        {recovered ? (
+          <span className="text-[11px] text-faint2">
+            {fill(t.payouts.afterRecovery, {
+              gross: amount(payout.grossAmount, payout.currencyCode),
+              recovery: amount(payout.recoveryAmount, payout.currencyCode),
             })}
           </span>
         ) : null}
