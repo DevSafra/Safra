@@ -69,6 +69,7 @@ const NEEDS_PARTNER_SESSION = new RegExp(
     'mixed-booking-downstream',
     'refund-visibility',
     'checkout-and-acceptance',
+    'bidi-runs',
   ].join('|')})\\.spec\\.ts`,
 );
 
