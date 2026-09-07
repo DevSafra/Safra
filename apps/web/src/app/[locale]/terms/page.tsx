@@ -4,7 +4,16 @@ import { notFound } from 'next/navigation';
 
 import { LegalPage } from '@/components/legal-page';
 import { isLocale, routing } from '@/i18n/routing';
+import {
+  confirmationWindowMinutes,
+  durationParts,
+  refundMinimumPercent,
+  sameDayCutoffEnabled,
+  sameDayCutoffHour,
+} from '@safra/contracts';
+
 import { ltrIsolate } from '@/lib/bidi';
+import { getPublicSettings } from '@/lib/catalog';
 import { LEGAL_UPDATED } from '@/lib/legal';
 
 /**
@@ -53,6 +62,28 @@ export default async function TermsPage({
   setRequestLocale(locale);
 
   const t = await getTranslations('legal');
+  const tc = await getTranslations('common');
+
+  /*
+    الشروط state the RULES IN FORCE, so they are read from configuration (Bashar, 2026-09-07).
+
+    Two values were literals here and both were wrong in a different way. «خلال 120 دقيقة» simply
+    froze `booking.confirmation_window_minutes`. «تُغلق الساعة 17:00» was worse than frozen: it
+    stated a same-day cutoff as settled terms while `booking.same_day_cutoff_enabled` was `false`,
+    so the legal page described a restriction the platform was not applying — and named ONE hour
+    for a value `cities.same_day_cutoff_hour` overrides per city.
+
+    So the window is interpolated and the cutoff sentence appears only when the cutoff is on, saying
+    the hour is a default a city may change. A failed settings read leaves the paragraph absent
+    rather than asserting a rule: a legal page that cannot confirm a term must not state one.
+  */
+  const settings = await getPublicSettings();
+  const window = durationParts(confirmationWindowMinutes(settings));
+  const cutoff = sameDayCutoffEnabled(settings)
+    ? t('terms.bookingCutoffBody', {
+        hour: `${String(sameDayCutoffHour(settings)).padStart(2, '0')}:00`,
+      })
+    : null;
 
   return (
     <LegalPage
@@ -64,10 +95,25 @@ export default async function TermsPage({
       backLabel={t('backHome')}
       sections={[
         { heading: t('terms.roleHeading'), body: t('terms.roleBody') },
-        { heading: t('terms.bookingHeading'), body: t('terms.bookingBody') },
+        {
+          heading: t('terms.bookingHeading'),
+          body: [
+            t('terms.bookingBody', {
+              window: tc(window.unit === 'hours' ? 'durationHours' : 'durationMinutes', {
+                count: window.count,
+              }),
+            }),
+            cutoff,
+          ]
+            .filter(Boolean)
+            .join('\n\n'),
+        },
         { heading: t('terms.noResponseHeading'), body: t('terms.noResponseBody') },
         { heading: t('terms.priceHeading'), body: t('terms.priceBody') },
-        { heading: t('terms.cancelHeading'), body: t('terms.cancelBody') },
+        {
+          heading: t('terms.cancelHeading'),
+          body: t('terms.cancelBody', { minimum: refundMinimumPercent(settings) }),
+        },
         { heading: t('terms.reviewsHeading'), body: t('terms.reviewsBody') },
         { heading: t('terms.disputesHeading'), body: t('terms.disputesBody') },
         { heading: t('terms.changesHeading'), body: t('terms.changesBody') },

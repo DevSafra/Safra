@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 
+import { confirmationWindowLabel } from '@/lib/operating-rules';
+
 import { DEFAULT_MONEY_CURRENCY } from '@safra/contracts';
 
 import { formatMoney } from '@/lib/localise';
@@ -58,6 +60,8 @@ export default async function BookingDetailPage({
 
   const t = await getTranslations('account');
   const pending = await getTranslations('bookingPending');
+  /* The confirmation window as CONFIGURED — never «ساعتان» in the copy (finding 217). */
+  const confirmationWindow = await confirmationWindowLabel();
 
   const [summaryRead, booking] = await Promise.all([
     getAccountSummary(),
@@ -276,7 +280,11 @@ export default async function BookingDetailPage({
       {awaiting ? (
         <>
           <ol className="mt-6 space-y-3">
-            {[pending('step1'), pending('step2'), pending('step3')].map((step, index) => (
+            {[
+              pending('step1', { window: confirmationWindow }),
+              pending('step2'),
+              pending('step3'),
+            ].map((step, index) => (
               <li
                 key={step}
                 className="flex gap-3 rounded-card border border-line bg-card p-4"

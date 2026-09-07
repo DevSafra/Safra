@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
+
+import { confirmationWindowLabel } from '@/lib/operating-rules';
 import { getTranslations } from 'next-intl/server';
 
 import { BackLink } from '@/components/back-link';
@@ -53,6 +55,8 @@ export default async function BookingPendingPage({
   const back = returnTo(locale, (await searchParams)['from'], 'home');
 
   const t = await getTranslations('bookingPending');
+  /* The confirmation window as CONFIGURED — never «ساعتان» in the copy (finding 217). */
+  const confirmationWindow = await confirmationWindowLabel();
 
   // Deliberately no booking lookup. A reference alone must not reveal a booking's
   // details to anyone who guesses one — references are sequential (§13.2). The
@@ -74,20 +78,22 @@ export default async function BookingPendingPage({
       </div>
 
       <ol className="mt-8 space-y-3 text-start">
-        {[t('step1'), t('step2'), t('step3')].map((step, index) => (
-          <li
-            key={step}
-            className="flex gap-3 rounded-card border border-line bg-card p-4"
-          >
-            <span
-              aria-hidden
-              className="grid size-7 shrink-0 place-items-center rounded-full border border-gold/40 text-sm text-gold"
+        {[t('step1', { window: confirmationWindow }), t('step2'), t('step3')].map(
+          (step, index) => (
+            <li
+              key={step}
+              className="flex gap-3 rounded-card border border-line bg-card p-4"
             >
-              {index + 1}
-            </span>
-            <span className="text-sm text-muted">{step}</span>
-          </li>
-        ))}
+              <span
+                aria-hidden
+                className="grid size-7 shrink-0 place-items-center rounded-full border border-gold/40 text-sm text-gold"
+              >
+                {index + 1}
+              </span>
+              <span className="text-sm text-muted">{step}</span>
+            </li>
+          ),
+        )}
       </ol>
 
       <p className="mt-6 rounded-card border border-ok/30 bg-ok/10 p-4 text-sm text-ok">

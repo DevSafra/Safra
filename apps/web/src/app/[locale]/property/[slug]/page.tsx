@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
+import { confirmationWindowLabel } from '@/lib/operating-rules';
+
 import { isLocale, routing, type Locale } from '@/i18n/routing';
 import { MAX_BASKET_ROOMS } from '@/lib/basket-limits';
 import { readableDate } from '@/lib/readable-date';
@@ -162,6 +164,8 @@ export default async function PropertyPage({
   const tnav = await getTranslations('nav');
   const ta = await getTranslations('amenities');
   const tt = await getTranslations('propertyTypes');
+  /* The confirmation window as CONFIGURED — never «ساعتان» in the copy (finding 217). */
+  const confirmationWindow = await confirmationWindowLabel();
   const ts = await getTranslations('starRating');
   const tc = await getTranslations('city');
   const tcal = await getTranslations('calendar');
@@ -926,7 +930,9 @@ export default async function PropertyPage({
                     {t('askSafra')}
                   </Link>
 
-                  <p className="mt-4 text-xs text-faint">{t('notInstantNotice')}</p>
+                  <p className="mt-4 text-xs text-faint">
+                    {t('notInstantNotice', { window: confirmationWindow })}
+                  </p>
                 </>
               ) : (
                 <p className="text-sm text-muted">{t('noUnits')}</p>

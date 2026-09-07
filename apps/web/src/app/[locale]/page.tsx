@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+
+import { confirmationWindowMinutes, durationParts } from '@safra/contracts';
 import { notFound } from 'next/navigation';
 
 import { SearchForm } from '@/components/search-form';
@@ -93,6 +95,8 @@ export default async function HomePage({
   const t = await getTranslations('home');
   const tt = await getTranslations('propertyTypes');
   const ta = await getTranslations('attributes');
+  /* `common` carries the duration messages — they are needed wherever a setting is a length of time. */
+  const tc = await getTranslations('common');
 
   const today = todayInDamascus();
   const tomorrow = tomorrowInDamascus();
@@ -113,6 +117,11 @@ export default async function HomePage({
     recommendedStays(today, tomorrow),
   ]);
 
+  const rule = durationParts(confirmationWindowMinutes(settings));
+  const windowLabel = tc(rule.unit === 'hours' ? 'durationHours' : 'durationMinutes', {
+    count: rule.count,
+  });
+
   const trust = [
     { icon: VerifiedIcon, label: t('trustVerified') },
     { icon: WalletIcon, label: t('trustPayment') },
@@ -123,7 +132,16 @@ export default async function HomePage({
     { title: t('step1Title'), body: t('step1Body') },
     /* The fee is a setting the super admin edits (P-005), never a literal in the copy. */
     { title: t('step2Title'), body: t('step2Body') },
-    { title: t('step3Title'), body: t('step3Body') },
+    /*
+      «نؤكد خلال ساعتين» was a literal, and the window is a SETTING (Bashar, 2026-09-07: operational
+      values «should always be derived from the active configuration rather than embedded in static
+      strings»). Change it to ninety minutes and the home page kept promising two hours.
+
+      The duration goes through `durationParts` and an ICU message rather than a template, because
+      «ساعتين» is Arabic DUAL — correct for 120 minutes and wrong for every other value, and Arabic
+      has six plural forms to pick between. The settings map is already on this page for the fee.
+    */
+    { title: t('step3Title', { window: windowLabel }), body: t('step3Body') },
     { title: t('step4Title'), body: t('step4Body') },
   ];
 
@@ -395,7 +413,7 @@ export default async function HomePage({
         <div className="mx-auto max-w-7xl px-4 py-10 sm:py-12">
           <SectionHeading eyebrow={t('howTitle')}>{t('howSubtitle')}</SectionHeading>
           <p className="mt-3 max-w-[70ch] text-sm leading-relaxed text-muted">
-            {t('howBody')}
+            {t('howBody', { window: windowLabel })}
           </p>
 
           {/*

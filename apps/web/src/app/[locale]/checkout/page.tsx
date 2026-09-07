@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 
+import { confirmationWindowLabel } from '@/lib/operating-rules';
+
 import { customerFeeVisible } from '@safra/contracts';
 
 import { dialOptions } from '@/lib/dial-options';
@@ -169,6 +171,8 @@ export default async function CheckoutPage({
 
   /* Whether the fee is NAMED here. The invoice reads the same setting the same way. */
   const feeVisible = customerFeeVisible(settings);
+  /* The confirmation window as CONFIGURED — never «ساعتان» in the copy (finding 217). */
+  const confirmationWindow = await confirmationWindowLabel(settings);
 
   if (!priced) {
     return (
@@ -501,7 +505,7 @@ export default async function CheckoutPage({
                 advance understands why SAFRA sits in the middle.
               */}
               <p className="mt-4 rounded-lg border border-sky/30 bg-sky/10 p-3 text-xs text-sky">
-                {t('notInstant')}
+                {t('notInstant', { window: confirmationWindow })}
               </p>
             </div>
           </aside>
