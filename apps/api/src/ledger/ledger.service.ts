@@ -447,22 +447,63 @@ export class LedgerService {
    * twice — the guard is the absence of a debit on the account for this booking, which is the
    * state itself rather than a flag beside it.
    */
-  async reverseCommissionIfFullyRefunded(
+  /**
+   * Gives back what a refund means the partner did not earn — and what SAFRA did not earn on it.
+   *
+   * ## Bashar's rule (2026-09-07)
+   *
+   * «For a full refund, partner commission must be fully reversed. For a partial refund, partner
+   * payable should be reduced proportionally to the refunded amount. SAFRA should not silently
+   * absorb refund costs while continuing to recognise the full partner earning and full commission
+   * as if no refund occurred.»
+   *
+   * ## Why the arithmetic closes exactly
+   *
+   * A capture posts credits of `fee + commission + payable` against the money that arrived, so the
+   * ACCOMMODATION is `commission + payable` — SAFRA's cut of the room plus the partner's share of
+   * it. A refund returns a slice of the accommodation (the SAFRA fee is not refunded, which is the
+   * existing rule and unchanged here), so returning that slice means giving back the same
+   * proportion of each.
+   *
+   * The two reversals therefore sum to exactly the refund, and the `refund` clearing account nets
+   * to zero once they are posted:
+   *
+   *     capture   customer_payment DR total   | fee CR, commission CR, payable CR
+   *     refund    refund DR R                 | customer_payment CR R
+   *     this      commission DR c·p, payable DR y·p | refund CR R
+   *
+   * Leaving `partner_payable` alone — which is what the previous version did — left SAFRA's books
+   * asserting it still owed the partner for a stay that was entirely returned: $2,883,565.44 across
+   * 15,499 fully refunded bookings on this database, with the commission dutifully reversed beside
+   * it. Reversing one and not the other is not half right; it is a balance sheet that does not
+   * describe the world.
+   *
+   * ## Every figure comes from the LEDGER, not from the booking
+   *
+   * The original amounts are the capture's own credits and the reversals are its own debits, so
+   * this is idempotent under a retry, correct across SEVERAL refunds on one booking, and unaffected
+   * by `bookings.partner_payable_amount` being reduced afterwards (which it is, below, because that
+   * column is what accrual reads).
+   *
+   * A payout RELEASE also debits `partner_payable` — and carries no `booking_id`, because it pays a
+   * whole transfer rather than one stay. That is what separates a release from a reversal here, and
+   * it is a structural difference rather than a description this could mistake.
+   */
+  async reverseForRefund(
     tx: Database,
     bookingId: string,
   ): Promise<{ entryGroupId: string } | null> {
     const rows = await tx.execute<{
-      base_amount: string;
-      commission: string;
       currency_id: string;
       fx_rate_to_syp: string;
       partner_id: string | null;
       refunded: string;
-      already: string;
+      commission_credited: string;
+      commission_reversed: string;
+      payable_credited: string;
+      payable_reversed: string;
     }>(sql`
-      SELECT b.base_amount::text,
-             b.partner_commission_amount::text AS commission,
-             b.currency_id::text,
+      SELECT b.currency_id::text,
              b.fx_rate_to_syp::text,
              b.partner_id::text,
              coalesce((
@@ -471,12 +512,30 @@ export class LedgerService {
                   AND r.status = 'completed'
                   AND r.deleted_at IS NULL
              ), 0)::text AS refunded,
-             (
-               SELECT count(*) FROM ledger_entries e
+             coalesce((
+               SELECT sum(e.amount) FROM ledger_entries e
+                WHERE e.booking_id = b.id
+                  AND e.account = 'safra_commission_partner'
+                  AND e.direction = 'credit'
+             ), 0)::text AS commission_credited,
+             coalesce((
+               SELECT sum(e.amount) FROM ledger_entries e
                 WHERE e.booking_id = b.id
                   AND e.account = 'safra_commission_partner'
                   AND e.direction = 'debit'
-             )::text AS already
+             ), 0)::text AS commission_reversed,
+             coalesce((
+               SELECT sum(e.amount) FROM ledger_entries e
+                WHERE e.booking_id = b.id
+                  AND e.account = 'partner_payable'
+                  AND e.direction = 'credit'
+             ), 0)::text AS payable_credited,
+             coalesce((
+               SELECT sum(e.amount) FROM ledger_entries e
+                WHERE e.booking_id = b.id
+                  AND e.account = 'partner_payable'
+                  AND e.direction = 'debit'
+             ), 0)::text AS payable_reversed
         FROM bookings b
        WHERE b.id = ${bookingId}
     `);
@@ -485,17 +544,80 @@ export class LedgerService {
 
     if (!row) return null;
 
-    /* Already given back. The guard is the ledger's own state, so a retry cannot double-reverse. */
-    if (Number(row.already) > 0) return null;
+    const commission = toMinor(row.commission_credited, MONEY_SCALE);
+    const payable = toMinor(row.payable_credited, MONEY_SCALE);
+    const accommodation = commission + payable;
 
-    const commission = toMinor(row.commission, MONEY_SCALE);
-
-    if (commission <= 0n) return null;
-    if (toMinor(row.refunded, MONEY_SCALE) < toMinor(row.base_amount, MONEY_SCALE))
-      return null;
+    /* Nothing was captured for this booking, so there is nothing to give back. */
+    if (accommodation <= 0n) return null;
 
     /*
-      Its OWN transaction, because all three callers reach here AFTER theirs has closed.
+      A refund can never exceed the accommodation: the SAFRA fee is not refundable, and a figure
+      above the accommodation would otherwise reverse more than was ever credited.
+    */
+    const refunded = toMinor(row.refunded, MONEY_SCALE);
+    const returned = refunded > accommodation ? accommodation : refunded;
+
+    if (returned <= 0n) return null;
+
+    /*
+      The commission share, rounded half-up, and the payable share taking the REMAINDER.
+
+      Deriving both by multiplication would leave the pair short or long by a rounding unit, and the
+      `refund` clearing account would then carry a residue for ever. Taking the remainder makes the
+      two sum to the refund exactly, which is what lets that account net to zero.
+    */
+    const targetCommission = (commission * returned + accommodation / 2n) / accommodation;
+    const targetPayable = returned - targetCommission;
+
+    const commissionDelta =
+      targetCommission - toMinor(row.commission_reversed, MONEY_SCALE);
+    const payableDelta = targetPayable - toMinor(row.payable_reversed, MONEY_SCALE);
+
+    /*
+      Nothing left to reverse. Negative would mean more has been given back than the refunds
+      justify — never written, because a reversal that un-reverses is a correction somebody should
+      make deliberately rather than a side effect of a retry.
+    */
+    if (commissionDelta <= 0n && payableDelta <= 0n) return null;
+
+    const legs: LedgerLeg[] = [];
+    const note =
+      returned >= accommodation
+        ? 'Reversed, booking refunded in full'
+        : 'Reversed in proportion to the refund';
+
+    if (commissionDelta > 0n) {
+      legs.push({
+        account: 'safra_commission_partner',
+        direction: 'debit',
+        amount: fromMinor(commissionDelta, MONEY_SCALE),
+        description: note,
+      });
+    }
+
+    if (payableDelta > 0n) {
+      legs.push({
+        account: 'partner_payable',
+        direction: 'debit',
+        amount: fromMinor(payableDelta, MONEY_SCALE),
+        description: note,
+      });
+    }
+
+    legs.push({
+      account: 'refund',
+      direction: 'credit',
+      amount: fromMinor(
+        (commissionDelta > 0n ? commissionDelta : 0n) +
+          (payableDelta > 0n ? payableDelta : 0n),
+        MONEY_SCALE,
+      ),
+      description: note,
+    });
+
+    /*
+      Its OWN transaction, because all callers reach here AFTER theirs has closed.
 
       `post` writes one leg per statement and the balance trigger is deferred to COMMIT. Outside a
       transaction each statement commits by itself, so the trigger fired on the debit alone and
@@ -503,30 +625,82 @@ export class LedgerService {
       have to reach COMMIT together, which is what this wraps them in. Nested inside a caller that
       already has one, it is a savepoint and behaves the same.
     */
-    return tx.transaction(async (inner) =>
-      this.post(
-        inner as unknown as Database,
-        [
-          {
-            account: 'safra_commission_partner',
-            direction: 'debit',
-            amount: row.commission,
-            description: 'Commission reversed, booking refunded in full',
-          },
-          {
-            account: 'refund',
-            direction: 'credit',
-            amount: row.commission,
-            description: 'Commission reversed, booking refunded in full',
-          },
-        ],
-        {
-          currencyId: row.currency_id,
-          fxRateToSyp: row.fx_rate_to_syp,
-          bookingId,
-          partnerId: row.partner_id ?? undefined,
-        },
-      ),
-    );
+    return tx.transaction(async (inner) => {
+      const posted = await this.post(inner as unknown as Database, legs, {
+        currencyId: row.currency_id,
+        fxRateToSyp: row.fx_rate_to_syp,
+        bookingId,
+        partnerId: row.partner_id ?? undefined,
+      });
+
+      /*
+        And the SNAPSHOT accrual reads.
+
+        `bookings.partner_payable_amount` is what `PayoutService.accrue` copies onto a payout item,
+        so a reversal that only reached the ledger would still have paid the partner in full at the
+        next accrual. Set from the ledger rather than decremented, so a retry cannot drift it.
+      */
+      await inner.execute(sql`
+        UPDATE bookings
+           SET partner_payable_amount = ${fromMinor(payable - targetPayable, MONEY_SCALE)},
+               updated_at = now()
+         WHERE id = ${bookingId}
+      `);
+
+      /*
+        And any payout line that has NOT been paid yet.
+
+        A booking refunded before its transfer goes out must not still be on it at the old figure.
+        A PAID payout is deliberately untouched — its total is frozen by trigger the moment money
+        moves, and money already sent to a partner is a recovery for a person to decide on rather
+        than something to quietly rewrite. `docs/FUTURE-WORK.md` records that case.
+
+        The payouts are read FIRST because a fully reversed line is deleted rather than zeroed —
+        `partner_payout_items_positive` forbids a zero line, and rightly: a transfer listing a
+        booking worth nothing is a reconciliation puzzle for whoever reads it later. Deleting it
+        cannot resurrect the booking either, since accrual only attaches a payable above zero.
+        Retotalling after the delete needs the ids in hand, or the query has nothing left to find.
+      */
+      const affected = await inner.execute<{ payout_id: string }>(sql`
+        SELECT i.payout_id::text
+          FROM partner_payout_items i
+          JOIN partner_payouts p ON p.id = i.payout_id
+         WHERE i.booking_id = ${bookingId}
+           AND p.deleted_at IS NULL
+           AND p.status NOT IN ('paid', 'cancelled')
+      `);
+
+      const remaining = payable - targetPayable;
+
+      if (affected.rows.length > 0) {
+        if (remaining <= 0n) {
+          await inner.execute(sql`
+            DELETE FROM partner_payout_items WHERE booking_id = ${bookingId}
+          `);
+        } else {
+          await inner.execute(sql`
+            UPDATE partner_payout_items
+               SET amount = ${fromMinor(remaining, MONEY_SCALE)}
+             WHERE booking_id = ${bookingId}
+          `);
+        }
+
+        for (const row of affected.rows) {
+          await inner.execute(sql`
+            UPDATE partner_payouts p
+               SET gross_amount = coalesce(i.total, 0),
+                   net_amount = coalesce(i.total, 0) - p.fine_amount,
+                   updated_at = now()
+              FROM (
+                SELECT coalesce(sum(amount), 0) AS total
+                  FROM partner_payout_items WHERE payout_id = ${row.payout_id}
+              ) i
+             WHERE p.id = ${row.payout_id}
+          `);
+        }
+      }
+
+      return posted;
+    });
   }
 }

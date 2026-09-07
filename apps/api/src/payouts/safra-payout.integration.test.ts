@@ -248,16 +248,20 @@ describeIfDb('SafraPayoutService', () => {
     can never fail.
   */
   /*
-    What a refund does to SAFRA's own revenue — two accounts, two different answers.
+    What a refund does to SAFRA's own revenue, and to what SAFRA owes the partner.
 
-    Bashar decided on 2026-09-05 that a booking refunded to its full stay price gives up its
-    partner commission, and that the service fee keeps the behaviour it had. So the two accounts
-    are held to DIFFERENT thresholds, by two different mechanisms, and each test below names which:
+    Bashar's rule, in two decisions:
 
-      - COMMISSION is reversed in the ledger once refunds reach `base_amount`.
-      - The FEE is filtered out of the summary only when the whole `total_amount` went back.
+      - 2026-09-05: a booking refunded to its full stay price gives up its partner commission, and
+        the SAFRA service fee keeps the behaviour it had.
+      - 2026-09-07: a PARTIAL refund reduces the partner payable in proportion, because «SAFRA
+        should not silently absorb refund costs while continuing to recognise the full partner
+        earning and full commission as if no refund occurred».
 
-    A test that checked one account would pass against a service that applied one rule to both.
+    So three accounts are held to three different answers on the same event, and every test below
+    names which one it is about. A test that checked one account would pass against a service that
+    applied one rule to all three — which is exactly what the previous version did: it reversed the
+    commission, left `partner_payable` standing, and looked correct.
   */
   describe('revenue that was refunded', () => {
     /** Accrued for one account, as the service reports it. */
@@ -269,88 +273,181 @@ describeIfDb('SafraPayoutService', () => {
       );
     }
 
-    /** A booking whose stay price went back in full, with its commission still standing. */
-    async function fullyRefundedBooking() {
-      const rows = await db.execute<{ id: string; commission: string; fee: string }>(sql`
+    /** What has been given back on one account for one booking, in the BOOKING's currency. */
+    async function reversedOn(account: string, bookingId: string): Promise<number> {
+      const rows = await db.execute<{ total: string }>(sql`
+        SELECT coalesce(sum(e.amount), 0)::text AS total
+          FROM ledger_entries e
+         WHERE e.booking_id = ${bookingId}::uuid
+           AND e.account = ${account}
+           AND e.direction = 'debit'
+      `);
+
+      return Number(rows.rows[0]!.total);
+    }
+
+    /*
+      A booking with a refund of a chosen share of its stay price — BUILT, never searched for.
+
+      The historical backfill reversed every fully refunded booking in the database, so a search
+      for an unreversed one now finds nothing and the test would SKIP: green, and covering
+      precisely nothing. Building it also makes the share an input, which is what lets one helper
+      serve the full case, the partial case and the second-refund case.
+    */
+    async function bookingRefunded(share: number) {
+      const clean = await db.execute<{
+        id: string;
+        base: string;
+        commission: string;
+        payable: string;
+        fx: string;
+      }>(sql`
         SELECT b.id::text,
-               (b.partner_commission_amount * b.fx_rate_to_syp)::text AS commission,
-               (b.customer_fee_amount * b.fx_rate_to_syp)::text AS fee
+               b.base_amount::text AS base,
+               b.fx_rate_to_syp::text AS fx,
+               (SELECT sum(e.amount) FROM ledger_entries e
+                 WHERE e.booking_id = b.id
+                   AND e.account = 'safra_commission_partner'
+                   AND e.direction = 'credit')::text AS commission,
+               (SELECT sum(e.amount) FROM ledger_entries e
+                 WHERE e.booking_id = b.id
+                   AND e.account = 'partner_payable'
+                   AND e.direction = 'credit')::text AS payable
           FROM bookings b
-         WHERE b.partner_commission_amount > 0
-           AND coalesce((SELECT sum(r.amount) FROM refunds r
-                          WHERE r.booking_id = b.id AND r.status = 'completed'
-                            AND r.deleted_at IS NULL), 0) >= b.base_amount
-           AND NOT EXISTS (SELECT 1 FROM ledger_entries e
-                            WHERE e.booking_id = b.id
-                              AND e.account = 'safra_commission_partner'
-                              AND e.direction = 'debit')
+         WHERE b.base_amount > 0
+           AND NOT EXISTS (SELECT 1 FROM refunds r
+                            WHERE r.booking_id = b.id AND r.deleted_at IS NULL)
+           AND NOT EXISTS (SELECT 1 FROM partner_payout_items i WHERE i.booking_id = b.id)
+           AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id)
            AND EXISTS (SELECT 1 FROM ledger_entries e
                         WHERE e.booking_id = b.id
                           AND e.account = 'safra_commission_partner'
                           AND e.direction = 'credit')
+           AND EXISTS (SELECT 1 FROM ledger_entries e
+                        WHERE e.booking_id = b.id
+                          AND e.account = 'partner_payable'
+                          AND e.direction = 'credit')
          LIMIT 1
       `);
 
-      return rows.rows[0];
+      const row = clean.rows[0];
+
+      expect(row, 'a captured booking with no refund to build on').toBeDefined();
+
+      await addRefund(row!.id, share);
+
+      return row!;
     }
 
-    it('gives back the commission on a booking refunded to its full stay price', async () => {
-      const booking = await fullyRefundedBooking();
+    /** One more completed refund for `share` of the stay price. */
+    async function addRefund(bookingId: string, share: number): Promise<void> {
+      await db.execute(sql`
+        INSERT INTO refunds (payment_id, booking_id, amount, currency_id,
+                             applied_refund_percent, reason, status, wallet_amount,
+                             completed_at)
+        SELECT p.id, b.id, round(b.base_amount * ${String(share)}::numeric, 2), b.currency_id,
+               ${String(share * 100)}::numeric,
+               'built by safra-payout.integration.test', 'completed', 0, now()
+          FROM bookings b JOIN payments p ON p.booking_id = b.id
+         WHERE b.id = ${bookingId}::uuid
+         LIMIT 1
+      `);
+    }
 
-      expect(booking, 'the fixture has one to reverse').toBeDefined();
+    it('gives back the whole commission AND the whole payable on a booking refunded in full', async () => {
+      const booking = await bookingRefunded(1);
 
       const before = await accruedOn('safra_commission_partner');
-      const posted = await ledger.reverseCommissionIfFullyRefunded(db, booking!.id);
+      const posted = await ledger.reverseForRefund(db, booking.id);
 
       expect(posted, 'it posted a group').not.toBeNull();
+
+      /*
+        Both accounts, and their SUM.
+
+        The sum is the assertion that matters: the pair has to come to the refund exactly, because
+        the `refund` clearing account is credited that total and a residue there would never clear.
+        Reversing the commission alone satisfied neither.
+      */
+      expect(await reversedOn('safra_commission_partner', booking.id)).toBeCloseTo(
+        Number(booking.commission),
+        2,
+      );
+      expect(
+        await reversedOn('partner_payable', booking.id),
+        'the payable went back too — this is what was missing',
+      ).toBeCloseTo(Number(booking.payable), 2);
+      expect(
+        (await reversedOn('safra_commission_partner', booking.id)) +
+          (await reversedOn('partner_payable', booking.id)),
+        'the two reversals sum to the stay price',
+      ).toBeCloseTo(Number(booking.base), 2);
 
       const after = await accruedOn('safra_commission_partner');
 
       expect(before - after, 'accrued fell by exactly the commission').toBeCloseTo(
-        Number(booking!.commission),
+        Number(booking.commission) * Number(booking.fx),
         0,
       );
     });
 
     /*
-      The opposite control, and the reason the two accounts cannot share one rule.
+      And the SNAPSHOT the payout run reads.
 
-      A stay refunded to `base_amount` keeps its service fee — `refund.service.ts` calls the fee
-      earned when the booking is made, and Bashar left that standing when he decided the commission
-      question. A service that applied the commission threshold to both accounts would pass the
-      test above and quietly write off revenue SAFRA is entitled to.
+      `bookings.partner_payable_amount` is what accrual copies onto a payout item, so a reversal
+      that reached only the ledger would still have paid the partner in full at the next hourly
+      accrual — the books would say one thing and the transfer would do another.
+    */
+    it('reduces what the payout run will pay for that booking to nothing', async () => {
+      const booking = await bookingRefunded(1);
+
+      await ledger.reverseForRefund(db, booking.id);
+
+      const rows = await db.execute<{ payable: string }>(sql`
+        SELECT partner_payable_amount::text AS payable FROM bookings WHERE id = ${booking.id}::uuid
+      `);
+
+      expect(Number(rows.rows[0]!.payable), 'nothing left to accrue').toBeCloseTo(0, 2);
+    });
+
+    /*
+      The opposite control, and the reason the accounts cannot share one rule.
+
+      A refunded stay keeps its service fee — `refund.service.ts` calls the fee earned when the
+      booking is made, and Bashar left that standing when he decided both the commission question
+      and the payable question. A service that applied the refund proportion to all three accounts
+      would pass every test above and quietly write off revenue SAFRA is entitled to.
     */
     it('keeps the service fee on that same booking, which is a separate rule', async () => {
-      const booking = await fullyRefundedBooking();
-
-      expect(booking).toBeDefined();
-
+      const booking = await bookingRefunded(1);
       const before = await accruedOn('safra_commission_customer');
 
-      await ledger.reverseCommissionIfFullyRefunded(db, booking!.id);
+      await ledger.reverseForRefund(db, booking.id);
 
       expect(
         await accruedOn('safra_commission_customer'),
-        'the fee is untouched by a commission reversal',
+        'the fee is untouched by a refund reversal',
       ).toBeCloseTo(before, 0);
     });
 
     /* Three code paths complete a refund, so calling twice must not give the money back twice. */
     it('reverses once however many times it is asked', async () => {
-      const booking = await fullyRefundedBooking();
+      const booking = await bookingRefunded(1);
 
-      expect(booking).toBeDefined();
-      expect(
-        await ledger.reverseCommissionIfFullyRefunded(db, booking!.id),
-      ).not.toBeNull();
+      expect(await ledger.reverseForRefund(db, booking.id)).not.toBeNull();
 
-      const after = await accruedOn('safra_commission_partner');
+      const commission = await reversedOn('safra_commission_partner', booking.id);
+      const payable = await reversedOn('partner_payable', booking.id);
 
       expect(
-        await ledger.reverseCommissionIfFullyRefunded(db, booking!.id),
+        await ledger.reverseForRefund(db, booking.id),
         'the second call posts nothing',
       ).toBeNull();
-      expect(await accruedOn('safra_commission_partner')).toBeCloseTo(after, 0);
+      expect(await reversedOn('safra_commission_partner', booking.id)).toBeCloseTo(
+        commission,
+        2,
+      );
+      expect(await reversedOn('partner_payable', booking.id)).toBeCloseTo(payable, 2);
     });
 
     /*
@@ -361,13 +458,10 @@ describeIfDb('SafraPayoutService', () => {
       meaning. The mark is that a transfer's group credits `safra_payout`.
     */
     it('does not report a reversal as money transferred out', async () => {
-      const booking = await fullyRefundedBooking();
-
-      expect(booking).toBeDefined();
-
+      const booking = await bookingRefunded(1);
       const before = await service.revenueSummary();
 
-      await ledger.reverseCommissionIfFullyRefunded(db, booking!.id);
+      await ledger.reverseForRefund(db, booking.id);
 
       const after = await service.revenueSummary();
 
@@ -379,46 +473,150 @@ describeIfDb('SafraPayoutService', () => {
     });
 
     /*
-      The boundary itself, from the other side.
+      Bashar's 2026-09-07 decision, which REVERSED what this test used to assert.
 
-      Bashar's rule is that the stay price has to have gone back IN FULL. A booking refunded part
-      of the way is a customer who changed their mind late and got a share back — the partner still
-      lost the night and SAFRA still sold the booking. Without this, the threshold could be written
-      as "any refund at all" and every test above would still pass.
+      It used to hold that a partly refunded booking kept its commission in full — the threshold
+      was «refunds reached base_amount, or nothing happens». That was the behaviour he ruled
+      against: half the stay went back to the customer and SAFRA carried the whole cost while still
+      recognising the full commission and owing the partner the full payable.
+
+      Half is chosen because it is the one share where a proportional reversal and a full one are
+      unmistakably different figures. A 100%-or-nothing rule fails the first two assertions; a
+      rule that reversed everything on any refund at all fails them too, in the other direction.
     */
-    it('keeps the commission on a booking only partly refunded', async () => {
+    it('reverses HALF of each on a booking refunded half way', async () => {
+      const booking = await bookingRefunded(0.5);
+
+      expect(await ledger.reverseForRefund(db, booking.id)).not.toBeNull();
+
+      const commission = await reversedOn('safra_commission_partner', booking.id);
+      const payable = await reversedOn('partner_payable', booking.id);
+
+      expect(commission, 'half the commission').toBeCloseTo(
+        Number(booking.commission) / 2,
+        1,
+      );
+      expect(payable, 'half the payable').toBeCloseTo(Number(booking.payable) / 2, 1);
+      expect(
+        commission + payable,
+        'and together they come to the refund EXACTLY, so the clearing account nets to zero',
+      ).toBeCloseTo(Number(booking.base) / 2, 2);
+    });
+
+    /*
+      A second refund on a booking already partly reversed.
+
+      This is where a service that DECREMENTED its way to the answer drifts: it would compute the
+      new proportion against a payable it had already reduced. Every figure is derived from the
+      capture's own ledger credits for exactly this reason, so the second call tops the reversal up
+      to the full amount rather than reversing a proportion of a proportion.
+    */
+    it('tops the reversal up when a second refund arrives', async () => {
+      const booking = await bookingRefunded(0.5);
+
+      await ledger.reverseForRefund(db, booking.id);
+      await addRefund(booking.id, 0.5);
+      await ledger.reverseForRefund(db, booking.id);
+
+      expect(
+        await reversedOn('safra_commission_partner', booking.id),
+        'the whole commission, not three quarters of it',
+      ).toBeCloseTo(Number(booking.commission), 2);
+      expect(await reversedOn('partner_payable', booking.id)).toBeCloseTo(
+        Number(booking.payable),
+        2,
+      );
+    });
+
+    /*
+      A refund cannot reverse more than the stay was worth.
+
+      The SAFRA fee is not refundable, so `total_amount` can exceed `base_amount` — and a refund
+      recorded for the whole total (or a bad row, or a duplicate) must not debit past what was ever
+      credited. Without the clamp the reversal would exceed the credits and leave the partner owed
+      a NEGATIVE amount, which reads on their dashboard as a debt to SAFRA.
+    */
+    it('never gives back more than was credited, whatever the refund says', async () => {
+      const booking = await bookingRefunded(1);
+
+      await addRefund(booking.id, 1);
+      await ledger.reverseForRefund(db, booking.id);
+
+      const commission = await reversedOn('safra_commission_partner', booking.id);
+      const payable = await reversedOn('partner_payable', booking.id);
+
+      expect(commission + payable, 'capped at the stay price').toBeCloseTo(
+        Number(booking.base),
+        2,
+      );
+      expect(
+        payable,
+        'and no further than the payable that was credited',
+      ).toBeLessThanOrEqual(Number(booking.payable) + 0.01);
+    });
+
+    /*
+      A payout that has been accrued but NOT paid still owes the old figure until this fixes it.
+
+      The gap this closes is a booking refunded after the hourly accrual ran and before the
+      transfer went out: the item was written from the pre-refund payable, so without this the
+      partner is paid for a stay the customer got back. A PAID payout is deliberately left alone —
+      money that has moved is a recovery for a person to decide on.
+    */
+    it('reduces an unpaid payout item and its payout total', async () => {
+      const booking = await bookingRefunded(1);
+
       /*
-        Built here rather than looked for. Almost every refund in the fixture is for the whole stay
-        price, so a search would have found nothing and the test would have skipped — which reads
-        as coverage and is not. Half of base_amount is unambiguously short of the threshold.
+        `pending_release`, not `accruing`: closed, totalled, and waiting for a human to release it.
+        That is precisely the window this test is about — and a partner may only have ONE accruing
+        payout per currency, so building a second would collide with the real one.
       */
-      const clean = await db.execute<{ id: string }>(sql`
-        SELECT b.id::text
-          FROM bookings b
-         WHERE b.partner_commission_amount > 0
-           AND NOT EXISTS (SELECT 1 FROM refunds r
-                            WHERE r.booking_id = b.id AND r.deleted_at IS NULL)
-           AND EXISTS (SELECT 1 FROM payments p WHERE p.booking_id = b.id)
-         LIMIT 1
+      const payout = await db.execute<{ id: string }>(sql`
+        INSERT INTO partner_payouts (partner_id, currency_id, period_start, period_end,
+                                     gross_amount, net_amount, status)
+        SELECT b.partner_id, b.currency_id, current_date, current_date,
+               b.partner_payable_amount, b.partner_payable_amount, 'pending_release'
+          FROM bookings b WHERE b.id = ${booking.id}::uuid
+        RETURNING id::text
       `);
 
-      const row = clean.rows[0];
-
-      expect(row, 'a booking with commission and no refund').toBeDefined();
+      const payoutId = payout.rows[0]!.id;
 
       await db.execute(sql`
-        INSERT INTO refunds (payment_id, booking_id, amount, currency_id,
-                             applied_refund_percent, reason, status, wallet_amount)
-        SELECT p.id, b.id, round(b.base_amount / 2, 2), b.currency_id, 50,
-               'half the stay, deliberately short of the threshold', 'completed', 0
-          FROM bookings b JOIN payments p ON p.booking_id = b.id
-         WHERE b.id = ${row!.id}::uuid
-         LIMIT 1
+        INSERT INTO partner_payout_items (payout_id, booking_id, amount)
+        SELECT ${payoutId}::uuid, b.id, b.partner_payable_amount
+          FROM bookings b WHERE b.id = ${booking.id}::uuid
       `);
+
+      await ledger.reverseForRefund(db, booking.id);
+
+      const lines = await db.execute<{ n: string }>(sql`
+        SELECT count(*)::text AS n FROM partner_payout_items
+         WHERE booking_id = ${booking.id}::uuid
+      `);
+      const after = await db.execute<{ gross: string; net: string }>(sql`
+        SELECT gross_amount::text AS gross, net_amount::text AS net
+          FROM partner_payouts WHERE id = ${payoutId}::uuid
+      `);
+
+      /*
+        GONE, not zeroed. `partner_payout_items_positive` forbids a zero line — which is the
+        database saying what the reconciliation reader would: a transfer listing a booking worth
+        nothing raises a question rather than answering one. The booking cannot re-accrue either,
+        because accrual only attaches a payable above zero.
+      */
+      expect(Number(lines.rows[0]!.n), 'the line is gone').toBe(0);
       expect(
-        await ledger.reverseCommissionIfFullyRefunded(db, row!.id),
-        'nothing is reversed while the stay is only part refunded',
-      ).toBeNull();
+        Number(after.rows[0]!.gross),
+        'and the transfer is worth nothing',
+      ).toBeCloseTo(0, 2);
+      expect(Number(after.rows[0]!.net)).toBeCloseTo(0, 2);
+
+      /* Built here, so it does not sit in the registry as a real transfer afterwards. */
+      await db.execute(
+        sql`DELETE FROM partner_payout_items WHERE payout_id = ${payoutId}::uuid`,
+      );
+      await db.execute(sql`DELETE FROM partner_payouts WHERE id = ${payoutId}::uuid`);
     });
 
     /* Advertising revenue has no booking, so a join written carelessly deletes the ad business. */

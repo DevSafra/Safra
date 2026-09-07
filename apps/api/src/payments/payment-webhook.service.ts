@@ -297,7 +297,7 @@ export class PaymentWebhookService {
       forget: an asynchronous provider settles here rather than in the call that asked it to. The
       reversal is idempotent, so a provider that both replies and sends a webhook posts it once.
     */
-    await this.ledger.reverseCommissionIfFullyRefunded(this.db, payment.booking_id);
+    await this.ledger.reverseForRefund(this.db, payment.booking_id);
 
     return 'accepted';
   }

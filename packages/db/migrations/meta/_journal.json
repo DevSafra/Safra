@@ -498,6 +498,13 @@
       "when": 1788735598201,
       "tag": "0070_booking_room_lines",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1788778915827,
+      "tag": "0071_proportional_refund_reversal",
+      "breakpoints": true
     }
   ]
 }
