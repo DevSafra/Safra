@@ -84,7 +84,11 @@ export function AcceptInvitationForm({ token }: { token: string }) {
   }
 
   return (
-    <form onSubmit={(event) => void handleSubmit(event)} className="grid gap-4">
+    <form
+      method="post"
+      onSubmit={(event) => void handleSubmit(event)}
+      className="grid gap-4"
+    >
       {error ? (
         <p
           role="alert"

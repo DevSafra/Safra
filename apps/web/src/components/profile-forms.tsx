@@ -114,6 +114,21 @@ export function ProfileForm({
 
   return (
     <form
+      /*
+        `method="post"` on a form whose submit is handled in JavaScript.
+
+        It looks redundant and is not. A form with no method is a GET, so the ONE moment
+        hydration has not finished — or fails outright: a CSP without `unsafe-eval`, a chunk
+        that 404s after a static copy, a phone on a stalled connection — the browser falls back
+        to its own submit and puts the password in the URL. Which is where a query string then
+        lives for ever: browser history, the access log, a Referer header, a shared link.
+
+        Driven and confirmed on 2026-09-07, before this attribute existed: submitting the
+        partner sign-in produced `/login?email=…&password=…` on BOTH the dev server and the
+        standalone build. A POST that the page route answers with 405 loses nothing; a GET that
+        succeeds loses the credential.
+          */
+      method="post"
       onSubmit={(event) => void submit(event)}
       className="grid gap-3 rounded-card border border-line bg-card p-5"
     >
@@ -273,6 +288,7 @@ export function PasswordForm({
 
   return (
     <form
+      method="post"
       onSubmit={(event) => void submit(event)}
       className="grid gap-3 rounded-card border border-line bg-card p-5"
     >

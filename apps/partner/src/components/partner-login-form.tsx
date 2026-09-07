@@ -227,6 +227,21 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
       {awaitingCode ? (
         <form
           /*
+            `method="post"` on a form whose submit is handled in JavaScript.
+
+            It looks redundant and is not. A form with no method is a GET, so the ONE moment
+            hydration has not finished — or fails outright: a CSP without `unsafe-eval`, a chunk
+            that 404s after a static copy, a phone on a stalled connection — the browser falls back
+            to its own submit and puts the password in the URL. Which is where a query string then
+            lives for ever: browser history, the access log, a Referer header, a shared link.
+
+            Driven and confirmed on 2026-09-07, before this attribute existed: submitting the
+            partner sign-in produced `/login?email=…&password=…` on BOTH the dev server and the
+            standalone build. A POST that the page route answers with 405 loses nothing; a GET that
+            succeeds loses the credential.
+          */
+          method="post"
+          /*
             A distinct key per step, copied from the console's form for the reason recorded there:
             React reuses a DOM node when the element type at a position is unchanged, so swapping one
             <input> for another RECYCLED it — and the code field arrived pre-filled with the password.
@@ -299,6 +314,7 @@ export function PartnerLoginForm({ next }: { readonly next: string }) {
         </form>
       ) : (
         <form
+          method="post"
           key="credentials"
           onSubmit={(event) => {
             void submitCredentials(event);
